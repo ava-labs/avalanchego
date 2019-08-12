@@ -248,20 +248,20 @@ func isLocalBlock(block *types.Block) bool {
 	return false
 }
 
-func NewETHChain(config *miner.Config, chainConfig *params.ChainConfig, etherBase *common.Address) *ETHChain {
+func NewETHChain(config *eth.Config, chainConfig *params.ChainConfig, etherBase *common.Address) *ETHChain {
     if config == nil {
-        config = &eth.DefaultConfig.Miner
+        config = &eth.DefaultConfig
     }
     if chainConfig == nil {
         chainConfig = params.MainnetChainConfig
     }
     mux := new(event.TypeMux)
     ctx := node.NewServiceContext(mux)
-    backend, _ := eth.New(&ctx, &eth.DefaultConfig)
+    backend, _ := eth.New(&ctx, config)
     chain := &ETHChain {
         mux: mux,
         backend: backend,
-        worker: miner.NewWorker(config, chainConfig, &DummyEngine{}, backend, mux, isLocalBlock),
+        worker: miner.NewWorker(&config.Miner, chainConfig, &DummyEngine{}, backend, mux, isLocalBlock),
     }
     if etherBase == nil {
         etherBase = &common.Address{

@@ -5,14 +5,29 @@ import (
     "encoding/hex"
     "github.com/ethereum/go-ethereum/core/types"
     "github.com/ethereum/go-ethereum/common"
+    "github.com/ethereum/go-ethereum/common/hexutil"
+    "github.com/ethereum/go-ethereum/core"
+    "github.com/Determinant/coreth/eth"
     "github.com/Determinant/coreth"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
     "time"
 )
 
 func main() {
     log.Root().SetHandler(log.StdoutHandler)
-    chain := coreth.NewETHChain(nil, nil, nil)
+    config := eth.DefaultConfig
+    genAddr := common.Address{}
+    genBalance := big.NewInt(1000000000000000000)
+    config.Genesis = &core.Genesis{
+        Config:     params.MainnetChainConfig,
+        Nonce:      66,
+        ExtraData:  hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
+        GasLimit:   5000,
+        Difficulty: big.NewInt(0),
+        Alloc: core.GenesisAlloc{genAddr: {Balance: genBalance }},
+    }
+    chain := coreth.NewETHChain(&config, nil, nil)
     to := common.Address{}
     nouce := 0
     amount := big.NewInt(0)
