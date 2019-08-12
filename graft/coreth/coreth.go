@@ -27,8 +27,8 @@ type Hash = common.Hash
 
 type ETHChain struct {
     mux *event.TypeMux
-    worker *miner.Worker
     backend *eth.Ethereum
+    worker *miner.Worker
 }
 
 type DummyEngine struct {
@@ -248,7 +248,7 @@ func isLocalBlock(block *types.Block) bool {
 	return false
 }
 
-func NewETHChain(config *miner.Config, chainConfig *params.ChainConfig) *ETHChain {
+func NewETHChain(config *miner.Config, chainConfig *params.ChainConfig, etherBase *common.Address) *ETHChain {
     if config == nil {
         config = &eth.DefaultConfig.Miner
     }
@@ -260,11 +260,31 @@ func NewETHChain(config *miner.Config, chainConfig *params.ChainConfig) *ETHChai
     backend, _ := eth.New(&ctx, &eth.DefaultConfig)
     chain := &ETHChain {
         mux: mux,
+        backend: backend,
         worker: miner.NewWorker(config, chainConfig, &DummyEngine{}, backend, mux, isLocalBlock),
     }
+    if etherBase == nil {
+        etherBase = &common.Address{
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        }
+    }
+    chain.worker.SetEtherbase(*etherBase)
     return chain
 }
 
 func (self *ETHChain) Start() {
     self.worker.Start()
+}
+
+func (self *ETHChain) Stop() {
+    self.worker.Stop()
+}
+
+func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
+    return self.backend.TxPool().AddRemotes(txs)
+}
+
+func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
+    return self.backend.TxPool().AddLocals(txs)
 }

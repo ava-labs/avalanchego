@@ -93,7 +93,7 @@ func (ctx *ServiceContext) ExtRPCEnabled() bool {
 
 func NewServiceContext(mux *event.TypeMux) ServiceContext {
     return ServiceContext {
-        config: nil,
+        config: &Config{},
         services: make(map[reflect.Type]Service),
         EventMux: mux,
         AccountManager: nil,
