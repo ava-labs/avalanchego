@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/common"
 	eminer "github.com/ethereum/go-ethereum/miner"
 )
 
@@ -40,6 +41,10 @@ type Worker = worker
 
 func NewWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool) *Worker {
     return newWorker(config, chainConfig, engine, eth, mux, isLocalBlock)
+}
+
+func (self *Worker) SetEtherbase(addr common.Address) {
+    self.setEtherbase(addr)
 }
 
 func (self *Worker) Start() {
