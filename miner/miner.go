@@ -18,6 +18,8 @@
 package miner
 
 import (
+    "fmt"
+    "time"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -25,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
 	eminer "github.com/ethereum/go-ethereum/miner"
 )
 
@@ -37,20 +40,50 @@ type Backend interface {
 // Config is the configuration parameters of mining.
 type Config = eminer.Config
 
-type Worker = worker
-
-func NewWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool) *Worker {
-    return newWorker(config, chainConfig, engine, eth, mux, isLocalBlock)
+type Miner struct {
+    w *worker
 }
 
-func (self *Worker) SetEtherbase(addr common.Address) {
-    self.setEtherbase(addr)
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+    return &Miner {
+        w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock),
+    }
 }
 
-func (self *Worker) Start() {
-    self.start()
+func (self *Miner) SetEtherbase(addr common.Address) {
+    self.w.setEtherbase(addr)
 }
 
-func (self *Worker) Stop() {
-    self.stop()
+func (self *Miner) Start(coinbase common.Address) {
+    self.w.start()
+}
+
+func (self *Miner) Stop() {
+    self.w.stop()
+}
+
+func (self *Miner) SetExtra(extra []byte) error {
+	if uint64(len(extra)) > params.MaximumExtraDataSize {
+		return fmt.Errorf("Extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
+	}
+	self.w.setExtra(extra)
+	return nil
+}
+
+func (self *Miner) Mining()  bool {
+    return false
+}
+
+func (self *Miner) HashRate() uint64 {
+    return 0
+}
+
+func (self *Miner) SetRecommitInterval(interval time.Duration) {}
+
+func (self *Miner) PendingBlock() *types.Block {
+	return self.w.pendingBlock()
+}
+
+func (self *Miner) Pending() (*types.Block, *state.StateDB) {
+	return self.w.pending()
 }
