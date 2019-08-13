@@ -56,7 +56,7 @@ func main() {
     }
 
     chainID := chainConfig.ChainID
-    nonce := uint64(0)
+    nonce := uint64(1)
     value := big.NewInt(1000000000000)
     gasLimit := 21000
     gasPrice := big.NewInt(1000)

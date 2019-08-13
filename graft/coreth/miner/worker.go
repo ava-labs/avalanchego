@@ -605,6 +605,7 @@ func (w *worker) resultLoop() {
 
 			// Broadcast the block and announce chain insertion event
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
+            //w.chain.FastSyncCommitHead(block.Hash())
 
 			var events []interface{}
 			switch stat {
