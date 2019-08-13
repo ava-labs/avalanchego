@@ -46,6 +46,7 @@ func NewETHChain(config *eth.Config, etherBase *common.Address) *ETHChain {
 }
 
 func (self *ETHChain) Start() {
+    //utils.StartNode(stack)
     self.backend.StartMining(0)
 }
 

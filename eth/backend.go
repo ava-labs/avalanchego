@@ -509,10 +509,10 @@ func (s *Ethereum) Stop() error {
 	s.bloomIndexer.Close()
 	s.blockchain.Stop()
 	s.engine.Close()
-	s.protocolManager.Stop()
-	if s.lesServer != nil {
-		s.lesServer.Stop()
-	}
+	//s.protocolManager.Stop()
+	//if s.lesServer != nil {
+	//	s.lesServer.Stop()
+	//}
 	s.txPool.Stop()
 	s.miner.Stop()
 	s.eventMux.Stop()
