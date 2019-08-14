@@ -35,7 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/Determinant/coreth/internal/debug"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/node"
+	"github.com/Determinant/coreth/node"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 

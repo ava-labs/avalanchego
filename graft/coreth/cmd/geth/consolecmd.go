@@ -26,7 +26,7 @@ import (
 
 	"github.com/Determinant/coreth/cmd/utils"
 	"github.com/ethereum/go-ethereum/console"
-	"github.com/ethereum/go-ethereum/node"
+	"github.com/Determinant/coreth/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	"gopkg.in/urfave/cli.v1"
 )

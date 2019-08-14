@@ -50,9 +50,6 @@ func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *even
     }
 }
 
-func (self *Miner) SetEtherbase(addr common.Address) {
-    self.w.setEtherbase(addr)
-}
 
 func (self *Miner) Start(coinbase common.Address) {
     self.w.start()
@@ -60,14 +57,6 @@ func (self *Miner) Start(coinbase common.Address) {
 
 func (self *Miner) Stop() {
     self.w.stop()
-}
-
-func (self *Miner) SetExtra(extra []byte) error {
-	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("Extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
-	}
-	self.w.setExtra(extra)
-	return nil
 }
 
 func (self *Miner) Mining()  bool {
@@ -78,12 +67,27 @@ func (self *Miner) HashRate() uint64 {
     return 0
 }
 
-func (self *Miner) SetRecommitInterval(interval time.Duration) {}
+func (self *Miner) SetExtra(extra []byte) error {
+	if uint64(len(extra)) > params.MaximumExtraDataSize {
+		return fmt.Errorf("Extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
+	}
+	self.w.setExtra(extra)
+	return nil
+}
+
+func (self *Miner) SetRecommitInterval(interval time.Duration) {
+	self.w.setRecommitInterval(interval)
+}
+
+func (self *Miner) Pending() (*types.Block, *state.StateDB) {
+	return self.w.pending()
+}
+
 
 func (self *Miner) PendingBlock() *types.Block {
 	return self.w.pendingBlock()
 }
 
-func (self *Miner) Pending() (*types.Block, *state.StateDB) {
-	return self.w.pending()
+func (self *Miner) SetEtherbase(addr common.Address) {
+    self.w.setEtherbase(addr)
 }
