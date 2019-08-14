@@ -58,7 +58,7 @@ func main() {
     config.Miner.ManualMining = true
 
     chainID := chainConfig.ChainID
-    nonce := uint64(1)
+    nonce := uint64(0)
     value := big.NewInt(1000000000000)
     gasLimit := 21000
     gasPrice := big.NewInt(1000)
@@ -71,7 +71,7 @@ func main() {
         tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
         signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey); checkError(err)
         chain.AddLocalTxs([]*types.Transaction{signedTx})
-        time.Sleep(1000 * time.Millisecond)
+        time.Sleep(2000 * time.Millisecond)
         nonce++
         chain.GenBlock()
     }

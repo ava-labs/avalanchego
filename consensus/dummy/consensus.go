@@ -192,7 +192,7 @@ uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 }
 
 func (self *DummyEngine) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
-    time.Sleep(1000 * time.Millisecond)
+    //time.Sleep(1000 * time.Millisecond)
     fmt.Printf("sealed %s\n", block.ParentHash().String())
     results <- block
     return nil

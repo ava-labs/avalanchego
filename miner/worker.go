@@ -28,7 +28,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-    "fmt"
+    //"fmt"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -294,7 +294,7 @@ func (w *worker) close() {
 
 func (w *worker) genBlock() {
     interrupt := new(int32)
-    *interrupt = commitInterruptNewHead
+    *interrupt = commitInterruptNone
     w.newWorkCh <- &newWorkReq{
         interrupt: interrupt,
         noempty: false,
@@ -635,7 +635,6 @@ func (w *worker) resultLoop() {
 
 			// Insert the block into the set of pending ones to resultLoop for confirmations
 			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
-            fmt.Printf("new parent: %s\n", w.chain.CurrentBlock().Hash().String())
 
 		case <-w.exitCh:
 			return
