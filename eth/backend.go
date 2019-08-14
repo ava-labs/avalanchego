@@ -532,3 +532,16 @@ func (s *Ethereum) Stop() error {
 	close(s.shutdownChan)
 	return nil
 }
+
+func (s *Ethereum) StopPart() error {
+	s.bloomIndexer.Close()
+	s.blockchain.Stop()
+	s.engine.Close()
+	s.txPool.Stop()
+	s.miner.Stop()
+	s.eventMux.Stop()
+
+	s.chainDb.Close()
+	close(s.shutdownChan)
+	return nil
+}

@@ -46,12 +46,11 @@ func NewETHChain(config *eth.Config, etherBase *common.Address) *ETHChain {
 }
 
 func (self *ETHChain) Start() {
-    //utils.StartNode(stack)
     self.backend.StartMining(0)
 }
 
 func (self *ETHChain) Stop() {
-    self.backend.Stop()
+    self.backend.StopPart()
 }
 
 func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
