@@ -53,6 +53,10 @@ func (self *ETHChain) Stop() {
     self.backend.StopPart()
 }
 
+func (self *ETHChain) GenBlock() {
+    self.backend.Miner().GenBlock()
+}
+
 func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
     return self.backend.TxPool().AddRemotes(txs)
 }

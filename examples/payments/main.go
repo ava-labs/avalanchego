@@ -55,6 +55,8 @@ func main() {
         Alloc: core.GenesisAlloc{ genKey.Address: { Balance: genBalance }},
     }
 
+    config.Miner.ManualMining = true
+
     chainID := chainConfig.ChainID
     nonce := uint64(1)
     value := big.NewInt(1000000000000)
@@ -69,8 +71,9 @@ func main() {
         tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
         signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey); checkError(err)
         chain.AddLocalTxs([]*types.Transaction{signedTx})
-        time.Sleep(5000 * time.Millisecond)
+        time.Sleep(1000 * time.Millisecond)
         nonce++
+        chain.GenBlock()
     }
 
     c := make(chan os.Signal, 1)
