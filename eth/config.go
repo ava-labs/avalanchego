@@ -24,6 +24,7 @@ import (
 	"runtime"
 	"time"
 
+    "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -154,4 +155,35 @@ type Config struct {
 
 	// CheckpointOracle is the configuration for checkpoint oracle.
 	CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
+}
+
+func MyDefaultConfig() Config {
+    config := DefaultConfig
+    chainConfig := &params.ChainConfig {
+        ChainID:             big.NewInt(42222),
+        HomesteadBlock:      big.NewInt(0),
+        DAOForkBlock:        big.NewInt(0),
+        DAOForkSupport:      true,
+        EIP150Block:         big.NewInt(0),
+        EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
+        EIP155Block:         big.NewInt(0),
+        EIP158Block:         big.NewInt(0),
+        ByzantiumBlock:      big.NewInt(0),
+        ConstantinopleBlock: big.NewInt(0),
+        PetersburgBlock:     big.NewInt(0),
+        IstanbulBlock:       nil,
+        Ethash:              nil,
+    }
+    genBalance := big.NewInt(1000000000000000000)
+
+    config.Genesis = &core.Genesis{
+        Config:     chainConfig,
+        Nonce:      0,
+        Number:     0,
+        ExtraData:  hexutil.MustDecode("0x00"),
+        GasLimit:   100000000,
+        Difficulty: big.NewInt(0),
+        Alloc: core.GenesisAlloc{ common.Address{}: { Balance: genBalance }},
+    }
+    return config
 }

@@ -93,8 +93,7 @@ func (self *DummyEngine) verifyHeaderWorker(chain consensus.ChainReader, headers
 }
 
 func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
-    addr := common.Address{}
-    return addr, nil
+    return header.Coinbase, nil
 }
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool) error {
@@ -173,7 +172,7 @@ func (self *DummyEngine) VerifySeal(chain consensus.ChainReader, header *types.H
 }
 
 func (self *DummyEngine) Prepare(chain consensus.ChainReader, header *types.Header) error {
-    header.Difficulty = big.NewInt(0)
+    header.Difficulty = big.NewInt(1)
     return nil
 }
 
@@ -222,7 +221,7 @@ func (self *DummyEngine) SealHash(header *types.Header) (hash common.Hash) {
 }
 
 func (self *DummyEngine) CalcDifficulty(chain consensus.ChainReader, time uint64, parent *types.Header) *big.Int {
-    return big.NewInt(0)
+    return big.NewInt(1)
 }
 
 func (self *DummyEngine) APIs(chain consensus.ChainReader) []rpc.API {
