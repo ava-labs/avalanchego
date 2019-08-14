@@ -20,6 +20,7 @@ package miner
 import (
     "fmt"
     "time"
+    "math/big"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,8 +28,8 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/state"
-	eminer "github.com/ethereum/go-ethereum/miner"
 )
 
 // Backend wraps all methods required for mining.
@@ -38,15 +39,25 @@ type Backend interface {
 }
 
 // Config is the configuration parameters of mining.
-type Config = eminer.Config
+type Config struct {
+	Etherbase common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
+	Notify    []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages(only useful in ethash).
+	ExtraData hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
+	GasFloor  uint64         // Target gas floor for mined blocks.
+	GasCeil   uint64         // Target gas ceiling for mined blocks.
+	GasPrice  *big.Int       // Minimum gas price for mining a transaction
+	Recommit  time.Duration  // The time interval for miner to re-create mining work.
+	Noverify  bool           // Disable remote mining solution verification(only useful in ethash).
+    ManualMining bool
+}
 
 type Miner struct {
     w *worker
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, manualMining bool) *Miner {
     return &Miner {
-        w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock),
+        w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, manualMining),
     }
 }
 
@@ -90,4 +101,8 @@ func (self *Miner) PendingBlock() *types.Block {
 
 func (self *Miner) SetEtherbase(addr common.Address) {
     self.w.setEtherbase(addr)
+}
+
+func (self *Miner) GenBlock() {
+    self.w.genBlock()
 }
