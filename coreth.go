@@ -2,16 +2,18 @@ package coreth
 
 import (
     "io"
+    "os"
     "crypto/ecdsa"
 
     "github.com/ethereum/go-ethereum/core/types"
     "github.com/ethereum/go-ethereum/common"
-    //"github.com/ethereum/go-ethereum/eth"
     "github.com/ethereum/go-ethereum/event"
     "github.com/Determinant/coreth/eth"
     "github.com/Determinant/coreth/node"
     "github.com/Determinant/coreth/consensus/dummy"
     "github.com/ethereum/go-ethereum/crypto"
+    "github.com/ethereum/go-ethereum/log"
+    "github.com/mattn/go-isatty"
 )
 
 type Tx = types.Transaction
@@ -90,4 +92,10 @@ func NewKey(rand io.Reader) (*Key, error) {
         return nil, err
     }
     return NewKeyFromECDSA(privateKeyECDSA), nil
+}
+
+func init() {
+    usecolor := (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())) && os.Getenv("TERM") != "dumb"
+    glogger := log.StreamHandler(io.Writer(os.Stderr), log.TerminalFormat(usecolor))
+    log.Root().SetHandler(glogger)
 }
