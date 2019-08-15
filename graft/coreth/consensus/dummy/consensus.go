@@ -17,7 +17,16 @@ import (
     "github.com/ethereum/go-ethereum/rpc"
 )
 
+type ConsensusCallbacks struct {
+    OnSeal func(*types.Block)
+}
+
 type DummyEngine struct {
+    cb *ConsensusCallbacks
+}
+
+func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
+    return &DummyEngine { cb: cb }
 }
 
 var (
@@ -192,8 +201,9 @@ uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 }
 
 func (self *DummyEngine) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
-    //time.Sleep(1000 * time.Millisecond)
-    fmt.Printf("sealed %s\n", block.ParentHash().String())
+    if self.cb.OnSeal != nil {
+        self.cb.OnSeal(block)
+    }
     results <- block
     return nil
 }

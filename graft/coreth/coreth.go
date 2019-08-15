@@ -10,6 +10,7 @@ import (
     "github.com/ethereum/go-ethereum/event"
     "github.com/Determinant/coreth/eth"
     "github.com/Determinant/coreth/node"
+    "github.com/Determinant/coreth/consensus/dummy"
     "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -19,8 +20,8 @@ type Hash = common.Hash
 
 type ETHChain struct {
     backend *eth.Ethereum
+    cb *dummy.ConsensusCallbacks
 }
-
 
 
 func isLocalBlock(block *types.Block) bool {
@@ -33,8 +34,9 @@ func NewETHChain(config *eth.Config, etherBase *common.Address) *ETHChain {
     }
     mux := new(event.TypeMux)
     ctx := node.NewServiceContext(mux)
-    backend, _ := eth.New(&ctx, config)
-    chain := &ETHChain { backend: backend }
+    cb := new(dummy.ConsensusCallbacks)
+    backend, _ := eth.New(&ctx, config, cb)
+    chain := &ETHChain { backend: backend, cb: cb }
     if etherBase == nil {
         etherBase = &common.Address{
             1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -63,6 +65,10 @@ func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
 
 func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
     return self.backend.TxPool().AddLocals(txs)
+}
+
+func (self *ETHChain) SetOnSeal(cb func(*types.Block)) {
+    self.cb.OnSeal = cb
 }
 
 type Key struct {
