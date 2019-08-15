@@ -18,18 +18,18 @@
 package miner
 
 import (
-    "fmt"
-    "time"
-    "math/big"
+	"fmt"
+	"math/big"
+	"time"
 
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // Backend wraps all methods required for mining.
@@ -40,43 +40,42 @@ type Backend interface {
 
 // Config is the configuration parameters of mining.
 type Config struct {
-	Etherbase common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
-	Notify    []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages(only useful in ethash).
-	ExtraData hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
-	GasFloor  uint64         // Target gas floor for mined blocks.
-	GasCeil   uint64         // Target gas ceiling for mined blocks.
-	GasPrice  *big.Int       // Minimum gas price for mining a transaction
-	Recommit  time.Duration  // The time interval for miner to re-create mining work.
-	Noverify  bool           // Disable remote mining solution verification(only useful in ethash).
-    ManualMining bool
-    ManualUncle bool
+	Etherbase    common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
+	Notify       []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages(only useful in ethash).
+	ExtraData    hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
+	GasFloor     uint64         // Target gas floor for mined blocks.
+	GasCeil      uint64         // Target gas ceiling for mined blocks.
+	GasPrice     *big.Int       // Minimum gas price for mining a transaction
+	Recommit     time.Duration  // The time interval for miner to re-create mining work.
+	Noverify     bool           // Disable remote mining solution verification(only useful in ethash).
+	ManualMining bool
+	ManualUncle  bool
 }
 
 type Miner struct {
-    w *worker
+	w *worker
 }
 
 func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
-    return &Miner {
-        w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock),
-    }
+	return &Miner{
+		w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock),
+	}
 }
 
-
 func (self *Miner) Start(coinbase common.Address) {
-    self.w.start()
+	self.w.start()
 }
 
 func (self *Miner) Stop() {
-    self.w.stop()
+	self.w.stop()
 }
 
-func (self *Miner) Mining()  bool {
-    return false
+func (self *Miner) Mining() bool {
+	return false
 }
 
 func (self *Miner) HashRate() uint64 {
-    return 0
+	return 0
 }
 
 func (self *Miner) SetExtra(extra []byte) error {
@@ -95,15 +94,14 @@ func (self *Miner) Pending() (*types.Block, *state.StateDB) {
 	return self.w.pending()
 }
 
-
 func (self *Miner) PendingBlock() *types.Block {
 	return self.w.pendingBlock()
 }
 
 func (self *Miner) SetEtherbase(addr common.Address) {
-    self.w.setEtherbase(addr)
+	self.w.setEtherbase(addr)
 }
 
 func (self *Miner) GenBlock() {
-    self.w.genBlock()
+	self.w.genBlock()
 }

@@ -14,9 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 //
-// NOTE: this piece of code is adopted from
-// github.com/ethereum/go-ethereum/miner/worker.go,
-// modified by Ted Yin.
+// NOTE: this piece of code is modified by Ted Yin.
 // The modification is also licensed under the same LGPL.
 
 package miner
@@ -28,7 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-    //"fmt"
+	//"fmt"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -180,8 +178,8 @@ type worker struct {
 	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
 	fullTaskHook func()                             // Method to call before pushing the full sealing task.
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
-    manualMining bool
-    manualUncle bool
+	manualMining bool
+	manualUncle  bool
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool) *worker {
@@ -207,8 +205,8 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		startCh:            make(chan struct{}, 1),
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
-        manualMining: config.ManualMining,
-        manualUncle: config.ManualUncle,
+		manualMining:       config.ManualMining,
+		manualUncle:        config.ManualUncle,
 	}
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
@@ -295,13 +293,13 @@ func (w *worker) close() {
 }
 
 func (w *worker) genBlock() {
-    interrupt := new(int32)
-    *interrupt = commitInterruptNone
-    w.newWorkCh <- &newWorkReq{
-        interrupt: interrupt,
-        noempty: false,
-        timestamp: time.Now().Unix(),
-    }
+	interrupt := new(int32)
+	*interrupt = commitInterruptNone
+	w.newWorkCh <- &newWorkReq{
+		interrupt: interrupt,
+		noempty:   false,
+		timestamp: time.Now().Unix(),
+	}
 }
 
 // newWorkLoop is a standalone goroutine to submit new mining work upon received events.
@@ -362,18 +360,18 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-w.startCh:
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
-            if !w.manualMining {
-		        log.Trace("commit ch")
-			    commit(false, commitInterruptNewHead)
-            }
+			if !w.manualMining {
+				log.Trace("commit ch")
+				commit(false, commitInterruptNewHead)
+			}
 
 		case head := <-w.chainHeadCh:
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
-            if !w.manualMining {
-		        log.Trace("commit update")
-			    commit(false, commitInterruptNewHead)
-            }
+			if !w.manualMining {
+				log.Trace("commit update")
+				commit(false, commitInterruptNewHead)
+			}
 
 		case <-timer.C:
 			// If mining is running resubmit a new work cycle periodically to pull in
@@ -384,7 +382,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 					timer.Reset(recommit)
 					continue
 				}
-		        log.Trace("commit resubmit")
+				log.Trace("commit resubmit")
 				commit(true, commitInterruptResubmit)
 			}
 
@@ -616,9 +614,9 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
-            //fmt.Printf("parent1: %s\n", w.chain.CurrentBlock().Hash().String())
+			//fmt.Printf("parent1: %s\n", w.chain.CurrentBlock().Hash().String())
 			stat, err := w.chain.WriteBlockWithState(block, receipts, task.state)
-            //fmt.Printf("parent2: %s\n", w.chain.CurrentBlock().Hash().String())
+			//fmt.Printf("parent2: %s\n", w.chain.CurrentBlock().Hash().String())
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
@@ -628,7 +626,6 @@ func (w *worker) resultLoop() {
 
 			// Broadcast the block and announce chain insertion event
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
-            //w.chain.FastSyncCommitHead(block.Hash())
 
 			var events []interface{}
 			switch stat {
@@ -948,7 +945,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if !noempty && !w.manualUncle {
 		// Create an empty block based on temporary copied state for sealing in advance without waiting block
 		// execution finished.
-        log.Trace("commit n1")
+		log.Trace("commit n1")
 		w.commit(uncles, nil, false, tstart)
 	}
 
@@ -983,7 +980,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
-    log.Trace("commit n2")
+	log.Trace("commit n2")
 	w.commit(uncles, w.fullTaskHook, true, tstart)
 }
 
