@@ -1,14 +1,16 @@
 package main
 
 import (
-    "os"
-    "github.com/ava-labs/coreth/cmd/geth"
+	"github.com/ava-labs/coreth/cmd/geth"
+	"os"
 )
 
 func checkError(err error) {
-    if err != nil { panic(err) }
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
-    geth.App.Run(os.Args)
+	geth.App.Run(os.Args)
 }

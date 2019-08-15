@@ -18,11 +18,15 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+type OnFinalizeCallbackType = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
+type OnFinalizeAndAssembleCallbackType = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt)
+type OnAPIsCallbackType = func(consensus.ChainReader) []rpc.API
+
 type ConsensusCallbacks struct {
 	OnSeal                func(*types.Block) error
-	OnAPIs                func(consensus.ChainReader) []rpc.API
-	OnFinalize            func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
-	OnFinalizeAndAssemble func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt)
+	OnAPIs                OnAPIsCallbackType
+	OnFinalize            OnFinalizeCallbackType
+	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
 }
 
 type DummyEngine struct {
