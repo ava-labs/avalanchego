@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
@@ -68,8 +69,41 @@ func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
 	return self.backend.TxPool().AddLocals(txs)
 }
 
-func (self *ETHChain) SetOnSeal(cb func(*types.Block)) {
+func (self *ETHChain) SetOnSeal(cb func(*types.Block) error) {
 	self.cb.OnSeal = cb
+}
+
+func (self *ETHChain) SetOnAPIs(cb dummy.OnAPIsCallbackType) {
+	self.cb.OnAPIs = cb
+}
+
+func (self *ETHChain) SetOnFinalize(cb dummy.OnFinalizeCallbackType) {
+	self.cb.OnFinalize = cb
+}
+
+func (self *ETHChain) SetOnFinalizeAndAssemble(cb dummy.OnFinalizeAndAssembleCallbackType) {
+	self.cb.OnFinalizeAndAssemble = cb
+}
+
+// Returns a new mutable state based on the current HEAD block.
+func (self *ETHChain) CurrentState() (*state.StateDB, error) {
+	return self.backend.BlockChain().State()
+}
+
+// Returns a new mutable state based on the given block.
+func (self *ETHChain) BlockState(block *types.Block) (*state.StateDB, error) {
+	return self.backend.BlockChain().StateAt(block.Root())
+}
+
+// Retrives a block from the database by hash.
+func (self *ETHChain) GetBlockByHash(hash common.Hash) *types.Block {
+	return self.backend.BlockChain().GetBlockByHash(hash)
+}
+
+// SetHead sets the current head block to the one defined by the hash
+// irrelevant what the chain contents were prior.
+func (self *ETHChain) SetHead(hash common.Hash) error {
+	return self.backend.BlockChain().FastSyncCommitHead(hash)
 }
 
 type Key struct {
