@@ -363,7 +363,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
             if !w.manualMining {
-		        log.Warn("commit ch")
+		        log.Trace("commit ch")
 			    commit(false, commitInterruptNewHead)
             }
 
@@ -371,7 +371,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
             if !w.manualMining {
-		        log.Warn("commit update")
+		        log.Trace("commit update")
 			    commit(false, commitInterruptNewHead)
             }
 
@@ -384,7 +384,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 					timer.Reset(recommit)
 					continue
 				}
-		        log.Warn("commit resubmit")
+		        log.Trace("commit resubmit")
 				commit(true, commitInterruptResubmit)
 			}
 
@@ -451,7 +451,6 @@ func (w *worker) mainLoop() {
 			// If our mining block contains less than 2 uncle blocks,
 			// add the new uncle block if valid and regenerate a mining block.
 			if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 && !w.manualUncle {
-                log.Warn("wtf")
 				start := time.Now()
 				if err := w.commitUncle(w.current, ev.Block.Header()); err == nil {
 					var uncles []*types.Header
@@ -949,7 +948,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if !noempty && !w.manualUncle {
 		// Create an empty block based on temporary copied state for sealing in advance without waiting block
 		// execution finished.
-        log.Warn("commit n1")
+        log.Trace("commit n1")
 		w.commit(uncles, nil, false, tstart)
 	}
 
@@ -984,7 +983,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
-    log.Warn("commit n2")
+    log.Trace("commit n2")
 	w.commit(uncles, w.fullTaskHook, true, tstart)
 }
 

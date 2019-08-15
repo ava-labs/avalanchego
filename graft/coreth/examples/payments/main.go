@@ -13,7 +13,6 @@ import (
     "github.com/ethereum/go-ethereum/core"
     "github.com/Determinant/coreth/eth"
     "github.com/Determinant/coreth"
-    "github.com/ethereum/go-ethereum/log"
     "github.com/ethereum/go-ethereum/params"
     "github.com/ethereum/go-ethereum/common"
 )
@@ -23,7 +22,6 @@ func checkError(err error) {
 }
 
 func main() {
-    log.Root().SetHandler(log.StderrHandler)
     config := eth.DefaultConfig
     chainConfig := &params.ChainConfig {
         ChainID:             big.NewInt(1),
