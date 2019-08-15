@@ -1,0 +1,3 @@
+[submodule "vendor/github.com/ethereum/go-ethereum"]
+	path = vendor/github.com/ethereum/go-ethereum
+	url = https://github.com/Determinant/go-ethereum
