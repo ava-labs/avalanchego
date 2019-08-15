@@ -76,8 +76,8 @@ func main() {
 	showBalance := func() {
 		state, err := chain.CurrentState()
 		checkError(err)
-		log.Info(fmt.Sprintf("genesis balanche = %s", state.GetBalance(genKey.Address)))
-		log.Info(fmt.Sprintf("bob's balanche = %s", state.GetBalance(bob.Address)))
+		log.Info(fmt.Sprintf("genesis balance = %s", state.GetBalance(genKey.Address)))
+		log.Info(fmt.Sprintf("bob's balance = %s", state.GetBalance(bob.Address)))
 	}
 	chain.SetOnSeal(func(block *types.Block) error {
 		go func() {
