@@ -106,6 +106,10 @@ func (self *ETHChain) SetHead(hash common.Hash) error {
 	return self.backend.BlockChain().FastSyncCommitHead(hash)
 }
 
+func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
+	return self.backend.BlockChain().GetReceiptsByHash(hash)
+}
+
 type Key struct {
 	Address    common.Address
 	PrivateKey *ecdsa.PrivateKey
