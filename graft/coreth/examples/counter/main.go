@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"go/build"
 	"math/big"
 	"os"
 	"os/signal"
@@ -65,7 +66,11 @@ func main() {
 	config.Miner.ManualUncle = true
 
 	// compile the smart contract
-	counterSrc, err := filepath.Abs("./counter.sol")
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
+	}
+	counterSrc, err := filepath.Abs(gopath + "/src/github.com/ava-labs/coreth/examples/counter/counter.sol")
 	checkError(err)
 	contracts, err := compiler.CompileSolidity("", counterSrc)
 	checkError(err)
