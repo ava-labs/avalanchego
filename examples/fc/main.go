@@ -2,7 +2,7 @@ package main
 
 import (
     "os"
-    "github.com/Determinant/coreth/cmd/geth"
+    "github.com/ava-labs/coreth/cmd/geth"
 )
 
 func checkError(err error) {

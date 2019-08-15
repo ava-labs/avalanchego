@@ -11,8 +11,8 @@ import (
     "github.com/ethereum/go-ethereum/core/types"
     "github.com/ethereum/go-ethereum/common/hexutil"
     "github.com/ethereum/go-ethereum/core"
-    "github.com/Determinant/coreth/eth"
-    "github.com/Determinant/coreth"
+    "github.com/ava-labs/coreth/eth"
+    "github.com/ava-labs/coreth"
     "github.com/ethereum/go-ethereum/params"
     "github.com/ethereum/go-ethereum/common"
 )

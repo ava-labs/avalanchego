@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/Determinant/coreth/consensus/dummy"
-	"github.com/Determinant/coreth/eth"
-	"github.com/Determinant/coreth/node"
+	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/node"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"

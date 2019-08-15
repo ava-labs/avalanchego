@@ -33,9 +33,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/Determinant/coreth/internal/debug"
+	"github.com/ava-labs/coreth/internal/debug"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/Determinant/coreth/node"
+	"github.com/ava-labs/coreth/node"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 

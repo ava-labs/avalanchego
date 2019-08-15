@@ -28,17 +28,17 @@ import (
 	"time"
 
 	"github.com/elastic/gosigar"
-	"github.com/Determinant/coreth/cmd/utils"
+	"github.com/ava-labs/coreth/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/console"
-	"github.com/Determinant/coreth/eth"
+	"github.com/ava-labs/coreth/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/Determinant/coreth/internal/debug"
+	"github.com/ava-labs/coreth/internal/debug"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/Determinant/coreth/node"
+	"github.com/ava-labs/coreth/node"
 	cli "gopkg.in/urfave/cli.v1"
 )
 
