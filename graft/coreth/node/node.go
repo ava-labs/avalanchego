@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Determinant/coreth/internal/debug"
+	"github.com/ava-labs/coreth/internal/debug"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"

@@ -24,8 +24,8 @@ import (
 
 	"strings"
 
-	"github.com/Determinant/coreth/cmd/utils"
-	"github.com/Determinant/coreth/internal/debug"
+	"github.com/ava-labs/coreth/cmd/utils"
+	"github.com/ava-labs/coreth/internal/debug"
 	cli "gopkg.in/urfave/cli.v1"
 )
 

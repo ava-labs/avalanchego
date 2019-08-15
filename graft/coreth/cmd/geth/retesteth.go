@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Determinant/coreth/cmd/utils"
+	"github.com/ava-labs/coreth/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
