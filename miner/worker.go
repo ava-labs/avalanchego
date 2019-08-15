@@ -181,9 +181,10 @@ type worker struct {
 	fullTaskHook func()                             // Method to call before pushing the full sealing task.
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
     manualMining bool
+    manualUncle bool
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, manualMining bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool) *worker {
 	worker := &worker{
 		config:             config,
 		chainConfig:        chainConfig,
@@ -206,7 +207,8 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		startCh:            make(chan struct{}, 1),
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
-        manualMining: manualMining,
+        manualMining: config.ManualMining,
+        manualUncle: config.ManualUncle,
 	}
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
@@ -361,6 +363,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
             if !w.manualMining {
+		        log.Warn("commit ch")
 			    commit(false, commitInterruptNewHead)
             }
 
@@ -368,6 +371,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
             if !w.manualMining {
+		        log.Warn("commit update")
 			    commit(false, commitInterruptNewHead)
             }
 
@@ -380,6 +384,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 					timer.Reset(recommit)
 					continue
 				}
+		        log.Warn("commit resubmit")
 				commit(true, commitInterruptResubmit)
 			}
 
@@ -445,7 +450,8 @@ func (w *worker) mainLoop() {
 			}
 			// If our mining block contains less than 2 uncle blocks,
 			// add the new uncle block if valid and regenerate a mining block.
-			if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 {
+			if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 && !w.manualUncle {
+                log.Warn("wtf")
 				start := time.Now()
 				if err := w.commitUncle(w.current, ev.Block.Header()); err == nil {
 					var uncles []*types.Header
@@ -611,7 +617,9 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
+            //fmt.Printf("parent1: %s\n", w.chain.CurrentBlock().Hash().String())
 			stat, err := w.chain.WriteBlockWithState(block, receipts, task.state)
+            //fmt.Printf("parent2: %s\n", w.chain.CurrentBlock().Hash().String())
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
@@ -938,9 +946,10 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	commitUncles(w.localUncles)
 	commitUncles(w.remoteUncles)
 
-	if !noempty {
+	if !noempty && !w.manualUncle {
 		// Create an empty block based on temporary copied state for sealing in advance without waiting block
 		// execution finished.
+        log.Warn("commit n1")
 		w.commit(uncles, nil, false, tstart)
 	}
 
@@ -951,7 +960,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		return
 	}
 	// Short circuit if there is no available pending transactions
-	if len(pending) == 0 {
+	if len(pending) == 0 && !w.manualMining {
 		w.updateSnapshot()
 		return
 	}
@@ -975,6 +984,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
+    log.Warn("commit n2")
 	w.commit(uncles, w.fullTaskHook, true, tstart)
 }
 

@@ -9,7 +9,6 @@ import (
     "math/big"
     //"encoding/hex"
     "github.com/ethereum/go-ethereum/core/types"
-    //"github.com/ethereum/go-ethereum/common"
     "github.com/ethereum/go-ethereum/common/hexutil"
     "github.com/ethereum/go-ethereum/core"
     "github.com/Determinant/coreth/eth"
@@ -42,7 +41,7 @@ func main() {
         Ethash:              nil,
     }
 
-    genBalance := big.NewInt(1000000000000000000)
+    genBalance := big.NewInt(100000000000000000)
     genKey, _ := coreth.NewKey(rand.Reader)
 
     config.Genesis = &core.Genesis{
@@ -56,24 +55,32 @@ func main() {
     }
 
     config.Miner.ManualMining = true
+    config.Miner.ManualUncle = true
 
     chainID := chainConfig.ChainID
     nonce := uint64(0)
     value := big.NewInt(1000000000000)
     gasLimit := 21000
-    gasPrice := big.NewInt(1000)
+    gasPrice := big.NewInt(1000000000)
     bob, err := coreth.NewKey(rand.Reader); checkError(err)
 
     chain := coreth.NewETHChain(&config, nil)
+    chain.SetOnSeal(func(block *types.Block) {
+        go func() {
+            time.Sleep(1000 * time.Millisecond)
+            chain.GenBlock()
+        }()
+    })
     chain.Start()
 
+    chain.GenBlock()
     for i := 0; i < 10; i++ {
         tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
         signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey); checkError(err)
-        chain.AddLocalTxs([]*types.Transaction{signedTx})
-        time.Sleep(2000 * time.Millisecond)
+        _ = signedTx
+        chain.AddRemoteTxs([]*types.Transaction{signedTx})
+        time.Sleep(1000 * time.Millisecond)
         nonce++
-        chain.GenBlock()
     }
 
     c := make(chan os.Signal, 1)

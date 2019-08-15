@@ -49,15 +49,16 @@ type Config struct {
 	Recommit  time.Duration  // The time interval for miner to re-create mining work.
 	Noverify  bool           // Disable remote mining solution verification(only useful in ethash).
     ManualMining bool
+    ManualUncle bool
 }
 
 type Miner struct {
     w *worker
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, manualMining bool) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
     return &Miner {
-        w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, manualMining),
+        w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock),
     }
 }
 

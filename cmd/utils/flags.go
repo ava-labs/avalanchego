@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/Determinant/coreth/consensus/dummy"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -49,7 +50,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/metrics/influxdb"
-	"github.com/ethereum/go-ethereum/miner"
+	"github.com/Determinant/coreth/miner"
 	"github.com/Determinant/coreth/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -1481,7 +1482,7 @@ func RegisterEthService(stack *node.Node, cfg *eth.Config) {
         panic("not supported")
     } else {
         err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-            fullNode, err := eth.New(ctx, cfg)
+            fullNode, err := eth.New(ctx, cfg, &dummy.ConsensusCallbacks{})
             if fullNode != nil && cfg.LightServ > 0 {
                 panic("not supported")
             }
