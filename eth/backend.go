@@ -25,6 +25,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/Determinant/coreth/consensus/dummy"
+	mycore "github.com/Determinant/coreth/core"
+	"github.com/Determinant/coreth/internal/ethapi"
+	"github.com/Determinant/coreth/miner"
+	"github.com/Determinant/coreth/node"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -33,8 +38,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
-	mycore "github.com/Determinant/coreth/core"
-	"github.com/Determinant/coreth/consensus/dummy"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -44,10 +47,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/Determinant/coreth/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/Determinant/coreth/miner"
-	"github.com/Determinant/coreth/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/params"
@@ -246,7 +246,7 @@ func makeExtraData(extra []byte) []byte {
 
 // CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
 func CreateConsensusEngine(ctx *node.ServiceContext, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, cb *dummy.ConsensusCallbacks) consensus.Engine {
-    return dummy.NewDummyEngine(cb)
+	return dummy.NewDummyEngine(cb)
 }
 
 // APIs return the collection of RPC services the ethereum package offers.
