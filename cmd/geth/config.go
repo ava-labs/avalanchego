@@ -27,11 +27,11 @@ import (
 	cli "gopkg.in/urfave/cli.v1"
 
 	"github.com/ava-labs/coreth/cmd/utils"
-	"github.com/ethereum/go-ethereum/dashboard"
+	"github.com/ava-labs/go-ethereum/dashboard"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
-	"github.com/ethereum/go-ethereum/params"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	"github.com/ava-labs/go-ethereum/params"
+	whisper "github.com/ava-labs/go-ethereum/whisper/whisperv6"
 	"github.com/naoina/toml"
 )
 
