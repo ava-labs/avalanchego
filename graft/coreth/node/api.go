@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ava-labs/go-ethereum/common/hexutil"
+	"github.com/ava-labs/go-ethereum/crypto"
+	"github.com/ava-labs/go-ethereum/p2p"
+	"github.com/ava-labs/go-ethereum/p2p/enode"
+	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 // PrivateAdminAPI is the collection of administrative API methods exposed only

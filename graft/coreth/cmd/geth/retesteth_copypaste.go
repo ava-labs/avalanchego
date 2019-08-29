@@ -19,9 +19,9 @@ package geth
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ava-labs/go-ethereum/common/hexutil"
+	"github.com/ava-labs/go-ethereum/core/types"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction

@@ -24,9 +24,9 @@ import (
 	"strings"
 
 	"github.com/ava-labs/coreth/cmd/utils"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ava-labs/go-ethereum/consensus/ethash"
+	"github.com/ava-labs/go-ethereum/eth"
+	"github.com/ava-labs/go-ethereum/params"
 	"gopkg.in/urfave/cli.v1"
 )
 

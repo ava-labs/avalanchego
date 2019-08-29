@@ -24,15 +24,15 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ava-labs/go-ethereum/common/hexutil"
+	"github.com/ava-labs/go-ethereum/core/rawdb"
+	"github.com/ava-labs/go-ethereum/core/state"
+	"github.com/ava-labs/go-ethereum/ethdb"
+	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ava-labs/go-ethereum/params"
+	"github.com/ava-labs/go-ethereum/rlp"
+	"github.com/ava-labs/go-ethereum/core"
 )
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")

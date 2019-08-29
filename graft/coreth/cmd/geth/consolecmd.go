@@ -25,9 +25,9 @@ import (
 	"syscall"
 
 	"github.com/ava-labs/coreth/cmd/utils"
-	"github.com/ethereum/go-ethereum/console"
+	"github.com/ava-labs/go-ethereum/console"
 	"github.com/ava-labs/coreth/node"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ava-labs/go-ethereum/rpc"
 	"gopkg.in/urfave/cli.v1"
 )
 

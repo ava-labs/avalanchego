@@ -8,12 +8,12 @@ import (
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ava-labs/go-ethereum/core/state"
+	"github.com/ava-labs/go-ethereum/core/types"
+	"github.com/ava-labs/go-ethereum/crypto"
+	"github.com/ava-labs/go-ethereum/event"
+	"github.com/ava-labs/go-ethereum/log"
 	"github.com/mattn/go-isatty"
 )
 
@@ -100,9 +100,9 @@ func (self *ETHChain) GetBlockByHash(hash common.Hash) *types.Block {
 	return self.backend.BlockChain().GetBlockByHash(hash)
 }
 
-// SetHead sets the current head block to the one defined by the hash
+// SetTail sets the current head block to the one defined by the hash
 // irrelevant what the chain contents were prior.
-func (self *ETHChain) SetHead(hash common.Hash) error {
+func (self *ETHChain) SetTail(hash common.Hash) error {
 	return self.backend.BlockChain().FastSyncCommitHead(hash)
 }
 
