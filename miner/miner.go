@@ -56,9 +56,9 @@ type Miner struct {
 	w *worker
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, mcb *MinerCallbacks) *Miner {
 	return &Miner{
-		w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock),
+		w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, mcb),
 	}
 }
 

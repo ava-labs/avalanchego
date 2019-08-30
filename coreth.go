@@ -7,6 +7,7 @@ import (
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/core/state"
@@ -24,6 +25,7 @@ type Hash = common.Hash
 type ETHChain struct {
 	backend *eth.Ethereum
 	cb      *dummy.ConsensusCallbacks
+	mcb     *miner.MinerCallbacks
 }
 
 func isLocalBlock(block *types.Block) bool {
@@ -37,8 +39,9 @@ func NewETHChain(config *eth.Config, etherBase *common.Address) *ETHChain {
 	mux := new(event.TypeMux)
 	ctx := node.NewServiceContext(mux)
 	cb := new(dummy.ConsensusCallbacks)
-	backend, _ := eth.New(&ctx, config, cb)
-	chain := &ETHChain{backend: backend, cb: cb}
+	mcb := new(miner.MinerCallbacks)
+	backend, _ := eth.New(&ctx, config, cb, mcb)
+	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb}
 	if etherBase == nil {
 		etherBase = &common.Address{
 			1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -71,6 +74,10 @@ func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
 
 func (self *ETHChain) SetOnSeal(cb func(*types.Block) error) {
 	self.cb.OnSeal = cb
+}
+
+func (self *ETHChain) SetOnSealMiner(cb func(*types.Block) error) {
+	self.mcb.OnSeal = cb
 }
 
 func (self *ETHChain) SetOnAPIs(cb dummy.OnAPIsCallbackType) {
