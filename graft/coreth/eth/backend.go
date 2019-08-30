@@ -116,7 +116,7 @@ func (s *Ethereum) SetContractBackend(backend bind.ContractBackend) {
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks) (*Ethereum, error) {
+func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks, mcb *miner.MinerCallbacks) (*Ethereum, error) {
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -214,7 +214,7 @@ func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks)
 	if eth.protocolManager, err = NewProtocolManager(chainConfig, checkpoint, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb, cacheLimit, config.Whitelist); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock, mcb)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{ctx.ExtRPCEnabled(), eth, nil}

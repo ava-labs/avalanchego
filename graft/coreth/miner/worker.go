@@ -28,7 +28,6 @@ import (
 	"time"
 	//"fmt"
 
-	mapset "github.com/deckarep/golang-set"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/consensus"
 	"github.com/ava-labs/go-ethereum/consensus/misc"
@@ -38,6 +37,7 @@ import (
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/params"
+	mapset "github.com/deckarep/golang-set"
 )
 
 const (
@@ -123,6 +123,10 @@ type intervalAdjust struct {
 	inc   bool
 }
 
+type MinerCallbacks struct {
+	OnSeal func(*types.Block) error
+}
+
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {
@@ -174,15 +178,16 @@ type worker struct {
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
 	// Test hooks
-	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
-	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
-	fullTaskHook func()                             // Method to call before pushing the full sealing task.
-	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
-	manualMining bool
-	manualUncle  bool
+	newTaskHook    func(*task)                        // Method to call upon receiving a new sealing task.
+	skipSealHook   func(*task) bool                   // Method to decide whether skipping the sealing.
+	fullTaskHook   func()                             // Method to call before pushing the full sealing task.
+	resubmitHook   func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+	manualMining   bool
+	manualUncle    bool
+	minerCallbacks *MinerCallbacks
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, mcb *MinerCallbacks) *worker {
 	worker := &worker{
 		config:             config,
 		chainConfig:        chainConfig,
@@ -207,6 +212,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
 		manualMining:       config.ManualMining,
 		manualUncle:        config.ManualUncle,
+		minerCallbacks:     mcb,
 	}
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
@@ -623,6 +629,9 @@ func (w *worker) resultLoop() {
 			}
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
 				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
+			if w.minerCallbacks.OnSeal != nil {
+				w.minerCallbacks.OnSeal(block)
+			}
 
 			// Broadcast the block and announce chain insertion event
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
