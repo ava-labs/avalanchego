@@ -121,6 +121,10 @@ func (self *ETHChain) GetGenesisBlock() *types.Block {
 	return self.backend.BlockChain().Genesis()
 }
 
+func (self *ETHChain) InsertChain(chain []*types.Block) (int, error) {
+	return self.backend.BlockChain().InsertChain(chain)
+}
+
 type Key struct {
 	Address    common.Address
 	PrivateKey *ecdsa.PrivateKey
