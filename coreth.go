@@ -110,6 +110,10 @@ func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	return self.backend.BlockChain().GetReceiptsByHash(hash)
 }
 
+func (self *ETHChain) GetGenesisBlock() *types.Block {
+	return self.backend.BlockChain().Genesis()
+}
+
 type Key struct {
 	Address    common.Address
 	PrivateKey *ecdsa.PrivateKey
