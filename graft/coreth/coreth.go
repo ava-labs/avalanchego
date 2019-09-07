@@ -64,8 +64,17 @@ func (self *ETHChain) GenBlock() {
 	self.backend.Miner().GenBlock()
 }
 
+func (self *ETHChain) PendingSize() (int, error) {
+	pending, err := self.backend.TxPool().Pending()
+	count := 0
+	for _, txs := range pending {
+		count += len(txs)
+	}
+	return count, err
+}
+
 func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
-	return self.backend.TxPool().AddRemotes(txs)
+	return self.backend.TxPool().AddRemotesSync(txs)
 }
 
 func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
