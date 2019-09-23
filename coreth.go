@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ava-labs/go-ethereum/rpc"
 	"github.com/mattn/go-isatty"
 )
 
@@ -132,6 +133,22 @@ func (self *ETHChain) GetGenesisBlock() *types.Block {
 
 func (self *ETHChain) InsertChain(chain []*types.Block) (int, error) {
 	return self.backend.BlockChain().InsertChain(chain)
+}
+
+func (self *ETHChain) NewRPCHandler() *rpc.Server {
+	return rpc.NewServer()
+}
+
+func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string) {
+	nsmap := make(map[string]bool)
+	for _, ns := range namespaces {
+		nsmap[ns] = true
+	}
+	for _, api := range self.backend.APIs() {
+		if nsmap[api.Namespace] {
+			handler.RegisterName(api.Namespace, api.Service)
+		}
+	}
 }
 
 type Key struct {
