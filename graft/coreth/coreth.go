@@ -2,6 +2,7 @@ package coreth
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"io"
 	"os"
 
@@ -38,7 +39,13 @@ func NewETHChain(config *eth.Config, etherBase *common.Address) *ETHChain {
 		config = &eth.DefaultConfig
 	}
 	mux := new(event.TypeMux)
-	ctx := node.NewServiceContext(mux)
+	ctx, ep, err := node.NewServiceContext(nil, mux)
+	if err != nil {
+		panic(err)
+	}
+	if ep != "" {
+		log.Info(fmt.Sprintf("ephemeral = %s", ep))
+	}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
 	backend, _ := eth.New(&ctx, config, cb, mcb)
@@ -149,6 +156,10 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 			handler.RegisterName(api.Namespace, api.Service)
 		}
 	}
+}
+
+func (self *ETHChain) GetTxSubmitCh() <-chan struct{} {
+	return self.backend.GetTxSubmitCh()
 }
 
 type Key struct {

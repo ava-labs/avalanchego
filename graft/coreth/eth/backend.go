@@ -99,6 +99,8 @@ type Ethereum struct {
 	netRPCService *ethapi.PublicNetAPI
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+
+	txSubmitChan chan struct{}
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
@@ -157,6 +159,7 @@ func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks,
 		etherbase:      config.Miner.Etherbase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
+		txSubmitChan:   make(chan struct{}, 1),
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -544,4 +547,8 @@ func (s *Ethereum) StopPart() error {
 	s.chainDb.Close()
 	close(s.shutdownChan)
 	return nil
+}
+
+func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
+	return s.txSubmitChan
 }
