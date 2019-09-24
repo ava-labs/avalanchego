@@ -160,7 +160,12 @@ func (b *EthAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscri
 }
 
 func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	return b.eth.txPool.AddLocal(signedTx)
+	err := b.eth.txPool.AddLocal(signedTx)
+	select {
+	case b.eth.txSubmitChan <- struct{}{}:
+	default:
+	}
+	return err
 }
 
 func (b *EthAPIBackend) GetPoolTransactions() (types.Transactions, error) {

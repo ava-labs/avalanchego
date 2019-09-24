@@ -91,13 +91,17 @@ func (ctx *ServiceContext) ExtRPCEnabled() bool {
 	return ctx.config.ExtRPCEnabled()
 }
 
-func NewServiceContext(mux *event.TypeMux) ServiceContext {
-    return ServiceContext {
-        config: &Config{},
-        services: make(map[reflect.Type]Service),
-        EventMux: mux,
-        AccountManager: nil,
-    }
+func NewServiceContext(cfg *Config, mux *event.TypeMux) (ServiceContext, string, error) {
+	if cfg == nil {
+		cfg = &Config{}
+	}
+	am, ep, err := makeAccountManager(cfg)
+	return ServiceContext{
+		config:         cfg,
+		services:       make(map[reflect.Type]Service),
+		EventMux:       mux,
+		AccountManager: am,
+	}, ep, err
 }
 
 // ServiceConstructor is the function signature of the constructors needed to be
