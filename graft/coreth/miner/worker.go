@@ -953,7 +953,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	commitUncles(w.localUncles)
 	commitUncles(w.remoteUncles)
 
-	if !noempty && !w.manualUncle {
+	if !noempty && !w.manualMining {
 		// Create an empty block based on temporary copied state for sealing in advance without waiting block
 		// execution finished.
 		log.Trace("commit n1")
