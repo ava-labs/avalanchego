@@ -50,6 +50,7 @@ type Config struct {
 	Noverify     bool           // Disable remote mining solution verification(only useful in ethash).
 	ManualMining bool
 	ManualUncle  bool
+	DisableUncle bool
 }
 
 type Miner struct {

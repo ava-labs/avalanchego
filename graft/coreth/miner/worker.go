@@ -184,6 +184,7 @@ type worker struct {
 	resubmitHook   func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 	manualMining   bool
 	manualUncle    bool
+	disableUncle   bool
 	minerCallbacks *MinerCallbacks
 }
 
@@ -212,7 +213,11 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
 		manualMining:       config.ManualMining,
 		manualUncle:        config.ManualUncle,
+		disableUncle:       config.DisableUncle,
 		minerCallbacks:     mcb,
+	}
+	if worker.disableUncle {
+		worker.manualUncle = true
 	}
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
@@ -689,6 +694,9 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 
 // commitUncle adds the given block to uncle block set, returns error if failed to add.
 func (w *worker) commitUncle(env *environment, uncle *types.Header) error {
+	if w.disableUncle {
+		return nil
+	}
 	hash := uncle.Hash()
 	if env.uncles.Contains(hash) {
 		return errors.New("uncle not unique")
@@ -936,6 +944,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			if uncle.NumberU64()+staleThreshold <= header.Number.Uint64() {
 				delete(blocks, hash)
 			}
+		}
+		if w.disableUncle {
+			return
 		}
 		for hash, uncle := range blocks {
 			if len(uncles) == 2 {
