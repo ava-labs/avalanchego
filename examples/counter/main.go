@@ -92,7 +92,7 @@ func main() {
 	gasPrice := big.NewInt(1000000000)
 
 	blockCount := 0
-	chain := coreth.NewETHChain(&config, nil)
+	chain := coreth.NewETHChain(&config, nil, nil)
 	log.Info(chain.GetGenesisBlock().Hash().Hex())
 	firstBlock := false
 	var contractAddr common.Address
