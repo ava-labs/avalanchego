@@ -34,12 +34,15 @@ func isLocalBlock(block *types.Block) bool {
 	return false
 }
 
-func NewETHChain(config *eth.Config, etherBase *common.Address) *ETHChain {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address) *ETHChain {
 	if config == nil {
 		config = &eth.DefaultConfig
 	}
+	if nodecfg == nil {
+		nodecfg = &node.Config{}
+	}
 	mux := new(event.TypeMux)
-	ctx, ep, err := node.NewServiceContext(nil, mux)
+	ctx, ep, err := node.NewServiceContext(nodecfg, mux)
 	if err != nil {
 		panic(err)
 	}
