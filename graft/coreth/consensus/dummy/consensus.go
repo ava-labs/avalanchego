@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	myparams "github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/consensus"
 	"github.com/ava-labs/go-ethereum/core/state"
@@ -24,6 +25,7 @@ type OnAPIsCallbackType = func(consensus.ChainReader) []rpc.API
 
 type ConsensusCallbacks struct {
 	OnSeal                func(*types.Block) error
+	OnSealHash            func(*types.Header)
 	OnAPIs                OnAPIsCallbackType
 	OnFinalize            OnFinalizeCallbackType
 	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
@@ -54,8 +56,8 @@ var (
 // modified from consensus.go
 func (self *DummyEngine) verifyHeader(chain consensus.ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+	if uint64(len(header.Extra)) > myparams.MaximumExtraDataSize {
+		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), myparams.MaximumExtraDataSize)
 	}
 	// Verify the header's timestamp
 	if !uncle {
@@ -63,7 +65,8 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainReader, header, paren
 			return consensus.ErrFutureBlock
 		}
 	}
-	if header.Time <= parent.Time {
+	//if header.Time <= parent.Time {
+	if header.Time < parent.Time {
 		return errZeroBlockTime
 	}
 	// Verify that the gas limit is <= 2^63-1
@@ -278,6 +281,10 @@ func (self *DummyEngine) Seal(chain consensus.ChainReader, block *types.Block, r
 }
 
 func (self *DummyEngine) SealHash(header *types.Header) (hash common.Hash) {
+	if self.cb.OnSealHash != nil {
+		self.cb.OnSealHash(header)
+	}
+
 	hasher := sha3.NewLegacyKeccak256()
 
 	rlp.Encode(hasher, []interface{}{

@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/go-ethereum/params"
 	"github.com/ava-labs/go-ethereum/rlp"
 	"math/big"
-	//mrand "math/rand"
-	"time"
+	"sync"
+	//"time"
 )
 
 func checkError(err error) {
@@ -30,6 +30,7 @@ type TestChain struct {
 	chain       *coreth.ETHChain
 	parentBlock common.Hash
 	outBlockCh  chan<- []byte
+	blockWait   sync.WaitGroup
 }
 
 func (tc *TestChain) insertBlock(block *types.Block) {
@@ -50,7 +51,16 @@ func NewTestChain(name string, config *eth.Config,
 		outBlockCh: outBlockCh,
 	}
 	tc.insertBlock(tc.chain.GetGenesisBlock())
-	tc.chain.SetOnSealMiner(func(block *types.Block) error {
+	tc.chain.SetOnHeaderNew(func(header *types.Header) {
+		hid := make([]byte, 32)
+		_, err := rand.Read(hid)
+		if err != nil {
+			panic("cannot generate hid")
+		}
+		header.Extra = append(header.Extra, hid...)
+		//fmt.Printf("%s\n", hexutil.Encode(header.Extra))
+	})
+	tc.chain.SetOnSealFinish(func(block *types.Block) error {
 		blkID := tc.blkCount
 		tc.blkCount++
 		if len(block.Uncles()) != 0 {
@@ -71,6 +81,7 @@ func NewTestChain(name string, config *eth.Config,
 			<-inAckCh
 			log.Info(fmt.Sprintf("%s: got ack", name))
 		}
+		tc.blockWait.Done()
 		return nil
 	})
 	go func() {
@@ -104,16 +115,77 @@ func (tc *TestChain) GenRandomTree(n int, max int) {
 	for i := 0; i < n; i++ {
 		nblocks := len(tc.blocks)
 		m := max
-		if m < 0 {
+		if m < 0 || nblocks < m {
 			m = nblocks
 		}
 		pb, _ := rand.Int(rand.Reader, big.NewInt((int64)(m)))
 		pn := pb.Int64()
 		tc.parentBlock = tc.blocks[nblocks-1-(int)(pn)]
 		tc.chain.SetTail(tc.parentBlock)
+		tc.blockWait.Add(1)
 		tc.chain.GenBlock()
-		time.Sleep(time.Second)
+		tc.blockWait.Wait()
 	}
+}
+
+func run(config *eth.Config, a1, a2, b1, b2 int) {
+	aliceBlk := make(chan []byte)
+	bobBlk := make(chan []byte)
+	aliceAck := make(chan struct{})
+	bobAck := make(chan struct{})
+	alice := NewTestChain("alice", config, bobBlk, aliceBlk, bobAck, aliceAck)
+	bob := NewTestChain("bob", config, aliceBlk, bobBlk, aliceAck, bobAck)
+	alice.Start()
+	bob.Start()
+	alice.GenRandomTree(a1, a2)
+	log.Info("alice finished generating the tree")
+	//time.Sleep(1 * time.Second)
+	bob.outBlockCh = nil
+	bob.GenRandomTree(b1, b2)
+	//mrand.Shuffle(len(bob.blocks),
+	//	func(i, j int) { bob.blocks[i], bob.blocks[j] = bob.blocks[j], bob.blocks[i] })
+	log.Info("bob finished generating the tree")
+	//time.Sleep(1 * time.Second)
+	log.Info("bob sends out all its blocks")
+	for i := range bob.blocks {
+		serialized, err := rlp.EncodeToBytes(bob.chain.GetBlockByHash(bob.blocks[i]))
+		if err != nil {
+			panic(err)
+		}
+		bobBlk <- serialized
+		<-aliceAck
+		log.Info(fmt.Sprintf("bob: got ack"))
+	}
+	log.Info("bob finished generating the tree")
+	//time.Sleep(1 * time.Second)
+	log.Info("comparing two trees")
+	if len(alice.blocks) != len(bob.blocks) {
+		panic(fmt.Sprintf("mismatching tree size %d != %d", len(alice.blocks), len(bob.blocks)))
+	}
+	gn := big.NewInt(0)
+	for i := range alice.blocks {
+		ablk := alice.chain.GetBlockByHash(alice.blocks[i])
+		bblk := bob.chain.GetBlockByHash(alice.blocks[i])
+		for ablk.Number().Cmp(gn) > 0 && bblk.Number().Cmp(gn) > 0 {
+			result := ablk.Hash() == bblk.Hash()
+			opsign := "=="
+			if !result {
+				opsign = "!="
+			}
+			log.Info(fmt.Sprintf("alice(%d = %s) %s bob (%d = %s)",
+				ablk.Number(), ablk.Hash().Hex(),
+				opsign,
+				bblk.Number(), bblk.Hash().Hex()))
+			if !result {
+				panic("mismatching path")
+			}
+			ablk = alice.chain.GetBlockByHash(ablk.ParentHash())
+			bblk = bob.chain.GetBlockByHash(bblk.ParentHash())
+		}
+		log.Info(fmt.Sprintf("%s ok", alice.blocks[i].Hex()))
+	}
+	alice.Stop()
+	bob.Stop()
 }
 
 func main() {
@@ -153,61 +225,6 @@ func main() {
 	config.Miner.ManualMining = true
 	config.Miner.DisableUncle = true
 
-	aliceBlk := make(chan []byte)
-	bobBlk := make(chan []byte)
-	aliceAck := make(chan struct{})
-	bobAck := make(chan struct{})
-	alice := NewTestChain("alice", &config, bobBlk, aliceBlk, bobAck, aliceAck)
-	bob := NewTestChain("bob", &config, aliceBlk, bobBlk, aliceAck, bobAck)
-	alice.Start()
-	bob.Start()
-	alice.GenRandomTree(60, -1)
-	log.Info("alice finished generating the tree")
-	time.Sleep(2 * time.Second)
-	bob.outBlockCh = nil
-	bob.GenRandomTree(60, 2)
-	//mrand.Shuffle(len(bob.blocks),
-	//	func(i, j int) { bob.blocks[i], bob.blocks[j] = bob.blocks[j], bob.blocks[i] })
-	log.Info("bob finished generating the tree")
-	time.Sleep(2 * time.Second)
-	log.Info("bob sends out all its blocks")
-	for i := range bob.blocks {
-		serialized, err := rlp.EncodeToBytes(bob.chain.GetBlockByHash(bob.blocks[i]))
-		if err != nil {
-			panic(err)
-		}
-		bobBlk <- serialized
-		<-aliceAck
-		log.Info(fmt.Sprintf("bob: got ack"))
-	}
-	log.Info("bob finished generating the tree")
-	time.Sleep(2 * time.Second)
-	log.Info("comparing two trees")
-	if len(alice.blocks) != len(bob.blocks) {
-		panic(fmt.Sprintf("mismatching tree size %d != %d", len(alice.blocks), len(bob.blocks)))
-	}
-	gn := big.NewInt(0)
-	for i := range alice.blocks {
-		ablk := alice.chain.GetBlockByHash(alice.blocks[i])
-		bblk := bob.chain.GetBlockByHash(alice.blocks[i])
-		for ablk.Number().Cmp(gn) > 0 && bblk.Number().Cmp(gn) > 0 {
-			result := ablk.Hash() == bblk.Hash()
-			opsign := "=="
-			if !result {
-				opsign = "!="
-			}
-			log.Info(fmt.Sprintf("alice(%d = %s) %s bob (%d = %s)",
-				ablk.Number(), ablk.Hash().Hex(),
-				opsign,
-				bblk.Number(), bblk.Hash().Hex()))
-			if !result {
-				panic("mismatching path")
-			}
-			ablk = alice.chain.GetBlockByHash(ablk.ParentHash())
-			bblk = bob.chain.GetBlockByHash(bblk.ParentHash())
-		}
-		log.Info(fmt.Sprintf("%s ok", alice.blocks[i].Hex()))
-	}
-	alice.Stop()
-	bob.Stop()
+	run(&config, 60, 1, 60, 1)
+	run(&config, 500, 10, 500, 5)
 }

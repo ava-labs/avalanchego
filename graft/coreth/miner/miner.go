@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"time"
 
+	myparams "github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
 	"github.com/ava-labs/go-ethereum/consensus"
@@ -80,8 +81,8 @@ func (self *Miner) HashRate() uint64 {
 }
 
 func (self *Miner) SetExtra(extra []byte) error {
-	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("Extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
+	if uint64(len(extra)) > myparams.MaximumExtraDataSize {
+		return fmt.Errorf("Extra exceeds max length. %d > %v", len(extra), myparams.MaximumExtraDataSize)
 	}
 	self.w.setExtra(extra)
 	return nil
