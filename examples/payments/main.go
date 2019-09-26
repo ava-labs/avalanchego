@@ -60,7 +60,7 @@ func main() {
 
 	// grab the control of block generation and disable auto uncle
 	config.Miner.ManualMining = true
-	config.Miner.ManualUncle = true
+	config.Miner.DisableUncle = true
 
 	// info required to generate a transaction
 	chainID := chainConfig.ChainID
@@ -72,7 +72,7 @@ func main() {
 	checkError(err)
 
 	blockCount := 0
-	chain := coreth.NewETHChain(&config, nil)
+	chain := coreth.NewETHChain(&config, nil, nil)
 	showBalance := func() {
 		state, err := chain.CurrentState()
 		checkError(err)
