@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
+	myparams "github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/accounts"
 	"github.com/ava-labs/go-ethereum/accounts/abi/bind"
 	"github.com/ava-labs/go-ethereum/common"
@@ -240,8 +241,8 @@ func makeExtraData(extra []byte) []byte {
 			runtime.GOOS,
 		})
 	}
-	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", params.MaximumExtraDataSize)
+	if uint64(len(extra)) > myparams.MaximumExtraDataSize {
+		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", myparams.MaximumExtraDataSize)
 		extra = nil
 	}
 	return extra
@@ -441,7 +442,8 @@ func (s *Ethereum) StartMining(threads int) error {
 		// introduced to speed sync times.
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 
-		go s.miner.Start(eb)
+		//go s.miner.Start(eb)
+		s.miner.Start(eb)
 	}
 	return nil
 }

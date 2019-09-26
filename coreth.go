@@ -96,8 +96,20 @@ func (self *ETHChain) SetOnSeal(cb func(*types.Block) error) {
 	self.cb.OnSeal = cb
 }
 
-func (self *ETHChain) SetOnSealMiner(cb func(*types.Block) error) {
-	self.mcb.OnSeal = cb
+func (self *ETHChain) SetOnSealHash(cb func(*types.Header)) {
+	self.cb.OnSealHash = cb
+}
+
+func (self *ETHChain) SetOnSealFinish(cb func(*types.Block) error) {
+	self.mcb.OnSealFinish = cb
+}
+
+func (self *ETHChain) SetOnHeaderNew(cb func(*types.Header)) {
+	self.mcb.OnHeaderNew = cb
+}
+
+func (self *ETHChain) SetOnSealDrop(cb func(*types.Block)) {
+	self.mcb.OnSealDrop = cb
 }
 
 func (self *ETHChain) SetOnAPIs(cb dummy.OnAPIsCallbackType) {

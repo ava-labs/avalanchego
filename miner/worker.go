@@ -26,7 +26,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	//"fmt"
 
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/consensus"
@@ -124,7 +123,9 @@ type intervalAdjust struct {
 }
 
 type MinerCallbacks struct {
-	OnSeal func(*types.Block) error
+	OnSealFinish func(*types.Block) error
+	OnSealDrop   func(*types.Block)
+	OnHeaderNew  func(*types.Header)
 }
 
 // worker is the main object which takes care of submitting new work to consensus engine
@@ -558,6 +559,10 @@ func (w *worker) taskLoop() {
 			// Reject duplicate sealing work due to resubmitting.
 			sealHash := w.engine.SealHash(task.block.Header())
 			if sealHash == prev {
+				log.Warn("Reject duplicate sealing work due to resubmitting.")
+				if w.minerCallbacks.OnSealDrop != nil {
+					w.minerCallbacks.OnSealDrop(task.block)
+				}
 				continue
 			}
 			// Interrupt previous sealing operation
@@ -565,6 +570,9 @@ func (w *worker) taskLoop() {
 			stopCh, prev = make(chan struct{}), sealHash
 
 			if w.skipSealHook != nil && w.skipSealHook(task) {
+				if w.minerCallbacks.OnSealDrop != nil {
+					w.minerCallbacks.OnSealDrop(task.block)
+				}
 				continue
 			}
 			w.pendingMu.Lock()
@@ -636,8 +644,8 @@ func (w *worker) resultLoop() {
 			}
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
 				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
-			if w.minerCallbacks.OnSeal != nil {
-				w.minerCallbacks.OnSeal(block)
+			if w.minerCallbacks.OnSealFinish != nil {
+				w.minerCallbacks.OnSealFinish(block)
 			}
 
 			// Broadcast the block and announce chain insertion event
@@ -883,7 +891,8 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	parent := w.chain.CurrentBlock()
 
 	if parent.Time() >= uint64(timestamp) {
-		timestamp = int64(parent.Time() + 1)
+		//timestamp = int64(parent.Time() + 1)
+		timestamp = int64(parent.Time())
 	}
 	// this will ensure we're not going off too far in the future
 	if now := time.Now().Unix(); timestamp > now+1 {
@@ -924,6 +933,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 				header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
 			}
 		}
+	}
+	if w.minerCallbacks.OnHeaderNew != nil {
+		w.minerCallbacks.OnHeaderNew(header)
 	}
 	// Could potentially happen if starting to mine in an odd state.
 	err := w.makeCurrent(parent, header)
