@@ -29,12 +29,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/ethstats"
+	"github.com/ava-labs/coreth/miner"
+	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/go-ethereum/accounts"
 	"github.com/ava-labs/go-ethereum/accounts/keystore"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/fdlimit"
 	"github.com/ava-labs/go-ethereum/consensus"
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/go-ethereum/consensus/clique"
 	"github.com/ava-labs/go-ethereum/consensus/ethash"
 	"github.com/ava-labs/go-ethereum/core"
@@ -43,15 +47,11 @@ import (
 	"github.com/ava-labs/go-ethereum/dashboard"
 	"github.com/ava-labs/go-ethereum/eth/downloader"
 	"github.com/ava-labs/go-ethereum/eth/gasprice"
-	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/go-ethereum/ethdb"
-	"github.com/ava-labs/coreth/ethstats"
 	"github.com/ava-labs/go-ethereum/graphql"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/metrics"
 	"github.com/ava-labs/go-ethereum/metrics/influxdb"
-	"github.com/ava-labs/coreth/miner"
-	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/go-ethereum/p2p"
 	"github.com/ava-labs/go-ethereum/p2p/discv5"
 	"github.com/ava-labs/go-ethereum/p2p/enode"
@@ -1477,21 +1477,21 @@ func SetDashboardConfig(ctx *cli.Context, cfg *dashboard.Config) {
 
 // RegisterEthService adds an Ethereum client to the stack.
 func RegisterEthService(stack *node.Node, cfg *eth.Config) {
-    var err error
-    if cfg.SyncMode == downloader.LightSync {
-        panic("not supported")
-    } else {
-        err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-            fullNode, err := eth.New(ctx, cfg, &dummy.ConsensusCallbacks{})
-            if fullNode != nil && cfg.LightServ > 0 {
-                panic("not supported")
-            }
-            return fullNode, err
-        })
-    }
-    if err != nil {
-        Fatalf("Failed to register the Ethereum service: %v", err)
-    }
+	var err error
+	if cfg.SyncMode == downloader.LightSync {
+		panic("not supported")
+	} else {
+		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+			fullNode, err := eth.New(ctx, cfg, &dummy.ConsensusCallbacks{}, &miner.MinerCallbacks{}, nil)
+			if fullNode != nil && cfg.LightServ > 0 {
+				panic("not supported")
+			}
+			return fullNode, err
+		})
+	}
+	if err != nil {
+		Fatalf("Failed to register the Ethereum service: %v", err)
+	}
 }
 
 // RegisterDashboardService adds a dashboard to the stack.
