@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/go-ethereum/rlp"
 	"math/big"
 	"sync"
-	//"time"
 )
 
 func checkError(err error) {
@@ -58,7 +57,6 @@ func NewTestChain(name string, config *eth.Config,
 			panic("cannot generate hid")
 		}
 		header.Extra = append(header.Extra, hid...)
-		//fmt.Printf("%s\n", hexutil.Encode(header.Extra))
 	})
 	tc.chain.SetOnSealFinish(func(block *types.Block) error {
 		blkID := tc.blkCount

@@ -92,7 +92,7 @@ func main() {
 	gasPrice := big.NewInt(1000000000)
 
 	blockCount := 0
-	chain := coreth.NewETHChain(&config, nil, nil)
+	chain := coreth.NewETHChain(&config, nil, nil, nil)
 	log.Info(chain.GetGenesisBlock().Hash().Hex())
 	firstBlock := false
 	var contractAddr common.Address
@@ -125,17 +125,22 @@ func main() {
 					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 					checkError(err)
 					chain.AddRemoteTxs([]*types.Transaction{signedTx})
-					time.Sleep(1000 * time.Millisecond)
 					nonce++
 				}
 			}()
 		}
 		return false
 	}
-	chain.SetOnSeal(func(block *types.Block) error {
+	chain.SetOnHeaderNew(func(header *types.Header) {
+		hid := make([]byte, 32)
+		_, err := rand.Read(hid)
+		if err != nil {
+			panic("cannot generate hid")
+		}
+		header.Extra = append(header.Extra, hid...)
+	})
+	chain.SetOnSealFinish(func(block *types.Block) error {
 		go func() {
-			// the minimum time gap is 1s
-			time.Sleep(1000 * time.Millisecond)
 			// generate 15 blocks
 			blockCount++
 			if postGen(block) {

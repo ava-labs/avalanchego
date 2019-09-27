@@ -3,12 +3,6 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
-	"math/big"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-	//"encoding/hex"
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/go-ethereum/common"
@@ -17,6 +11,10 @@ import (
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/params"
+	"math/big"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func checkError(err error) {
@@ -72,20 +70,26 @@ func main() {
 	checkError(err)
 
 	blockCount := 0
-	chain := coreth.NewETHChain(&config, nil, nil)
+	chain := coreth.NewETHChain(&config, nil, nil, nil)
 	showBalance := func() {
 		state, err := chain.CurrentState()
 		checkError(err)
 		log.Info(fmt.Sprintf("genesis balance = %s", state.GetBalance(genKey.Address)))
 		log.Info(fmt.Sprintf("bob's balance = %s", state.GetBalance(bob.Address)))
 	}
-	chain.SetOnSeal(func(block *types.Block) error {
+	chain.SetOnHeaderNew(func(header *types.Header) {
+		hid := make([]byte, 32)
+		_, err := rand.Read(hid)
+		if err != nil {
+			panic("cannot generate hid")
+		}
+		header.Extra = append(header.Extra, hid...)
+	})
+	chain.SetOnSealFinish(func(block *types.Block) error {
 		go func() {
-			// the minimum time gap is 1s
-			time.Sleep(1000 * time.Millisecond)
 			// generate 15 blocks
 			blockCount++
-			if blockCount == 15 {
+			if blockCount == 43 {
 				showBalance()
 				return
 			}
@@ -97,13 +101,12 @@ func main() {
 	// start the chain
 	chain.Start()
 	chain.GenBlock()
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 42; i++ {
 		tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 		checkError(err)
 		_ = signedTx
 		chain.AddRemoteTxs([]*types.Transaction{signedTx})
-		time.Sleep(1000 * time.Millisecond)
 		nonce++
 	}
 
