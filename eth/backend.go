@@ -119,7 +119,7 @@ func (s *Ethereum) SetContractBackend(backend bind.ContractBackend) {
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks, mcb *miner.MinerCallbacks) (*Ethereum, error) {
+func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks, mcb *miner.MinerCallbacks, chainDb ethdb.Database) (*Ethereum, error) {
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -137,10 +137,13 @@ func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks,
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
 
-	// Assemble the Ethereum object
-	chainDb, err := ctx.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
-	if err != nil {
-		return nil, err
+	var err error
+	if chainDb == nil {
+		// Assemble the Ethereum object
+		chainDb, err = ctx.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/")
+		if err != nil {
+			return nil, err
+		}
 	}
 	chainConfig, genesisHash, genesisErr := mycore.SetupGenesisBlock(chainDb, config.Genesis)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {

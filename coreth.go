@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/go-ethereum/core/state"
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/crypto"
+	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/rpc"
@@ -34,7 +35,7 @@ func isLocalBlock(block *types.Block) bool {
 	return false
 }
 
-func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address) *ETHChain {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Address, chainDB ethdb.Database) *ETHChain {
 	if config == nil {
 		config = &eth.DefaultConfig
 	}
@@ -47,11 +48,11 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 		panic(err)
 	}
 	if ep != "" {
-		log.Info(fmt.Sprintf("ephemeral = %s", ep))
+		log.Info(fmt.Sprintf("temporary keystore = %s", ep))
 	}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
-	backend, _ := eth.New(&ctx, config, cb, mcb)
+	backend, _ := eth.New(&ctx, config, cb, mcb, chainDB)
 	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb}
 	if etherBase == nil {
 		etherBase = &common.Address{
