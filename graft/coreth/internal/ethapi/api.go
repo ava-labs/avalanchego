@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/accounts"
 	"github.com/ava-labs/go-ethereum/accounts/keystore"
 	"github.com/ava-labs/go-ethereum/accounts/scwallet"
@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/go-ethereum/p2p"
 	"github.com/ava-labs/go-ethereum/params"
 	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/rpc"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/tyler-smith/go-bip39"
 )
 

@@ -29,6 +29,7 @@ type ETHChain struct {
 	backend *eth.Ethereum
 	cb      *dummy.ConsensusCallbacks
 	mcb     *miner.MinerCallbacks
+	bcb     *eth.BackendCallbacks
 }
 
 func isLocalBlock(block *types.Block) bool {
@@ -52,8 +53,9 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
-	backend, _ := eth.New(&ctx, config, cb, mcb, chainDB)
-	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb}
+	bcb := new(eth.BackendCallbacks)
+	backend, _ := eth.New(&ctx, config, cb, mcb, bcb, chainDB)
+	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
 	if etherBase == nil {
 		etherBase = &common.Address{
 			1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -123,6 +125,10 @@ func (self *ETHChain) SetOnFinalize(cb dummy.OnFinalizeCallbackType) {
 
 func (self *ETHChain) SetOnFinalizeAndAssemble(cb dummy.OnFinalizeAndAssembleCallbackType) {
 	self.cb.OnFinalizeAndAssemble = cb
+}
+
+func (self *ETHChain) SetOnQueryAcceptedBlock(cb func() *types.Block) {
+	self.bcb.OnQueryAcceptedBlock = cb
 }
 
 // Returns a new mutable state based on the current HEAD block.

@@ -27,6 +27,8 @@ import (
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	mycore "github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/eth/filters"
+	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
@@ -44,8 +46,6 @@ import (
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/core/vm"
 	"github.com/ava-labs/go-ethereum/eth/downloader"
-	"github.com/ava-labs/go-ethereum/eth/filters"
-	"github.com/ava-labs/go-ethereum/eth/gasprice"
 	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
@@ -63,6 +63,10 @@ type LesServer interface {
 	Protocols() []p2p.Protocol
 	SetBloomBitsIndexer(bbIndexer *core.ChainIndexer)
 	SetContractBackend(bind.ContractBackend)
+}
+
+type BackendCallbacks struct {
+	OnQueryAcceptedBlock func() *types.Block
 }
 
 // Ethereum implements the Ethereum full node service.
@@ -102,6 +106,7 @@ type Ethereum struct {
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
 	txSubmitChan chan struct{}
+	bcb          *BackendCallbacks
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
@@ -119,7 +124,11 @@ func (s *Ethereum) SetContractBackend(backend bind.ContractBackend) {
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks, mcb *miner.MinerCallbacks, chainDb ethdb.Database) (*Ethereum, error) {
+func New(ctx *node.ServiceContext, config *Config,
+	cb *dummy.ConsensusCallbacks,
+	mcb *miner.MinerCallbacks,
+	bcb *BackendCallbacks,
+	chainDb ethdb.Database) (*Ethereum, error) {
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -164,6 +173,7 @@ func New(ctx *node.ServiceContext, config *Config, cb *dummy.ConsensusCallbacks,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		txSubmitChan:   make(chan struct{}, 1),
+		bcb:            bcb,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -556,4 +566,12 @@ func (s *Ethereum) StopPart() error {
 
 func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
 	return s.txSubmitChan
+}
+
+func (s *Ethereum) AcceptedBlock() *types.Block {
+	cb := s.bcb.OnQueryAcceptedBlock
+	if cb != nil {
+		return cb()
+	}
+	return s.blockchain.CurrentBlock()
 }
