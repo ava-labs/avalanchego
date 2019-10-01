@@ -24,13 +24,13 @@ import (
 	"runtime"
 	"time"
 
-    "github.com/ava-labs/go-ethereum/common/hexutil"
+	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ava-labs/go-ethereum/common/hexutil"
 	"github.com/ava-labs/go-ethereum/consensus/ethash"
 	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/eth/downloader"
-	"github.com/ava-labs/go-ethereum/eth/gasprice"
-	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/go-ethereum/params"
 )
 
@@ -158,32 +158,32 @@ type Config struct {
 }
 
 func MyDefaultConfig() Config {
-    config := DefaultConfig
-    chainConfig := &params.ChainConfig {
-        ChainID:             big.NewInt(42222),
-        HomesteadBlock:      big.NewInt(0),
-        DAOForkBlock:        big.NewInt(0),
-        DAOForkSupport:      true,
-        EIP150Block:         big.NewInt(0),
-        EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
-        EIP155Block:         big.NewInt(0),
-        EIP158Block:         big.NewInt(0),
-        ByzantiumBlock:      big.NewInt(0),
-        ConstantinopleBlock: big.NewInt(0),
-        PetersburgBlock:     big.NewInt(0),
-        IstanbulBlock:       nil,
-        Ethash:              nil,
-    }
-    genBalance := big.NewInt(1000000000000000000)
+	config := DefaultConfig
+	chainConfig := &params.ChainConfig{
+		ChainID:             big.NewInt(42222),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        big.NewInt(0),
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       nil,
+		Ethash:              nil,
+	}
+	genBalance := big.NewInt(1000000000000000000)
 
-    config.Genesis = &core.Genesis{
-        Config:     chainConfig,
-        Nonce:      0,
-        Number:     0,
-        ExtraData:  hexutil.MustDecode("0x00"),
-        GasLimit:   100000000,
-        Difficulty: big.NewInt(0),
-        Alloc: core.GenesisAlloc{ common.Address{}: { Balance: genBalance }},
-    }
-    return config
+	config.Genesis = &core.Genesis{
+		Config:     chainConfig,
+		Nonce:      0,
+		Number:     0,
+		ExtraData:  hexutil.MustDecode("0x00"),
+		GasLimit:   100000000,
+		Difficulty: big.NewInt(0),
+		Alloc:      core.GenesisAlloc{common.Address{}: {Balance: genBalance}},
+	}
+	return config
 }

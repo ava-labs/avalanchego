@@ -28,15 +28,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/coreth/internal/ethapi"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
 	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/rawdb"
 	"github.com/ava-labs/go-ethereum/core/state"
 	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/rpc"
 	"github.com/ava-labs/go-ethereum/trie"
 )
 
@@ -271,6 +271,8 @@ func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error
 	var block *types.Block
 	if blockNr == rpc.LatestBlockNumber {
 		block = api.eth.blockchain.CurrentBlock()
+	} else if blockNr == rpc.AcceptedBlockNumber {
+		block = api.eth.AcceptedBlock()
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
 	}

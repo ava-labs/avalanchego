@@ -21,6 +21,7 @@ import (
 	"context"
 	"math/big"
 
+	myrpc "github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/accounts"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/core"
@@ -50,11 +51,11 @@ type Backend interface {
 
 	// Blockchain API
 	SetHead(number uint64)
-	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
+	HeaderByNumber(ctx context.Context, number myrpc.BlockNumber) (*types.Header, error)
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
-	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
+	BlockByNumber(ctx context.Context, number myrpc.BlockNumber) (*types.Block, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
-	StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error)
+	StateAndHeaderByNumber(ctx context.Context, number myrpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
 	GetTd(hash common.Hash) *big.Int
 	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error)
@@ -81,6 +82,7 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
+	AcceptedBlock() *types.Block
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

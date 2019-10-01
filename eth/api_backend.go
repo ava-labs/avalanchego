@@ -21,6 +21,8 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/accounts"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/math"
@@ -31,11 +33,9 @@ import (
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/core/vm"
 	"github.com/ava-labs/go-ethereum/eth/downloader"
-	"github.com/ava-labs/go-ethereum/eth/gasprice"
 	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/params"
-	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 // EthAPIBackend implements ethapi.Backend for full nodes
@@ -54,6 +54,10 @@ func (b *EthAPIBackend) CurrentBlock() *types.Block {
 	return b.eth.blockchain.CurrentBlock()
 }
 
+func (b *EthAPIBackend) AcceptedBlock() *types.Block {
+	return b.eth.AcceptedBlock()
+}
+
 func (b *EthAPIBackend) SetHead(number uint64) {
 	b.eth.protocolManager.downloader.Cancel()
 	b.eth.blockchain.SetHead(number)
@@ -68,6 +72,9 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	// Otherwise resolve and return the block
 	if number == rpc.LatestBlockNumber {
 		return b.eth.blockchain.CurrentBlock().Header(), nil
+	}
+	if number == rpc.AcceptedBlockNumber {
+		return b.eth.AcceptedBlock().Header(), nil
 	}
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
 }
@@ -85,6 +92,9 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	// Otherwise resolve and return the block
 	if number == rpc.LatestBlockNumber {
 		return b.eth.blockchain.CurrentBlock(), nil
+	}
+	if number == rpc.AcceptedBlockNumber {
+		return b.eth.AcceptedBlock(), nil
 	}
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
 }

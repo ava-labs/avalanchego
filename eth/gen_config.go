@@ -6,12 +6,12 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/consensus/ethash"
 	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/eth/downloader"
-	"github.com/ava-labs/go-ethereum/eth/gasprice"
-	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/go-ethereum/params"
 )
 
