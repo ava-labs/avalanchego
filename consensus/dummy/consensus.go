@@ -276,7 +276,9 @@ func (self *DummyEngine) Seal(chain consensus.ChainReader, block *types.Block, r
 	} else {
 		err = nil
 	}
-	results <- block
+	if err == nil {
+		results <- block
+	}
 	return
 }
 
