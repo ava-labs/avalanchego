@@ -979,7 +979,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if !noempty && !w.manualMining {
 		// Create an empty block based on temporary copied state for sealing in advance without waiting block
 		// execution finished.
-		log.Trace("commit n1")
 		w.commit(uncles, nil, false, tstart)
 	}
 
@@ -1014,7 +1013,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
-	log.Trace("commit n2")
 	w.commit(uncles, w.fullTaskHook, true, tstart)
 }
 

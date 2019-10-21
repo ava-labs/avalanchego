@@ -1369,20 +1369,24 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 			reorg = !currentPreserve && (blockPreserve || mrand.Float64() < 0.5)
 		}
 	}
-	if !bc.manualCanonical && reorg {
-		// Reorganise the chain if the parent is not the head block
-		if block.ParentHash() != currentBlock.Hash() {
-			if err := bc.reorg(currentBlock, block); err != nil {
-				return NonStatTy, err
-			}
-		}
-		// Write the positional metadata for transaction/receipt lookups and preimages
-		rawdb.WriteTxLookupEntries(batch, block)
-		rawdb.WritePreimages(batch, state.Preimages())
-
+	if bc.manualCanonical {
 		status = CanonStatTy
 	} else {
-		status = SideStatTy
+		if reorg {
+			// Reorganise the chain if the parent is not the head block
+			if block.ParentHash() != currentBlock.Hash() {
+				if err := bc.reorg(currentBlock, block); err != nil {
+					return NonStatTy, err
+				}
+			}
+			// Write the positional metadata for transaction/receipt lookups and preimages
+			rawdb.WriteTxLookupEntries(batch, block)
+			rawdb.WritePreimages(batch, state.Preimages())
+
+			status = CanonStatTy
+		} else {
+			status = SideStatTy
+		}
 	}
 	if err := batch.Write(); err != nil {
 		return NonStatTy, err
