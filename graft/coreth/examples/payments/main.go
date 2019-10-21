@@ -4,10 +4,10 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/ava-labs/coreth"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/params"
@@ -83,11 +83,13 @@ func main() {
 		header.Extra = append(header.Extra, hid...)
 	})
 	newBlockChan := make(chan *types.Block)
+	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	chain.SetOnSealFinish(func(block *types.Block) error {
 		newBlockChan <- block
 		return nil
 	})
 
+	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	// start the chain
 	chain.Start()
 	for i := 0; i < 42; i++ {
@@ -98,7 +100,7 @@ func main() {
 		nonce++
 		chain.GenBlock()
 		block := <-newBlockChan
-		chain.SetTail(block.Hash())
+		<-newTxPoolHeadChan
 		log.Info("finished generating block, starting the next iteration", "height", block.Number())
 	}
 	showBalance()
