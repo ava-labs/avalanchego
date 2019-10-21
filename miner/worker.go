@@ -637,6 +637,7 @@ func (w *worker) resultLoop() {
 			// Commit block and state to database.
 			//fmt.Printf("parent1: %s\n", w.chain.CurrentBlock().Hash().String())
 			stat, err := w.chain.WriteBlockWithState(block, receipts, task.state)
+			stat = core.CanonStatTy
 			//fmt.Printf("parent2: %s\n", w.chain.CurrentBlock().Hash().String())
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)

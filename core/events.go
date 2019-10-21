@@ -25,7 +25,7 @@ import (
 type NewTxsEvent struct{ Txs []*types.Transaction }
 
 // NewTxPoolHeadEvent is posted when the pool head is updated.
-type NewTxPoolHeadEvent struct{ block *types.Block }
+type NewTxPoolHeadEvent struct{ Block *types.Block }
 
 // PendingLogsEvent is posted pre mining and notifies of pending logs.
 type PendingLogsEvent struct {
