@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/coreth/core"
 	myrpc "github.com/ava-labs/coreth/rpc"
 	ethereum "github.com/ava-labs/go-ethereum"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/rawdb"
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/event"

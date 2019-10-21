@@ -21,10 +21,11 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/ava-labs/coreth/core"
 	myrpc "github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/accounts"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core"
+	ethcore "github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/bloombits"
 	"github.com/ava-labs/go-ethereum/core/state"
 	"github.com/ava-labs/go-ethereum/core/types"
@@ -58,7 +59,7 @@ type Backend interface {
 	StateAndHeaderByNumber(ctx context.Context, number myrpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
 	GetTd(hash common.Hash) *big.Int
-	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error)
+	GetEVM(ctx context.Context, msg ethcore.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error)
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription

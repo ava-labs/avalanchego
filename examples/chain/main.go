@@ -189,6 +189,7 @@ func run(config *eth.Config, a1, a2, b1, b2 int) {
 func main() {
 	// configure the chain
 	config := eth.DefaultConfig
+	config.ManualCanonical = true
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),

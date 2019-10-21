@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
-	mycore "github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/internal/ethapi"
@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/go-ethereum/consensus"
 	"github.com/ava-labs/go-ethereum/consensus/clique"
 	"github.com/ava-labs/go-ethereum/consensus/ethash"
-	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/bloombits"
 	"github.com/ava-labs/go-ethereum/core/rawdb"
 	"github.com/ava-labs/go-ethereum/core/types"
@@ -50,7 +49,7 @@ import (
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/p2p"
-	"github.com/ava-labs/go-ethereum/p2p/enr"
+	//"github.com/ava-labs/go-ethereum/p2p/enr"
 	"github.com/ava-labs/go-ethereum/params"
 	"github.com/ava-labs/go-ethereum/rlp"
 	"github.com/ava-labs/go-ethereum/rpc"
@@ -154,7 +153,7 @@ func New(ctx *node.ServiceContext, config *Config,
 			return nil, err
 		}
 	}
-	chainConfig, genesisHash, genesisErr := mycore.SetupGenesisBlock(chainDb, config.Genesis)
+	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
@@ -205,7 +204,7 @@ func New(ctx *node.ServiceContext, config *Config,
 			TrieTimeLimit:       config.TrieTimeout,
 		}
 	)
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve)
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, config.ManualCanonical)
 	if err != nil {
 		return nil, err
 	}
@@ -222,15 +221,15 @@ func New(ctx *node.ServiceContext, config *Config,
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
-	// Permit the downloader to use the trie cache allowance during fast sync
-	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit
-	checkpoint := config.Checkpoint
-	if checkpoint == nil {
-		checkpoint = params.TrustedCheckpoints[genesisHash]
-	}
-	if eth.protocolManager, err = NewProtocolManager(chainConfig, checkpoint, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb, cacheLimit, config.Whitelist); err != nil {
-		return nil, err
-	}
+	//// Permit the downloader to use the trie cache allowance during fast sync
+	//cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit
+	//checkpoint := config.Checkpoint
+	//if checkpoint == nil {
+	//	checkpoint = params.TrustedCheckpoints[genesisHash]
+	//}
+	//if eth.protocolManager, err = NewProtocolManager(chainConfig, checkpoint, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb, cacheLimit, config.Whitelist); err != nil {
+	//	return nil, err
+	//}
 	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock, mcb)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
@@ -295,11 +294,11 @@ func (s *Ethereum) APIs() []rpc.API {
 			Version:   "1.0",
 			Service:   NewPublicMinerAPI(s),
 			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
-			Public:    true,
+			//}, {
+			//	Namespace: "eth",
+			//	Version:   "1.0",
+			//	Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
+			//	Public:    true,
 		}, {
 			Namespace: "miner",
 			Version:   "1.0",
@@ -451,9 +450,9 @@ func (s *Ethereum) StartMining(threads int) error {
 			log.Error("Cannot start mining without etherbase", "err", err)
 			return fmt.Errorf("etherbase missing: %v", err)
 		}
-		// If mining is started, we can disable the transaction rejection mechanism
-		// introduced to speed sync times.
-		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
+		//// If mining is started, we can disable the transaction rejection mechanism
+		//// introduced to speed sync times.
+		//atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 
 		//go s.miner.Start(eb)
 		s.miner.Start(eb)
@@ -495,20 +494,20 @@ func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruni
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
 	protos := make([]p2p.Protocol, len(ProtocolVersions))
-	for i, vsn := range ProtocolVersions {
-		protos[i] = s.protocolManager.makeProtocol(vsn)
-		protos[i].Attributes = []enr.Entry{s.currentEthEntry()}
-	}
-	if s.lesServer != nil {
-		protos = append(protos, s.lesServer.Protocols()...)
-	}
+	//for i, vsn := range ProtocolVersions {
+	//	protos[i] = s.protocolManager.makeProtocol(vsn)
+	//	protos[i].Attributes = []enr.Entry{s.currentEthEntry()}
+	//}
+	//if s.lesServer != nil {
+	//	protos = append(protos, s.lesServer.Protocols()...)
+	//}
 	return protos
 }
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
 func (s *Ethereum) Start(srvr *p2p.Server) error {
-	s.startEthEntryUpdate(srvr.LocalNode())
+	//s.startEthEntryUpdate(srvr.LocalNode())
 
 	// Start the bloom bits servicing goroutines
 	s.startBloomHandlers(params.BloomBitsBlocks)
@@ -525,7 +524,9 @@ func (s *Ethereum) Start(srvr *p2p.Server) error {
 		maxPeers -= s.config.LightPeers
 	}
 	// Start the networking layer and the light server if requested
-	s.protocolManager.Start(maxPeers)
+	if s.protocolManager != nil {
+		s.protocolManager.Start(maxPeers)
+	}
 	if s.lesServer != nil {
 		s.lesServer.Start(srvr)
 	}
@@ -538,7 +539,9 @@ func (s *Ethereum) Stop() error {
 	s.bloomIndexer.Close()
 	s.blockchain.Stop()
 	s.engine.Close()
-	s.protocolManager.Stop()
+	if s.protocolManager != nil {
+		s.protocolManager.Stop()
+	}
 	if s.lesServer != nil {
 		s.lesServer.Stop()
 	}
