@@ -149,7 +149,7 @@ func (self *ETHChain) GetBlockByHash(hash common.Hash) *types.Block {
 // SetTail sets the current head block to the one defined by the hash
 // irrelevant what the chain contents were prior.
 func (self *ETHChain) SetTail(hash common.Hash) error {
-	return self.backend.BlockChain().FastSyncCommitHead(hash)
+	return self.backend.BlockChain().ManualHead(hash)
 }
 
 func (self *ETHChain) GetReceiptsByHash(hash common.Hash) types.Receipts {

@@ -22,11 +22,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/coreth/core"
 	myparams "github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
 	"github.com/ava-labs/go-ethereum/consensus"
-	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/state"
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/event"

@@ -27,10 +27,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/consensus"
 	"github.com/ava-labs/go-ethereum/consensus/misc"
-	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/state"
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/event"

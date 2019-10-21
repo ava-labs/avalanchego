@@ -12,9 +12,6 @@ import (
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/params"
 	"math/big"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func checkError(err error) {
@@ -26,6 +23,7 @@ func checkError(err error) {
 func main() {
 	// configure the chain
 	config := eth.DefaultConfig
+	config.ManualCanonical = true
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),
@@ -69,7 +67,6 @@ func main() {
 	bob, err := coreth.NewKey(rand.Reader)
 	checkError(err)
 
-	blockCount := 0
 	chain := coreth.NewETHChain(&config, nil, nil, nil)
 	showBalance := func() {
 		state, err := chain.CurrentState()
@@ -85,22 +82,16 @@ func main() {
 		}
 		header.Extra = append(header.Extra, hid...)
 	})
+	newBlockChan := make(chan *types.Block)
 	chain.SetOnSealFinish(func(block *types.Block) error {
 		go func() {
-			// generate 15 blocks
-			blockCount++
-			if blockCount == 43 {
-				showBalance()
-				return
-			}
-			chain.GenBlock()
+			newBlockChan <- block
 		}()
 		return nil
 	})
 
 	// start the chain
 	chain.Start()
-	chain.GenBlock()
 	for i := 0; i < 42; i++ {
 		tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
@@ -108,11 +99,11 @@ func main() {
 		_ = signedTx
 		chain.AddRemoteTxs([]*types.Transaction{signedTx})
 		nonce++
+		chain.GenBlock()
+		block := <-newBlockChan
+		chain.SetTail(block.Hash())
+		log.Info("finished generating block, starting the next iteration", "height", block.Number())
 	}
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	signal.Notify(c, os.Interrupt, syscall.SIGINT)
-	<-c
+	showBalance()
 	chain.Stop()
 }

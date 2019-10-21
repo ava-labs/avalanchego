@@ -21,12 +21,13 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/accounts"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/math"
-	"github.com/ava-labs/go-ethereum/core"
+	ethcore "github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/bloombits"
 	"github.com/ava-labs/go-ethereum/core/rawdb"
 	"github.com/ava-labs/go-ethereum/core/state"
@@ -141,7 +142,7 @@ func (b *EthAPIBackend) GetTd(blockHash common.Hash) *big.Int {
 	return b.eth.blockchain.GetTdByHash(blockHash)
 }
 
-func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error) {
+func (b *EthAPIBackend) GetEVM(ctx context.Context, msg ethcore.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error) {
 	state.SetBalance(msg.From(), math.MaxBig256)
 	vmError := func() error { return nil }
 
