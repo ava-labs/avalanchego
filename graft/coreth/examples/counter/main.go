@@ -141,14 +141,11 @@ func main() {
 		header.Extra = append(header.Extra, hid...)
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
-		go func() {
-			// generate 15 blocks
-			blockCount++
-			if postGen(block) {
-				return
-			}
-			chain.GenBlock()
-		}()
+		blockCount++
+		if postGen(block) {
+			return nil
+		}
+		chain.GenBlock()
 		return nil
 	})
 

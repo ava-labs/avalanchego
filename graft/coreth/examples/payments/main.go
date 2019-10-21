@@ -84,9 +84,7 @@ func main() {
 	})
 	newBlockChan := make(chan *types.Block)
 	chain.SetOnSealFinish(func(block *types.Block) error {
-		go func() {
-			newBlockChan <- block
-		}()
+		newBlockChan <- block
 		return nil
 	})
 
@@ -96,7 +94,6 @@ func main() {
 		tx := types.NewTransaction(nonce, bob.Address, value, uint64(gasLimit), gasPrice, nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 		checkError(err)
-		_ = signedTx
 		chain.AddRemoteTxs([]*types.Transaction{signedTx})
 		nonce++
 		chain.GenBlock()
