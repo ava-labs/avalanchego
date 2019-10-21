@@ -329,7 +329,7 @@ func (pool *TxPool) loop() {
 			if ev.Block != nil {
 				pool.requestReset(head.Header(), ev.Block.Header())
 				head = ev.Block
-				pool.headFeed.Send(NewTxPoolHeadEvent{head})
+				pool.headFeed.Send(NewTxPoolHeadEvent{Block: head})
 			}
 
 		// System shutdown.
