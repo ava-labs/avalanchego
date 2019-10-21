@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
@@ -180,8 +181,13 @@ func (self *ETHChain) AttachEthService(handler *rpc.Server, namespaces []string)
 	}
 }
 
+// TODO: use SubscribeNewTxsEvent()
 func (self *ETHChain) GetTxSubmitCh() <-chan struct{} {
 	return self.backend.GetTxSubmitCh()
+}
+
+func (self *ETHChain) GetTxPool() *core.TxPool {
+	return self.backend.TxPool()
 }
 
 type Key struct {

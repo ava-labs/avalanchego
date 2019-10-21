@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ava-labs/coreth"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/compiler"
-	//"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/log"
@@ -94,6 +93,7 @@ func main() {
 
 	blockCount := 0
 	chain := coreth.NewETHChain(&config, nil, nil, nil)
+	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	log.Info(chain.GetGenesisBlock().Hash().Hex())
 	firstBlock := false
 	var contractAddr common.Address
@@ -145,11 +145,15 @@ func main() {
 		if postGen(block) {
 			return nil
 		}
-		chain.GenBlock()
+		go func() {
+			<-newTxPoolHeadChan
+			chain.GenBlock()
+		}()
 		return nil
 	})
 
 	// start the chain
+	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	chain.Start()
 
 	_ = contract
