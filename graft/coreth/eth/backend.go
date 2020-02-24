@@ -153,7 +153,7 @@ func New(ctx *node.ServiceContext, config *Config,
 			return nil, err
 		}
 	}
-	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
+	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, config.OverrideIstanbul)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
@@ -524,12 +524,10 @@ func (s *Ethereum) Start(srvr *p2p.Server) error {
 		maxPeers -= s.config.LightPeers
 	}
 	// Start the networking layer and the light server if requested
-	if s.protocolManager != nil {
-		s.protocolManager.Start(maxPeers)
-	}
-	if s.lesServer != nil {
-		s.lesServer.Start(srvr)
-	}
+	//s.protocolManager.Start(maxPeers)
+	//if s.lesServer != nil {
+	//	s.lesServer.Start(srvr)
+	//}
 	return nil
 }
 
@@ -539,12 +537,10 @@ func (s *Ethereum) Stop() error {
 	s.bloomIndexer.Close()
 	s.blockchain.Stop()
 	s.engine.Close()
-	if s.protocolManager != nil {
-		s.protocolManager.Stop()
-	}
-	if s.lesServer != nil {
-		s.lesServer.Stop()
-	}
+	//s.protocolManager.Stop()
+	//if s.lesServer != nil {
+	//	s.lesServer.Stop()
+	//}
 	s.txPool.Stop()
 	s.miner.Stop()
 	s.eventMux.Stop()
