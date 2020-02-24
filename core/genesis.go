@@ -26,13 +26,14 @@ import (
 
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
+	"github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/rawdb"
 	"github.com/ava-labs/go-ethereum/core/state"
+	"github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/params"
 	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/core"
 )
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
@@ -62,6 +63,16 @@ func (h storageJSON) MarshalText() ([]byte, error) {
 	return hexutil.Bytes(h[:]).MarshalText()
 }
 
+// GenesisMismatchError is raised when trying to overwrite an existing
+// genesis block with an incompatible one.
+type GenesisMismatchError struct {
+	Stored, New common.Hash
+}
+
+func (e *GenesisMismatchError) Error() string {
+	return fmt.Sprintf("database contains incompatible genesis (have %x, new %x)", e.Stored, e.New)
+}
+
 // SetupGenesisBlock writes or updates the genesis block in db.
 // The block that will be used is:
 //
@@ -76,6 +87,10 @@ func (h storageJSON) MarshalText() ([]byte, error) {
 //
 // The returned chain configuration is never nil.
 func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
+	return SetupGenesisBlockWithOverride(db, genesis, nil)
+}
+
+func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, overrideIstanbul *big.Int) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
 		return params.AllEthashProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
@@ -105,7 +120,7 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 		// Ensure the stored genesis matches with the given one.
 		hash := genesis.ToBlock(nil).Hash()
 		if hash != stored {
-			return genesis.Config, hash, &core.GenesisMismatchError{stored, hash}
+			return genesis.Config, hash, &GenesisMismatchError{stored, hash}
 		}
 		block, err := genesis.Commit(db)
 		if err != nil {
@@ -118,12 +133,15 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	if genesis != nil {
 		hash := genesis.ToBlock(nil).Hash()
 		if hash != stored {
-			return genesis.Config, hash, &core.GenesisMismatchError{stored, hash}
+			return genesis.Config, hash, &GenesisMismatchError{stored, hash}
 		}
 	}
 
 	// Get the existing chain configuration.
 	newcfg := configOrDefault(genesis, stored)
+	if overrideIstanbul != nil {
+		newcfg.IstanbulBlock = overrideIstanbul
+	}
 	storedcfg := rawdb.ReadChainConfig(db, stored)
 	if storedcfg == nil {
 		log.Warn("Found genesis block without chain config")
@@ -222,7 +240,7 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 	// Assemble and return the genesis with the precompiles and faucet pre-funded
 	return &Genesis{
 		Config:     &config,
-		ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, 65)...),
+		ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
 		GasLimit:   6283185,
 		Difficulty: big.NewInt(1),
 		Alloc: map[common.Address]GenesisAccount{
