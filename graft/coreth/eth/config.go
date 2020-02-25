@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"errors"
 	"math/big"
 	"os"
 	"os/user"
@@ -160,8 +161,20 @@ type Config struct {
 	// Istanbul block override (TODO: remove after the fork)
 	OverrideIstanbul *big.Int
 
-    // Manually select and grow the canonical chain
-	ManualCanonical  bool
+	// Manually select and grow the canonical chain
+	ManualCanonical bool
+}
+
+func (cfg *Config) SetGCMode(gcmode string) error {
+	switch gcmode {
+	case "full":
+		cfg.NoPruning = false
+	case "archive":
+		cfg.NoPruning = true
+	default:
+		return errors.New("invalid gcmode value")
+	}
+	return nil
 }
 
 func MyDefaultConfig() Config {
