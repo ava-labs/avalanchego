@@ -151,7 +151,7 @@ func main() {
 }
 
 func (t *tp) benchmarkAvalanche() {
-	platformGenesisBytes := genesis.Genesis(t.networkID)
+	platformGenesisBytes, _ := genesis.Genesis(t.networkID)
 	genesisState := &platformvm.Genesis{}
 	err := platformvm.Codec.Unmarshal(platformGenesisBytes, genesisState)
 	t.log.AssertNoError(err)
@@ -241,7 +241,7 @@ func (t *tp) IssueAvalanche(chainID ids.ID, wallet dagwallet.Wallet) {
 }
 
 func (t *tp) benchmarkSnowman() {
-	platformGenesisBytes := genesis.Genesis(t.networkID)
+	platformGenesisBytes, _ := genesis.Genesis(t.networkID)
 	genesisState := &platformvm.Genesis{}
 	err := platformvm.Codec.Unmarshal(platformGenesisBytes, genesisState)
 	t.log.AssertNoError(err)

@@ -367,7 +367,7 @@ func (n *Node) initChains() {
 		beacons.Add(validators.NewValidator(peer.ID, 1))
 	}
 
-	genesisBytes := genesis.Genesis(n.Config.NetworkID)
+	genesisBytes, _ := genesis.Genesis(n.Config.NetworkID)
 
 	// Create the Platform Chain
 	n.chainManager.ForceCreateChain(chains.ChainParameters{
