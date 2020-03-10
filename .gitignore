@@ -1,0 +1,45 @@
+*.log
+*~
+.DS_Store
+
+awscpu
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.profile
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+*logs/
+
+.vscode*
+
+*.pb*
+*.ava
+
+db*
+*cpu[0-9]*
+*mem[0-9]*
+*lock[0-9]*
+*.profile
+*.swp
+*.aux
+*.fdb*
+*.fls
+*.gz
+*.pdf
+
+.coverage
+
+bin/
+build/
+
+*/mykey/staker.*

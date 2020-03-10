@@ -1,0 +1,102 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package ids
+
+import "strings"
+
+// ShortSet is a set of ShortIDs
+type ShortSet map[[20]byte]bool
+
+func (ids *ShortSet) init(size int) {
+	if *ids == nil {
+		*ids = make(map[[20]byte]bool, size)
+	}
+}
+
+// Add all the ids to this set, if the id is already in the set, nothing happens
+func (ids *ShortSet) Add(idList ...ShortID) {
+	ids.init(2 * len(idList))
+	for _, id := range idList {
+		(*ids)[id.Key()] = true
+	}
+}
+
+// Union adds all the ids from the provided sets to this set.
+func (ids *ShortSet) Union(idSet ShortSet) {
+	ids.init(2 * idSet.Len())
+	for id := range idSet {
+		(*ids)[id] = true
+	}
+}
+
+// Contains returns true if the set contains this id, false otherwise
+func (ids *ShortSet) Contains(id ShortID) bool {
+	ids.init(1)
+	return (*ids)[id.Key()]
+}
+
+// Len returns the number of ids in this set
+func (ids ShortSet) Len() int { return len(ids) }
+
+// Remove all the id from this set, if the id isn't in the set, nothing happens
+func (ids *ShortSet) Remove(idList ...ShortID) {
+	ids.init(1)
+	for _, id := range idList {
+		delete(*ids, id.Key())
+	}
+}
+
+// Clear empties this set
+func (ids *ShortSet) Clear() { *ids = nil }
+
+// CappedList returns a list of length at most [size]. Size should be >= 0
+func (ids ShortSet) CappedList(size int) []ShortID {
+	idList := make([]ShortID, size)[:0]
+	for id := range ids {
+		if size <= 0 {
+			break
+		}
+		size--
+		idList = append(idList, NewShortID(id))
+	}
+	return idList
+}
+
+// List converts this set into a list
+func (ids ShortSet) List() []ShortID {
+	idList := make([]ShortID, len(ids))[:0]
+	for id := range ids {
+		idList = append(idList, NewShortID(id))
+	}
+	return idList
+}
+
+// Equals returns true if the sets contain the same elements
+func (ids ShortSet) Equals(oIDs ShortSet) bool {
+	if ids.Len() != oIDs.Len() {
+		return false
+	}
+	for key := range oIDs {
+		if !ids[key] {
+			return false
+		}
+	}
+	return true
+}
+
+// String returns the string representation of a set
+func (ids ShortSet) String() string {
+	sb := strings.Builder{}
+	sb.WriteString("{")
+	first := true
+	for idBytes := range ids {
+		if !first {
+			sb.WriteString(", ")
+		}
+		first = false
+		sb.WriteString(NewShortID(idBytes).String())
+	}
+	sb.WriteString("}")
+	return sb.String()
+}

@@ -1,0 +1,137 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package mockdb
+
+import (
+	"errors"
+
+	"github.com/ava-labs/gecko/database"
+)
+
+var errNoFunction = errors.New("user didn't specify what value(s) return")
+
+// Database implements database.Database.
+// This is a mock database meant to be used in tests.
+// You specify the database's return value(s) for a given method call by
+// assign value to the corresponding member.
+// For example, to specify what should happen when Has is called,
+// assign a value to OnHas.
+// If no value is assigned to the corresponding member, the method returns an error or nil
+// If you
+type Database struct {
+	// Executed when Has is called
+	OnHas                           func([]byte) (bool, error)
+	OnGet                           func([]byte) ([]byte, error)
+	OnPut                           func([]byte) error
+	OnDelete                        func([]byte) error
+	OnNewBatch                      func() database.Batch
+	OnNewIterator                   func() database.Iterator
+	OnNewIteratorWithStart          func([]byte) database.Iterator
+	OnNewIteratorWithPrefix         func([]byte) database.Iterator
+	OnNewIteratorWithStartAndPrefix func([]byte, []byte) database.Iterator
+	OnStat                          func() (string, error)
+	OnCompact                       func([]byte, []byte) error
+	OnClose                         func() error
+}
+
+// Has implements the database.Database interface
+func (db *Database) Has(b []byte) (bool, error) {
+	if db.OnHas == nil {
+		return false, errNoFunction
+	}
+	return db.OnHas(b)
+}
+
+// Get implements the database.Database interface
+func (db *Database) Get(b []byte) ([]byte, error) {
+	if db.OnGet == nil {
+		return nil, errNoFunction
+	}
+	return db.OnGet(b)
+}
+
+// Put implements the database.Database interface
+func (db *Database) Put(b []byte) error {
+	if db.OnPut == nil {
+		return errNoFunction
+	}
+	return db.OnPut(b)
+}
+
+// Delete implements the database.Database interface
+func (db *Database) Delete(b []byte) error {
+	if db.OnDelete == nil {
+		return errNoFunction
+	}
+	return db.OnDelete(b)
+}
+
+// NewBatch implements the database.Database interface
+func (db *Database) NewBatch() database.Batch {
+	if db.OnNewBatch == nil {
+		return nil
+	}
+	return db.OnNewBatch()
+}
+
+// NewIterator implements the database.Database interface
+func (db *Database) NewIterator() database.Iterator {
+	if db.OnNewIterator == nil {
+		return nil
+	}
+	return db.OnNewIterator()
+}
+
+// NewIteratorWithStart implements the database.Database interface
+func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
+	if db.OnNewIteratorWithStart == nil {
+		return nil
+	}
+	return db.OnNewIteratorWithStart(start)
+}
+
+// NewIteratorWithPrefix implements the database.Database interface
+func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
+	if db.OnNewIteratorWithPrefix == nil {
+		return nil
+	}
+	return db.OnNewIteratorWithPrefix(prefix)
+}
+
+// NewIteratorWithStartAndPrefix implements the database.Database interface
+func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+	if db.OnNewIteratorWithStartAndPrefix == nil {
+		return nil
+	}
+	return db.OnNewIteratorWithStartAndPrefix(start, prefix)
+}
+
+// Stat implements the database.Database interface
+func (db *Database) Stat() (string, error) {
+	if db.OnStat == nil {
+		return "", errNoFunction
+	}
+	return db.OnStat()
+}
+
+// Compact implements the database.Database interface
+func (db *Database) Compact(start []byte, limit []byte) error {
+	if db.OnCompact == nil {
+		return errNoFunction
+	}
+	return db.OnCompact(start, limit)
+}
+
+// Close implements the database.Database interface
+func (db *Database) Close() error {
+	if db.OnClose == nil {
+		return errNoFunction
+	}
+	return db.OnClose()
+}
+
+// New returns a new mock database
+func New() *Database {
+	return &Database{}
+}

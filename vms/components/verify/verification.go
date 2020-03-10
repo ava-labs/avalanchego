@@ -1,0 +1,19 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package verify
+
+// Verifiable can be verified
+type Verifiable interface {
+	Verify() error
+}
+
+// All returns nil if all the verifiables were verified with no errors
+func All(verifiables ...Verifiable) error {
+	for _, verifiable := range verifiables {
+		if err := verifiable.Verify(); err != nil {
+			return err
+		}
+	}
+	return nil
+}

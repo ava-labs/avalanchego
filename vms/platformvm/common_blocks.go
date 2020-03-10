@@ -1,0 +1,236 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package platformvm
+
+import (
+	"errors"
+
+	"github.com/ava-labs/gecko/vms/components/missing"
+
+	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/vms/components/core"
+)
+
+// When one stakes, one must specify the time one will start to validate and
+// the time one will stop validating. The latter must be after the former, and both
+// times must be in the future.
+//
+// When one wants to start staking:
+// * They issue a transaction to that effect to an existing staker.
+// * The staker checks whether the specified "start staking time" is in the past relative to
+//   their wall clock.
+//   ** If so, the staker ignores the transaction
+//   ** If not, the staker issues a proposal block (see below) on behalf of the would-be staker.
+//
+// When one is done staking:
+// * The staking set decides whether the staker should receive either:
+//   ** Only the $AVA that the staker put up as a bond
+//	 ** The $AVA the staker put up as a bond, and also a reward for staking
+//
+// This chain has three types of blocks:
+// 1. A proposal block
+//	- Contains a proposal to do one of the following:
+//    * Change the chain time from t to t'. (This doubles as
+//      proposing to update the staking set.)
+//      ** It must be that: t' > t
+//      ** It must be that: t' <= [time at which the next staker stops staking]
+//    * Reward a staker upon their leaving the staking pool
+//    	** It must be that chain time == [time for this staker to stop staking]
+//    	** It must be that this staker is the next staker to stop staking
+//    * Add a staker to the staking pool
+//      ** It must be that: staker.startTime < chain time
+//	- A proposal block is always followed by either a commit block or a rejection block
+// 2. A commit block
+//	- Does one of the following:
+//    * Approve a proposal to change the chain time from t to t'
+//      ** This should be the initial preference if t' <= Wall clock time
+//    * Approve a proposal to reward for a staker upon their leaving the staking pool
+//      ** It must be that: chain time == [time for this staker to stop staking]
+//      ** It must be that: this staker is the next staker to stop staking
+//    * Approve a proposal to add a staker to the staking pool
+//      ** This should be the initial preference if staker.startTime > Wall clock
+//         time
+//	- A commit block must always be preceded on the chain by the proposal block whose
+//	  proposal is being commited
+// 3. A rejection block
+//  - Does one of the following:
+//    * Reject a proposal to change the chain time from t to t' (therefore keeping it at t)
+//      ** This should be the initial preference if t' > [this node's wall clock time + Delta],
+//         where Delta is our synchrony assumption
+//    * Reject a proposal to reward for a staker upon their leaving the staking pool.
+//      ** The staker only has their bond (locked tokens) returned
+//      ** This should be the initial preference if the staker has had < Chi uptime
+//      ** It must be that: t == [time for this staker to stop staking]
+//      ** It must be that: this staker is the next staker to stop staking
+//    * Reject a proposal to add a staker to the staking set.
+//		** Increase the timestamp to the would-be staker's start time
+//      ** This should be the initial preference if staker.startTime <= Wall clock
+//         time
+//  - A rejection block must always be preceded on the chain by the proposal block whose
+//	  proposal is being rejected
+
+var (
+	errInvalidBlockType   = errors.New("invalid block type")
+	errEmptyValidatingSet = errors.New("empty validating set")
+)
+
+// Block is the common interface that all staking blocks must have
+type Block interface {
+	snowman.Block
+
+	// initialize this block's non-serialized fields.
+	// This method should be called when a block is unmarshaled from bytes.
+	// [vm] is the vm the block exists in
+	// [bytes] is the byte representation of this block
+	initialize(vm *VM, bytes []byte) error
+
+	// parentBlock returns the parent block, similarly to Parent. However, it
+	// provides the more specific staking.Block interface.
+	parentBlock() Block
+
+	// addChild notifies this block that it has a child block building on
+	// its database. When this block commits its database, it should set the
+	// child's database to the former's underlying database instance. This ensures that
+	// the database versions do not recurse the length of the chain.
+	addChild(Block)
+
+	// free all the references of this block from the vm's memory
+	free()
+
+	// Set the database underlying the block's versiondb's to [db]
+	setBaseDatabase(db database.Database)
+}
+
+// A decision block (either Commit, Abort, or DecisionBlock.) represents a
+// decision to either commit (accept) or abort (reject) the changes specified in
+// its parent, if its parent is a proposal. Otherwise, the changes are committed
+// immediately.
+type decision interface {
+	// This function should only be called after Verify is called.
+	// returns a database that contains the state of the chain if this block is
+	// accepted.
+	onAccept() database.Database
+}
+
+// CommonBlock contains the fields common to all blocks of the Platform Chain
+type CommonBlock struct {
+	*core.Block `serialize:"true"`
+	vm          *VM
+
+	// This block's parent.
+	// nil before parentBlock() is called on this block
+	parent Block
+
+	// This block's children
+	children []Block
+}
+
+// Reject implements the snowman.Block interface
+func (cb *CommonBlock) Reject() {
+	defer cb.free() // remove this block from memory
+
+	cb.Block.Reject()
+}
+
+// free removes this block from memory
+func (cb *CommonBlock) free() {
+	delete(cb.vm.currentBlocks, cb.ID().Key())
+	cb.parent = nil
+	cb.children = nil
+}
+
+// Parent returns this block's parent
+func (cb *CommonBlock) Parent() snowman.Block {
+	parent := cb.parentBlock()
+	if parent != nil {
+		return parent
+	}
+	return &missing.Block{BlkID: cb.ParentID()}
+}
+
+// parentBlock returns this block's parent
+func (cb *CommonBlock) parentBlock() Block {
+	// Check if the block already has a reference to its parent
+	if cb.parent != nil {
+		return cb.parent
+	}
+
+	// Get the parent from database
+	parentID := cb.ParentID()
+	parent, err := cb.vm.getBlock(parentID)
+	if err != nil {
+		cb.vm.Ctx.Log.Warn("could not get parent (ID %s) of block %s", parentID, cb.ID())
+		return nil
+	}
+	cb.parent = parent
+	return parent.(Block)
+}
+
+// addChild adds [child] as a child of this block
+func (cb *CommonBlock) addChild(child Block) { cb.children = append(cb.children, child) }
+
+// CommonDecisionBlock contains the fields and methods common to all decision blocks
+// (ie *Commit and *Abort)
+type CommonDecisionBlock struct {
+	CommonBlock `serialize:"true"`
+
+	// state of the chain if this block is accepted
+	onAcceptDB *versiondb.Database
+
+	// to be executed if this block is accepted
+	onAcceptFunc func()
+}
+
+// initialize this block
+func (cdb *CommonDecisionBlock) initialize(vm *VM, bytes []byte) error {
+	cdb.vm = vm
+	cdb.Block.Initialize(bytes, vm.SnowmanVM)
+	return nil
+}
+
+// setBaseDatabase sets this block's base database to [db]
+func (cdb *CommonDecisionBlock) setBaseDatabase(db database.Database) {
+	if err := cdb.onAcceptDB.SetDatabase(db); err != nil {
+		cdb.vm.Ctx.Log.Error("problem while setting base database: %s", err)
+	}
+}
+
+// onAccept returns:
+// 1) The state of the chain if this block is accepted
+// 2) The function to execute if this block is accepted
+func (cdb *CommonDecisionBlock) onAccept() database.Database {
+	if cdb.Status().Decided() {
+		return cdb.vm.DB
+	}
+	return cdb.onAcceptDB
+}
+
+// Accept implements the snowman.Block interface
+func (cdb *CommonDecisionBlock) Accept() {
+	cdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", cdb.ID())
+
+	cdb.CommonBlock.Accept()
+
+	// Update the state of the chain in the database
+	if err := cdb.onAcceptDB.Commit(); err != nil {
+		cdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+	}
+	if err := cdb.vm.DB.Commit(); err != nil {
+		cdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+	}
+
+	for _, child := range cdb.children {
+		child.setBaseDatabase(cdb.vm.DB)
+	}
+	if cdb.onAcceptFunc != nil {
+		cdb.onAcceptFunc()
+	}
+
+	parent := cdb.parentBlock()
+	// remove this block and its parent from memory
+	parent.free()
+	cdb.free()
+}

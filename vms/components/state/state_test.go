@@ -1,0 +1,437 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package state
+
+import (
+	"testing"
+
+	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/wrappers"
+)
+
+// toy example of a block, just used for testing
+type block struct {
+	parentID ids.ID
+	value    uint64
+}
+
+const blockSize = 40 // hashing.HashLen (32) + length of uin64 (8)
+
+func (b *block) Bytes() []byte {
+	p := wrappers.Packer{Bytes: make([]byte, blockSize)}
+	p.PackFixedBytes(b.parentID.Bytes())
+	p.PackLong(b.value)
+	return p.Bytes
+}
+
+func unmarshalBlock(bytes []byte) (interface{}, error) {
+	p := wrappers.Packer{Bytes: bytes}
+
+	parentID, err := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
+	if err != nil {
+		return nil, err
+	}
+
+	value := p.UnpackLong()
+
+	if p.Errored() {
+		return nil, p.Err
+	}
+
+	return &block{
+		parentID: parentID,
+		value:    value,
+	}, nil
+}
+
+// toy example of an account, just used for testing
+type account struct {
+	id      ids.ID
+	balance uint64
+	nonce   uint64
+}
+
+const accountSize = 32 + 8 + 8
+
+func (acc *account) Bytes() []byte {
+	p := wrappers.Packer{Bytes: make([]byte, accountSize)}
+	p.PackFixedBytes(acc.id.Bytes())
+	p.PackLong(acc.balance)
+	p.PackLong(acc.nonce)
+	return p.Bytes
+}
+
+func unmarshalAccount(bytes []byte) (interface{}, error) {
+	p := wrappers.Packer{Bytes: bytes}
+
+	id, err := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
+	if err != nil {
+		return nil, err
+	}
+
+	balance := p.UnpackLong()
+	nonce := p.UnpackLong()
+
+	if p.Errored() {
+		return nil, p.Err
+	}
+
+	return &account{
+		id:      id,
+		balance: balance,
+		nonce:   nonce,
+	}, nil
+}
+
+// Ensure there is an error if someone tries to do a put without registering the type
+func TestPutUnregistered(t *testing.T) {
+	// make a state and a database
+	state := NewState()
+	db := memdb.New()
+	defer db.Close()
+
+	// make an account
+	acc1 := &account{
+		id:      ids.NewID([32]byte{1, 2, 3}),
+		balance: 1,
+		nonce:   2,
+	}
+
+	if err := state.Put(db, 1, ids.NewID([32]byte{1, 2, 3}), acc1); err == nil {
+		t.Fatal("should have failed because type ID is unregistred")
+	}
+
+	// register type
+	if err := state.RegisterType(1, unmarshalAccount); err != nil {
+		t.Fatal(err)
+	}
+
+	// should not error now
+	if err := state.Put(db, 1, ids.NewID([32]byte{1, 2, 3}), acc1); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Ensure there is an error if someone tries to get the value associated with a
+// key that doesn't exist
+func TestKeyDoesNotExist(t *testing.T) {
+	// make a state and a database
+	state := NewState()
+	db := memdb.New()
+	defer db.Close()
+
+	if _, err := state.Get(db, 1, ids.NewID([32]byte{1, 2, 3})); err == nil {
+		t.Fatal("should have failed because no such key or typeID exists")
+	}
+
+	// register type with ID 1
+	typeID := uint64(1)
+	if err := state.RegisterType(typeID, unmarshalAccount); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should still fail because there is no value with this key
+	if _, err := state.Get(db, typeID, ids.NewID([32]byte{1, 2, 3})); err == nil {
+		t.Fatal("should have failed because no such key exists")
+	}
+}
+
+// Ensure there is an error if someone tries to register a type ID that already exists
+func TestRegisterExistingTypeID(t *testing.T) {
+	// make a state and a database
+	state := NewState()
+	db := memdb.New()
+	defer db.Close()
+
+	// register type with ID 1
+	typeID := uint64(1)
+	if err := state.RegisterType(typeID, unmarshalBlock); err != nil {
+		t.Fatal(err)
+	}
+
+	// try to register the same type ID
+	if err := state.RegisterType(typeID, unmarshalAccount); err == nil {
+		t.Fatal("Should have errored because typeID already registered")
+	}
+
+}
+
+// Ensure there is an error when someone tries to get a value using the wrong typeID
+func TestGetWrongTypeID(t *testing.T) {
+	// make a state and a database
+	state := NewState()
+	db := memdb.New()
+	defer db.Close()
+
+	// register type with ID 1
+	blockTypeID := uint64(1)
+	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+		t.Fatal(err)
+	}
+
+	// make and put a block
+	block := &block{
+		parentID: ids.NewID([32]byte{4, 5, 6}),
+		value:    5,
+	}
+	blockID := ids.NewID([32]byte{1, 2, 3})
+	err := state.Put(db, blockTypeID, blockID, block)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// try to get it using the right key but wrong typeID
+	if _, err := state.Get(db, 2, blockID); err == nil {
+		t.Fatal("should have failed because type ID is wrong")
+	}
+}
+
+// Ensure that there is no error when someone puts two values with the same
+// key but different type IDs
+func TestSameKeyDifferentTypeID(t *testing.T) {
+	// make a state and a database
+	state := NewState()
+	db := memdb.New()
+	defer db.Close()
+
+	// register block type with ID 1
+	blockTypeID := uint64(1)
+	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+		t.Fatal(err)
+	}
+
+	// register account type with ID 2
+	accountTypeID := uint64(2)
+	if err := state.RegisterType(accountTypeID, unmarshalAccount); err != nil {
+		t.Fatal(err)
+	}
+
+	sharedKey := ids.NewID([32]byte{1, 2, 3})
+
+	// make an account
+	acc := &account{
+		id:      ids.NewID([32]byte{1, 2, 3}),
+		balance: 1,
+		nonce:   2,
+	}
+
+	// put it using sharedKey
+	err := state.Put(db, accountTypeID, sharedKey, acc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make a block
+	block1 := &block{
+		parentID: ids.NewID([32]byte{4, 5, 6}),
+		value:    5,
+	}
+
+	// put it using sharedKey
+	err = state.Put(db, blockTypeID, sharedKey, block1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ensure the account is still there and correct
+	if accInterface, err := state.Get(db, accountTypeID, sharedKey); err != nil {
+		t.Fatal(err)
+	} else if accFromState, ok := accInterface.(*account); !ok {
+		t.Fatal("should have been type *account")
+	} else if accFromState.balance != acc.balance {
+		t.Fatal("balances should be same")
+	} else if !accFromState.id.Equals(acc.id) {
+		t.Fatal("ids should be the same")
+	} else if accFromState.nonce != acc.nonce {
+		t.Fatal("nonces should be same")
+	}
+
+	// ensure the block is still there and correct
+	if blockInterface, err := state.Get(db, blockTypeID, sharedKey); err != nil {
+		t.Fatal(err)
+	} else if blockFromState, ok := blockInterface.(*block); !ok {
+		t.Fatal("should have been type *block")
+	} else if !blockFromState.parentID.Equals(block1.parentID) {
+		t.Fatal("parentIDs should be same")
+	} else if blockFromState.value != block1.value {
+		t.Fatal("values should be same")
+	}
+}
+
+// Ensure that overwriting a value works
+func TestOverwrite(t *testing.T) {
+	// make a state and a database
+	state := NewState()
+	db := memdb.New()
+	defer db.Close()
+
+	// register block type with ID 1
+	blockTypeID := uint64(1)
+	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+		t.Fatal(err)
+	}
+
+	// make a block
+	block1 := &block{
+		parentID: ids.NewID([32]byte{4, 5, 6}),
+		value:    5,
+	}
+
+	key := ids.NewID([32]byte{1, 2, 3})
+
+	// put it
+	err := state.Put(db, blockTypeID, key, block1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make another block
+	block2 := &block{
+		parentID: ids.NewID([32]byte{100, 200, 1}),
+		value:    6,
+	}
+
+	// put it with the same key
+	err = state.Put(db, blockTypeID, key, block2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ensure the first value was over-written
+	// get it and make sure it's right
+	if blockInterface, err := state.Get(db, blockTypeID, key); err != nil {
+		t.Fatal(err)
+	} else if blockFromState, ok := blockInterface.(*block); !ok {
+		t.Fatal("should have been type *block")
+	} else if !blockFromState.parentID.Equals(block2.parentID) {
+		t.Fatal("parentIDs should be same")
+	} else if blockFromState.value != block2.value {
+		t.Fatal("values should be same")
+	}
+}
+
+// Put 4 values, 2 of one type and 2 of another
+func TestHappyPath(t *testing.T) {
+	// make a state and a database
+	state := NewState()
+	db := memdb.New()
+	defer db.Close()
+
+	accountTypeID := uint64(1)
+
+	// register type account
+	err := state.RegisterType(accountTypeID, unmarshalAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make an account
+	acc1 := &account{
+		id:      ids.NewID([32]byte{1, 2, 3}),
+		balance: 1,
+		nonce:   2,
+	}
+
+	// put it
+	err = state.Put(db, accountTypeID, acc1.id, acc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get it and make sure it's right
+	if acc1Interface, err := state.Get(db, accountTypeID, acc1.id); err != nil {
+		t.Fatal(err)
+	} else if acc1FromState, ok := acc1Interface.(*account); !ok {
+		t.Fatal("should have been type *account")
+	} else if acc1FromState.balance != acc1.balance {
+		t.Fatal("balances should be same")
+	} else if !acc1FromState.id.Equals(acc1.id) {
+		t.Fatal("ids should be the same")
+	} else if acc1FromState.nonce != acc1.nonce {
+		t.Fatal("nonces should be same")
+	}
+
+	// make another account
+	acc2 := &account{
+		id:      ids.NewID([32]byte{9, 2, 1}),
+		balance: 7,
+		nonce:   44,
+	}
+
+	// put it
+	err = state.Put(db, accountTypeID, acc2.id, acc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get it and make sure it's right
+	if acc2Interface, err := state.Get(db, accountTypeID, acc2.id); err != nil {
+		t.Fatal(err)
+	} else if acc2FromState, ok := acc2Interface.(*account); !ok {
+		t.Fatal("should have been type *account")
+	} else if acc2FromState.balance != acc2.balance {
+		t.Fatal("balances should be same")
+	} else if !acc2FromState.id.Equals(acc2.id) {
+		t.Fatal("ids should be the same")
+	} else if acc2FromState.nonce != acc2.nonce {
+		t.Fatal("nonces should be same")
+	}
+
+	// register type block
+	blockTypeID := uint64(2)
+	err = state.RegisterType(blockTypeID, unmarshalBlock)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make a block
+	block1ID := ids.NewID([32]byte{9, 9, 9})
+	block1 := &block{
+		parentID: ids.NewID([32]byte{4, 5, 6}),
+		value:    5,
+	}
+
+	// put it
+	err = state.Put(db, blockTypeID, block1ID, block1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get it and make sure it's right
+	if block1Interface, err := state.Get(db, blockTypeID, block1ID); err != nil {
+		t.Fatal(err)
+	} else if block1FromState, ok := block1Interface.(*block); !ok {
+		t.Fatal("should have been type *block")
+	} else if !block1FromState.parentID.Equals(block1.parentID) {
+		t.Fatal("parentIDs should be same")
+	} else if block1FromState.value != block1.value {
+		t.Fatal("values should be same")
+	}
+
+	// make another block
+	block2ID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9})
+	block2 := &block{
+		parentID: ids.NewID([32]byte{10, 1, 2}),
+		value:    67,
+	}
+
+	// put it
+	err = state.Put(db, blockTypeID, block2ID, block2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get it and make sure it's right
+	if block2Interface, err := state.Get(db, blockTypeID, block2ID); err != nil {
+		t.Fatal(err)
+	} else if block2FromState, ok := block2Interface.(*block); !ok {
+		t.Fatal("should have been type *block")
+	} else if !block2FromState.parentID.Equals(block2.parentID) {
+		t.Fatal("parentIDs should be same")
+	} else if block2FromState.value != block2.value {
+		t.Fatal("values should be same")
+	}
+}

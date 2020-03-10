@@ -1,0 +1,20 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package common
+
+import (
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/validators"
+)
+
+// DefaultConfigTest returns a test configuration
+func DefaultConfigTest() Config {
+	return Config{
+		Context:       snow.DefaultContextTest(),
+		Validators:    validators.NewSet(),
+		Beacons:       validators.NewSet(),
+		Sender:        &SenderTest{},
+		Bootstrapable: &BootstrapableTest{},
+	}
+}
