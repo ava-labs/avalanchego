@@ -48,9 +48,11 @@ func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 		snowflake: binarySnowflake{
 			beta:       beta,
 			preference: choice,
+			confidence: sb.confidence,
 			finalized:  sb.Finalized(),
 		},
 	}
+	bs.numSuccessfulPolls[choice] = sb.numSuccessfulPolls
 	return bs
 }
 

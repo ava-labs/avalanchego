@@ -103,6 +103,12 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 		return
 	}
 
+	if realVtxID := vtx.ID(); !vtxID.Equals(realVtxID) {
+		b.BootstrapConfig.Context.Log.Warn("Put called for vertexID %s, but provided vertexID %s", vtxID, realVtxID)
+		b.GetFailed(vdr, requestID, vtxID)
+		return
+	}
+
 	b.addVertex(vtx)
 }
 

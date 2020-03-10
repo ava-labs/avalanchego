@@ -97,6 +97,12 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 		return
 	}
 
+	if realBlkID := blk.ID(); !blkID.Equals(realBlkID) {
+		b.BootstrapConfig.Context.Log.Warn("Put called for blockID %s, but provided blockID %s", blkID, realBlkID)
+		b.GetFailed(vdr, requestID, blkID)
+		return
+	}
+
 	b.addBlock(blk)
 }
 

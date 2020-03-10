@@ -297,9 +297,12 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 		vdrSet.Add(vdr.ID())
 	}
 
+	toSample := ids.ShortSet{}
+	toSample.Union(vdrSet)
+
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet.Len()) {
-		t.Config.Sender.PullQuery(vdrSet, t.RequestID, blkID)
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
+		t.Config.Sender.PullQuery(toSample, t.RequestID, blkID)
 	} else if numVdrs < p.K {
 		t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", blkID)
 	}
@@ -314,9 +317,12 @@ func (t *Transitive) pushSample(blk snowman.Block) {
 		vdrSet.Add(vdr.ID())
 	}
 
+	toSample := ids.ShortSet{}
+	toSample.Union(vdrSet)
+
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet.Len()) {
-		t.Config.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
+		t.Config.Sender.PushQuery(toSample, t.RequestID, blk.ID(), blk.Bytes())
 	} else if numVdrs < p.K {
 		t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
