@@ -15,6 +15,10 @@ import (
 
 // This file contains methods of VM that deal with getting/putting values from database
 
+var (
+	errEmptyAccountAddress = errors.New("account has empty address")
+)
+
 // TODO: Cache prefixed IDs or use different way of keying into database
 const (
 	currentValidatorsPrefix uint64 = iota
@@ -102,6 +106,10 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 // get the account with the specified Address
 // If account does not exist in database, return new account
 func (vm *VM) getAccount(db database.Database, address ids.ShortID) (Account, error) {
+	if address.IsZero() {
+		return Account{}, errEmptyAccountAddress
+	}
+
 	longID := address.LongID()
 
 	// see if account exists
