@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/logging"
 
@@ -18,6 +19,7 @@ import (
 
 // Admin is the API service for node admin management
 type Admin struct {
+	nodeID       ids.ShortID
 	networkID    uint32
 	log          logging.Logger
 	networking   Networking
@@ -27,12 +29,13 @@ type Admin struct {
 }
 
 // NewService returns a new admin API service
-func NewService(networkID uint32, log logging.Logger, chainManager chains.Manager, peers Peerable, httpServer *api.Server) *common.HTTPHandler {
+func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers Peerable, httpServer *api.Server) *common.HTTPHandler {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&Admin{
+		nodeID:       nodeID,
 		networkID:    networkID,
 		log:          log,
 		chainManager: chainManager,
@@ -42,6 +45,22 @@ func NewService(networkID uint32, log logging.Logger, chainManager chains.Manage
 		httpServer: httpServer,
 	}, "admin")
 	return &common.HTTPHandler{Handler: newServer}
+}
+
+// GetNodeIDArgs are the arguments for calling GetNodeID
+type GetNodeIDArgs struct{}
+
+// GetNodeIDReply are the results from calling GetNodeID
+type GetNodeIDReply struct {
+	NodeID ids.ShortID `json:"nodeID"`
+}
+
+// GetNodeID returns the node ID of this node
+func (service *Admin) GetNodeID(r *http.Request, args *GetNodeIDArgs, reply *GetNodeIDReply) error {
+	service.log.Debug("Admin: GetNodeID called")
+
+	reply.NodeID = service.nodeID
+	return nil
 }
 
 // GetNetworkIDArgs are the arguments for calling GetNetworkID
