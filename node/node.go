@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/ava-labs/salticidae-go"
@@ -44,12 +43,6 @@ import (
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
-)
-
-const (
-	defaultChannelSize     = 1
-	externalRequestTimeout = 2 * time.Second
-	internalRequestTimeout = 250 * time.Millisecond
 )
 
 // MainNode is the reference for node callbacks
