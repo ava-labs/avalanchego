@@ -41,6 +41,10 @@ func (v *voter) Update() {
 		return
 	}
 
+	// To prevent any potential deadlocks with un-disclosed dependencies, votes
+	// must be bubbled to the nearest valid block
+	results = v.bubbleVotes(results)
+
 	v.t.Config.Context.Log.Verbo("Finishing poll [%d] with:\n%s", v.requestID, &results)
 	v.t.Consensus.RecordPoll(results)
 
@@ -56,4 +60,24 @@ func (v *voter) Update() {
 	if len(v.t.polls.m) == 0 {
 		v.t.repoll()
 	}
+}
+
+func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
+	bubbledVotes := ids.Bag{}
+	for _, vote := range votes.List() {
+		count := votes.Count(vote)
+		blk, err := v.t.Config.VM.GetBlock(vote)
+		if err != nil {
+			continue
+		}
+
+		for blk.Status().Fetched() && !v.t.Consensus.Issued(blk) {
+			blk = blk.Parent()
+		}
+
+		if !blk.Status().Decided() && v.t.Consensus.Issued(blk) {
+			bubbledVotes.AddCount(blk.ID(), count)
+		}
+	}
+	return bubbledVotes
 }
