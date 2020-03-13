@@ -23,8 +23,14 @@ import (
 	jsoncodec "github.com/ava-labs/gecko/utils/json"
 )
 
+const (
+	// maxUserPassLen is the maximum length of the username or password allowed
+	maxUserPassLen = 1024
+)
+
 var (
-	errEmptyUsername = errors.New("username can't be the empty string")
+	errEmptyUsername     = errors.New("username can't be the empty string")
+	errUserPassMaxLength = errors.New(fmt.Sprintf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen))
 )
 
 // KeyValuePair ...
@@ -113,6 +119,10 @@ type CreateUserReply struct {
 func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *CreateUserReply) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
+
+	if len(args.Username) > maxUserPassLen || len(args.Password) > maxUserPassLen {
+		return errUserPassMaxLength
+	}
 
 	ks.log.Verbo("CreateUser called with %s", args.Username)
 

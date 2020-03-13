@@ -5,6 +5,8 @@ package keystore
 
 import (
 	"bytes"
+	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
@@ -54,6 +56,56 @@ func TestServiceCreateUser(t *testing.T) {
 			t.Fatalf("'bob' should have been a user that was created")
 		}
 	}
+}
+
+// genStr returns a string of given length
+func genStr(n int) string {
+	b := make([]byte, n)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)[:n]
+}
+
+// TestServiceCreateUserArgsChecks generates excessively long usernames or
+// passwords to assure the santity checks on string length are not exceeded
+func TestServiceCreateUserArgsCheck(t *testing.T) {
+	ks := Keystore{}
+	ks.Initialize(logging.NoLog{}, memdb.New())
+
+	{
+		reply := CreateUserReply{}
+		err := ks.CreateUser(nil, &CreateUserArgs{
+			Username: genStr(maxUserPassLen + 1),
+			Password: "shortpass",
+		}, &reply)
+
+		if reply.Success || err != errUserPassMaxLength {
+			t.Fatal("User was created when it should have been rejected due to too long a Username, err =", err)
+		}
+	}
+
+	{
+		reply := CreateUserReply{}
+		err := ks.CreateUser(nil, &CreateUserArgs{
+			Username: "shortuser",
+			Password: genStr(maxUserPassLen + 1),
+		}, &reply)
+
+		if reply.Success || err != errUserPassMaxLength {
+			t.Fatal("User was created when it should have been rejected due to too long a Password, err =", err)
+		}
+	}
+
+	{
+		reply := ListUsersReply{}
+		if err := ks.ListUsers(nil, &ListUsersArgs{}, &reply); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(reply.Users) > 0 {
+			t.Fatalf("A user exists when there should be none")
+		}
+	}
+
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
