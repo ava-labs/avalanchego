@@ -30,7 +30,7 @@ const (
 
 var (
 	errEmptyUsername     = errors.New("username can't be the empty string")
-	errUserPassMaxLength = errors.New(fmt.Sprintf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen))
+	errUserPassMaxLength = fmt.Errorf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen)
 )
 
 // KeyValuePair ...
