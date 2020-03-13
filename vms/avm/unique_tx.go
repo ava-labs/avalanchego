@@ -37,6 +37,8 @@ type txState struct {
 	deps       []snowstorm.Tx
 
 	status choices.Status
+
+	onDecide func(choices.Status)
 }
 
 func (tx *UniqueTx) refresh() {
@@ -124,6 +126,10 @@ func (tx *UniqueTx) Accept() {
 	tx.vm.pubsub.Publish("accepted", txID)
 
 	tx.t.deps = nil // Needed to prevent a memory leak
+
+	if tx.t.onDecide != nil {
+		tx.t.onDecide(choices.Accepted)
+	}
 }
 
 // Reject is called when the transaction was finalized as rejected by consensus
@@ -143,6 +149,10 @@ func (tx *UniqueTx) Reject() {
 	tx.vm.pubsub.Publish("rejected", txID)
 
 	tx.t.deps = nil // Needed to prevent a memory leak
+
+	if tx.t.onDecide != nil {
+		tx.t.onDecide(choices.Rejected)
+	}
 }
 
 // Status returns the current status of this transaction

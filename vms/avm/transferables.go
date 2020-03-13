@@ -75,10 +75,13 @@ func (outs *innerSortTransferableOutputs) Less(i, j int) bool {
 func (outs *innerSortTransferableOutputs) Len() int      { return len(outs.outs) }
 func (outs *innerSortTransferableOutputs) Swap(i, j int) { o := outs.outs; o[j], o[i] = o[i], o[j] }
 
-func sortTransferableOutputs(outs []*TransferableOutput, c codec.Codec) {
+// SortTransferableOutputs sorts output objects
+func SortTransferableOutputs(outs []*TransferableOutput, c codec.Codec) {
 	sort.Sort(&innerSortTransferableOutputs{outs: outs, codec: c})
 }
-func isSortedTransferableOutputs(outs []*TransferableOutput, c codec.Codec) bool {
+
+// IsSortedTransferableOutputs returns true if output objects are sorted
+func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Codec) bool {
 	return sort.IsSorted(&innerSortTransferableOutputs{outs: outs, codec: c})
 }
 

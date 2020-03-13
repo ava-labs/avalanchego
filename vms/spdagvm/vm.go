@@ -315,7 +315,7 @@ func (vm *VM) Send(amount uint64, assetID, toAddrStr string, fromPKs []string) (
 	}
 
 	// Add all of the keys in [fromPKs] to a keychain
-	keychain := KeyChain{}
+	keychain := Keychain{}
 	factory := crypto.FactorySECP256K1R{}
 	cb58 := formatting.CB58{}
 	for _, fpk := range fromPKs {

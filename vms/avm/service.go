@@ -56,7 +56,7 @@ type IssueTxReply struct {
 func (service *Service) IssueTx(r *http.Request, args *IssueTxArgs, reply *IssueTxReply) error {
 	service.vm.ctx.Log.Verbo("IssueTx called with %s", args.Tx)
 
-	txID, err := service.vm.IssueTx(args.Tx.Bytes)
+	txID, err := service.vm.IssueTx(args.Tx.Bytes, nil)
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
 
-	assetID, err := service.vm.IssueTx(b)
+	assetID, err := service.vm.IssueTx(b, nil)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -391,7 +391,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
 
-	assetID, err := service.vm.IssueTx(b)
+	assetID, err := service.vm.IssueTx(b, nil)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -634,7 +634,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		return errInsufficientFunds
 	}
 
-	sortTransferableInputsWithSigners(ins, keys)
+	SortTransferableInputsWithSigners(ins, keys)
 
 	outs := []*TransferableOutput{
 		&TransferableOutput{
@@ -671,7 +671,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		)
 	}
 
-	sortTransferableOutputs(outs, service.vm.codec)
+	SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{
 		UnsignedTx: &BaseTx{
@@ -708,7 +708,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
 
-	txID, err := service.vm.IssueTx(b)
+	txID, err := service.vm.IssueTx(b, nil)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -741,10 +741,15 @@ func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
 	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
 }
 
-func sortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
+// SortTransferableInputsWithSigners sorts the inputs and signers based on the
+// input's utxo ID
+func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
 	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
-func isSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
+
+// IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
+// sorted and unique
+func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
 	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 

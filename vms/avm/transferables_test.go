@@ -85,11 +85,11 @@ func TestTransferableOutputSorting(t *testing.T) {
 		},
 	}
 
-	if isSortedTransferableOutputs(outs, c) {
+	if IsSortedTransferableOutputs(outs, c) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	sortTransferableOutputs(outs, c)
-	if !isSortedTransferableOutputs(outs, c) {
+	SortTransferableOutputs(outs, c)
+	if !IsSortedTransferableOutputs(outs, c) {
 		t.Fatalf("Should be sorted")
 	}
 	if result := outs[0].Out.(*TestTransferable).Val; result != 0 {
