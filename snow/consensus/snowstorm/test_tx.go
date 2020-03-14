@@ -14,6 +14,7 @@ type TestTx struct {
 	Deps       []Tx
 	Ins        ids.Set
 	Stat       choices.Status
+	Validity   error
 	Bits       []byte
 }
 
@@ -39,7 +40,7 @@ func (tx *TestTx) Reject() { tx.Stat = choices.Rejected }
 func (tx *TestTx) Reset() { tx.Stat = choices.Processing }
 
 // Verify returns nil
-func (tx *TestTx) Verify() error { return nil }
+func (tx *TestTx) Verify() error { return tx.Validity }
 
 // Bytes returns the bits
 func (tx *TestTx) Bytes() []byte { return tx.Bits }

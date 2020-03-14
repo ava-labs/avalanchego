@@ -2363,3 +2363,97 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	sender.PushQueryF = nil
 	st.getVertex = nil
 }
+
+func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
+	config := DefaultConfig()
+
+	vdr := validators.GenerateRandomValidator(1)
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vals.Add(vdr)
+
+	st := &stateTest{t: t}
+	config.State = st
+
+	gVtx := &Vtx{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}
+
+	vts := []avalanche.Vertex{gVtx}
+	utxos := []ids.ID{GenerateID(), GenerateID()}
+
+	tx0 := &TestTx{
+		TestTx: snowstorm.TestTx{
+			Identifier: GenerateID(),
+			Stat:       choices.Processing,
+		},
+	}
+	tx0.Ins.Add(utxos[0])
+
+	tx1 := &TestTx{
+		TestTx: snowstorm.TestTx{
+			Identifier: GenerateID(),
+			Stat:       choices.Processing,
+			Validity:   errors.New(""),
+		},
+	}
+	tx1.Ins.Add(utxos[1])
+
+	vtx0 := &Vtx{
+		parents: vts,
+		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx0},
+		height:  1,
+		status:  choices.Processing,
+	}
+
+	vtx1 := &Vtx{
+		parents: []avalanche.Vertex{vtx0},
+		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx1},
+		height:  2,
+		status:  choices.Processing,
+	}
+
+	te := &Transitive{}
+	te.Initialize(config)
+	te.finishBootstrapping()
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	te.Config.Sender = sender
+
+	reqID := new(uint32)
+	sender.PushQueryF = func(_ ids.ShortSet, requestID uint32, _ ids.ID, _ []byte) {
+		*reqID = requestID
+	}
+
+	te.insert(vtx0)
+
+	sender.PushQueryF = func(ids.ShortSet, uint32, ids.ID, []byte) {
+		t.Fatalf("should have failed verification")
+	}
+
+	te.insert(vtx1)
+
+	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case vtxID.Equals(vtx0.ID()):
+			return vtx0, nil
+		case vtxID.Equals(vtx1.ID()):
+			return vtx1, nil
+		}
+		return nil, errors.New("Unknown vtx")
+	}
+
+	votes := ids.Set{}
+	votes.Add(vtx1.ID())
+	te.Chits(vdr.ID(), *reqID, votes)
+
+	if status := vtx0.Status(); status != choices.Accepted {
+		t.Fatalf("should have accepted the vertex due to transitive voting")
+	}
+}
