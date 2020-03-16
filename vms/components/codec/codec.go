@@ -25,8 +25,8 @@ const (
 )
 
 const (
-	defaultMaxSize        = 1 << 19 // default max size, in bytes, of something being marshalled by Marshal()
-	defaultMaxSliceLength = 1 << 19 // default max length of a slice being marshalled by Marshal()
+	defaultMaxSize        = 1 << 18 // default max size, in bytes, of something being marshalled by Marshal()
+	defaultMaxSliceLength = 1 << 18 // default max length of a slice being marshalled by Marshal()
 )
 
 // ErrBadCodec is returned when one tries to perform an operation
