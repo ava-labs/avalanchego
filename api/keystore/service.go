@@ -134,11 +134,11 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
+	ks.log.Verbo("CreateUser called with %s", args.Username[:maxUserPassLen])
+
 	if len(args.Username) > maxUserPassLen || len(args.Password) > maxUserPassLen {
 		return errUserPassMaxLength
 	}
-
-	ks.log.Verbo("CreateUser called with %s", args.Username)
 
 	if args.Username == "" {
 		return errEmptyUsername
