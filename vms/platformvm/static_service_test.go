@@ -81,6 +81,7 @@ func TestBuildGenesis(t *testing.T) {
 		Destination: addr,
 	}
 	chains := APIChain{
+		SubnetID:    DefaultSubnetID,
 		GenesisData: genesisData,
 		VMID:        vmID,
 		Name:        "My Favorite Episode",

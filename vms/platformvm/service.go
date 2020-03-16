@@ -8,9 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
-
-	"github.com/gorilla/rpc/v2/json2"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -31,22 +28,6 @@ var (
 	errNoSource             = errors.New("call is missing field 'stakeSource'")
 	errGetStakeSource       = errors.New("couldn't get account specified in 'stakeSource'")
 )
-
-var key *crypto.PrivateKeySECP256K1R
-
-func init() {
-	cb58 := formatting.CB58{}
-	err := cb58.FromString("24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5")
-	if err != nil {
-		panic(err)
-	}
-	factory := crypto.FactorySECP256K1R{}
-	pk, err := factory.ToPrivateKey(cb58.Bytes)
-	if err != nil {
-		panic(err)
-	}
-	key = pk.(*crypto.PrivateKeySECP256K1R)
-}
 
 // Service defines the API calls that can be made to the platform chain
 type Service struct{ vm *VM }
@@ -642,8 +623,10 @@ func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignRespons
 		genTx.Tx, err = service.signAddNonDefaultSubnetValidatorTx(tx, key)
 	case *CreateSubnetTx:
 		genTx.Tx, err = service.signCreateSubnetTx(tx, key)
+	case *CreateChainTx:
+		genTx.Tx, err = service.signCreateChainTx(tx, key)
 	default:
-		err = errors.New("Could not parse given tx. Must be one of: addDefaultSubnetValidatorTx, addNonDefaultSubnetValidatorTx, createSubnetTx")
+		err = errors.New("Could not parse given tx")
 	}
 	if err != nil {
 		return err
@@ -773,6 +756,59 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 	return tx, nil
 }
 
+// Signs an unsigned or partially signed CreateChainTx with [key]
+// If [key] is a control key for the subnet and there is an empty spot in tx.ControlSigs, signs there
+// If [key] is a control key for the subnet and there is no empty spot in tx.ControlSigs, signs as payer
+// If [key] is not a control key, sign as payer (account controlled by [key] pays the tx fee)
+// Sorts tx.ControlSigs before returning
+// Assumes each element of tx.ControlSigs is actually a signature, not just empty bytes
+func (service *Service) signCreateChainTx(tx *CreateChainTx, key *crypto.PrivateKeySECP256K1R) (*CreateChainTx, error) {
+	service.vm.Ctx.Log.Debug("platform.signCreateChainTx called")
+
+	// Compute the byte repr. of the unsigned tx and the signature of [key] over it
+	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
+	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+	}
+	sig, err := key.Sign(unsignedTxBytes)
+	if err != nil {
+		return nil, errors.New("error while signing")
+	}
+	if len(sig) != crypto.SECP256K1RSigLen {
+		return nil, fmt.Errorf("expected signature to be length %d but was length %d", crypto.SECP256K1RSigLen, len(sig))
+	}
+
+	// Get information about the subnet
+	subnet, err := service.vm.getSubnet(service.vm.DB, tx.SubnetID)
+	if err != nil {
+		return nil, fmt.Errorf("problem getting subnet information: %v", err)
+	}
+
+	// Find the location at which [key] should put its signature.
+	// If [key] is a control key for this subnet and there is an empty spot in tx.ControlSigs, sign there
+	// If [key] is a control key for this subnet and there is no empty spot in tx.ControlSigs, sign as payer
+	// If [key] is not a control key, sign as payer (account controlled by [key] pays the tx fee)
+	controlKeySet := ids.ShortSet{}
+	controlKeySet.Add(subnet.ControlKeys...)
+	isControlKey := controlKeySet.Contains(key.PublicKey().Address())
+
+	payerSigEmpty := tx.PayerSig == [crypto.SECP256K1RSigLen]byte{} // true if no key has signed to pay the tx fee
+
+	if isControlKey && len(tx.ControlSigs) != int(subnet.Threshold) { // Sign as controlSig
+		tx.ControlSigs = append(tx.ControlSigs, [crypto.SECP256K1RSigLen]byte{})
+		copy(tx.ControlSigs[len(tx.ControlSigs)-1][:], sig)
+	} else if payerSigEmpty { // sign as payer
+		copy(tx.PayerSig[:], sig)
+	} else {
+		return nil, errors.New("no place for key to sign")
+	}
+
+	crypto.SortSECP2561RSigs(tx.ControlSigs)
+
+	return tx, nil
+}
+
 // IssueTxArgs are the arguments to IssueTx
 type IssueTxArgs struct {
 	// Tx being sent to the network
@@ -860,7 +896,6 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 	response.UnsignedTx.Bytes = txBytes
 	return nil
-
 }
 
 /*
@@ -871,6 +906,9 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
+	// ID of Subnet that validates the new blockchain
+	SubnetID ids.ID
+
 	// ID of the VM the new blockchain is running
 	VMID string `json:"vmID"`
 
@@ -880,26 +918,21 @@ type CreateBlockchainArgs struct {
 	// Human-readable name for the new blockchain, not necessarily unique
 	Name string `json:"name"`
 
-	// To generate the byte representation of the genesis data for this blockchain,
-	// a POST request with body [GenesisData] is made to the API method whose name is [Method], whose
-	// endpoint is [Endpoint]. See Platform Chain documentation for more info and examples.
-	Method      string      `json:"method"`
-	Endpoint    string      `json:"endpoint"`
-	GenesisData interface{} `json:"genesisData"`
-}
+	// Next unused nonce of the account paying the transaction fee
+	PayerNonce json.Uint64 `json:"payerNonce"`
 
-// CreateGenesisReply is the reply from a call to CreateGenesis
-type CreateGenesisReply struct {
-	Bytes formatting.CB58 `json:"bytes"`
+	// Genesis state of the blockchain being created
+	GenesisData formatting.CB58 `json:"genesisData"`
 }
 
 // CreateBlockchainReply is the reply from calling CreateBlockchain
 type CreateBlockchainReply struct {
-	BlockchainID ids.ID `json:"blockchainID"`
+	UnsignedTx formatting.CB58 `json:"unsignedTx"`
 }
 
-// CreateBlockchain issues a transaction to the network to create a new blockchain
-func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, reply *CreateBlockchainReply) error {
+// CreateBlockchain returns an unsigned transaction to create a new blockchain
+// Must be signed with the Subnet's control keys and with a key that pays the transaction fee before issuance
+func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *CreateBlockchainReply) error {
 	vmID, err := service.vm.ChainManager.LookupVM(args.VMID)
 	if err != nil {
 		return fmt.Errorf("no VM with ID '%s' found", args.VMID)
@@ -914,47 +947,30 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		fxIDs = append(fxIDs, fxID)
 	}
 
-	genesisBytes := []byte(nil)
-	if args.Method != "" {
-		buf, err := json2.EncodeClientRequest(args.Method, args.GenesisData)
-		if err != nil {
-			return fmt.Errorf("problem building blockchain genesis state: %w", err)
-		}
-
-		writer := httptest.NewRecorder()
-		service.vm.Ctx.HTTP.Call(
-			/*writer=*/ writer,
-			/*method=*/ "POST",
-			/*base=*/ args.VMID,
-			/*endpoint=*/ args.Endpoint,
-			/*body=*/ bytes.NewBuffer(buf),
-			/*headers=*/ map[string]string{
-				"Content-Type": "application/json",
-			},
-		)
-
-		result := CreateGenesisReply{}
-		if err := json2.DecodeClientResponse(writer.Body, &result); err != nil {
-			return fmt.Errorf("problem building blockchain genesis state: %w", err)
-		}
-		genesisBytes = result.Bytes.Bytes
-	} else if args.GenesisData != nil {
-		return errNoMethodWithGenesis
+	tx := CreateChainTx{
+		UnsignedCreateChainTx: UnsignedCreateChainTx{
+			NetworkID:   service.vm.Ctx.NetworkID,
+			SubnetID:    args.SubnetID,
+			Nonce:       uint64(args.PayerNonce),
+			ChainName:   args.Name,
+			VMID:        vmID,
+			FxIDs:       fxIDs,
+			GenesisData: args.GenesisData.Bytes,
+		},
+		PayerAddress: ids.ShortID{},
+		PayerSig:     [crypto.SECP256K1RSigLen]byte{},
+		ControlSigs:  nil,
+		vm:           nil,
+		id:           ids.ID{},
+		bytes:        nil,
 	}
 
-	// TODO: Should use the key store to sign this transaction.
-	// TODO: Nonce shouldn't always be 0
-	tx, err := service.vm.newCreateChainTx(0, genesisBytes, vmID, fxIDs, args.Name, service.vm.Ctx.NetworkID, key)
+	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
 	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
+		return errCreatingTransaction
 	}
 
-	// Add this tx to the set of unissued txs
-	service.vm.unissuedDecisionTxs = append(service.vm.unissuedDecisionTxs, tx)
-	service.vm.resetTimer()
-
-	reply.BlockchainID = tx.ID()
-
+	response.UnsignedTx.Bytes = txBytes
 	return nil
 }
 
