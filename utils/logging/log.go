@@ -171,7 +171,7 @@ func (l *Log) format(level Level, format string, args ...interface{}) string {
 
 	return fmt.Sprintf("%s[%s]%s %s\n",
 		level,
-		time.Now().Format("01-02|15:04:05"),
+		time.Now().Format("01-02|15:04:05.000"),
 		prefix,
 		text)
 }
