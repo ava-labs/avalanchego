@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/gecko/snow/validators"
+
 	"github.com/ava-labs/gecko/database"
 
 	"github.com/ava-labs/gecko/ids"
@@ -128,7 +130,12 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 
-	return nil, nil
+	// Register new subnet in validator manager
+	onAccept := func() {
+		tx.vm.Validators.PutValidatorSet(tx.ID, validators.NewSet())
+	}
+
+	return onAccept, nil
 }
 
 // Bytes returns the byte representation of [tx]

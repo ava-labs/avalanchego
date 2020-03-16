@@ -342,6 +342,7 @@ func Genesis(networkID uint32) ([]byte, error) {
 	platformvmArgs.Chains = []platformvm.APIChain{
 		platformvm.APIChain{
 			GenesisData: avmReply.Bytes,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        avm.ID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
@@ -350,21 +351,25 @@ func Genesis(networkID uint32) ([]byte, error) {
 		},
 		platformvm.APIChain{
 			GenesisData: evmReply,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        evm.ID,
 			Name:        "Athereum",
 		},
 		platformvm.APIChain{
 			GenesisData: spdagvmReply.Bytes,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        spdagvm.ID,
 			Name:        "Simple DAG Payments",
 		},
 		platformvm.APIChain{
 			GenesisData: spchainvmReply.Bytes,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        spchainvm.ID,
 			Name:        "Simple Chain Payments",
 		},
 		platformvm.APIChain{
 			GenesisData: formatting.CB58{Bytes: []byte{}}, // There is no genesis data
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        timestampvm.ID,
 			Name:        "Simple Timestamp Server",
 		},

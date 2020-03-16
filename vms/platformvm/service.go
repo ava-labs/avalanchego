@@ -845,6 +845,14 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		defer service.vm.resetTimer()
 		response.TxID = tx.ID
 		return nil
+	case *CreateChainTx:
+		if err := tx.initialize(service.vm); err != nil {
+			return fmt.Errorf("error initializing tx: %s", err)
+		}
+		service.vm.unissuedDecisionTxs = append(service.vm.unissuedDecisionTxs, tx)
+		defer service.vm.resetTimer()
+		response.TxID = tx.ID()
+		return nil
 	default:
 		return errors.New("Could not parse given tx. Must be one of: addDefaultSubnetValidatorTx, addDefaultSubnetDelegatorTx, addNonDefaultSubnetValidatorTx, createSubnetTx")
 	}
