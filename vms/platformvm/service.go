@@ -770,6 +770,8 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 		return nil, errors.New("no place for key to sign")
 	}
 
+	crypto.SortSECP2561RSigs(tx.ControlSigs)
+
 	return tx, nil
 }
 
