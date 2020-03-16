@@ -315,6 +315,18 @@ func TestEngineQuery(t *testing.T) {
 		if !bytes.Equal(b, vtx1.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
+
+		st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+			if vtxID.Equals(vtx0.ID()) {
+				return &Vtx{status: choices.Processing}, nil
+			}
+			if vtxID.Equals(vtx1.ID()) {
+				return vtx1, nil
+			}
+			t.Fatalf("Wrong vertex requested")
+			panic("Should have failed")
+		}
+
 		return vtx1, nil
 	}
 	te.Put(vdr.ID(), 0, vtx1.ID(), vtx1.Bytes())
