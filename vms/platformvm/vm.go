@@ -292,14 +292,6 @@ func (vm *VM) initBlockchains() error {
 	}
 
 	for _, chain := range blockchains { // Create each blockchain
-		// The validators that compose the Subnet that validates this chain
-		validators, subnetExists := vm.Validators.GetValidatorSet(chain.SubnetID)
-		if !subnetExists {
-			vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
-		}
-		if !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
-			continue
-		}
 		vm.createChain(chain)
 	}
 	return nil
@@ -326,8 +318,18 @@ func (vm *VM) initSubnets() error {
 	return nil
 }
 
-// Create a blockchain
+// Create the blockchain described in [tx], but only if this node is a member of
+// the Subnet that validates the chain
 func (vm *VM) createChain(tx *CreateChainTx) {
+	// The validators that compose the Subnet that validates this chain
+	validators, subnetExists := vm.Validators.GetValidatorSet(tx.SubnetID)
+	if !subnetExists {
+		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
+	}
+	if !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
+		return
+	}
+
 	chainParams := chains.ChainParameters{
 		ID:          tx.ID(),
 		SubnetID:    tx.SubnetID,
