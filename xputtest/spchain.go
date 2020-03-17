@@ -19,12 +19,10 @@ import (
 	"github.com/ava-labs/gecko/xputtest/chainwallet"
 )
 
-func (n *network) benchmarkSPChain(genesisState *platformvm.Genesis) {
-	spchainChain := genesisState.Chains[3]
-	n.log.AssertTrue(spchainChain.ChainName == "Simple Chain Payments", "wrong chain name")
-	genesisBytes := spchainChain.GenesisData
-
-	wallet := chainwallet.NewWallet(n.networkID, spchainChain.ID())
+// benchmark an instance of the sp chain
+func (n *network) benchmarkSPChain(chain *platformvm.CreateChainTx) {
+	genesisBytes := chain.GenesisData
+	wallet := chainwallet.NewWallet(n.networkID, chain.ID())
 
 	codec := spchainvm.Codec{}
 	accounts, err := codec.UnmarshalGenesis(genesisBytes)
@@ -47,10 +45,10 @@ func (n *network) benchmarkSPChain(genesisState *platformvm.Genesis) {
 
 	n.log.AssertNoError(wallet.GenerateTxs(config.NumTxs))
 
-	go n.log.RecoverAndPanic(func() { n.IssueSPChain(spchainChain.ID(), wallet) })
+	go n.log.RecoverAndPanic(func() { n.IssueSPChain(chain.ID(), wallet) })
 }
 
-func (n *network) IssueSPChain(chainID ids.ID, wallet chainwallet.Wallet) {
+func (n *network) IssueSPChain(chainID ids.ID, wallet *chainwallet.Wallet) {
 	n.log.Debug("Issuing with %d", wallet.Balance())
 	numAccepted := 0
 	numPending := 0

@@ -19,12 +19,10 @@ import (
 	"github.com/ava-labs/gecko/xputtest/avmwallet"
 )
 
-func (n *network) benchmarkAVM(genesisState *platformvm.Genesis) {
-	avmChain := genesisState.Chains[0]
-	n.log.AssertTrue(avmChain.ChainName == "AVM", "wrong chain name")
-	genesisBytes := avmChain.GenesisData
-
-	wallet, err := avmwallet.NewWallet(n.networkID, avmChain.ID(), config.AvaTxFee)
+// benchmark an instance of the avm
+func (n *network) benchmarkAVM(chain *platformvm.CreateChainTx) {
+	genesisBytes := chain.GenesisData
+	wallet, err := avmwallet.NewWallet(n.networkID, chain.ID(), config.AvaTxFee)
 	n.log.AssertNoError(err)
 
 	cb58 := formatting.CB58{}
@@ -56,9 +54,10 @@ func (n *network) benchmarkAVM(genesisState *platformvm.Genesis) {
 
 	n.log.AssertNoError(wallet.GenerateTxs(config.NumTxs, assetID))
 
-	go n.log.RecoverAndPanic(func() { n.IssueAVM(avmChain.ID(), assetID, wallet) })
+	go n.log.RecoverAndPanic(func() { n.IssueAVM(chain.ID(), assetID, wallet) })
 }
 
+// issue transactions to the instance of the avm funded by the provided wallet
 func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wallet) {
 	n.log.Debug("Issuing with %d", wallet.Balance(assetID))
 	numAccepted := 0

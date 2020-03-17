@@ -25,11 +25,11 @@ type Wallet struct {
 }
 
 // NewWallet returns a new Wallet
-func NewWallet(networkID uint32, chainID ids.ID, txFee uint64) Wallet {
-	return Wallet{
+func NewWallet(networkID uint32, chainID ids.ID, txFee uint64) *Wallet {
+	return &Wallet{
 		networkID: networkID,
 		chainID:   chainID,
-		keychain:  &spdagvm.Keychain{},
+		keychain:  spdagvm.NewKeychain(networkID, chainID),
 		utxoSet:   &UTXOSet{},
 		txFee:     txFee,
 	}

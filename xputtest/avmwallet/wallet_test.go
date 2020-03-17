@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -245,20 +244,7 @@ func TestWalletWithGenesis(t *testing.T) {
 		w.ImportKey(sk.(*crypto.PrivateKeySECP256K1R))
 	}
 
-	platformGenesisBytes := genesis.Genesis(genesis.LocalID)
-	genesisState := &platformvm.Genesis{}
-	err = platformvm.Codec.Unmarshal(platformGenesisBytes, genesisState)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := genesisState.Initialize(); err != nil {
-		t.Fatal(err)
-	}
-
-	avmChain := genesisState.Chains[0]
-	if name := avmChain.ChainName; name != "AVM" {
-		t.Fatalf("wrong chain name")
-	}
+	avmChain := genesis.VMGenesis(ctx.NetworkID, avm.ID)
 	genesisBytes := avmChain.GenesisData
 
 	genesis := avm.Genesis{}
@@ -282,8 +268,8 @@ func TestWalletWithGenesis(t *testing.T) {
 
 	assetID := genesisTx.ID()
 
-	if balance := w.Balance(assetID); balance != 45*units.MegaAva {
-		t.Fatalf("balance of %d was expected but got %d", 45*units.MegaAva, balance)
+	if balance := w.Balance(assetID); balance == 0 {
+		t.Fatalf("expected a positive balance")
 	}
 
 	for i := 1; i <= 1000; i++ {
