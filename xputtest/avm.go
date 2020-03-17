@@ -65,11 +65,15 @@ func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wal
 
 	n.decided <- ids.ID{}
 
+	// track the last second of transactions
 	meter := timer.TimedMeter{Duration: time.Second}
 	for d := range n.decided {
+		// display the TPS every 1000 txs
 		if numAccepted%1000 == 0 {
 			n.log.Info("TPS: %d", meter.Ticks())
 		}
+
+		// d is the ID of the tx that was accepted
 		if !d.IsZero() {
 			meter.Tick()
 			n.log.Debug("Finalized %s", d)
@@ -77,10 +81,12 @@ func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wal
 			numPending--
 		}
 
+		// Issue all the txs that we can right now
 		for numPending < config.MaxOutstandingTxs && wallet.Balance(assetID) > 0 && numAccepted+numPending < config.NumTxs {
 			tx := wallet.NextTx()
 			n.log.AssertTrue(tx != nil, "Tx creation failed")
 
+			// send the IssueTx message
 			it, err := n.build.IssueTx(chainID, tx.Bytes())
 			n.log.AssertNoError(err)
 			ds := it.DataStream()
@@ -96,6 +102,8 @@ func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wal
 			numPending++
 			n.log.Debug("Sent tx, pending = %d, accepted = %d", numPending, numAccepted)
 		}
+
+		// If we are done issuing txs, return from the function
 		if numAccepted+numPending >= config.NumTxs {
 			n.log.Info("done with test")
 			return
