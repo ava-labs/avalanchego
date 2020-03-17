@@ -282,24 +282,25 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// Create all of the chains that the database says should exist
+// Create all chains that exist that this node validates
+// Can only be called after initSubnets()
 func (vm *VM) initBlockchains() error {
-	vm.Ctx.Log.Verbo("initializing blockchains")
-	existingChains, err := vm.getChains(vm.DB)
+	vm.Ctx.Log.Info("initializing blockchains")
+	blockchains, err := vm.getChains(vm.DB) // get blockchains that exist
 	if err != nil {
 		return err
 	}
-	for _, chain := range existingChains { // Create each blockchain
-		chainParams := chains.ChainParameters{
-			ID:          chain.ID(),
-			SubnetID:    chain.SubnetID,
-			GenesisData: chain.GenesisData,
-			VMAlias:     chain.VMID.String(),
+
+	for _, chain := range blockchains { // Create each blockchain
+		// The validators that compose the Subnet that validates this chain
+		validators, subnetExists := vm.Validators.GetValidatorSet(chain.SubnetID)
+		if !subnetExists {
+			vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		}
-		for _, fxID := range chain.FxIDs {
-			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
+		if !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
+			continue
 		}
-		vm.ChainManager.CreateChain(chainParams)
+		vm.createChain(chain)
 	}
 	return nil
 }
@@ -323,6 +324,20 @@ func (vm *VM) initSubnets() error {
 	}
 
 	return nil
+}
+
+// Create a blockchain
+func (vm *VM) createChain(tx *CreateChainTx) {
+	chainParams := chains.ChainParameters{
+		ID:          tx.ID(),
+		SubnetID:    tx.SubnetID,
+		GenesisData: tx.GenesisData,
+		VMAlias:     tx.VMID.String(),
+	}
+	for _, fxID := range tx.FxIDs {
+		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
+	}
+	vm.ChainManager.CreateChain(chainParams)
 }
 
 // Shutdown this blockchain
