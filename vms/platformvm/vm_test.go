@@ -153,7 +153,7 @@ func defaultVM() *VM {
 		&EventHeap{
 			SortByStartTime: false,
 		},
-		tx.ID,
+		tx.id,
 	)
 	if err != nil {
 		panic(err)
@@ -163,7 +163,7 @@ func defaultVM() *VM {
 		&EventHeap{
 			SortByStartTime: true,
 		},
-		tx.ID,
+		tx.id,
 	)
 	if err != nil {
 		panic(err)
@@ -437,7 +437,7 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		keys[0],
@@ -482,7 +482,7 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 	commit.Accept() // accept the proposal
 
 	// Verify that new validator is in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.ID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,7 +510,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		keys[0],
@@ -555,7 +555,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 	abort.Accept() // reject the proposal
 
 	// Verify that new validator NOT in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.ID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -765,7 +765,7 @@ func TestCreateChain(t *testing.T) {
 
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		timestampvm.ID,
 		nil,
@@ -887,7 +887,7 @@ func TestCreateSubnet(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		createSubnetTx.ID,
+		createSubnetTx.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0],
@@ -937,7 +937,7 @@ func TestCreateSubnet(t *testing.T) {
 	commit.Accept() // add the validator to pending validator set
 
 	// Verify validator is in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.ID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -991,7 +991,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Verify validator no longer in pending validator set
 	// Verify validator is in pending validator set
-	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID)
+	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1000,7 +1000,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Verify validator is in current validator set
-	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.ID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1050,14 +1050,14 @@ func TestCreateSubnet(t *testing.T) {
 	commit.Accept() // remove validator from current validator set
 
 	// pending validators and current validator should be empty
-	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID)
+	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if pendingValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
 	}
-	currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.ID)
+	currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}

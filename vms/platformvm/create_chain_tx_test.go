@@ -24,7 +24,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	// Case 2: network ID is wrong
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -44,7 +44,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	// case 3: tx ID is empty
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -64,7 +64,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	// Case 4: vm ID is empty
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -84,7 +84,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	// Case 5: Control sigs not sorted
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -105,7 +105,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	// Case 6: Control sigs not unique
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -125,7 +125,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	// Case 7: Control sigs are nil
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -145,7 +145,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	// Case 8: Valid tx passes syntactic verification
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -166,7 +166,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Case 1: No control sigs (2 are needed)
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -187,7 +187,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Case 2: 1 control sig (2 are needed)
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -219,7 +219,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -269,7 +269,7 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 	// create a tx
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
@@ -300,7 +300,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	// create a valid tx
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
-		testSubnet1.ID,
+		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,

@@ -318,7 +318,7 @@ func (vm *VM) initSubnets() error {
 	}
 
 	for _, subnet := range subnets {
-		if err := vm.updateValidators(subnet.ID); err != nil {
+		if err := vm.updateValidators(subnet.id); err != nil {
 			return err
 		}
 	}
@@ -621,7 +621,7 @@ func (vm *VM) nextValidatorChangeTime(db database.Database, start bool) time.Tim
 		return earliest
 	}
 	for _, subnet := range subnets {
-		t := vm.nextSubnetValidatorChangeTime(db, subnet.ID, start)
+		t := vm.nextSubnetValidatorChangeTime(db, subnet.id, start)
 		if t.Before(earliest) {
 			earliest = t
 		}

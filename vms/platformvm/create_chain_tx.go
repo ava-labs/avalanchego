@@ -156,7 +156,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	}
 	var subnet *CreateSubnetTx // the subnet that will validate the new chain
 	for _, sn := range subnets {
-		if sn.ID.Equals(tx.SubnetID) {
+		if sn.id.Equals(tx.SubnetID) {
 			subnet = sn
 			break
 		}
