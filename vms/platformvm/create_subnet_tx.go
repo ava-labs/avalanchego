@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/snow/validators"
-
 	"github.com/ava-labs/gecko/database"
-
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -27,9 +25,6 @@ var (
 type UnsignedCreateSubnetTx struct {
 	// The VM this tx exists within
 	vm *VM
-
-	// ID is this transaction's ID
-	ID ids.ID
 
 	// NetworkID is the ID of the network this tx was issued on
 	NetworkID uint32 `serialize:"true"`
@@ -49,18 +44,24 @@ type UnsignedCreateSubnetTx struct {
 type CreateSubnetTx struct {
 	UnsignedCreateSubnetTx `serialize:"true"`
 
+	// Signature on the UnsignedCreateSubnetTx's byte repr
+	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+
 	// The public key that signed this transaction
 	// The transaction fee will be paid from the corresponding account
 	// (ie the account whose ID is [key].Address())
 	// [key] is non-nil iff this tx is valid
 	key crypto.PublicKey
 
-	// Signature on the UnsignedCreateSubnetTx's byte repr
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+	// ID is this transaction's ID
+	id ids.ID
 
 	// Byte representation of this transaction (including signature)
 	bytes []byte
 }
+
+// ID returns the ID of this transaction
+func (tx *CreateSubnetTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify nil iff [tx] is syntactically valid.
 // If [tx] is valid, this method sets [tx.key]
@@ -70,7 +71,7 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 		return errNilTx
 	case tx.key != nil:
 		return nil // Only verify the transaction once
-	case tx.ID.IsZero():
+	case tx.id.IsZero():
 		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
 		return errWrongNetworkID
@@ -108,8 +109,8 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	}
 
 	for _, subnet := range subnets {
-		if subnet.ID.Equals(tx.ID) {
-			return nil, fmt.Errorf("there is already a subnet with ID %s", tx.ID)
+		if subnet.id.Equals(tx.id) {
+			return nil, fmt.Errorf("there is already a subnet with ID %s", tx.id)
 		}
 	}
 	subnets = append(subnets, tx) // add new subnet
@@ -132,7 +133,7 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 
 	// Register new subnet in validator manager
 	onAccept := func() {
-		tx.vm.Validators.PutValidatorSet(tx.ID, validators.NewSet())
+		tx.vm.Validators.PutValidatorSet(tx.id, validators.NewSet())
 	}
 
 	return onAccept, nil
@@ -159,7 +160,7 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 		return err
 	}
 	tx.bytes = txBytes
-	tx.ID = ids.NewID(hashing.ComputeHash256Array(txBytes))
+	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
 	return nil
 }
 

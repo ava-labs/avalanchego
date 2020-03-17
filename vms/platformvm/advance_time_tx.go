@@ -105,15 +105,15 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 		return nil, nil, nil, nil, err
 	}
 	for _, subnet := range subnets {
-		current, pending, err := tx.vm.calculateValidators(db, tx.Timestamp(), subnet.ID)
+		current, pending, err := tx.vm.calculateValidators(db, tx.Timestamp(), subnet.id)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 
-		if err := tx.vm.putCurrentValidators(onCommitDB, current, subnet.ID); err != nil {
+		if err := tx.vm.putCurrentValidators(onCommitDB, current, subnet.id); err != nil {
 			return nil, nil, nil, nil, err
 		}
-		if err := tx.vm.putPendingValidators(onCommitDB, pending, subnet.ID); err != nil {
+		if err := tx.vm.putPendingValidators(onCommitDB, pending, subnet.id); err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}
@@ -127,7 +127,7 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 			return
 		}
 		for _, subnet := range subnets {
-			if err := tx.vm.updateValidators(subnet.ID); err != nil {
+			if err := tx.vm.updateValidators(subnet.id); err != nil {
 				tx.vm.Ctx.Log.Debug("failed to update validators on the default subnet: %s", err)
 			}
 		}

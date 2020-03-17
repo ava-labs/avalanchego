@@ -78,7 +78,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		response.Subnets = make([]APISubnet, len(subnets))
 		for i, subnet := range subnets {
 			response.Subnets[i] = APISubnet{
-				ID:          subnet.ID,
+				ID:          subnet.id,
 				ControlKeys: subnet.ControlKeys,
 				Threshold:   json.Uint16(subnet.Threshold),
 			}
@@ -89,10 +89,10 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	idsSet := ids.Set{}
 	idsSet.Add(args.IDs...)
 	for _, subnet := range subnets {
-		if idsSet.Contains(subnet.ID) {
+		if idsSet.Contains(subnet.id) {
 			response.Subnets = append(response.Subnets,
 				APISubnet{
-					ID:          subnet.ID,
+					ID:          subnet.id,
 					ControlKeys: subnet.ControlKeys,
 					Threshold:   json.Uint16(subnet.Threshold),
 				},
@@ -837,15 +837,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		defer service.vm.resetTimer()
 		response.TxID = tx.ID()
 		return nil
-	case *CreateSubnetTx:
-		if err := tx.initialize(service.vm); err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		service.vm.unissuedDecisionTxs = append(service.vm.unissuedDecisionTxs, tx)
-		defer service.vm.resetTimer()
-		response.TxID = tx.ID
-		return nil
-	case *CreateChainTx:
+	case DecisionTx:
 		if err := tx.initialize(service.vm); err != nil {
 			return fmt.Errorf("error initializing tx: %s", err)
 		}
@@ -854,7 +846,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		response.TxID = tx.ID()
 		return nil
 	default:
-		return errors.New("Could not parse given tx. Must be one of: addDefaultSubnetValidatorTx, addDefaultSubnetDelegatorTx, addNonDefaultSubnetValidatorTx, createSubnetTx")
+		return errors.New("Could not parse given tx. Must be either a TimedTx or a DecisionTx")
 	}
 }
 
