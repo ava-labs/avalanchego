@@ -291,7 +291,7 @@ func (vm *VM) initBlockchains() error {
 		return err
 	}
 
-	for _, chain := range blockchains { // Create each blockchain
+	for _, chain := range blockchains {
 		vm.createChain(chain)
 	}
 	return nil
@@ -325,6 +325,7 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 	validators, subnetExists := vm.Validators.GetValidatorSet(tx.SubnetID)
 	if !subnetExists {
 		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
+		return
 	}
 	if !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
 		return
@@ -653,13 +654,16 @@ func (vm *VM) nextSubnetValidatorChangeTime(db database.Database, subnetID ids.I
 // Returns:
 // 1) The validator set of subnet with ID [subnetID] when timestamp is advanced to [timestamp]
 // 2) The pending validator set of subnet with ID [subnetID] when timestamp is advanced to [timestamp]
+// 3) The IDs of the validators that start validating [subnetID] between now and [timestamp]
+// 4) The IDs of the validators that stop validating [subnetID] between now and [timestamp]
 // Note that this method will not remove validators from the current validator set of the default subnet.
 // That happens in reward blocks.
-func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, subnetID ids.ID) (current, pending *EventHeap, err error) {
+func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, subnetID ids.ID) (current,
+	pending *EventHeap, started, stopped ids.ShortSet, err error) {
 	// remove validators whose end time <= [timestamp]
 	current, err = vm.getCurrentValidators(db, subnetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if !subnetID.Equals(DefaultSubnetID) { // validators of default subnet removed in rewardValidatorTxs, not here
 		for current.Len() > 0 {
@@ -668,11 +672,12 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 				break
 			}
 			current.Remove()
+			stopped.Add(next.Vdr().ID())
 		}
 	}
 	pending, err = vm.getPendingValidators(db, subnetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	for pending.Len() > 0 {
 		nextTx := pending.Peek() // pending staker with earliest start time
@@ -681,8 +686,9 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 		}
 		heap.Push(current, nextTx)
 		heap.Pop(pending)
+		started.Add(nextTx.Vdr().ID())
 	}
-	return current, pending, nil
+	return current, pending, started, stopped, nil
 }
 
 func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {

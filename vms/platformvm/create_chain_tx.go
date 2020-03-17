@@ -194,7 +194,8 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 		}
 	}
 
-	// If this proposal is committed, create the new blockchain using the chain manager
+	// If this proposal is committed and this node is a member of the
+	// subnet that validates the blockchain, create the blockchain
 	onAccept := func() {
 		tx.vm.createChain(tx)
 	}
