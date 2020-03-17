@@ -265,13 +265,8 @@ func (vm *VM) Initialize(
 	})
 	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
 
-	if err := vm.initValidators(); err != nil {
-		ctx.Log.Error("failed to initialize validator manager: %s", err)
-		return err
-	}
-
-	if err := vm.updateValidators(DefaultSubnetID); err != nil {
-		ctx.Log.Error("failed to initialize default Subnet validator set: %s", err)
+	if err := vm.initSubnets(); err != nil {
+		ctx.Log.Error("failed to initialize Subnets: %s", err)
 		return err
 	}
 
@@ -289,7 +284,7 @@ func (vm *VM) Initialize(
 
 // Create all of the chains that the database says should exist
 func (vm *VM) initBlockchains() error {
-	vm.Ctx.Log.Verbo("platform chain initializing existing blockchains")
+	vm.Ctx.Log.Verbo("initializing blockchains")
 	existingChains, err := vm.getChains(vm.DB)
 	if err != nil {
 		return err
@@ -310,8 +305,8 @@ func (vm *VM) initBlockchains() error {
 }
 
 // Set the node's validator manager to be up to date
-func (vm *VM) initValidators() error {
-	vm.Ctx.Log.Verbo("platform chain initializing Subnet validators")
+func (vm *VM) initSubnets() error {
+	vm.Ctx.Log.Info("initializing Subnets")
 	subnets, err := vm.getSubnets(vm.DB)
 	if err != nil {
 		return err
@@ -698,11 +693,12 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 	return vdrList
 }
 
-// Update the node's validator manager to reflect the current validator set of the given Subnet
+// update the node's validator manager to contain the current validator set of the given Subnet
 func (vm *VM) updateValidators(subnetID ids.ID) error {
-	validatorSet, ok := vm.Validators.GetValidatorSet(subnetID)
-	if !ok {
-		return fmt.Errorf("couldn't get the validator sampler of the %s subnet", subnetID)
+	validatorSet, subnetInitialized := vm.Validators.GetValidatorSet(subnetID)
+	if !subnetInitialized { // validator manager doesn't know about this subnet yet
+		validatorSet = validators.NewSet()
+		vm.Validators.PutValidatorSet(subnetID, validatorSet)
 	}
 
 	currentValidators, err := vm.getCurrentValidators(vm.DB, subnetID)
