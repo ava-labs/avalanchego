@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/chains"
+
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -113,7 +115,8 @@ func defaultVM() *VM {
 	}
 
 	vm := &VM{
-		SnowmanVM: &core.SnowmanVM{},
+		SnowmanVM:    &core.SnowmanVM{},
+		ChainManager: chains.MockManager{},
 	}
 
 	defaultSubnet := validators.NewSet()

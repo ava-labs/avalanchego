@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
@@ -197,19 +196,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 
 	// If this proposal is committed, create the new blockchain using the chain manager
 	onAccept := func() {
-		chainParams := chains.ChainParameters{
-			ID:          tx.ID(),
-			SubnetID:    tx.SubnetID,
-			GenesisData: tx.GenesisData,
-			VMAlias:     tx.VMID.String(),
-		}
-		for _, fxID := range tx.FxIDs {
-			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-		}
-		// TODO: Not sure how else to make this not nil pointer error during tests
-		if tx.vm.ChainManager != nil {
-			tx.vm.ChainManager.CreateChain(chainParams)
-		}
+		tx.vm.createChain(tx)
 	}
 
 	return onAccept, nil

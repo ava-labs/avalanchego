@@ -265,13 +265,8 @@ func (vm *VM) Initialize(
 	})
 	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
 
-	if err := vm.initValidators(); err != nil {
-		ctx.Log.Error("failed to initialize validator manager: %s", err)
-		return err
-	}
-
-	if err := vm.updateValidators(DefaultSubnetID); err != nil {
-		ctx.Log.Error("failed to initialize default Subnet validator set: %s", err)
+	if err := vm.initSubnets(); err != nil {
+		ctx.Log.Error("failed to initialize Subnets: %s", err)
 		return err
 	}
 
@@ -287,31 +282,32 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// Create all of the chains that the database says should exist
+// Create all chains that exist that this node validates
+// Can only be called after initSubnets()
 func (vm *VM) initBlockchains() error {
-	vm.Ctx.Log.Verbo("platform chain initializing existing blockchains")
-	existingChains, err := vm.getChains(vm.DB)
+	vm.Ctx.Log.Info("initializing blockchains")
+	blockchains, err := vm.getChains(vm.DB) // get blockchains that exist
 	if err != nil {
 		return err
 	}
-	for _, chain := range existingChains { // Create each blockchain
-		chainParams := chains.ChainParameters{
-			ID:          chain.ID(),
-			SubnetID:    chain.SubnetID,
-			GenesisData: chain.GenesisData,
-			VMAlias:     chain.VMID.String(),
+
+	for _, chain := range blockchains { // Create each blockchain
+		// The validators that compose the Subnet that validates this chain
+		validators, subnetExists := vm.Validators.GetValidatorSet(chain.SubnetID)
+		if !subnetExists {
+			vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		}
-		for _, fxID := range chain.FxIDs {
-			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
+		if !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
+			continue
 		}
-		vm.ChainManager.CreateChain(chainParams)
+		vm.createChain(chain)
 	}
 	return nil
 }
 
 // Set the node's validator manager to be up to date
-func (vm *VM) initValidators() error {
-	vm.Ctx.Log.Verbo("platform chain initializing Subnet validators")
+func (vm *VM) initSubnets() error {
+	vm.Ctx.Log.Info("initializing Subnets")
 	subnets, err := vm.getSubnets(vm.DB)
 	if err != nil {
 		return err
@@ -328,6 +324,20 @@ func (vm *VM) initValidators() error {
 	}
 
 	return nil
+}
+
+// Create a blockchain
+func (vm *VM) createChain(tx *CreateChainTx) {
+	chainParams := chains.ChainParameters{
+		ID:          tx.ID(),
+		SubnetID:    tx.SubnetID,
+		GenesisData: tx.GenesisData,
+		VMAlias:     tx.VMID.String(),
+	}
+	for _, fxID := range tx.FxIDs {
+		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
+	}
+	vm.ChainManager.CreateChain(chainParams)
 }
 
 // Shutdown this blockchain
@@ -698,11 +708,12 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 	return vdrList
 }
 
-// Update the node's validator manager to reflect the current validator set of the given Subnet
+// update the node's validator manager to contain the current validator set of the given Subnet
 func (vm *VM) updateValidators(subnetID ids.ID) error {
-	validatorSet, ok := vm.Validators.GetValidatorSet(subnetID)
-	if !ok {
-		return fmt.Errorf("couldn't get the validator sampler of the %s subnet", subnetID)
+	validatorSet, subnetInitialized := vm.Validators.GetValidatorSet(subnetID)
+	if !subnetInitialized { // validator manager doesn't know about this subnet yet
+		validatorSet = validators.NewSet()
+		vm.Validators.PutValidatorSet(subnetID, validatorSet)
 	}
 
 	currentValidators, err := vm.getCurrentValidators(vm.DB, subnetID)
