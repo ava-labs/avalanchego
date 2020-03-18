@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 )
@@ -74,11 +75,13 @@ type APIDefaultSubnetValidator struct {
 // [VMID] is the ID of the VM this chain runs.
 // [FxIDs] are the IDs of the Fxs the chain supports.
 // [Name] is a human-readable, non-unique name for the chain.
+// [SubnetID] is the ID of the subnet that validates the chain
 type APIChain struct {
 	GenesisData formatting.CB58 `json:"genesisData"`
 	VMID        ids.ID          `json:"vmID"`
 	FxIDs       []ids.ID        `json:"fxIDs"`
 	Name        string          `json:"name"`
+	SubnetID    ids.ID          `json:"subnetID"`
 }
 
 // BuildGenesisArgs are the arguments used to create
@@ -134,8 +137,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return errAccountHasNoValue
 		}
 		accounts = append(accounts, newAccount(
-			account.Address, // ID
-			0,               // nonce
+			account.Address,         // ID
+			0,                       // nonce
 			uint64(account.Balance), // balance
 		))
 	}
@@ -182,12 +185,15 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		tx := &CreateChainTx{
 			UnsignedCreateChainTx: UnsignedCreateChainTx{
 				NetworkID:   uint32(args.NetworkID),
+				SubnetID:    chain.SubnetID,
 				Nonce:       0,
 				ChainName:   chain.Name,
 				VMID:        chain.VMID,
 				FxIDs:       chain.FxIDs,
 				GenesisData: chain.GenesisData.Bytes,
 			},
+			ControlSigs: [][crypto.SECP256K1RSigLen]byte{},
+			PayerSig:    [crypto.SECP256K1RSigLen]byte{},
 		}
 		if err := tx.initialize(nil); err != nil {
 			return err
