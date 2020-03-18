@@ -1133,6 +1133,9 @@ type APIBlockchain struct {
 	// Blockchain's ID
 	ID ids.ID `json:"id"`
 
+	// Blockchain's (non-unique) human-readable name
+	Name string `json:"name"`
+
 	// Subnet that validates the blockchain
 	SubnetID ids.ID `json:"subnetID"`
 
@@ -1158,6 +1161,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	for _, chain := range chains {
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chain.ID(),
+			Name:     chain.ChainName,
 			SubnetID: chain.SubnetID,
 			VMID:     chain.VMID,
 		})
