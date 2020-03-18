@@ -289,6 +289,9 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 	return nil
 }
 
+// Inner returns itself
+func (b *batch) Inner() database.Batch { return b }
+
 // iterator walks over both the in memory database and the underlying database
 // at the same time.
 type iterator struct {
