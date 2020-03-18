@@ -409,13 +409,18 @@ func (u *unaryNode) RecordPoll(votes ids.Bag, reset bool) node {
 		u.snowball.RecordSuccessfulPoll()
 
 		if u.child != nil {
-			decidedPrefix := u.child.DecidedPrefix()
-			filteredVotes := votes.Filter(u.commonPrefix, decidedPrefix, u.preference)
+			// We are guaranteed that u.commonPrefix will equal
+			// u.child.DecidedPrefix(). Otherwise, there must have been a
+			// decision under this node, which isn't possible because
+			// beta1 <= beta2. That means that filtering the votes between
+			// u.commonPrefix and u.child.DecidedPrefix() would always result in
+			// the same set being returned.
+
 			// If I'm now decided, return my child
 			if u.Finalized() {
-				return u.child.RecordPoll(filteredVotes, u.shouldReset)
+				return u.child.RecordPoll(votes, u.shouldReset)
 			}
-			u.child = u.child.RecordPoll(filteredVotes, u.shouldReset)
+			u.child = u.child.RecordPoll(votes, u.shouldReset)
 			// The child's preference may have changed
 			u.preference = u.child.Preference()
 		}
