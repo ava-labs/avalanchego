@@ -10,13 +10,17 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/spchainvm"
 )
 
 // Wallet is a holder for keys and UTXOs.
 type Wallet struct {
-	networkID  uint32
-	chainID    ids.ID
+	networkID uint32
+	chainID   ids.ID
+
+	log logging.Logger
+
 	keychain   *spchainvm.Keychain            // Mapping from public address to the SigningKeys
 	accountSet map[[20]byte]spchainvm.Account // Mapping from addresses to accounts
 	balance    uint64
@@ -25,10 +29,11 @@ type Wallet struct {
 }
 
 // NewWallet ...
-func NewWallet(networkID uint32, chainID ids.ID) *Wallet {
+func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID) *Wallet {
 	return &Wallet{
 		networkID:  networkID,
 		chainID:    chainID,
+		log:        log,
 		keychain:   spchainvm.NewKeychain(networkID, chainID),
 		accountSet: make(map[[20]byte]spchainvm.Account),
 	}
@@ -62,9 +67,16 @@ func (w *Wallet) Balance() uint64 { return w.balance }
 // Generate them all on test initialization so tx generation is not bottleneck
 // in testing
 func (w *Wallet) GenerateTxs(numTxs int) error {
+	w.log.Info("Generating %d transactions", numTxs)
+
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = w.networkID
 	ctx.ChainID = w.chainID
+
+	frequency := numTxs / 50
+	if frequency > 1000 {
+		frequency = 1000
+	}
 
 	w.txs = make([]*spchainvm.Tx, numTxs)
 	for i := range w.txs {
@@ -72,8 +84,16 @@ func (w *Wallet) GenerateTxs(numTxs int) error {
 		if err != nil {
 			return err
 		}
+
+		if numGenerated := i + 1; numGenerated%frequency == 0 {
+			w.log.Info("Generated %d out of %d transactions", numGenerated, numTxs)
+		}
+
 		w.txs[i] = tx
 	}
+
+	w.log.Info("Finished generating %d transactions", numTxs)
+
 	return nil
 }
 

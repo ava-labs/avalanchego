@@ -22,7 +22,7 @@ import (
 // benchmark an instance of the sp chain
 func (n *network) benchmarkSPChain(chain *platformvm.CreateChainTx) {
 	genesisBytes := chain.GenesisData
-	wallet := chainwallet.NewWallet(n.networkID, chain.ID())
+	wallet := chainwallet.NewWallet(n.log, n.networkID, chain.ID())
 
 	codec := spchainvm.Codec{}
 	accounts, err := codec.UnmarshalGenesis(genesisBytes)
@@ -88,6 +88,7 @@ func (n *network) IssueSPChain(chainID ids.ID, wallet *chainwallet.Wallet) {
 		}
 		if numAccepted+numPending >= config.NumTxs {
 			n.log.Info("done with test")
+			net.ec.Stop()
 			return
 		}
 	}

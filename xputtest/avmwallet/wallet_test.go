@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -18,7 +19,7 @@ import (
 
 func TestNewWallet(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +30,7 @@ func TestNewWallet(t *testing.T) {
 
 func TestWalletGetAddress(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +46,7 @@ func TestWalletGetAddress(t *testing.T) {
 
 func TestWalletGetMultipleAddresses(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestWalletGetMultipleAddresses(t *testing.T) {
 
 func TestWalletEmptyBalance(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +78,7 @@ func TestWalletEmptyBalance(t *testing.T) {
 
 func TestWalletAddUTXO(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +100,7 @@ func TestWalletAddUTXO(t *testing.T) {
 
 func TestWalletAddInvalidUTXO(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +119,7 @@ func TestWalletAddInvalidUTXO(t *testing.T) {
 
 func TestWalletCreateTx(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +169,7 @@ func TestWalletCreateTx(t *testing.T) {
 
 func TestWalletImportKey(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +194,7 @@ func TestWalletImportKey(t *testing.T) {
 
 func TestWalletString(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +226,7 @@ func TestWalletWithGenesis(t *testing.T) {
 	ctx.NetworkID = 12345
 	ctx.ChainID = ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-	w, err := NewWallet(ctx.NetworkID, ctx.ChainID, 0)
+	w, err := NewWallet(logging.NoLog{}, ctx.NetworkID, ctx.ChainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

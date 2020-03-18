@@ -22,7 +22,7 @@ import (
 // benchmark an instance of the avm
 func (n *network) benchmarkAVM(chain *platformvm.CreateChainTx) {
 	genesisBytes := chain.GenesisData
-	wallet, err := avmwallet.NewWallet(n.networkID, chain.ID(), config.AvaTxFee)
+	wallet, err := avmwallet.NewWallet(n.log, n.networkID, chain.ID(), config.AvaTxFee)
 	n.log.AssertNoError(err)
 
 	cb58 := formatting.CB58{}
@@ -106,6 +106,7 @@ func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wal
 		// If we are done issuing txs, return from the function
 		if numAccepted+numPending >= config.NumTxs {
 			n.log.Info("done with test")
+			net.ec.Stop()
 			return
 		}
 	}
