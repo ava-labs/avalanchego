@@ -18,37 +18,48 @@ var (
 	errUnknownAccount = errors.New("unknown account")
 )
 
-// KeyChain is a collection of keys that can be used to spend utxos
-type KeyChain struct {
+// Keychain is a collection of keys that can be used to spend utxos
+type Keychain struct {
+	factory   crypto.FactorySECP256K1R
 	networkID uint32
 	chainID   ids.ID
-	// This can be used to iterate over. However, it should not be modified externally.
+
+	// Key: The id of a private key (namely, [privKey].PublicKey().Address().Key())
+	// Value: The index in Keys of that private key
 	keyMap map[[20]byte]int
-	Addrs  ids.ShortSet
-	Keys   []*crypto.PrivateKeySECP256K1R
+
+	// Each element is an address controlled by a key in [Keys]
+	// This can be used to iterate over. It should not be modified externally.
+	Addrs ids.ShortSet
+
+	// List of keys this keychain manages
+	// This can be used to iterate over. It should not be modified externally.
+	Keys []*crypto.PrivateKeySECP256K1R
 }
 
-// NewKeyChain creates a new keychain for a chain
-func NewKeyChain(networkID uint32, chainID ids.ID) *KeyChain {
-	return &KeyChain{
-		chainID: chainID,
-		keyMap:  make(map[[20]byte]int),
+// NewKeychain creates a new keychain for a chain
+func NewKeychain(networkID uint32, chainID ids.ID) *Keychain {
+	return &Keychain{
+		networkID: networkID,
+		chainID:   chainID,
+		keyMap:    make(map[[20]byte]int),
 	}
 }
 
 // New returns a newly generated private key
-func (kc *KeyChain) New() *crypto.PrivateKeySECP256K1R {
-	factory := &crypto.FactorySECP256K1R{}
-
-	skGen, _ := factory.NewPrivateKey()
+func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
+	skGen, err := kc.factory.NewPrivateKey()
+	if err != nil {
+		return nil, err
+	}
 
 	sk := skGen.(*crypto.PrivateKeySECP256K1R)
 	kc.Add(sk)
-	return sk
+	return sk, nil
 }
 
 // Add a new key to the key chain
-func (kc *KeyChain) Add(key *crypto.PrivateKeySECP256K1R) {
+func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
 	addr := key.PublicKey().Address()
 	addrHash := addr.Key()
 	if _, ok := kc.keyMap[addrHash]; !ok {
@@ -59,7 +70,7 @@ func (kc *KeyChain) Add(key *crypto.PrivateKeySECP256K1R) {
 }
 
 // Get a key from the keychain. If the key is unknown, the
-func (kc *KeyChain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
+func (kc *Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
 	if i, ok := kc.keyMap[id.Key()]; ok {
 		return kc.Keys[i], true
 	}
@@ -67,10 +78,10 @@ func (kc *KeyChain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
 }
 
 // Addresses returns a list of addresses this keychain manages
-func (kc *KeyChain) Addresses() ids.ShortSet { return kc.Addrs }
+func (kc *Keychain) Addresses() ids.ShortSet { return kc.Addrs }
 
 // Spend attempts to create a new transaction
-func (kc *KeyChain) Spend(account Account, amount uint64, destination ids.ShortID) (*Tx, Account, error) {
+func (kc *Keychain) Spend(account Account, amount uint64, destination ids.ShortID) (*Tx, Account, error) {
 	key, exists := kc.Get(account.ID())
 	if !exists {
 		return nil, Account{}, errUnknownAccount
@@ -83,7 +94,7 @@ func (kc *KeyChain) Spend(account Account, amount uint64, destination ids.ShortI
 
 // PrefixedString returns a string representation of this keychain with each
 // line prepended with [prefix]
-func (kc *KeyChain) PrefixedString(prefix string) string {
+func (kc *Keychain) PrefixedString(prefix string) string {
 	s := strings.Builder{}
 
 	format := fmt.Sprintf("%%sKey[%s]: Key: %%s Address: %%s\n",
@@ -99,6 +110,6 @@ func (kc *KeyChain) PrefixedString(prefix string) string {
 	return strings.TrimSuffix(s.String(), "\n")
 }
 
-func (kc *KeyChain) String() string {
+func (kc *Keychain) String() string {
 	return kc.PrefixedString("")
 }

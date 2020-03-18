@@ -8,7 +8,8 @@ type ChainType int
 
 // Chain types
 const (
-	UnknownChain ChainType = iota
-	ChainChain
-	DagChain
+	unknown ChainType = iota
+	spChain
+	spDAG
+	avmDAG
 )

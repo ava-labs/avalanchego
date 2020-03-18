@@ -1,14 +1,14 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package dagwallet
+package avmwallet
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/spdagvm"
+	"github.com/ava-labs/gecko/vms/avm"
 )
 
 // UTXOSet ...
@@ -19,22 +19,24 @@ type UTXOSet struct {
 
 	// List of UTXOs in this set
 	// This can be used to iterate over. It should not be modified externally.
-	UTXOs []*spdagvm.UTXO
+	UTXOs []*avm.UTXO
 }
 
 // Put ...
-func (us *UTXOSet) Put(utxo *spdagvm.UTXO) {
+func (us *UTXOSet) Put(utxo *avm.UTXO) {
 	if us.utxoMap == nil {
 		us.utxoMap = make(map[[32]byte]int)
 	}
-	if _, ok := us.utxoMap[utxo.ID().Key()]; !ok {
-		us.utxoMap[utxo.ID().Key()] = len(us.UTXOs)
+	utxoID := utxo.InputID()
+	utxoKey := utxoID.Key()
+	if _, ok := us.utxoMap[utxoKey]; !ok {
+		us.utxoMap[utxoKey] = len(us.UTXOs)
 		us.UTXOs = append(us.UTXOs, utxo)
 	}
 }
 
 // Get ...
-func (us *UTXOSet) Get(id ids.ID) *spdagvm.UTXO {
+func (us *UTXOSet) Get(id ids.ID) *avm.UTXO {
 	if us.utxoMap == nil {
 		return nil
 	}
@@ -46,7 +48,7 @@ func (us *UTXOSet) Get(id ids.ID) *spdagvm.UTXO {
 }
 
 // Remove ...
-func (us *UTXOSet) Remove(id ids.ID) *spdagvm.UTXO {
+func (us *UTXOSet) Remove(id ids.ID) *avm.UTXO {
 	i, ok := us.utxoMap[id.Key()]
 	if !ok {
 		return nil
@@ -59,34 +61,32 @@ func (us *UTXOSet) Remove(id ids.ID) *spdagvm.UTXO {
 	us.UTXOs[i] = us.UTXOs[j]
 	us.UTXOs = us.UTXOs[:j]
 
-	us.utxoMap[utxoJ.ID().Key()] = i
-	delete(us.utxoMap, utxoI.ID().Key())
+	us.utxoMap[utxoJ.InputID().Key()] = i
+	delete(us.utxoMap, utxoI.InputID().Key())
 
 	return utxoI
 }
 
-func (us *UTXOSet) string(prefix string) string {
+// PrefixedString returns a string with each new line prefixed with [prefix]
+func (us *UTXOSet) PrefixedString(prefix string) string {
 	s := strings.Builder{}
 
+	s.WriteString(fmt.Sprintf("UTXOs (length=%d):", len(us.UTXOs)))
 	for i, utxo := range us.UTXOs {
-		out := utxo.Out().(*spdagvm.OutputPayment)
-		sourceID, sourceIndex := utxo.Source()
+		utxoID := utxo.InputID()
+		txID, txIndex := utxo.InputSource()
 
-		s.WriteString(fmt.Sprintf("%sUTXO[%d]:"+
-			"\n%s    InputID: %s"+
-			"\n%s    InputIndex: %d"+
-			"\n%s    Locktime: %d"+
-			"\n%s    Amount: %d\n",
+		s.WriteString(fmt.Sprintf("\n%sUTXO[%d]:"+
+			"\n%s    UTXOID: %s"+
+			"\n%s    TxID: %s"+
+			"\n%s    TxIndex: %d",
 			prefix, i,
-			prefix, sourceID,
-			prefix, sourceIndex,
-			prefix, out.Locktime(),
-			prefix, out.Amount()))
+			prefix, utxoID,
+			prefix, txID,
+			prefix, txIndex))
 	}
 
-	return strings.TrimSuffix(s.String(), "\n")
+	return s.String()
 }
 
-func (us *UTXOSet) String() string {
-	return us.string("")
-}
+func (us *UTXOSet) String() string { return us.PrefixedString("  ") }

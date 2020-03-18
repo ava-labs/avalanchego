@@ -251,8 +251,11 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
  ******************************************************************************
  */
 
-// IssueTx attempts to send a transaction to consensus
-func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
+// IssueTx attempts to send a transaction to consensus.
+// If onDecide is specified, the function will be called when the transaction is
+// either accepted or rejected with the appropriate status. This function will
+// go out of scope when the transaction is removed from memory.
+func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err
@@ -261,6 +264,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
+	tx.t.onDecide = onDecide
 	return tx.ID(), nil
 }
 

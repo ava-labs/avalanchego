@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/logging"
 )
 
 type issuableVM interface {
@@ -17,17 +18,18 @@ type issuableVM interface {
 
 // Issuer manages all the chain transaction flushing.
 type Issuer struct {
-	lock  sync.Mutex
-	vms   map[[32]byte]issuableVM
-	locks map[[32]byte]sync.Locker
-
+	lock      sync.Mutex
+	log       logging.Logger
+	vms       map[[32]byte]issuableVM
+	locks     map[[32]byte]sync.Locker
 	callbacks chan func()
 }
 
 // Initialize this flusher
-func (i *Issuer) Initialize() {
+func (i *Issuer) Initialize(log logging.Logger) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
+	i.log = log
 	i.vms = make(map[[32]byte]issuableVM)
 	i.locks = make(map[[32]byte]sync.Locker)
 	i.callbacks = make(chan func(), 1000)
@@ -64,8 +66,12 @@ func (i *Issuer) IssueTx(chainID ids.ID, tx []byte, finalized func(choices.Statu
 			lock.Lock()
 			defer lock.Unlock()
 			if vm, exists := i.vms[key]; exists {
-				vm.IssueTx(tx, finalized)
+				if _, err := vm.IssueTx(tx, finalized); err != nil {
+					i.log.Error("Issuing the tx returned with %s unexpectedly", err)
+				}
 			}
 		}
+	} else {
+		i.log.Warn("Attempted to issue a Tx to an unsupported chain %s", chainID)
 	}
 }
