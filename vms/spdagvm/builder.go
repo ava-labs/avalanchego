@@ -88,8 +88,8 @@ func (b Builder) NewSig(index uint32) *Sig { return &Sig{index: index} }
 //     * This output can't be spent until at least [locktime].
 //   * If there is any "change" there is another output controlled by [changeAddr] with the change.
 //   * The UTXOs consumed to make this transaction are a subset of [utxos].
-//   * The keys controlling [utxos] are in [keyChain]
-func (b Builder) NewTxFromUTXOs(keyChain *KeyChain, utxos []*UTXO, amount, txFee, locktime uint64,
+//   * The keys controlling [utxos] are in [keychain]
+func (b Builder) NewTxFromUTXOs(keychain *Keychain, utxos []*UTXO, amount, txFee, locktime uint64,
 	threshold uint32, toAddrs []ids.ShortID, changeAddr ids.ShortID, currentTime uint64) (*Tx, error) {
 
 	ins := []Input{}            // Consumed by this transaction
@@ -103,7 +103,7 @@ func (b Builder) NewTxFromUTXOs(keyChain *KeyChain, utxos []*UTXO, amount, txFee
 	spent := uint64(0) // The sum of the UTXOs consumed in this transaction
 	for i := 0; i < len(utxos) && amountPlusTxFee > spent; i++ {
 		utxo := utxos[i]
-		if in, signer, err := keyChain.Spend(utxo, currentTime); err == nil {
+		if in, signer, err := keychain.Spend(utxo, currentTime); err == nil {
 			ins = append(ins, in)
 			amount := in.(*InputPayment).Amount()
 			spent += amount

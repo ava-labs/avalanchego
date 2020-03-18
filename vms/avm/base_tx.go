@@ -102,7 +102,7 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 			return err
 		}
 	}
-	if !isSortedTransferableOutputs(t.Outs, c) {
+	if !IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -215,7 +215,7 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) erro
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
+		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred.Cred); err != nil {
 			return err
 		}
 	}

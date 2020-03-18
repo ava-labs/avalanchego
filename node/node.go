@@ -215,7 +215,7 @@ func (n *Node) initConsensusNet() {
 
 func (n *Node) initClients() {
 	n.Issuer = &xputtest.Issuer{}
-	n.Issuer.Initialize()
+	n.Issuer.Initialize(n.Log)
 
 	n.CClientAPI = &xputtest.CClientHandler
 	n.CClientAPI.Initialize(n.ClientNet, n.Issuer)
