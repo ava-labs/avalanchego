@@ -157,6 +157,7 @@ func Aliases(networkID uint32) (generalAliases map[string][]string, chainAliases
 		spdagvm.ID.Key():     []string{"spdag"},
 		spchainvm.ID.Key():   []string{"spchain"},
 		timestampvm.ID.Key(): []string{"timestamp"},
+		secp256k1fx.ID.Key(): []string{"secp256k1fx"},
 	}
 
 	genesisBytes, _ := Genesis(networkID)
