@@ -256,7 +256,7 @@ func TestSnowballTrinary(t *testing.T) {
 	tree.RecordPoll(redBag)
 
 	if pref := tree.Preference(); !Blue.Equals(pref) {
-		t.Fatalf("Wrong preference. Expected %s got %s", Green, pref)
+		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
