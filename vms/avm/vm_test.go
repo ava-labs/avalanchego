@@ -492,7 +492,7 @@ func TestIssueTx(t *testing.T) {
 	}
 	newTx.Initialize(b)
 
-	txID, err := vm.IssueTx(newTx.Bytes())
+	txID, err := vm.IssueTx(newTx.Bytes(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,5 +545,161 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 	if len(utxos) != 7 {
 		t.Fatalf("Wrong number of utxos (%d) returned", len(utxos))
+	}
+}
+
+func TestIssueDependentTx(t *testing.T) {
+	genesisBytes := BuildGenesisTest(t)
+
+	issuer := make(chan common.Message, 1)
+
+	ctx.Lock.Lock()
+	vm := &VM{}
+	err := vm.Initialize(
+		ctx,
+		memdb.New(),
+		genesisBytes,
+		issuer,
+		[]*common.Fx{&common.Fx{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	key := keys[0]
+
+	firstTx := &Tx{UnsignedTx: &OperationTx{BaseTx: BaseTx{
+		NetID: networkID,
+		BCID:  chainID,
+		Ins: []*TransferableInput{
+			&TransferableInput{
+				UTXOID: UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 1,
+				},
+				Asset: Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: 50000,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
+					},
+				},
+			},
+		},
+		Outs: []*TransferableOutput{
+			&TransferableOutput{
+				Asset: Asset{ID: genesisTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 50000,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
+					},
+				},
+			},
+		},
+	}}}
+
+	unsignedBytes, err := vm.codec.Marshal(&firstTx.UnsignedTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sig, err := key.Sign(unsignedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixedSig := [crypto.SECP256K1RSigLen]byte{}
+	copy(fixedSig[:], sig)
+
+	firstTx.Creds = append(firstTx.Creds, &Credential{
+		Cred: &secp256k1fx.Credential{
+			Sigs: [][crypto.SECP256K1RSigLen]byte{
+				fixedSig,
+			},
+		},
+	})
+
+	b, err := vm.codec.Marshal(firstTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstTx.Initialize(b)
+
+	_, err = vm.IssueTx(firstTx.Bytes(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondTx := &Tx{UnsignedTx: &OperationTx{BaseTx: BaseTx{
+		NetID: networkID,
+		BCID:  chainID,
+		Ins: []*TransferableInput{
+			&TransferableInput{
+				UTXOID: UTXOID{
+					TxID:        firstTx.ID(),
+					OutputIndex: 0,
+				},
+				Asset: Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: 50000,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
+					},
+				},
+			},
+		},
+	}}}
+
+	unsignedBytes, err = vm.codec.Marshal(&secondTx.UnsignedTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sig, err = key.Sign(unsignedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixedSig = [crypto.SECP256K1RSigLen]byte{}
+	copy(fixedSig[:], sig)
+
+	secondTx.Creds = append(secondTx.Creds, &Credential{
+		Cred: &secp256k1fx.Credential{
+			Sigs: [][crypto.SECP256K1RSigLen]byte{
+				fixedSig,
+			},
+		},
+	})
+
+	b, err = vm.codec.Marshal(secondTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondTx.Initialize(b)
+
+	_, err = vm.IssueTx(secondTx.Bytes(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+
+	if txs := vm.PendingTxs(); len(txs) != 2 {
+		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 }

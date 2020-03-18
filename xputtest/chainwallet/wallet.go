@@ -4,6 +4,7 @@
 package chainwallet
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/gecko/ids"
@@ -12,22 +13,15 @@ import (
 	"github.com/ava-labs/gecko/vms/spchainvm"
 )
 
-// The max number of transactions this wallet can send as part of the throughput tests
-// lower --> low startup time but test has shorter duration
-// higher --> high startup time but test has longer duration
-const (
-	MaxNumTxs = 25000
-)
-
 // Wallet is a holder for keys and UTXOs.
 type Wallet struct {
 	networkID  uint32
 	chainID    ids.ID
-	keyChain   *spchainvm.KeyChain            // Mapping from public address to the SigningKeys
+	keychain   *spchainvm.Keychain            // Mapping from public address to the SigningKeys
 	accountSet map[[20]byte]spchainvm.Account // Mapping from addresses to accounts
 	balance    uint64
-	TxsSent    int32
-	txs        [MaxNumTxs]*spchainvm.Tx
+
+	txs []*spchainvm.Tx
 }
 
 // NewWallet ...
@@ -35,16 +29,16 @@ func NewWallet(networkID uint32, chainID ids.ID) Wallet {
 	return Wallet{
 		networkID:  networkID,
 		chainID:    chainID,
-		keyChain:   spchainvm.NewKeyChain(networkID, chainID),
+		keychain:   spchainvm.NewKeychain(networkID, chainID),
 		accountSet: make(map[[20]byte]spchainvm.Account),
 	}
 }
 
 // CreateAddress returns a brand new address! Ready to receive funds!
-func (w *Wallet) CreateAddress() ids.ShortID { return w.keyChain.New().PublicKey().Address() }
+func (w *Wallet) CreateAddress() ids.ShortID { return w.keychain.New().PublicKey().Address() }
 
 // ImportKey imports a private key into this wallet
-func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keyChain.Add(sk) }
+func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keychain.Add(sk) }
 
 // AddAccount adds a new account to this wallet, if this wallet can spend it.
 func (w *Wallet) AddAccount(account spchainvm.Account) {
@@ -61,35 +55,40 @@ func (w *Wallet) Balance() uint64 { return w.balance }
 // during the test
 // Generate them all on test initialization so tx generation is not bottleneck
 // in testing
-func (w *Wallet) GenerateTxs() {
+func (w *Wallet) GenerateTxs(numTxs int) error {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = w.networkID
 	ctx.ChainID = w.chainID
 
-	for i := 0; i < MaxNumTxs; i++ {
-		if i%1000 == 0 {
-			fmt.Printf("generated %d transactions\n", i)
-		}
+	w.txs = make([]*spchainvm.Tx, numTxs)
+	for i := 0; i < numTxs; {
 		for _, account := range w.accountSet {
-			accountID := account.ID()
-			if key, exists := w.keyChain.Get(accountID); exists {
-				amount := uint64(1)
-				if tx, sendAccount, err := account.CreateTx(amount, accountID, ctx, key); err == nil {
-					newAccount, err := sendAccount.Receive(tx, ctx)
-					if err != nil {
-						panic("shouldn't error")
-					}
-					w.accountSet[accountID.Key()] = newAccount
-					w.txs[i] = tx
-					continue
-				} else {
-					panic("shouldn't error here either: " + err.Error())
-				}
-			} else {
-				panic("shouldn't not exist")
+			if i >= numTxs {
+				break
 			}
+
+			accountID := account.ID()
+			key, exists := w.keychain.Get(accountID)
+			if !exists {
+				return errors.New("missing account")
+			}
+
+			amount := uint64(1)
+			tx, sendAccount, err := account.CreateTx(amount, accountID, ctx, key)
+			if err != nil {
+				return err
+			}
+
+			newAccount, err := sendAccount.Receive(tx, ctx)
+			if err != nil {
+				return err
+			}
+			w.accountSet[accountID.Key()] = newAccount
+			w.txs[i] = tx
+			i++
 		}
 	}
+	return nil
 }
 
 /*
@@ -101,7 +100,7 @@ func (w *Wallet) Send() *spchainvm.Tx {
 
 	for _, account := range w.accountSet {
 		accountID := account.ID()
-		if key, exists := w.keyChain.Get(accountID); exists {
+		if key, exists := w.keychain.Get(accountID); exists {
 			amount := uint64(1)
 			if tx, sendAccount, err := account.CreateTx(amount, accountID, ctx, key); err == nil {
 				newAccount, err := sendAccount.Receive(tx, ctx)
@@ -118,16 +117,17 @@ func (w *Wallet) Send() *spchainvm.Tx {
 
 // NextTx returns the next tx to be sent as part of xput test
 func (w *Wallet) NextTx() *spchainvm.Tx {
-	if w.TxsSent >= MaxNumTxs {
+	if len(w.txs) == 0 {
 		return nil
 	}
-	w.TxsSent++
-	return w.txs[w.TxsSent-1]
+	tx := w.txs[0]
+	w.txs = w.txs[1:]
+	return tx
 }
 
 func (w Wallet) String() string {
 	return fmt.Sprintf(
-		"KeyChain:\n"+
+		"Keychain:\n"+
 			"%s",
-		w.keyChain.PrefixedString("    "))
+		w.keychain.PrefixedString("    "))
 }

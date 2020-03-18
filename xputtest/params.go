@@ -6,7 +6,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
+
+	stdnet "net"
 
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/utils"
@@ -48,10 +49,12 @@ func init() {
 	logLevel := flag.String("log-level", "info", "The log level. Should be one of {all, debug, info, warn, error, fatal, off}")
 
 	// Test Variables:
-	chain := flag.Bool("chain", false, "Execute chain transactions")
-	dag := flag.Bool("dag", false, "Execute dag transactions")
+	spchain := flag.Bool("sp-chain", false, "Execute simple payment chain transactions")
+	spdag := flag.Bool("sp-dag", false, "Execute simple payment dag transactions")
+	avm := flag.Bool("avm", false, "Execute avm transactions")
 	flag.IntVar(&config.Key, "key", 0, "Index of the genesis key list to use")
-	flag.IntVar(&config.MaxOutstandingTxs, "max_outstanding", 1000, "Maximum number of transactions to leave outstanding")
+	flag.IntVar(&config.NumTxs, "num-txs", 25000, "Total number of transaction to issue")
+	flag.IntVar(&config.MaxOutstandingTxs, "max-outstanding", 1000, "Maximum number of transactions to leave outstanding")
 
 	flag.Parse()
 
@@ -61,7 +64,7 @@ func init() {
 	config.NetworkID = networkID
 
 	// Remote:
-	parsedIP := net.ParseIP(*ip)
+	parsedIP := stdnet.ParseIP(*ip)
 	if parsedIP == nil {
 		errs.Add(fmt.Errorf("invalid IP Address %s", *ip))
 	}
@@ -82,11 +85,13 @@ func init() {
 
 	// Test Variables:
 	switch {
-	case *chain:
-		config.Chain = ChainChain
-	case *dag:
-		config.Chain = DagChain
+	case *spchain:
+		config.Chain = spChain
+	case *spdag:
+		config.Chain = spDAG
+	case *avm:
+		config.Chain = avmDAG
 	default:
-		config.Chain = UnknownChain
+		config.Chain = unknown
 	}
 }

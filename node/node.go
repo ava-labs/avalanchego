@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/ava-labs/salticidae-go"
@@ -47,10 +46,7 @@ import (
 )
 
 const (
-	defaultChannelSize     = 1
-	externalRequestTimeout = 2 * time.Second
-	internalRequestTimeout = 250 * time.Millisecond
-	maxMessageSize         = 1 << 25
+	maxMessageSize = 1 << 25 // maximum size of a message sent with salticidae
 )
 
 // MainNode is the reference for node callbacks
@@ -219,7 +215,7 @@ func (n *Node) initConsensusNet() {
 
 func (n *Node) initClients() {
 	n.Issuer = &xputtest.Issuer{}
-	n.Issuer.Initialize()
+	n.Issuer.Initialize(n.Log)
 
 	n.CClientAPI = &xputtest.CClientHandler
 	n.CClientAPI.Initialize(n.ClientNet, n.Issuer)

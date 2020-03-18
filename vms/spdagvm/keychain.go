@@ -18,8 +18,8 @@ var (
 	errCantSpend   = errors.New("utxo couldn't be spent")
 )
 
-// KeyChain is a collection of keys that can be used to spend utxos
-type KeyChain struct {
+// Keychain is a collection of keys that can be used to spend utxos
+type Keychain struct {
 	// This can be used to iterate over. However, it should not be modified externally.
 	// Key: The id of a private key (namely, [privKey].PublicKey().Address().Key())
 	// Value: The index in Keys of that private key
@@ -32,7 +32,7 @@ type KeyChain struct {
 	Keys []*crypto.PrivateKeySECP256K1R
 }
 
-func (kc *KeyChain) init() {
+func (kc *Keychain) init() {
 	if kc.keyMap == nil {
 		kc.keyMap = make(map[[20]byte]int)
 	}
@@ -40,7 +40,7 @@ func (kc *KeyChain) init() {
 
 // Add a new key to the key chain.
 // If [key] is already in the keychain, does nothing.
-func (kc *KeyChain) Add(key *crypto.PrivateKeySECP256K1R) {
+func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
 	kc.init()
 
 	addr := key.PublicKey().Address() // The address controlled by [key]
@@ -53,7 +53,7 @@ func (kc *KeyChain) Add(key *crypto.PrivateKeySECP256K1R) {
 }
 
 // Get a key from the keychain. If the key is unknown, the second return value is false.
-func (kc KeyChain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
+func (kc Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
 	kc.init()
 
 	if i, ok := kc.keyMap[id.Key()]; ok {
@@ -63,12 +63,12 @@ func (kc KeyChain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
 }
 
 // Addresses returns a list of addresses this keychain manages
-func (kc KeyChain) Addresses() ids.ShortSet { return kc.Addrs }
+func (kc Keychain) Addresses() ids.ShortSet { return kc.Addrs }
 
 // New returns a newly generated private key.
 // The key and the address it controls are added to
 // [kc.Keys] and [kc.Addrs], respectively
-func (kc *KeyChain) New() (*crypto.PrivateKeySECP256K1R, error) {
+func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
 	factory := crypto.FactorySECP256K1R{}
 
 	skGen, err := factory.NewPrivateKey()
@@ -82,7 +82,7 @@ func (kc *KeyChain) New() (*crypto.PrivateKeySECP256K1R, error) {
 }
 
 // Spend attempts to create an input
-func (kc *KeyChain) Spend(utxo *UTXO, time uint64) (Input, *InputSigner, error) {
+func (kc *Keychain) Spend(utxo *UTXO, time uint64) (Input, *InputSigner, error) {
 	builder := Builder{
 		NetworkID: 0,
 		ChainID:   ids.Empty,
@@ -144,7 +144,7 @@ func (kc *KeyChain) Spend(utxo *UTXO, time uint64) (Input, *InputSigner, error) 
 // 2) A list of private keys such that each key controls an address in [addresses]
 // 3) true iff this keychain contains at least [threshold] keys that control an address
 //    in [addresses]
-func (kc *KeyChain) GetSigsAndKeys(addresses []ids.ShortID, threshold int) ([]*Sig, []*crypto.PrivateKeySECP256K1R, bool) {
+func (kc *Keychain) GetSigsAndKeys(addresses []ids.ShortID, threshold int) ([]*Sig, []*crypto.PrivateKeySECP256K1R, bool) {
 	sigs := []*Sig{}
 	keys := []*crypto.PrivateKeySECP256K1R{}
 	builder := Builder{
@@ -162,7 +162,7 @@ func (kc *KeyChain) GetSigsAndKeys(addresses []ids.ShortID, threshold int) ([]*S
 
 // PrefixedString returns the key chain as a string representation with [prefix]
 // added before every line.
-func (kc *KeyChain) PrefixedString(prefix string) string {
+func (kc *Keychain) PrefixedString(prefix string) string {
 	s := strings.Builder{}
 
 	format := fmt.Sprintf("%%sKey[%s]: Key: %%s Address: %%s\n",
@@ -178,4 +178,4 @@ func (kc *KeyChain) PrefixedString(prefix string) string {
 	return strings.TrimSuffix(s.String(), "\n")
 }
 
-func (kc *KeyChain) String() string { return kc.PrefixedString("") }
+func (kc *Keychain) String() string { return kc.PrefixedString("") }
