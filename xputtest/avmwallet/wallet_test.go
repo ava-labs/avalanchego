@@ -259,7 +259,7 @@ func TestWalletWithGenesis(t *testing.T) {
 	}
 
 	avmChain := genesisState.Chains[0]
-	if name := avmChain.ChainName; name != "AVM" {
+	if name := avmChain.ChainName; name != "X-Chain" {
 		t.Fatalf("wrong chain name")
 	}
 	genesisBytes := avmChain.GenesisData
