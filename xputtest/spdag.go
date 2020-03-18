@@ -19,12 +19,10 @@ import (
 	"github.com/ava-labs/gecko/xputtest/dagwallet"
 )
 
-func (n *network) benchmarkSPDAG(genesisState *platformvm.Genesis) {
-	spDAGChain := genesisState.Chains[2]
-	n.log.AssertTrue(spDAGChain.ChainName == "Simple DAG Payments", "wrong chain name")
-	genesisBytes := spDAGChain.GenesisData
-
-	wallet := dagwallet.NewWallet(n.networkID, spDAGChain.ID(), config.AvaTxFee)
+// benchmark an instance of the sp dag
+func (n *network) benchmarkSPDAG(chain *platformvm.CreateChainTx) {
+	genesisBytes := chain.GenesisData
+	wallet := dagwallet.NewWallet(n.networkID, chain.ID(), config.AvaTxFee)
 
 	codec := spdagvm.Codec{}
 	tx, err := codec.UnmarshalTx(genesisBytes)
@@ -43,10 +41,11 @@ func (n *network) benchmarkSPDAG(genesisState *platformvm.Genesis) {
 		wallet.AddUTXO(utxo)
 	}
 
-	go n.log.RecoverAndPanic(func() { n.IssueSPDAG(spDAGChain.ID(), wallet) })
+	go n.log.RecoverAndPanic(func() { n.IssueSPDAG(chain.ID(), wallet) })
 }
 
-func (n *network) IssueSPDAG(chainID ids.ID, wallet dagwallet.Wallet) {
+// issue transactions to the instance of the spdag funded by the provided wallet
+func (n *network) IssueSPDAG(chainID ids.ID, wallet *dagwallet.Wallet) {
 	n.log.Info("starting avalanche benchmark")
 	pending := make(map[[32]byte]*spdagvm.Tx)
 	canAdd := []*spdagvm.Tx{}

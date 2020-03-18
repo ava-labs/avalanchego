@@ -20,31 +20,42 @@ var (
 
 // Keychain is a collection of keys that can be used to spend utxos
 type Keychain struct {
+	factory   crypto.FactorySECP256K1R
 	networkID uint32
 	chainID   ids.ID
-	// This can be used to iterate over. However, it should not be modified externally.
+
+	// Key: The id of a private key (namely, [privKey].PublicKey().Address().Key())
+	// Value: The index in Keys of that private key
 	keyMap map[[20]byte]int
-	Addrs  ids.ShortSet
-	Keys   []*crypto.PrivateKeySECP256K1R
+
+	// Each element is an address controlled by a key in [Keys]
+	// This can be used to iterate over. It should not be modified externally.
+	Addrs ids.ShortSet
+
+	// List of keys this keychain manages
+	// This can be used to iterate over. It should not be modified externally.
+	Keys []*crypto.PrivateKeySECP256K1R
 }
 
 // NewKeychain creates a new keychain for a chain
 func NewKeychain(networkID uint32, chainID ids.ID) *Keychain {
 	return &Keychain{
-		chainID: chainID,
-		keyMap:  make(map[[20]byte]int),
+		networkID: networkID,
+		chainID:   chainID,
+		keyMap:    make(map[[20]byte]int),
 	}
 }
 
 // New returns a newly generated private key
-func (kc *Keychain) New() *crypto.PrivateKeySECP256K1R {
-	factory := &crypto.FactorySECP256K1R{}
-
-	skGen, _ := factory.NewPrivateKey()
+func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
+	skGen, err := kc.factory.NewPrivateKey()
+	if err != nil {
+		return nil, err
+	}
 
 	sk := skGen.(*crypto.PrivateKeySECP256K1R)
 	kc.Add(sk)
-	return sk
+	return sk, nil
 }
 
 // Add a new key to the key chain

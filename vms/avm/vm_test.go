@@ -548,6 +548,8 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	}
 }
 
+// Test issuing a transaction that consumes a currently pending UTXO. The
+// transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 

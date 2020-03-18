@@ -13,9 +13,13 @@ import (
 
 // UTXOSet ...
 type UTXOSet struct {
-	// This can be used to iterate over. However, it should not be modified externally.
+	// Key: The id of a UTXO
+	// Value: The index in UTXOs of that UTXO
 	utxoMap map[[32]byte]int
-	UTXOs   []*spdagvm.UTXO
+
+	// List of UTXOs in this set
+	// This can be used to iterate over. It should not be modified externally.
+	UTXOs []*spdagvm.UTXO
 }
 
 // Put ...

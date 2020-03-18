@@ -20,29 +20,35 @@ var (
 
 // Keychain is a collection of keys that can be used to spend utxos
 type Keychain struct {
-	// This can be used to iterate over. However, it should not be modified externally.
+	factory   crypto.FactorySECP256K1R
+	networkID uint32
+	chainID   ids.ID
+
 	// Key: The id of a private key (namely, [privKey].PublicKey().Address().Key())
 	// Value: The index in Keys of that private key
 	keyMap map[[20]byte]int
 
 	// Each element is an address controlled by a key in [Keys]
+	// This can be used to iterate over. It should not be modified externally.
 	Addrs ids.ShortSet
 
 	// List of keys this keychain manages
+	// This can be used to iterate over. It should not be modified externally.
 	Keys []*crypto.PrivateKeySECP256K1R
 }
 
-func (kc *Keychain) init() {
-	if kc.keyMap == nil {
-		kc.keyMap = make(map[[20]byte]int)
+// NewKeychain creates a new keychain for a chain
+func NewKeychain(networkID uint32, chainID ids.ID) *Keychain {
+	return &Keychain{
+		networkID: networkID,
+		chainID:   chainID,
+		keyMap:    make(map[[20]byte]int),
 	}
 }
 
 // Add a new key to the key chain.
 // If [key] is already in the keychain, does nothing.
 func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
-	kc.init()
-
 	addr := key.PublicKey().Address() // The address controlled by [key]
 	addrHash := addr.Key()
 	if _, ok := kc.keyMap[addrHash]; !ok {
@@ -53,9 +59,7 @@ func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
 }
 
 // Get a key from the keychain. If the key is unknown, the second return value is false.
-func (kc Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
-	kc.init()
-
+func (kc *Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
 	if i, ok := kc.keyMap[id.Key()]; ok {
 		return kc.Keys[i], true
 	}
@@ -63,15 +67,13 @@ func (kc Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
 }
 
 // Addresses returns a list of addresses this keychain manages
-func (kc Keychain) Addresses() ids.ShortSet { return kc.Addrs }
+func (kc *Keychain) Addresses() ids.ShortSet { return kc.Addrs }
 
 // New returns a newly generated private key.
 // The key and the address it controls are added to
 // [kc.Keys] and [kc.Addrs], respectively
 func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
-	factory := crypto.FactorySECP256K1R{}
-
-	skGen, err := factory.NewPrivateKey()
+	skGen, err := kc.factory.NewPrivateKey()
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +86,8 @@ func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
 // Spend attempts to create an input
 func (kc *Keychain) Spend(utxo *UTXO, time uint64) (Input, *InputSigner, error) {
 	builder := Builder{
-		NetworkID: 0,
-		ChainID:   ids.Empty,
+		NetworkID: kc.networkID,
+		ChainID:   kc.chainID,
 	}
 
 	switch out := utxo.Out().(type) {
@@ -148,8 +150,8 @@ func (kc *Keychain) GetSigsAndKeys(addresses []ids.ShortID, threshold int) ([]*S
 	sigs := []*Sig{}
 	keys := []*crypto.PrivateKeySECP256K1R{}
 	builder := Builder{
-		NetworkID: 0,
-		ChainID:   ids.Empty,
+		NetworkID: kc.networkID,
+		ChainID:   kc.chainID,
 	}
 	for i := uint32(0); i < uint32(len(addresses)) && len(keys) < threshold; i++ {
 		if key, exists := kc.Get(addresses[i]); exists {
