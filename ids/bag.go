@@ -95,7 +95,7 @@ func (b *Bag) Mode() (ID, int) { return b.mode, b.modeFreq }
 func (b *Bag) Threshold() Set { return b.metThreshold }
 
 // Filter returns the bag of ids with the same counts as this bag, except all
-// the ids in the returned bag must have the same bits in the range [start, end]
+// the ids in the returned bag must have the same bits in the range [start, end)
 // as id.
 func (b *Bag) Filter(start, end int, id ID) Bag {
 	newBag := Bag{}

@@ -11,15 +11,15 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func TestNewWallet(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestNewWallet(t *testing.T) {
 
 func TestWalletGetAddress(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestWalletGetAddress(t *testing.T) {
 
 func TestWalletGetMultipleAddresses(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestWalletGetMultipleAddresses(t *testing.T) {
 
 func TestWalletEmptyBalance(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestWalletEmptyBalance(t *testing.T) {
 
 func TestWalletAddUTXO(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestWalletAddUTXO(t *testing.T) {
 
 func TestWalletAddInvalidUTXO(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestWalletAddInvalidUTXO(t *testing.T) {
 
 func TestWalletCreateTx(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestWalletCreateTx(t *testing.T) {
 
 func TestWalletImportKey(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestWalletImportKey(t *testing.T) {
 
 func TestWalletString(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(12345, chainID, 0)
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestWalletWithGenesis(t *testing.T) {
 	ctx.NetworkID = 12345
 	ctx.ChainID = ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-	w, err := NewWallet(ctx.NetworkID, ctx.ChainID, 0)
+	w, err := NewWallet(logging.NoLog{}, ctx.NetworkID, ctx.ChainID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,20 +245,7 @@ func TestWalletWithGenesis(t *testing.T) {
 		w.ImportKey(sk.(*crypto.PrivateKeySECP256K1R))
 	}
 
-	platformGenesisBytes := genesis.Genesis(genesis.LocalID)
-	genesisState := &platformvm.Genesis{}
-	err = platformvm.Codec.Unmarshal(platformGenesisBytes, genesisState)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := genesisState.Initialize(); err != nil {
-		t.Fatal(err)
-	}
-
-	avmChain := genesisState.Chains[0]
-	if name := avmChain.ChainName; name != "AVM" {
-		t.Fatalf("wrong chain name")
-	}
+	avmChain := genesis.VMGenesis(ctx.NetworkID, avm.ID)
 	genesisBytes := avmChain.GenesisData
 
 	genesis := avm.Genesis{}
@@ -282,8 +269,8 @@ func TestWalletWithGenesis(t *testing.T) {
 
 	assetID := genesisTx.ID()
 
-	if balance := w.Balance(assetID); balance != 45*units.MegaAva {
-		t.Fatalf("balance of %d was expected but got %d", 45*units.MegaAva, balance)
+	if balance := w.Balance(assetID); balance == 0 {
+		t.Fatalf("expected a positive balance")
 	}
 
 	for i := 1; i <= 1000; i++ {

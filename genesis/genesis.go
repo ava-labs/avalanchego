@@ -504,6 +504,9 @@ func VMGenesis(networkID uint32, vmID ids.ID) *platformvm.CreateChainTx {
 	genesisBytes := Genesis(networkID)
 	genesis := platformvm.Genesis{}
 	platformvm.Codec.Unmarshal(genesisBytes, &genesis)
+	if err := genesis.Initialize(); err != nil {
+		panic(err)
+	}
 	for _, chain := range genesis.Chains {
 		if chain.VMID.Equals(vmID) {
 			return chain
