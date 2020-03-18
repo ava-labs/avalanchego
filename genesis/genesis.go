@@ -348,13 +348,13 @@ func Genesis(networkID uint32) ([]byte, error) {
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
 			},
-			Name: "AVM",
+			Name: "X-Chain",
 		},
 		platformvm.APIChain{
 			GenesisData: evmReply,
 			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        evm.ID,
-			Name:        "Athereum",
+			Name:        "C-Chain",
 		},
 		platformvm.APIChain{
 			GenesisData: spdagvmReply.Bytes,
