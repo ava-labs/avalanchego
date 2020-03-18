@@ -589,7 +589,7 @@ type SignArgs struct {
 // SignResponse is the response from Sign
 type SignResponse struct {
 	// The signed bytes
-	Tx formatting.CB58
+	Tx formatting.CB58 `json:"tx"`
 }
 
 // Sign [args.bytes]
@@ -911,7 +911,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
 	// ID of Subnet that validates the new blockchain
-	SubnetID ids.ID
+	SubnetID ids.ID `json:"subnetID"`
 
 	// ID of the VM the new blockchain is running
 	VMID string `json:"vmID"`
