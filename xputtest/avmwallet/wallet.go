@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -25,19 +26,23 @@ import (
 type Wallet struct {
 	networkID uint32
 	chainID   ids.ID
-	clock     timer.Clock
-	codec     codec.Codec
-	keychain  *secp256k1fx.Keychain // Mapping from public address to the SigningKeys
-	utxoSet   *UTXOSet              // Mapping from utxoIDs to UTXOs
-	balance   map[[32]byte]uint64
-	txFee     uint64
+
+	clock timer.Clock
+	codec codec.Codec
+	log   logging.Logger
+
+	keychain *secp256k1fx.Keychain // Mapping from public address to the SigningKeys
+	utxoSet  *UTXOSet              // Mapping from utxoIDs to UTXOs
+
+	balance map[[32]byte]uint64
+	txFee   uint64
 
 	txsSent int32
 	txs     []*avm.Tx
 }
 
 // NewWallet returns a new Wallet
-func NewWallet(networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) {
+func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) {
 	c := codec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -54,6 +59,7 @@ func NewWallet(networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) 
 		networkID: networkID,
 		chainID:   chainID,
 		codec:     c,
+		log:       log,
 		keychain:  secp256k1fx.NewKeychain(),
 		utxoSet:   &UTXOSet{},
 		balance:   make(map[[32]byte]uint64),
@@ -249,9 +255,16 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 // Generate them all on test initialization so tx generation is not bottleneck
 // in testing
 func (w *Wallet) GenerateTxs(numTxs int, assetID ids.ID) error {
+	w.log.Info("Generating %d transactions", numTxs)
+
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = w.networkID
 	ctx.ChainID = w.chainID
+
+	frequency := numTxs / 50
+	if frequency > 1000 {
+		frequency = 1000
+	}
 
 	w.txs = make([]*avm.Tx, numTxs)
 	for i := 0; i < numTxs; i++ {
@@ -271,8 +284,14 @@ func (w *Wallet) GenerateTxs(numTxs int, assetID ids.ID) error {
 			w.AddUTXO(utxo)
 		}
 
+		if numGenerated := i + 1; numGenerated%frequency == 0 {
+			w.log.Info("Generated %d out of %d transactions", numGenerated, numTxs)
+		}
+
 		w.txs[i] = tx
 	}
+
+	w.log.Info("Finished generating %d transactions", numTxs)
 	return nil
 }
 
