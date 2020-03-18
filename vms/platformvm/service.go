@@ -17,16 +17,17 @@ import (
 )
 
 var (
-	errMissingDecisionBlock = errors.New("should have a decision block within the past two blocks")
-	errParsingID            = errors.New("error parsing ID")
-	errGetAccount           = errors.New("error retrieving account information")
-	errGetAccounts          = errors.New("error getting accounts controlled by specified user")
-	errGetUser              = errors.New("error while getting user. Does user exist?")
-	errNoMethodWithGenesis  = errors.New("no method was provided but genesis data was provided")
-	errCreatingTransaction  = errors.New("problem while creating transaction")
-	errNoDestination        = errors.New("call is missing field 'stakeDestination'")
-	errNoSource             = errors.New("call is missing field 'stakeSource'")
-	errGetStakeSource       = errors.New("couldn't get account specified in 'stakeSource'")
+	errMissingDecisionBlock  = errors.New("should have a decision block within the past two blocks")
+	errParsingID             = errors.New("error parsing ID")
+	errGetAccount            = errors.New("error retrieving account information")
+	errGetAccounts           = errors.New("error getting accounts controlled by specified user")
+	errGetUser               = errors.New("error while getting user. Does user exist?")
+	errNoMethodWithGenesis   = errors.New("no method was provided but genesis data was provided")
+	errCreatingTransaction   = errors.New("problem while creating transaction")
+	errNoDestination         = errors.New("call is missing field 'stakeDestination'")
+	errNoSource              = errors.New("call is missing field 'stakeSource'")
+	errGetStakeSource        = errors.New("couldn't get account specified in 'stakeSource'")
+	errNoBlockchainWithAlias = errors.New("there is no blockchain with the specified alias")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -967,6 +968,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 
 	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
 	if err != nil {
+		service.vm.Ctx.Log.Error("problem marshaling createChainTx: %v", err)
 		return errCreatingTransaction
 	}
 
@@ -1041,4 +1043,42 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	}
 
 	return false, nil
+}
+
+// ValidatedByArgs is the arguments for calling ValidatedBy
+type ValidatedByArgs struct {
+	// ValidatedBy returns the ID of the Subnet validating the blockchain with this alias/ID
+	BlockchainAlias string `json:"blockchainAlias"`
+}
+
+func (args *ValidatedByArgs) validate() error {
+	if args.BlockchainAlias == "" {
+		return errors.New("blockchainAlias is empty")
+	}
+	return nil
+}
+
+// ValidatedByResponse is the reply from calling ValidatedBy
+type ValidatedByResponse struct {
+	// ID of the Subnet validating the specified blockchain
+	SubnetID ids.ID `json:"subnetID"`
+}
+
+// ValidatedBy returns the ID of the Subnet that validates [args.BlockchainID]
+func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
+	if err := args.validate(); err != nil {
+		return err
+	}
+
+	blockchainID, err := service.vm.ChainManager.Lookup(args.BlockchainAlias)
+	if err != nil {
+		return errNoBlockchainWithAlias
+	}
+
+	chain, err := service.vm.getChain(service.vm.DB, blockchainID)
+	if err != nil {
+		return err
+	}
+	response.SubnetID = chain.SubnetID
+	return nil
 }
