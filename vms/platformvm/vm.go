@@ -136,7 +136,12 @@ func init() {
 type VM struct {
 	*core.SnowmanVM
 
+	// Node's validator manager
+	// Maps Subnets --> nodes in the Subnet
 	Validators validators.Manager
+
+	// true if the node is being run with staking enabled
+	StakingEnabled bool
 
 	// The node's chain manager
 	ChainManager chains.Manager
@@ -327,7 +332,7 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		return
 	}
-	if !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
+	if !validators.Contains(vm.Ctx.NodeID) && vm.StakingEnabled { // This node doesn't validate this blockchain
 		return
 	}
 

@@ -361,8 +361,9 @@ func (n *Node) initChains() {
 	n.vmManager.RegisterVMFactory(
 		/*vmID=*/ platformvm.ID,
 		/*vmFactory=*/ &platformvm.Factory{
-			ChainManager: n.chainManager,
-			Validators:   vdrs,
+			ChainManager:   n.chainManager,
+			Validators:     vdrs,
+			StakingEnabled: n.Config.EnableStaking,
 		},
 	)
 

@@ -16,14 +16,16 @@ var (
 
 // Factory can create new instances of the Platform Chain
 type Factory struct {
-	ChainManager chains.Manager
-	Validators   validators.Manager
+	ChainManager   chains.Manager
+	Validators     validators.Manager
+	StakingEnabled bool
 }
 
 // New returns a new instance of the Platform Chain
 func (f *Factory) New() interface{} {
 	return &VM{
-		ChainManager: f.ChainManager,
-		Validators:   f.Validators,
+		ChainManager:   f.ChainManager,
+		Validators:     f.Validators,
+		StakingEnabled: f.StakingEnabled,
 	}
 }
