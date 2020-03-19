@@ -1071,15 +1071,8 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 
 // ValidatedByArgs is the arguments for calling ValidatedBy
 type ValidatedByArgs struct {
-	// ValidatedBy returns the ID of the Subnet validating the blockchain with this alias/ID
-	BlockchainAlias string `json:"blockchainAlias"`
-}
-
-func (args *ValidatedByArgs) validate() error {
-	if args.BlockchainAlias == "" {
-		return errors.New("blockchainAlias is empty")
-	}
-	return nil
+	// ValidatedBy returns the ID of the Subnet validating the blockchain with this ID
+	BlockchainID ids.ID `json:"blockchainID"`
 }
 
 // ValidatedByResponse is the reply from calling ValidatedBy
@@ -1092,16 +1085,7 @@ type ValidatedByResponse struct {
 func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	service.vm.Ctx.Log.Debug("validatedBy called")
 
-	if err := args.validate(); err != nil {
-		return err
-	}
-
-	blockchainID, err := service.vm.ChainManager.Lookup(args.BlockchainAlias)
-	if err != nil {
-		return errNoBlockchainWithAlias
-	}
-
-	chain, err := service.vm.getChain(service.vm.DB, blockchainID)
+	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
 	if err != nil {
 		return err
 	}
