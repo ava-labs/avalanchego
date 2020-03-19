@@ -184,29 +184,55 @@ func (db *Database) Commit() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.mem == nil {
-		return database.ErrClosed
+	batch, err := db.commitBatch()
+	if err != nil {
+		return err
 	}
-	if len(db.mem) == 0 {
-		return nil
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	db.abort()
+	return nil
+}
+
+// Abort all changes to the underlying database
+func (db *Database) Abort() {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	db.abort()
+}
+
+func (db *Database) abort() { db.mem = make(map[string]valueDelete, memdb.DefaultSize) }
+
+// CommitBatch returns a batch that will commit all pending writes to the underlying database
+func (db *Database) CommitBatch() (database.Batch, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	return db.commitBatch()
+}
+
+func (db *Database) commitBatch() (database.Batch, error) {
+	if db.mem == nil {
+		return nil, database.ErrClosed
 	}
 
 	batch := db.db.NewBatch()
 	for key, value := range db.mem {
 		if value.delete {
 			if err := batch.Delete([]byte(key)); err != nil {
-				return err
+				return nil, err
 			}
 		} else if err := batch.Put([]byte(key), value.value); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if err := batch.Write(); err != nil {
-		return err
+		return nil, err
 	}
 
-	db.mem = make(map[string]valueDelete, memdb.DefaultSize)
-	return nil
+	return batch, nil
 }
 
 // Close implements the database.Database interface
