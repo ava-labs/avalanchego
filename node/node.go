@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
 	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
@@ -67,6 +68,9 @@ type Node struct {
 
 	// Handles calls to Keystore API
 	keystoreServer keystore.Keystore
+
+	// Manages shared memory
+	sharedMemory atomic.SharedMemory
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -415,12 +419,20 @@ func (n *Node) initChainManager() {
 		n.ValidatorAPI,
 		&n.APIServer,
 		&n.keystoreServer,
+		&n.sharedMemory,
 	)
 
 	n.chainManager.AddRegistrant(&n.APIServer)
 }
 
-// initWallet initializes the Wallet service
+// initSharedMemory initializes the shared memory for cross chain interation
+func (n *Node) initSharedMemory() {
+	n.Log.Info("initializing SharedMemory")
+	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
+	n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
+}
+
+// initKeystoreAPI initializes the keystore service
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() {
 	n.Log.Info("initializing Keystore API")
@@ -501,6 +513,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err = n.initNodeID(); err != nil { // Derive this node's ID
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
+
+	// initialize shared memory
+	n.initSharedMemory()
 
 	// Start HTTP APIs
 	n.initAPIServer()   // Start the API Server
