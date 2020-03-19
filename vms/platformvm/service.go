@@ -9,6 +9,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	"github.com/ava-labs/gecko/vms/avm"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
@@ -953,6 +957,13 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 			return fmt.Errorf("no FX with ID '%s' found", fxIDStr)
 		}
 		fxIDs = append(fxIDs, fxID)
+	}
+	// If creating AVM instance, use secp256k1fx
+	// TODO: Document FXs and have user specify them in API call
+	fxIDsSet := ids.Set{}
+	fxIDsSet.Add(fxIDs...)
+	if vmID.Equals(avm.ID) && !fxIDsSet.Contains(secp256k1fx.ID) {
+		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
 	if args.SubnetID.Equals(DefaultSubnetID) {
