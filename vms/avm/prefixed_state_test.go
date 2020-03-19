@@ -29,7 +29,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 		Out:   &testVerifiable{},
 	}
 
-	tx := &Tx{UnsignedTx: &OperationTx{BaseTx: BaseTx{
+	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
 		Ins: []*TransferableInput{
@@ -51,7 +51,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 				},
 			},
 		},
-	}}}
+	}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {
@@ -66,11 +66,9 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	tx.Creds = append(tx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 

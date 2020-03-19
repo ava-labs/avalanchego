@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -155,11 +156,11 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
+func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	for i, in := range t.Ins {
 		cred := creds[i]
 
-		fxIndex, err := vm.getFx(cred.Cred)
+		fxIndex, err := vm.getFx(cred)
 		if err != nil {
 			return err
 		}
@@ -178,7 +179,7 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) erro
 				return errIncompatibleFx
 			}
 
-			err = fx.VerifyTransfer(uTx, utxo.Out, in.In, cred.Cred)
+			err = fx.VerifyTransfer(uTx, utxo.Out, in.In, cred)
 			if err == nil {
 				continue
 			}
@@ -215,7 +216,7 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) erro
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred.Cred); err != nil {
+		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
 			return err
 		}
 	}

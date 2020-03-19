@@ -238,7 +238,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 
 			cred.Sigs = append(cred.Sigs, fixedSig)
 		}
-		tx.Creds = append(tx.Creds, &avm.Credential{Cred: cred})
+		tx.Creds = append(tx.Creds, cred)
 	}
 
 	b, err := w.codec.Marshal(tx)

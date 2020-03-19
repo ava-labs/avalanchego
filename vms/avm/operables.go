@@ -9,7 +9,6 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -20,55 +19,6 @@ var (
 	errNilOperableInput   = errors.New("nil operable input is not valid")
 	errNilOperableFxInput = errors.New("nil operable feature extension input is not valid")
 )
-
-// OperableOutput ...
-type OperableOutput struct {
-	Out verify.Verifiable `serialize:"true"`
-}
-
-// Output returns the feature extension output that this Output is using.
-func (out *OperableOutput) Output() verify.Verifiable { return out.Out }
-
-// Verify implements the verify.Verifiable interface
-func (out *OperableOutput) Verify() error {
-	switch {
-	case out == nil:
-		return errNilOperableOutput
-	case out.Out == nil:
-		return errNilOperableFxOutput
-	default:
-		return out.Out.Verify()
-	}
-}
-
-type innerSortOperableOutputs struct {
-	outs  []*OperableOutput
-	codec codec.Codec
-}
-
-func (outs *innerSortOperableOutputs) Less(i, j int) bool {
-	iOut := outs.outs[i]
-	jOut := outs.outs[j]
-
-	iBytes, err := outs.codec.Marshal(&iOut.Out)
-	if err != nil {
-		return false
-	}
-	jBytes, err := outs.codec.Marshal(&jOut.Out)
-	if err != nil {
-		return false
-	}
-	return bytes.Compare(iBytes, jBytes) == -1
-}
-func (outs *innerSortOperableOutputs) Len() int      { return len(outs.outs) }
-func (outs *innerSortOperableOutputs) Swap(i, j int) { o := outs.outs; o[j], o[i] = o[i], o[j] }
-
-func sortOperableOutputs(outs []*OperableOutput, c codec.Codec) {
-	sort.Sort(&innerSortOperableOutputs{outs: outs, codec: c})
-}
-func isSortedOperableOutputs(outs []*OperableOutput, c codec.Codec) bool {
-	return sort.IsSorted(&innerSortOperableOutputs{outs: outs, codec: c})
-}
 
 // OperableInput ...
 type OperableInput struct {

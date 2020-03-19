@@ -7,75 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/codec"
 )
-
-func TestOperableOutputVerifyNil(t *testing.T) {
-	oo := (*OperableOutput)(nil)
-	if err := oo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil operable output")
-	}
-}
-
-func TestOperableOutputVerifyNilFx(t *testing.T) {
-	oo := &OperableOutput{}
-	if err := oo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil operable fx output")
-	}
-}
-
-func TestOperableOutputVerify(t *testing.T) {
-	oo := &OperableOutput{
-		Out: &testVerifiable{},
-	}
-	if err := oo.Verify(); err != nil {
-		t.Fatal(err)
-	}
-	if oo.Output() != oo.Out {
-		t.Fatalf("Should have returned the fx output")
-	}
-}
-
-func TestOperableOutputSorting(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&TestTransferable{})
-	c.RegisterType(&testVerifiable{})
-
-	outs := []*OperableOutput{
-		&OperableOutput{
-			Out: &TestTransferable{Val: 1},
-		},
-		&OperableOutput{
-			Out: &TestTransferable{Val: 0},
-		},
-		&OperableOutput{
-			Out: &TestTransferable{Val: 0},
-		},
-		&OperableOutput{
-			Out: &testVerifiable{},
-		},
-	}
-
-	if isSortedOperableOutputs(outs, c) {
-		t.Fatalf("Shouldn't be sorted")
-	}
-	sortOperableOutputs(outs, c)
-	if !isSortedOperableOutputs(outs, c) {
-		t.Fatalf("Should be sorted")
-	}
-	if result := outs[0].Out.(*TestTransferable).Val; result != 0 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if result := outs[1].Out.(*TestTransferable).Val; result != 0 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if result := outs[2].Out.(*TestTransferable).Val; result != 1 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if _, ok := outs[3].Out.(*testVerifiable); !ok {
-		t.Fatalf("testVerifiable expected")
-	}
-}
 
 func TestOperableInputVerifyNil(t *testing.T) {
 	oi := (*OperableInput)(nil)

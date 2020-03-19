@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -63,7 +64,7 @@ func (t *OperationTx) UTXOs() []*UTXO {
 				Asset: Asset{
 					ID: asset,
 				},
-				Out: out.Out,
+				Out: out,
 			})
 		}
 	}
@@ -106,7 +107,7 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
+func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
 		return err
 	}
@@ -123,7 +124,7 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential)
 			ins = append(ins, in.In)
 
 			cred := creds[i+offset]
-			credIntfs = append(credIntfs, cred.Cred)
+			credIntfs = append(credIntfs, cred)
 
 			utxoID := in.InputID()
 			utxo, err := vm.state.UTXO(utxoID)
@@ -165,7 +166,7 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential)
 		}
 		offset += len(op.Ins)
 		for _, out := range op.Outs {
-			outs = append(outs, out.Out)
+			outs = append(outs, out)
 		}
 
 		var fxObj interface{}

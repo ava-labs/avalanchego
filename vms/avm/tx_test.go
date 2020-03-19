@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -45,7 +46,7 @@ func TestTxInvalidCredential(t *testing.T) {
 	c.RegisterType(&testVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &OperationTx{BaseTx: BaseTx{
+		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
 			Ins: []*TransferableInput{
@@ -67,11 +68,9 @@ func TestTxInvalidCredential(t *testing.T) {
 					},
 				},
 			},
-		}},
-		Creds: []*Credential{
-			&Credential{
-				Cred: &testVerifiable{err: errUnneededAddress},
-			},
+		},
+		Creds: []verify.Verifiable{
+			&testVerifiable{err: errUnneededAddress},
 		},
 	}
 
@@ -99,7 +98,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	c.RegisterType(&testVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &OperationTx{BaseTx: BaseTx{
+		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
 			Ins: []*TransferableInput{
@@ -138,14 +137,10 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 					},
 				},
 			},
-		}},
-		Creds: []*Credential{
-			&Credential{
-				Cred: &testVerifiable{},
-			},
-			&Credential{
-				Cred: &testVerifiable{},
-			},
+		},
+		Creds: []verify.Verifiable{
+			&testVerifiable{},
+			&testVerifiable{},
 		},
 	}
 
@@ -214,10 +209,8 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 				},
 			},
 		},
-		Creds: []*Credential{
-			&Credential{
-				Cred: &testVerifiable{},
-			},
+		Creds: []verify.Verifiable{
+			&testVerifiable{},
 		},
 	}
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 const (
@@ -111,7 +112,7 @@ func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *CreateAssetTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
+func (t *CreateAssetTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	return t.BaseTx.SemanticVerify(vm, uTx, creds)
 }
 

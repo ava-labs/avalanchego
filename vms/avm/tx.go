@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -31,7 +32,7 @@ type UnsignedTx interface {
 	InputUTXOs() []*UTXOID
 	UTXOs() []*UTXO
 	SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
-	SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error
+	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error
 }
 
 // Tx is the core operation that can be performed. The tx uses the UTXO model.
@@ -42,12 +43,12 @@ type UnsignedTx interface {
 type Tx struct {
 	UnsignedTx `serialize:"true"`
 
-	Creds []*Credential `serialize:"true"` // The credentials of this transaction
+	Creds []verify.Verifiable `serialize:"true"` // The credentials of this transaction
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the
 // specified UTXOs. The returned array should not be modified.
-func (t *Tx) Credentials() []*Credential { return t.Creds }
+func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
 
 // SyntacticVerify verifies that this transaction is well-formed.
 func (t *Tx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
