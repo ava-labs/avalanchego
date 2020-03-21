@@ -11,6 +11,9 @@ import (
 
 // nnarySnowball is a naive implementation of a multi-color snowball instance
 type nnarySnowball struct {
+	// wrap the n-nary snowflake logic
+	nnarySnowflake
+
 	// preference is the choice with the largest number of successful polls.
 	// Ties are broken by switching choice lazily
 	preference ids.ID
@@ -22,20 +25,17 @@ type nnarySnowball struct {
 	// numSuccessfulPolls tracks the total number of successful network polls of
 	// the choices
 	numSuccessfulPolls map[[32]byte]int
-
-	// snowflake wraps the n-nary snowflake logic
-	snowflake nnarySnowflake
 }
 
 // Initialize implements the NnarySnowball interface
 func (sb *nnarySnowball) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
 	sb.preference = choice
 	sb.numSuccessfulPolls = make(map[[32]byte]int)
-	sb.snowflake.Initialize(betaVirtuous, betaRogue, choice)
+	sb.nnarySnowflake.Initialize(betaVirtuous, betaRogue, choice)
 }
 
 // Add implements the NnarySnowball interface
-func (sb *nnarySnowball) Add(choice ids.ID) { sb.snowflake.Add(choice) }
+func (sb *nnarySnowball) Add(choice ids.ID) { sb.nnarySnowflake.Add(choice) }
 
 // Preference implements the NnarySnowball interface
 func (sb *nnarySnowball) Preference() ids.ID {
@@ -44,7 +44,7 @@ func (sb *nnarySnowball) Preference() ids.ID {
 	// this case is handled for completion. Therefore, if snowflake is
 	// finalized, then our finalized snowflake choice should be preferred.
 	if sb.Finalized() {
-		return sb.snowflake.Preference()
+		return sb.nnarySnowflake.Preference()
 	}
 	return sb.preference
 }
@@ -64,16 +64,10 @@ func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
 		sb.maxSuccessfulPolls = numSuccessfulPolls
 	}
 
-	sb.snowflake.RecordSuccessfulPoll(choice)
+	sb.nnarySnowflake.RecordSuccessfulPoll(choice)
 }
-
-// RecordUnsuccessfulPoll implements the NnarySnowball interface
-func (sb *nnarySnowball) RecordUnsuccessfulPoll() { sb.snowflake.RecordUnsuccessfulPoll() }
-
-// Finalized implements the NnarySnowball interface
-func (sb *nnarySnowball) Finalized() bool { return sb.snowflake.Finalized() }
 
 func (sb *nnarySnowball) String() string {
 	return fmt.Sprintf("SB(Preference = %s, NumSuccessfulPolls = %d, SF = %s)",
-		sb.preference, sb.maxSuccessfulPolls, &sb.snowflake)
+		sb.preference, sb.maxSuccessfulPolls, &sb.nnarySnowflake)
 }

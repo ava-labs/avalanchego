@@ -175,7 +175,7 @@ func TestNarySnowflakeColor(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.snowflake.Preference(); !Blue.Equals(pref) {
+	if pref := sb.nnarySnowflake.Preference(); !Blue.Equals(pref) {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	}
 
@@ -183,7 +183,7 @@ func TestNarySnowflakeColor(t *testing.T) {
 
 	if pref := sb.Preference(); !Blue.Equals(pref) {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if pref := sb.snowflake.Preference(); !Red.Equals(pref) {
+	} else if pref := sb.nnarySnowflake.Preference(); !Red.Equals(pref) {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	}
 }

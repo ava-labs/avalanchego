@@ -44,12 +44,12 @@ func (sb *unarySnowball) Finalized() bool { return sb.finalized }
 // Extend implements the UnarySnowball interface
 func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 	bs := &binarySnowball{
-		preference: choice,
-		snowflake: binarySnowflake{
+		binarySnowflake: binarySnowflake{
 			beta:       beta,
 			preference: choice,
 			finalized:  sb.Finalized(),
 		},
+		preference: choice,
 	}
 	return bs
 }

@@ -9,6 +9,9 @@ import (
 
 // binarySnowball is the implementation of a binary snowball instance
 type binarySnowball struct {
+	// wrap the binary snowflake logic
+	binarySnowflake
+
 	// preference is the choice with the largest number of successful polls.
 	// Ties are broken by switching choice lazily
 	preference int
@@ -16,15 +19,12 @@ type binarySnowball struct {
 	// numSuccessfulPolls tracks the total number of successful network polls of
 	// the 0 and 1 choices
 	numSuccessfulPolls [2]int
-
-	// snowflake wraps the binary snowflake logic
-	snowflake binarySnowflake
 }
 
 // Initialize implements the BinarySnowball interface
 func (sb *binarySnowball) Initialize(beta, choice int) {
 	sb.preference = choice
-	sb.snowflake.Initialize(beta, choice)
+	sb.binarySnowflake.Initialize(beta, choice)
 }
 
 // Preference implements the BinarySnowball interface
@@ -34,7 +34,7 @@ func (sb *binarySnowball) Preference() int {
 	// this case is handled for completion. Therefore, if snowflake is
 	// finalized, then our finalized snowflake choice should be preferred.
 	if sb.Finalized() {
-		return sb.snowflake.Preference()
+		return sb.binarySnowflake.Preference()
 	}
 	return sb.preference
 }
@@ -45,14 +45,8 @@ func (sb *binarySnowball) RecordSuccessfulPoll(choice int) {
 	if sb.numSuccessfulPolls[choice] > sb.numSuccessfulPolls[1-choice] {
 		sb.preference = choice
 	}
-	sb.snowflake.RecordSuccessfulPoll(choice)
+	sb.binarySnowflake.RecordSuccessfulPoll(choice)
 }
-
-// RecordUnsuccessfulPoll implements the BinarySnowball interface
-func (sb *binarySnowball) RecordUnsuccessfulPoll() { sb.snowflake.RecordUnsuccessfulPoll() }
-
-// Finalized implements the BinarySnowball interface
-func (sb *binarySnowball) Finalized() bool { return sb.snowflake.Finalized() }
 
 func (sb *binarySnowball) String() string {
 	return fmt.Sprintf(
@@ -60,5 +54,5 @@ func (sb *binarySnowball) String() string {
 		sb.preference,
 		sb.numSuccessfulPolls[0],
 		sb.numSuccessfulPolls[1],
-		&sb.snowflake)
+		&sb.binarySnowflake)
 }
