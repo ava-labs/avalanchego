@@ -34,9 +34,6 @@ func (sb *nnarySnowball) Initialize(betaVirtuous, betaRogue int, choice ids.ID) 
 	sb.numSuccessfulPolls = make(map[[32]byte]int)
 }
 
-// Add implements the NnarySnowball interface
-func (sb *nnarySnowball) Add(choice ids.ID) { sb.nnarySnowflake.Add(choice) }
-
 // Preference implements the NnarySnowball interface
 func (sb *nnarySnowball) Preference() ids.ID {
 	// It is possible, with low probability, that the snowflake preference is
@@ -51,10 +48,6 @@ func (sb *nnarySnowball) Preference() ids.ID {
 
 // RecordSuccessfulPoll implements the NnarySnowball interface
 func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
-	if sb.Finalized() {
-		return
-	}
-
 	key := choice.Key()
 	numSuccessfulPolls := sb.numSuccessfulPolls[key] + 1
 	sb.numSuccessfulPolls[key] = numSuccessfulPolls

@@ -47,7 +47,7 @@ func (sf *nnarySnowflake) Add(choice ids.ID) { sf.rogue = sf.rogue || !choice.Eq
 
 // RecordSuccessfulPoll implements the NnarySnowflake interface
 func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
-	if sf.Finalized() {
+	if sf.finalized {
 		return // This instace is already decided.
 	}
 
@@ -73,6 +73,6 @@ func (sf *nnarySnowflake) Finalized() bool { return sf.finalized }
 func (sf *nnarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",
 		sf.confidence,
-		sf.Finalized(),
+		sf.finalized,
 		&sf.nnarySlush)
 }
