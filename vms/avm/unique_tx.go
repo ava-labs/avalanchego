@@ -6,6 +6,7 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
@@ -98,13 +99,20 @@ func (tx *UniqueTx) ID() ids.ID { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() {
+	defer tx.vm.db.Abort()
+
 	if err := tx.setStatus(choices.Accepted); err != nil {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
 		return
 	}
 
 	// Remove spent utxos
-	for _, utxoID := range tx.InputIDs().List() {
+	for _, utxo := range tx.InputUTXOs() {
+		if utxo.Symbolic() {
+			// If the UTXO is symbolic, it can't be spent
+			continue
+		}
+		utxoID := utxo.InputID()
 		if err := tx.vm.state.SpendUTXO(utxoID); err != nil {
 			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
 			return
@@ -120,11 +128,22 @@ func (tx *UniqueTx) Accept() {
 	}
 
 	txID := tx.ID()
-	tx.vm.ctx.Log.Verbo("Accepting Tx: %s", txID)
-
-	if err := tx.vm.db.Commit(); err != nil {
-		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", tx.txID, err)
+	effects, err := tx.SideEffects(tx.vm)
+	if err != nil {
+		tx.vm.ctx.Log.Error("Failed to compute side effects from %s due to %s", txID, err)
+		return
 	}
+
+	commitBatch, err := tx.vm.db.CommitBatch()
+	if err != nil {
+		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
+	}
+
+	if err := atomic.WriteAll(commitBatch, effects...); err != nil {
+		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
+	}
+
+	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish("accepted", txID)
 
@@ -137,6 +156,8 @@ func (tx *UniqueTx) Accept() {
 
 // Reject is called when the transaction was finalized as rejected by consensus
 func (tx *UniqueTx) Reject() {
+	defer tx.vm.db.Abort()
+
 	if err := tx.setStatus(choices.Rejected); err != nil {
 		tx.vm.ctx.Log.Error("Failed to reject tx %s due to %s", tx.txID, err)
 		return

@@ -6,8 +6,8 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
-
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -31,8 +31,10 @@ type UnsignedTx interface {
 	AssetIDs() ids.Set
 	InputUTXOs() []*UTXOID
 	UTXOs() []*UTXO
+
 	SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
 	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error
+	SideEffects(vm *VM) ([]database.Batch, error)
 }
 
 // Tx is the core operation that can be performed. The tx uses the UTXO model.

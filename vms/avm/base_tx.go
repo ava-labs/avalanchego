@@ -6,9 +6,9 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -78,10 +78,8 @@ func (t *BaseTx) UTXOs() []*UTXO {
 				TxID:        txID,
 				OutputIndex: uint32(i),
 			},
-			Asset: Asset{
-				ID: out.AssetID(),
-			},
-			Out: out.Out,
+			Asset: Asset{ID: out.AssetID()},
+			Out:   out.Out,
 		}
 	}
 	return utxos
@@ -98,10 +96,12 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		return errWrongChainID
 	}
 
+	fc := NewFlowChecker()
 	for _, out := range t.Outs {
 		if err := out.Verify(); err != nil {
 			return err
 		}
+		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
 	if !IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
@@ -111,45 +111,16 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		if err := in.Verify(); err != nil {
 			return err
 		}
+		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
 	if !isSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 
-	consumedFunds := map[[32]byte]uint64{}
-	for _, in := range t.Ins {
-		assetID := in.AssetID()
-		amount := in.Input().Amount()
+	// TODO: Add the Tx fee to the produced side
 
-		var err error
-		assetIDKey := assetID.Key()
-		consumedFunds[assetIDKey], err = math.Add64(consumedFunds[assetIDKey], amount)
-
-		if err != nil {
-			return errInputOverflow
-		}
-	}
-	producedFunds := map[[32]byte]uint64{}
-	for _, out := range t.Outs {
-		assetID := out.AssetID()
-		amount := out.Output().Amount()
-
-		var err error
-		assetIDKey := assetID.Key()
-		producedFunds[assetIDKey], err = math.Add64(producedFunds[assetIDKey], amount)
-
-		if err != nil {
-			return errOutputOverflow
-		}
-	}
-
-	// TODO: Add the Tx fee to the producedFunds
-
-	for assetID, producedAssetAmount := range producedFunds {
-		consumedAssetAmount := consumedFunds[assetID]
-		if producedAssetAmount > consumedAssetAmount {
-			return errInsufficientFunds
-		}
+	if err := fc.Verify(); err != nil {
+		return err
 	}
 
 	return t.metadata.Verify()
@@ -166,45 +137,10 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable
 		}
 		fx := vm.fxs[fxIndex].Fx
 
-		utxoID := in.InputID()
-		utxo, err := vm.state.UTXO(utxoID)
-		if err == nil {
-			utxoAssetID := utxo.AssetID()
-			inAssetID := in.AssetID()
-			if !utxoAssetID.Equals(inAssetID) {
-				return errAssetIDMismatch
-			}
-
-			if !vm.verifyFxUsage(fxIndex, inAssetID) {
-				return errIncompatibleFx
-			}
-
-			err = fx.VerifyTransfer(uTx, utxo.Out, in.In, cred)
-			if err == nil {
-				continue
-			}
+		utxo, err := vm.getUTXO(&in.UTXOID)
+		if err != nil {
 			return err
 		}
-
-		inputTx, inputIndex := in.InputSource()
-		parent := UniqueTx{
-			vm:   vm,
-			txID: inputTx,
-		}
-
-		if err := parent.Verify(); err != nil {
-			return errMissingUTXO
-		} else if status := parent.Status(); status.Decided() {
-			return errMissingUTXO
-		}
-
-		utxos := parent.UTXOs()
-
-		if uint32(len(utxos)) <= inputIndex || int(inputIndex) < 0 {
-			return errInvalidUTXO
-		}
-
-		utxo = utxos[int(inputIndex)]
 
 		utxoAssetID := utxo.AssetID()
 		inAssetID := in.AssetID()
@@ -222,3 +158,6 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable
 	}
 	return nil
 }
+
+// SideEffects that this transaction has in addition to the UTXO operations.
+func (t *BaseTx) SideEffects(vm *VM) ([]database.Batch, error) { return nil, nil }

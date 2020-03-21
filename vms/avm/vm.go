@@ -432,6 +432,32 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 	}
 }
 
+func (vm *VM) getUTXO(utxoID *UTXOID) (*UTXO, error) {
+	inputID := utxoID.InputID()
+	utxo, err := vm.state.UTXO(inputID)
+	if err == nil {
+		return utxo, nil
+	}
+
+	inputTx, inputIndex := utxoID.InputSource()
+	parent := UniqueTx{
+		vm:   vm,
+		txID: inputTx,
+	}
+
+	if err := parent.Verify(); err != nil {
+		return nil, errMissingUTXO
+	} else if status := parent.Status(); status.Decided() {
+		return nil, errMissingUTXO
+	}
+
+	parentUTXOs := parent.UTXOs()
+	if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
+		return nil, errInvalidUTXO
+	}
+	return parentUTXOs[int(inputIndex)], nil
+}
+
 func (vm *VM) getFx(val interface{}) (int, error) {
 	valType := reflect.TypeOf(val)
 	fx, exists := vm.typeToFxIndex[valType]

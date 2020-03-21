@@ -14,6 +14,7 @@ import (
 
 var (
 	errOperationsNotSortedUnique = errors.New("operations not sorted and unique")
+	errNoOperations              = errors.New("an operationTx must have at least one operation")
 
 	errDoubleSpend = errors.New("inputs attempt to double spend an input")
 )
@@ -61,10 +62,8 @@ func (t *OperationTx) UTXOs() []*UTXO {
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: Asset{
-					ID: asset,
-				},
-				Out: out,
+				Asset: Asset{ID: asset},
+				Out:   out,
 			})
 		}
 	}
@@ -77,6 +76,8 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 	switch {
 	case t == nil:
 		return errNilTx
+	case len(t.Ops) == 0:
+		return errNoOperations
 	}
 
 	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
@@ -126,37 +127,10 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verif
 			cred := creds[i+offset]
 			credIntfs = append(credIntfs, cred)
 
-			utxoID := in.InputID()
-			utxo, err := vm.state.UTXO(utxoID)
-			if err == nil {
-				utxoAssetID := utxo.AssetID()
-				if !utxoAssetID.Equals(opAssetID) {
-					return errAssetIDMismatch
-				}
-
-				utxos = append(utxos, utxo.Out)
-				continue
+			utxo, err := vm.getUTXO(&in.UTXOID)
+			if err != nil {
+				return err
 			}
-
-			inputTx, inputIndex := in.InputSource()
-			parent := UniqueTx{
-				vm:   vm,
-				txID: inputTx,
-			}
-
-			if err := parent.Verify(); err != nil {
-				return errMissingUTXO
-			} else if status := parent.Status(); status.Decided() {
-				return errMissingUTXO
-			}
-
-			parentUTXOs := parent.UTXOs()
-
-			if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
-				return errInvalidUTXO
-			}
-
-			utxo = parentUTXOs[int(inputIndex)]
 
 			utxoAssetID := utxo.AssetID()
 			if !utxoAssetID.Equals(opAssetID) {
