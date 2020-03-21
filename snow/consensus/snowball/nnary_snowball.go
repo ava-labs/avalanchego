@@ -29,9 +29,9 @@ type nnarySnowball struct {
 
 // Initialize implements the NnarySnowball interface
 func (sb *nnarySnowball) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
+	sb.nnarySnowflake.Initialize(betaVirtuous, betaRogue, choice)
 	sb.preference = choice
 	sb.numSuccessfulPolls = make(map[[32]byte]int)
-	sb.nnarySnowflake.Initialize(betaVirtuous, betaRogue, choice)
 }
 
 // Add implements the NnarySnowball interface
@@ -68,6 +68,6 @@ func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
 }
 
 func (sb *nnarySnowball) String() string {
-	return fmt.Sprintf("SB(Preference = %s, NumSuccessfulPolls = %d, SF = %s)",
+	return fmt.Sprintf("SB(Preference = %s, NumSuccessfulPolls = %d, %s)",
 		sb.preference, sb.maxSuccessfulPolls, &sb.nnarySnowflake)
 }

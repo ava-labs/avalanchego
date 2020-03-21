@@ -23,8 +23,8 @@ type binarySnowball struct {
 
 // Initialize implements the BinarySnowball interface
 func (sb *binarySnowball) Initialize(beta, choice int) {
-	sb.preference = choice
 	sb.binarySnowflake.Initialize(beta, choice)
+	sb.preference = choice
 }
 
 // Preference implements the BinarySnowball interface
@@ -50,7 +50,7 @@ func (sb *binarySnowball) RecordSuccessfulPoll(choice int) {
 
 func (sb *binarySnowball) String() string {
 	return fmt.Sprintf(
-		"SB(Preference = %d, NumSuccessfulPolls[0] = %d, NumSuccessfulPolls[1] = %d, SF = %s)",
+		"SB(Preference = %d, NumSuccessfulPolls[0] = %d, NumSuccessfulPolls[1] = %d, %s)",
 		sb.preference,
 		sb.numSuccessfulPolls[0],
 		sb.numSuccessfulPolls[1],
