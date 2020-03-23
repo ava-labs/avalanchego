@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -20,12 +21,12 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 
 	vm.codec.RegisterType(&testVerifiable{})
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
+		Asset: ava.Asset{ID: ids.Empty},
 		Out:   &testVerifiable{},
 	}
 
@@ -34,13 +35,11 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
-				Asset: Asset{
-					ID: asset,
-				},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 20 * units.KiloAva,
 					Input: secp256k1fx.Input{
@@ -118,12 +117,12 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 
 	vm.codec.RegisterType(&testVerifiable{})
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
+		Asset: ava.Asset{ID: ids.Empty},
 		Out:   &testVerifiable{},
 	}
 
@@ -141,12 +140,12 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 
 	vm.codec.RegisterType(&testAddressable{})
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
+		Asset: ava.Asset{ID: ids.Empty},
 		Out: &testAddressable{
 			Addrs: [][]byte{
 				[]byte{0},

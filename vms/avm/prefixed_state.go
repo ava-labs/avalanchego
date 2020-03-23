@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 const (
@@ -37,31 +38,31 @@ func (s *prefixedState) UniqueTx(tx *UniqueTx) *UniqueTx {
 }
 
 // Tx attempts to load a transaction from storage.
-func (s *prefixedState) Tx(id ids.ID) (*Tx, error) { return s.state.Tx(s.uniqueID(id, txID, s.tx)) }
+func (s *prefixedState) Tx(id ids.ID) (*Tx, error) { return s.state.Tx(uniqueID(id, txID, s.tx)) }
 
 // SetTx saves the provided transaction to storage.
 func (s *prefixedState) SetTx(id ids.ID, tx *Tx) error {
-	return s.state.SetTx(s.uniqueID(id, txID, s.tx), tx)
+	return s.state.SetTx(uniqueID(id, txID, s.tx), tx)
 }
 
 // UTXO attempts to load a utxo from storage.
-func (s *prefixedState) UTXO(id ids.ID) (*UTXO, error) {
-	return s.state.UTXO(s.uniqueID(id, utxoID, s.utxo))
+func (s *prefixedState) UTXO(id ids.ID) (*ava.UTXO, error) {
+	return s.state.UTXO(uniqueID(id, utxoID, s.utxo))
 }
 
 // SetUTXO saves the provided utxo to storage.
-func (s *prefixedState) SetUTXO(id ids.ID, utxo *UTXO) error {
-	return s.state.SetUTXO(s.uniqueID(id, utxoID, s.utxo), utxo)
+func (s *prefixedState) SetUTXO(id ids.ID, utxo *ava.UTXO) error {
+	return s.state.SetUTXO(uniqueID(id, utxoID, s.utxo), utxo)
 }
 
 // Status returns the status of the provided transaction id from storage.
 func (s *prefixedState) Status(id ids.ID) (choices.Status, error) {
-	return s.state.Status(s.uniqueID(id, txStatusID, s.txStatus))
+	return s.state.Status(uniqueID(id, txStatusID, s.txStatus))
 }
 
 // SetStatus saves the provided status to storage.
 func (s *prefixedState) SetStatus(id ids.ID, status choices.Status) error {
-	return s.state.SetStatus(s.uniqueID(id, txStatusID, s.txStatus), status)
+	return s.state.SetStatus(uniqueID(id, txStatusID, s.txStatus), status)
 }
 
 // DBInitialized returns the status of this database. If the database is
@@ -76,21 +77,12 @@ func (s *prefixedState) SetDBInitialized(status choices.Status) error {
 // Funds returns the mapping from the 32 byte representation of an address to a
 // list of utxo IDs that reference the address.
 func (s *prefixedState) Funds(id ids.ID) ([]ids.ID, error) {
-	return s.state.IDs(s.uniqueID(id, fundsID, s.funds))
+	return s.state.IDs(uniqueID(id, fundsID, s.funds))
 }
 
 // SetFunds saves the mapping from address to utxo IDs to storage.
 func (s *prefixedState) SetFunds(id ids.ID, idSlice []ids.ID) error {
-	return s.state.SetIDs(s.uniqueID(id, fundsID, s.funds), idSlice)
-}
-
-func (s *prefixedState) uniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
-	if cachedIDIntf, found := cacher.Get(id); found {
-		return cachedIDIntf.(ids.ID)
-	}
-	uID := id.Prefix(prefix)
-	cacher.Put(id, uID)
-	return uID
+	return s.state.SetIDs(uniqueID(id, fundsID, s.funds), idSlice)
 }
 
 // SpendUTXO consumes the provided utxo.
@@ -126,7 +118,7 @@ func (s *prefixedState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 }
 
 // FundUTXO adds the provided utxo to the database
-func (s *prefixedState) FundUTXO(utxo *UTXO) error {
+func (s *prefixedState) FundUTXO(utxo *ava.UTXO) error {
 	utxoID := utxo.InputID()
 	if err := s.SetUTXO(utxoID, utxo); err != nil {
 		return err

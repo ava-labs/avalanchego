@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -28,7 +29,7 @@ var (
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
-	metadata
+	ava.Metadata
 
 	NetID uint32                `serialize:"true"` // ID of the network this chain lives on
 	BCID  ids.ID                `serialize:"true"` // ID of the chain on which this transaction exists (prevents replay attacks)
@@ -51,8 +52,8 @@ func (t *BaseTx) Outputs() []*TransferableOutput { return t.Outs }
 func (t *BaseTx) Inputs() []*TransferableInput { return t.Ins }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *BaseTx) InputUTXOs() []*UTXOID {
-	utxos := []*UTXOID(nil)
+func (t *BaseTx) InputUTXOs() []*ava.UTXOID {
+	utxos := []*ava.UTXOID(nil)
 	for _, in := range t.Ins {
 		utxos = append(utxos, &in.UTXOID)
 	}
@@ -69,16 +70,16 @@ func (t *BaseTx) AssetIDs() ids.Set {
 }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *BaseTx) UTXOs() []*UTXO {
+func (t *BaseTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
-	utxos := make([]*UTXO, len(t.Outs))
+	utxos := make([]*ava.UTXO, len(t.Outs))
 	for i, out := range t.Outs {
-		utxos[i] = &UTXO{
-			UTXOID: UTXOID{
+		utxos[i] = &ava.UTXO{
+			UTXOID: ava.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(i),
 			},
-			Asset: Asset{ID: out.AssetID()},
+			Asset: ava.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		}
 	}
@@ -96,7 +97,7 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		return errWrongChainID
 	}
 
-	fc := NewFlowChecker()
+	fc := ava.NewFlowChecker()
 	for _, out := range t.Outs {
 		if err := out.Verify(); err != nil {
 			return err
@@ -123,7 +124,7 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		return err
 	}
 
-	return t.metadata.Verify()
+	return t.Metadata.Verify()
 }
 
 // SemanticVerify that this transaction is valid to be spent.
@@ -159,5 +160,5 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable
 	return nil
 }
 
-// SideEffects that this transaction has in addition to the UTXO operations.
-func (t *BaseTx) SideEffects(vm *VM) ([]database.Batch, error) { return nil, nil }
+// ExecuteWithSideEffects writes the batch with any additional side effects
+func (t *BaseTx) ExecuteWithSideEffects(_ *VM, batch database.Batch) error { return batch.Write() }

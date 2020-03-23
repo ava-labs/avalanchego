@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -20,7 +21,7 @@ var (
 
 // Operation ...
 type Operation struct {
-	Asset `serialize:"true"`
+	ava.Asset `serialize:"true"`
 
 	Ins  []*OperableInput    `serialize:"true"`
 	Outs []verify.Verifiable `serialize:"true"`

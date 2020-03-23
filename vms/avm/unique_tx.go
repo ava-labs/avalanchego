@@ -6,10 +6,10 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 var (
@@ -36,8 +36,8 @@ type TxState struct {
 	validity                          error
 
 	inputs     ids.Set
-	inputUTXOs []*UTXOID
-	utxos      []*UTXO
+	inputUTXOs []*ava.UTXOID
+	utxos      []*ava.UTXO
 	deps       []snowstorm.Tx
 
 	status choices.Status
@@ -128,19 +128,15 @@ func (tx *UniqueTx) Accept() {
 	}
 
 	txID := tx.ID()
-	effects, err := tx.SideEffects(tx.vm)
-	if err != nil {
-		tx.vm.ctx.Log.Error("Failed to compute side effects from %s due to %s", txID, err)
-		return
-	}
-
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
+		return
 	}
 
-	if err := atomic.WriteAll(commitBatch, effects...); err != nil {
+	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
+		return
 	}
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
@@ -229,7 +225,7 @@ func (tx *UniqueTx) InputIDs() ids.Set {
 }
 
 // InputUTXOs returns the utxos that will be consumed on tx acceptance
-func (tx *UniqueTx) InputUTXOs() []*UTXOID {
+func (tx *UniqueTx) InputUTXOs() []*ava.UTXOID {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.inputUTXOs) != 0 {
 		return tx.inputUTXOs
@@ -239,7 +235,7 @@ func (tx *UniqueTx) InputUTXOs() []*UTXOID {
 }
 
 // UTXOs returns the utxos that will be added to the UTXO set on tx acceptance
-func (tx *UniqueTx) UTXOs() []*UTXO {
+func (tx *UniqueTx) UTXOs() []*ava.UTXO {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.utxos) != 0 {
 		return tx.utxos

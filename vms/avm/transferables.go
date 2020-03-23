@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -23,7 +24,7 @@ var (
 
 // TransferableOutput ...
 type TransferableOutput struct {
-	Asset `serialize:"true"`
+	ava.Asset `serialize:"true"`
 
 	Out FxTransferable `serialize:"true"`
 }
@@ -87,8 +88,8 @@ func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Codec) bool
 
 // TransferableInput ...
 type TransferableInput struct {
-	UTXOID `serialize:"true"`
-	Asset  `serialize:"true"`
+	ava.UTXOID `serialize:"true"`
+	ava.Asset  `serialize:"true"`
 
 	In FxTransferable `serialize:"true"`
 }

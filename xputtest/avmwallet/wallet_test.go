@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -83,9 +84,9 @@ func TestWalletAddUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	utxo := &avm.UTXO{
-		UTXOID: avm.UTXOID{TxID: ids.Empty.Prefix(0)},
-		Asset:  avm.Asset{ID: ids.Empty.Prefix(1)},
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{TxID: ids.Empty.Prefix(0)},
+		Asset:  ava.Asset{ID: ids.Empty.Prefix(1)},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1000,
 		},
@@ -105,9 +106,9 @@ func TestWalletAddInvalidUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	utxo := &avm.UTXO{
-		UTXOID: avm.UTXOID{TxID: ids.Empty.Prefix(0)},
-		Asset:  avm.Asset{ID: ids.Empty.Prefix(1)},
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{TxID: ids.Empty.Prefix(0)},
+		Asset:  ava.Asset{ID: ids.Empty.Prefix(1)},
 	}
 
 	w.AddUTXO(utxo)
@@ -130,9 +131,9 @@ func TestWalletCreateTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	utxo := &avm.UTXO{
-		UTXOID: avm.UTXOID{TxID: ids.Empty.Prefix(1)},
-		Asset:  avm.Asset{ID: assetID},
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{TxID: ids.Empty.Prefix(1)},
+		Asset:  ava.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1000,
 			OutputOwners: secp256k1fx.OutputOwners{

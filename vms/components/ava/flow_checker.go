@@ -1,12 +1,18 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package ava
 
 import (
+	"errors"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/wrappers"
+)
+
+var (
+	errInsufficientFunds = errors.New("insufficient funds")
 )
 
 // FlowChecker ...

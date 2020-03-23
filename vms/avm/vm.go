@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
@@ -123,10 +124,11 @@ func (vm *VM) Initialize(
 	}
 
 	vm.state = &prefixedState{
-		state: &state{
-			c:  &cache.LRU{Size: stateCacheSize},
-			vm: vm,
-		},
+		state: &state{State: ava.State{
+			Cache: &cache.LRU{Size: stateCacheSize},
+			DB:    vm.db,
+			Codec: vm.codec,
+		}},
 
 		tx:       &cache.LRU{Size: idCacheSize},
 		utxo:     &cache.LRU{Size: idCacheSize},
@@ -270,14 +272,14 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 
 // GetUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
-func (vm *VM) GetUTXOs(addrs ids.Set) ([]*UTXO, error) {
+func (vm *VM) GetUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
 		utxos, _ := vm.state.Funds(addr)
 		utxoIDs.Add(utxos...)
 	}
 
-	utxos := []*UTXO{}
+	utxos := []*ava.UTXO{}
 	for _, utxoID := range utxoIDs.List() {
 		utxo, err := vm.state.UTXO(utxoID)
 		if err != nil {
@@ -432,7 +434,7 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 	}
 }
 
-func (vm *VM) getUTXO(utxoID *UTXOID) (*UTXO, error) {
+func (vm *VM) getUTXO(utxoID *ava.UTXOID) (*ava.UTXO, error) {
 	inputID := utxoID.InputID()
 	utxo, err := vm.state.UTXO(inputID)
 	if err == nil {

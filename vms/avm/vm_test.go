@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -298,9 +299,7 @@ func TestTxSerialization(t *testing.T) {
 		},
 		Ops: []*Operation{
 			&Operation{
-				Asset: Asset{
-					ID: asset,
-				},
+				Asset: ava.Asset{ID: asset},
 				Outs: []verify.Verifiable{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -317,9 +316,7 @@ func TestTxSerialization(t *testing.T) {
 		addr := key.PublicKey().Address()
 
 		unsignedTx.Outs = append(unsignedTx.Outs, &TransferableOutput{
-			Asset: Asset{
-				ID: asset,
-			},
+			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 20 * units.KiloAva,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -445,13 +442,11 @@ func TestIssueTx(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -578,11 +573,11 @@ func TestIssueDependentTx(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: genesisTx.ID()},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -595,7 +590,7 @@ func TestIssueDependentTx(t *testing.T) {
 		},
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: genesisTx.ID()},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 50000,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -641,11 +636,11 @@ func TestIssueDependentTx(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        firstTx.ID(),
 					OutputIndex: 0,
 				},
-				Asset: Asset{ID: genesisTx.ID()},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{

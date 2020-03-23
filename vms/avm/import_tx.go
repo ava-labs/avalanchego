@@ -8,18 +8,26 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/gecko/chains/atomic"
+	"github.com/ava-labs/gecko/database/versiondb"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
+var (
+	errNilUTXOID = errors.New("nil utxo ID is not valid")
+)
+
 // ImportInput ...
 type ImportInput struct {
-	UTXOID ids.ID `serialize:"true"`
-	Asset  `serialize:"true"`
+	UTXOID    ids.ID `serialize:"true"`
+	ava.Asset `serialize:"true"`
 
 	In FxTransferable `serialize:"true"`
 }
@@ -63,12 +71,12 @@ type ImportTx struct {
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *ImportTx) InputUTXOs() []*UTXOID {
+func (t *ImportTx) InputUTXOs() []*ava.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, in := range t.Ins {
-		utxos = append(utxos, &UTXOID{
-			TxID:     in.UTXOID,
-			symbolic: true,
+		utxos = append(utxos, &ava.UTXOID{
+			TxID:   in.UTXOID,
+			Symbol: true,
 		})
 	}
 	return utxos
@@ -84,17 +92,17 @@ func (t *ImportTx) AssetIDs() ids.Set {
 }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *ImportTx) UTXOs() []*UTXO {
+func (t *ImportTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, out := range t.Outs {
-		utxos = append(utxos, &UTXO{
-			UTXOID: UTXOID{
+		utxos = append(utxos, &ava.UTXO{
+			UTXOID: ava.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(len(utxos)),
 			},
-			Asset: Asset{ID: out.AssetID()},
+			Asset: ava.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		})
 	}
@@ -119,7 +127,7 @@ func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 		return err
 	}
 
-	fc := NewFlowChecker()
+	fc := ava.NewFlowChecker()
 	for _, out := range t.Outs {
 		if err := out.Verify(); err != nil {
 			return err
@@ -159,6 +167,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
 
+	state := ava.NewPrefixedState(smDB, vm.codec)
+
 	offset := len(t.BaseTx.Ins)
 	for i, in := range t.Ins {
 		cred := creds[i+offset]
@@ -170,7 +180,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		fx := vm.fxs[fxIndex].Fx
 
 		utxoID := in.UTXOID
-		utxo, err := vm.state.UTXO(utxoID)
+		utxo, err := state.PlatformUTXO(utxoID)
 		if err != nil {
 			return err
 		}
@@ -191,5 +201,26 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 	return nil
 }
 
-// SideEffects that this transaction has in addition to the UTXO operations.
-func (t *ImportTx) SideEffects(vm *VM) ([]database.Batch, error) { return nil, nil }
+// ExecuteWithSideEffects writes the batch with any additional side effects
+func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
+	bID := ids.Empty // TODO: Needs to be set to the platform chain
+	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+
+	vsmDB := versiondb.New(smDB)
+
+	state := ava.NewPrefixedState(vsmDB, vm.codec)
+	for _, in := range t.Ins {
+		utxoID := in.UTXOID
+		if err := state.SetPlatformUTXO(utxoID, nil); err != nil {
+			return err
+		}
+	}
+
+	sharedBatch, err := vsmDB.CommitBatch()
+	if err != nil {
+		return err
+	}
+
+	return atomic.WriteAll(batch, sharedBatch)
+}

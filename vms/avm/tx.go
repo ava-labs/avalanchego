@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -29,12 +30,12 @@ type UnsignedTx interface {
 	Inputs() []*TransferableInput
 
 	AssetIDs() ids.Set
-	InputUTXOs() []*UTXOID
-	UTXOs() []*UTXO
+	InputUTXOs() []*ava.UTXOID
+	UTXOs() []*ava.UTXO
 
 	SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
 	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error
-	SideEffects(vm *VM) ([]database.Batch, error)
+	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
 
 // Tx is the core operation that can be performed. The tx uses the UTXO model.

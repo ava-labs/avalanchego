@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -30,7 +31,7 @@ type OperationTx struct {
 func (t *OperationTx) Operations() []*Operation { return t.Ops }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *OperationTx) InputUTXOs() []*UTXOID {
+func (t *OperationTx) InputUTXOs() []*ava.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, op := range t.Ops {
 		for _, in := range op.Ins {
@@ -50,19 +51,19 @@ func (t *OperationTx) AssetIDs() ids.Set {
 }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *OperationTx) UTXOs() []*UTXO {
+func (t *OperationTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, op := range t.Ops {
 		asset := op.AssetID()
 		for _, out := range op.Outs {
-			utxos = append(utxos, &UTXO{
-				UTXOID: UTXOID{
+			utxos = append(utxos, &ava.UTXO{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out:   out,
 			})
 		}

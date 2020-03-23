@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -74,6 +75,10 @@ type GetTxStatusArgs struct {
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
+
+var (
+	errNilTxID = errors.New("nil transaction ID")
+)
 
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, reply *GetTxStatusReply) error {
@@ -618,7 +623,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 		in := &TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  Asset{ID: assetID},
+			Asset:  ava.Asset{ID: assetID},
 			In:     input,
 		}
 
@@ -638,9 +643,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 	outs := []*TransferableOutput{
 		&TransferableOutput{
-			Asset: Asset{
-				ID: assetID,
-			},
+			Asset: ava.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt:      uint64(args.Amount),
 				Locktime: 0,
@@ -656,9 +659,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		changeAddr := kc.Keys[0].PublicKey().Address()
 		outs = append(outs,
 			&TransferableOutput{
-				Asset: Asset{
-					ID: assetID,
-				},
+				Asset: ava.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:      amountSpent - uint64(args.Amount),
 					Locktime: 0,
@@ -836,9 +837,7 @@ func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, re
 					},
 					Ops: []*Operation{
 						&Operation{
-							Asset: Asset{
-								ID: assetID,
-							},
+							Asset: ava.Asset{ID: assetID},
 							Ins: []*OperableInput{
 								&OperableInput{
 									UTXOID: utxo.UTXOID,

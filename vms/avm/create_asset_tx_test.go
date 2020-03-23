@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -94,7 +95,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 			}),
 			Outs: []*TransferableOutput{
 				&TransferableOutput{
-					Asset: Asset{
+					Asset: ava.Asset{
 						ID: ids.NewID([32]byte{
 							0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 							0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -125,7 +126,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 			},
 			Ins: []*TransferableInput{
 				&TransferableInput{
-					UTXOID: UTXOID{
+					UTXOID: ava.UTXOID{
 						TxID: ids.NewID([32]byte{
 							0xf1, 0xe1, 0xd1, 0xc1, 0xb1, 0xa1, 0x91, 0x81,
 							0x71, 0x61, 0x51, 0x41, 0x31, 0x21, 0x11, 0x01,
@@ -134,7 +135,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 						}),
 						OutputIndex: 5,
 					},
-					Asset: Asset{
+					Asset: ava.Asset{
 						ID: ids.NewID([32]byte{
 							0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 							0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,

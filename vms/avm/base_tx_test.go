@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -79,7 +80,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -91,7 +92,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -100,7 +101,7 @@ func TestBaseTxSerialization(t *testing.T) {
 					}),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -139,7 +140,7 @@ func TestBaseTxGetters(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -151,7 +152,7 @@ func TestBaseTxGetters(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -160,7 +161,7 @@ func TestBaseTxGetters(t *testing.T) {
 					}),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -219,7 +220,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -231,7 +232,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -240,7 +241,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -290,7 +291,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -302,7 +303,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -311,7 +312,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 					}),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -344,7 +345,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 		BCID:  ids.Empty,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -356,7 +357,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -365,7 +366,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 					}),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -401,7 +402,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -410,7 +411,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 					}),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -443,7 +444,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 2,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -453,7 +454,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 				},
 			},
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 1,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -465,7 +466,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -474,7 +475,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 					}),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -507,7 +508,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -544,7 +545,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -556,7 +557,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -565,7 +566,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: math.MaxUint64,
 					Input: secp256k1fx.Input{
@@ -574,7 +575,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 				},
 			},
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -583,7 +584,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 					}),
 					OutputIndex: 1,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 1,
 					Input: secp256k1fx.Input{
@@ -616,7 +617,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 2,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -626,7 +627,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 				},
 			},
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: math.MaxUint64,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -638,7 +639,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -647,7 +648,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 1,
 					Input: secp256k1fx.Input{
@@ -680,7 +681,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: math.MaxUint64,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -692,7 +693,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -701,7 +702,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 1,
 					Input: secp256k1fx.Input{
@@ -734,7 +735,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 		BCID:  chainID,
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -746,7 +747,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 		},
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -755,7 +756,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: Asset{ID: asset},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -802,13 +803,11 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -892,13 +891,11 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -965,13 +962,11 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: asset,
-				},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1067,14 +1062,12 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
-				In: &TestTransferable{},
+				Asset: ava.Asset{ID: genesisTx.ID()},
+				In:    &TestTransferable{},
 			},
 		},
 	}}
@@ -1148,13 +1141,11 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1223,13 +1214,11 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1311,13 +1300,11 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: math.MaxUint32,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1398,13 +1385,11 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1417,9 +1402,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		},
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:      50000,
 					Locktime: 0,
@@ -1475,13 +1458,11 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: 2,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1561,13 +1542,11 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1580,9 +1559,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		},
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:      50000,
 					Locktime: 0,
@@ -1638,13 +1615,11 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: 0,
 				},
-				Asset: Asset{
-					ID: asset,
-				},
+				Asset: ava.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1738,13 +1713,11 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1757,9 +1730,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		},
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:      50000,
 					Locktime: 0,
@@ -1815,13 +1786,11 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: 0,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1899,13 +1868,11 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        genesisTx.ID(),
 					OutputIndex: 1,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{
@@ -1918,9 +1885,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		},
 		Outs: []*TransferableOutput{
 			&TransferableOutput{
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:      50000,
 					Locktime: 0,
@@ -1976,13 +1941,11 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		BCID:  chainID,
 		Ins: []*TransferableInput{
 			&TransferableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: 0,
 				},
-				Asset: Asset{
-					ID: genesisTx.ID(),
-				},
+				Asset: ava.Asset{ID: genesisTx.ID()},
 				In: &secp256k1fx.TransferInput{
 					Amt: 50000,
 					Input: secp256k1fx.Input{

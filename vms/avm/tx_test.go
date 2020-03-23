@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -51,13 +52,11 @@ func TestTxInvalidCredential(t *testing.T) {
 			BCID:  chainID,
 			Ins: []*TransferableInput{
 				&TransferableInput{
-					UTXOID: UTXOID{
+					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: Asset{
-						ID: asset,
-					},
+					Asset: ava.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAva,
 						Input: secp256k1fx.Input{
@@ -103,13 +102,11 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			BCID:  chainID,
 			Ins: []*TransferableInput{
 				&TransferableInput{
-					UTXOID: UTXOID{
+					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: Asset{
-						ID: asset,
-					},
+					Asset: ava.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAva,
 						Input: secp256k1fx.Input{
@@ -120,13 +117,11 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 					},
 				},
 				&TransferableInput{
-					UTXOID: UTXOID{
+					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: Asset{
-						ID: asset,
-					},
+					Asset: ava.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAva,
 						Input: secp256k1fx.Input{
@@ -174,13 +169,8 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 				BCID:  chainID,
 				Ins: []*TransferableInput{
 					&TransferableInput{
-						UTXOID: UTXOID{
-							TxID:        ids.Empty,
-							OutputIndex: 0,
-						},
-						Asset: Asset{
-							ID: asset,
-						},
+						UTXOID: ava.UTXOID{TxID: ids.Empty, OutputIndex: 0},
+						Asset:  ava.Asset{ID: asset},
 						In: &secp256k1fx.TransferInput{
 							Amt: 20 * units.KiloAva,
 							Input: secp256k1fx.Input{
@@ -194,12 +184,10 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 			},
 			Ops: []*Operation{
 				&Operation{
-					Asset: Asset{
-						ID: asset,
-					},
+					Asset: ava.Asset{ID: asset},
 					Ins: []*OperableInput{
 						&OperableInput{
-							UTXOID: UTXOID{
+							UTXOID: ava.UTXOID{
 								TxID:        ids.Empty,
 								OutputIndex: 1,
 							},

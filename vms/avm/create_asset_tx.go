@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 )
 
@@ -43,18 +44,18 @@ type CreateAssetTx struct {
 func (t *CreateAssetTx) InitialStates() []*InitialState { return t.States }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *CreateAssetTx) UTXOs() []*UTXO {
+func (t *CreateAssetTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, state := range t.States {
 		for _, out := range state.Outs {
-			utxos = append(utxos, &UTXO{
-				UTXOID: UTXOID{
+			utxos = append(utxos, &ava.UTXO{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: Asset{
+				Asset: ava.Asset{
 					ID: txID,
 				},
 				Out: out,

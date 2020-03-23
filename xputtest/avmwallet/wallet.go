@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -92,7 +93,7 @@ func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keychain.Add(sk)
 
 // AddUTXO adds a new UTXO to this wallet if this wallet may spend it
 // The UTXO's output must be an OutputPayment
-func (w *Wallet) AddUTXO(utxo *avm.UTXO) {
+func (w *Wallet) AddUTXO(utxo *ava.UTXO) {
 	out, ok := utxo.Out.(avm.FxTransferable)
 	if !ok {
 		return
@@ -157,7 +158,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 
 		in := &avm.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avm.Asset{ID: assetID},
+			Asset:  ava.Asset{ID: assetID},
 			In:     input,
 		}
 
@@ -177,7 +178,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 
 	outs := []*avm.TransferableOutput{
 		&avm.TransferableOutput{
-			Asset: avm.Asset{ID: assetID},
+			Asset: ava.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt:      amount,
 				Locktime: 0,
@@ -196,7 +197,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		}
 		outs = append(outs,
 			&avm.TransferableOutput{
-				Asset: avm.Asset{ID: assetID},
+				Asset: ava.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:      amountSpent - amount,
 					Locktime: 0,
