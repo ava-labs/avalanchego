@@ -18,6 +18,9 @@ awscpu
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# ignore GoLand metafiles directory
+.idea/
+
 *logs/
 
 .vscode*
