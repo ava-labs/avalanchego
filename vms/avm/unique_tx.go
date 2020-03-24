@@ -289,13 +289,14 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	tx.verifiedState = true
-	tx.validity = tx.Tx.SemanticVerify(tx.vm, tx)
-
-	if tx.validity == nil {
-		tx.vm.pubsub.Publish("verified", tx.ID())
+	err := tx.Tx.SemanticVerify(tx.vm, tx)
+	if err != nil {
+		return err
 	}
-	return tx.validity
+
+	tx.verifiedState = true
+	tx.vm.pubsub.Publish("verified", tx.ID())
+	return nil
 }
 
 // UnsignedBytes returns the unsigned bytes of the transaction

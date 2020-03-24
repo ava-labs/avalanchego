@@ -17,12 +17,8 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
-var (
-	errNilUTXOID = errors.New("nil utxo ID is not valid")
-)
-
-// ImportTx is a transaction that imports an asset from another blockchain.
-type ImportTx struct {
+// ExportTx is a transaction that exports an asset to another blockchain.
+type ExportTx struct {
 	BaseTx `serialize:"true"`
 
 	Outs []*TransferableOutput `serialize:"true"` // The outputs of this transaction
@@ -30,17 +26,16 @@ type ImportTx struct {
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *ImportTx) InputUTXOs() []*ava.UTXOID {
+func (t *ExportTx) InputUTXOs() []*ava.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, in := range t.Ins {
-		in.Symbol = true
 		utxos = append(utxos, &in.UTXOID)
 	}
 	return utxos
 }
 
 // AssetIDs returns the IDs of the assets this transaction depends on
-func (t *ImportTx) AssetIDs() ids.Set {
+func (t *ExportTx) AssetIDs() ids.Set {
 	assets := t.BaseTx.AssetIDs()
 	for _, in := range t.Ins {
 		assets.Add(in.AssetID())
@@ -48,36 +43,17 @@ func (t *ImportTx) AssetIDs() ids.Set {
 	return assets
 }
 
-// UTXOs returns the UTXOs transaction is producing.
-func (t *ImportTx) UTXOs() []*ava.UTXO {
-	txID := t.ID()
-	utxos := t.BaseTx.UTXOs()
-
-	for _, out := range t.Outs {
-		utxos = append(utxos, &ava.UTXO{
-			UTXOID: ava.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(len(utxos)),
-			},
-			Asset: ava.Asset{ID: out.AssetID()},
-			Out:   out.Out,
-		})
-	}
-
-	return utxos
-}
-
 var (
-	errNoImportInputs = errors.New("no import inputs")
+	errNoExportInputs = errors.New("no export inputs")
 )
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
 	switch {
 	case t == nil:
 		return errNilTx
 	case len(t.Ins) == 0:
-		return errNoImportInputs
+		return errNoExportInputs
 	}
 
 	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
@@ -111,16 +87,10 @@ func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
 		return err
 	}
-
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
-
-	state := ava.NewPrefixedState(smDB, vm.codec)
 
 	offset := len(t.BaseTx.Ins)
 	for i, in := range t.Ins {
@@ -132,11 +102,11 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 		fx := vm.fxs[fxIndex].Fx
 
-		utxoID := in.UTXOID.InputID()
-		utxo, err := state.PlatformUTXO(utxoID)
+		utxo, err := vm.getUTXO(&in.UTXOID)
 		if err != nil {
 			return err
 		}
+
 		utxoAssetID := utxo.AssetID()
 		inAssetID := in.AssetID()
 		if !utxoAssetID.Equals(inAssetID) {
@@ -155,7 +125,9 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 }
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
-func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
+func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
+	txID := t.ID()
+
 	bID := ids.Empty // TODO: Needs to be set to the platform chain
 	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
@@ -163,13 +135,22 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := ava.NewPrefixedState(vsmDB, vm.codec)
-	for _, in := range t.Ins {
-		utxoID := in.UTXOID.InputID()
-		if _, err := state.PlatformUTXO(utxoID); err == nil {
-			if err := state.SetPlatformUTXO(utxoID, nil); err != nil {
+	for i, out := range t.Outs {
+		utxo := &ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(t.BaseTx.Outs) + i),
+			},
+			Asset: ava.Asset{ID: out.AssetID()},
+			Out:   out.Out,
+		}
+
+		utxoID := utxo.InputID()
+		if _, err := state.AVMStatus(utxoID); err == nil {
+			if err := state.SetAVMStatus(utxoID, choices.Unknown); err != nil {
 				return err
 			}
-		} else if err := state.SetPlatformStatus(utxoID, choices.Accepted); err != nil {
+		} else if err := state.SetAVMUTXO(utxoID, utxo); err != nil {
 			return err
 		}
 	}

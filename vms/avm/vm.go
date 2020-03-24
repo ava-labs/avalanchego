@@ -123,25 +123,12 @@ func (vm *VM) Initialize(
 		return errs.Err
 	}
 
-	vm.state = &prefixedState{
-		state: &state{State: ava.State{
-			Cache: &cache.LRU{Size: stateCacheSize},
-			DB:    vm.db,
-			Codec: vm.codec,
-		}},
-
-		tx:       &cache.LRU{Size: idCacheSize},
-		utxo:     &cache.LRU{Size: idCacheSize},
-		txStatus: &cache.LRU{Size: idCacheSize},
-		funds:    &cache.LRU{Size: idCacheSize},
-
-		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
-	}
-
 	c := codec.NewDefault()
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
 
 	vm.fxs = make([]*parsedFx, len(fxs))
 	for i, fxContainer := range fxs {
@@ -167,6 +154,21 @@ func (vm *VM) Initialize(
 	}
 
 	vm.codec = c
+
+	vm.state = &prefixedState{
+		state: &state{State: ava.State{
+			Cache: &cache.LRU{Size: stateCacheSize},
+			DB:    vm.db,
+			Codec: vm.codec,
+		}},
+
+		tx:       &cache.LRU{Size: idCacheSize},
+		utxo:     &cache.LRU{Size: idCacheSize},
+		txStatus: &cache.LRU{Size: idCacheSize},
+		funds:    &cache.LRU{Size: idCacheSize},
+
+		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
+	}
 
 	if err := vm.initAliases(genesisBytes); err != nil {
 		return err

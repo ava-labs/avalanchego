@@ -65,3 +65,23 @@ func (s *PrefixedState) PlatformStatus(id ids.ID) (choices.Status, error) {
 func (s *PrefixedState) SetPlatformStatus(id ids.ID, status choices.Status) error {
 	return s.SetStatus(UniqueID(id, platformStatusID, s.platformStatus), status)
 }
+
+// AVMUTXO attempts to load a utxo from AVM's storage.
+func (s *PrefixedState) AVMUTXO(id ids.ID) (*UTXO, error) {
+	return s.UTXO(UniqueID(id, avmUTXOID, s.platformUTXO))
+}
+
+// SetAVMUTXO saves the provided utxo to AVM's storage.
+func (s *PrefixedState) SetAVMUTXO(id ids.ID, utxo *UTXO) error {
+	return s.SetUTXO(UniqueID(id, avmUTXOID, s.platformUTXO), utxo)
+}
+
+// AVMStatus returns the AVM status from storage.
+func (s *PrefixedState) AVMStatus(id ids.ID) (choices.Status, error) {
+	return s.Status(UniqueID(id, avmStatusID, s.platformStatus))
+}
+
+// SetAVMStatus saves the provided platform status to storage.
+func (s *PrefixedState) SetAVMStatus(id ids.ID, status choices.Status) error {
+	return s.SetStatus(UniqueID(id, avmStatusID, s.platformStatus), status)
+}
