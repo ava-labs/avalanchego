@@ -71,6 +71,9 @@ func (tx *CreateChainTx) Key() crypto.PublicKey { return tx.key }
 // Bytes returns the byte representation of a CreateChainTx
 func (tx *CreateChainTx) Bytes() []byte { return tx.bytes }
 
+// InputUTXOs returns an empty set
+func (tx *CreateChainTx) InputUTXOs() ids.Set { return ids.Set{} }
+
 // SyntacticVerify this transaction is well-formed
 // Also populates [tx.Key] with the public key that signed this transaction
 func (tx *CreateChainTx) SyntacticVerify() error {
