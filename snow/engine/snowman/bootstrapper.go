@@ -113,7 +113,7 @@ func (b *bootstrapper) fetch(blkID ids.ID) {
 		b.sendRequest(blkID)
 		return
 	}
-	b.addBlock(blk)
+	b.storeBlock(blk)
 }
 
 func (b *bootstrapper) sendRequest(blkID ids.ID) {
@@ -132,6 +132,14 @@ func (b *bootstrapper) sendRequest(blkID ids.ID) {
 }
 
 func (b *bootstrapper) addBlock(blk snowman.Block) {
+	b.storeBlock(blk)
+
+	if numPending := b.pending.Len(); numPending == 0 {
+		b.finish()
+	}
+}
+
+func (b *bootstrapper) storeBlock(blk snowman.Block) {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
@@ -161,9 +169,6 @@ func (b *bootstrapper) addBlock(blk snowman.Block) {
 
 	numPending := b.pending.Len()
 	b.numPendingRequests.Set(float64(numPending))
-	if numPending == 0 {
-		b.finish()
-	}
 }
 
 func (b *bootstrapper) finish() {
