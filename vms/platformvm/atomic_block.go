@@ -67,6 +67,13 @@ func (ab *AtomicBlock) conflicts(s ids.Set) bool {
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
 	parentBlock := ab.parentBlock()
+
+	ab.inputs = ab.Tx.InputUTXOs()
+
+	if parentBlock.conflicts(ab.inputs) {
+		return errConflictingParentTxs
+	}
+
 	// AtomicBlock is not a modifier on a proposal block, so its parent must be
 	// a decision.
 	parent, ok := parentBlock.(decision)
@@ -79,11 +86,6 @@ func (ab *AtomicBlock) Verify() error {
 	ab.onAcceptDB = versiondb.New(pdb)
 	if err := ab.Tx.SemanticVerify(ab.onAcceptDB); err != nil {
 		return err
-	}
-	ab.inputs = ab.Tx.InputUTXOs()
-
-	if parentBlock.conflicts(ab.inputs) {
-		return errConflictingParentTxs
 	}
 
 	ab.vm.currentBlocks[ab.ID().Key()] = ab

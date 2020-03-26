@@ -18,7 +18,7 @@ func TestTxHeapStart(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{1}),                   // node ID
+		ids.NewShortID([20]byte{}),                    // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID
@@ -33,7 +33,7 @@ func TestTxHeapStart(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{}),                    // node ID
+		ids.NewShortID([20]byte{1}),                   // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID
@@ -85,7 +85,7 @@ func TestTxHeapStop(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{1}),                   // node ID
+		ids.NewShortID([20]byte{}),                    // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID
@@ -100,7 +100,7 @@ func TestTxHeapStop(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{}),                    // node ID
+		ids.NewShortID([20]byte{1}),                   // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID

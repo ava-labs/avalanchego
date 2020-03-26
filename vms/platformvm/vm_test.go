@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -18,7 +19,10 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/timestampvm"
 )
 
@@ -1058,5 +1062,169 @@ func TestCreateSubnet(t *testing.T) {
 	if currentValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
 	}
+}
 
+// test asset import
+func TestAtomicImport(t *testing.T) {
+	vm := defaultVM()
+
+	utxoID := ava.UTXOID{
+		TxID:        ids.Empty.Prefix(0),
+		OutputIndex: 1,
+	}
+	assetID := ids.Empty.Prefix(1)
+	amount := uint64(50000)
+	key := keys[0]
+
+	sm := &atomic.SharedMemory{}
+	sm.Initialize(logging.NoLog{}, memdb.New())
+
+	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+
+	tx, err := vm.newImportTx(
+		defaultNonce+1,
+		testNetworkID,
+		[]*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: utxoID,
+			Asset:  ava.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   amount,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+		[][]*crypto.PrivateKeySECP256K1R{[]*crypto.PrivateKeySECP256K1R{key}},
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.Lock.Lock()
+	defer vm.Ctx.Lock.Unlock()
+
+	vm.AVA = assetID
+
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+	if _, err := vm.BuildBlock(); err == nil {
+		t.Fatalf("should have errored due to missing utxos")
+	}
+
+	// Provide the avm UTXO:
+
+	bID := ids.Empty // TODO: Needs to be set to the platform chain
+	smDB := vm.Ctx.SharedMemory.GetDatabase(bID)
+
+	utxo := &ava.UTXO{
+		UTXOID: utxoID,
+		Asset:  ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{key.PublicKey().Address()},
+			},
+		},
+	}
+
+	state := ava.NewPrefixedState(smDB, Codec)
+	if err := state.SetAVMUTXO(utxoID.InputID(), utxo); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	blk.Accept()
+
+	smDB = vm.Ctx.SharedMemory.GetDatabase(bID)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+
+	state = ava.NewPrefixedState(smDB, vm.codec)
+	if _, err := state.AVMUTXO(utxoID.InputID()); err == nil {
+		t.Fatalf("shouldn't have been able to read the utxo")
+	}
+}
+
+// test optimistic asset import
+func TestOptimisticAtomicImport(t *testing.T) {
+	vm := defaultVM()
+
+	utxoID := ava.UTXOID{
+		TxID:        ids.Empty.Prefix(0),
+		OutputIndex: 1,
+	}
+	assetID := ids.Empty.Prefix(1)
+	amount := uint64(50000)
+	key := keys[0]
+
+	sm := &atomic.SharedMemory{}
+	sm.Initialize(logging.NoLog{}, memdb.New())
+
+	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+
+	tx, err := vm.newImportTx(
+		defaultNonce+1,
+		testNetworkID,
+		[]*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: utxoID,
+			Asset:  ava.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   amount,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+		[][]*crypto.PrivateKeySECP256K1R{[]*crypto.PrivateKeySECP256K1R{key}},
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.Lock.Lock()
+	defer vm.Ctx.Lock.Unlock()
+
+	vm.AVA = assetID
+
+	blk, err := vm.newAtomicBlock(vm.Preferred(), tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err == nil {
+		t.Fatalf("should have errored due to an invalid atomic utxo")
+	}
+
+	previousAccount, err := vm.getAccount(vm.DB, key.PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blk.Accept()
+
+	newAccount, err := vm.getAccount(vm.DB, key.PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if newAccount.Balance != previousAccount.Balance+amount {
+		t.Fatalf("failed to provide funds")
+	}
+
+	bID := ids.Empty // TODO: Needs to be set to the platform chain
+	smDB := vm.Ctx.SharedMemory.GetDatabase(bID)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+
+	state := ava.NewPrefixedState(smDB, Codec)
+	if _, err := state.AVMStatus(utxoID.InputID()); err != nil {
+		t.Fatal(err)
+	}
 }

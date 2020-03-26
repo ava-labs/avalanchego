@@ -8,11 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -639,7 +637,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		return errInsufficientFunds
 	}
 
-	SortTransferableInputsWithSigners(ins, keys)
+	ava.SortTransferableInputsWithSigners(ins, keys)
 
 	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
 		Asset: ava.Asset{ID: assetID},
@@ -712,42 +710,6 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 	reply.TxID = txID
 	return nil
-}
-
-type innerSortTransferableInputsWithSigners struct {
-	ins     []*ava.TransferableInput
-	signers [][]*crypto.PrivateKeySECP256K1R
-}
-
-func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
-	iID, iIndex := ins.ins[i].InputSource()
-	jID, jIndex := ins.ins[j].InputSource()
-
-	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
-	case -1:
-		return true
-	case 0:
-		return iIndex < jIndex
-	default:
-		return false
-	}
-}
-func (ins *innerSortTransferableInputsWithSigners) Len() int { return len(ins.ins) }
-func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
-	ins.ins[j], ins.ins[i] = ins.ins[i], ins.ins[j]
-	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
-}
-
-// SortTransferableInputsWithSigners sorts the inputs and signers based on the
-// input's utxo ID
-func SortTransferableInputsWithSigners(ins []*ava.TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
-	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
-}
-
-// IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
-// sorted and unique
-func IsSortedAndUniqueTransferableInputsWithSigners(ins []*ava.TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
-	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 
 // CreateMintTxArgs are arguments for passing into CreateMintTx requests

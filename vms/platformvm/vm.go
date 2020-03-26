@@ -135,8 +135,8 @@ func init() {
 		Codec.RegisterType(&UnsignedImportTx{}),
 		Codec.RegisterType(&ImportTx{}),
 
-		// Codec.RegisterType(&UnsignedExportTx{}),
-		// Codec.RegisterType(&ExportTx{}),
+		Codec.RegisterType(&UnsignedExportTx{}),
+		Codec.RegisterType(&ExportTx{}),
 
 		Codec.RegisterType(&advanceTimeTx{}),
 		Codec.RegisterType(&rewardValidatorTx{}),
@@ -158,7 +158,8 @@ type VM struct {
 	// AVA asset ID
 	AVA ids.ID
 
-	fx secp256k1fx.Fx
+	fx    secp256k1fx.Fx
+	codec codec.Codec
 
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
@@ -173,6 +174,7 @@ type VM struct {
 	// Transactions that have not been put into blocks yet
 	unissuedEvents      *EventHeap
 	unissuedDecisionTxs []DecisionTx
+	unissuedAtomicTxs   []AtomicTx
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
@@ -199,6 +201,12 @@ func (vm *VM) Initialize(
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
 		return err
 	}
+
+	vm.codec = codec.NewDefault()
+	if err := vm.fx.Initialize(vm); err != nil {
+		return err
+	}
+	vm.codec = Codec
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()
@@ -344,6 +352,24 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		var txs []DecisionTx
 		txs, vm.unissuedDecisionTxs = vm.unissuedDecisionTxs[:numTxs], vm.unissuedDecisionTxs[numTxs:]
 		blk, err := vm.newStandardBlock(preferredID, txs)
+		if err != nil {
+			return nil, err
+		}
+		if err := blk.Verify(); err != nil {
+			vm.resetTimer()
+			return nil, err
+		}
+		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+			return nil, err
+		}
+		return blk, vm.DB.Commit()
+	}
+
+	// If there is a pending atomic tx, build a block with it
+	if len(vm.unissuedAtomicTxs) > 0 {
+		tx := vm.unissuedAtomicTxs[0]
+		vm.unissuedAtomicTxs = vm.unissuedAtomicTxs[1:]
+		blk, err := vm.newAtomicBlock(preferredID, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -521,9 +547,9 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 // Check if there is a block ready to be added to consensus
 // If so, notify the consensus engine
 func (vm *VM) resetTimer() {
-	// If there is a pending CreateChainTx, trigger building of a block
-	// with that transaction
-	if len(vm.unissuedDecisionTxs) > 0 {
+	// If there is a pending transaction, trigger building of a block with that
+	// transaction
+	if len(vm.unissuedDecisionTxs) > 0 || len(vm.unissuedAtomicTxs) > 0 {
 		vm.SnowmanVM.NotifyBlockReady()
 		return
 	}
@@ -705,3 +731,9 @@ func (vm *VM) updateValidators(subnetID ids.ID) error {
 	validatorSet.Set(validators)
 	return nil
 }
+
+// Codec ...
+func (vm *VM) Codec() codec.Codec { return vm.codec }
+
+// Clock ...
+func (vm *VM) Clock() *timer.Clock { return &vm.clock }

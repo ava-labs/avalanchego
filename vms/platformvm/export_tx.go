@@ -3,166 +3,199 @@
 
 package platformvm
 
-// import (
-// 	"fmt"
+import (
+	"errors"
 
-// 	"github.com/ava-labs/gecko/chains"
-// 	"github.com/ava-labs/gecko/database"
-// 	"github.com/ava-labs/gecko/ids"
-// 	"github.com/ava-labs/gecko/utils/crypto"
-// 	"github.com/ava-labs/gecko/utils/hashing"
-// 	"github.com/ava-labs/gecko/vms/components/ava"
-// )
+	"github.com/ava-labs/gecko/chains/atomic"
+	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/ava"
+)
 
-// // UnsignedExportTx is an unsigned ExportTx
-// type UnsignedExportTx struct {
-// 	// ID of the network this blockchain exists on
-// 	NetworkID uint32 `serialize:"true"`
+var (
+	errNoExportOutputs  = errors.New("no export outputs")
+	errOutputsNotSorted = errors.New("outputs not sorted")
+)
 
-// 	// Next unused nonce of account paying the transaction fee for this transaction.
-// 	// Currently unused, as there are no tx fees.
-// 	Nonce uint64 `serialize:"true"`
+// UnsignedExportTx is an unsigned ExportTx
+type UnsignedExportTx struct {
+	// ID of the network this blockchain exists on
+	NetworkID uint32 `serialize:"true"`
 
-// 	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
-// }
+	// Next unused nonce of account paying for this transaction.
+	Nonce uint64 `serialize:"true"`
 
-// // ExportTx exports funds to the AVM
-// type ExportTx struct {
-// 	UnsignedExportTx `serialize:"true"`
+	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
+}
 
-// 	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+// ExportTx exports funds to the AVM
+type ExportTx struct {
+	UnsignedExportTx `serialize:"true"`
 
-// 	vm    *VM
-// 	id    ids.ID
-// 	key   crypto.PublicKey // public key of transaction signer
-// 	bytes []byte
-// }
+	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
 
-// func (tx *ExportTx) initialize(vm *VM) error {
-// 	tx.vm = vm
-// 	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
-// 	tx.bytes = txBytes
-// 	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
-// 	return err
-// }
+	vm    *VM
+	id    ids.ID
+	key   crypto.PublicKey // public key of transaction signer
+	bytes []byte
+}
 
-// // ID of this transaction
-// func (tx *ExportTx) ID() ids.ID { return tx.id }
+func (tx *ExportTx) initialize(vm *VM) error {
+	tx.vm = vm
+	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
+	tx.bytes = txBytes
+	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
+	return err
+}
 
-// // Key returns the public key of the signer of this transaction
-// // Precondition: tx.Verify() has been called and returned nil
-// func (tx *ExportTx) Key() crypto.PublicKey { return tx.key }
+// ID of this transaction
+func (tx *ExportTx) ID() ids.ID { return tx.id }
 
-// // Bytes returns the byte representation of a CreateChainTx
-// func (tx *ExportTx) Bytes() []byte { return tx.bytes }
+// Key returns the public key of the signer of this transaction
+// Precondition: tx.Verify() has been called and returned nil
+func (tx *ExportTx) Key() crypto.PublicKey { return tx.key }
 
-// // InputUTXOs returns an empty set
-// func (tx *ExportTx) InputUTXOs() ids.Set { return ids.Set{} }
+// Bytes returns the byte representation of an ExportTx
+func (tx *ExportTx) Bytes() []byte { return tx.bytes }
 
-// // SyntacticVerify this transaction is well-formed
-// // Also populates [tx.Key] with the public key that signed this transaction
-// func (tx *ExportTx) SyntacticVerify() error {
-// 	switch {
-// 	case tx == nil:
-// 		return errNilTx
-// 	case tx.key != nil:
-// 		return nil // Only verify the transaction once
-// 	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
-// 		return errWrongNetworkID
-// 	case tx.id.IsZero():
-// 		return errInvalidID
-// 	}
+// InputUTXOs returns an empty set
+func (tx *ExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 
-// 	unsignedIntf := interface{}(&tx.UnsignedImportTx)
-// 	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr of unsigned tx
-// 	if err != nil {
-// 		return err
-// 	}
+// SyntacticVerify this transaction is well-formed
+// Also populates [tx.Key] with the public key that signed this transaction
+func (tx *ExportTx) SyntacticVerify() error {
+	switch {
+	case tx == nil:
+		return errNilTx
+	case tx.key != nil:
+		return nil // Only verify the transaction once
+	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
+		return errWrongNetworkID
+	case tx.id.IsZero():
+		return errInvalidID
+	case len(tx.Outs) == 0:
+		return errNoExportOutputs
+	}
 
-// 	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
-// 	if err != nil {
-// 		return err
-// 	}
-// 	tx.key = key
+	for _, out := range tx.Outs {
+		if err := out.Verify(); err != nil {
+			return err
+		}
+		if !out.AssetID().Equals(tx.vm.AVA) {
+			return errUnknownAsset
+		}
+	}
+	if !ava.IsSortedTransferableOutputs(tx.Outs, Codec) {
+		return errOutputsNotSorted
+	}
 
-// 	return nil
-// }
+	unsignedIntf := interface{}(&tx.UnsignedExportTx)
+	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr of unsigned tx
+	if err != nil {
+		return err
+	}
 
-// // SemanticVerify this transaction is valid.
-// func (tx *ExportTx) SemanticVerify(db database.Database) (func(), error) {
-// 	if err := tx.SyntacticVerify(); err != nil {
-// 		return nil, err
-// 	}
+	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
+	if err != nil {
+		return err
+	}
 
-// 	currentChains, err := tx.vm.getChains(db) // chains that currently exist
-// 	if err != nil {
-// 		return nil, errDBChains
-// 	}
-// 	for _, chain := range currentChains {
-// 		if chain.ID().Equals(tx.ID()) {
-// 			return nil, fmt.Errorf("chain with ID %s already exists", chain.ID())
-// 		}
-// 	}
-// 	currentChains = append(currentChains, tx) // add this new chain
-// 	if err := tx.vm.putChains(db, currentChains); err != nil {
-// 		return nil, err
-// 	}
+	tx.key = key
+	return nil
+}
 
-// 	// Deduct tx fee from payer's account
-// 	account, err := tx.vm.getAccount(db, tx.Key().Address())
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	account, err = account.Remove(0, tx.Nonce)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if err := tx.vm.putAccount(db, account); err != nil {
-// 		return nil, err
-// 	}
+// SemanticVerify this transaction is valid.
+func (tx *ExportTx) SemanticVerify(db database.Database) error {
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
-// 	// If this proposal is committed, create the new blockchain using the chain manager
-// 	onAccept := func() {
-// 		chainParams := chains.ChainParameters{
-// 			ID:          tx.ID(),
-// 			GenesisData: tx.GenesisData,
-// 			VMAlias:     tx.VMID.String(),
-// 		}
-// 		for _, fxID := range tx.FxIDs {
-// 			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-// 		}
-// 		// TODO: Not sure how else to make this not nil pointer error during tests
-// 		if tx.vm.ChainManager != nil {
-// 			tx.vm.ChainManager.CreateChain(chainParams)
-// 		}
-// 	}
+	amount := uint64(0)
+	for _, out := range tx.Outs {
+		newAmount, err := math.Add64(out.Out.Amount(), amount)
+		if err != nil {
+			return err
+		}
+		amount = newAmount
+	}
 
-// 	return onAccept, nil
-// }
+	accountID := tx.key.Address()
+	account, err := tx.vm.getAccount(db, accountID)
+	if err != nil {
+		return errDBAccount
+	}
 
-// func (vm *VM) newExportTx(nonce uint64, genesisData []byte, vmID ids.ID, fxIDs []ids.ID, chainName string, networkID uint32, key *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
-// 	tx := &CreateChainTx{
-// 		UnsignedCreateChainTx: UnsignedCreateChainTx{
-// 			NetworkID:   networkID,
-// 			Nonce:       nonce,
-// 			GenesisData: genesisData,
-// 			VMID:        vmID,
-// 			FxIDs:       fxIDs,
-// 			ChainName:   chainName,
-// 		},
-// 	}
+	account, err = account.Remove(amount, tx.Nonce)
+	if err != nil {
+		return err
+	}
+	return tx.vm.putAccount(db, account)
+}
 
-// 	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
-// 	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction
-// 	if err != nil {
-// 		return nil, err
-// 	}
+// Accept this transaction.
+func (tx *ExportTx) Accept(batch database.Batch) error {
+	txID := tx.ID()
 
-// 	sig, err := key.Sign(unsignedBytes)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	copy(tx.Sig[:], sig)
+	bID := ids.Empty // TODO: Needs to be set to the platform chain
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(bID)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(bID)
 
-// 	return tx, tx.initialize(vm)
-// }
+	vsmDB := versiondb.New(smDB)
+
+	state := ava.NewPrefixedState(vsmDB, Codec)
+	for i, out := range tx.Outs {
+		utxo := &ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(i),
+			},
+			Asset: ava.Asset{ID: out.AssetID()},
+			Out:   out.Out,
+		}
+
+		utxoID := utxo.InputID()
+		if _, err := state.PlatformStatus(utxoID); err == nil {
+			if err := state.SetPlatformStatus(utxoID, choices.Unknown); err != nil {
+				return err
+			}
+		} else if err := state.SetPlatformUTXO(utxoID, utxo); err != nil {
+			return err
+		}
+	}
+
+	sharedBatch, err := vsmDB.CommitBatch()
+	if err != nil {
+		return err
+	}
+
+	return atomic.WriteAll(batch, sharedBatch)
+}
+
+func (vm *VM) newExportTx(nonce uint64, networkID uint32, outs []*ava.TransferableOutput, from *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
+	ava.SortTransferableOutputs(outs, Codec)
+
+	tx := &ExportTx{UnsignedExportTx: UnsignedExportTx{
+		NetworkID: networkID,
+		Nonce:     nonce,
+		Outs:      outs,
+	}}
+
+	unsignedIntf := interface{}(&tx.UnsignedExportTx)
+	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := key.Sign(unsignedBytes)
+	if err != nil {
+		return nil, err
+	}
+	copy(tx.Sig[:], sig)
+
+	return tx, tx.initialize(vm)
+}

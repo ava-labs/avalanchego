@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -32,8 +34,8 @@ type UnsignedImportTx struct {
 	// ID of the network this blockchain exists on
 	NetworkID uint32 `serialize:"true"`
 
-	// Next unused nonce of account paying the transaction fee for this transaction.
-	// Currently unused, as there are no tx fees.
+	// Next unused nonce of account paying the transaction fee and receiving the
+	// inputs of this transaction.
 	Nonce uint64 `serialize:"true"`
 
 	// Account that this transaction is being sent by. This is needed to ensure the Credentials are replay safe.
@@ -49,10 +51,11 @@ type ImportTx struct {
 	Sig   [crypto.SECP256K1RSigLen]byte `serialize:"true"`
 	Creds []verify.Verifiable           `serialize:"true"` // The credentials of this transaction
 
-	vm    *VM
-	id    ids.ID
-	key   crypto.PublicKey // public key of transaction signer
-	bytes []byte
+	vm            *VM
+	id            ids.ID
+	key           crypto.PublicKey // public key of transaction signer
+	unsignedBytes []byte
+	bytes         []byte
 }
 
 func (tx *ImportTx) initialize(vm *VM) error {
@@ -70,7 +73,10 @@ func (tx *ImportTx) ID() ids.ID { return tx.id }
 // Precondition: tx.Verify() has been called and returned nil
 func (tx *ImportTx) Key() crypto.PublicKey { return tx.key }
 
-// Bytes returns the byte representation of a CreateChainTx
+// UnsignedBytes returns the unsigned byte representation of an ImportTx
+func (tx *ImportTx) UnsignedBytes() []byte { return tx.unsignedBytes }
+
+// Bytes returns the byte representation of an ImportTx
 func (tx *ImportTx) Bytes() []byte { return tx.bytes }
 
 // InputUTXOs returns an empty set
@@ -139,6 +145,7 @@ func (tx *ImportTx) SyntacticVerify() error {
 	}
 
 	tx.key = key
+	tx.unsignedBytes = unsignedBytes
 	return nil
 }
 
@@ -148,36 +155,13 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 		return err
 	}
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(bID)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(bID)
-
-	state := ava.NewPrefixedState(smDB, Codec)
-
 	amount := uint64(0)
-	for i, in := range tx.Ins {
+	for _, in := range tx.Ins {
 		newAmount, err := math.Add64(in.In.Amount(), amount)
 		if err != nil {
 			return err
 		}
 		amount = newAmount
-
-		cred := tx.Creds[i]
-
-		utxoID := in.UTXOID.InputID()
-		utxo, err := state.AVMUTXO(utxoID)
-		if err != nil {
-			return err
-		}
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-
-		if err := tx.vm.fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
-			return err
-		}
 	}
 
 	// Deduct tx fee from payer's account
@@ -193,7 +177,36 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 	if err != nil {
 		return err
 	}
-	return tx.vm.putAccount(db, account)
+	if err := tx.vm.putAccount(db, account); err != nil {
+		return err
+	}
+
+	bID := ids.Empty // TODO: Needs to be set to the platform chain
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(bID)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+
+	state := ava.NewPrefixedState(smDB, Codec)
+
+	for i, in := range tx.Ins {
+		cred := tx.Creds[i]
+
+		utxoID := in.UTXOID.InputID()
+		utxo, err := state.AVMUTXO(utxoID)
+		if err != nil {
+			return err
+		}
+		utxoAssetID := utxo.AssetID()
+		inAssetID := in.AssetID()
+		if !utxoAssetID.Equals(inAssetID) {
+			return errAssetIDMismatch
+		}
+
+		if err := tx.vm.fx.VerifyTransfer(tx, utxo.Out, in.In, cred); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Accept this transaction.
@@ -224,25 +237,42 @@ func (tx *ImportTx) Accept(batch database.Batch) error {
 	return atomic.WriteAll(batch, sharedBatch)
 }
 
-func (vm *VM) newImportTx(nonce uint64, genesisData []byte, vmID ids.ID, fxIDs []ids.ID, chainName string, networkID uint32, key *crypto.PrivateKeySECP256K1R) (*ImportTx, error) {
-	tx := &CreateChainTx{
-		UnsignedCreateChainTx: UnsignedCreateChainTx{
-			NetworkID:   networkID,
-			Nonce:       nonce,
-			GenesisData: genesisData,
-			VMID:        vmID,
-			FxIDs:       fxIDs,
-			ChainName:   chainName,
-		},
-	}
+func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.TransferableInput, from [][]*crypto.PrivateKeySECP256K1R, to *crypto.PrivateKeySECP256K1R) (*ImportTx, error) {
+	ava.SortTransferableInputsWithSigners(ins, from)
 
-	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
+	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
+		NetworkID: networkID,
+		Nonce:     nonce,
+		Ins:       ins,
+	}}
+
+	pubkeyBytes := key.PublicKey().Bytes()
+	copy(tx.Account[:], pubkeyBytes)
+
+	unsignedIntf := interface{}(&tx.UnsignedImportTx)
 	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction
 	if err != nil {
 		return nil, err
 	}
 
-	sig, err := key.Sign(unsignedBytes)
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	for _, credKeys := range from {
+		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return nil, fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	sig, err := key.SignHash(hash)
 	if err != nil {
 		return nil, err
 	}

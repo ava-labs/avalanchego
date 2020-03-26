@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -142,4 +143,40 @@ func SortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTrans
 // IsSortedAndUniqueTransferableInputs ...
 func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
 	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
+}
+
+type innerSortTransferableInputsWithSigners struct {
+	ins     []*TransferableInput
+	signers [][]*crypto.PrivateKeySECP256K1R
+}
+
+func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
+	iID, iIndex := ins.ins[i].InputSource()
+	jID, jIndex := ins.ins[j].InputSource()
+
+	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
+	case -1:
+		return true
+	case 0:
+		return iIndex < jIndex
+	default:
+		return false
+	}
+}
+func (ins *innerSortTransferableInputsWithSigners) Len() int { return len(ins.ins) }
+func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
+	ins.ins[j], ins.ins[i] = ins.ins[i], ins.ins[j]
+	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
+}
+
+// SortTransferableInputsWithSigners sorts the inputs and signers based on the
+// input's utxo ID
+func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
+	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
+}
+
+// IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
+// sorted and unique
+func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
+	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
