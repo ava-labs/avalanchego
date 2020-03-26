@@ -324,6 +324,11 @@ func (c codec) unmarshal(p *wrappers.Packer, field reflect.Value) error {
 		if !ok {
 			return errUnmarshalUnregisteredType
 		}
+		// Ensure struct actually does implement the interface
+		fieldType := field.Type()
+		if !typ.Implements(fieldType) {
+			return fmt.Errorf("%s does not implement interface %s", typ, fieldType)
+		}
 		concreteInstancePtr := reflect.New(typ) // instance of the proper type
 		// Unmarshal into the struct
 		if err := c.unmarshal(p, concreteInstancePtr.Elem()); err != nil {
