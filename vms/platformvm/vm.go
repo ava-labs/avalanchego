@@ -150,13 +150,16 @@ func init() {
 type VM struct {
 	*core.SnowmanVM
 
-	Validators validators.Manager
+	validators validators.Manager
 
 	// The node's chain manager
-	ChainManager chains.Manager
+	chainManager chains.Manager
 
 	// AVA asset ID
-	AVA ids.ID
+	ava ids.ID
+
+	// AVM is the ID of the ava virtual machine
+	avm ids.ID
 
 	fx    secp256k1fx.Fx
 	codec codec.Codec
@@ -325,7 +328,7 @@ func (vm *VM) initBlockchains() error {
 		for _, fxID := range chain.FxIDs {
 			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
 		}
-		vm.ChainManager.CreateChain(chainParams)
+		vm.chainManager.CreateChain(chainParams)
 	}
 	return nil
 }
@@ -717,7 +720,7 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 }
 
 func (vm *VM) updateValidators(subnetID ids.ID) error {
-	validatorSet, ok := vm.Validators.GetValidatorSet(subnetID)
+	validatorSet, ok := vm.validators.GetValidatorSet(subnetID)
 	if !ok {
 		return fmt.Errorf("couldn't get the validator sampler of the %s subnet", subnetID)
 	}

@@ -112,9 +112,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		return err
 	}
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
 
@@ -138,6 +137,9 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		if !utxoAssetID.Equals(inAssetID) {
 			return errAssetIDMismatch
 		}
+		if !utxoAssetID.Equals(vm.ava) {
+			return errWrongAssetID
+		}
 
 		if !vm.verifyFxUsage(fxIndex, inAssetID) {
 			return errIncompatibleFx
@@ -152,9 +154,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
 func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
 
 	vsmDB := versiondb.New(smDB)
 

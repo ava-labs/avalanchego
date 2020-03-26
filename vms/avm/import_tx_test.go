@@ -130,8 +130,16 @@ func TestIssueImportTx(t *testing.T) {
 	ctx.ChainID = chainID
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	avaID := genesisTx.ID()
+	platformID := ids.Empty.Prefix(0)
+
 	ctx.Lock.Lock()
-	vm := &VM{}
+	vm := &VM{
+		ava:      avaID,
+		platform: platformID,
+	}
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -149,8 +157,6 @@ func TestIssueImportTx(t *testing.T) {
 
 	key := keys[0]
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-
 	utxoID := ava.UTXOID{
 		TxID: ids.NewID([32]byte{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
@@ -167,7 +173,7 @@ func TestIssueImportTx(t *testing.T) {
 		},
 		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: genesisTx.ID()},
+			Asset:  ava.Asset{ID: avaID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   1000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -205,12 +211,11 @@ func TestIssueImportTx(t *testing.T) {
 
 	// Provide the platform UTXO:
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
 	utxo := &ava.UTXO{
 		UTXOID: utxoID,
-		Asset:  ava.Asset{ID: genesisTx.ID()},
+		Asset:  ava.Asset{ID: avaID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1000,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -225,7 +230,7 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
 	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
 		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
@@ -246,8 +251,8 @@ func TestIssueImportTx(t *testing.T) {
 	parsedTx := txs[0]
 	parsedTx.Accept()
 
-	smDB = vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
 	state = ava.NewPrefixedState(smDB, vm.codec)
 	if _, err := state.PlatformUTXO(utxoID.InputID()); err == nil {
@@ -269,10 +274,12 @@ func TestForceAcceptImportTx(t *testing.T) {
 	ctx.ChainID = chainID
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
+	platformID := ids.Empty.Prefix(0)
+
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	vm := &VM{}
+	vm := &VM{platform: platformID}
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -351,9 +358,8 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	parsedTx.Accept()
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
 	utxoSource := utxoID.InputID()

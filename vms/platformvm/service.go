@@ -248,7 +248,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		args.SubnetID = DefaultSubnetID
 	}
 
-	validators, ok := service.vm.Validators.GetValidatorSet(args.SubnetID)
+	validators, ok := service.vm.validators.GetValidatorSet(args.SubnetID)
 	if !ok {
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}
@@ -902,14 +902,14 @@ type CreateBlockchainReply struct {
 
 // CreateBlockchain issues a transaction to the network to create a new blockchain
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, reply *CreateBlockchainReply) error {
-	vmID, err := service.vm.ChainManager.LookupVM(args.VMID)
+	vmID, err := service.vm.chainManager.LookupVM(args.VMID)
 	if err != nil {
 		return fmt.Errorf("no VM with ID '%s' found", args.VMID)
 	}
 
 	fxIDs := []ids.ID(nil)
 	for _, fxIDStr := range args.FxIDs {
-		fxID, err := service.vm.ChainManager.LookupVM(fxIDStr)
+		fxID, err := service.vm.chainManager.LookupVM(fxIDStr)
 		if err != nil {
 			return fmt.Errorf("no FX with ID '%s' found", fxIDStr)
 		}
@@ -974,7 +974,7 @@ type GetBlockchainStatusReply struct {
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
 func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
-	_, err := service.vm.ChainManager.Lookup(args.BlockchainID)
+	_, err := service.vm.chainManager.Lookup(args.BlockchainID)
 	if err == nil {
 		reply.Status = Validating
 		return nil

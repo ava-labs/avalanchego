@@ -176,7 +176,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		return nil, errors.New("insufficient funds")
 	}
 
-	avm.SortTransferableInputsWithSigners(ins, keys)
+	ava.SortTransferableInputsWithSigners(ins, keys)
 
 	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
 		Asset: ava.Asset{ID: assetID},

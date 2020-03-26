@@ -86,7 +86,7 @@ func (tx *ExportTx) SyntacticVerify() error {
 		if err := out.Verify(); err != nil {
 			return err
 		}
-		if !out.AssetID().Equals(tx.vm.AVA) {
+		if !out.AssetID().Equals(tx.vm.ava) {
 			return errUnknownAsset
 		}
 	}
@@ -141,9 +141,8 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 func (tx *ExportTx) Accept(batch database.Batch) error {
 	txID := tx.ID()
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(bID)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
 
 	vsmDB := versiondb.New(smDB)
 

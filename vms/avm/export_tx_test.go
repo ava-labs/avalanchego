@@ -130,8 +130,16 @@ func TestIssueExportTx(t *testing.T) {
 	ctx.ChainID = chainID
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	avaID := genesisTx.ID()
+	platformID := ids.Empty.Prefix(0)
+
 	ctx.Lock.Lock()
-	vm := &VM{}
+	vm := &VM{
+		ava:      avaID,
+		platform: platformID,
+	}
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -149,8 +157,6 @@ func TestIssueExportTx(t *testing.T) {
 
 	key := keys[0]
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-
 	tx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
@@ -158,17 +164,17 @@ func TestIssueExportTx(t *testing.T) {
 		},
 		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: ava.UTXOID{
-				TxID:        genesisTx.ID(),
+				TxID:        avaID,
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: ava.Asset{ID: avaID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   50000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		}},
 		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -228,9 +234,8 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	parsedTx.Accept()
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
 
@@ -261,8 +266,16 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	ctx.ChainID = chainID
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	avaID := genesisTx.ID()
+	platformID := ids.Empty.Prefix(0)
+
 	ctx.Lock.Lock()
-	vm := &VM{}
+	vm := &VM{
+		ava:      avaID,
+		platform: platformID,
+	}
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -280,8 +293,6 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	key := keys[0]
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-
 	tx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
@@ -289,17 +300,17 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		},
 		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: ava.UTXOID{
-				TxID:        genesisTx.ID(),
+				TxID:        avaID,
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: ava.Asset{ID: avaID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   50000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		}},
 		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -358,8 +369,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
 
@@ -372,12 +382,12 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
 	parsedTx.Accept()
 
-	smDB = vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
 	state = ava.NewPrefixedState(smDB, vm.codec)
 

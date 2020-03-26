@@ -112,6 +112,9 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		if !utxoAssetID.Equals(inAssetID) {
 			return errAssetIDMismatch
 		}
+		if !utxoAssetID.Equals(vm.ava) {
+			return errWrongAssetID
+		}
 
 		if !vm.verifyFxUsage(fxIndex, inAssetID) {
 			return errIncompatibleFx
@@ -128,9 +131,8 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	txID := t.ID()
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.ctx.SharedMemory.GetDatabase(bID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
 
 	vsmDB := versiondb.New(smDB)
 

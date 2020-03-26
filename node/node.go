@@ -326,7 +326,10 @@ func (n *Node) initNodeID() error {
 // its factory needs to reference n.chainManager, which is nil right now
 func (n *Node) initVMManager() {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
-	n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{})
+	n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
+		AVA:      genesis.AVAAssetID(n.Config.NetworkID),
+		Platform: ids.Empty,
+	})
 	n.vmManager.RegisterVMFactory(evm.ID, &evm.Factory{})
 	n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee})
 	n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{})
@@ -362,6 +365,8 @@ func (n *Node) initChains() {
 		/*vmFactory=*/ &platformvm.Factory{
 			ChainManager: n.chainManager,
 			Validators:   vdrs,
+			AVA:          genesis.AVAAssetID(n.Config.NetworkID),
+			AVM:          genesis.VMGenesis(n.Config.NetworkID, avm.ID).ID(),
 		},
 	)
 

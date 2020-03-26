@@ -120,8 +120,8 @@ func defaultVM() *VM {
 	}
 
 	defaultSubnet := validators.NewSet()
-	vm.Validators = validators.NewManager()
-	vm.Validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
+	vm.validators = validators.NewManager()
+	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
 	db := memdb.New()
@@ -1068,11 +1068,12 @@ func TestCreateSubnet(t *testing.T) {
 func TestAtomicImport(t *testing.T) {
 	vm := defaultVM()
 
+	avmID := ids.Empty.Prefix(0)
 	utxoID := ava.UTXOID{
-		TxID:        ids.Empty.Prefix(0),
+		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
-	assetID := ids.Empty.Prefix(1)
+	assetID := ids.Empty.Prefix(2)
 	amount := uint64(50000)
 	key := keys[0]
 
@@ -1102,7 +1103,8 @@ func TestAtomicImport(t *testing.T) {
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 
-	vm.AVA = assetID
+	vm.ava = assetID
+	vm.avm = avmID
 
 	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
 	if _, err := vm.BuildBlock(); err == nil {
@@ -1111,8 +1113,7 @@ func TestAtomicImport(t *testing.T) {
 
 	// Provide the avm UTXO:
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.Ctx.SharedMemory.GetDatabase(bID)
+	smDB := vm.Ctx.SharedMemory.GetDatabase(avmID)
 
 	utxo := &ava.UTXO{
 		UTXOID: utxoID,
@@ -1131,7 +1132,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+	vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
 
 	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
 	blk, err := vm.BuildBlock()
@@ -1145,8 +1146,8 @@ func TestAtomicImport(t *testing.T) {
 
 	blk.Accept()
 
-	smDB = vm.Ctx.SharedMemory.GetDatabase(bID)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB = vm.Ctx.SharedMemory.GetDatabase(avmID)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
 
 	state = ava.NewPrefixedState(smDB, vm.codec)
 	if _, err := state.AVMUTXO(utxoID.InputID()); err == nil {
@@ -1158,11 +1159,12 @@ func TestAtomicImport(t *testing.T) {
 func TestOptimisticAtomicImport(t *testing.T) {
 	vm := defaultVM()
 
+	avmID := ids.Empty.Prefix(0)
 	utxoID := ava.UTXOID{
-		TxID:        ids.Empty.Prefix(0),
+		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
-	assetID := ids.Empty.Prefix(1)
+	assetID := ids.Empty.Prefix(2)
 	amount := uint64(50000)
 	key := keys[0]
 
@@ -1192,7 +1194,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 
-	vm.AVA = assetID
+	vm.ava = assetID
+	vm.avm = avmID
 
 	blk, err := vm.newAtomicBlock(vm.Preferred(), tx)
 	if err != nil {
@@ -1219,9 +1222,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatalf("failed to provide funds")
 	}
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := vm.Ctx.SharedMemory.GetDatabase(bID)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := vm.Ctx.SharedMemory.GetDatabase(avmID)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
 
 	state := ava.NewPrefixedState(smDB, Codec)
 	if _, err := state.AVMStatus(utxoID.InputID()); err != nil {

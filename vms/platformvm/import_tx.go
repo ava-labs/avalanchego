@@ -110,7 +110,7 @@ func (tx *ImportTx) SyntacticVerify() error {
 		if err := in.Verify(); err != nil {
 			return err
 		}
-		if !in.AssetID().Equals(tx.vm.AVA) {
+		if !in.AssetID().Equals(tx.vm.ava) {
 			return errUnknownAsset
 		}
 	}
@@ -181,9 +181,8 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 		return err
 	}
 
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(bID)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
 
 	state := ava.NewPrefixedState(smDB, Codec)
 
@@ -211,9 +210,8 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 
 // Accept this transaction.
 func (tx *ImportTx) Accept(batch database.Batch) error {
-	bID := ids.Empty // TODO: Needs to be set to the platform chain
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(bID)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(bID)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
 
 	vsmDB := versiondb.New(smDB)
 

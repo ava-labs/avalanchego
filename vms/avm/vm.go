@@ -50,6 +50,9 @@ var (
 type VM struct {
 	ids.Aliaser
 
+	ava      ids.ID
+	platform ids.ID
+
 	// Contains information of where this VM is executing
 	ctx *snow.Context
 
