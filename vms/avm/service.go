@@ -219,7 +219,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 	for _, utxo := range utxos {
 		if utxo.AssetID().Equals(assetID) {
-			transferable, ok := utxo.Out.(FxTransferable)
+			transferable, ok := utxo.Out.(ava.Transferable)
 			if !ok {
 				continue
 			}
@@ -601,7 +601,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 	amountSpent := uint64(0)
 	time := service.vm.clock.Unix()
 
-	ins := []*TransferableInput{}
+	ins := []*ava.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(assetID) {
@@ -611,7 +611,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(FxTransferable)
+		input, ok := inputIntf.(ava.Transferable)
 		if !ok {
 			continue
 		}
@@ -621,7 +621,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		}
 		amountSpent = spent
 
-		in := &TransferableInput{
+		in := &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  ava.Asset{ID: assetID},
 			In:     input,
@@ -641,38 +641,34 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 	SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*TransferableOutput{
-		&TransferableOutput{
-			Asset: ava.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:      uint64(args.Amount),
-				Locktime: 0,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
-				},
+	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      uint64(args.Amount),
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
 			},
 		},
-	}
+	}}
 
 	if amountSpent > uint64(args.Amount) {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs,
-			&TransferableOutput{
-				Asset: ava.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:      amountSpent - uint64(args.Amount),
-					Locktime: 0,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      amountSpent - uint64(args.Amount),
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
 				},
 			},
-		)
+		})
 	}
 
-	SortTransferableOutputs(outs, service.vm.codec)
+	ava.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{
 		UnsignedTx: &BaseTx{
@@ -719,7 +715,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 }
 
 type innerSortTransferableInputsWithSigners struct {
-	ins     []*TransferableInput
+	ins     []*ava.TransferableInput
 	signers [][]*crypto.PrivateKeySECP256K1R
 }
 
@@ -744,13 +740,13 @@ func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
 
 // SortTransferableInputsWithSigners sorts the inputs and signers based on the
 // input's utxo ID
-func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
+func SortTransferableInputsWithSigners(ins []*ava.TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
 	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 
 // IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
 // sorted and unique
-func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
+func IsSortedAndUniqueTransferableInputsWithSigners(ins []*ava.TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
 	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 

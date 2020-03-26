@@ -31,10 +31,10 @@ var (
 type BaseTx struct {
 	ava.Metadata
 
-	NetID uint32                `serialize:"true"` // ID of the network this chain lives on
-	BCID  ids.ID                `serialize:"true"` // ID of the chain on which this transaction exists (prevents replay attacks)
-	Outs  []*TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins   []*TransferableInput  `serialize:"true"` // The inputs to this transaction
+	NetID uint32                    `serialize:"true"` // ID of the network this chain lives on
+	BCID  ids.ID                    `serialize:"true"` // ID of the chain on which this transaction exists (prevents replay attacks)
+	Outs  []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
+	Ins   []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
 }
 
 // NetworkID is the ID of the network on which this transaction exists
@@ -45,11 +45,11 @@ func (t *BaseTx) ChainID() ids.ID { return t.BCID }
 
 // Outputs track which outputs this transaction is producing. The returned array
 // should not be modified.
-func (t *BaseTx) Outputs() []*TransferableOutput { return t.Outs }
+func (t *BaseTx) Outputs() []*ava.TransferableOutput { return t.Outs }
 
 // Inputs track which UTXOs this transaction is consuming. The returned array
 // should not be modified.
-func (t *BaseTx) Inputs() []*TransferableInput { return t.Ins }
+func (t *BaseTx) Inputs() []*ava.TransferableInput { return t.Ins }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
 func (t *BaseTx) InputUTXOs() []*ava.UTXOID {
@@ -104,7 +104,7 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !IsSortedTransferableOutputs(t.Outs, c) {
+	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -114,7 +114,7 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		}
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !isSortedAndUniqueTransferableInputs(t.Ins) {
+	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 

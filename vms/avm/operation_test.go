@@ -53,14 +53,14 @@ func TestOperationVerifyInputsNotSorted(t *testing.T) {
 					TxID:        ids.Empty,
 					OutputIndex: 1,
 				},
-				In: &testVerifiable{},
+				In: &ava.TestVerifiable{},
 			},
 			&OperableInput{
 				UTXOID: ava.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
-				In: &testVerifiable{},
+				In: &ava.TestVerifiable{},
 			},
 		},
 	}
@@ -71,13 +71,13 @@ func TestOperationVerifyInputsNotSorted(t *testing.T) {
 
 func TestOperationVerifyOutputsNotSorted(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&TestTransferable{})
+	c.RegisterType(&ava.TestTransferable{})
 
 	op := &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
 		Outs: []verify.Verifiable{
-			&TestTransferable{Val: 1},
-			&TestTransferable{Val: 0},
+			&ava.TestTransferable{Val: 1},
+			&ava.TestTransferable{Val: 0},
 		},
 	}
 	if err := op.Verify(c); err == nil {
@@ -90,7 +90,7 @@ func TestOperationVerify(t *testing.T) {
 	op := &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
 		Outs: []verify.Verifiable{
-			&testVerifiable{},
+			&ava.TestVerifiable{},
 		},
 	}
 	if err := op.Verify(c); err != nil {
@@ -100,7 +100,7 @@ func TestOperationVerify(t *testing.T) {
 
 func TestOperationSorting(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&testVerifiable{})
+	c.RegisterType(&ava.TestVerifiable{})
 
 	ops := []*Operation{
 		&Operation{
@@ -111,7 +111,7 @@ func TestOperationSorting(t *testing.T) {
 						TxID:        ids.Empty,
 						OutputIndex: 1,
 					},
-					In: &testVerifiable{},
+					In: &ava.TestVerifiable{},
 				},
 			},
 		},
@@ -123,7 +123,7 @@ func TestOperationSorting(t *testing.T) {
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					In: &testVerifiable{},
+					In: &ava.TestVerifiable{},
 				},
 			},
 		},
@@ -143,7 +143,7 @@ func TestOperationSorting(t *testing.T) {
 					TxID:        ids.Empty,
 					OutputIndex: 1,
 				},
-				In: &testVerifiable{},
+				In: &ava.TestVerifiable{},
 			},
 		},
 	})

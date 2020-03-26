@@ -72,7 +72,7 @@ func TestExportTxSerialization(t *testing.T) {
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
 		},
-		Ins: []*TransferableInput{&TransferableInput{
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -156,7 +156,7 @@ func TestIssueExportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*TransferableInput{&TransferableInput{
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: ava.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
@@ -167,7 +167,7 @@ func TestIssueExportTx(t *testing.T) {
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		}},
-		Outs: []*TransferableOutput{&TransferableOutput{
+		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
 			Asset: ava.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
@@ -287,7 +287,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*TransferableInput{&TransferableInput{
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: ava.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
@@ -298,7 +298,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		}},
-		Outs: []*TransferableOutput{&TransferableOutput{
+		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
 			Asset: ava.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,

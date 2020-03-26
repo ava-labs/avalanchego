@@ -144,9 +144,6 @@ func (tx *CreateSubnetTx) Bytes() []byte {
 	return tx.bytes
 }
 
-// InputUTXOs returns an empty set
-func (tx *CreateSubnetTx) InputUTXOs() ids.Set { return ids.Set{} }
-
 // initialize sets [tx.vm] to [vm]
 func (tx *CreateSubnetTx) initialize(vm *VM) error {
 	tx.vm = vm

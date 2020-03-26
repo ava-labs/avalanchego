@@ -5,7 +5,6 @@ package avm
 
 import (
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 type parsedFx struct {
@@ -30,16 +29,6 @@ type Fx interface {
 	// outputs. If the transaction can't spend the output based on the input and
 	// credential, a non-nil error  should be returned.
 	VerifyOperation(tx interface{}, utxos, ins, creds, outs []interface{}) error
-}
-
-// FxTransferable is the interface a feature extension must provide to transfer
-// value between features extensions.
-type FxTransferable interface {
-	verify.Verifiable
-
-	// Amount returns how much value this output consumes of the asset in its
-	// transaction.
-	Amount() uint64
 }
 
 // FxAddressable is the interface a feature extension must provide to be able to

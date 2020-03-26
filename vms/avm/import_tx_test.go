@@ -72,7 +72,7 @@ func TestImportTxSerialization(t *testing.T) {
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
 		},
-		Ins: []*TransferableInput{&TransferableInput{
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -165,7 +165,7 @@ func TestIssueImportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*TransferableInput{&TransferableInput{
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: utxoID,
 			Asset:  ava.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
@@ -306,7 +306,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*TransferableInput{&TransferableInput{
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
 			UTXOID: utxoID,
 			Asset:  ava.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{

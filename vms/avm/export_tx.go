@@ -21,8 +21,8 @@ import (
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
-	Outs []*TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins  []*TransferableInput  `serialize:"true"` // The inputs to this transaction
+	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
+	Ins  []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -67,7 +67,7 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !IsSortedTransferableOutputs(t.Outs, c) {
+	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -77,7 +77,7 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 		}
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !isSortedAndUniqueTransferableInputs(t.Ins) {
+	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 

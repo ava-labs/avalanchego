@@ -27,6 +27,10 @@ const (
 	// SECP256K1RSKLen is the number of bytes in a secp2561k recoverable private
 	// key
 	SECP256K1RSKLen = 32
+
+	// SECP256K1RPKLen is the number of bytes in a secp2561k recoverable public
+	// key
+	SECP256K1RPKLen = 33
 )
 
 // FactorySECP256K1R ...

@@ -27,7 +27,7 @@ func TestOperableInputVerifyNilFx(t *testing.T) {
 func TestOperableInputVerify(t *testing.T) {
 	oi := &OperableInput{
 		UTXOID: ava.UTXOID{TxID: ids.Empty},
-		In:     &testVerifiable{},
+		In:     &ava.TestVerifiable{},
 	}
 	if err := oi.Verify(); err != nil {
 		t.Fatal(err)
@@ -44,28 +44,28 @@ func TestOperableInputSorting(t *testing.T) {
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
 			UTXOID: ava.UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 1,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
 			UTXOID: ava.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
 			UTXOID: ava.UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 0,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 	}
 	if isSortedAndUniqueOperableInputs(ins) {
@@ -98,7 +98,7 @@ func TestOperableInputSorting(t *testing.T) {
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		In: &testVerifiable{},
+		In: &ava.TestVerifiable{},
 	})
 	if isSortedAndUniqueOperableInputs(ins) {
 		t.Fatalf("Shouldn't be unique")

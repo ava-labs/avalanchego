@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package ava
 
 import (
 	"bytes"
@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -22,7 +21,7 @@ func TestTransferableOutputVerifyNil(t *testing.T) {
 }
 
 func TestTransferableOutputVerifyNilFx(t *testing.T) {
-	to := &TransferableOutput{Asset: ava.Asset{ID: ids.Empty}}
+	to := &TransferableOutput{Asset: Asset{ID: ids.Empty}}
 	if err := to.Verify(); err == nil {
 		t.Fatalf("Should have errored due to nil transferable fx output")
 	}
@@ -30,7 +29,7 @@ func TestTransferableOutputVerifyNilFx(t *testing.T) {
 
 func TestTransferableOutputVerify(t *testing.T) {
 	to := &TransferableOutput{
-		Asset: ava.Asset{ID: ids.Empty},
+		Asset: Asset{ID: ids.Empty},
 		Out:   &TestTransferable{Val: 1},
 	}
 	if err := to.Verify(); err != nil {
@@ -47,23 +46,23 @@ func TestTransferableOutputSorting(t *testing.T) {
 
 	outs := []*TransferableOutput{
 		&TransferableOutput{
-			Asset: ava.Asset{ID: ids.NewID([32]byte{1})},
+			Asset: Asset{ID: ids.NewID([32]byte{1})},
 			Out:   &TestTransferable{Val: 1},
 		},
 		&TransferableOutput{
-			Asset: ava.Asset{ID: ids.Empty},
+			Asset: Asset{ID: ids.Empty},
 			Out:   &TestTransferable{Val: 1},
 		},
 		&TransferableOutput{
-			Asset: ava.Asset{ID: ids.NewID([32]byte{1})},
+			Asset: Asset{ID: ids.NewID([32]byte{1})},
 			Out:   &TestTransferable{Val: 0},
 		},
 		&TransferableOutput{
-			Asset: ava.Asset{ID: ids.Empty},
+			Asset: Asset{ID: ids.Empty},
 			Out:   &TestTransferable{Val: 0},
 		},
 		&TransferableOutput{
-			Asset: ava.Asset{ID: ids.Empty},
+			Asset: Asset{ID: ids.Empty},
 			Out:   &TestTransferable{Val: 0},
 		},
 	}
@@ -115,7 +114,7 @@ func TestTransferableOutputSerialization(t *testing.T) {
 	}
 
 	out := &TransferableOutput{
-		Asset: ava.Asset{
+		Asset: Asset{
 			ID: ids.NewID([32]byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -165,8 +164,8 @@ func TestTransferableInputVerifyNil(t *testing.T) {
 
 func TestTransferableInputVerifyNilFx(t *testing.T) {
 	ti := &TransferableInput{
-		UTXOID: ava.UTXOID{TxID: ids.Empty},
-		Asset:  ava.Asset{ID: ids.Empty},
+		UTXOID: UTXOID{TxID: ids.Empty},
+		Asset:  Asset{ID: ids.Empty},
 	}
 	if err := ti.Verify(); err == nil {
 		t.Fatalf("Should have errored due to nil transferable fx input")
@@ -175,8 +174,8 @@ func TestTransferableInputVerifyNilFx(t *testing.T) {
 
 func TestTransferableInputVerify(t *testing.T) {
 	ti := &TransferableInput{
-		UTXOID: ava.UTXOID{TxID: ids.Empty},
-		Asset:  ava.Asset{ID: ids.Empty},
+		UTXOID: UTXOID{TxID: ids.Empty},
+		Asset:  Asset{ID: ids.Empty},
 		In:     &TestTransferable{},
 	}
 	if err := ti.Verify(); err != nil {
@@ -193,57 +192,57 @@ func TestTransferableInputSorting(t *testing.T) {
 
 	ins := []*TransferableInput{
 		&TransferableInput{
-			UTXOID: ava.UTXOID{
+			UTXOID: UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: ids.Empty},
+			Asset: Asset{ID: ids.Empty},
 			In:    &TestTransferable{},
 		},
 		&TransferableInput{
-			UTXOID: ava.UTXOID{
+			UTXOID: UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: ids.Empty},
+			Asset: Asset{ID: ids.Empty},
 			In:    &TestTransferable{},
 		},
 		&TransferableInput{
-			UTXOID: ava.UTXOID{
+			UTXOID: UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: ids.Empty},
+			Asset: Asset{ID: ids.Empty},
 			In:    &TestTransferable{},
 		},
 		&TransferableInput{
-			UTXOID: ava.UTXOID{
+			UTXOID: UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: ids.Empty},
+			Asset: Asset{ID: ids.Empty},
 			In:    &TestTransferable{},
 		},
 	}
 
-	if isSortedAndUniqueTransferableInputs(ins) {
+	if IsSortedAndUniqueTransferableInputs(ins) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	sortTransferableInputs(ins)
-	if !isSortedAndUniqueTransferableInputs(ins) {
+	SortTransferableInputs(ins)
+	if !IsSortedAndUniqueTransferableInputs(ins) {
 		t.Fatalf("Should be sorted")
 	}
 
 	ins = append(ins, &TransferableInput{
-		UTXOID: ava.UTXOID{
+		UTXOID: UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: ava.Asset{ID: ids.Empty},
+		Asset: Asset{ID: ids.Empty},
 		In:    &TestTransferable{},
 	})
 
-	if isSortedAndUniqueTransferableInputs(ins) {
+	if IsSortedAndUniqueTransferableInputs(ins) {
 		t.Fatalf("Shouldn't be unique")
 	}
 }
@@ -272,7 +271,7 @@ func TestTransferableInputSerialization(t *testing.T) {
 	}
 
 	in := &TransferableInput{
-		UTXOID: ava.UTXOID{
+		UTXOID: UTXOID{
 			TxID: ids.NewID([32]byte{
 				0xf1, 0xe1, 0xd1, 0xc1, 0xb1, 0xa1, 0x91, 0x81,
 				0x71, 0x61, 0x51, 0x41, 0x31, 0x21, 0x11, 0x01,
@@ -281,7 +280,7 @@ func TestTransferableInputSerialization(t *testing.T) {
 			}),
 			OutputIndex: 5,
 		},
-		Asset: ava.Asset{
+		Asset: Asset{
 			ID: ids.NewID([32]byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,

@@ -19,7 +19,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	vm := GenesisVM(t)
 	state := vm.state
 
-	vm.codec.RegisterType(&testVerifiable{})
+	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{
@@ -27,29 +27,27 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: ava.Asset{ID: ids.Empty},
-		Out:   &testVerifiable{},
+		Out:   &ava.TestVerifiable{},
 	}
 
 	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 0,
-				},
-				Asset: ava.Asset{ID: asset},
-				In: &secp256k1fx.TransferInput{
-					Amt: 20 * units.KiloAva,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 20 * units.KiloAva,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
+		}},
 	}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
@@ -115,7 +113,7 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 	vm := GenesisVM(t)
 	state := vm.state
 
-	vm.codec.RegisterType(&testVerifiable{})
+	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{
@@ -123,7 +121,7 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: ava.Asset{ID: ids.Empty},
-		Out:   &testVerifiable{},
+		Out:   &ava.TestVerifiable{},
 	}
 
 	if err := state.FundUTXO(utxo); err != nil {

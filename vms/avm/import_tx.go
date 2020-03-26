@@ -17,16 +17,12 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
-var (
-	errNilUTXOID = errors.New("nil utxo ID is not valid")
-)
-
 // ImportTx is a transaction that imports an asset from another blockchain.
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	Outs []*TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins  []*TransferableInput  `serialize:"true"` // The inputs to this transaction
+	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
+	Ins  []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -91,7 +87,7 @@ func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !IsSortedTransferableOutputs(t.Outs, c) {
+	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -101,7 +97,7 @@ func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 		}
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !isSortedAndUniqueTransferableInputs(t.Ins) {
+	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 

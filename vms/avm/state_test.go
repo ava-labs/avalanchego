@@ -175,7 +175,7 @@ func TestStateUTXOs(t *testing.T) {
 	vm := GenesisVM(t)
 	state := vm.state.state
 
-	vm.codec.RegisterType(&testVerifiable{})
+	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
@@ -187,7 +187,7 @@ func TestStateUTXOs(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: ava.Asset{ID: ids.Empty},
-		Out:   &testVerifiable{},
+		Out:   &ava.TestVerifiable{},
 	}
 
 	if err := state.SetUTXO(ids.Empty, utxo); err != nil {
@@ -245,7 +245,7 @@ func TestStateTXs(t *testing.T) {
 	vm := GenesisVM(t)
 	state := vm.state.state
 
-	vm.codec.RegisterType(&TestTransferable{})
+	vm.codec.RegisterType(&ava.TestTransferable{})
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")
@@ -254,23 +254,21 @@ func TestStateTXs(t *testing.T) {
 	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 0,
-				},
-				Asset: ava.Asset{ID: asset},
-				In: &secp256k1fx.TransferInput{
-					Amt: 20 * units.KiloAva,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 20 * units.KiloAva,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
+		}},
 	}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)

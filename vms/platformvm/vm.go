@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 const (
@@ -108,6 +109,13 @@ func init() {
 		Codec.RegisterType(&Abort{}),
 		Codec.RegisterType(&Commit{}),
 		Codec.RegisterType(&StandardBlock{}),
+		Codec.RegisterType(&AtomicBlock{}),
+
+		Codec.RegisterType(&secp256k1fx.MintOutput{}),
+		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
+		Codec.RegisterType(&secp256k1fx.MintInput{}),
+		Codec.RegisterType(&secp256k1fx.TransferInput{}),
+		Codec.RegisterType(&secp256k1fx.Credential{}),
 
 		Codec.RegisterType(&UnsignedAddDefaultSubnetValidatorTx{}),
 		Codec.RegisterType(&addDefaultSubnetValidatorTx{}),
@@ -123,6 +131,12 @@ func init() {
 
 		Codec.RegisterType(&UnsignedCreateSubnetTx{}),
 		Codec.RegisterType(&CreateSubnetTx{}),
+
+		Codec.RegisterType(&UnsignedImportTx{}),
+		Codec.RegisterType(&ImportTx{}),
+
+		// Codec.RegisterType(&UnsignedExportTx{}),
+		// Codec.RegisterType(&ExportTx{}),
 
 		Codec.RegisterType(&advanceTimeTx{}),
 		Codec.RegisterType(&rewardValidatorTx{}),
@@ -140,6 +154,11 @@ type VM struct {
 
 	// The node's chain manager
 	ChainManager chains.Manager
+
+	// AVA asset ID
+	AVA ids.ID
+
+	fx secp256k1fx.Fx
 
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R

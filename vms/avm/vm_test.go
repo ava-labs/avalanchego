@@ -317,7 +317,7 @@ func TestTxSerialization(t *testing.T) {
 	for _, key := range keys {
 		addr := key.PublicKey().Address()
 
-		unsignedTx.Outs = append(unsignedTx.Outs, &TransferableOutput{
+		unsignedTx.Outs = append(unsignedTx.Outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 20 * units.KiloAva,
@@ -444,23 +444,21 @@ func TestIssueTx(t *testing.T) {
 	newTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        genesisTx.ID(),
-					OutputIndex: 1,
-				},
-				Asset: ava.Asset{ID: genesisTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: 50000,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: ava.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
+		}},
 	}}
 
 	unsignedBytes, err := vm.codec.Marshal(&newTx.UnsignedTx)
@@ -575,35 +573,31 @@ func TestIssueDependentTx(t *testing.T) {
 	firstTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        genesisTx.ID(),
-					OutputIndex: 1,
-				},
-				Asset: ava.Asset{ID: genesisTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: 50000,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: ava.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
-		Outs: []*TransferableOutput{
-			&TransferableOutput{
-				Asset: ava.Asset{ID: genesisTx.ID()},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 50000,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
+		}},
+		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
+			Asset: ava.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 50000,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
 				},
 			},
-		},
+		}},
 	}}
 
 	unsignedBytes, err := vm.codec.Marshal(&firstTx.UnsignedTx)
@@ -638,23 +632,21 @@ func TestIssueDependentTx(t *testing.T) {
 	secondTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        firstTx.ID(),
-					OutputIndex: 0,
-				},
-				Asset: ava.Asset{ID: genesisTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: 50000,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        firstTx.ID(),
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
+		}},
 	}}
 
 	unsignedBytes, err = vm.codec.Marshal(&secondTx.UnsignedTx)
