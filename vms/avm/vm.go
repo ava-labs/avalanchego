@@ -264,7 +264,7 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
-	tx.t.onDecide = onDecide
+	tx.onDecide = onDecide
 	return tx.ID(), nil
 }
 
@@ -402,18 +402,18 @@ func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
 	rawTx.Initialize(b)
 
 	tx := &UniqueTx{
+		TxState: &TxState{
+			Tx: rawTx,
+		},
 		vm:   vm,
 		txID: rawTx.ID(),
-		t: &txState{
-			tx: rawTx,
-		},
 	}
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, err
 	}
 
 	if tx.Status() == choices.Unknown {
-		if err := vm.state.SetTx(tx.ID(), tx.t.tx); err != nil {
+		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
 		tx.setStatus(choices.Processing)
@@ -449,7 +449,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	if status := tx.Status(); !status.Fetched() {
 		return false
 	}
-	createAssetTx, ok := tx.t.tx.UnsignedTx.(*CreateAssetTx)
+	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
 	if !ok {
 		return false
 	}

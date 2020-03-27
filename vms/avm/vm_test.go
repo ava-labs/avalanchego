@@ -5,6 +5,7 @@ package avm
 
 import (
 	"bytes"
+	"encoding/json"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -300,13 +302,11 @@ func TestTxSerialization(t *testing.T) {
 				Asset: Asset{
 					ID: asset,
 				},
-				Outs: []*OperableOutput{
-					&OperableOutput{
-						Out: &secp256k1fx.MintOutput{
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-							},
+				Outs: []verify.Verifiable{
+					&secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 						},
 					},
 				},
@@ -478,11 +478,9 @@ func TestIssueTx(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	newTx.Creds = append(newTx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	newTx.Creds = append(newTx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 
@@ -622,11 +620,9 @@ func TestIssueDependentTx(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	firstTx.Creds = append(firstTx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	firstTx.Creds = append(firstTx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 
@@ -675,11 +671,9 @@ func TestIssueDependentTx(t *testing.T) {
 	fixedSig = [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	secondTx.Creds = append(secondTx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	secondTx.Creds = append(secondTx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 
@@ -701,7 +695,14 @@ func TestIssueDependentTx(t *testing.T) {
 		t.Fatalf("Wrong message")
 	}
 
-	if txs := vm.PendingTxs(); len(txs) != 2 {
+	txs := vm.PendingTxs()
+	if len(txs) != 2 {
 		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
+
+	jsonBytes, err := json.Marshal(txs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Fatalf("%s", jsonBytes)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestOperationVerifyNil(t *testing.T) {
@@ -42,21 +43,6 @@ func TestOperationVerifyInvalidInput(t *testing.T) {
 	}
 	if err := op.Verify(c); err == nil {
 		t.Fatalf("Should have errored due to an invalid input")
-	}
-}
-
-func TestOperationVerifyInvalidOutput(t *testing.T) {
-	c := codec.NewDefault()
-	op := &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
-		Outs: []*OperableOutput{
-			&OperableOutput{},
-		},
-	}
-	if err := op.Verify(c); err == nil {
-		t.Fatalf("Should have errored due to an invalid output")
 	}
 }
 
@@ -96,13 +82,9 @@ func TestOperationVerifyOutputsNotSorted(t *testing.T) {
 		Asset: Asset{
 			ID: ids.Empty,
 		},
-		Outs: []*OperableOutput{
-			&OperableOutput{
-				Out: &TestTransferable{Val: 1},
-			},
-			&OperableOutput{
-				Out: &TestTransferable{Val: 0},
-			},
+		Outs: []verify.Verifiable{
+			&TestTransferable{Val: 1},
+			&TestTransferable{Val: 0},
 		},
 	}
 	if err := op.Verify(c); err == nil {
@@ -116,10 +98,8 @@ func TestOperationVerify(t *testing.T) {
 		Asset: Asset{
 			ID: ids.Empty,
 		},
-		Outs: []*OperableOutput{
-			&OperableOutput{
-				Out: &testVerifiable{},
-			},
+		Outs: []verify.Verifiable{
+			&testVerifiable{},
 		},
 	}
 	if err := op.Verify(c); err != nil {

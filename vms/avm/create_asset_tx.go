@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 const (
@@ -32,10 +33,10 @@ var (
 // CreateAssetTx is a transaction that creates a new asset.
 type CreateAssetTx struct {
 	BaseTx       `serialize:"true"`
-	Name         string          `serialize:"true"`
-	Symbol       string          `serialize:"true"`
-	Denomination byte            `serialize:"true"`
-	States       []*InitialState `serialize:"true"`
+	Name         string          `serialize:"true" json:"name"`
+	Symbol       string          `serialize:"true" json:"symbol"`
+	Denomination byte            `serialize:"true" json:"denomination"`
+	States       []*InitialState `serialize:"true" json:"initialStates"`
 }
 
 // InitialStates track which virtual machines, and the initial state of these
@@ -111,7 +112,7 @@ func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *CreateAssetTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
+func (t *CreateAssetTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	return t.BaseTx.SemanticVerify(vm, uTx, creds)
 }
 

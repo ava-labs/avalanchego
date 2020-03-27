@@ -16,7 +16,7 @@ var (
 
 // Input ...
 type Input struct {
-	SigIndices []uint32 `serialize:"true"`
+	SigIndices []uint32 `serialize:"true" json:"signatureIndices"`
 }
 
 // Verify this input is syntactically valid
