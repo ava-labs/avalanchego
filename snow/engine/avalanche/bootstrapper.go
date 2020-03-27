@@ -119,7 +119,7 @@ func (b *bootstrapper) fetch(vtxID ids.ID) {
 		b.sendRequest(vtxID)
 		return
 	}
-	b.addVertex(vtx)
+	b.storeVertex(vtx)
 }
 
 func (b *bootstrapper) sendRequest(vtxID ids.ID) {
@@ -138,6 +138,14 @@ func (b *bootstrapper) sendRequest(vtxID ids.ID) {
 }
 
 func (b *bootstrapper) addVertex(vtx avalanche.Vertex) {
+	b.storeVertex(vtx)
+
+	if numPending := b.pending.Len(); numPending == 0 {
+		b.finish()
+	}
+}
+
+func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 	vts := []avalanche.Vertex{vtx}
 
 	for len(vts) > 0 {
@@ -181,9 +189,6 @@ func (b *bootstrapper) addVertex(vtx avalanche.Vertex) {
 
 	numPending := b.pending.Len()
 	b.numPendingRequests.Set(float64(numPending))
-	if numPending == 0 {
-		b.finish()
-	}
 }
 
 func (b *bootstrapper) finish() {
