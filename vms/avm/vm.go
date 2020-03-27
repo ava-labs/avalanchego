@@ -275,6 +275,31 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+
+	utxoIDs := ids.Set{}
+	for _, addr := range addrs.List() {
+		utxos, _ := state.PlatformFunds(addr)
+		utxoIDs.Add(utxos...)
+	}
+
+	utxos := []*ava.UTXO{}
+	for _, utxoID := range utxoIDs.List() {
+		utxo, err := state.PlatformUTXO(utxoID)
+		if err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
+}
+
 // GetUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
 func (vm *VM) GetUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {

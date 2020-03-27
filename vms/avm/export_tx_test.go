@@ -168,7 +168,7 @@ func TestIssueExportTx(t *testing.T) {
 				},
 			}},
 		},
-		ExportOuts: []*ava.TransferableOutput{&ava.TransferableOutput{
+		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
@@ -301,7 +301,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 				},
 			}},
 		},
-		ExportOuts: []*ava.TransferableOutput{&ava.TransferableOutput{
+		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,

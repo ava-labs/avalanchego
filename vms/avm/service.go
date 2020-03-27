@@ -948,6 +948,147 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 	return nil
 }
 
+// SendImportArgs are arguments for passing into SendImport requests
+type SendImportArgs struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	To       string `json:"to"`
+}
+
+// SendImportReply defines the SendImport replies returned from the API
+type SendImportReply struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// SendImport returns the ID of the newly created atomic transaction
+func (service *Service) SendImport(_ *http.Request, args *SendImportArgs, reply *SendImportReply) error {
+	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+
+	toBytes, err := service.vm.Parse(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+	to, err := ids.ToShortID(toBytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := userState{vm: service.vm}
+
+	addresses, _ := user.Addresses(db)
+
+	addrs := ids.Set{}
+	addrs.Add(addresses...)
+	utxos, err := service.vm.GetAtomicUTXOs(addrs)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
+	}
+
+	kc := secp256k1fx.NewKeychain()
+	for _, addr := range addresses {
+		sk, err := user.Key(db, addr)
+		if err != nil {
+			return fmt.Errorf("problem retrieving private key: %w", err)
+		}
+		kc.Add(sk)
+	}
+
+	amount := uint64(0)
+	time := service.vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		if !utxo.AssetID().Equals(service.vm.ava) {
+			continue
+		}
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			continue
+		}
+		input, ok := inputIntf.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		spent, err := math.Add64(amount, input.Amount())
+		if err != nil {
+			return errSpendOverflow
+		}
+		amount = spent
+
+		in := &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: service.vm.ava},
+			In:     input,
+		}
+
+		ins = append(ins, in)
+		keys = append(keys, signers)
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+
+	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: service.vm.ava},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      amount,
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
+		},
+	}}
+
+	tx := Tx{UnsignedTx: &ImportTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+			Outs:  outs,
+		},
+		Ins: ins,
+	}}
+
+	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	for _, credKeys := range keys {
+		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	b, err := service.vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	txID, err := service.vm.IssueTx(b, nil)
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
+	return nil
+}
+
 // SendExportArgs are arguments for passing into SendExport requests
 type SendExportArgs struct {
 	Username string      `json:"username"`
@@ -1083,7 +1224,7 @@ func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply 
 			Outs:  outs,
 			Ins:   ins,
 		},
-		ExportOuts: exportOuts,
+		Outs: exportOuts,
 	}}
 
 	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)

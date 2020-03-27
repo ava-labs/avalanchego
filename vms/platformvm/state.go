@@ -211,18 +211,18 @@ func (vm *VM) getSubnets(db database.Database) ([]*CreateSubnetTx, error) {
 }
 
 // get the subnet with the specified ID
-func (vm *VM) getSubnet(db database.Database, ID ids.ID) (*CreateSubnetTx, error) {
+func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error) {
 	subnets, err := vm.getSubnets(db)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, subnet := range subnets {
-		if subnet.ID.Equals(ID) {
+		if subnet.id.Equals(id) {
 			return subnet, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find subnet with ID %s", ID)
+	return nil, fmt.Errorf("couldn't find subnet with ID %s", id)
 }
 
 // register each type that we'll be storing in the database

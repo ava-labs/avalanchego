@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -632,7 +633,7 @@ func (vm *VM) nextValidatorChangeTime(db database.Database, start bool) time.Tim
 		return earliest
 	}
 	for _, subnet := range subnets {
-		t := vm.nextSubnetValidatorChangeTime(db, subnet.ID, start)
+		t := vm.nextSubnetValidatorChangeTime(db, subnet.id, start)
 		if t.Before(earliest) {
 			earliest = t
 		}
@@ -740,3 +741,28 @@ func (vm *VM) Codec() codec.Codec { return vm.codec }
 
 // Clock ...
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+
+	utxoIDs := ids.Set{}
+	for _, addr := range addrs.List() {
+		utxos, _ := state.AVMFunds(addr)
+		utxoIDs.Add(utxos...)
+	}
+
+	utxos := []*ava.UTXO{}
+	for _, utxoID := range utxoIDs.List() {
+		utxo, err := state.AVMUTXO(utxoID)
+		if err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
+}

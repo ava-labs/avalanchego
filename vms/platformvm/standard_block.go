@@ -12,6 +12,8 @@ import (
 
 // DecisionTx is an operation that can be decided without being proposed
 type DecisionTx interface {
+	ID() ids.ID
+
 	initialize(vm *VM) error
 
 	// Attempt to verify this transaction with the provided state. The provided

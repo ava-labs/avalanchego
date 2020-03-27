@@ -24,11 +24,6 @@ type UnsignedTx interface {
 	ID() ids.ID
 	Bytes() []byte
 
-	NetworkID() uint32
-	ChainID() ids.ID
-	Outputs() []*ava.TransferableOutput
-	Inputs() []*ava.TransferableInput
-
 	AssetIDs() ids.Set
 	InputUTXOs() []*ava.UTXOID
 	UTXOs() []*ava.UTXO

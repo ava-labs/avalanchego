@@ -38,7 +38,7 @@ type UnsignedImportTx struct {
 	Nonce uint64 `serialize:"true"`
 
 	// Account that this transaction is being sent by. This is needed to ensure the Credentials are replay safe.
-	Account [crypto.SECP256K1RPKLen]byte `serialize:"true"`
+	Account ids.ShortID `serialize:"true"`
 
 	Ins []*ava.TransferableInput `serialize:"true"` // The inputs to this transaction
 }
@@ -129,17 +129,12 @@ func (tx *ImportTx) SyntacticVerify() error {
 		return err
 	}
 
-	expectedPublicKey, err := tx.vm.factory.ToPublicKey(tx.Account[:])
-	if err != nil {
-		return err
-	}
-
 	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
 	if err != nil {
 		return err
 	}
 
-	if !expectedPublicKey.Address().Equals(key.Address()) {
+	if !tx.Account.Equals(key.Address()) {
 		return errPublicKeySignatureMismatch
 	}
 
@@ -236,11 +231,9 @@ func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.Transferabl
 	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
 		NetworkID: networkID,
 		Nonce:     nonce,
+		Account:   key.PublicKey().Address(),
 		Ins:       ins,
 	}}
-
-	pubkeyBytes := key.PublicKey().Bytes()
-	copy(tx.Account[:], pubkeyBytes)
 
 	unsignedIntf := interface{}(&tx.UnsignedImportTx)
 	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction

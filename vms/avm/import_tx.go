@@ -20,8 +20,7 @@ import (
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins  []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
+	Ins []*ava.TransferableInput `serialize:"true"` // The inputs to this transaction
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -43,25 +42,6 @@ func (t *ImportTx) AssetIDs() ids.Set {
 	return assets
 }
 
-// UTXOs returns the UTXOs transaction is producing.
-func (t *ImportTx) UTXOs() []*ava.UTXO {
-	txID := t.ID()
-	utxos := t.BaseTx.UTXOs()
-
-	for _, out := range t.Outs {
-		utxos = append(utxos, &ava.UTXO{
-			UTXOID: ava.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(len(utxos)),
-			},
-			Asset: ava.Asset{ID: out.AssetID()},
-			Out:   out.Out,
-		})
-	}
-
-	return utxos
-}
-
 var (
 	errNoImportInputs = errors.New("no import inputs")
 )
@@ -71,12 +51,12 @@ func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 	switch {
 	case t == nil:
 		return errNilTx
+	case t.NetID != ctx.NetworkID:
+		return errWrongNetworkID
+	case !t.BCID.Equals(ctx.ChainID):
+		return errWrongChainID
 	case len(t.Ins) == 0:
 		return errNoImportInputs
-	}
-
-	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
-		return err
 	}
 
 	fc := ava.NewFlowChecker()
@@ -88,6 +68,16 @@ func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 	}
 	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
+	}
+
+	for _, in := range t.BaseTx.Ins {
+		if err := in.Verify(); err != nil {
+			return err
+		}
+		fc.Consume(in.AssetID(), in.Input().Amount())
+	}
+	if !ava.IsSortedAndUniqueTransferableInputs(t.BaseTx.Ins) {
+		return errInputsNotSortedUnique
 	}
 
 	for _, in := range t.Ins {

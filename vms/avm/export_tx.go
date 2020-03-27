@@ -17,7 +17,7 @@ import (
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
-	ExportOuts []*ava.TransferableOutput `serialize:"true"` // The outputs this transaction is sending to the other chain
+	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs this transaction is sending to the other chain
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -32,6 +32,16 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) erro
 	}
 
 	fc := ava.NewFlowChecker()
+	for _, out := range t.BaseTx.Outs {
+		if err := out.Verify(); err != nil {
+			return err
+		}
+		fc.Produce(out.AssetID(), out.Output().Amount())
+	}
+	if !ava.IsSortedTransferableOutputs(t.BaseTx.Outs, c) {
+		return errOutputsNotSorted
+	}
+
 	for _, out := range t.Outs {
 		if err := out.Verify(); err != nil {
 			return err
@@ -39,16 +49,6 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) erro
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
 	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
-		return errOutputsNotSorted
-	}
-
-	for _, out := range t.ExportOuts {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !ava.IsSortedTransferableOutputs(t.ExportOuts, c) {
 		return errOutputsNotSorted
 	}
 
@@ -102,7 +102,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 	}
 
-	for _, out := range t.ExportOuts {
+	for _, out := range t.Outs {
 		if !out.AssetID().Equals(vm.ava) {
 			return errWrongAssetID
 		}
@@ -121,11 +121,11 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := ava.NewPrefixedState(vsmDB, vm.codec)
-	for i, out := range t.ExportOuts {
+	for i, out := range t.Outs {
 		utxo := &ava.UTXO{
 			UTXOID: ava.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(len(t.Outs) + i),
+				OutputIndex: uint32(len(t.BaseTx.Outs) + i),
 			},
 			Asset: ava.Asset{ID: out.AssetID()},
 			Out:   out.Out,

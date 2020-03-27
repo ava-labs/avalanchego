@@ -54,12 +54,9 @@ func (t *txJob) Execute() {
 	case choices.Unknown, choices.Rejected:
 		t.numDropped.Inc()
 	case choices.Processing:
-		if err := t.tx.Verify(); err == nil {
-			t.tx.Accept()
-			t.numAccepted.Inc()
-		} else {
-			t.numDropped.Inc()
-		}
+		t.tx.Verify()
+		t.tx.Accept()
+		t.numAccepted.Inc()
 	}
 }
 func (t *txJob) Bytes() []byte { return t.tx.Bytes() }

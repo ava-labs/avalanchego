@@ -167,19 +167,7 @@ func TestBaseTxGetters(t *testing.T) {
 
 	txID := tx.ID()
 
-	if netID := tx.NetworkID(); netID != networkID {
-		t.Fatalf("Wrong network ID returned")
-	} else if bcID := tx.ChainID(); !bcID.Equals(chainID) {
-		t.Fatalf("Wrong chain ID returned")
-	} else if outs := tx.Outputs(); len(outs) != 1 {
-		t.Fatalf("Outputs returned wrong number of outs")
-	} else if out := outs[0]; out != tx.Outs[0] {
-		t.Fatalf("Outputs returned wrong output")
-	} else if ins := tx.Inputs(); len(ins) != 1 {
-		t.Fatalf("Inputs returned wrong number of ins")
-	} else if in := ins[0]; in != tx.Ins[0] {
-		t.Fatalf("Inputs returned wrong input")
-	} else if assets := tx.AssetIDs(); assets.Len() != 1 {
+	if assets := tx.AssetIDs(); assets.Len() != 1 {
 		t.Fatalf("Wrong number of assets returned")
 	} else if !assets.Contains(asset) {
 		t.Fatalf("Wrong asset returned")
@@ -191,8 +179,6 @@ func TestBaseTxGetters(t *testing.T) {
 		t.Fatalf("Wrong output index returned")
 	} else if assetID := utxo.AssetID(); !assetID.Equals(asset) {
 		t.Fatalf("Wrong asset ID returned")
-	} else if utxoOut := utxo.Out; utxoOut != out.Out {
-		t.Fatalf("Wrong output returned")
 	}
 }
 

@@ -37,20 +37,6 @@ type BaseTx struct {
 	Ins   []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
 }
 
-// NetworkID is the ID of the network on which this transaction exists
-func (t *BaseTx) NetworkID() uint32 { return t.NetID }
-
-// ChainID is the ID of the chain on which this transaction exists
-func (t *BaseTx) ChainID() ids.ID { return t.BCID }
-
-// Outputs track which outputs this transaction is producing. The returned array
-// should not be modified.
-func (t *BaseTx) Outputs() []*ava.TransferableOutput { return t.Outs }
-
-// Inputs track which UTXOs this transaction is consuming. The returned array
-// should not be modified.
-func (t *BaseTx) Inputs() []*ava.TransferableInput { return t.Ins }
-
 // InputUTXOs track which UTXOs this transaction is consuming.
 func (t *BaseTx) InputUTXOs() []*ava.UTXOID {
 	utxos := []*ava.UTXOID(nil)

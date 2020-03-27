@@ -21,6 +21,8 @@ var (
 type AtomicTx interface {
 	initialize(vm *VM) error
 
+	ID() ids.ID
+
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 
