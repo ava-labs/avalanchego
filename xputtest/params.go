@@ -6,6 +6,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 
 	stdnet "net"
 
@@ -28,35 +29,47 @@ func init() {
 	loggingConfig, err := logging.DefaultConfig()
 	errs.Add(err)
 
+	fs := flag.NewFlagSet("xputtest", flag.ContinueOnError)
+
 	// NetworkID:
-	networkName := flag.String("network-id", genesis.LocalName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", genesis.LocalName, "Network ID this node will connect to")
 
 	// Ava fees:
-	flag.Uint64Var(&config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
+	fs.Uint64Var(&config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
 
 	// Assertions:
-	flag.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
+	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
 
 	// Crypto:
-	flag.BoolVar(&config.EnableCrypto, "signature-verification-enabled", true, "Turn on signature verification")
+	fs.BoolVar(&config.EnableCrypto, "signature-verification-enabled", true, "Turn on signature verification")
 
 	// Remote Server:
-	ip := flag.String("ip", "127.0.0.1", "IP address of the remote server socket")
-	port := flag.Uint("port", 9652, "Port of the remote server socket")
+	ip := fs.String("ip", "127.0.0.1", "IP address of the remote server socket")
+	port := fs.Uint("port", 9652, "Port of the remote server socket")
 
 	// Logging:
-	logsDir := flag.String("log-dir", "", "Logging directory for Ava")
-	logLevel := flag.String("log-level", "info", "The log level. Should be one of {all, debug, info, warn, error, fatal, off}")
+	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
+	logLevel := fs.String("log-level", "info", "The log level. Should be one of {all, debug, info, warn, error, fatal, off}")
 
 	// Test Variables:
-	spchain := flag.Bool("sp-chain", false, "Execute simple payment chain transactions")
-	spdag := flag.Bool("sp-dag", false, "Execute simple payment dag transactions")
-	avm := flag.Bool("avm", false, "Execute avm transactions")
-	flag.IntVar(&config.Key, "key", 0, "Index of the genesis key list to use")
-	flag.IntVar(&config.NumTxs, "num-txs", 25000, "Total number of transaction to issue")
-	flag.IntVar(&config.MaxOutstandingTxs, "max-outstanding", 1000, "Maximum number of transactions to leave outstanding")
+	spchain := fs.Bool("sp-chain", false, "Execute simple payment chain transactions")
+	spdag := fs.Bool("sp-dag", false, "Execute simple payment dag transactions")
+	avm := fs.Bool("avm", false, "Execute avm transactions")
+	fs.IntVar(&config.Key, "key", 0, "Index of the genesis key list to use")
+	fs.IntVar(&config.NumTxs, "num-txs", 25000, "Total number of transaction to issue")
+	fs.IntVar(&config.MaxOutstandingTxs, "max-outstanding", 1000, "Maximum number of transactions to leave outstanding")
 
-	flag.Parse()
+	ferr := fs.Parse(os.Args[1:])
+
+	if ferr == flag.ErrHelp {
+		// display usage/help text and exit successfully
+		os.Exit(0)
+	}
+
+	if ferr != nil {
+		// other type of error occurred when parsing args
+		os.Exit(2)
+	}
 
 	networkID, err := genesis.NetworkID(*networkName)
 	errs.Add(err)

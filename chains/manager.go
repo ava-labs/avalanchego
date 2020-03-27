@@ -391,7 +391,7 @@ func (m *manager) createAvalancheChain(
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      (beacons.Len() + 1) / 2,
+				Alpha:      beacons.Len()/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			VtxBlocked: vtxBlocker,
@@ -471,7 +471,7 @@ func (m *manager) createSnowmanChain(
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      (beacons.Len() + 1) / 2,
+				Alpha:      beacons.Len()/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			Blocked:      blocked,

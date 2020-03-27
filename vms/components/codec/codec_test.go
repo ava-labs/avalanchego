@@ -538,3 +538,42 @@ func TestTooLargeUnmarshal(t *testing.T) {
 		t.Fatalf("Should have errored due to too many bytes provided")
 	}
 }
+
+type outerInterface interface {
+	ToInt() int
+}
+
+type outer struct {
+	Interface outerInterface `serialize:"true"`
+}
+
+type innerInterface struct{}
+
+func (it *innerInterface) ToInt() int {
+	return 0
+}
+
+type innerNoInterface struct{}
+
+// Ensure deserializing structs into the wrong interface errors gracefully
+func TestUnmarshalInvalidInterface(t *testing.T) {
+	codec := NewDefault()
+
+	codec.RegisterType(&innerInterface{})
+	codec.RegisterType(&innerNoInterface{})
+
+	{
+		bytes := []byte{0, 0, 0, 0}
+		s := outer{}
+		if err := codec.Unmarshal(bytes, &s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	{
+		bytes := []byte{0, 0, 0, 1}
+		s := outer{}
+		if err := codec.Unmarshal(bytes, &s); err == nil {
+			t.Fatalf("should have errored")
+		}
+	}
+}
