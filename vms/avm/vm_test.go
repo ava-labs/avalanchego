@@ -5,7 +5,6 @@ package avm
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
@@ -695,14 +694,7 @@ func TestIssueDependentTx(t *testing.T) {
 		t.Fatalf("Wrong message")
 	}
 
-	txs := vm.PendingTxs()
-	if len(txs) != 2 {
+	if txs := vm.PendingTxs(); len(txs) != 2 {
 		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
-
-	jsonBytes, err := json.Marshal(txs[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Fatalf("%s", jsonBytes)
 }
