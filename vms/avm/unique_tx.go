@@ -191,6 +191,9 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 
 	txIDs := ids.Set{}
 	for _, in := range tx.InputUTXOs() {
+		if in.Symbolic() {
+			continue
+		}
 		txID, _ := in.InputSource()
 		if !txIDs.Contains(txID) {
 			txIDs.Add(txID)
