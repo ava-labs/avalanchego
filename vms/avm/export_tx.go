@@ -8,7 +8,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -131,13 +130,7 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			Asset: ava.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		}
-
-		utxoID := utxo.InputID()
-		if _, err := state.AVMStatus(utxoID); err == nil {
-			if err := state.SetAVMStatus(utxoID, choices.Unknown); err != nil {
-				return err
-			}
-		} else if err := state.SetAVMUTXO(utxoID, utxo); err != nil {
+		if err := state.FundAVMUTXO(utxo); err != nil {
 			return err
 		}
 	}

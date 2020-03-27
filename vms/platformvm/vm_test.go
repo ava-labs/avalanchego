@@ -1128,7 +1128,7 @@ func TestAtomicImport(t *testing.T) {
 	}
 
 	state := ava.NewPrefixedState(smDB, Codec)
-	if err := state.SetAVMUTXO(utxoID.InputID(), utxo); err != nil {
+	if err := state.FundAVMUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1220,13 +1220,5 @@ func TestOptimisticAtomicImport(t *testing.T) {
 
 	if newAccount.Balance != previousAccount.Balance+amount {
 		t.Fatalf("failed to provide funds")
-	}
-
-	smDB := vm.Ctx.SharedMemory.GetDatabase(avmID)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
-
-	state := ava.NewPrefixedState(smDB, Codec)
-	if _, err := state.AVMStatus(utxoID.InputID()); err != nil {
-		t.Fatal(err)
 	}
 }

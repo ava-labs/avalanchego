@@ -95,7 +95,7 @@ func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 		return err
 	}
 
-	addressable, ok := utxo.Out.(FxAddressable)
+	addressable, ok := utxo.Out.(ava.Addressable)
 	if !ok {
 		return nil
 	}
@@ -124,7 +124,7 @@ func (s *prefixedState) FundUTXO(utxo *ava.UTXO) error {
 		return err
 	}
 
-	addressable, ok := utxo.Out.(FxAddressable)
+	addressable, ok := utxo.Out.(ava.Addressable)
 	if !ok {
 		return nil
 	}

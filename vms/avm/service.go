@@ -947,3 +947,176 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 	reply.Tx.Bytes = txBytes
 	return nil
 }
+
+// SendExportArgs are arguments for passing into SendExport requests
+type SendExportArgs struct {
+	Username string      `json:"username"`
+	Password string      `json:"password"`
+	Amount   json.Uint64 `json:"amount"`
+	To       string      `json:"to"`
+}
+
+// SendExportReply defines the Send replies returned from the API
+type SendExportReply struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// SendExport returns the ID of the newly created atomic transaction
+func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply *SendExportReply) error {
+	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+
+	if args.Amount == 0 {
+		return errInvalidAmount
+	}
+
+	toBytes, err := service.vm.Parse(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+	to, err := ids.ToShortID(toBytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := userState{vm: service.vm}
+
+	addresses, _ := user.Addresses(db)
+
+	addrs := ids.Set{}
+	addrs.Add(addresses...)
+	utxos, err := service.vm.GetUTXOs(addrs)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
+	}
+
+	kc := secp256k1fx.NewKeychain()
+	for _, addr := range addresses {
+		sk, err := user.Key(db, addr)
+		if err != nil {
+			return fmt.Errorf("problem retrieving private key: %w", err)
+		}
+		kc.Add(sk)
+	}
+
+	amountSpent := uint64(0)
+	time := service.vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		if !utxo.AssetID().Equals(service.vm.ava) {
+			continue
+		}
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			continue
+		}
+		input, ok := inputIntf.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		spent, err := math.Add64(amountSpent, input.Amount())
+		if err != nil {
+			return errSpendOverflow
+		}
+		amountSpent = spent
+
+		in := &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: service.vm.ava},
+			In:     input,
+		}
+
+		ins = append(ins, in)
+		keys = append(keys, signers)
+
+		if amountSpent >= uint64(args.Amount) {
+			break
+		}
+	}
+
+	if amountSpent < uint64(args.Amount) {
+		return errInsufficientFunds
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+
+	exportOuts := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: service.vm.ava},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      uint64(args.Amount),
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
+		},
+	}}
+
+	outs := []*ava.TransferableOutput{}
+	if amountSpent > uint64(args.Amount) {
+		changeAddr := kc.Keys[0].PublicKey().Address()
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: service.vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      amountSpent - uint64(args.Amount),
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	ava.SortTransferableOutputs(outs, service.vm.codec)
+
+	tx := Tx{UnsignedTx: &ExportTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+			Outs:  outs,
+			Ins:   ins,
+		},
+		ExportOuts: exportOuts,
+	}}
+
+	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	for _, credKeys := range keys {
+		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	b, err := service.vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	txID, err := service.vm.IssueTx(b, nil)
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
+	return nil
+}

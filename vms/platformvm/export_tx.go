@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
@@ -156,13 +155,7 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 			Asset: ava.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		}
-
-		utxoID := utxo.InputID()
-		if _, err := state.PlatformStatus(utxoID); err == nil {
-			if err := state.SetPlatformStatus(utxoID, choices.Unknown); err != nil {
-				return err
-			}
-		} else if err := state.SetPlatformUTXO(utxoID, utxo); err != nil {
+		if err := state.FundPlatformUTXO(utxo); err != nil {
 			return err
 		}
 	}

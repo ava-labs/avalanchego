@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
@@ -218,11 +217,7 @@ func (tx *ImportTx) Accept(batch database.Batch) error {
 	state := ava.NewPrefixedState(vsmDB, Codec)
 	for _, in := range tx.Ins {
 		utxoID := in.UTXOID.InputID()
-		if _, err := state.AVMUTXO(utxoID); err == nil {
-			if err := state.SetAVMUTXO(utxoID, nil); err != nil {
-				return err
-			}
-		} else if err := state.SetAVMStatus(utxoID, choices.Accepted); err != nil {
+		if err := state.SpendAVMUTXO(utxoID); err != nil {
 			return err
 		}
 	}

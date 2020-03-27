@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -226,7 +225,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
-	if err := state.SetPlatformUTXO(utxoID.InputID(), utxo); err != nil {
+	if err := state.FundPlatformUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 
@@ -365,9 +364,5 @@ func TestForceAcceptImportTx(t *testing.T) {
 	utxoSource := utxoID.InputID()
 	if _, err := state.PlatformUTXO(utxoSource); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
-	} else if status, err := state.PlatformStatus(utxoSource); err != nil {
-		t.Fatal(err)
-	} else if status != choices.Accepted {
-		t.Fatalf("should have marked the utxo as consumed")
 	}
 }

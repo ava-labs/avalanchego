@@ -30,9 +30,3 @@ type Fx interface {
 	// credential, a non-nil error  should be returned.
 	VerifyOperation(tx interface{}, utxos, ins, creds, outs []interface{}) error
 }
-
-// FxAddressable is the interface a feature extension must provide to be able to
-// be tracked as a part of the utxo set for a set of addresses
-type FxAddressable interface {
-	Addresses() [][]byte
-}

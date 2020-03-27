@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -243,9 +242,6 @@ func TestIssueExportTx(t *testing.T) {
 	if _, err := state.AVMUTXO(utxoID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := state.AVMStatus(utxoID); err == nil {
-		t.Fatalf("should have failed to read the status")
-	}
 }
 
 // Test force accepting an import transaction.
@@ -374,7 +370,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		OutputIndex: 0,
 	}
 	utxoID := utxo.InputID()
-	if err := state.SetAVMStatus(utxoID, choices.Accepted); err != nil {
+	if err := state.SpendAVMUTXO(utxoID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -389,8 +385,5 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	if _, err := state.AVMUTXO(utxoID); err == nil {
 		t.Fatalf("should have failed to read the utxo")
-	}
-	if _, err := state.AVMStatus(utxoID); err == nil {
-		t.Fatalf("should have failed to read the status")
 	}
 }

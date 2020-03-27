@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -162,11 +161,7 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	state := ava.NewPrefixedState(vsmDB, vm.codec)
 	for _, in := range t.Ins {
 		utxoID := in.UTXOID.InputID()
-		if _, err := state.PlatformUTXO(utxoID); err == nil {
-			if err := state.SetPlatformUTXO(utxoID, nil); err != nil {
-				return err
-			}
-		} else if err := state.SetPlatformStatus(utxoID, choices.Accepted); err != nil {
+		if err := state.SpendPlatformUTXO(utxoID); err != nil {
 			return err
 		}
 	}

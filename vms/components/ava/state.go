@@ -111,3 +111,43 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 	}
 	return s.DB.Put(id.Bytes(), bytes)
 }
+
+// IDs returns a slice of IDs from storage
+func (s *State) IDs(id ids.ID) ([]ids.ID, error) {
+	if idsIntf, found := s.Cache.Get(id); found {
+		if idSlice, ok := idsIntf.([]ids.ID); ok {
+			return idSlice, nil
+		}
+		return nil, errCacheTypeMismatch
+	}
+
+	bytes, err := s.DB.Get(id.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	idSlice := []ids.ID(nil)
+	if err := s.Codec.Unmarshal(bytes, &idSlice); err != nil {
+		return nil, err
+	}
+
+	s.Cache.Put(id, idSlice)
+	return idSlice, nil
+}
+
+// SetIDs saves a slice of IDs to the database.
+func (s *State) SetIDs(id ids.ID, idSlice []ids.ID) error {
+	if len(idSlice) == 0 {
+		s.Cache.Evict(id)
+		return s.DB.Delete(id.Bytes())
+	}
+
+	s.Cache.Put(id, idSlice)
+
+	bytes, err := s.Codec.Marshal(idSlice)
+	if err != nil {
+		return err
+	}
+
+	return s.DB.Put(id.Bytes(), bytes)
+}
