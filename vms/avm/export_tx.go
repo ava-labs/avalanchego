@@ -4,12 +4,9 @@
 package avm
 
 import (
-	"errors"
-
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -17,47 +14,22 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
-// ExportTx is a transaction that exports an asset to another blockchain.
+// ExportTx is the basis of all transactions.
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
-	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins  []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
+	ExportOuts []*ava.TransferableOutput `serialize:"true"` // The outputs this transaction is sending to the other chain
 }
-
-// InputUTXOs track which UTXOs this transaction is consuming.
-func (t *ExportTx) InputUTXOs() []*ava.UTXOID {
-	utxos := t.BaseTx.InputUTXOs()
-	for _, in := range t.Ins {
-		utxos = append(utxos, &in.UTXOID)
-	}
-	return utxos
-}
-
-// AssetIDs returns the IDs of the assets this transaction depends on
-func (t *ExportTx) AssetIDs() ids.Set {
-	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.Ins {
-		assets.Add(in.AssetID())
-	}
-	return assets
-}
-
-var (
-	errNoExportInputs = errors.New("no export inputs")
-)
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error {
 	switch {
 	case t == nil:
 		return errNilTx
-	case len(t.Ins) == 0:
-		return errNoExportInputs
-	}
-
-	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
-		return err
+	case t.NetID != ctx.NetworkID:
+		return errWrongNetworkID
+	case !t.BCID.Equals(ctx.ChainID):
+		return errWrongChainID
 	}
 
 	fc := ava.NewFlowChecker()
@@ -68,6 +40,16 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
 	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
+		return errOutputsNotSorted
+	}
+
+	for _, out := range t.ExportOuts {
+		if err := out.Verify(); err != nil {
+			return err
+		}
+		fc.Produce(out.AssetID(), out.Output().Amount())
+	}
+	if !ava.IsSortedTransferableOutputs(t.ExportOuts, c) {
 		return errOutputsNotSorted
 	}
 
@@ -83,18 +65,17 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int)
 
 	// TODO: Add the Tx fee to the produced side
 
-	return fc.Verify()
-}
-
-// SemanticVerify that this transaction is well-formed.
-func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
-	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
+	if err := fc.Verify(); err != nil {
 		return err
 	}
 
-	offset := len(t.BaseTx.Ins)
+	return t.Metadata.Verify()
+}
+
+// SemanticVerify that this transaction is valid to be spent.
+func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	for i, in := range t.Ins {
-		cred := creds[i+offset]
+		cred := creds[i]
 
 		fxIndex, err := vm.getFx(cred)
 		if err != nil {
@@ -112,9 +93,6 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		if !utxoAssetID.Equals(inAssetID) {
 			return errAssetIDMismatch
 		}
-		if !utxoAssetID.Equals(vm.ava) {
-			return errWrongAssetID
-		}
 
 		if !vm.verifyFxUsage(fxIndex, inAssetID) {
 			return errIncompatibleFx
@@ -124,6 +102,13 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 			return err
 		}
 	}
+
+	for _, out := range t.ExportOuts {
+		if !out.AssetID().Equals(vm.ava) {
+			return errWrongAssetID
+		}
+	}
+
 	return nil
 }
 
@@ -137,11 +122,11 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := ava.NewPrefixedState(vsmDB, vm.codec)
-	for i, out := range t.Outs {
+	for i, out := range t.ExportOuts {
 		utxo := &ava.UTXO{
 			UTXOID: ava.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(len(t.BaseTx.Outs) + i),
+				OutputIndex: uint32(len(t.Outs) + i),
 			},
 			Asset: ava.Asset{ID: out.AssetID()},
 			Out:   out.Out,
