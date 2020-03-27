@@ -18,6 +18,10 @@ func (TreeFactory) New() Consensus { return &Tree{} }
 
 // Tree implements the snowball interface by using a modified patricia tree.
 type Tree struct {
+	// node is the root that represents the first snowball instance in the tree,
+	// and contains references to all the other snowball instances in the tree.
+	node
+
 	// params contains all the configurations of a snowball instance
 	params Parameters
 
@@ -31,10 +35,6 @@ type Tree struct {
 	// that any later traversal into this sub-tree should call
 	// RecordUnsuccessfulPoll before performing any other action.
 	shouldReset bool
-
-	// root is the node that represents the first snowball instance in the tree,
-	// and contains references to all the other snowball instances in the tree.
-	root node
 }
 
 // Initialize implements the Consensus interface
@@ -44,7 +44,7 @@ func (t *Tree) Initialize(params Parameters, choice ids.ID) {
 	snowball := &unarySnowball{}
 	snowball.Initialize(params.BetaVirtuous)
 
-	t.root = &unaryNode{
+	t.node = &unaryNode{
 		tree:         t,
 		preference:   choice,
 		commonPrefix: ids.NumBits, // The initial state has no conflicts
@@ -57,20 +57,17 @@ func (t *Tree) Parameters() Parameters { return t.params }
 
 // Add implements the Consensus interface
 func (t *Tree) Add(choice ids.ID) {
-	prefix := t.root.DecidedPrefix()
+	prefix := t.node.DecidedPrefix()
 	// Make sure that we haven't already decided against this new id
 	if ids.EqualSubset(0, prefix, t.Preference(), choice) {
-		t.root = t.root.Add(choice)
+		t.node = t.node.Add(choice)
 	}
 }
-
-// Preference implements the Consensus interface
-func (t *Tree) Preference() ids.ID { return t.root.Preference() }
 
 // RecordPoll implements the Consensus interface
 func (t *Tree) RecordPoll(votes ids.Bag) {
 	// Get the assumed decided prefix of the root node.
-	decidedPrefix := t.root.DecidedPrefix()
+	decidedPrefix := t.node.DecidedPrefix()
 
 	// If any of the bits differ from the preference in this prefix, the vote is
 	// for a rejected operation. So, we filter out these invalid votes.
@@ -78,7 +75,7 @@ func (t *Tree) RecordPoll(votes ids.Bag) {
 
 	// Now that the votes have been restricted to valid votes, pass them into
 	// the first snowball instance
-	t.root = t.root.RecordPoll(filteredVotes, t.shouldReset)
+	t.node = t.node.RecordPoll(filteredVotes, t.shouldReset)
 
 	// Because we just passed the reset into the snowball instance, we should no
 	// longer reset.
@@ -88,14 +85,11 @@ func (t *Tree) RecordPoll(votes ids.Bag) {
 // RecordUnsuccessfulPoll implements the Consensus interface
 func (t *Tree) RecordUnsuccessfulPoll() { t.shouldReset = true }
 
-// Finalized implements the Consensus interface
-func (t *Tree) Finalized() bool { return t.root.Finalized() }
-
 func (t *Tree) String() string {
 	builder := strings.Builder{}
 
 	prefixes := []string{""}
-	nodes := []node{t.root}
+	nodes := []node{t.node}
 
 	for len(prefixes) > 0 {
 		newSize := len(prefixes) - 1
