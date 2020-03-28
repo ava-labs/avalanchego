@@ -27,11 +27,12 @@ func TestTopologicalTxIssued(t *testing.T) { TxIssuedTest(t, TopologicalFactory{
 func TestAvalancheVoting(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:              prometheus.NewRegistry(),
+			K:                    2,
+			Alpha:                2,
+			BetaVirtuous:         1,
+			BetaRogue:            2,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -106,11 +107,12 @@ func TestAvalancheVoting(t *testing.T) {
 func TestAvalancheTransitiveVoting(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:              prometheus.NewRegistry(),
+			K:                    2,
+			Alpha:                2,
+			BetaVirtuous:         1,
+			BetaRogue:            2,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -199,11 +201,12 @@ func TestAvalancheTransitiveVoting(t *testing.T) {
 func TestAvalancheSplitVoting(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:              prometheus.NewRegistry(),
+			K:                    2,
+			Alpha:                2,
+			BetaVirtuous:         1,
+			BetaRogue:            2,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -262,11 +265,12 @@ func TestAvalancheSplitVoting(t *testing.T) {
 func TestAvalancheTransitiveRejection(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:              prometheus.NewRegistry(),
+			K:                    2,
+			Alpha:                2,
+			BetaVirtuous:         1,
+			BetaRogue:            2,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -363,11 +367,12 @@ func TestAvalancheTransitiveRejection(t *testing.T) {
 func TestAvalancheVirtuous(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:              prometheus.NewRegistry(),
+			K:                    2,
+			Alpha:                2,
+			BetaVirtuous:         1,
+			BetaRogue:            2,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -489,6 +494,7 @@ func TestAvalancheIsVirtuous(t *testing.T) {
 			Alpha:        2,
 			BetaVirtuous: 1,
 			BetaRogue:    2,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -572,6 +578,7 @@ func TestAvalancheQuiesce(t *testing.T) {
 			Alpha:        1,
 			BetaVirtuous: 1,
 			BetaRogue:    1,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -665,6 +672,7 @@ func TestAvalancheOrphans(t *testing.T) {
 			Alpha:        1,
 			BetaVirtuous: math.MaxInt32,
 			BetaRogue:    math.MaxInt32,
+			ConcurrentRepolls:    1,
 		},
 		Parents:   2,
 		BatchSize: 1,

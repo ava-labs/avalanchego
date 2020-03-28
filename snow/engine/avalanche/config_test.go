@@ -26,11 +26,12 @@ func DefaultConfig() Config {
 		},
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            1,
-				Alpha:        1,
-				BetaVirtuous: 1,
-				BetaRogue:    2,
+				Metrics:              prometheus.NewRegistry(),
+				K:                    1,
+				Alpha:                1,
+				BetaVirtuous:         1,
+				BetaRogue:            2,
+				ConcurrentRepolls:    1,
 			},
 			Parents:   2,
 			BatchSize: 1,
