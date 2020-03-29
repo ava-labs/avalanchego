@@ -13,7 +13,7 @@ var (
 
 // TransferInput ...
 type TransferInput struct {
-	Amt   uint64 `serialize:"true"`
+	Amt   uint64 `serialize:"true" json:"amount"`
 	Input `serialize:"true"`
 }
 

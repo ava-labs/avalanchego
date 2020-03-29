@@ -14,9 +14,6 @@ import (
 )
 
 var (
-	errNilOperableOutput   = errors.New("nil operable output is not valid")
-	errNilOperableFxOutput = errors.New("nil operable feature extension output is not valid")
-
 	errNilOperableInput   = errors.New("nil operable input is not valid")
 	errNilOperableFxInput = errors.New("nil operable feature extension input is not valid")
 )
@@ -25,7 +22,7 @@ var (
 type OperableInput struct {
 	ava.UTXOID `serialize:"true"`
 
-	In verify.Verifiable `serialize:"true"`
+	In verify.Verifiable `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.

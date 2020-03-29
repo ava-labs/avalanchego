@@ -23,8 +23,8 @@ var (
 type Operation struct {
 	ava.Asset `serialize:"true"`
 
-	Ins  []*OperableInput    `serialize:"true"`
-	Outs []verify.Verifiable `serialize:"true"`
+	Ins  []*OperableInput    `serialize:"true" json:"inputs"`
+	Outs []verify.Verifiable `serialize:"true" json:"outputs"`
 }
 
 // Verify implements the verify.Verifiable interface

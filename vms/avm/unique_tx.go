@@ -24,7 +24,6 @@ var (
 // performance boost
 type UniqueTx struct {
 	*TxState
-
 	vm   *VM
 	txID ids.ID
 }

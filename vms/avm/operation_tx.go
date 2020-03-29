@@ -23,7 +23,7 @@ var (
 // OperationTx is a transaction with no credentials.
 type OperationTx struct {
 	BaseTx `serialize:"true"`
-	Ops    []*Operation `serialize:"true"`
+	Ops    []*Operation `serialize:"true" json:"operations"`
 }
 
 // Operations track which ops this transaction is performing. The returned array

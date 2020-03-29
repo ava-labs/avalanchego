@@ -16,7 +16,7 @@ var (
 
 // Asset ...
 type Asset struct {
-	ID ids.ID `serialize:"true"`
+	ID ids.ID `serialize:"true" json:"assetID"`
 }
 
 // AssetID returns the ID of the contained asset
