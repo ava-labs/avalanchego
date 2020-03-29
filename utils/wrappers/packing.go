@@ -24,6 +24,8 @@ const (
 	IntLen = 4
 	// LongLen is the number of bytes per long
 	LongLen = 8
+	// BoolLen is the number of bytes per bool
+	BoolLen = 1
 )
 
 var (
@@ -242,7 +244,9 @@ func (p *Packer) PackFixedByteSlices(byteSlices [][]byte) {
 	}
 }
 
-// UnpackFixedByteSlices unpack a byte slice slice to the byte array
+// UnpackFixedByteSlices returns a byte slice slice from the byte array.
+// Each byte slice has the specified size. The number of byte slices is
+// read from the byte array.
 func (p *Packer) UnpackFixedByteSlices(size int) [][]byte {
 	sliceSize := p.UnpackInt()
 	bytes := [][]byte(nil)
