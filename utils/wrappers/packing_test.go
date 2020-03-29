@@ -11,6 +11,7 @@ import (
 const (
 	ByteSentinal  = 0
 	ShortSentinal = 0
+	IntSentinal   = 0
 )
 
 func TestPackerPackByte(t *testing.T) {
@@ -102,7 +103,7 @@ func TestPackerUnpackShort(t *testing.T) {
 	}
 }
 
-func TestPackerInt(t *testing.T) {
+func TestPackerPackInt(t *testing.T) {
 	p := Packer{MaxSize: 4}
 
 	p.PackInt(0x01020304)
@@ -118,6 +119,34 @@ func TestPackerInt(t *testing.T) {
 	expected := []byte{0x01, 0x02, 0x03, 0x04}
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackInt wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
+	}
+
+	p.PackInt(0x05060708)
+	if !p.Errored() {
+		t.Fatal("Packer.PackInt did not fail when attempt was beyond p.MaxSize")
+	}
+}
+
+func TestPackerUnpackInt(t *testing.T) {
+	var (
+		p                  = Packer{Bytes: []byte{0x01, 0x02, 0x03, 0x04}, Offset: 0}
+		actual             = p.UnpackInt()
+		expected    uint32 = 0x01020304
+		expectedLen        = IntLen
+	)
+	if p.Errored() {
+		t.Fatalf("Packer.UnpackInt unexpectedly raised %s", p.Err)
+	} else if actual != expected {
+		t.Fatalf("Packer.UnpackInt returned %d, but expected %d", actual, expected)
+	} else if p.Offset != expectedLen {
+		t.Fatalf("Packer.UnpackInt left Offset %d, expected %d", p.Offset, expectedLen)
+	}
+
+	actual = p.UnpackInt()
+	if !p.Errored() {
+		t.Fatalf("Packer.UnpackInt should have set error, due to attempted out of bounds read")
+	} else if actual != IntSentinal {
+		t.Fatalf("Packer.UnpackInt returned %d, expected sentinal value %d", actual, IntSentinal)
 	}
 }
 
