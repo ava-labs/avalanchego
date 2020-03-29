@@ -12,6 +12,7 @@ const (
 	ByteSentinal  = 0
 	ShortSentinal = 0
 	IntSentinal   = 0
+	LongSentinal  = 0
 )
 
 func TestPackerPackByte(t *testing.T) {
@@ -150,7 +151,7 @@ func TestPackerUnpackInt(t *testing.T) {
 	}
 }
 
-func TestPackerLong(t *testing.T) {
+func TestPackerPackLong(t *testing.T) {
 	p := Packer{MaxSize: 8}
 
 	p.PackLong(0x0102030405060708)
@@ -166,6 +167,34 @@ func TestPackerLong(t *testing.T) {
 	expected := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackLong wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
+	}
+
+	p.PackLong(0x090a0b0c0d0e0f00)
+	if !p.Errored() {
+		t.Fatal("Packer.PackLong did not fail when attempt was beyond p.MaxSize")
+	}
+}
+
+func TestPackerUnpackLong(t *testing.T) {
+	var (
+		p                  = Packer{Bytes: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, Offset: 0}
+		actual             = p.UnpackLong()
+		expected    uint64 = 0x0102030405060708
+		expectedLen        = LongLen
+	)
+	if p.Errored() {
+		t.Fatalf("Packer.UnpackLong unexpectedly raised %s", p.Err)
+	} else if actual != expected {
+		t.Fatalf("Packer.UnpackLong returned %d, but expected %d", actual, expected)
+	} else if p.Offset != expectedLen {
+		t.Fatalf("Packer.UnpackLong left Offset %d, expected %d", p.Offset, expectedLen)
+	}
+
+	actual = p.UnpackLong()
+	if !p.Errored() {
+		t.Fatalf("Packer.UnpackLong should have set error, due to attempted out of bounds read")
+	} else if actual != LongSentinal {
+		t.Fatalf("Packer.UnpackLong returned %d, expected sentinal value %d", actual, LongSentinal)
 	}
 }
 
