@@ -17,6 +17,32 @@ const (
 	BoolSentinal  = false
 )
 
+func TestPackerCheckSpace(t *testing.T) {
+	p := Packer{Offset: -1}
+	p.CheckSpace(1)
+	if !p.Errored() {
+		t.Fatal("Expected errNegativeOffset")
+	}
+
+	p = Packer{}
+	p.CheckSpace(-1)
+	if !p.Errored() {
+		t.Fatal("Expected errInvalidInput")
+	}
+
+	p = Packer{Bytes: []byte{0x01}, Offset: 1}
+	p.CheckSpace(1)
+	if !p.Errored() {
+		t.Fatal("Expected errBadLength")
+	}
+
+	p = Packer{Bytes: []byte{0x01}, Offset: 2}
+	p.CheckSpace(0)
+	if !p.Errored() {
+		t.Fatal("Expected errBadLength, due to out of bounds offset")
+	}
+}
+
 func TestPackerPackByte(t *testing.T) {
 	p := Packer{MaxSize: 1}
 
