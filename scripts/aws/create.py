@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Start a number of AVA nodes on Amazon EC2
 """
