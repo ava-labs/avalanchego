@@ -6,12 +6,12 @@ import (
 )
 
 func TestClockSet(t *testing.T) {
-	clock := Clock{false, time.Unix(1000000, 0)}
-	clock.Set(time.Unix(0, 0))
+	clock := Clock{}
+	clock.Set(time.Unix(1000000, 0))
 	if clock.faked == false {
 		t.Error("Fake time was set, but .faked flag was not set")
 	}
-	if !clock.Time().Equal(time.Unix(0, 0)) {
+	if !clock.Time().Equal(time.Unix(1000000, 0)) {
 		t.Error("Fake time was set, but not returned")
 	}
 }
