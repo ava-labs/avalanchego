@@ -71,3 +71,16 @@ func TestParametersInvalidBetaRogue(t *testing.T) {
 		t.Fatalf("Should have failed due to invalid beta rogue")
 	}
 }
+
+func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
+	p := Parameters{
+		K:            1,
+		Alpha:        1,
+		BetaVirtuous: 28,
+		BetaRogue:    3,
+	}
+
+	if err := p.Valid(); err == nil {
+		t.Fatalf("Should have failed due to invalid beta rogue")
+	}
+}
