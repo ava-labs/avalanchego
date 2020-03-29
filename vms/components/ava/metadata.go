@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package ava
 
 import (
 	"errors"
@@ -15,25 +15,26 @@ var (
 	errMetadataNotInitialize = errors.New("metadata was never initialized and is not valid")
 )
 
-type metadata struct {
+// Metadata ...
+type Metadata struct {
 	id    ids.ID // The ID of this data
 	bytes []byte // Byte representation of this data
 }
 
-// Bytes returns the binary representation of this data
-func (md *metadata) Initialize(bytes []byte) {
+// Initialize set the bytes and ID
+func (md *Metadata) Initialize(bytes []byte) {
 	md.id = ids.NewID(hashing.ComputeHash256Array(bytes))
 	md.bytes = bytes
 }
 
 // ID returns the unique ID of this data
-func (md *metadata) ID() ids.ID { return md.id }
+func (md *Metadata) ID() ids.ID { return md.id }
 
 // Bytes returns the binary representation of this data
-func (md *metadata) Bytes() []byte { return md.bytes }
+func (md *Metadata) Bytes() []byte { return md.bytes }
 
 // Verify implements the verify.Verifiable interface
-func (md *metadata) Verify() error {
+func (md *Metadata) Verify() error {
 	switch {
 	case md == nil:
 		return errNilMetadata

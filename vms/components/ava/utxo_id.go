@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package ava
 
 import (
 	"errors"
@@ -20,7 +20,9 @@ type UTXOID struct {
 	TxID        ids.ID `serialize:"true"`
 	OutputIndex uint32 `serialize:"true"`
 
-	// Cached:
+	// Symbol is false if the UTXO should be part of the DB
+	Symbol bool
+	// id is the unique ID of a UTXO, it is calculated from TxID and OutputIndex
 	id ids.ID
 }
 
@@ -34,6 +36,10 @@ func (utxo *UTXOID) InputID() ids.ID {
 	}
 	return utxo.id
 }
+
+// Symbolic returns if this is the ID of a UTXO in the DB, or if it is a
+// symbolic input
+func (utxo *UTXOID) Symbolic() bool { return utxo.Symbol }
 
 // Verify implements the verify.Verifiable interface
 func (utxo *UTXOID) Verify() error {

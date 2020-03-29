@@ -148,8 +148,8 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
 		}
 		// TODO: Not sure how else to make this not nil pointer error during tests
-		if tx.vm.ChainManager != nil {
-			tx.vm.ChainManager.CreateChain(chainParams)
+		if tx.vm.chainManager != nil {
+			tx.vm.chainManager.CreateChain(chainParams)
 		}
 	}
 

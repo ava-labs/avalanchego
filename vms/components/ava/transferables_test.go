@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package ava
 
 import (
 	"bytes"
@@ -21,11 +21,7 @@ func TestTransferableOutputVerifyNil(t *testing.T) {
 }
 
 func TestTransferableOutputVerifyNilFx(t *testing.T) {
-	to := &TransferableOutput{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
-	}
+	to := &TransferableOutput{Asset: Asset{ID: ids.Empty}}
 	if err := to.Verify(); err == nil {
 		t.Fatalf("Should have errored due to nil transferable fx output")
 	}
@@ -33,12 +29,8 @@ func TestTransferableOutputVerifyNilFx(t *testing.T) {
 
 func TestTransferableOutputVerify(t *testing.T) {
 	to := &TransferableOutput{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
-		Out: &TestTransferable{
-			Val: 1,
-		},
+		Asset: Asset{ID: ids.Empty},
+		Out:   &TestTransferable{Val: 1},
 	}
 	if err := to.Verify(); err != nil {
 		t.Fatal(err)
@@ -54,34 +46,24 @@ func TestTransferableOutputSorting(t *testing.T) {
 
 	outs := []*TransferableOutput{
 		&TransferableOutput{
-			Asset: Asset{
-				ID: ids.NewID([32]byte{1}),
-			},
-			Out: &TestTransferable{Val: 1},
+			Asset: Asset{ID: ids.NewID([32]byte{1})},
+			Out:   &TestTransferable{Val: 1},
 		},
 		&TransferableOutput{
-			Asset: Asset{
-				ID: ids.Empty,
-			},
-			Out: &TestTransferable{Val: 1},
+			Asset: Asset{ID: ids.Empty},
+			Out:   &TestTransferable{Val: 1},
 		},
 		&TransferableOutput{
-			Asset: Asset{
-				ID: ids.NewID([32]byte{1}),
-			},
-			Out: &TestTransferable{Val: 0},
+			Asset: Asset{ID: ids.NewID([32]byte{1})},
+			Out:   &TestTransferable{Val: 0},
 		},
 		&TransferableOutput{
-			Asset: Asset{
-				ID: ids.Empty,
-			},
-			Out: &TestTransferable{Val: 0},
+			Asset: Asset{ID: ids.Empty},
+			Out:   &TestTransferable{Val: 0},
 		},
 		&TransferableOutput{
-			Asset: Asset{
-				ID: ids.Empty,
-			},
-			Out: &TestTransferable{Val: 0},
+			Asset: Asset{ID: ids.Empty},
+			Out:   &TestTransferable{Val: 0},
 		},
 	}
 
@@ -243,11 +225,11 @@ func TestTransferableInputSorting(t *testing.T) {
 		},
 	}
 
-	if isSortedAndUniqueTransferableInputs(ins) {
+	if IsSortedAndUniqueTransferableInputs(ins) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	sortTransferableInputs(ins)
-	if !isSortedAndUniqueTransferableInputs(ins) {
+	SortTransferableInputs(ins)
+	if !IsSortedAndUniqueTransferableInputs(ins) {
 		t.Fatalf("Should be sorted")
 	}
 
@@ -260,7 +242,7 @@ func TestTransferableInputSorting(t *testing.T) {
 		In:    &TestTransferable{},
 	})
 
-	if isSortedAndUniqueTransferableInputs(ins) {
+	if IsSortedAndUniqueTransferableInputs(ins) {
 		t.Fatalf("Shouldn't be unique")
 	}
 }

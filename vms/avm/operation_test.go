@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestOperationVerifyNil(t *testing.T) {
@@ -21,9 +23,7 @@ func TestOperationVerifyNil(t *testing.T) {
 func TestOperationVerifyEmpty(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
+		Asset: ava.Asset{ID: ids.Empty},
 	}
 	if err := op.Verify(c); err == nil {
 		t.Fatalf("Should have errored due to empty operation")
@@ -33,9 +33,7 @@ func TestOperationVerifyEmpty(t *testing.T) {
 func TestOperationVerifyInvalidInput(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
+		Asset: ava.Asset{ID: ids.Empty},
 		Ins: []*OperableInput{
 			&OperableInput{},
 		},
@@ -45,41 +43,24 @@ func TestOperationVerifyInvalidInput(t *testing.T) {
 	}
 }
 
-func TestOperationVerifyInvalidOutput(t *testing.T) {
-	c := codec.NewDefault()
-	op := &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
-		Outs: []*OperableOutput{
-			&OperableOutput{},
-		},
-	}
-	if err := op.Verify(c); err == nil {
-		t.Fatalf("Should have errored due to an invalid output")
-	}
-}
-
 func TestOperationVerifyInputsNotSorted(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
+		Asset: ava.Asset{ID: ids.Empty},
 		Ins: []*OperableInput{
 			&OperableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 1,
 				},
-				In: &testVerifiable{},
+				In: &ava.TestVerifiable{},
 			},
 			&OperableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
-				In: &testVerifiable{},
+				In: &ava.TestVerifiable{},
 			},
 		},
 	}
@@ -90,19 +71,13 @@ func TestOperationVerifyInputsNotSorted(t *testing.T) {
 
 func TestOperationVerifyOutputsNotSorted(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&TestTransferable{})
+	c.RegisterType(&ava.TestTransferable{})
 
 	op := &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
-		Outs: []*OperableOutput{
-			&OperableOutput{
-				Out: &TestTransferable{Val: 1},
-			},
-			&OperableOutput{
-				Out: &TestTransferable{Val: 0},
-			},
+		Asset: ava.Asset{ID: ids.Empty},
+		Outs: []verify.Verifiable{
+			&ava.TestTransferable{Val: 1},
+			&ava.TestTransferable{Val: 0},
 		},
 	}
 	if err := op.Verify(c); err == nil {
@@ -113,13 +88,9 @@ func TestOperationVerifyOutputsNotSorted(t *testing.T) {
 func TestOperationVerify(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
-		Outs: []*OperableOutput{
-			&OperableOutput{
-				Out: &testVerifiable{},
-			},
+		Asset: ava.Asset{ID: ids.Empty},
+		Outs: []verify.Verifiable{
+			&ava.TestVerifiable{},
 		},
 	}
 	if err := op.Verify(c); err != nil {
@@ -129,34 +100,30 @@ func TestOperationVerify(t *testing.T) {
 
 func TestOperationSorting(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&testVerifiable{})
+	c.RegisterType(&ava.TestVerifiable{})
 
 	ops := []*Operation{
 		&Operation{
-			Asset: Asset{
-				ID: ids.Empty,
-			},
+			Asset: ava.Asset{ID: ids.Empty},
 			Ins: []*OperableInput{
 				&OperableInput{
-					UTXOID: UTXOID{
+					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 1,
 					},
-					In: &testVerifiable{},
+					In: &ava.TestVerifiable{},
 				},
 			},
 		},
 		&Operation{
-			Asset: Asset{
-				ID: ids.Empty,
-			},
+			Asset: ava.Asset{ID: ids.Empty},
 			Ins: []*OperableInput{
 				&OperableInput{
-					UTXOID: UTXOID{
+					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					In: &testVerifiable{},
+					In: &ava.TestVerifiable{},
 				},
 			},
 		},
@@ -169,16 +136,14 @@ func TestOperationSorting(t *testing.T) {
 		t.Fatalf("Should be sorted")
 	}
 	ops = append(ops, &Operation{
-		Asset: Asset{
-			ID: ids.Empty,
-		},
+		Asset: ava.Asset{ID: ids.Empty},
 		Ins: []*OperableInput{
 			&OperableInput{
-				UTXOID: UTXOID{
+				UTXOID: ava.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 1,
 				},
-				In: &testVerifiable{},
+				In: &ava.TestVerifiable{},
 			},
 		},
 	})

@@ -6,10 +6,12 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -27,31 +29,17 @@ var (
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
-	metadata
+	ava.Metadata
 
-	NetID uint32                `serialize:"true"` // ID of the network this chain lives on
-	BCID  ids.ID                `serialize:"true"` // ID of the chain on which this transaction exists (prevents replay attacks)
-	Outs  []*TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins   []*TransferableInput  `serialize:"true"` // The inputs to this transaction
+	NetID uint32                    `serialize:"true"` // ID of the network this chain lives on
+	BCID  ids.ID                    `serialize:"true"` // ID of the chain on which this transaction exists (prevents replay attacks)
+	Outs  []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
+	Ins   []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
 }
 
-// NetworkID is the ID of the network on which this transaction exists
-func (t *BaseTx) NetworkID() uint32 { return t.NetID }
-
-// ChainID is the ID of the chain on which this transaction exists
-func (t *BaseTx) ChainID() ids.ID { return t.BCID }
-
-// Outputs track which outputs this transaction is producing. The returned array
-// should not be modified.
-func (t *BaseTx) Outputs() []*TransferableOutput { return t.Outs }
-
-// Inputs track which UTXOs this transaction is consuming. The returned array
-// should not be modified.
-func (t *BaseTx) Inputs() []*TransferableInput { return t.Ins }
-
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *BaseTx) InputUTXOs() []*UTXOID {
-	utxos := []*UTXOID(nil)
+func (t *BaseTx) InputUTXOs() []*ava.UTXOID {
+	utxos := []*ava.UTXOID(nil)
 	for _, in := range t.Ins {
 		utxos = append(utxos, &in.UTXOID)
 	}
@@ -68,19 +56,17 @@ func (t *BaseTx) AssetIDs() ids.Set {
 }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *BaseTx) UTXOs() []*UTXO {
+func (t *BaseTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
-	utxos := make([]*UTXO, len(t.Outs))
+	utxos := make([]*ava.UTXO, len(t.Outs))
 	for i, out := range t.Outs {
-		utxos[i] = &UTXO{
-			UTXOID: UTXOID{
+		utxos[i] = &ava.UTXO{
+			UTXOID: ava.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(i),
 			},
-			Asset: Asset{
-				ID: out.AssetID(),
-			},
-			Out: out.Out,
+			Asset: ava.Asset{ID: out.AssetID()},
+			Out:   out.Out,
 		}
 	}
 	return utxos
@@ -97,12 +83,14 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		return errWrongChainID
 	}
 
+	fc := ava.NewFlowChecker()
 	for _, out := range t.Outs {
 		if err := out.Verify(); err != nil {
 			return err
 		}
+		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !IsSortedTransferableOutputs(t.Outs, c) {
+	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -110,100 +98,36 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 		if err := in.Verify(); err != nil {
 			return err
 		}
+		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !isSortedAndUniqueTransferableInputs(t.Ins) {
+	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 
-	consumedFunds := map[[32]byte]uint64{}
-	for _, in := range t.Ins {
-		assetID := in.AssetID()
-		amount := in.Input().Amount()
+	// TODO: Add the Tx fee to the produced side
 
-		var err error
-		assetIDKey := assetID.Key()
-		consumedFunds[assetIDKey], err = math.Add64(consumedFunds[assetIDKey], amount)
-
-		if err != nil {
-			return errInputOverflow
-		}
-	}
-	producedFunds := map[[32]byte]uint64{}
-	for _, out := range t.Outs {
-		assetID := out.AssetID()
-		amount := out.Output().Amount()
-
-		var err error
-		assetIDKey := assetID.Key()
-		producedFunds[assetIDKey], err = math.Add64(producedFunds[assetIDKey], amount)
-
-		if err != nil {
-			return errOutputOverflow
-		}
+	if err := fc.Verify(); err != nil {
+		return err
 	}
 
-	// TODO: Add the Tx fee to the producedFunds
-
-	for assetID, producedAssetAmount := range producedFunds {
-		consumedAssetAmount := consumedFunds[assetID]
-		if producedAssetAmount > consumedAssetAmount {
-			return errInsufficientFunds
-		}
-	}
-
-	return t.metadata.Verify()
+	return t.Metadata.Verify()
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
+func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	for i, in := range t.Ins {
 		cred := creds[i]
 
-		fxIndex, err := vm.getFx(cred.Cred)
+		fxIndex, err := vm.getFx(cred)
 		if err != nil {
 			return err
 		}
 		fx := vm.fxs[fxIndex].Fx
 
-		utxoID := in.InputID()
-		utxo, err := vm.state.UTXO(utxoID)
-		if err == nil {
-			utxoAssetID := utxo.AssetID()
-			inAssetID := in.AssetID()
-			if !utxoAssetID.Equals(inAssetID) {
-				return errAssetIDMismatch
-			}
-
-			if !vm.verifyFxUsage(fxIndex, inAssetID) {
-				return errIncompatibleFx
-			}
-
-			err = fx.VerifyTransfer(uTx, utxo.Out, in.In, cred.Cred)
-			if err == nil {
-				continue
-			}
+		utxo, err := vm.getUTXO(&in.UTXOID)
+		if err != nil {
 			return err
 		}
-
-		inputTx, inputIndex := in.InputSource()
-		parent := UniqueTx{
-			vm:   vm,
-			txID: inputTx,
-		}
-
-		if err := parent.Verify(); err != nil {
-			return errMissingUTXO
-		} else if status := parent.Status(); status.Decided() {
-			return errMissingUTXO
-		}
-
-		utxos := parent.UTXOs()
-
-		if uint32(len(utxos)) <= inputIndex || int(inputIndex) < 0 {
-			return errInvalidUTXO
-		}
-
-		utxo = utxos[int(inputIndex)]
 
 		utxoAssetID := utxo.AssetID()
 		inAssetID := in.AssetID()
@@ -215,9 +139,12 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) erro
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred.Cred); err != nil {
+		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
 			return err
 		}
 	}
 	return nil
 }
+
+// ExecuteWithSideEffects writes the batch with any additional side effects
+func (t *BaseTx) ExecuteWithSideEffects(_ *VM, batch database.Batch) error { return batch.Write() }

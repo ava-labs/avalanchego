@@ -28,7 +28,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -48,7 +48,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID+1,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -67,7 +67,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -87,7 +87,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -107,7 +107,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -126,7 +126,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix())-1,
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -147,7 +147,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix())-1,
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -167,7 +167,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix())+1,
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -187,7 +187,7 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -212,7 +212,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix())+1,
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -235,7 +235,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -245,7 +245,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	_, _, _, _, err = tx.SemanticVerify(vm.DB)
 	if err != nil {
-		t.Log(testSubnet1.ID)
+		t.Log(testSubnet1.id)
 		subnets, err := vm.getSubnets(vm.DB)
 		if err != nil {
 			t.Fatal(err)
@@ -253,7 +253,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		if len(subnets) == 0 {
 			t.Fatal("no subnets found")
 		}
-		t.Logf("subnets[0].ID: %v", subnets[0].ID)
+		t.Logf("subnets[0].ID: %v", subnets[0].id)
 		t.Fatal(err)
 	}
 
@@ -290,7 +290,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(DSStartTime.Unix()), // start validating non-default subnet before default subnet
 		uint64(DSEndTime.Unix()),
 		pendingDSValidatorID,
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -324,7 +324,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(DSStartTime.Unix())-1, // start validating non-default subnet before default subnet
 		uint64(DSEndTime.Unix()),
 		pendingDSValidatorID,
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -346,7 +346,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(DSStartTime.Unix()),
 		uint64(DSEndTime.Unix())+1, // stop validating non-default subnet after stopping validating default subnet
 		pendingDSValidatorID,
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -368,7 +368,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(DSStartTime.Unix()), // same start time as for default subnet
 		uint64(DSEndTime.Unix()),   // same end time as for default subnet
 		pendingDSValidatorID,
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,
@@ -389,12 +389,12 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
-		defaultNonce+1,              // nonce
-		defaultWeight,               // weight
-		uint64(newTimestamp.Unix()), // start time
+		defaultNonce+1,                                          // nonce
+		defaultWeight,                                           // weight
+		uint64(newTimestamp.Unix()),                             // start time
 		uint64(newTimestamp.Add(MinimumStakingDuration).Unix()), // end time
 		defaultKey.PublicKey().Address(),                        // node ID
-		testSubnet1.ID,                                          // subnet ID
+		testSubnet1.id,                                          // subnet ID
 		testNetworkID,                                           // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey, // tx fee payer
@@ -429,7 +429,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
 		defaultKey.PublicKey().Address(),        // node ID
-		testSubnet1.ID,                          // subnet ID
+		testSubnet1.id,                          // subnet ID
 		testNetworkID,                           // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		newAcctKey.(*crypto.PrivateKeySECP256K1R), // tx fee payer
@@ -451,7 +451,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
 		defaultKey.PublicKey().Address(),        // node ID
-		testSubnet1.ID,                          // subnet ID
+		testSubnet1.id,                          // subnet ID
 		testNetworkID,                           // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey, // tx fee payer
@@ -465,7 +465,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 			SortByStartTime: false,
 			Txs:             []TimedTx{tx},
 		},
-		testSubnet1.ID,
+		testSubnet1.id,
 	)
 	// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 
@@ -475,7 +475,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
 		defaultKey.PublicKey().Address(),        // node ID
-		testSubnet1.ID,                          // subnet ID
+		testSubnet1.id,                          // subnet ID
 		testNetworkID,                           // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey, // tx fee payer
@@ -494,17 +494,17 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		&EventHeap{
 			SortByStartTime: false,
 		},
-		testSubnet1.ID,
+		testSubnet1.id,
 	)
 
 	// Case 9: Too many signatures
 	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
-		defaultNonce+1,                    // nonce
-		defaultWeight,                     // weight
-		uint64(defaultGenesisTime.Unix()), // start time
+		defaultNonce+1,                                                  // nonce
+		defaultWeight,                                                   // weight
+		uint64(defaultGenesisTime.Unix()),                               // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		keys[0].PublicKey().Address(),                                   // node ID
-		testSubnet1.ID,                                                  // subnet ID
+		testSubnet1.id,                                                  // subnet ID
 		testNetworkID,                                                   // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		defaultKey, // tx fee payer
@@ -520,12 +520,12 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case 10: Too few signatures
 	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
-		defaultNonce+1,                    // nonce
-		defaultWeight,                     // weight
-		uint64(defaultGenesisTime.Unix()), // start time
+		defaultNonce+1,                                                // nonce
+		defaultWeight,                                                 // weight
+		uint64(defaultGenesisTime.Unix()),                             // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		keys[0].PublicKey().Address(),                                 // node ID
-		testSubnet1.ID,                                                // subnet ID
+		testSubnet1.id,                                                // subnet ID
 		testNetworkID,                                                 // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[2]},
 		defaultKey, // tx fee payer
@@ -541,12 +541,12 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case 10: Control Signature from invalid key
 	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
-		defaultNonce+1,                    // nonce
-		defaultWeight,                     // weight
-		uint64(defaultGenesisTime.Unix()), // start time
+		defaultNonce+1,                                                // nonce
+		defaultWeight,                                                 // weight
+		uint64(defaultGenesisTime.Unix()),                             // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		keys[0].PublicKey().Address(),                                 // node ID
-		testSubnet1.ID,                                                // subnet ID
+		testSubnet1.id,                                                // subnet ID
 		testNetworkID,                                                 // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], keys[3]},
 		defaultKey, // tx fee payer
@@ -563,12 +563,12 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	// Case 11: Proposed validator in pending validator set for subnet
 	// First, add validator to pending validator set of subnet
 	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
-		defaultNonce+1,                      // nonce
-		defaultWeight,                       // weight
-		uint64(defaultGenesisTime.Unix())+1, // start time
+		defaultNonce+1,                                                  // nonce
+		defaultWeight,                                                   // weight
+		uint64(defaultGenesisTime.Unix())+1,                             // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		defaultKey.PublicKey().Address(),                                // node ID
-		testSubnet1.ID,                                                  // subnet ID
+		testSubnet1.id,                                                  // subnet ID
 		testNetworkID,                                                   // network ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey, // tx fee payer
@@ -582,7 +582,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{tx},
 		},
-		testSubnet1.ID,
+		testSubnet1.id,
 	)
 	// Node with ID nodeIDKey.PublicKey().Address() now pending validator for subnet with ID testSubnet1.ID
 
@@ -604,7 +604,7 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		defaultKey.PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		defaultKey,

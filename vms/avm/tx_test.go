@@ -8,7 +8,9 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -42,37 +44,29 @@ func TestTxInvalidCredential(t *testing.T) {
 	c.RegisterType(&secp256k1fx.MintInput{})
 	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.Credential{})
-	c.RegisterType(&testVerifiable{})
+	c.RegisterType(&ava.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &OperationTx{BaseTx: BaseTx{
+		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*TransferableInput{
-				&TransferableInput{
-					UTXOID: UTXOID{
-						TxID:        ids.Empty,
-						OutputIndex: 0,
-					},
-					Asset: Asset{
-						ID: asset,
-					},
-					In: &secp256k1fx.TransferInput{
-						Amt: 20 * units.KiloAva,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{
-								0,
-							},
+			Ins: []*ava.TransferableInput{&ava.TransferableInput{
+				UTXOID: ava.UTXOID{
+					TxID:        ids.Empty,
+					OutputIndex: 0,
+				},
+				Asset: ava.Asset{ID: asset},
+				In: &secp256k1fx.TransferInput{
+					Amt: 20 * units.KiloAva,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
 						},
 					},
 				},
-			},
-		}},
-		Creds: []*Credential{
-			&Credential{
-				Cred: &testVerifiable{err: errUnneededAddress},
-			},
+			}},
 		},
+		Creds: []verify.Verifiable{&ava.TestVerifiable{Err: errUnneededAddress}},
 	}
 
 	b, err := c.Marshal(tx)
@@ -96,21 +90,19 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	c.RegisterType(&secp256k1fx.MintInput{})
 	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.Credential{})
-	c.RegisterType(&testVerifiable{})
+	c.RegisterType(&ava.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &OperationTx{BaseTx: BaseTx{
+		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*TransferableInput{
-				&TransferableInput{
-					UTXOID: UTXOID{
+			Ins: []*ava.TransferableInput{
+				&ava.TransferableInput{
+					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: Asset{
-						ID: asset,
-					},
+					Asset: ava.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAva,
 						Input: secp256k1fx.Input{
@@ -120,14 +112,12 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 						},
 					},
 				},
-				&TransferableInput{
-					UTXOID: UTXOID{
+				&ava.TransferableInput{
+					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: Asset{
-						ID: asset,
-					},
+					Asset: ava.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAva,
 						Input: secp256k1fx.Input{
@@ -138,14 +128,10 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 					},
 				},
 			},
-		}},
-		Creds: []*Credential{
-			&Credential{
-				Cred: &testVerifiable{},
-			},
-			&Credential{
-				Cred: &testVerifiable{},
-			},
+		},
+		Creds: []verify.Verifiable{
+			&ava.TestVerifiable{},
+			&ava.TestVerifiable{},
 		},
 	}
 
@@ -170,55 +156,42 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	c.RegisterType(&secp256k1fx.MintInput{})
 	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.Credential{})
-	c.RegisterType(&testVerifiable{})
+	c.RegisterType(&ava.TestVerifiable{})
 
 	tx := &Tx{
 		UnsignedTx: &OperationTx{
 			BaseTx: BaseTx{
 				NetID: networkID,
 				BCID:  chainID,
-				Ins: []*TransferableInput{
-					&TransferableInput{
-						UTXOID: UTXOID{
-							TxID:        ids.Empty,
-							OutputIndex: 0,
-						},
-						Asset: Asset{
-							ID: asset,
-						},
-						In: &secp256k1fx.TransferInput{
-							Amt: 20 * units.KiloAva,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{
-									0,
-								},
+				Ins: []*ava.TransferableInput{&ava.TransferableInput{
+					UTXOID: ava.UTXOID{TxID: ids.Empty, OutputIndex: 0},
+					Asset:  ava.Asset{ID: asset},
+					In: &secp256k1fx.TransferInput{
+						Amt: 20 * units.KiloAva,
+						Input: secp256k1fx.Input{
+							SigIndices: []uint32{
+								0,
 							},
 						},
 					},
-				},
+				}},
 			},
 			Ops: []*Operation{
 				&Operation{
-					Asset: Asset{
-						ID: asset,
-					},
+					Asset: ava.Asset{ID: asset},
 					Ins: []*OperableInput{
 						&OperableInput{
-							UTXOID: UTXOID{
+							UTXOID: ava.UTXOID{
 								TxID:        ids.Empty,
 								OutputIndex: 1,
 							},
-							In: &testVerifiable{},
+							In: &ava.TestVerifiable{},
 						},
 					},
 				},
 			},
 		},
-		Creds: []*Credential{
-			&Credential{
-				Cred: &testVerifiable{},
-			},
-		},
+		Creds: []verify.Verifiable{&ava.TestVerifiable{}},
 	}
 
 	b, err := c.Marshal(tx)

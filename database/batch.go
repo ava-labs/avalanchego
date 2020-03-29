@@ -23,6 +23,11 @@ type Batch interface {
 
 	// Replay replays the batch contents.
 	Replay(w KeyValueWriter) error
+
+	// Inner returns a Batch writing to the inner database, if one exists. If
+	// this batch is already writing to the base DB, then itself should be
+	// returned.
+	Inner() Batch
 }
 
 // Batcher wraps the NewBatch method of a backing data store.

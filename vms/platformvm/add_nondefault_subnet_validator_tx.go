@@ -162,7 +162,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	}
 	var subnet *CreateSubnetTx
 	for _, sn := range subnets {
-		if sn.ID.Equals(tx.SubnetID()) {
+		if sn.id.Equals(tx.SubnetID()) {
 			subnet = sn
 			break
 		}

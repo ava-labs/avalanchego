@@ -7,75 +7,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
-
-func TestOperableOutputVerifyNil(t *testing.T) {
-	oo := (*OperableOutput)(nil)
-	if err := oo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil operable output")
-	}
-}
-
-func TestOperableOutputVerifyNilFx(t *testing.T) {
-	oo := &OperableOutput{}
-	if err := oo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil operable fx output")
-	}
-}
-
-func TestOperableOutputVerify(t *testing.T) {
-	oo := &OperableOutput{
-		Out: &testVerifiable{},
-	}
-	if err := oo.Verify(); err != nil {
-		t.Fatal(err)
-	}
-	if oo.Output() != oo.Out {
-		t.Fatalf("Should have returned the fx output")
-	}
-}
-
-func TestOperableOutputSorting(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&TestTransferable{})
-	c.RegisterType(&testVerifiable{})
-
-	outs := []*OperableOutput{
-		&OperableOutput{
-			Out: &TestTransferable{Val: 1},
-		},
-		&OperableOutput{
-			Out: &TestTransferable{Val: 0},
-		},
-		&OperableOutput{
-			Out: &TestTransferable{Val: 0},
-		},
-		&OperableOutput{
-			Out: &testVerifiable{},
-		},
-	}
-
-	if isSortedOperableOutputs(outs, c) {
-		t.Fatalf("Shouldn't be sorted")
-	}
-	sortOperableOutputs(outs, c)
-	if !isSortedOperableOutputs(outs, c) {
-		t.Fatalf("Should be sorted")
-	}
-	if result := outs[0].Out.(*TestTransferable).Val; result != 0 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if result := outs[1].Out.(*TestTransferable).Val; result != 0 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if result := outs[2].Out.(*TestTransferable).Val; result != 1 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if _, ok := outs[3].Out.(*testVerifiable); !ok {
-		t.Fatalf("testVerifiable expected")
-	}
-}
 
 func TestOperableInputVerifyNil(t *testing.T) {
 	oi := (*OperableInput)(nil)
@@ -93,10 +26,8 @@ func TestOperableInputVerifyNilFx(t *testing.T) {
 
 func TestOperableInputVerify(t *testing.T) {
 	oi := &OperableInput{
-		UTXOID: UTXOID{
-			TxID: ids.Empty,
-		},
-		In: &testVerifiable{},
+		UTXOID: ava.UTXOID{TxID: ids.Empty},
+		In:     &ava.TestVerifiable{},
 	}
 	if err := oi.Verify(); err != nil {
 		t.Fatal(err)
@@ -109,32 +40,32 @@ func TestOperableInputVerify(t *testing.T) {
 func TestOperableInputSorting(t *testing.T) {
 	ins := []*OperableInput{
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 1,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 0,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 	}
 	if isSortedAndUniqueOperableInputs(ins) {
@@ -163,11 +94,11 @@ func TestOperableInputSorting(t *testing.T) {
 		t.Fatalf("OutputIndex expected: %s ; result: %s", ids.Empty, result)
 	}
 	ins = append(ins, &OperableInput{
-		UTXOID: UTXOID{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		In: &testVerifiable{},
+		In: &ava.TestVerifiable{},
 	})
 	if isSortedAndUniqueOperableInputs(ins) {
 		t.Fatalf("Shouldn't be unique")

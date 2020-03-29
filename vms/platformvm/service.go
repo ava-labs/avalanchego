@@ -16,7 +16,11 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -97,7 +101,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		response.Subnets = make([]APISubnet, len(subnets))
 		for i, subnet := range subnets {
 			response.Subnets[i] = APISubnet{
-				ID:          subnet.ID,
+				ID:          subnet.id,
 				ControlKeys: subnet.ControlKeys,
 				Threshold:   json.Uint16(subnet.Threshold),
 			}
@@ -108,10 +112,10 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	idsSet := ids.Set{}
 	idsSet.Add(args.IDs...)
 	for _, subnet := range subnets {
-		if idsSet.Contains(subnet.ID) {
+		if idsSet.Contains(subnet.id) {
 			response.Subnets = append(response.Subnets,
 				APISubnet{
-					ID:          subnet.ID,
+					ID:          subnet.id,
 					ControlKeys: subnet.ControlKeys,
 					Threshold:   json.Uint16(subnet.Threshold),
 				},
@@ -248,7 +252,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		args.SubnetID = DefaultSubnetID
 	}
 
-	validators, ok := service.vm.Validators.GetValidatorSet(args.SubnetID)
+	validators, ok := service.vm.validators.GetValidatorSet(args.SubnetID)
 	if !ok {
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}
@@ -432,6 +436,11 @@ type genericTx struct {
  ******************************************************
  */
 
+// CreateTxResponse is the response from calls to create a transaction
+type CreateTxResponse struct {
+	UnsignedTx formatting.CB58 `json:"unsignedTx"`
+}
+
 // AddDefaultSubnetValidatorArgs are the arguments to AddDefaultSubnetValidator
 type AddDefaultSubnetValidatorArgs struct {
 	APIDefaultSubnetValidator
@@ -440,15 +449,9 @@ type AddDefaultSubnetValidatorArgs struct {
 	PayerNonce json.Uint64 `json:"payerNonce"`
 }
 
-// AddDefaultSubnetValidatorResponse is the response from a call to AddDefaultSubnetValidator
-type AddDefaultSubnetValidatorResponse struct {
-	// The unsigned transaction
-	UnsignedTx formatting.CB58 `json:"unsignedTx"`
-}
-
 // AddDefaultSubnetValidator returns an unsigned transaction to add a validator to the default subnet
 // The returned unsigned transaction should be signed using Sign()
-func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *AddDefaultSubnetValidatorResponse) error {
+func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *CreateTxResponse) error {
 	service.vm.Ctx.Log.Debug("platform.AddDefaultSubnetValidator called")
 
 	if args.ID.IsZero() { // If ID unspecified, use this node's ID as validator ID
@@ -490,16 +493,10 @@ type AddDefaultSubnetDelegatorArgs struct {
 	PayerNonce json.Uint64 `json:"payerNonce"`
 }
 
-// AddDefaultSubnetDelegatorResponse is the response from a call to AddDefaultSubnetDelegator
-type AddDefaultSubnetDelegatorResponse struct {
-	// The unsigned transaction
-	UnsignedTx formatting.CB58 `json:"unsignedTx"`
-}
-
 // AddDefaultSubnetDelegator returns an unsigned transaction to add a delegator
 // to the default subnet
 // The returned unsigned transaction should be signed using Sign()
-func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *AddDefaultSubnetDelegatorResponse) error {
+func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *CreateTxResponse) error {
 	service.vm.Ctx.Log.Debug("platform.AddDefaultSubnetDelegator called")
 
 	if args.ID.IsZero() { // If ID unspecified, use this node's ID as validator ID
@@ -541,15 +538,9 @@ type AddNonDefaultSubnetValidatorArgs struct {
 	PayerNonce json.Uint64 `json:"payerNonce"`
 }
 
-// AddNonDefaultSubnetValidatorResponse is the response from a call to AddNonDefaultSubnetValidator
-type AddNonDefaultSubnetValidatorResponse struct {
-	// The unsigned transaction
-	UnsignedTx formatting.CB58 `json:"unsignedTx"`
-}
-
 // AddNonDefaultSubnetValidator adds a validator to a subnet other than the default subnet
 // Returns the unsigned transaction, which must be signed using Sign
-func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *AddNonDefaultSubnetValidatorResponse) error {
+func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *CreateTxResponse) error {
 	tx := addNonDefaultSubnetValidatorTx{
 		UnsignedAddNonDefaultSubnetValidatorTx: UnsignedAddNonDefaultSubnetValidatorTx{
 			SubnetValidator: SubnetValidator{
@@ -583,6 +574,83 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	return nil
 }
 
+// CreateSubnetArgs are the arguments to CreateSubnet
+type CreateSubnetArgs struct {
+	// The ID member of APISubnet is ignored
+	APISubnet
+
+	// Nonce of the account that pays the transaction fee
+	PayerNonce json.Uint64 `json:"payerNonce"`
+}
+
+// CreateSubnet returns an unsigned transaction to create a new subnet.
+// The unsigned transaction must be signed with the key of [args.Payer]
+func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *CreateTxResponse) error {
+	service.vm.Ctx.Log.Debug("platform.createSubnet called")
+
+	// Create the transaction
+	tx := CreateSubnetTx{
+		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
+			NetworkID:   service.vm.Ctx.NetworkID,
+			Nonce:       uint64(args.PayerNonce),
+			ControlKeys: args.ControlKeys,
+			Threshold:   uint16(args.Threshold),
+		},
+		key:   nil,
+		Sig:   [65]byte{},
+		bytes: nil,
+	}
+
+	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	if err != nil {
+		return errCreatingTransaction
+	}
+
+	response.UnsignedTx.Bytes = txBytes
+	return nil
+}
+
+// CreateExportTxArgs are the arguments to CreateExportTx
+type CreateExportTxArgs struct {
+	// ID of the address that will receive the exported funds
+	To ids.ShortID `json:"to"`
+
+	// Nonce of the account that pays the transaction fee
+	PayerNonce json.Uint64 `json:"payerNonce"`
+
+	Amount json.Uint64 `json:"amount"`
+}
+
+// CreateExportTx returns an unsigned transaction to export funds.
+// The unsigned transaction must be signed with the key of [args.Payer]
+func (service *Service) CreateExportTx(_ *http.Request, args *CreateExportTxArgs, response *CreateTxResponse) error {
+	service.vm.Ctx.Log.Debug("platform.createExportTx called")
+
+	// Create the transaction
+	tx := ExportTx{UnsignedExportTx: UnsignedExportTx{
+		NetworkID: service.vm.Ctx.NetworkID,
+		Nonce:     uint64(args.PayerNonce),
+		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
+			Asset: ava.Asset{ID: service.vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: uint64(args.Amount),
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{args.To},
+				},
+			},
+		}},
+	}}
+
+	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	if err != nil {
+		return errCreatingTransaction
+	}
+
+	response.UnsignedTx.Bytes = txBytes
+	return nil
+}
+
 /*
  ******************************************************
  **************** Sign/Issue Txs **********************
@@ -606,7 +674,7 @@ type SignArgs struct {
 // SignResponse is the response from Sign
 type SignResponse struct {
 	// The signed bytes
-	Tx formatting.CB58
+	Tx formatting.CB58 `json:"tx"`
 }
 
 // Sign [args.bytes]
@@ -642,6 +710,8 @@ func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignRespons
 		genTx.Tx, err = service.signAddNonDefaultSubnetValidatorTx(tx, key)
 	case *CreateSubnetTx:
 		genTx.Tx, err = service.signCreateSubnetTx(tx, key)
+	case *ExportTx:
+		genTx.Tx, err = service.signExportTx(tx, key)
 	default:
 		err = errors.New("Could not parse given tx. Must be one of: addDefaultSubnetValidatorTx, addNonDefaultSubnetValidatorTx, createSubnetTx")
 	}
@@ -722,6 +792,29 @@ func (service *Service) signCreateSubnetTx(tx *CreateSubnetTx, key *crypto.Priva
 	return tx, nil
 }
 
+// Sign [xt] with [key]
+func (service *Service) signExportTx(tx *ExportTx, key *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
+	service.vm.Ctx.Log.Debug("platform.signAddDefaultSubnetValidatorTx called")
+
+	// TODO: Should we check if tx is already signed?
+	unsignedIntf := interface{}(&tx.UnsignedExportTx)
+	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+	}
+
+	sig, err := key.Sign(unsignedTxBytes)
+	if err != nil {
+		return nil, errors.New("error while signing")
+	}
+	if len(sig) != crypto.SECP256K1RSigLen {
+		return nil, fmt.Errorf("expected signature to be length %d but was length %d", crypto.SECP256K1RSigLen, len(sig))
+	}
+	copy(tx.Sig[:], sig)
+
+	return tx, nil
+}
+
 // Signs an unsigned or partially signed addNonDefaultSubnetValidatorTx with [key]
 // If [key] is a control key for the subnet and there is an empty spot in tx.ControlSigs, signs there
 // If [key] is a control key for the subnet and there is no empty spot in tx.ControlSigs, signs as payer
@@ -775,6 +868,141 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 	return tx, nil
 }
 
+// CreateImportTxArgs are the arguments to CreateImportTx
+type CreateImportTxArgs struct {
+	// Addresses that can be used to sign the import
+	ImportAddresses []ids.ShortID `json:"importAddresses"`
+
+	// ID of the account that will receive the imported funds, and pay the
+	// import fee
+	AccountID ids.ShortID `json:"accountID"`
+
+	// Nonce of the account that pays the transaction fee
+	PayerNonce json.Uint64 `json:"payerNonce"`
+
+	// User that controls the Addresses
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// CreateImportTx returns an unsigned transaction to import funds.
+// The unsigned transaction must be signed with the key of [args.Payer]
+func (service *Service) CreateImportTx(_ *http.Request, args *CreateImportTxArgs, response *SignResponse) error {
+	service.vm.Ctx.Log.Debug("platform.createImportTx called")
+
+	// Get the key of the Signer
+	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("couldn't get data for user '%s'. Does user exist?", args.Username)
+	}
+	user := user{db: db}
+
+	kc := secp256k1fx.NewKeychain()
+	for _, addr := range args.ImportAddresses {
+		key, err := user.getKey(addr)
+		if err != nil {
+			return errDB
+		}
+		kc.Add(key)
+	}
+
+	key, err := user.getKey(args.AccountID)
+	if err != nil {
+		return errDB
+	}
+	kc.Add(key)
+
+	addrs := ids.Set{}
+	for _, addr := range args.ImportAddresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
+
+	utxos, err := service.vm.GetAtomicUTXOs(addrs)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
+	}
+
+	amount := uint64(0)
+	time := service.vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		if !utxo.AssetID().Equals(service.vm.ava) {
+			continue
+		}
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			continue
+		}
+		input, ok := inputIntf.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		spent, err := math.Add64(amount, input.Amount())
+		if err != nil {
+			return err
+		}
+		amount = spent
+
+		in := &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: service.vm.ava},
+			In:     input,
+		}
+
+		ins = append(ins, in)
+		keys = append(keys, signers)
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+
+	// Create the transaction
+	tx := ImportTx{UnsignedImportTx: UnsignedImportTx{
+		NetworkID: service.vm.Ctx.NetworkID,
+		Nonce:     uint64(args.PayerNonce),
+		Account:   args.AccountID,
+		Ins:       ins,
+	}}
+
+	// TODO: Should we check if tx is already signed?
+	unsignedIntf := interface{}(&tx.UnsignedImportTx)
+	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
+	if err != nil {
+		return fmt.Errorf("error serializing unsigned tx: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedTxBytes)
+
+	sig, err := key.SignHash(hash)
+	if err != nil {
+		return errors.New("error while signing")
+	}
+	copy(tx.Sig[:], sig)
+
+	for _, credKeys := range keys {
+		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	if err != nil {
+		return errCreatingTransaction
+	}
+
+	response.Tx.Bytes = txBytes
+	return nil
+}
+
 // IssueTxArgs are the arguments to IssueTx
 type IssueTxArgs struct {
 	// Tx being sent to the network
@@ -800,69 +1028,25 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 			return fmt.Errorf("error initializing tx: %s", err)
 		}
 		service.vm.unissuedEvents.Push(tx)
-		defer service.vm.resetTimer()
 		response.TxID = tx.ID()
-		return nil
-	case *CreateSubnetTx:
+	case DecisionTx:
 		if err := tx.initialize(service.vm); err != nil {
 			return fmt.Errorf("error initializing tx: %s", err)
 		}
 		service.vm.unissuedDecisionTxs = append(service.vm.unissuedDecisionTxs, tx)
-		defer service.vm.resetTimer()
-		response.TxID = tx.ID
-		return nil
+		response.TxID = tx.ID()
+	case AtomicTx:
+		if err := tx.initialize(service.vm); err != nil {
+			return fmt.Errorf("error initializing tx: %s", err)
+		}
+		service.vm.unissuedAtomicTxs = append(service.vm.unissuedAtomicTxs, tx)
+		response.TxID = tx.ID()
 	default:
-		return errors.New("Could not parse given tx. Must be one of: addDefaultSubnetValidatorTx, addDefaultSubnetDelegatorTx, addNonDefaultSubnetValidatorTx, createSubnetTx")
-	}
-}
-
-/*
- ******************************************************
- **************** Create a Subnet *********************
- ******************************************************
- */
-
-// CreateSubnetArgs are the arguments to CreateSubnet
-type CreateSubnetArgs struct {
-	// The ID member of APISubnet is ignored
-	APISubnet
-
-	// Nonce of the account that pays the transaction fee
-	PayerNonce json.Uint64 `json:"payerNonce"`
-}
-
-// CreateSubnetResponse is the response from a call to CreateSubnet
-type CreateSubnetResponse struct {
-	// Byte representation of the unsigned transaction to create a new subnet
-	UnsignedTx formatting.CB58 `json:"unsignedTx"`
-}
-
-// CreateSubnet returns an unsigned transaction to create a new subnet.
-// The unsigned transaction must be signed with the key of [args.Payer]
-func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *CreateSubnetResponse) error {
-	service.vm.Ctx.Log.Debug("platform.createSubnet called")
-
-	// Create the transaction
-	tx := CreateSubnetTx{
-		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
-			NetworkID:   service.vm.Ctx.NetworkID,
-			Nonce:       uint64(args.PayerNonce),
-			ControlKeys: args.ControlKeys,
-			Threshold:   uint16(args.Threshold),
-		},
-		key:   nil,
-		Sig:   [65]byte{},
-		bytes: nil,
+		return errors.New("Could not parse given tx. Must be a TimedTx, DecisionTx, or AtomicTx")
 	}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
-	if err != nil {
-		return errCreatingTransaction
-	}
-
-	response.UnsignedTx.Bytes = txBytes
+	service.vm.resetTimer()
 	return nil
-
 }
 
 /*
@@ -902,14 +1086,14 @@ type CreateBlockchainReply struct {
 
 // CreateBlockchain issues a transaction to the network to create a new blockchain
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, reply *CreateBlockchainReply) error {
-	vmID, err := service.vm.ChainManager.LookupVM(args.VMID)
+	vmID, err := service.vm.chainManager.LookupVM(args.VMID)
 	if err != nil {
 		return fmt.Errorf("no VM with ID '%s' found", args.VMID)
 	}
 
 	fxIDs := []ids.ID(nil)
 	for _, fxIDStr := range args.FxIDs {
-		fxID, err := service.vm.ChainManager.LookupVM(fxIDStr)
+		fxID, err := service.vm.chainManager.LookupVM(fxIDStr)
 		if err != nil {
 			return fmt.Errorf("no FX with ID '%s' found", fxIDStr)
 		}
@@ -974,7 +1158,7 @@ type GetBlockchainStatusReply struct {
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
 func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
-	_, err := service.vm.ChainManager.Lookup(args.BlockchainID)
+	_, err := service.vm.chainManager.Lookup(args.BlockchainID)
 	if err == nil {
 		reply.Status = Validating
 		return nil

@@ -21,6 +21,9 @@ const (
 
 	// SECP256K1SKLen is the number of bytes in a secp2561k private key
 	SECP256K1SKLen = 32
+
+	// SECP256K1PKLen is the number of bytes in a secp2561k public key
+	SECP256K1PKLen = 33
 )
 
 // FactorySECP256K1 ...

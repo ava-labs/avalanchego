@@ -48,6 +48,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
 	c.RegisterType(&secp256k1fx.MintInput{})

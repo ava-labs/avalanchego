@@ -9,7 +9,9 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -19,10 +21,10 @@ var (
 
 // Operation ...
 type Operation struct {
-	Asset `serialize:"true"`
+	ava.Asset `serialize:"true"`
 
-	Ins  []*OperableInput  `serialize:"true"`
-	Outs []*OperableOutput `serialize:"true"`
+	Ins  []*OperableInput    `serialize:"true"`
+	Outs []verify.Verifiable `serialize:"true"`
 }
 
 // Verify implements the verify.Verifiable interface
@@ -48,7 +50,7 @@ func (op *Operation) Verify(c codec.Codec) error {
 			return err
 		}
 	}
-	if !isSortedOperableOutputs(op.Outs, c) {
+	if !isSortedVerifiables(op.Outs, c) {
 		return errOutputsNotSorted
 	}
 

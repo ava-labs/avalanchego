@@ -8,11 +8,14 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
 	errOperationsNotSortedUnique = errors.New("operations not sorted and unique")
+	errNoOperations              = errors.New("an operationTx must have at least one operation")
 
 	errDoubleSpend = errors.New("inputs attempt to double spend an input")
 )
@@ -28,7 +31,7 @@ type OperationTx struct {
 func (t *OperationTx) Operations() []*Operation { return t.Ops }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *OperationTx) InputUTXOs() []*UTXOID {
+func (t *OperationTx) InputUTXOs() []*ava.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, op := range t.Ops {
 		for _, in := range op.Ins {
@@ -48,22 +51,20 @@ func (t *OperationTx) AssetIDs() ids.Set {
 }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *OperationTx) UTXOs() []*UTXO {
+func (t *OperationTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, op := range t.Ops {
 		asset := op.AssetID()
 		for _, out := range op.Outs {
-			utxos = append(utxos, &UTXO{
-				UTXOID: UTXOID{
+			utxos = append(utxos, &ava.UTXO{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: Asset{
-					ID: asset,
-				},
-				Out: out.Out,
+				Asset: ava.Asset{ID: asset},
+				Out:   out,
 			})
 		}
 	}
@@ -76,6 +77,8 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 	switch {
 	case t == nil:
 		return errNilTx
+	case len(t.Ops) == 0:
+		return errNoOperations
 	}
 
 	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
@@ -106,7 +109,7 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
+func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
 		return err
 	}
@@ -123,39 +126,12 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential)
 			ins = append(ins, in.In)
 
 			cred := creds[i+offset]
-			credIntfs = append(credIntfs, cred.Cred)
+			credIntfs = append(credIntfs, cred)
 
-			utxoID := in.InputID()
-			utxo, err := vm.state.UTXO(utxoID)
-			if err == nil {
-				utxoAssetID := utxo.AssetID()
-				if !utxoAssetID.Equals(opAssetID) {
-					return errAssetIDMismatch
-				}
-
-				utxos = append(utxos, utxo.Out)
-				continue
+			utxo, err := vm.getUTXO(&in.UTXOID)
+			if err != nil {
+				return err
 			}
-
-			inputTx, inputIndex := in.InputSource()
-			parent := UniqueTx{
-				vm:   vm,
-				txID: inputTx,
-			}
-
-			if err := parent.Verify(); err != nil {
-				return errMissingUTXO
-			} else if status := parent.Status(); status.Decided() {
-				return errMissingUTXO
-			}
-
-			parentUTXOs := parent.UTXOs()
-
-			if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
-				return errInvalidUTXO
-			}
-
-			utxo = parentUTXOs[int(inputIndex)]
 
 			utxoAssetID := utxo.AssetID()
 			if !utxoAssetID.Equals(opAssetID) {
@@ -165,7 +141,7 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential)
 		}
 		offset += len(op.Ins)
 		for _, out := range op.Outs {
-			outs = append(outs, out.Out)
+			outs = append(outs, out)
 		}
 
 		var fxObj interface{}
