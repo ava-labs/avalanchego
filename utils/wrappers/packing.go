@@ -24,6 +24,8 @@ const (
 	IntLen = 4
 	// LongLen is the number of bytes per long
 	LongLen = 8
+	// BoolLen is the number of bytes per bool
+	BoolLen = 1
 )
 
 var (

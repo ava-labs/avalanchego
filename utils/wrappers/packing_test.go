@@ -14,6 +14,7 @@ const (
 	ShortSentinal = 0
 	IntSentinal   = 0
 	LongSentinal  = 0
+	BoolSentinal  = false
 )
 
 func TestPackerPackByte(t *testing.T) {
@@ -405,5 +406,61 @@ func TestPackBool(t *testing.T) {
 
 	if bool1 || !bool2 || bool3 {
 		t.Fatal("got back wrong values")
+	}
+}
+
+func TestPackerPackBool(t *testing.T) {
+	p := Packer{MaxSize: 1}
+
+	p.PackBool(true)
+
+	if p.Errored() {
+		t.Fatal(p.Err)
+	}
+
+	if size := len(p.Bytes); size != 1 {
+		t.Fatalf("Packer.PackBool wrote %d byte(s) but expected %d byte(s)", size, 1)
+	}
+
+	expected := []byte{0x01}
+	if !bytes.Equal(p.Bytes, expected) {
+		t.Fatalf("Packer.PackBool wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
+	}
+
+	p.PackBool(false)
+	if !p.Errored() {
+		t.Fatal("Packer.PackLong did not fail when attempt was beyond p.MaxSize")
+	}
+}
+
+func TestPackerUnpackBool(t *testing.T) {
+	var (
+		p                = Packer{Bytes: []byte{0x01}, Offset: 0}
+		actual           = p.UnpackBool()
+		expected    bool = true
+		expectedLen      = BoolLen
+	)
+	if p.Errored() {
+		t.Fatalf("Packer.UnpackBool unexpectedly raised %s", p.Err)
+	} else if actual != expected {
+		t.Fatalf("Packer.UnpackBool returned %t, but expected %t", actual, expected)
+	} else if p.Offset != expectedLen {
+		t.Fatalf("Packer.UnpackBool left Offset %d, expected %d", p.Offset, expectedLen)
+	}
+
+	actual = p.UnpackBool()
+	if !p.Errored() {
+		t.Fatalf("Packer.UnpackBool should have set error, due to attempted out of bounds read")
+	} else if actual != BoolSentinal {
+		t.Fatalf("Packer.UnpackBool returned %t, expected sentinal value %t", actual, BoolSentinal)
+	}
+
+	p = Packer{Bytes: []byte{0x42}, Offset: 0}
+	expected = false
+	actual = p.UnpackBool()
+	if !p.Errored() {
+		t.Fatalf("Packer.UnpackBool id not raise error for invalid boolean value %v", p.Bytes)
+	} else if actual != expected {
+		t.Fatalf("Packer.UnpackBool returned %t, expected sentinal value %t", actual, BoolSentinal)
 	}
 }
