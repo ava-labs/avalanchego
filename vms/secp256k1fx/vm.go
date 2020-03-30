@@ -15,3 +15,19 @@ type VM interface {
 	Clock() *timer.Clock
 	Logger() logging.Logger
 }
+
+// TestVM is a minimal implementation of a VM
+type TestVM struct {
+	CLK  *timer.Clock
+	Code codec.Codec
+	Log  logging.Logger
+}
+
+// Clock returns CLK
+func (vm *TestVM) Clock() *timer.Clock { return vm.CLK }
+
+// Codec returns Code
+func (vm *TestVM) Codec() codec.Codec { return vm.Code }
+
+// Logger returns Log
+func (vm *TestVM) Logger() logging.Logger { return vm.Log }

@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/gecko/vms"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/evm"
+	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/spchainvm"
@@ -333,8 +334,9 @@ func (n *Node) initVMManager() {
 	n.vmManager.RegisterVMFactory(evm.ID, &evm.Factory{})
 	n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee})
 	n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{})
-	n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{})
 	n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{})
+	n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{})
+	n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{})
 }
 
 // Create the EventDispatcher used for hooking events
