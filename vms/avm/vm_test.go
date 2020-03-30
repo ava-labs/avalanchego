@@ -7,8 +7,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/gecko/vms/propertyfx"
-
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -21,6 +19,7 @@ import (
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
+	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
