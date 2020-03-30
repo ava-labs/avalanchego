@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -331,6 +332,9 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 
 // Codec returns a reference to the internal codec of this VM
 func (vm *VM) Codec() codec.Codec { return vm.codec }
+
+// Logger returns a reference to the internal logger of this VM
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 /*
  ******************************************************************************

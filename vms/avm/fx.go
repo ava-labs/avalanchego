@@ -5,6 +5,7 @@ package avm
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 type parsedFx struct {
@@ -22,11 +23,18 @@ type Fx interface {
 	// provided utxo with no restrictions on the destination. If the transaction
 	// can't spend the output based on the input and credential, a non-nil error
 	// should be returned.
-	VerifyTransfer(tx, utxo, in, cred interface{}) error
+	VerifyTransfer(tx, in, cred, utxo interface{}) error
 
 	// VerifyOperation verifies that the specified transaction can spend the
 	// provided utxos conditioned on the result being restricted to the provided
 	// outputs. If the transaction can't spend the output based on the input and
 	// credential, a non-nil error  should be returned.
-	VerifyOperation(tx interface{}, utxos, ins, creds, outs []interface{}) error
+	VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error
+}
+
+// FxOperation ...
+type FxOperation interface {
+	verify.Verifiable
+
+	Outs() []verify.Verifiable
 }

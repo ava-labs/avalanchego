@@ -48,7 +48,7 @@ func TestExportTxSerialization(t *testing.T) {
 		0x19, 0x39, 0x59, 0x79, 0x98, 0xb8, 0xd8, 0xf8,
 		// input:
 		// input ID:
-		0x00, 0x00, 0x00, 0x08,
+		0x00, 0x00, 0x00, 0x05,
 		// amount:
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe8,
 		// num sig indices:
@@ -93,10 +93,10 @@ func TestExportTxSerialization(t *testing.T) {
 	c.RegisterType(&OperationTx{})
 	c.RegisterType(&ImportTx{})
 	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	b, err := c.Marshal(&tx.UnsignedTx)

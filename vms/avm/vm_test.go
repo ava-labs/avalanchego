@@ -54,10 +54,10 @@ func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 	c.RegisterType(&OperationTx{})
 	c.RegisterType(&ImportTx{})
 	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	genesis := Genesis{}
@@ -192,7 +192,7 @@ func GenesisVM(t *testing.T) *VM {
 func TestTxSerialization(t *testing.T) {
 	expected := []byte{
 		// txID:
-		0x00, 0x00, 0x00, 0x02,
+		0x00, 0x00, 0x00, 0x01,
 		// networkID:
 		0x00, 0x00, 0xa8, 0x66,
 		// chainID:
@@ -209,7 +209,7 @@ func TestTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		// fxID:
-		0x00, 0x00, 0x00, 0x06,
+		0x00, 0x00, 0x00, 0x07,
 		// secp256k1 Transferable Output:
 		// amount:
 		0x00, 0x00, 0x12, 0x30, 0x9c, 0xe5, 0x40, 0x00,
@@ -230,7 +230,7 @@ func TestTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		// fxID:
-		0x00, 0x00, 0x00, 0x06,
+		0x00, 0x00, 0x00, 0x07,
 		// secp256k1 Transferable Output:
 		// amount:
 		0x00, 0x00, 0x12, 0x30, 0x9c, 0xe5, 0x40, 0x00,
@@ -251,7 +251,7 @@ func TestTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		// fxID:
-		0x00, 0x00, 0x00, 0x06,
+		0x00, 0x00, 0x00, 0x07,
 		// secp256k1 Transferable Output:
 		// amount:
 		0x00, 0x00, 0x12, 0x30, 0x9c, 0xe5, 0x40, 0x00,
@@ -267,20 +267,24 @@ func TestTxSerialization(t *testing.T) {
 		0x92, 0xf0, 0xee, 0x31,
 		// number of inputs:
 		0x00, 0x00, 0x00, 0x00,
-		// number of operations:
+		// name length:
+		0x00, 0x04,
+		// name:
+		'n', 'a', 'm', 'e',
+		// symbol length:
+		0x00, 0x04,
+		// symbol:
+		's', 'y', 'm', 'b',
+		// denomination
+		0x00,
+		// number of initial states:
 		0x00, 0x00, 0x00, 0x01,
-		// operation[0]:
-		// assetID:
-		0x01, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		// number of inputs:
+		// fx index:
 		0x00, 0x00, 0x00, 0x00,
 		// number of outputs:
 		0x00, 0x00, 0x00, 0x01,
 		// fxID:
-		0x00, 0x00, 0x00, 0x05,
+		0x00, 0x00, 0x00, 0x06,
 		// secp256k1 Mint Output:
 		// threshold:
 		0x00, 0x00, 0x00, 0x01,
@@ -294,14 +298,17 @@ func TestTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}
 
-	unsignedTx := &OperationTx{
+	unsignedTx := &CreateAssetTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ops: []*Operation{
-			&Operation{
-				Asset: ava.Asset{ID: asset},
+		Name:         "name",
+		Symbol:       "symb",
+		Denomination: 0,
+		States: []*InitialState{
+			&InitialState{
+				FxID: 0,
 				Outs: []verify.Verifiable{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -335,10 +342,10 @@ func TestTxSerialization(t *testing.T) {
 	c.RegisterType(&OperationTx{})
 	c.RegisterType(&ImportTx{})
 	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	b, err := c.Marshal(tx)

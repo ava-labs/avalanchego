@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
@@ -112,10 +113,10 @@ func init() {
 		Codec.RegisterType(&StandardBlock{}),
 		Codec.RegisterType(&AtomicBlock{}),
 
+		Codec.RegisterType(&secp256k1fx.TransferInput{}),
 		Codec.RegisterType(&secp256k1fx.MintOutput{}),
 		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
-		Codec.RegisterType(&secp256k1fx.MintInput{}),
-		Codec.RegisterType(&secp256k1fx.TransferInput{}),
+		Codec.RegisterType(&secp256k1fx.MintOperation{}),
 		Codec.RegisterType(&secp256k1fx.Credential{}),
 
 		Codec.RegisterType(&UnsignedAddDefaultSubnetValidatorTx{}),
@@ -741,6 +742,9 @@ func (vm *VM) Codec() codec.Codec { return vm.codec }
 
 // Clock ...
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+
+// Logger ...
+func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.

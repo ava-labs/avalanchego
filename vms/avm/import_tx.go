@@ -20,7 +20,7 @@ import (
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	Ins []*ava.TransferableInput `serialize:"true"` // The inputs to this transaction
+	Ins []*ava.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -41,6 +41,9 @@ func (t *ImportTx) AssetIDs() ids.Set {
 	}
 	return assets
 }
+
+// NumCredentials returns the number of expected credentials
+func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ins) }
 
 var (
 	errNoImportInputs = errors.New("no import inputs")
@@ -106,7 +109,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
 
-	offset := len(t.BaseTx.Ins)
+	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.Ins {
 		cred := creds[i+offset]
 
@@ -134,7 +137,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
+		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
 			return err
 		}
 	}

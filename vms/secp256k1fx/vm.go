@@ -4,6 +4,7 @@
 package secp256k1fx
 
 import (
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/components/codec"
 )
@@ -12,4 +13,5 @@ import (
 type VM interface {
 	Codec() codec.Codec
 	Clock() *timer.Clock
+	Logger() logging.Logger
 }

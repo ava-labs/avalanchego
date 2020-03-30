@@ -787,41 +787,35 @@ func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, re
 				continue
 			}
 
-			tx := Tx{
-				UnsignedTx: &OperationTx{
-					BaseTx: BaseTx{
-						NetID: service.vm.ctx.NetworkID,
-						BCID:  service.vm.ctx.ChainID,
-					},
-					Ops: []*Operation{
-						&Operation{
-							Asset: ava.Asset{ID: assetID},
-							Ins: []*OperableInput{
-								&OperableInput{
-									UTXOID: utxo.UTXOID,
-									In: &secp256k1fx.MintInput{
-										Input: secp256k1fx.Input{
-											SigIndices: sigs,
-										},
-									},
-								},
+			tx := Tx{UnsignedTx: &OperationTx{
+				BaseTx: BaseTx{
+					NetID: service.vm.ctx.NetworkID,
+					BCID:  service.vm.ctx.ChainID,
+				},
+				Ops: []*Operation{
+					&Operation{
+						Asset: ava.Asset{ID: assetID},
+						UTXOIDs: []*ava.UTXOID{
+							&utxo.UTXOID,
+						},
+						Op: &secp256k1fx.MintOperation{
+							MintInput: secp256k1fx.Input{
+								SigIndices: sigs,
 							},
-							Outs: []verify.Verifiable{
-								&secp256k1fx.MintOutput{
-									OutputOwners: out.OutputOwners,
-								},
-								&secp256k1fx.TransferOutput{
-									Amt: uint64(args.Amount),
-									OutputOwners: secp256k1fx.OutputOwners{
-										Threshold: 1,
-										Addrs:     []ids.ShortID{to},
-									},
+							MintOutput: secp256k1fx.MintOutput{
+								OutputOwners: out.OutputOwners,
+							},
+							TransferOutput: secp256k1fx.TransferOutput{
+								Amt: uint64(args.Amount),
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs:     []ids.ShortID{to},
 								},
 							},
 						},
 					},
 				},
-			}
+			}}
 
 			txBytes, err := service.vm.codec.Marshal(&tx)
 			if err != nil {

@@ -17,7 +17,7 @@ import (
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
-	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs this transaction is sending to the other chain
+	Outs []*ava.TransferableOutput `serialize:"true" json:"exportedOutputs"` // The outputs this transaction is sending to the other chain
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -97,7 +97,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
+		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
 			return err
 		}
 	}

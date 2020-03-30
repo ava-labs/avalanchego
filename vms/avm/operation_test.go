@@ -12,6 +12,14 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
+type testOperable struct {
+	ava.TestTransferable `serialize:"true"`
+
+	Outputs []verify.Verifiable `serialize:"true"`
+}
+
+func (o *testOperable) Outs() []verify.Verifiable { return o.Outputs }
+
 func TestOperationVerifyNil(t *testing.T) {
 	c := codec.NewDefault()
 	op := (*Operation)(nil)
@@ -30,58 +38,24 @@ func TestOperationVerifyEmpty(t *testing.T) {
 	}
 }
 
-func TestOperationVerifyInvalidInput(t *testing.T) {
+func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
-		Ins: []*OperableInput{
-			&OperableInput{},
-		},
-	}
-	if err := op.Verify(c); err == nil {
-		t.Fatalf("Should have errored due to an invalid input")
-	}
-}
-
-func TestOperationVerifyInputsNotSorted(t *testing.T) {
-	c := codec.NewDefault()
-	op := &Operation{
-		Asset: ava.Asset{ID: ids.Empty},
-		Ins: []*OperableInput{
-			&OperableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 1,
-				},
-				In: &ava.TestVerifiable{},
+		UTXOIDs: []*ava.UTXOID{
+			&ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 1,
 			},
-			&OperableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 0,
-				},
-				In: &ava.TestVerifiable{},
+			&ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 0,
 			},
 		},
+		Op: &testOperable{},
 	}
 	if err := op.Verify(c); err == nil {
-		t.Fatalf("Should have errored due to unsorted inputs")
-	}
-}
-
-func TestOperationVerifyOutputsNotSorted(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&ava.TestTransferable{})
-
-	op := &Operation{
-		Asset: ava.Asset{ID: ids.Empty},
-		Outs: []verify.Verifiable{
-			&ava.TestTransferable{Val: 1},
-			&ava.TestTransferable{Val: 0},
-		},
-	}
-	if err := op.Verify(c); err == nil {
-		t.Fatalf("Should have errored due to unsorted outputs")
+		t.Fatalf("Should have errored due to unsorted utxoIDs")
 	}
 }
 
@@ -89,9 +63,13 @@ func TestOperationVerify(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
-		Outs: []verify.Verifiable{
-			&ava.TestVerifiable{},
+		UTXOIDs: []*ava.UTXOID{
+			&ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 1,
+			},
 		},
+		Op: &testOperable{},
 	}
 	if err := op.Verify(c); err != nil {
 		t.Fatal(err)
@@ -100,32 +78,28 @@ func TestOperationVerify(t *testing.T) {
 
 func TestOperationSorting(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&ava.TestVerifiable{})
+	c.RegisterType(&testOperable{})
 
 	ops := []*Operation{
 		&Operation{
 			Asset: ava.Asset{ID: ids.Empty},
-			Ins: []*OperableInput{
-				&OperableInput{
-					UTXOID: ava.UTXOID{
-						TxID:        ids.Empty,
-						OutputIndex: 1,
-					},
-					In: &ava.TestVerifiable{},
+			UTXOIDs: []*ava.UTXOID{
+				&ava.UTXOID{
+					TxID:        ids.Empty,
+					OutputIndex: 1,
 				},
 			},
+			Op: &testOperable{},
 		},
 		&Operation{
 			Asset: ava.Asset{ID: ids.Empty},
-			Ins: []*OperableInput{
-				&OperableInput{
-					UTXOID: ava.UTXOID{
-						TxID:        ids.Empty,
-						OutputIndex: 0,
-					},
-					In: &ava.TestVerifiable{},
+			UTXOIDs: []*ava.UTXOID{
+				&ava.UTXOID{
+					TxID:        ids.Empty,
+					OutputIndex: 0,
 				},
 			},
+			Op: &testOperable{},
 		},
 	}
 	if isSortedAndUniqueOperations(ops, c) {
@@ -137,15 +111,13 @@ func TestOperationSorting(t *testing.T) {
 	}
 	ops = append(ops, &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
-		Ins: []*OperableInput{
-			&OperableInput{
-				UTXOID: ava.UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 1,
-				},
-				In: &ava.TestVerifiable{},
+		UTXOIDs: []*ava.UTXOID{
+			&ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 1,
 			},
 		},
+		Op: &testOperable{},
 	})
 	if isSortedAndUniqueOperations(ops, c) {
 		t.Fatalf("Shouldn't be unique")

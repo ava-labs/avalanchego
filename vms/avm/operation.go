@@ -15,16 +15,17 @@ import (
 )
 
 var (
-	errNilOperation   = errors.New("nil operation is not valid")
-	errEmptyOperation = errors.New("empty operation is not valid")
+	errNilOperation              = errors.New("nil operation is not valid")
+	errNilFxOperation            = errors.New("nil fx operation is not valid")
+	errNotSortedAndUniqueUTXOIDs = errors.New("utxo IDs not sorted and unique")
 )
 
 // Operation ...
 type Operation struct {
 	ava.Asset `serialize:"true"`
 
-	Ins  []*OperableInput    `serialize:"true" json:"inputs"`
-	Outs []verify.Verifiable `serialize:"true" json:"outputs"`
+	UTXOIDs []*ava.UTXOID `serialize:"true" json:"inputIDs"`
+	Op      FxOperation   `serialize:"true" json:"operation"`
 }
 
 // Verify implements the verify.Verifiable interface
@@ -32,29 +33,13 @@ func (op *Operation) Verify(c codec.Codec) error {
 	switch {
 	case op == nil:
 		return errNilOperation
-	case len(op.Ins) == 0 && len(op.Outs) == 0:
-		return errEmptyOperation
+	case op.Op == nil:
+		return errNilFxOperation
+	case !ava.IsSortedAndUniqueUTXOIDs(op.UTXOIDs):
+		return errNotSortedAndUniqueUTXOIDs
+	default:
+		return verify.All(&op.Asset, op.Op)
 	}
-
-	for _, in := range op.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-	}
-	if !isSortedAndUniqueOperableInputs(op.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	for _, out := range op.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-	}
-	if !isSortedVerifiables(op.Outs, c) {
-		return errOutputsNotSorted
-	}
-
-	return op.Asset.Verify()
 }
 
 type innerSortOperation struct {

@@ -50,10 +50,10 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 	c.RegisterType(&OperationTx{})
 	c.RegisterType(&ImportTx{})
 	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	g := Genesis{}
