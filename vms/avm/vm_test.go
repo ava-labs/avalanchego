@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/gecko/vms/propertyfx"
+
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -850,6 +852,153 @@ func TestIssueNFT(t *testing.T) {
 	transferNFTTx.Initialize(b)
 
 	if _, err = vm.IssueTx(transferNFTTx.Bytes(), nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Test issuing a transaction that creates an Property family
+func TestIssueProperty(t *testing.T) {
+	genesisBytes := BuildGenesisTest(t)
+
+	issuer := make(chan common.Message, 1)
+
+	ctx.Lock.Lock()
+	vm := &VM{}
+	err := vm.Initialize(
+		ctx,
+		memdb.New(),
+		genesisBytes,
+		issuer,
+		[]*common.Fx{
+			&common.Fx{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			&common.Fx{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+			&common.Fx{
+				ID: ids.Empty.Prefix(2),
+				Fx: &propertyfx.Fx{},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	createAssetTx := &Tx{UnsignedTx: &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "Team Rocket",
+		Symbol:       "TR",
+		Denomination: 0,
+		States: []*InitialState{&InitialState{
+			FxID: 2,
+			Outs: []verify.Verifiable{
+				&propertyfx.MintOutput{
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			},
+		}},
+	}}
+
+	b, err := vm.codec.Marshal(createAssetTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createAssetTx.Initialize(b)
+
+	if _, err = vm.IssueTx(createAssetTx.Bytes(), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	mintPropertyTx := &Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Ops: []*Operation{&Operation{
+			Asset: ava.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*ava.UTXOID{&ava.UTXOID{
+				TxID:        createAssetTx.ID(),
+				OutputIndex: 0,
+			}},
+			Op: &propertyfx.MintOperation{
+				MintInput: secp256k1fx.Input{
+					SigIndices: []uint32{0},
+				},
+				MintOutput: propertyfx.MintOutput{
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+				OwnedOutput: propertyfx.OwnedOutput{},
+			},
+		}},
+	}}
+
+	unsignedBytes, err := vm.codec.Marshal(&mintPropertyTx.UnsignedTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := keys[0]
+	sig, err := key.Sign(unsignedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixedSig := [crypto.SECP256K1RSigLen]byte{}
+	copy(fixedSig[:], sig)
+
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{Credential: secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
+		}},
+	})
+
+	b, err = vm.codec.Marshal(mintPropertyTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mintPropertyTx.Initialize(b)
+
+	if _, err = vm.IssueTx(mintPropertyTx.Bytes(), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	burnPropertyTx := &Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Ops: []*Operation{&Operation{
+			Asset: ava.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*ava.UTXOID{&ava.UTXOID{
+				TxID:        mintPropertyTx.ID(),
+				OutputIndex: 1,
+			}},
+			Op: &propertyfx.BurnOperation{Input: secp256k1fx.Input{}},
+		}},
+	}}
+
+	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
+
+	b, err = vm.codec.Marshal(burnPropertyTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	burnPropertyTx.Initialize(b)
+
+	if _, err = vm.IssueTx(burnPropertyTx.Bytes(), nil); err != nil {
 		t.Fatal(err)
 	}
 }
