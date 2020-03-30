@@ -17,8 +17,9 @@ import (
 const maxThreshold = 25
 
 var (
-	errThresholdExceedsKeysLen = errors.New("threshold must be no more than number of control keys")
-	errThresholdTooHigh        = fmt.Errorf("threshold can't be greater than %d", maxThreshold)
+	errThresholdExceedsKeysLen       = errors.New("threshold must be no more than number of control keys")
+	errThresholdTooHigh              = fmt.Errorf("threshold can't be greater than %d", maxThreshold)
+	errControlKeysNotSortedAndUnique = errors.New("control keys must be sorted and unique")
 )
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
@@ -77,6 +78,10 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 		return errWrongNetworkID
 	case tx.Threshold > uint16(len(tx.ControlKeys)):
 		return errThresholdExceedsKeysLen
+	case tx.Threshold > maxThreshold:
+		return errThresholdTooHigh
+	case !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys):
+		return errControlKeysNotSortedAndUnique
 	}
 
 	// Byte representation of the unsigned transaction
@@ -106,12 +111,6 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	subnets, err := tx.vm.getSubnets(db)
 	if err != nil {
 		return nil, err
-	}
-
-	for _, subnet := range subnets {
-		if subnet.id.Equals(tx.id) {
-			return nil, fmt.Errorf("there is already a subnet with ID %s", tx.id)
-		}
 	}
 	subnets = append(subnets, tx) // add new subnet
 	if err := tx.vm.putSubnets(db, subnets); err != nil {
@@ -164,6 +163,8 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 	return nil
 }
 
+// [controlKeys] must be unique. They will be sorted by this method.
+// If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
 func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []ids.ShortID,
 	threshold uint16, payerKey *crypto.PrivateKeySECP256K1R,
 ) (*CreateSubnetTx, error) {
@@ -176,6 +177,16 @@ func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []id
 			ControlKeys: controlKeys,
 			Threshold:   threshold,
 		},
+	}
+
+	if threshold == 0 {
+		tx.ControlKeys = make([]ids.ShortID, 0)
+	}
+	// Sort control keys
+	ids.SortShortIDs(tx.ControlKeys)
+	// Ensure control keys are unique
+	if !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys) {
+		return nil, errControlKeysNotSortedAndUnique
 	}
 
 	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)

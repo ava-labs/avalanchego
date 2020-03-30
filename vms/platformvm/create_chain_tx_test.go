@@ -122,27 +122,7 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should've errored because control sigs not unique")
 	}
 
-	// Case 7: Control sigs are nil
-	tx, err = vm.newCreateChainTx(
-		defaultNonce+1,
-		testSubnet1.id,
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		testNetworkID,
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
-	)
-	if err != nil {
-		t.Fatalf("should have passed verification but got %v", err)
-	}
-	tx.ControlSigs = nil
-	if err := tx.SyntacticVerify(); err == nil {
-		t.Fatal("should've errored because control sigs are nil")
-	}
-
-	// Case 8: Valid tx passes syntactic verification
+	// Case 7: Valid tx passes syntactic verification
 	tx, err = vm.newCreateChainTx(
 		defaultNonce+1,
 		testSubnet1.id,

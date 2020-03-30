@@ -362,7 +362,7 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
-		return fmt.Errorf("error during vm's Initialize: %v", err)
+		return fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
 	// Handles serialization/deserialization of vertices and also the

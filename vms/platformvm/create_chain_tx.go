@@ -17,7 +17,6 @@ var (
 	errInvalidVMID                   = errors.New("invalid VM ID")
 	errFxIDsNotSortedAndUnique       = errors.New("feature extensions IDs must be sorted and unique")
 	errControlSigsNotSortedAndUnique = errors.New("control signatures must be sorted and unique")
-	errControlSigsNil                = errors.New("control signatures are nil. (Should be empty slice if there are none.)")
 )
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx
@@ -95,8 +94,6 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return errInvalidVMID
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
-	case tx.ControlSigs == nil:
-		return errControlSigsNil
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
 		return errControlSigsNotSortedAndUnique
 	}
@@ -141,7 +138,9 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	account, err = account.Remove(txFee, tx.Nonce)
+	// txFee is removed in account.Remove
+	// TODO: Consider changing Remove to be parameterized on total amount (inc. tx fee) to remove
+	account, err = account.Remove(0, tx.Nonce)
 	if err != nil {
 		return nil, err
 	}
