@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"os"
 	"path"
 	"strings"
 
@@ -44,64 +45,76 @@ func init() {
 	loggingConfig, err := logging.DefaultConfig()
 	errs.Add(err)
 
+	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
+
 	// NetworkID:
-	networkName := flag.String("network-id", genesis.LocalName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", genesis.LocalName, "Network ID this node will connect to")
 
 	// Ava fees:
-	flag.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
+	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
 
 	// Assertions:
-	flag.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
+	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
 
 	// Crypto:
-	flag.BoolVar(&Config.EnableCrypto, "signature-verification-enabled", true, "Turn on signature verification")
+	fs.BoolVar(&Config.EnableCrypto, "signature-verification-enabled", true, "Turn on signature verification")
 
 	// Database:
-	db := flag.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := flag.String("db-dir", "db", "Database directory for Ava state")
+	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
+	dbDir := fs.String("db-dir", "db", "Database directory for Ava state")
 
 	// IP:
-	consensusIP := flag.String("public-ip", "", "Public IP of this node")
+	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 
 	// HTTP Server:
-	httpPort := flag.Uint("http-port", 9650, "Port of the HTTP server")
-	flag.BoolVar(&Config.EnableHTTPS, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
-	flag.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
-	flag.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
+	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
+	fs.BoolVar(&Config.EnableHTTPS, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
+	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
+	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
 
 	// Bootstrapping:
-	bootstrapIPs := flag.String("bootstrap-ips", "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	bootstrapIDs := flag.String("bootstrap-ids", "", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	bootstrapIPs := fs.String("bootstrap-ips", "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	bootstrapIDs := fs.String("bootstrap-ids", "", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
-	consensusPort := flag.Uint("staking-port", 9651, "Port of the consensus server")
-	flag.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
-	flag.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "", "TLS private key file for staking connections")
-	flag.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "", "TLS certificate file for staking connections")
+	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
+	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
+	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "", "TLS private key file for staking connections")
+	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "", "TLS certificate file for staking connections")
 
 	// Logging:
-	logsDir := flag.String("log-dir", "", "Logging directory for Ava")
-	logLevel := flag.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
-	logDisplayLevel := flag.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
+	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
+	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
+	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 
-	flag.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 20, "Number of nodes to query for each network poll")
-	flag.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 18, "Alpha value to use for required number positive results")
-	flag.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 20, "Beta value to use for virtuous transactions")
-	flag.IntVar(&Config.ConsensusParams.BetaRogue, "snow-rogue-commit-threshold", 30, "Beta value to use for rogue transactions")
-	flag.IntVar(&Config.ConsensusParams.Parents, "snow-avalanche-num-parents", 5, "Number of vertexes for reference from each new vertex")
-	flag.IntVar(&Config.ConsensusParams.BatchSize, "snow-avalanche-batch-size", 30, "Number of operations to batch in each new vertex")
+	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 20, "Number of nodes to query for each network poll")
+	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 18, "Alpha value to use for required number positive results")
+	fs.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 20, "Beta value to use for virtuous transactions")
+	fs.IntVar(&Config.ConsensusParams.BetaRogue, "snow-rogue-commit-threshold", 30, "Beta value to use for rogue transactions")
+	fs.IntVar(&Config.ConsensusParams.Parents, "snow-avalanche-num-parents", 5, "Number of vertexes for reference from each new vertex")
+	fs.IntVar(&Config.ConsensusParams.BatchSize, "snow-avalanche-batch-size", 30, "Number of operations to batch in each new vertex")
 
 	// Enable/Disable APIs:
-	flag.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", true, "If true, this node exposes the Admin API")
-	flag.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
-	flag.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
-	flag.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
+	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", true, "If true, this node exposes the Admin API")
+	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
+	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
+	fs.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
 
 	// Throughput Server
-	throughputPort := flag.Uint("xput-server-port", 9652, "Port of the deprecated throughput test server")
-	flag.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
+	throughputPort := fs.Uint("xput-server-port", 9652, "Port of the deprecated throughput test server")
+	fs.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
 
-	flag.Parse()
+	ferr := fs.Parse(os.Args[1:])
+
+	if ferr == flag.ErrHelp {
+		// display usage/help text and exit successfully
+		os.Exit(0)
+	}
+
+	if ferr != nil {
+		// other type of error occurred when parsing args
+		os.Exit(2)
+	}
 
 	networkID, err := genesis.NetworkID(*networkName)
 	errs.Add(err)
