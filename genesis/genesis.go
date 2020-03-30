@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
+	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
@@ -160,6 +161,7 @@ func Aliases(networkID uint32) (generalAliases map[string][]string, chainAliases
 		timestampvm.ID.Key(): []string{"timestamp"},
 		secp256k1fx.ID.Key(): []string{"secp256k1fx"},
 		nftfx.ID.Key():       []string{"nftfx"},
+		propertyfx.ID.Key():  []string{"propertyfx"},
 	}
 
 	genesisBytes := Genesis(networkID)
@@ -353,6 +355,7 @@ func Genesis(networkID uint32) []byte {
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
 				nftfx.ID,
+				propertyfx.ID,
 			},
 			Name: "X-Chain",
 		},
