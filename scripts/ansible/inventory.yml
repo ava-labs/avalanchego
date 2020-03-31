@@ -11,7 +11,7 @@ borealis_bootstrap:
     ansible_connection: ssh
     ansible_user: ubuntu
 
-    network_id: "borealis"
+    network_id: "cascade"
     api_admin_enabled: true
     api_keystore_enabled: true
     api_metrics_enabled: true
@@ -62,7 +62,7 @@ borealis_node:
     ansible_connection: ssh
     ansible_user: ubuntu
 
-    network_id: "borealis"
+    network_id: "cascade"
     api_admin_enabled: true
     api_keystore_enabled: true
     api_metrics_enabled: true
