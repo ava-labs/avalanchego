@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
@@ -39,16 +40,17 @@ var (
 	// each key corresponds to an account that has $AVA and a genesis validator
 	keys []*crypto.PrivateKeySECP256K1R
 
-	// amount all genesis validators stake
+	// amount all genesis validators stake in defaultVM
 	defaultStakeAmount uint64
 
-	// balance of accounts that exist at genesis
+	// balance of accounts that exist at genesis in defaultVM
 	defaultBalance = 100 * MinimumStakeAmount
 
 	// At genesis this account has AVA and is validating the default subnet
 	defaultKey *crypto.PrivateKeySECP256K1R
 
-	// non-default subnet that exists at genesis in defaultVM
+	// non-default Subnet that exists at genesis in defaultVM
+	// Its controlKeys are keys[0], keys[1], keys[2]
 	testSubnet1            *CreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 )
@@ -116,7 +118,8 @@ func defaultVM() *VM {
 	}
 
 	vm := &VM{
-		SnowmanVM: &core.SnowmanVM{},
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
 	}
 
 	defaultSubnet := validators.NewSet()
@@ -136,7 +139,7 @@ func defaultVM() *VM {
 		testNetworkID,
 		0,
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()}, // control keys are keys[0], keys[1], keys[2]
-		2, // 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
+		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		keys[0],
 	)
 	if err != nil {
@@ -765,11 +768,13 @@ func TestCreateChain(t *testing.T) {
 
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
+		testSubnet1.id,
 		nil,
 		timestampvm.ID,
 		nil,
-		"name ",
+		"name",
 		testNetworkID,
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		keys[0],
 	)
 	if err != nil {
@@ -806,7 +811,7 @@ func TestCreateChain(t *testing.T) {
 	}
 
 	// Verify tx fee was deducted
-	account, err := vm.getAccount(vm.DB, tx.Key().Address())
+	account, err := vm.getAccount(vm.DB, tx.PayerAddress)
 	if err != nil {
 		t.Fatal(err)
 	}

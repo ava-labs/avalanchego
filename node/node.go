@@ -358,8 +358,13 @@ func (n *Node) initChains() {
 	n.Log.Info("initializing chains")
 
 	vdrs := n.vdrs
+
+	// If staking is disabled, ignore updates to Subnets' validator sets
+	// Instead of updating node's validator manager, platform chain makes changes
+	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
 		defaultSubnetValidators := validators.NewSet()
+		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 		vdrs = validators.NewManager()
 		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 	}
@@ -367,10 +372,11 @@ func (n *Node) initChains() {
 	n.vmManager.RegisterVMFactory(
 		/*vmID=*/ platformvm.ID,
 		/*vmFactory=*/ &platformvm.Factory{
-			ChainManager: n.chainManager,
-			Validators:   vdrs,
-			AVA:          genesis.AVAAssetID(n.Config.NetworkID),
-			AVM:          genesis.VMGenesis(n.Config.NetworkID, avm.ID).ID(),
+			ChainManager:   n.chainManager,
+			Validators:     vdrs,
+			StakingEnabled: n.Config.EnableStaking,
+			AVA:            genesis.AVAAssetID(n.Config.NetworkID),
+			AVM:            genesis.VMGenesis(n.Config.NetworkID, avm.ID).ID(),
 		},
 	)
 
@@ -379,11 +385,12 @@ func (n *Node) initChains() {
 		beacons.Add(validators.NewValidator(peer.ID, 1))
 	}
 
-	genesisBytes := genesis.Genesis(n.Config.NetworkID)
+	genesisBytes, _ := genesis.Genesis(n.Config.NetworkID)
 
 	// Create the Platform Chain
 	n.chainManager.ForceCreateChain(chains.ChainParameters{
 		ID:            ids.Empty,
+		SubnetID:      platformvm.DefaultSubnetID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: beacons,
@@ -413,6 +420,7 @@ func (n *Node) initAPIServer() {
 // Assumes n.DB, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager() {
 	n.chainManager = chains.New(
+		n.Config.EnableStaking,
 		n.Log,
 		n.LogFactory,
 		n.vmManager,

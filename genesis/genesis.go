@@ -3,9 +3,8 @@
 
 package genesis
 
-// TODO: Move this to a separate repo and leave only a byte array
-
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -15,6 +14,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core"
+
+	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ava-labs/go-ethereum/params"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
@@ -29,8 +32,6 @@ import (
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/params"
 )
 
 // Note that since an AVA network has exactly one Platform Chain,
@@ -164,7 +165,7 @@ func Aliases(networkID uint32) (generalAliases map[string][]string, chainAliases
 		propertyfx.ID.Key():  []string{"propertyfx"},
 	}
 
-	genesisBytes := Genesis(networkID)
+	genesisBytes, _ := Genesis(networkID)
 	genesis := &platformvm.Genesis{}                  // TODO let's not re-create genesis to do aliasing
 	platformvm.Codec.Unmarshal(genesisBytes, genesis) // TODO check for error
 	genesis.Initialize()
@@ -195,11 +196,7 @@ func Aliases(networkID uint32) (generalAliases map[string][]string, chainAliases
 // Since the Platform Chain causes the creation of all other
 // chains, this function returns the genesis data of the entire network.
 // The ID of the new network is [networkID].
-func Genesis(networkID uint32) []byte {
-	if networkID != LocalID {
-		panic("unknown network ID provided")
-	}
-
+func Genesis(networkID uint32) ([]byte, error) {
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
@@ -233,7 +230,7 @@ func Genesis(networkID uint32) []byte {
 	// Specify the genesis state of Athereum (the built-in instance of the EVM)
 	evmBalance, success := new(big.Int).SetString("33b2e3c9fd0804000000000", 16)
 	if success != true {
-		return nil
+		return nil, errors.New("problem creating evm genesis state")
 	}
 	evmArgs := core.Genesis{
 		Config: &params.ChainConfig{
@@ -268,7 +265,7 @@ func Genesis(networkID uint32) []byte {
 	evmSS := evm.StaticService{}
 	evmReply, err := evmSS.BuildGenesis(nil, &evmArgs)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	// Specify the genesis state of the simple payments DAG
@@ -286,7 +283,7 @@ func Genesis(networkID uint32) []byte {
 	spdagvmReply := spdagvm.BuildGenesisReply{}
 	spdagvmSS := spdagvm.StaticService{}
 	if err := spdagvmSS.BuildGenesis(nil, &spdagvmArgs, &spdagvmReply); err != nil {
-		return nil
+		return nil, fmt.Errorf("problem creating simple payments DAG: %w", err)
 	}
 
 	// Specify the genesis state of the simple payments chain
@@ -303,7 +300,7 @@ func Genesis(networkID uint32) []byte {
 
 	spchainvmSS := spchainvm.StaticService{}
 	if err := spchainvmSS.BuildGenesis(nil, &spchainvmArgs, &spchainvmReply); err != nil {
-		return nil
+		return nil, fmt.Errorf("problem creating simple payments chain: %w", err)
 	}
 
 	// Specify the initial state of the Platform Chain
@@ -351,6 +348,7 @@ func Genesis(networkID uint32) []byte {
 	platformvmArgs.Chains = []platformvm.APIChain{
 		platformvm.APIChain{
 			GenesisData: avmReply.Bytes,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        avm.ID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
@@ -361,21 +359,25 @@ func Genesis(networkID uint32) []byte {
 		},
 		platformvm.APIChain{
 			GenesisData: evmReply,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        evm.ID,
 			Name:        "C-Chain",
 		},
 		platformvm.APIChain{
 			GenesisData: spdagvmReply.Bytes,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        spdagvm.ID,
 			Name:        "Simple DAG Payments",
 		},
 		platformvm.APIChain{
 			GenesisData: spchainvmReply.Bytes,
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        spchainvm.ID,
 			Name:        "Simple Chain Payments",
 		},
 		platformvm.APIChain{
 			GenesisData: formatting.CB58{Bytes: []byte{}}, // There is no genesis data
+			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        timestampvm.ID,
 			Name:        "Simple Timestamp Server",
 		},
@@ -386,15 +388,15 @@ func Genesis(networkID uint32) []byte {
 
 	platformvmSS := platformvm.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
-		return nil
+		return nil, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	return platformvmReply.Bytes.Bytes
+	return platformvmReply.Bytes.Bytes, nil
 }
 
 // VMGenesis ...
 func VMGenesis(networkID uint32, vmID ids.ID) *platformvm.CreateChainTx {
-	genesisBytes := Genesis(networkID)
+	genesisBytes, _ := Genesis(networkID)
 	genesis := platformvm.Genesis{}
 	platformvm.Codec.Unmarshal(genesisBytes, &genesis)
 	if err := genesis.Initialize(); err != nil {

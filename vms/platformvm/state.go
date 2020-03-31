@@ -17,6 +17,7 @@ import (
 
 var (
 	errEmptyAccountAddress = errors.New("account has empty address")
+	errNoSuchBlockchain    = errors.New("there is no blockchain with the specified ID")
 )
 
 // TODO: Cache prefixed IDs or use different way of keying into database
@@ -146,7 +147,7 @@ func (vm *VM) putAccount(db database.Database, account Account) error {
 	return nil
 }
 
-// get the blockchains that exist
+// get all the blockchains that exist
 func (vm *VM) getChains(db database.Database) ([]*CreateChainTx, error) {
 	chainsInterface, err := vm.State.Get(db, chainsTypeID, chainsKey)
 	if err != nil {
@@ -154,10 +155,24 @@ func (vm *VM) getChains(db database.Database) ([]*CreateChainTx, error) {
 	}
 	chains, ok := chainsInterface.([]*CreateChainTx)
 	if !ok {
-		vm.Ctx.Log.Warn("expected to retrieve []*CreateChainTx from database but got different type")
+		vm.Ctx.Log.Error("expected to retrieve []*CreateChainTx from database but got different type")
 		return nil, errDBChains
 	}
 	return chains, nil
+}
+
+// get a blockchain by its ID
+func (vm *VM) getChain(db database.Database, ID ids.ID) (*CreateChainTx, error) {
+	chains, err := vm.getChains(db)
+	if err != nil {
+		return nil, err
+	}
+	for _, chain := range chains {
+		if chain.ID().Equals(ID) {
+			return chain, nil
+		}
+	}
+	return nil, errNoSuchBlockchain
 }
 
 // put the list of blockchains that exist to database

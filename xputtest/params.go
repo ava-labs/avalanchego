@@ -74,10 +74,6 @@ func init() {
 	networkID, err := genesis.NetworkID(*networkName)
 	errs.Add(err)
 
-	if networkID != genesis.LocalID {
-		errs.Add(fmt.Errorf("the only supported networkID is: %s", genesis.LocalName))
-	}
-
 	config.NetworkID = networkID
 
 	// Remote:
