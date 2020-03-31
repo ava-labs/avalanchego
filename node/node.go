@@ -52,6 +52,10 @@ const (
 	maxMessageSize = 1 << 25 // maximum size of a message sent with salticidae
 )
 
+var (
+	genesisHashKey = []byte("genesisID")
+)
+
 // MainNode is the reference for node callbacks
 var MainNode = Node{}
 
@@ -291,7 +295,38 @@ func (n *Node) Dispatch() { n.EC.Dispatch() }
  ******************************************************************************
  */
 
-func (n *Node) initDatabase() { n.DB = n.Config.DB }
+func (n *Node) initDatabase() error {
+	n.DB = n.Config.DB
+
+	expectedGenesis, err := genesis.Genesis(n.Config.NetworkID)
+	if err != nil {
+		return err
+	}
+	rawExpectedGenesisHash := hashing.ComputeHash256(expectedGenesis)
+
+	rawGenesisHash, err := n.DB.Get(genesisHashKey)
+	if err == database.ErrNotFound {
+		rawGenesisHash = rawExpectedGenesisHash
+		err = n.DB.Put(genesisHashKey, rawGenesisHash)
+	}
+	if err != nil {
+		return err
+	}
+
+	genesisHash, err := ids.ToID(rawGenesisHash)
+	if err != nil {
+		return err
+	}
+	expectedGenesisHash, err := ids.ToID(rawExpectedGenesisHash)
+	if err != nil {
+		return err
+	}
+
+	if !genesisHash.Equals(expectedGenesisHash) {
+		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
+	}
+	return nil
+}
 
 // Initialize this node's ID
 // If staking is disabled, a node's ID is a hash of its IP
@@ -525,7 +560,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 	n.HTTPLog = httpLog
 
-	n.initDatabase() // Set up the node's database
+	if err := n.initDatabase(); err != nil { // Set up the node's database
+		return fmt.Errorf("problem initializing database: %w", err)
+	}
 
 	if err = n.initNodeID(); err != nil { // Derive this node's ID
 		return fmt.Errorf("problem initializing staker ID: %w", err)
