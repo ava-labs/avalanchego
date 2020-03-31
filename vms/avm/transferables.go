@@ -25,7 +25,7 @@ var (
 type TransferableOutput struct {
 	Asset `serialize:"true"`
 
-	Out FxTransferable `serialize:"true"`
+	Out FxTransferable `serialize:"true" json:"output"`
 }
 
 // Output returns the feature extension output that this Output is using.
@@ -90,7 +90,7 @@ type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
 
-	In FxTransferable `serialize:"true"`
+	In FxTransferable `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -29,10 +30,10 @@ var (
 type BaseTx struct {
 	metadata
 
-	NetID uint32                `serialize:"true"` // ID of the network this chain lives on
-	BCID  ids.ID                `serialize:"true"` // ID of the chain on which this transaction exists (prevents replay attacks)
-	Outs  []*TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins   []*TransferableInput  `serialize:"true"` // The inputs to this transaction
+	NetID uint32                `serialize:"true" json:"networkID"`    // ID of the network this chain lives on
+	BCID  ids.ID                `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
+	Outs  []*TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
+	Ins   []*TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
 }
 
 // NetworkID is the ID of the network on which this transaction exists
@@ -155,11 +156,11 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
+func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
 	for i, in := range t.Ins {
 		cred := creds[i]
 
-		fxIndex, err := vm.getFx(cred.Cred)
+		fxIndex, err := vm.getFx(cred)
 		if err != nil {
 			return err
 		}
@@ -178,7 +179,7 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) erro
 				return errIncompatibleFx
 			}
 
-			err = fx.VerifyTransfer(uTx, utxo.Out, in.In, cred.Cred)
+			err = fx.VerifyTransfer(uTx, utxo.Out, in.In, cred)
 			if err == nil {
 				continue
 			}
@@ -215,7 +216,7 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) erro
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred.Cred); err != nil {
+		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
 			return err
 		}
 	}

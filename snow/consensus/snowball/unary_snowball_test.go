@@ -35,7 +35,7 @@ func TestUnarySnowball(t *testing.T) {
 	sbCloneIntf := sb.Clone()
 	sbClone, ok := sbCloneIntf.(*unarySnowball)
 	if !ok {
-		t.Fatalf("Unexpectedly clone type")
+		t.Fatalf("Unexpected clone type")
 	}
 
 	UnarySnowballStateTest(t, sbClone, 2, 1, false)
