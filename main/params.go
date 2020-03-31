@@ -33,6 +33,17 @@ var (
 	Err    error
 )
 
+// Bootstrap configs
+var (
+	BootstrapIPs = []string{
+		"3.227.207.132:21001",
+		"34.207.133.167:21001",
+		"107.23.241.199:21001",
+		"54.197.215.186:21001",
+		"18.234.153.22:21001",
+	}
+)
+
 var (
 	errBootstrapMismatch = errors.New("more bootstrap IDs provided than bootstrap IPs")
 )
@@ -48,7 +59,7 @@ func init() {
 	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.LocalName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", genesis.CascadeName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
@@ -73,8 +84,8 @@ func init() {
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
 
 	// Bootstrapping:
-	bootstrapIPs := fs.String("bootstrap-ips", "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	bootstrapIDs := fs.String("bootstrap-ids", "", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	bootstrapIPs := fs.String("bootstrap-ips", strings.Join(BootstrapIPs, ","), "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	bootstrapIDs := fs.String("bootstrap-ids", strings.Join(genesis.StakerIDs, ","), "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")

@@ -42,15 +42,15 @@ import (
 
 // Hardcoded network IDs
 const (
-	MainnetID  uint32 = 1
-	TestnetID  uint32 = 2
-	BorealisID uint32 = 2
-	LocalID    uint32 = 12345
+	MainnetID uint32 = 1
+	TestnetID uint32 = 2
+	CascadeID uint32 = 2
+	LocalID   uint32 = 12345
 
-	MainnetName  = "mainnet"
-	TestnetName  = "testnet"
-	BorealisName = "borealis"
-	LocalName    = "local"
+	MainnetName = "mainnet"
+	TestnetName = "testnet"
+	CascadeName = "cascade"
+	LocalName   = "local"
 )
 
 var (
@@ -62,14 +62,14 @@ var (
 	// Give special names to the mainnet and testnet
 	NetworkIDToNetworkName = map[uint32]string{
 		MainnetID: MainnetName,
-		TestnetID: BorealisName,
+		TestnetID: CascadeName,
 		LocalID:   LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
-		MainnetName:  MainnetID,
-		TestnetName:  TestnetID,
-		BorealisName: BorealisID,
-		LocalName:    LocalID,
+		MainnetName: MainnetID,
+		TestnetName: TestnetID,
+		CascadeName: CascadeID,
+		LocalName:   LocalID,
 	}
 	MintAddresses = []string{
 		"95YUFjhDG892VePMzpwKF9JzewGKvGRi3",
