@@ -352,11 +352,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	config.Params = avalanche.Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            3,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 3,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
