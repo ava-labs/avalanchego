@@ -18,8 +18,8 @@ var (
 
 // TransferOutput ...
 type TransferOutput struct {
-	GroupID                  uint32 `serialize:"true"`
-	Payload                  []byte `serialize:"true"`
+	GroupID                  uint32 `serialize:"true" json:"groupID"`
+	Payload                  []byte `serialize:"true" json:"payload"`
 	secp256k1fx.OutputOwners `serialize:"true"`
 }
 

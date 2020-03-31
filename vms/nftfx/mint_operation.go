@@ -13,10 +13,10 @@ var (
 
 // MintOperation ...
 type MintOperation struct {
-	MintInput secp256k1fx.Input           `serialize:"true"`
-	GroupID   uint32                      `serialize:"true"`
-	Payload   []byte                      `serialize:"true"`
-	Outputs   []*secp256k1fx.OutputOwners `serialize:"true"`
+	MintInput secp256k1fx.Input           `serialize:"true" json:"mintInput"`
+	GroupID   uint32                      `serialize:"true" json:"groupID"`
+	Payload   []byte                      `serialize:"true" json:"payload"`
+	Outputs   []*secp256k1fx.OutputOwners `serialize:"true" json:"outputs"`
 }
 
 // Outs ...

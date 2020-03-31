@@ -13,8 +13,8 @@ var (
 
 // TransferOperation ...
 type TransferOperation struct {
-	Input  secp256k1fx.Input `serialize:"true"`
-	Output TransferOutput    `serialize:"true"`
+	Input  secp256k1fx.Input `serialize:"true" json:"input"`
+	Output TransferOutput    `serialize:"true" json:"output"`
 }
 
 // Outs ...

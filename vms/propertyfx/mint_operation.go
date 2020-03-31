@@ -13,9 +13,9 @@ var (
 
 // MintOperation ...
 type MintOperation struct {
-	MintInput   secp256k1fx.Input `serialize:"true"`
-	MintOutput  MintOutput        `serialize:"true"`
-	OwnedOutput OwnedOutput       `serialize:"true"`
+	MintInput   secp256k1fx.Input `serialize:"true" json:"mintInput"`
+	MintOutput  MintOutput        `serialize:"true" json:"mintOutput"`
+	OwnedOutput OwnedOutput       `serialize:"true" json:"ownedOutput"`
 }
 
 // Outs ...

@@ -15,9 +15,9 @@ var (
 
 // MintOperation ...
 type MintOperation struct {
-	MintInput      Input          `serialize:"true"`
-	MintOutput     MintOutput     `serialize:"true"`
-	TransferOutput TransferOutput `serialize:"true"`
+	MintInput      Input          `serialize:"true" json:"mintInput"`
+	MintOutput     MintOutput     `serialize:"true" json:"mintOutput"`
+	TransferOutput TransferOutput `serialize:"true" json:"transferOutput"`
 }
 
 // Outs ...

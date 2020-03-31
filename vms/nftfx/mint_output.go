@@ -6,6 +6,6 @@ import (
 
 // MintOutput ...
 type MintOutput struct {
-	GroupID                  uint32 `serialize:"true"`
+	GroupID                  uint32 `serialize:"true" json:"groupID"`
 	secp256k1fx.OutputOwners `serialize:"true"`
 }
