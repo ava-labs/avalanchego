@@ -23,10 +23,11 @@ func DefaultConfig() Config {
 		},
 		Params: snowball.Parameters{
 			Metrics:      prometheus.NewRegistry(),
-			K:            1,
-			Alpha:        1,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			K:                    1,
+			Alpha:                1,
+			BetaVirtuous:         1,
+			BetaRogue:            2,
+			ConcurrentRepolls:    1,
 		},
 		Consensus: &snowman.Topological{},
 	}

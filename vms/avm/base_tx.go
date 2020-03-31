@@ -31,10 +31,10 @@ var (
 type BaseTx struct {
 	ava.Metadata
 
-	NetID uint32                    `serialize:"true"` // ID of the network this chain lives on
-	BCID  ids.ID                    `serialize:"true"` // ID of the chain on which this transaction exists (prevents replay attacks)
-	Outs  []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
-	Ins   []*ava.TransferableInput  `serialize:"true"` // The inputs to this transaction
+	NetID uint32                    `serialize:"true" json:"networkID"`    // ID of the network this chain lives on
+	BCID  ids.ID                    `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
+	Outs  []*ava.TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
+	Ins   []*ava.TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.

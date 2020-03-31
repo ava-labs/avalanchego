@@ -76,8 +76,10 @@ func (i *issuer) Update() {
 	}
 
 	i.t.RequestID++
+	polled := false
 	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
 		i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+		polled = true
 	} else if numVdrs < p.K {
 		i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
@@ -85,6 +87,10 @@ func (i *issuer) Update() {
 	i.t.vtxBlocked.Fulfill(vtxID)
 	for _, tx := range i.vtx.Txs() {
 		i.t.txBlocked.Fulfill(tx.ID())
+	}
+
+	if polled && len(i.t.polls.m) < i.t.Params.ConcurrentRepolls {
+		i.t.repoll()
 	}
 }
 

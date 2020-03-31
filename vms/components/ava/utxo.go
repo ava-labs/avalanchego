@@ -19,7 +19,7 @@ type UTXO struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
 
-	Out verify.Verifiable `serialize:"true"`
+	Out verify.Verifiable `serialize:"true" json:"output"`
 }
 
 // Verify implements the verify.Verifiable interface

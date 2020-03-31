@@ -17,8 +17,8 @@ var (
 // UTXOID ...
 type UTXOID struct {
 	// Serialized:
-	TxID        ids.ID `serialize:"true"`
-	OutputIndex uint32 `serialize:"true"`
+	TxID        ids.ID `serialize:"true" json:"txID"`
+	OutputIndex uint32 `serialize:"true" json:"outputIndex"`
 
 	// Symbol is false if the UTXO should be part of the DB
 	Symbol bool

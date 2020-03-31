@@ -39,9 +39,9 @@ type UnsignedTx interface {
 // attempting to consume and the inputs consume sufficient state to produce the
 // outputs.
 type Tx struct {
-	UnsignedTx `serialize:"true"`
+	UnsignedTx `serialize:"true" json:"unsignedTx"`
 
-	Creds []verify.Verifiable `serialize:"true"` // The credentials of this transaction
+	Creds []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the

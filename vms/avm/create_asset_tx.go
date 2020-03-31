@@ -33,10 +33,10 @@ var (
 // CreateAssetTx is a transaction that creates a new asset.
 type CreateAssetTx struct {
 	BaseTx       `serialize:"true"`
-	Name         string          `serialize:"true"`
-	Symbol       string          `serialize:"true"`
-	Denomination byte            `serialize:"true"`
-	States       []*InitialState `serialize:"true"`
+	Name         string          `serialize:"true" json:"name"`
+	Symbol       string          `serialize:"true" json:"symbol"`
+	Denomination byte            `serialize:"true" json:"denomination"`
+	States       []*InitialState `serialize:"true" json:"initialStates"`
 }
 
 // InitialStates track which virtual machines, and the initial state of these

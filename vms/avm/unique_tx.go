@@ -293,8 +293,7 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	err := tx.Tx.SemanticVerify(tx.vm, tx)
-	if err != nil {
+	if err := tx.Tx.SemanticVerify(tx.vm, tx); err != nil {
 		return err
 	}
 

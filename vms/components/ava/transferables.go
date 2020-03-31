@@ -36,7 +36,7 @@ type Transferable interface {
 type TransferableOutput struct {
 	Asset `serialize:"true"`
 
-	Out Transferable `serialize:"true"`
+	Out Transferable `serialize:"true" json:"output"`
 }
 
 // Output returns the feature extension output that this Output is using.
@@ -101,7 +101,7 @@ type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
 
-	In Transferable `serialize:"true"`
+	In Transferable `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.

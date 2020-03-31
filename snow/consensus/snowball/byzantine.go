@@ -24,6 +24,7 @@ type Byzantine struct {
 
 // Initialize implements the Consensus interface
 func (b *Byzantine) Initialize(params Parameters, choice ids.ID) {
+	b.params = params
 	b.preference = choice
 }
 

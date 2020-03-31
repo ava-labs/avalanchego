@@ -11,9 +11,9 @@ import (
 
 // Parameters required for snowball consensus
 type Parameters struct {
-	Namespace                         string
-	Metrics                           prometheus.Registerer
-	K, Alpha, BetaVirtuous, BetaRogue int
+	Namespace                                            string
+	Metrics                                              prometheus.Registerer
+	K, Alpha, BetaVirtuous, BetaRogue, ConcurrentRepolls int
 }
 
 // Valid returns nil if the parameters describe a valid initialization.
@@ -27,6 +27,10 @@ func (p Parameters) Valid() error {
 		return fmt.Errorf("BetaVirtuous = %d: Fails the condition that: 0 < BetaVirtuous", p.BetaVirtuous)
 	case p.BetaRogue < p.BetaVirtuous:
 		return fmt.Errorf("BetaVirtuous = %d, BetaRogue = %d: Fails the condition that: BetaVirtuous <= BetaRogue", p.BetaVirtuous, p.BetaRogue)
+	case p.ConcurrentRepolls <= 0:
+		return fmt.Errorf("ConcurrentRepolls = %d: Fails the condition that: 0 < ConcurrentRepolls", p.ConcurrentRepolls)
+	case p.ConcurrentRepolls > p.BetaRogue:
+		return fmt.Errorf("ConcurrentRepolls = %d, BetaRogue = %d: Fails the condition that: ConcurrentRepolls <= BetaRogue", p.ConcurrentRepolls, p.BetaRogue)
 	default:
 		return nil
 	}
