@@ -8,11 +8,9 @@ import (
 
 	"github.com/ava-labs/salticidae-go"
 
-	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/networking"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/spchainvm"
@@ -28,15 +26,11 @@ func (n *network) benchmarkSPChain(chain *platformvm.CreateChainTx) {
 	accounts, err := codec.UnmarshalGenesis(genesisBytes)
 	n.log.AssertNoError(err)
 
-	cb58 := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
-	for _, keyStr := range genesis.Keys {
-		n.log.AssertNoError(cb58.FromString(keyStr))
-		skGen, err := factory.ToPrivateKey(cb58.Bytes)
-		n.log.AssertNoError(err)
-		sk := skGen.(*crypto.PrivateKeySECP256K1R)
-		wallet.ImportKey(sk)
-	}
+	skGen, err := factory.ToPrivateKey(config.Key)
+	n.log.AssertNoError(err)
+	sk := skGen.(*crypto.PrivateKeySECP256K1R)
+	wallet.ImportKey(sk)
 
 	for _, account := range accounts {
 		wallet.AddAccount(account)

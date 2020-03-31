@@ -71,25 +71,35 @@ var (
 		BorealisName: BorealisID,
 		LocalName:    LocalID,
 	}
-	Keys = []string{
-		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
+	MintAddresses = []string{
+		"95YUFjhDG892VePMzpwKF9JzewGKvGRi3",
 	}
-	Addresses = []string{
-		"6Y3kysjF9jnHnYkdS9yGAuoHyae2eNmeV",
+	FundedAddresses = []string{
+		"9uKvvA7E35QCwLvAaohXTCfFejbf3Rv17",
+		"JLrYNMYXANGj43BfWXBxMMAEenUBp1Sbn",
+		"7TUTzwrU6nbZtWHjTHEpdneUvjKBxb3EM",
+		"77mPUXBdQKwQpPoX6rckCZGLGGdkuG1G6",
+		"4gGWdFZ4Gax1B466YKXyKRRpWLb42Afdt",
+		"CKTkzAPsRxCreyiDTnjGxLmjMarxF28fi",
+		"4ABm9gFHVtsNdcKSd1xsacFkGneSgzpaa",
+		"DpL8PTsrjtLzv5J8LL3D2A6YcnCTqrNH9",
+		"ZdhZv6oZrmXLyFDy6ovXAu6VxmbTsT2h",
+		"6cesTteH62Y5mLoDBUASaBvCXuL2AthL",
 	}
+
 	ParsedAddresses = []ids.ShortID{}
 	StakerIDs       = []string{
-		"7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
-		"MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
-		"NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
-		"GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
-		"P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
+		"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
+		"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
+		"DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
+		"N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
+		"EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
 	}
 	ParsedStakerIDs = []ids.ShortID{}
 )
 
 func init() {
-	for _, addrStr := range Addresses {
+	for _, addrStr := range FundedAddresses {
 		addr, err := ids.ShortFromString(addrStr)
 		if err != nil {
 			panic(err)
@@ -200,8 +210,12 @@ func Genesis(networkID uint32) ([]byte, error) {
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
+		owners := []interface{}{avm.Owners{
+			Threshold: 1,
+			Minters:   MintAddresses,
+		}}
 		holders := []interface{}(nil)
-		for _, addr := range Addresses {
+		for _, addr := range FundedAddresses {
 			holders = append(holders, avm.Holder{
 				Amount:  json.Uint64(45 * units.MegaAva),
 				Address: addr,
@@ -214,7 +228,8 @@ func Genesis(networkID uint32) ([]byte, error) {
 				Symbol:       "AVA",
 				Denomination: 9,
 				InitialState: map[string][]interface{}{
-					"fixedCap": holders,
+					"variableCap": owners,
+					"fixedCap":    holders,
 				},
 			},
 		}

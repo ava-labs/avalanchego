@@ -6,14 +6,9 @@ package avmwallet
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -219,85 +214,5 @@ func TestWalletString(t *testing.T) {
 		"\nUTXOs (length=0):"
 	if str := w.String(); str != expected {
 		t.Fatalf("got:\n%s\n\nexpected:\n%s", str, expected)
-	}
-}
-
-func TestWalletWithGenesis(t *testing.T) {
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 12345
-	ctx.ChainID = ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-
-	w, err := NewWallet(logging.NoLog{}, ctx.NetworkID, ctx.ChainID, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	b58 := formatting.CB58{}
-	factory := crypto.FactorySECP256K1R{}
-	for _, key := range genesis.Keys {
-		if err := b58.FromString(key); err != nil {
-			t.Fatal(err)
-		}
-
-		sk, err := factory.ToPrivateKey(b58.Bytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.ImportKey(sk.(*crypto.PrivateKeySECP256K1R))
-	}
-
-	avmChain := genesis.VMGenesis(ctx.NetworkID, avm.ID)
-	genesisBytes := avmChain.GenesisData
-
-	genesis := avm.Genesis{}
-	if err := w.codec.Unmarshal(genesisBytes, &genesis); err != nil {
-		t.Fatal(err)
-	}
-
-	genesisTx := genesis.Txs[0]
-	tx := avm.Tx{
-		UnsignedTx: &genesisTx.CreateAssetTx,
-	}
-	txBytes, err := w.codec.Marshal(&tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(txBytes)
-
-	for _, utxo := range tx.UTXOs() {
-		w.AddUTXO(utxo)
-	}
-
-	assetID := genesisTx.ID()
-
-	if balance := w.Balance(assetID); balance == 0 {
-		t.Fatalf("expected a positive balance")
-	}
-
-	for i := 1; i <= 1000; i++ {
-		addr, err := w.CreateAddress()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		tx, err := w.CreateTx(assetID, uint64(i), addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := tx.SyntacticVerify(ctx, w.codec, 1); err != nil {
-			t.Fatal(err)
-		}
-
-		for _, utxoID := range tx.InputUTXOs() {
-			w.RemoveUTXO(utxoID.InputID())
-		}
-		for _, utxo := range tx.UTXOs() {
-			w.AddUTXO(utxo)
-		}
-
-		if balance := w.Balance(assetID); balance != 45*units.MegaAva {
-			t.Fatalf("balance of %d was expected but got %d", 45*units.MegaAva, balance)
-		}
 	}
 }

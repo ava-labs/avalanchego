@@ -41,11 +41,6 @@ func main() {
 	crypto.EnableCrypto = config.EnableCrypto
 	net.decided = make(chan ids.ID, config.MaxOutstandingTxs)
 
-	if config.Key >= len(genesis.Keys) || config.Key < 0 {
-		log.Fatal("Unknown key specified")
-		return
-	}
-
 	// Init the network
 	log.AssertNoError(net.Initialize())
 
