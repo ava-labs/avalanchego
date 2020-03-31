@@ -287,11 +287,9 @@ func TestStateTXs(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	tx.Creds = append(tx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 

@@ -15,7 +15,7 @@ var (
 
 // Credential ...
 type Credential struct {
-	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
+	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
 }
 
 // Verify ...

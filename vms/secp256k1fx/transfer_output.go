@@ -13,8 +13,8 @@ var (
 
 // TransferOutput ...
 type TransferOutput struct {
-	Amt      uint64 `serialize:"true"`
-	Locktime uint64 `serialize:"true"`
+	Amt      uint64 `serialize:"true" json:"amount"`
+	Locktime uint64 `serialize:"true" json:"locktime"`
 
 	OutputOwners `serialize:"true"`
 }

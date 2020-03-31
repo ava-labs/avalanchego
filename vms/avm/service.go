@@ -163,7 +163,7 @@ func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescr
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownAssetID
 	}
-	createAssetTx, ok := tx.t.tx.UnsignedTx.(*CreateAssetTx)
+	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
 	if !ok {
 		return errTxNotCreateAsset
 	}
@@ -700,7 +700,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 			cred.Sigs = append(cred.Sigs, fixedSig)
 		}
-		tx.Creds = append(tx.Creds, &Credential{Cred: cred})
+		tx.Creds = append(tx.Creds, cred)
 	}
 
 	b, err := service.vm.codec.Marshal(tx)
@@ -849,19 +849,15 @@ func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, re
 									},
 								},
 							},
-							Outs: []*OperableOutput{
-								&OperableOutput{
-									&secp256k1fx.MintOutput{
-										OutputOwners: out.OutputOwners,
-									},
+							Outs: []verify.Verifiable{
+								&secp256k1fx.MintOutput{
+									OutputOwners: out.OutputOwners,
 								},
-								&OperableOutput{
-									&secp256k1fx.TransferOutput{
-										Amt: uint64(args.Amount),
-										OutputOwners: secp256k1fx.OutputOwners{
-											Threshold: 1,
-											Addrs:     []ids.ShortID{to},
-										},
+								&secp256k1fx.TransferOutput{
+									Amt: uint64(args.Amount),
+									OutputOwners: secp256k1fx.OutputOwners{
+										Threshold: 1,
+										Addrs:     []ids.ShortID{to},
 									},
 								},
 							},
@@ -963,11 +959,11 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 	}
 
 	if len(tx.Creds) == 0 {
-		tx.Creds = append(tx.Creds, &Credential{Cred: &secp256k1fx.Credential{}})
+		tx.Creds = append(tx.Creds, &secp256k1fx.Credential{})
 	}
 
 	cred := tx.Creds[0]
-	switch cred := cred.Cred.(type) {
+	switch cred := cred.(type) {
 	case *secp256k1fx.Credential:
 		if len(cred.Sigs) != size {
 			cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, size)
