@@ -20,6 +20,7 @@ var (
 	errThresholdExceedsKeysLen       = errors.New("threshold must be no more than number of control keys")
 	errThresholdTooHigh              = fmt.Errorf("threshold can't be greater than %d", maxThreshold)
 	errControlKeysNotSortedAndUnique = errors.New("control keys must be sorted and unique")
+	errUnneededKeys                  = errors.New("subnets shouldn't have keys if the threshold is 0")
 )
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
@@ -80,6 +81,8 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 		return errThresholdExceedsKeysLen
 	case tx.Threshold > maxThreshold:
 		return errThresholdTooHigh
+	case tx.Threshold == 0 && len(tx.ControlKeys) > 0:
+		return errUnneededKeys
 	case !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys):
 		return errControlKeysNotSortedAndUnique
 	}
@@ -168,7 +171,6 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []ids.ShortID,
 	threshold uint16, payerKey *crypto.PrivateKeySECP256K1R,
 ) (*CreateSubnetTx, error) {
-
 	tx := &CreateSubnetTx{
 		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
 			vm:          vm,
@@ -179,9 +181,10 @@ func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []id
 		},
 	}
 
-	if threshold == 0 {
-		tx.ControlKeys = make([]ids.ShortID, 0)
+	if threshold == 0 && len(tx.ControlKeys) > 0 {
+		return nil, errUnneededKeys
 	}
+
 	// Sort control keys
 	ids.SortShortIDs(tx.ControlKeys)
 	// Ensure control keys are unique
