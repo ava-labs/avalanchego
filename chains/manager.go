@@ -93,6 +93,7 @@ type manager struct {
 	// That is, [chainID].String() is an alias for the chain, too
 	ids.Aliaser
 
+	stakingEnabled  bool // True iff the network has staking enabled
 	log             logging.Logger
 	logFactory      logging.Factory
 	vmManager       vms.Manager // Manage mappings from vm ID --> vm
@@ -122,6 +123,7 @@ type manager struct {
 //     <validators> validate this chain
 // TODO: Make this function take less arguments
 func New(
+	stakingEnabled bool,
 	log logging.Logger,
 	logFactory logging.Factory,
 	vmManager vms.Manager,
@@ -146,6 +148,7 @@ func New(
 	router.Initialize(log, &timeoutManager)
 
 	m := &manager{
+		stakingEnabled:  stakingEnabled,
 		log:             log,
 		logFactory:      logFactory,
 		vmManager:       vmManager,
@@ -261,7 +264,13 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 	}
 
 	// The validators of this blockchain
-	validators, ok := m.validators.GetValidatorSet(ids.Empty) // TODO: Change argument to chain.SubnetID
+	var validators validators.Set // Validators validating this blockchain
+	var ok bool
+	if m.stakingEnabled {
+		validators, ok = m.validators.GetValidatorSet(chain.SubnetID)
+	} else { // Staking is disabled. Every peer validates every subnet.
+		validators, ok = m.validators.GetValidatorSet(ids.Empty) // ids.Empty is the default subnet ID. TODO: Move to const package so we can use it here.
+	}
 	if !ok {
 		m.log.Error("couldn't get validator set of subnet with ID %s. The subnet may not exist", chain.SubnetID)
 		return
@@ -358,7 +367,7 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
-		return err
+		return fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
 	// Handles serialization/deserialization of vertices and also the

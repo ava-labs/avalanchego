@@ -183,7 +183,7 @@ func (vm *VM) newExportTx(nonce uint64, networkID uint32, outs []*ava.Transferab
 		return nil, err
 	}
 
-	sig, err := key.Sign(unsignedBytes)
+	sig, err := from.Sign(unsignedBytes)
 	if err != nil {
 		return nil, err
 	}

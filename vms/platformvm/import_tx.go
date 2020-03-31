@@ -231,7 +231,7 @@ func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.Transferabl
 	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
 		NetworkID: networkID,
 		Nonce:     nonce,
-		Account:   key.PublicKey().Address(),
+		Account:   to.PublicKey().Address(),
 		Ins:       ins,
 	}}
 
@@ -258,7 +258,7 @@ func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.Transferabl
 		tx.Creds = append(tx.Creds, cred)
 	}
 
-	sig, err := key.SignHash(hash)
+	sig, err := to.SignHash(hash)
 	if err != nil {
 		return nil, err
 	}

@@ -106,7 +106,7 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes := Genesis(LocalID)
+	genesisBytes, _ := Genesis(LocalID)
 	genesis := platformvm.Genesis{}
 	if err := platformvm.Codec.Unmarshal(genesisBytes, &genesis); err != nil {
 		t.Fatal(err)

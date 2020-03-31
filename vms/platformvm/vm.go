@@ -151,7 +151,12 @@ func init() {
 type VM struct {
 	*core.SnowmanVM
 
+	// Node's validator manager
+	// Maps Subnets --> nodes in the Subnet HEAD
 	validators validators.Manager
+
+	// true if the node is being run with staking enabled
+	stakingEnabled bool
 
 	// The node's chain manager
 	chainManager chains.Manager
@@ -296,8 +301,8 @@ func (vm *VM) Initialize(
 	})
 	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
 
-	if err := vm.updateValidators(DefaultSubnetID); err != nil {
-		ctx.Log.Error("failed to initialize the current validator set: %s", err)
+	if err := vm.initSubnets(); err != nil {
+		ctx.Log.Error("failed to initialize Subnets: %s", err)
 		return err
 	}
 
@@ -313,25 +318,65 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// Create all of the chains that the database says should exist
+// Create all chains that exist that this node validates
+// Can only be called after initSubnets()
 func (vm *VM) initBlockchains() error {
-	vm.Ctx.Log.Verbo("platform chain initializing existing blockchains")
-	existingChains, err := vm.getChains(vm.DB)
+	vm.Ctx.Log.Info("initializing blockchains")
+	blockchains, err := vm.getChains(vm.DB) // get blockchains that exist
 	if err != nil {
 		return err
 	}
-	for _, chain := range existingChains { // Create each blockchain
-		chainParams := chains.ChainParameters{
-			ID:          chain.ID(),
-			GenesisData: chain.GenesisData,
-			VMAlias:     chain.VMID.String(),
-		}
-		for _, fxID := range chain.FxIDs {
-			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-		}
-		vm.chainManager.CreateChain(chainParams)
+
+	for _, chain := range blockchains {
+		vm.createChain(chain)
 	}
 	return nil
+}
+
+// Set the node's validator manager to be up to date
+func (vm *VM) initSubnets() error {
+	vm.Ctx.Log.Info("initializing Subnets")
+	subnets, err := vm.getSubnets(vm.DB)
+	if err != nil {
+		return err
+	}
+
+	if err := vm.updateValidators(DefaultSubnetID); err != nil {
+		return err
+	}
+
+	for _, subnet := range subnets {
+		if err := vm.updateValidators(subnet.id); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Create the blockchain described in [tx], but only if this node is a member of
+// the Subnet that validates the chain
+func (vm *VM) createChain(tx *CreateChainTx) {
+	// The validators that compose the Subnet that validates this chain
+	validators, subnetExists := vm.validators.GetValidatorSet(tx.SubnetID)
+	if !subnetExists {
+		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
+		return
+	}
+	if !validators.Contains(vm.Ctx.NodeID) && vm.stakingEnabled { // This node doesn't validate this blockchain
+		return
+	}
+
+	chainParams := chains.ChainParameters{
+		ID:          tx.ID(),
+		SubnetID:    tx.SubnetID,
+		GenesisData: tx.GenesisData,
+		VMAlias:     tx.VMID.String(),
+	}
+	for _, fxID := range tx.FxIDs {
+		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
+	}
+	vm.chainManager.CreateChain(chainParams)
 }
 
 // Shutdown this blockchain
@@ -663,13 +708,16 @@ func (vm *VM) nextSubnetValidatorChangeTime(db database.Database, subnetID ids.I
 // Returns:
 // 1) The validator set of subnet with ID [subnetID] when timestamp is advanced to [timestamp]
 // 2) The pending validator set of subnet with ID [subnetID] when timestamp is advanced to [timestamp]
+// 3) The IDs of the validators that start validating [subnetID] between now and [timestamp]
+// 4) The IDs of the validators that stop validating [subnetID] between now and [timestamp]
 // Note that this method will not remove validators from the current validator set of the default subnet.
 // That happens in reward blocks.
-func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, subnetID ids.ID) (current, pending *EventHeap, err error) {
+func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, subnetID ids.ID) (current,
+	pending *EventHeap, started, stopped ids.ShortSet, err error) {
 	// remove validators whose end time <= [timestamp]
 	current, err = vm.getCurrentValidators(db, subnetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if !subnetID.Equals(DefaultSubnetID) { // validators of default subnet removed in rewardValidatorTxs, not here
 		for current.Len() > 0 {
@@ -678,11 +726,12 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 				break
 			}
 			current.Remove()
+			stopped.Add(next.Vdr().ID())
 		}
 	}
 	pending, err = vm.getPendingValidators(db, subnetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	for pending.Len() > 0 {
 		nextTx := pending.Peek() // pending staker with earliest start time
@@ -691,8 +740,9 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 		}
 		heap.Push(current, nextTx)
 		heap.Pop(pending)
+		started.Add(nextTx.Vdr().ID())
 	}
-	return current, pending, nil
+	return current, pending, started, stopped, nil
 }
 
 func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
@@ -720,10 +770,12 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 	return vdrList
 }
 
+// update the node's validator manager to contain the current validator set of the given Subnet
 func (vm *VM) updateValidators(subnetID ids.ID) error {
-	validatorSet, ok := vm.validators.GetValidatorSet(subnetID)
-	if !ok {
-		return fmt.Errorf("couldn't get the validator sampler of the %s subnet", subnetID)
+	validatorSet, subnetInitialized := vm.validators.GetValidatorSet(subnetID)
+	if !subnetInitialized { // validator manager doesn't know about this subnet yet
+		validatorSet = validators.NewSet()
+		vm.validators.PutValidatorSet(subnetID, validatorSet)
 	}
 
 	currentValidators, err := vm.getCurrentValidators(vm.DB, subnetID)
