@@ -22,7 +22,7 @@ func ParamsTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2, ConcurrentRepolls: 1,
 	}
 	sb.Initialize(params, Red)
 
@@ -34,5 +34,7 @@ func ParamsTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong Beta1 parameter")
 	} else if p.BetaRogue != params.BetaRogue {
 		t.Fatalf("Wrong Beta2 parameter")
+	} else if p.ConcurrentRepolls != params.ConcurrentRepolls {
+		t.Fatalf("Wrong Repoll parameter")
 	}
 }

@@ -304,11 +304,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            3,
-		Alpha:        2,
-		BetaVirtuous: 1,
-		BetaRogue:    2,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 3,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 
 	vdr0 := validators.GenerateRandomValidator(1)
@@ -672,11 +673,12 @@ func TestVoteCanceling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            3,
-		Alpha:        2,
-		BetaVirtuous: 1,
-		BetaRogue:    2,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 3,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 
 	vdr0 := validators.GenerateRandomValidator(1)
