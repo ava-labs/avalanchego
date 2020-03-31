@@ -92,6 +92,8 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return errInvalidID
 	case tx.VMID.IsZero():
 		return errInvalidVMID
+	case tx.SubnetID.Equals(DefaultSubnetID):
+		return errDSCantValidate
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
