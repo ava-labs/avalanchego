@@ -17,11 +17,11 @@ func TestNetworkName(t *testing.T) {
 	if name := NetworkName(MainnetID); name != MainnetName {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, MainnetName)
 	}
-	if name := NetworkName(TestnetID); name != BorealisName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, BorealisName)
+	if name := NetworkName(TestnetID); name != CascadeName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, CascadeName)
 	}
-	if name := NetworkName(BorealisID); name != BorealisName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, BorealisName)
+	if name := NetworkName(CascadeID); name != CascadeName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, CascadeName)
 	}
 	if name := NetworkName(4294967295); name != "network-4294967295" {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, "network-4294967295")
@@ -45,7 +45,7 @@ func TestNetworkID(t *testing.T) {
 		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
 	}
 
-	id, err = NetworkID(BorealisName)
+	id, err = NetworkID(CascadeName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestNetworkID(t *testing.T) {
 		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
 	}
 
-	id, err = NetworkID("bOrEaLiS")
+	id, err = NetworkID("cAsCaDe")
 	if err != nil {
 		t.Fatal(err)
 	}
