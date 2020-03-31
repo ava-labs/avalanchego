@@ -706,6 +706,8 @@ func TestIssueNFT(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 
 	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
 	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
@@ -862,6 +864,8 @@ func TestIssueProperty(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 
 	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
 	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
