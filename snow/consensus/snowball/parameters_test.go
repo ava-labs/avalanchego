@@ -9,10 +9,11 @@ import (
 
 func TestParametersValid(t *testing.T) {
 	p := Parameters{
-		K:            1,
-		Alpha:        1,
-		BetaVirtuous: 1,
-		BetaRogue:    1,
+		K:                    1,
+		Alpha:                1,
+		BetaVirtuous:         1,
+		BetaRogue:            1,
+		ConcurrentRepolls:    1,
 	}
 
 	if err := p.Valid(); err != nil {
@@ -22,10 +23,11 @@ func TestParametersValid(t *testing.T) {
 
 func TestParametersInvalidK(t *testing.T) {
 	p := Parameters{
-		K:            0,
-		Alpha:        1,
-		BetaVirtuous: 1,
-		BetaRogue:    1,
+		K:                    0,
+		Alpha:                1,
+		BetaVirtuous:         1,
+		BetaRogue:            1,
+		ConcurrentRepolls:    1,
 	}
 
 	if err := p.Valid(); err == nil {
@@ -35,10 +37,11 @@ func TestParametersInvalidK(t *testing.T) {
 
 func TestParametersInvalidAlpha(t *testing.T) {
 	p := Parameters{
-		K:            1,
-		Alpha:        0,
-		BetaVirtuous: 1,
-		BetaRogue:    1,
+		K:                    1,
+		Alpha:                0,
+		BetaVirtuous:         1,
+		BetaRogue:            1,
+		ConcurrentRepolls:    1,
 	}
 
 	if err := p.Valid(); err == nil {
@@ -48,10 +51,11 @@ func TestParametersInvalidAlpha(t *testing.T) {
 
 func TestParametersInvalidBetaVirtuous(t *testing.T) {
 	p := Parameters{
-		K:            1,
-		Alpha:        1,
-		BetaVirtuous: 0,
-		BetaRogue:    1,
+		K:                    1,
+		Alpha:                1,
+		BetaVirtuous:         0,
+		BetaRogue:            1,
+		ConcurrentRepolls:    1,
 	}
 
 	if err := p.Valid(); err == nil {
@@ -61,13 +65,29 @@ func TestParametersInvalidBetaVirtuous(t *testing.T) {
 
 func TestParametersInvalidBetaRogue(t *testing.T) {
 	p := Parameters{
-		K:            1,
-		Alpha:        1,
-		BetaVirtuous: 1,
-		BetaRogue:    0,
+		K:                    1,
+		Alpha:                1,
+		BetaVirtuous:         1,
+		BetaRogue:            0,
+		ConcurrentRepolls:    1,
 	}
 
 	if err := p.Valid(); err == nil {
 		t.Fatalf("Should have failed due to invalid beta rogue")
 	}
 }
+
+func TestParametersInvalidConcurrentRepolls(t *testing.T) {
+       p := Parameters{
+               K:                    1,
+               Alpha:                1,
+               BetaVirtuous:         1,
+               BetaRogue:            1,
+               ConcurrentRepolls:    2,
+       }
+
+       if err := p.Valid(); err == nil {
+               t.Fatalf("Should have failed due to invalid concurrent repolls")
+       }
+}
+

@@ -305,7 +305,7 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 	}
 }
 
-func (t *Transitive) pushSample(blk snowman.Block) {
+func (t *Transitive) pushSample(blk snowman.Block) bool {
 	t.Config.Context.Log.Verbo("About to sample from: %s", t.Config.Validators)
 	p := t.Consensus.Parameters()
 	vdrs := t.Config.Validators.Sample(p.K)
@@ -315,11 +315,14 @@ func (t *Transitive) pushSample(blk snowman.Block) {
 	}
 
 	t.RequestID++
+	queryIssued := false
 	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet.Len()) {
 		t.Config.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+		queryIssued = true
 	} else if numVdrs < p.K {
 		t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
+	return queryIssued
 }
 
 func (t *Transitive) deliver(blk snowman.Block) {
@@ -338,9 +341,8 @@ func (t *Transitive) deliver(blk snowman.Block) {
 	}
 
 	t.Config.Context.Log.Verbo("Adding block to consensus: %s", blkID)
-
 	t.Consensus.Add(blk)
-	t.pushSample(blk)
+	polled := t.pushSample(blk)
 
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
@@ -371,6 +373,10 @@ func (t *Transitive) deliver(blk snowman.Block) {
 		blkID := blk.ID()
 		t.pending.Remove(blkID)
 		t.blocked.Abandon(blkID)
+	}
+
+	if polled && len(t.polls.m) < t.Params.ConcurrentRepolls {
+		t.repoll()
 	}
 
 	// Tracks performance statistics
