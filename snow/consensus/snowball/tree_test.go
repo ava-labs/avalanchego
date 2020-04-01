@@ -18,7 +18,7 @@ func TestTreeParams(t *testing.T) { ParamsTest(t, TreeFactory{}) }
 func TestSnowballSingleton(t *testing.T) {
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 5,
 	}
 	tree := Tree{}
 	tree.Initialize(params, Red)
@@ -30,6 +30,14 @@ func TestSnowballSingleton(t *testing.T) {
 	oneRed := ids.Bag{}
 	oneRed.Add(Red)
 	tree.RecordPoll(oneRed)
+
+	if tree.Finalized() {
+		t.Fatalf("Snowball is finalized too soon")
+	}
+
+
+	empty := ids.Bag{}
+	tree.RecordPoll(empty)
 
 	if tree.Finalized() {
 		t.Fatalf("Snowball is finalized too soon")

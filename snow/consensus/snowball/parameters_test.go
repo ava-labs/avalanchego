@@ -4,6 +4,7 @@
 package snowball
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -13,6 +14,34 @@ func TestParametersValid(t *testing.T) {
 		Alpha:             1,
 		BetaVirtuous:      1,
 		BetaRogue:         1,
+		ConcurrentRepolls: 1,
+	}
+
+	if err := p.Valid(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParametersAnotherValid(t *testing.T) {
+	p := Parameters{
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      28,
+		BetaRogue:         30,
+		ConcurrentRepolls: 1,
+	}
+
+	if err := p.Valid(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParametersYetAnotherValid(t *testing.T) {
+	p := Parameters{
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         3,
 		ConcurrentRepolls: 1,
 	}
 
@@ -79,14 +108,17 @@ func TestParametersInvalidBetaRogue(t *testing.T) {
 
 func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 	p := Parameters{
-		K:            1,
-		Alpha:        1,
-		BetaVirtuous: 28,
-		BetaRogue:    3,
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      28,
+		BetaRogue:         3,
+		ConcurrentRepolls: 1,
 	}
 
 	if err := p.Valid(); err == nil {
 		t.Fatalf("Should have failed due to invalid beta rogue")
+	} else if !strings.Contains(err.Error(), "\n") {
+		t.Fatalf("Should have described the extensive error")
 	}
 }
 

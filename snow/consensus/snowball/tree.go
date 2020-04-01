@@ -315,14 +315,14 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 		u.decidedPrefix, u.commonPrefix, u.preference, newChoice); !found {
 		// If the first difference doesn't exist, then this node shouldn't be
 		// split
-		if u.child != nil && ids.EqualSubset(
-			u.commonPrefix, u.child.DecidedPrefix(), u.preference, newChoice) {
-			// If the choice matched my child's prefix, then the add should be
-			// passed to my child. (Case 1. from above)
+		if u.child != nil {
+			// Because this node will finalize before any children could
+			// finalize, it must be that the newChoice will match my child's
+			// prefix
 			u.child = u.child.Add(newChoice)
 		}
-		// If the choice didn't my child's prefix, then the choice was
-		// previously rejected and the tree should not be modified
+		// if u.child is nil, then we are attempting to add the same choice into
+		// the tree, which should be a noop
 	} else {
 		// The difference was found, so this node must be split
 
