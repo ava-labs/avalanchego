@@ -5,6 +5,7 @@ package ids
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 )
 
@@ -28,10 +29,6 @@ func TestID(t *testing.T) {
 
 	if b := id.Bytes(); !bytes.Equal(hash[:], b) {
 		t.Fatalf("ID.Bytes returned wrong bytes")
-	}
-
-	if str := id.String(); str != "Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt" {
-		t.Fatalf("ID.String returned wrong string: %s", str)
 	}
 }
 
@@ -77,5 +74,145 @@ func TestFromString(t *testing.T) {
 	}
 	if id.Key() != id2.Key() {
 		t.Fatal("Expected FromString to be inverse of String but it wasn't")
+	}
+}
+
+func TestIDFromStringError(t *testing.T) {
+	tests := []struct {
+		in string
+	}{
+		{""},
+		{"foo"},
+		{"foobar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			_, err := FromString(tt.in)
+			if err == nil {
+				t.Error("Unexpected success")
+			}
+		})
+	}
+}
+
+func TestIDMarshalJSON(t *testing.T) {
+	tests := []struct {
+		label string
+		in    ID
+		out   []byte
+		err   error
+	}{
+		{"ID{}", ID{}, []byte("null"), nil},
+		{"ID(\"ava labs\")",
+			NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			out, err := tt.in.MarshalJSON()
+			if err != tt.err {
+				t.Errorf("Expected err %s, got error %v", tt.err, err)
+			} else if !bytes.Equal(out, tt.out) {
+				t.Errorf("got %q, expected %q", out, tt.out)
+			}
+		})
+	}
+}
+
+func TestIDUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		label string
+		in    []byte
+		out   ID
+		err   error
+	}{
+		{"ID{}", []byte("null"), ID{}, nil},
+		{"ID(\"ava labs\")",
+			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
+			NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			foo := ID{}
+			err := foo.UnmarshalJSON(tt.in)
+			if err != tt.err {
+				t.Errorf("Expected err %s, got error %v", tt.err, err)
+			} else if foo.ID != nil && foo.Key() != tt.out.Key() {
+				t.Errorf("got %q, expected %q", foo.Key(), tt.out.Key())
+			}
+		})
+	}
+}
+
+func TestIDHex(t *testing.T) {
+	id := NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	expected := "617661206c61627300000000000000000000000000000000000000000000000000"
+	actual := id.Hex()
+	if actual != actual {
+		t.Fatalf("got %s, expected %s", actual, expected)
+	}
+}
+
+func TestIDString(t *testing.T) {
+	tests := []struct {
+		label    string
+		id       ID
+		expected string
+	}{
+		{"ID{}", ID{}, "nil"},
+		{"ID{[32]byte{24}}", NewID([32]byte{24}), "Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			result := tt.id.String()
+			if result != tt.expected {
+				t.Errorf("got %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSortIDs(t *testing.T) {
+	ids := []ID{
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	SortIDs(ids)
+	expected := []ID{
+		NewID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if !reflect.DeepEqual(ids, expected) {
+		t.Fatal("[]ID was not sorted lexographically")
+	}
+}
+
+func TestIsSortedAndUnique(t *testing.T) {
+	unsorted := []ID{
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if IsSortedAndUniqueIDs(unsorted) {
+		t.Fatal("Wrongly accepted unsorted IDs")
+	}
+	duplicated := []ID{
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if IsSortedAndUniqueIDs(duplicated) {
+		t.Fatal("Wrongly accepted duplicated IDs")
+	}
+	sorted := []ID{
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if !IsSortedAndUniqueIDs(sorted) {
+		t.Fatal("Wrongly rejected sorted, unique IDs")
 	}
 }
