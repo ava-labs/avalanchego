@@ -55,11 +55,41 @@ func TestNnarySnowflake(t *testing.T) {
 	}
 }
 
+func TestVirtuousNnarySnowflake(t *testing.T) {
+	betaVirtuous := 2
+	betaRogue := 3
+
+	sb := nnarySnowflake{}
+	sb.Initialize(betaVirtuous, betaRogue, Red)
+
+	if pref := sb.Preference(); !Red.Equals(pref) {
+		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
+	} else if sb.Finalized() {
+		t.Fatalf("Finalized too early")
+	}
+
+	sb.RecordSuccessfulPoll(Red)
+
+	if pref := sb.Preference(); !Red.Equals(pref) {
+		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
+	} else if sb.Finalized() {
+		t.Fatalf("Finalized too early")
+	}
+
+	sb.RecordSuccessfulPoll(Red)
+
+	if pref := sb.Preference(); !Red.Equals(pref) {
+		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
+	} else if !sb.Finalized() {
+		t.Fatalf("Should be finalized")
+	}
+}
+
 func TestRogueNnarySnowflake(t *testing.T) {
 	betaVirtuous := 1
 	betaRogue := 2
 
-	sb := nnarySnowball{}
+	sb := nnarySnowflake{}
 	sb.Initialize(betaVirtuous, betaRogue, Red)
 	if sb.rogue {
 		t.Fatalf("Shouldn't be rogue")

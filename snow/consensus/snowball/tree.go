@@ -481,6 +481,10 @@ func (b *binaryNode) Add(id ids.ID) node {
 		ids.EqualSubset(b.bit+1, child.DecidedPrefix(), b.preferences[bit], id) {
 		b.children[bit] = child.Add(id)
 	}
+	// If child is nil, then the id has already been added to the tree, so
+	// nothing should be done
+	// If the decided prefix isn't matched, then a previous decision has made
+	// the id that is being added to have already been rejected
 	return b
 }
 
