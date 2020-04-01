@@ -90,7 +90,21 @@ func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 	}
 }
 
-func TestParametersInvalidConcurrentRepolls(t *testing.T) {
+func TestParametersTooFewConcurrentRepolls(t *testing.T) {
+	p := Parameters{
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 0,
+	}
+
+	if err := p.Valid(); err == nil {
+		t.Fatalf("Should have failed due to invalid concurrent repolls")
+	}
+}
+
+func TestParametersTooManyConcurrentRepolls(t *testing.T) {
 	p := Parameters{
 		K:                 1,
 		Alpha:             1,

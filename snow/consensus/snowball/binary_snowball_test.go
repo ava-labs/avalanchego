@@ -151,7 +151,7 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 		t.Fatalf("Finalized too late")
 	}
 
-	expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 2, NumSuccessfulPolls[1] = 2, SF(Confidence = 2, Finalized = true, SL(Preference = 1)))"
+	expected := "SB(Preference = 1, NumSuccessfulPolls[0] = 2, NumSuccessfulPolls[1] = 2, SF(Confidence = 2, Finalized = true, SL(Preference = 0)))"
 	if str := sb.String(); str != expected {
 		t.Fatalf("Wrong state. Expected:\n%s\nGot:\n%s", expected, str)
 	}
