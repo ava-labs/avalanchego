@@ -366,9 +366,9 @@ func (s *Voting) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 		vID := validatorID
 		if addr, exists := s.conns.GetIP(vID); exists {
 			addrs = append(addrs, addr)
-			s.log.Verbo("Sending a PushQuery to %s", toIPDesc(addr))
+			s.log.Verbo("Sending a PullQuery to %s", toIPDesc(addr))
 		} else {
-			s.log.Warn("Attempted to send a PushQuery message to a disconnected validator: %s", vID)
+			s.log.Warn("Attempted to send a PullQuery message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.QueryFailed(vID, chainID, requestID) })
 		}
 	}
