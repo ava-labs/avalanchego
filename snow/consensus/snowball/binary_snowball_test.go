@@ -103,8 +103,8 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 }
 
 func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
-	Red := 0
-	Blue := 1
+	Blue := 0
+	Red := 1
 
 	beta := 2
 
