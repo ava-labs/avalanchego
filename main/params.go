@@ -98,8 +98,8 @@ func init() {
 	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 
-	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 20, "Number of nodes to query for each network poll")
-	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 18, "Alpha value to use for required number positive results")
+	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 5, "Number of nodes to query for each network poll")
+	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 4, "Alpha value to use for required number positive results")
 	fs.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 20, "Beta value to use for virtuous transactions")
 	fs.IntVar(&Config.ConsensusParams.BetaRogue, "snow-rogue-commit-threshold", 30, "Beta value to use for rogue transactions")
 	fs.IntVar(&Config.ConsensusParams.Parents, "snow-avalanche-num-parents", 5, "Number of vertexes for reference from each new vertex")
