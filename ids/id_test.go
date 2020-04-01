@@ -29,10 +29,6 @@ func TestID(t *testing.T) {
 	if b := id.Bytes(); !bytes.Equal(hash[:], b) {
 		t.Fatalf("ID.Bytes returned wrong bytes")
 	}
-
-	if str := id.String(); str != "Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt" {
-		t.Fatalf("ID.String returned wrong string: %s", str)
-	}
 }
 
 func TestIDBit(t *testing.T) {
@@ -157,5 +153,24 @@ func TestIDHex(t *testing.T) {
 	actual := id.Hex()
 	if actual != actual {
 		t.Fatalf("got %s, expected %s", actual, expected)
+	}
+}
+
+func TestIDString(t *testing.T) {
+	tests := []struct {
+		label    string
+		id       ID
+		expected string
+	}{
+		{"ID{}", ID{}, "nil"},
+		{"ID{[32]byte{24}}", NewID([32]byte{24}), "Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			result := tt.id.String()
+			if result != tt.expected {
+				t.Errorf("got %q, expected %q", result, tt.expected)
+			}
+		})
 	}
 }
