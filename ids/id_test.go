@@ -123,3 +123,30 @@ func TestIDMarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestIDUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		label string
+		in    []byte
+		out   ID
+		err   error
+	}{
+		{"ID{}", []byte("null"), ID{}, nil},
+		{"ID(\"ava labs\")",
+			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
+			NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			foo := ID{}
+			err := foo.UnmarshalJSON(tt.in)
+			if err != tt.err {
+				t.Errorf("Expected err %s, got error %v", tt.err, err)
+			} else if foo.ID != nil && foo.Key() != tt.out.Key() {
+				t.Errorf("got %q, expected %q", foo.Key(), tt.out.Key())
+			}
+		})
+	}
+}
