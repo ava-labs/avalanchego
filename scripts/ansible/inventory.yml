@@ -2,8 +2,6 @@ borealis_bootstrap:
   hosts:
       bootstrap1:
         ansible_host: 3.227.207.132
-        staking_tls_key_file: "/home/ubuntu/keys/staker.key"
-        staking_tls_cert_file: "/home/ubuntu/keys/staker.crt"
         http_tls_enabled: true
         http_tls_key_file: "/home/ubuntu/ssl/privkey.pem"
         http_tls_cert_file: "/home/ubuntu/ssl/fullchain.pem"
