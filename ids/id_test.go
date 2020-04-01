@@ -192,3 +192,27 @@ func TestSortIDs(t *testing.T) {
 		t.Fatal("[]ID was not sorted lexographically")
 	}
 }
+
+func TestIsSortedAndUnique(t *testing.T) {
+	unsorted := []ID{
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if IsSortedAndUniqueIDs(unsorted) {
+		t.Fatal("Wrongly accepted unsorted IDs")
+	}
+	duplicated := []ID{
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if IsSortedAndUniqueIDs(duplicated) {
+		t.Fatal("Wrongly accepted duplicated IDs")
+	}
+	sorted := []ID{
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if !IsSortedAndUniqueIDs(sorted) {
+		t.Fatal("Wrongly rejected sorted, unique IDs")
+	}
+}
