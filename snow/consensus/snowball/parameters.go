@@ -9,6 +9,23 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	errMsg = "__________                    .___\n" +
+		"\\______   \\____________     __| _/__.__.\n" +
+		" |    |  _/\\_  __ \\__  \\   / __ <   |  |\n" +
+		" |    |   \\ |  | \\// __ \\_/ /_/ |\\___  |\n" +
+		" |______  / |__|  (____  /\\____ |/ ____|\n" +
+		"        \\/             \\/      \\/\\/\n" +
+		"\n" +
+		"🏆      🏆      🏆     🏆      🏆      🏆\n" +
+		"  ________ ________      ________________\n" +
+		" /  _____/ \\_____  \\    /  _  \\__    ___/\n" +
+		"/   \\  ___  /   |   \\  /  /_\\  \\|    |\n" +
+		"\\    \\_\\  \\/    |    \\/    |    \\    |\n" +
+		" \\______  /\\_______  /\\____|__  /____|\n" +
+		"        \\/         \\/         \\/\n"
+)
+
 // Parameters required for snowball consensus
 type Parameters struct {
 	Namespace                                            string
@@ -25,6 +42,8 @@ func (p Parameters) Valid() error {
 		return fmt.Errorf("K = %d, Alpha = %d: Fails the condition that: Alpha <= K", p.K, p.Alpha)
 	case p.BetaVirtuous <= 0:
 		return fmt.Errorf("BetaVirtuous = %d: Fails the condition that: 0 < BetaVirtuous", p.BetaVirtuous)
+	case p.BetaRogue == 3 && p.BetaVirtuous == 28:
+		return fmt.Errorf("BetaVirtuous = %d, BetaRogue = %d: Fails the condition that: BetaVirtuous <= BetaRogue\n%s", p.BetaVirtuous, p.BetaRogue, errMsg)
 	case p.BetaRogue < p.BetaVirtuous:
 		return fmt.Errorf("BetaVirtuous = %d, BetaRogue = %d: Fails the condition that: BetaVirtuous <= BetaRogue", p.BetaVirtuous, p.BetaRogue)
 	case p.ConcurrentRepolls <= 0:
