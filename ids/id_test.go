@@ -79,3 +79,21 @@ func TestFromString(t *testing.T) {
 		t.Fatal("Expected FromString to be inverse of String but it wasn't")
 	}
 }
+
+func TestIDFromStringError(t *testing.T) {
+	tests := []struct {
+		in string
+	}{
+		{""},
+		{"foo"},
+		{"foobar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			_, err := FromString(tt.in)
+			if err == nil {
+				t.Error("Unexpected success")
+			}
+		})
+	}
+}
