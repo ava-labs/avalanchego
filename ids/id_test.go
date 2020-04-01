@@ -5,6 +5,7 @@ package ids
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 )
 
@@ -172,5 +173,22 @@ func TestIDString(t *testing.T) {
 				t.Errorf("got %q, expected %q", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestSortIDs(t *testing.T) {
+	ids := []ID{
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	SortIDs(ids)
+	expected := []ID{
+		NewID([32]byte{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+		NewID([32]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+	}
+	if !reflect.DeepEqual(ids, expected) {
+		t.Fatal("[]ID was not sorted lexographically")
 	}
 }
