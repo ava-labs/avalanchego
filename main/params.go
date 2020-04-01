@@ -90,8 +90,8 @@ func init() {
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
 	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
-	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "", "TLS private key file for staking connections")
-	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "", "TLS certificate file for staking connections")
+	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "keys/staker.key", "TLS private key file for staking connections")
+	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "keys/staker.crt", "TLS certificate file for staking connections")
 
 	// Logging:
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
