@@ -97,3 +97,29 @@ func TestIDFromStringError(t *testing.T) {
 		})
 	}
 }
+
+func TestIDMarshalJSON(t *testing.T) {
+	tests := []struct {
+		label string
+		in    ID
+		out   []byte
+		err   error
+	}{
+		{"ID{}", ID{}, []byte("null"), nil},
+		{"ID(\"ava labs\")",
+			NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+			[]byte("\"jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7\""),
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			out, err := tt.in.MarshalJSON()
+			if err != tt.err {
+				t.Errorf("Expected err %s, got error %v", tt.err, err)
+			} else if !bytes.Equal(out, tt.out) {
+				t.Errorf("got %q, expected %q", out, tt.out)
+			}
+		})
+	}
+}
