@@ -4,6 +4,7 @@
 package snowball
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -122,30 +123,29 @@ func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 	}
 }
 
-func TestParametersTooFewConcurrentRepolls(t *testing.T) {
-	p := Parameters{
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 0,
+func TestParametersInvalidConcurrentRepolls(t *testing.T) {
+	tests := []Parameters{
+		Parameters{
+			K:                 1,
+			Alpha:             1,
+			BetaVirtuous:      1,
+			BetaRogue:         1,
+			ConcurrentRepolls: 2,
+		},
+		Parameters{
+			K:                 1,
+			Alpha:             1,
+			BetaVirtuous:      1,
+			BetaRogue:         1,
+			ConcurrentRepolls: 0,
+		},
 	}
-
-	if err := p.Valid(); err == nil {
-		t.Fatalf("Should have failed due to invalid concurrent repolls")
-	}
-}
-
-func TestParametersTooManyConcurrentRepolls(t *testing.T) {
-	p := Parameters{
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 2,
-	}
-
-	if err := p.Valid(); err == nil {
-		t.Fatalf("Should have failed due to invalid concurrent repolls")
+	for _, p := range tests {
+		label := fmt.Sprintf("ConcurrentRepolls=%d", p.ConcurrentRepolls)
+		t.Run(label, func(t *testing.T) {
+			if err := p.Valid(); err == nil {
+				t.Error("Should have failed due to invalid concurrent repolls")
+			}
+		})
 	}
 }
