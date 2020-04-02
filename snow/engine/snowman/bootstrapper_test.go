@@ -62,7 +62,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 		Context:    ctx,
 		Validators: peers,
 		Beacons:    peers,
-		Alpha:      peers.Len()/2 + 1,
+		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
 	}
 	return BootstrapConfig{

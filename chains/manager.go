@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms"
 
 	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
@@ -390,13 +391,22 @@ func (m *manager) createAvalancheChain(
 		},
 	}
 
+	bootstrapWeight := uint64(0)
+	for _, beacon := range beacons.List() {
+		newWeight, err := math.Add64(bootstrapWeight, beacon.Weight())
+		if err != nil {
+			return err
+		}
+		bootstrapWeight = newWeight
+	}
+
 	engine.Initialize(avaeng.Config{
 		BootstrapConfig: avaeng.BootstrapConfig{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      beacons.Len()/2 + 1, // must be > 50%
+				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			VtxBlocked: vtxBlocker,
@@ -417,6 +427,8 @@ func (m *manager) createAvalancheChain(
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	awaiting := &networking.AwaitingConnections{
+		Requested:      beacons,
+		WeightRequired: (3*bootstrapWeight + 3) / 4, // 75% must be connected to
 		Finish: func() {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
@@ -424,10 +436,6 @@ func (m *manager) createAvalancheChain(
 			engine.Startup()
 		},
 	}
-	for _, vdr := range beacons.List() {
-		awaiting.Requested.Add(vdr.ID())
-	}
-	awaiting.NumRequired = (3*awaiting.Requested.Len() + 3) / 4 // 75% must be connected to
 	m.awaiter.AwaitConnections(awaiting)
 
 	return nil
@@ -468,6 +476,15 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.sender, m.chainRouter, m.timeoutManager)
 
+	bootstrapWeight := uint64(0)
+	for _, beacon := range beacons.List() {
+		newWeight, err := math.Add64(bootstrapWeight, beacon.Weight())
+		if err != nil {
+			return err
+		}
+		bootstrapWeight = newWeight
+	}
+
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	engine.Initialize(smeng.Config{
@@ -476,7 +493,7 @@ func (m *manager) createSnowmanChain(
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      beacons.Len()/2 + 1, // must be > 50%
+				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			Blocked:      blocked,
@@ -496,6 +513,8 @@ func (m *manager) createSnowmanChain(
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	awaiting := &networking.AwaitingConnections{
+		Requested:      beacons,
+		WeightRequired: (3*bootstrapWeight + 3) / 4, // 75% must be connected to
 		Finish: func() {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
@@ -503,10 +522,6 @@ func (m *manager) createSnowmanChain(
 			engine.Startup()
 		},
 	}
-	for _, vdr := range beacons.List() {
-		awaiting.Requested.Add(vdr.ID())
-	}
-	awaiting.NumRequired = (3*awaiting.Requested.Len() + 3) / 4 // 75% must be connected to
 	m.awaiter.AwaitConnections(awaiting)
 	return nil
 }
