@@ -860,7 +860,7 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 // ImportAVAArgs are the arguments to ImportAVA
 type ImportAVAArgs struct {
 	// ID of the account that will receive the imported funds, and pay the transaction fee
-	AccountID ids.ShortID `json:"accountID"`
+	To ids.ShortID `json:"to"`
 
 	// Next unused nonce of the account
 	PayerNonce json.Uint64 `json:"payerNonce"`
@@ -884,14 +884,14 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	user := user{db: db}
 
 	kc := secp256k1fx.NewKeychain()
-	key, err := user.getKey(args.AccountID)
+	key, err := user.getKey(args.To)
 	if err != nil {
 		return errDB
 	}
 	kc.Add(key)
 
 	addrSet := ids.Set{}
-	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(args.AccountID.Bytes())))
+	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(args.To.Bytes())))
 
 	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
 	if err != nil {
@@ -937,7 +937,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	tx := ImportTx{UnsignedImportTx: UnsignedImportTx{
 		NetworkID: service.vm.Ctx.NetworkID,
 		Nonce:     uint64(args.PayerNonce),
-		Account:   args.AccountID,
+		Account:   args.To,
 		Ins:       ins,
 	}}
 
