@@ -1,7 +1,7 @@
 #!/bin/sh
 set -ex
 
-keypath=$GOPATH/src/github.com/ava-labs/gecko/keys/mykey
+keypath=$GOPATH/src/github.com/ava-labs/gecko/keys
 
 if test -f "$keypath/staker.key" || test -f "$keypath/staker.crt"; then
     echo "staker.key or staker.crt already exists. Not generating new key/certificiate."
