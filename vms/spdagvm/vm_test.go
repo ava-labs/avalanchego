@@ -22,7 +22,7 @@ var ctx *snow.Context
 var avaChainID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
 var defaultInitBalances = make(map[string]uint64)
 
-const txFeeTest = 0 // Tx fee to use for tests
+const txFeeTest = 1 // Tx fee to use for tests
 
 const (
 	defaultInitBalance = uint64(5000000000) // Measured in NanoAva
@@ -92,7 +92,7 @@ func TestAva(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 
 	vm := &VM{}
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
+	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil, txFeeTest)
 	vm.batchTimeout = 0
 
 	builder := Builder{
@@ -175,7 +175,7 @@ func TestInvalidSpentTx(t *testing.T) {
 	vm := &VM{}
 
 	ctx.Lock.Lock()
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
+	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil, txFeeTest)
 	vm.batchTimeout = 0
 
 	builder := Builder{
@@ -261,7 +261,7 @@ func TestInvalidTxVerification(t *testing.T) {
 	vm := &VM{}
 
 	ctx.Lock.Lock()
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
+	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil, txFeeTest)
 	vm.batchTimeout = 0
 
 	builder := Builder{
@@ -320,7 +320,7 @@ func TestRPCAPI(t *testing.T) {
 	vmDB := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
+	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil, txFeeTest)
 	vm.batchTimeout = 0
 
 	// Key: string repr. of an address
@@ -419,7 +419,7 @@ func TestRPCAPI(t *testing.T) {
 	} else if testbal != send1Amt {
 		t.Fatalf("GetBalance(%q): returned wrong balance - expected: %d ; returned: %d", addr1, send1Amt, testbal)
 		// Send [send2Amt] from [pks[0]] to [addr1]
-	} else if _, err = vm.Send(send1Amt, "", addr1, []string{pks[0]}); err != nil {
+	} else if _, err = vm.Send(send2Amt, "", addr1, []string{pks[0]}); err != nil {
 		t.Fatalf("Send(%d,%q,%q,%v): failed with error - %s", send2Amt, "", addr1, []string{pks[0]}, err)
 	}
 	ctx.Lock.Unlock()
@@ -527,7 +527,7 @@ func TestMultipleSend(t *testing.T) {
 	vmDB := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
+	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil, txFeeTest)
 
 	// Initialize these data structures
 	addrToPK := map[string]string{}
@@ -636,7 +636,7 @@ func TestIssuePendingDependency(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{}
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
+	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil, txFeeTest)
 	vm.batchTimeout = 0
 
 	builder := Builder{
@@ -742,7 +742,7 @@ func TestTxOutputOverflow(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 	ctx.Lock.Lock()
 	vm := &VM{}
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
+	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil, txFeeTest)
 	vm.batchTimeout = 0
 
 	// Create a new private key
@@ -803,7 +803,7 @@ func TestTxOutputOverflow(t *testing.T) {
 	// Send [2*txFeeTest+1] NanoAva from [key1Str] to [testAddr]
 	// Should overflow [testAddr] by 1
 	_, err = vm.Send(2*txFeeTest+1, "", testAddr, []string{privKey1})
-	if err == errOutputOverflow {
+	if err != errOutputOverflow {
 		t.Fatalf("Expected output to overflow but it did not")
 	}
 	ctx.Lock.Unlock()

@@ -87,6 +87,7 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	txFee uint64,
 ) error {
 	if len(fxs) != 0 {
 		return errUnsupportedFXs
@@ -107,6 +108,7 @@ func (vm *VM) Initialize(
 
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
+	vm.TxFee = txFee
 
 	// Initialize the database if it has not already been initialized
 	if dbStatus, err := vm.state.DBInitialized(); err != nil || dbStatus == choices.Unknown {
@@ -328,8 +330,17 @@ func (vm *VM) Send(amount uint64, assetID, toAddrStr string, fromPKs []string) (
 		if err != nil {
 			return "", err
 		}
-		// Parse the crpyo.PrivateKey repr. to a crypto.PrivateKeySECP256K1R
+		// Parse the crypto.PrivateKey repr. to a crypto.PrivateKeySECP256K1R
 		keychain.Add(pk.(*crypto.PrivateKeySECP256K1R))
+	}
+
+	toAddrBal, err := vm.GetBalance(toAddrStr, "")
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := math.Add64(toAddrBal, amount); err != nil {
+		return "", errOutputOverflow
 	}
 
 	// Parse [toAddrStr] to an ids.ShortID
