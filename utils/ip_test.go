@@ -88,7 +88,7 @@ func TestIPDescString(t *testing.T) {
 		result string
 	}{
 		{IPDesc{net.ParseIP("127.0.0.1"), 0}, "127.0.0.1:0"},
-		{IPDesc{net.ParseIP("::1"), 42}, "::1:42"},
+		{IPDesc{net.ParseIP("::1"), 42}, "[::1]:42"},
 		{IPDesc{net.ParseIP("::ffff:127.0.0.1"), 65535}, "127.0.0.1:65535"},
 		{IPDesc{net.IP{}, 1234}, "<nil>:1234"},
 	}
@@ -96,6 +96,55 @@ func TestIPDescString(t *testing.T) {
 		t.Run(tt.result, func(t *testing.T) {
 			if result := tt.ipDesc.String(); result != tt.result {
 				t.Errorf("Expected %q, got %q", tt.result, result)
+			}
+		})
+	}
+}
+
+func TestToIPDescError(t *testing.T) {
+	tests := []struct {
+		in  string
+		out IPDesc
+	}{
+		{"", IPDesc{}},
+		{":", IPDesc{}},
+		{"abc:", IPDesc{}},
+		{":abc", IPDesc{}},
+		{"abc:abc", IPDesc{}},
+		{"127.0.0.1:", IPDesc{}},
+		{":1", IPDesc{}},
+		{"::1", IPDesc{}},
+		{"::1:42", IPDesc{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			result, err := ToIPDesc(tt.in)
+			if err == nil {
+				t.Errorf("Unexpected success")
+			}
+			if !tt.out.Equal(result) {
+				t.Errorf("Expected %v, got %v", tt.out, result)
+			}
+		})
+	}
+}
+
+func TestToIPDesc(t *testing.T) {
+	tests := []struct {
+		in  string
+		out IPDesc
+	}{
+		{"127.0.0.1:42", IPDesc{net.ParseIP("127.0.0.1"), 42}},
+		{"[::1]:42", IPDesc{net.ParseIP("::1"), 42}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			result, err := ToIPDesc(tt.in)
+			if err != nil {
+				t.Errorf("Unexpected error %v", err)
+			}
+			if !tt.out.Equal(result) {
+				t.Errorf("Expected %#v, got %#v", tt.out, result)
 			}
 		})
 	}
