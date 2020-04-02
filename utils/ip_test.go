@@ -81,3 +81,22 @@ func TestIPDescPortString(t *testing.T) {
 		})
 	}
 }
+
+func TestIPDescString(t *testing.T) {
+	tests := []struct {
+		ipDesc IPDesc
+		result string
+	}{
+		{IPDesc{net.ParseIP("127.0.0.1"), 0}, "127.0.0.1:0"},
+		{IPDesc{net.ParseIP("::1"), 42}, "::1:42"},
+		{IPDesc{net.ParseIP("::ffff:127.0.0.1"), 65535}, "127.0.0.1:65535"},
+		{IPDesc{net.IP{}, 1234}, "<nil>:1234"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.result, func(t *testing.T) {
+			if result := tt.ipDesc.String(); result != tt.result {
+				t.Errorf("Expected %q, got %q", tt.result, result)
+			}
+		})
+	}
+}
