@@ -1094,7 +1094,7 @@ type SendExportArgs struct {
 	Username string      `json:"username"`
 	Password string      `json:"password"`
 	Amount   json.Uint64 `json:"amount"`
-	To       string      `json:"to"`
+	To       ids.ShortID `json:"to"`
 }
 
 // SendExportReply defines the Send replies returned from the API
@@ -1108,15 +1108,6 @@ func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply 
 
 	if args.Amount == 0 {
 		return errInvalidAmount
-	}
-
-	toBytes, err := service.vm.Parse(args.To)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
-	}
-	to, err := ids.ToShortID(toBytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
 	}
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -1194,7 +1185,7 @@ func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply 
 			Locktime: 0,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
+				Addrs:     []ids.ShortID{args.To},
 			},
 		},
 	}}

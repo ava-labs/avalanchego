@@ -856,17 +856,14 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 
 // CreateImportTxArgs are the arguments to CreateImportTx
 type CreateImportTxArgs struct {
-	// Addresses that can be used to sign the import
-	ImportAddresses []ids.ShortID `json:"importAddresses"`
-
 	// ID of the account that will receive the imported funds, and pay the
-	// import fee
+	// transaction fee
 	AccountID ids.ShortID `json:"accountID"`
 
-	// Nonce of the account that pays the transaction fee
+	// Next unused nonce of the account
 	PayerNonce json.Uint64 `json:"payerNonce"`
 
-	// User that controls the Addresses
+	// User that controls the account
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
@@ -884,26 +881,16 @@ func (service *Service) CreateImportTx(_ *http.Request, args *CreateImportTxArgs
 	user := user{db: db}
 
 	kc := secp256k1fx.NewKeychain()
-	for _, addr := range args.ImportAddresses {
-		key, err := user.getKey(addr)
-		if err != nil {
-			return errDB
-		}
-		kc.Add(key)
-	}
-
 	key, err := user.getKey(args.AccountID)
 	if err != nil {
 		return errDB
 	}
 	kc.Add(key)
 
-	addrs := ids.Set{}
-	for _, addr := range args.ImportAddresses {
-		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
-	}
+	addrSet := ids.Set{}
+	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(args.AccountID.Bytes())))
 
-	utxos, err := service.vm.GetAtomicUTXOs(addrs)
+	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
