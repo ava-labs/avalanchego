@@ -126,7 +126,7 @@ func TestVMGenesis(t *testing.T) {
 		{
 			networkID:  CascadeID,
 			vmID:       avm.ID,
-			expectedID: "2aJ8wzhzbDWB9utBtA4h1oqcrXJRWfj8RakJfJSo3M16i3Vk5N",
+			expectedID: "4ktRjsAKxgMr2aEzv9SWmrU7Xk5FniHUrVCX4P1TZSfTLZWFM",
 		},
 		{
 			networkID:  LocalID,
@@ -167,7 +167,7 @@ func TestAVAAssetID(t *testing.T) {
 	}{
 		{
 			networkID:  CascadeID,
-			expectedID: "4AXHxutuTMNdMqLkniJhmX5M1dgtVx3Gs1LNfJZcnE3P5ewSp",
+			expectedID: "21d7KVtPrubc5fHr6CGNcgbUb4seUjmZKr35ZX7BZb5iP8pXWA",
 		},
 		{
 			networkID:  LocalID,

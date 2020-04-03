@@ -110,9 +110,6 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 						})
 					}
 				case "variableCap":
-					initialState := &InitialState{
-						FxID: 0, // TODO: Should lookup secp256k1fx FxID
-					}
 					for _, state := range initialStates {
 						b, err := json.Marshal(state)
 						if err != nil {
