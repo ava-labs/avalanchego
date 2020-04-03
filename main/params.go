@@ -33,16 +33,21 @@ var (
 	Err    error
 )
 
-// Bootstrap configs
-var (
-	BootstrapIPs = []string{
-		"3.227.207.132:21001",
-		"34.207.133.167:21001",
-		"107.23.241.199:21001",
-		"54.197.215.186:21001",
-		"18.234.153.22:21001",
+// GetIPs returns the default IPs for each network
+func GetIPs(networkID uint32) []string {
+	switch networkID {
+	case genesis.CascadeID:
+		return []string{
+			"3.227.207.132:21001",
+			"34.207.133.167:21001",
+			"107.23.241.199:21001",
+			"54.197.215.186:21001",
+			"18.234.153.22:21001",
+		}
+	default:
+		return nil
 	}
-)
+}
 
 var (
 	errBootstrapMismatch = errors.New("more bootstrap IDs provided than bootstrap IPs")
@@ -84,8 +89,8 @@ func init() {
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
 
 	// Bootstrapping:
-	bootstrapIPs := fs.String("bootstrap-ips", strings.Join(BootstrapIPs, ","), "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	bootstrapIDs := fs.String("bootstrap-ids", strings.Join(genesis.StakerIDs, ","), "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	bootstrapIPs := fs.String("bootstrap-ips", "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	bootstrapIDs := fs.String("bootstrap-ids", "", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
@@ -164,7 +169,11 @@ func init() {
 	}
 
 	// Bootstrapping:
-	for _, ip := range strings.Split(*bootstrapIPs, ",") {
+	bsIPs := strings.Split(*bootstrapIPs, ",")
+	if *bootstrapIPs == "" {
+		bsIPs = GetIPs(networkID)
+	}
+	for _, ip := range bsIPs {
 		if ip != "" {
 			addr, err := utils.ToIPDesc(ip)
 			errs.Add(err)
@@ -172,6 +181,9 @@ func init() {
 				IP: addr,
 			})
 		}
+	}
+	if *bootstrapIDs == "" {
+		*bootstrapIDs = strings.Join(genesis.GetConfig(networkID).StakerIDs, ",")
 	}
 	if Config.EnableStaking {
 		i := 0

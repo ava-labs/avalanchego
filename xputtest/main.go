@@ -76,11 +76,17 @@ func main() {
 	// start the benchmark we want to run
 	switch config.Chain {
 	case spChain:
-		net.benchmarkSPChain(genesis.VMGenesis(config.NetworkID, spchainvm.ID))
+		tx, err := genesis.VMGenesis(config.NetworkID, spchainvm.ID)
+		log.AssertNoError(err)
+		net.benchmarkSPChain(tx)
 	case spDAG:
-		net.benchmarkSPDAG(genesis.VMGenesis(config.NetworkID, spdagvm.ID))
+		tx, err := genesis.VMGenesis(config.NetworkID, spdagvm.ID)
+		log.AssertNoError(err)
+		net.benchmarkSPChain(tx)
 	case avmDAG:
-		net.benchmarkAVM(genesis.VMGenesis(config.NetworkID, avm.ID))
+		tx, err := genesis.VMGenesis(config.NetworkID, avm.ID)
+		log.AssertNoError(err)
+		net.benchmarkSPChain(tx)
 	default:
 		log.Fatal("did not specify whether to test dag or chain. Exiting")
 		return
