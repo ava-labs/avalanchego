@@ -182,7 +182,7 @@ func init() {
 			})
 		}
 	}
-	if *bootstrapIDs == "" {
+	if *bootstrapIDs == "" && len(bsIPs) != 0 {
 		*bootstrapIDs = strings.Join(genesis.GetConfig(networkID).StakerIDs, ",")
 	}
 	if Config.EnableStaking {
