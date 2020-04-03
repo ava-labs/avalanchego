@@ -6,6 +6,7 @@ package genesis
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/platformvm"
@@ -106,9 +107,74 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes, _ := Genesis(LocalID)
+	genesisBytes, err := Genesis(LocalID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	genesis := platformvm.Genesis{}
 	if err := platformvm.Codec.Unmarshal(genesisBytes, &genesis); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestVMGenesis(t *testing.T) {
+	tests := []struct {
+		networkID  uint32
+		vmID       ids.ID
+		expectedID string
+	}{
+		{
+			networkID:  CascadeID,
+			vmID:       avm.ID,
+			expectedID: "2aJ8wzhzbDWB9utBtA4h1oqcrXJRWfj8RakJfJSo3M16i3Vk5N",
+		},
+		{
+			networkID:  LocalID,
+			vmID:       avm.ID,
+			expectedID: "4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH",
+		},
+	}
+
+	for _, test := range tests {
+		genesisTx, err := VMGenesis(test.networkID, test.vmID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result := genesisTx.ID().String(); test.expectedID != result {
+			t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
+				test.vmID,
+				test.networkID,
+				test.expectedID,
+				result)
+		}
+	}
+}
+
+func TestAVAAssetID(t *testing.T) {
+	tests := []struct {
+		networkID  uint32
+		expectedID string
+	}{
+		{
+			networkID:  CascadeID,
+			expectedID: "4AXHxutuTMNdMqLkniJhmX5M1dgtVx3Gs1LNfJZcnE3P5ewSp",
+		},
+		{
+			networkID:  LocalID,
+			expectedID: "n8XH5JY1EX5VYqDeAhB4Zd4GKxi9UNQy6oPpMsCAj1Q6xkiiL",
+		},
+	}
+
+	for _, test := range tests {
+		avaID, err := AVAAssetID(test.networkID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result := avaID.String(); test.expectedID != result {
+			t.Fatalf("AVA assetID with networkID %d was expected to be %s but was %s",
+				test.networkID,
+				test.expectedID,
+				result)
+		}
 	}
 }
