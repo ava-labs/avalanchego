@@ -89,8 +89,8 @@ func init() {
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
 
 	// Bootstrapping:
-	bootstrapIPs := fs.String("bootstrap-ips", "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	bootstrapIDs := fs.String("bootstrap-ids", "", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	bootstrapIPs := fs.String("bootstrap-ips", "default", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
@@ -169,11 +169,10 @@ func init() {
 	}
 
 	// Bootstrapping:
-	bsIPs := strings.Split(*bootstrapIPs, ",")
-	if *bootstrapIPs == "" {
-		bsIPs = GetIPs(networkID)
+	if *bootstrapIPs == "default" {
+		*bootstrapIPs = strings.Join(GetIPs(networkID), ",")
 	}
-	for _, ip := range bsIPs {
+	for _, ip := range strings.Split(*bootstrapIPs, ",") {
 		if ip != "" {
 			addr, err := utils.ToIPDesc(ip)
 			errs.Add(err)
@@ -182,8 +181,13 @@ func init() {
 			})
 		}
 	}
-	if *bootstrapIDs == "" && len(bsIPs) != 0 {
-		*bootstrapIDs = strings.Join(genesis.GetConfig(networkID).StakerIDs, ",")
+
+	if *bootstrapIDs == "default" {
+		if *bootstrapIPs == "" {
+			*bootstrapIDs = ""
+		} else {
+			*bootstrapIDs = strings.Join(genesis.GetConfig(networkID).StakerIDs, ",")
+		}
 	}
 	if Config.EnableStaking {
 		i := 0
