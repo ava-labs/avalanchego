@@ -133,6 +133,16 @@ func TestVMGenesis(t *testing.T) {
 			vmID:       avm.ID,
 			expectedID: "4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH",
 		},
+		{
+			networkID:  CascadeID,
+			vmID:       evm.ID,
+			expectedID: "2mUYSXfLrDtigwbzj1LxKVsHwELghc5sisoXrzJwLqAAQHF4i",
+		},
+		{
+			networkID:  LocalID,
+			vmID:       evm.ID,
+			expectedID: "tZGm6RCkeGpVETUTp11DW3UYFZmm69zfqxchpHrSF7wgy8rmw",
+		},
 	}
 
 	for _, test := range tests {

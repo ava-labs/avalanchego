@@ -85,6 +85,13 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 	if success != true {
 		return nil, errors.New("problem creating evm genesis state")
 	}
+
+	alloc := core.GenesisAlloc{}
+	for _, addr := range config.FundedEVMAddresses {
+		alloc[common.HexToAddress(addr)] = core.GenesisAccount{
+			Balance: evmBalance,
+		}
+	}
 	evmArgs := core.Genesis{
 		Config: &params.ChainConfig{
 			ChainID:             big.NewInt(43110),
@@ -106,11 +113,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 		Difficulty: big.NewInt(0),
 		Mixhash:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
 		Coinbase:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-		Alloc: core.GenesisAlloc{
-			common.HexToAddress(evm.GenesisTestAddr): core.GenesisAccount{
-				Balance: evmBalance,
-			},
-		},
+		Alloc:      alloc,
 		Number:     0,
 		GasUsed:    0,
 		ParentHash: common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),

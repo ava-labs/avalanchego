@@ -5,6 +5,7 @@ package genesis
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/evm"
 )
 
 // Note that since an AVA network has exactly one Platform Chain,
@@ -15,8 +16,8 @@ import (
 
 // Config contains the genesis addresses used to construct a genesis
 type Config struct {
-	MintAddresses, FundedAddresses, StakerIDs                   []string
-	ParsedMintAddresses, ParsedFundedAddresses, ParsedStakerIDs []ids.ShortID
+	MintAddresses, FundedAddresses, FundedEVMAddresses, StakerIDs []string
+	ParsedMintAddresses, ParsedFundedAddresses, ParsedStakerIDs   []ids.ShortID
 }
 
 func (c *Config) init() error {
@@ -65,6 +66,9 @@ var (
 			"ZdhZv6oZrmXLyFDy6ovXAu6VxmbTsT2h",
 			"6cesTteH62Y5mLoDBUASaBvCXuL2AthL",
 		},
+		FundedEVMAddresses: []string{
+			"0x572f4D80f10f663B5049F789546f25f70Bb62a7F",
+		},
 		StakerIDs: []string{
 			"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
 			"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
@@ -78,6 +82,10 @@ var (
 		FundedAddresses: []string{
 			// Private key: ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN
 			"6Y3kysjF9jnHnYkdS9yGAuoHyae2eNmeV",
+		},
+		FundedEVMAddresses: []string{
+			// Private key: evm.GenesisTestKey
+			evm.GenesisTestAddr,
 		},
 		StakerIDs: []string{
 			"7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
