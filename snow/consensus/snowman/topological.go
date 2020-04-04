@@ -4,8 +4,6 @@
 package snowman
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
@@ -21,11 +19,10 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // strongly preferred branch. This tree structure amortizes network polls to
 // vote on more than just the next position.
 type Topological struct {
+	metrics
+
 	ctx    *snow.Context
 	params snowball.Parameters
-
-	numProcessing            prometheus.Gauge
-	numAccepted, numRejected prometheus.Counter
 
 	head  ids.ID
 	nodes map[[32]byte]node // ParentID -> Snowball instance
@@ -62,33 +59,8 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	ts.ctx = ctx
 	ts.params = params
 
-	ts.numProcessing = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "processing",
-			Help:      "Number of currently processing blocks",
-		})
-	ts.numAccepted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "accepted",
-			Help:      "Number of blocks accepted",
-		})
-	ts.numRejected = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "rejected",
-			Help:      "Number of blocks rejected",
-		})
-
-	if err := ts.params.Metrics.Register(ts.numProcessing); err != nil {
-		ts.ctx.Log.Error("Failed to register processing statistics due to %s", err)
-	}
-	if err := ts.params.Metrics.Register(ts.numAccepted); err != nil {
-		ts.ctx.Log.Error("Failed to register accepted statistics due to %s", err)
-	}
-	if err := ts.params.Metrics.Register(ts.numRejected); err != nil {
-		ts.ctx.Log.Error("Failed to register rejected statistics due to %s", err)
+	if err := ts.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+		ts.ctx.Log.Error("%s", err)
 	}
 
 	ts.head = rootID
@@ -115,6 +87,7 @@ func (ts *Topological) Add(blk Block) {
 	bytes := blk.Bytes()
 	ts.ctx.DecisionDispatcher.Issue(ts.ctx.ChainID, blkID, bytes)
 	ts.ctx.ConsensusDispatcher.Issue(ts.ctx.ChainID, blkID, bytes)
+	ts.metrics.Issued(blkID)
 
 	if parent, ok := ts.nodes[parentKey]; ok {
 		parent.Add(blk)
@@ -130,8 +103,6 @@ func (ts *Topological) Add(blk Block) {
 		if ts.tail.Equals(parentID) {
 			ts.tail = blkID
 		}
-
-		ts.numProcessing.Inc()
 	} else {
 		// If the ancestor is missing, this means the ancestor must have already
 		// been pruned. Therefore, the dependent is transitively rejected.
@@ -140,8 +111,7 @@ func (ts *Topological) Add(blk Block) {
 		bytes := blk.Bytes()
 		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, bytes)
 		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, bytes)
-
-		ts.numRejected.Inc()
+		ts.metrics.Rejected(blkID)
 	}
 }
 
@@ -319,7 +289,6 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 			ts.accept(parentNode)
 			tail = parentNode.sb.Preference()
 			delete(ts.nodes, voteParentKey)
-			ts.numProcessing.Dec()
 		} else {
 			ts.nodes[voteParentKey] = parentNode
 		}
@@ -367,8 +336,8 @@ func (ts *Topological) accept(n node) {
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
 			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+			ts.metrics.Rejected(childID)
 
-			ts.numRejected.Inc()
 			rejects = append(rejects, childID)
 		}
 	}
@@ -383,7 +352,7 @@ func (ts *Topological) accept(n node) {
 	ts.ctx.ConsensusDispatcher.Accept(ts.ctx.ChainID, child.ID(), bytes)
 
 	child.Accept()
-	ts.numAccepted.Inc()
+	ts.metrics.Accepted(pref)
 }
 
 // Takes in a list of newly rejected ids and rejects everything that depends on
@@ -397,7 +366,6 @@ func (ts *Topological) rejectTransitively(rejected ...ids.ID) {
 		rejectKey := rejectID.Key()
 		rejectNode := ts.nodes[rejectKey]
 		delete(ts.nodes, rejectKey)
-		ts.numProcessing.Dec()
 
 		for childIDBytes, child := range rejectNode.children {
 			childID := ids.NewID(childIDBytes)
@@ -407,8 +375,7 @@ func (ts *Topological) rejectTransitively(rejected ...ids.ID) {
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
 			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-
-			ts.numRejected.Inc()
+			ts.metrics.Rejected(childID)
 		}
 	}
 }

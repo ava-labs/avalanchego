@@ -9,8 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
@@ -27,11 +25,10 @@ func (InputFactory) New() Consensus { return &Input{} }
 // Input is an implementation of a multi-color, non-transitive, snowball
 // instance
 type Input struct {
+	metrics
+
 	ctx    *snow.Context
 	params snowball.Parameters
-
-	numProcessing            prometheus.Gauge
-	numAccepted, numRejected prometheus.Counter
 
 	// preferences is the set of consumerIDs that have only in edges
 	// virtuous is the set of consumerIDs that have no edges
@@ -70,35 +67,8 @@ func (ig *Input) Initialize(ctx *snow.Context, params snowball.Parameters) {
 	ig.ctx = ctx
 	ig.params = params
 
-	namespace := fmt.Sprintf("gecko_%s", ig.ctx.ChainID)
-
-	ig.numProcessing = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "tx_processing",
-			Help:      "Number of processing transactions",
-		})
-	ig.numAccepted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "tx_accepted",
-			Help:      "Number of transactions accepted",
-		})
-	ig.numRejected = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "tx_rejected",
-			Help:      "Number of transactions rejected",
-		})
-
-	if err := ig.params.Metrics.Register(ig.numProcessing); err != nil {
-		ig.ctx.Log.Error("Failed to register tx_processing statistics due to %s", err)
-	}
-	if err := ig.params.Metrics.Register(ig.numAccepted); err != nil {
-		ig.ctx.Log.Error("Failed to register tx_accepted statistics due to %s", err)
-	}
-	if err := ig.params.Metrics.Register(ig.numRejected); err != nil {
-		ig.ctx.Log.Error("Failed to register tx_rejected statistics due to %s", err)
+	if err := ig.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+		ig.ctx.Log.Error("%s", err)
 	}
 
 	ig.txs = make(map[[32]byte]txNode)
@@ -136,11 +106,11 @@ func (ig *Input) Add(tx Tx) {
 	if inputs.Len() == 0 {
 		tx.Accept()
 		ig.ctx.DecisionDispatcher.Accept(ig.ctx.ChainID, txID, bytes)
-		ig.numAccepted.Inc()
+		ig.metrics.Issued(txID)
+		ig.metrics.Accepted(txID)
 		return
 	}
 
-	id := tx.ID()
 	cn := txNode{tx: tx}
 	virtuous := true
 	// If there are inputs, they must be voted on
@@ -154,26 +124,25 @@ func (ig *Input) Add(tx Tx) {
 				ig.virtuousVoting.Remove(conflictID)
 			}
 		} else {
-			input.preference = id // If there isn't a conflict, I'm preferred
+			input.preference = txID // If there isn't a conflict, I'm preferred
 		}
-		input.conflicts.Add(id)
+		input.conflicts.Add(txID)
 		ig.inputs[consumptionKey] = input
 
 		virtuous = virtuous && !exists
 	}
 
 	// Add the node to the set
-	ig.txs[id.Key()] = cn
+	ig.txs[txID.Key()] = cn
 	if virtuous {
 		// If I'm preferred in all my conflict sets, I'm preferred.
 		// Because the preference graph is a DAG, there will always be at least
 		// one preferred consumer, if there is a consumer
-		ig.preferences.Add(id)
-		ig.virtuous.Add(id)
-		ig.virtuousVoting.Add(id)
+		ig.preferences.Add(txID)
+		ig.virtuous.Add(txID)
+		ig.virtuousVoting.Add(txID)
 	}
-
-	ig.numProcessing.Inc()
+	ig.metrics.Issued(txID)
 
 	toReject := &inputRejector{
 		ig: ig,
@@ -321,7 +290,6 @@ func (ig *Input) reject(ids ...ids.ID) {
 		conflictKey := conflict.Key()
 		cn := ig.txs[conflictKey]
 		delete(ig.txs, conflictKey)
-		ig.numProcessing.Dec()
 		ig.preferences.Remove(conflict) // A rejected value isn't preferred
 
 		// Remove from all conflict sets
@@ -330,7 +298,7 @@ func (ig *Input) reject(ids ...ids.ID) {
 		// Mark it as rejected
 		cn.tx.Reject()
 		ig.ctx.DecisionDispatcher.Reject(ig.ctx.ChainID, cn.tx.ID(), cn.tx.Bytes())
-		ig.numRejected.Inc()
+		ig.metrics.Rejected(conflict)
 		ig.pendingAccept.Abandon(conflict)
 		ig.pendingReject.Fulfill(conflict)
 	}
@@ -517,8 +485,7 @@ func (a *inputAccepter) Update() {
 	// Mark it as accepted
 	a.tn.tx.Accept()
 	a.ig.ctx.DecisionDispatcher.Accept(a.ig.ctx.ChainID, id, a.tn.tx.Bytes())
-	a.ig.numAccepted.Inc()
-	a.ig.numProcessing.Dec()
+	a.ig.metrics.Accepted(id)
 
 	a.ig.pendingAccept.Fulfill(id)
 	a.ig.pendingReject.Abandon(id)
