@@ -16,6 +16,13 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
+var (
+	Genesis = &Blk{
+		id:     ids.Empty.Prefix(0),
+		status: choices.Accepted,
+	}
+)
+
 func ParamsTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
