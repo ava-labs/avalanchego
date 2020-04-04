@@ -19,8 +19,8 @@ var (
 
 // InitialState ...
 type InitialState struct {
-	FxID uint32              `serialize:"true"`
-	Outs []verify.Verifiable `serialize:"true"`
+	FxID uint32              `serialize:"true" json:"fxID"`
+	Outs []verify.Verifiable `serialize:"true" json:"outputs"`
 }
 
 // Verify implements the verify.Verifiable interface

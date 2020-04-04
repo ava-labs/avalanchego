@@ -8,37 +8,29 @@ import (
 
 	"github.com/ava-labs/salticidae-go"
 
-	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/networking"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/xputtest/chainwallet"
 )
 
-func (n *network) benchmarkSPChain(genesisState *platformvm.Genesis) {
-	spchainChain := genesisState.Chains[3]
-	n.log.AssertTrue(spchainChain.ChainName == "Simple Chain Payments", "wrong chain name")
-	genesisBytes := spchainChain.GenesisData
-
-	wallet := chainwallet.NewWallet(n.networkID, spchainChain.ID())
+// benchmark an instance of the sp chain
+func (n *network) benchmarkSPChain(chain *platformvm.CreateChainTx) {
+	genesisBytes := chain.GenesisData
+	wallet := chainwallet.NewWallet(n.log, n.networkID, chain.ID())
 
 	codec := spchainvm.Codec{}
 	accounts, err := codec.UnmarshalGenesis(genesisBytes)
 	n.log.AssertNoError(err)
 
-	cb58 := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
-	for _, keyStr := range genesis.Keys {
-		n.log.AssertNoError(cb58.FromString(keyStr))
-		skGen, err := factory.ToPrivateKey(cb58.Bytes)
-		n.log.AssertNoError(err)
-		sk := skGen.(*crypto.PrivateKeySECP256K1R)
-		wallet.ImportKey(sk)
-	}
+	skGen, err := factory.ToPrivateKey(config.Key)
+	n.log.AssertNoError(err)
+	sk := skGen.(*crypto.PrivateKeySECP256K1R)
+	wallet.ImportKey(sk)
 
 	for _, account := range accounts {
 		wallet.AddAccount(account)
@@ -47,10 +39,10 @@ func (n *network) benchmarkSPChain(genesisState *platformvm.Genesis) {
 
 	n.log.AssertNoError(wallet.GenerateTxs(config.NumTxs))
 
-	go n.log.RecoverAndPanic(func() { n.IssueSPChain(spchainChain.ID(), wallet) })
+	go n.log.RecoverAndPanic(func() { n.IssueSPChain(chain.ID(), wallet) })
 }
 
-func (n *network) IssueSPChain(chainID ids.ID, wallet chainwallet.Wallet) {
+func (n *network) IssueSPChain(chainID ids.ID, wallet *chainwallet.Wallet) {
 	n.log.Debug("Issuing with %d", wallet.Balance())
 	numAccepted := 0
 	numPending := 0
@@ -90,6 +82,7 @@ func (n *network) IssueSPChain(chainID ids.ID, wallet chainwallet.Wallet) {
 		}
 		if numAccepted+numPending >= config.NumTxs {
 			n.log.Info("done with test")
+			net.ec.Stop()
 			return
 		}
 	}

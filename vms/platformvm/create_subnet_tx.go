@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
-
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -17,18 +17,14 @@ import (
 const maxThreshold = 25
 
 var (
-	errThresholdExceedsKeysLen = errors.New("threshold must be no more than number of control keys")
-	errThresholdTooHigh        = fmt.Errorf("threshold can't be greater than %d", maxThreshold)
+	errThresholdExceedsKeysLen       = errors.New("threshold must be no more than number of control keys")
+	errThresholdTooHigh              = fmt.Errorf("threshold can't be greater than %d", maxThreshold)
+	errControlKeysNotSortedAndUnique = errors.New("control keys must be sorted and unique")
+	errUnneededKeys                  = errors.New("subnets shouldn't have keys if the threshold is 0")
 )
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
-	// The VM this tx exists within
-	vm *VM
-
-	// ID is this transaction's ID
-	ID ids.ID
-
 	// NetworkID is the ID of the network this tx was issued on
 	NetworkID uint32 `serialize:"true"`
 
@@ -47,18 +43,27 @@ type UnsignedCreateSubnetTx struct {
 type CreateSubnetTx struct {
 	UnsignedCreateSubnetTx `serialize:"true"`
 
+	// Signature on the UnsignedCreateSubnetTx's byte repr
+	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+
 	// The public key that signed this transaction
 	// The transaction fee will be paid from the corresponding account
 	// (ie the account whose ID is [key].Address())
 	// [key] is non-nil iff this tx is valid
 	key crypto.PublicKey
 
-	// Signature on the UnsignedCreateSubnetTx's byte repr
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+	// The VM this tx exists within
+	vm *VM
+
+	// ID is this transaction's ID
+	id ids.ID
 
 	// Byte representation of this transaction (including signature)
 	bytes []byte
 }
+
+// ID returns the ID of this transaction
+func (tx *CreateSubnetTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify nil iff [tx] is syntactically valid.
 // If [tx] is valid, this method sets [tx.key]
@@ -68,12 +73,18 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 		return errNilTx
 	case tx.key != nil:
 		return nil // Only verify the transaction once
-	case tx.ID.IsZero():
+	case tx.id.IsZero():
 		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
 		return errWrongNetworkID
 	case tx.Threshold > uint16(len(tx.ControlKeys)):
 		return errThresholdExceedsKeysLen
+	case tx.Threshold > maxThreshold:
+		return errThresholdTooHigh
+	case tx.Threshold == 0 && len(tx.ControlKeys) > 0:
+		return errUnneededKeys
+	case !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys):
+		return errControlKeysNotSortedAndUnique
 	}
 
 	// Byte representation of the unsigned transaction
@@ -104,12 +115,6 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-
-	for _, subnet := range subnets {
-		if subnet.ID.Equals(tx.ID) {
-			return nil, fmt.Errorf("there is already a subnet with ID %s", tx.ID)
-		}
-	}
 	subnets = append(subnets, tx) // add new subnet
 	if err := tx.vm.putSubnets(db, subnets); err != nil {
 		return nil, err
@@ -128,7 +133,12 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 
-	return nil, nil
+	// Register new subnet in validator manager
+	onAccept := func() {
+		tx.vm.validators.PutValidatorSet(tx.id, validators.NewSet())
+	}
+
+	return onAccept, nil
 }
 
 // Bytes returns the byte representation of [tx]
@@ -152,22 +162,31 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 		return err
 	}
 	tx.bytes = txBytes
-	tx.ID = ids.NewID(hashing.ComputeHash256Array(txBytes))
+	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
 	return nil
 }
 
+// [controlKeys] must be unique. They will be sorted by this method.
+// If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
 func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []ids.ShortID,
 	threshold uint16, payerKey *crypto.PrivateKeySECP256K1R,
 ) (*CreateSubnetTx, error) {
+	tx := &CreateSubnetTx{UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
+		NetworkID:   networkID,
+		Nonce:       nonce,
+		ControlKeys: controlKeys,
+		Threshold:   threshold,
+	}}
 
-	tx := &CreateSubnetTx{
-		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
-			vm:          vm,
-			NetworkID:   networkID,
-			Nonce:       nonce,
-			ControlKeys: controlKeys,
-			Threshold:   threshold,
-		},
+	if threshold == 0 && len(tx.ControlKeys) > 0 {
+		return nil, errUnneededKeys
+	}
+
+	// Sort control keys
+	ids.SortShortIDs(tx.ControlKeys)
+	// Ensure control keys are unique
+	if !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys) {
+		return nil, errControlKeysNotSortedAndUnique
 	}
 
 	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)

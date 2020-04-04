@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 )
 
@@ -32,10 +33,10 @@ var (
 // CreateAssetTx is a transaction that creates a new asset.
 type CreateAssetTx struct {
 	BaseTx       `serialize:"true"`
-	Name         string          `serialize:"true"`
-	Symbol       string          `serialize:"true"`
-	Denomination byte            `serialize:"true"`
-	States       []*InitialState `serialize:"true"`
+	Name         string          `serialize:"true" json:"name"`
+	Symbol       string          `serialize:"true" json:"symbol"`
+	Denomination byte            `serialize:"true" json:"denomination"`
+	States       []*InitialState `serialize:"true" json:"initialStates"`
 }
 
 // InitialStates track which virtual machines, and the initial state of these
@@ -43,18 +44,18 @@ type CreateAssetTx struct {
 func (t *CreateAssetTx) InitialStates() []*InitialState { return t.States }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *CreateAssetTx) UTXOs() []*UTXO {
+func (t *CreateAssetTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, state := range t.States {
 		for _, out := range state.Outs {
-			utxos = append(utxos, &UTXO{
-				UTXOID: UTXOID{
+			utxos = append(utxos, &ava.UTXO{
+				UTXOID: ava.UTXOID{
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: Asset{
+				Asset: ava.Asset{
 					ID: txID,
 				},
 				Out: out,
@@ -108,11 +109,6 @@ func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs
 		return errInitialStatesNotSortedUnique
 	}
 	return nil
-}
-
-// SemanticVerify that this transaction is well-formed.
-func (t *CreateAssetTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error {
-	return t.BaseTx.SemanticVerify(vm, uTx, creds)
 }
 
 // Sort ...

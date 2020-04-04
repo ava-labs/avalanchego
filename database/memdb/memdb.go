@@ -208,6 +208,9 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 	return nil
 }
 
+// Inner returns itself
+func (b *batch) Inner() database.Batch { return b }
+
 type iterator struct {
 	initialized bool
 	keys        []string

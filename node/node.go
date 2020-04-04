@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
 	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
@@ -35,10 +36,13 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/evm"
+	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
+	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
@@ -47,6 +51,10 @@ import (
 
 const (
 	maxMessageSize = 1 << 25 // maximum size of a message sent with salticidae
+)
+
+var (
+	genesisHashKey = []byte("genesisID")
 )
 
 // MainNode is the reference for node callbacks
@@ -67,6 +75,9 @@ type Node struct {
 
 	// Handles calls to Keystore API
 	keystoreServer keystore.Keystore
+
+	// Manages shared memory
+	sharedMemory atomic.SharedMemory
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -285,7 +296,38 @@ func (n *Node) Dispatch() { n.EC.Dispatch() }
  ******************************************************************************
  */
 
-func (n *Node) initDatabase() { n.DB = n.Config.DB }
+func (n *Node) initDatabase() error {
+	n.DB = n.Config.DB
+
+	expectedGenesis, err := genesis.Genesis(n.Config.NetworkID)
+	if err != nil {
+		return err
+	}
+	rawExpectedGenesisHash := hashing.ComputeHash256(expectedGenesis)
+
+	rawGenesisHash, err := n.DB.Get(genesisHashKey)
+	if err == database.ErrNotFound {
+		rawGenesisHash = rawExpectedGenesisHash
+		err = n.DB.Put(genesisHashKey, rawGenesisHash)
+	}
+	if err != nil {
+		return err
+	}
+
+	genesisHash, err := ids.ToID(rawGenesisHash)
+	if err != nil {
+		return err
+	}
+	expectedGenesisHash, err := ids.ToID(rawExpectedGenesisHash)
+	if err != nil {
+		return err
+	}
+
+	if !genesisHash.Equals(expectedGenesisHash) {
+		return fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
+	}
+	return nil
+}
 
 // Initialize this node's ID
 // If staking is disabled, a node's ID is a hash of its IP
@@ -320,14 +362,29 @@ func (n *Node) initNodeID() error {
 // AVM, EVM, Simple Payments DAG, Simple Payments Chain
 // The Platform VM is registered in initStaking because
 // its factory needs to reference n.chainManager, which is nil right now
-func (n *Node) initVMManager() {
+func (n *Node) initVMManager() error {
+	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
+	if err != nil {
+		return err
+	}
+
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
-	n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{})
-	n.vmManager.RegisterVMFactory(evm.ID, &evm.Factory{})
-	n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee})
-	n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{})
-	n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{})
-	n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{})
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
+			AVA:      avaAssetID,
+			Platform: ids.Empty,
+		}),
+		n.vmManager.RegisterVMFactory(evm.ID, &evm.Factory{}),
+		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
+		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
+		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
+		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
+		n.vmManager.RegisterVMFactory(propertyfx.ID, &propertyfx.Factory{}),
+	)
+	return errs.Err
 }
 
 // Create the EventDispatcher used for hooking events
@@ -343,38 +400,64 @@ func (n *Node) initEventDispatcher() {
 // Initializes the Platform chain.
 // Its genesis data specifies the other chains that should
 // be created.
-func (n *Node) initChains() {
+func (n *Node) initChains() error {
 	n.Log.Info("initializing chains")
 
 	vdrs := n.vdrs
+
+	// If staking is disabled, ignore updates to Subnets' validator sets
+	// Instead of updating node's validator manager, platform chain makes changes
+	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
 		defaultSubnetValidators := validators.NewSet()
+		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 		vdrs = validators.NewManager()
 		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 	}
 
-	n.vmManager.RegisterVMFactory(
+	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
+	if err != nil {
+		return err
+	}
+	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
+	if err != nil {
+		return err
+	}
+
+	err = n.vmManager.RegisterVMFactory(
 		/*vmID=*/ platformvm.ID,
 		/*vmFactory=*/ &platformvm.Factory{
-			ChainManager: n.chainManager,
-			Validators:   vdrs,
+			ChainManager:   n.chainManager,
+			Validators:     vdrs,
+			StakingEnabled: n.Config.EnableStaking,
+			AVA:            avaAssetID,
+			AVM:            createAVMTx.ID(),
 		},
 	)
+	if err != nil {
+		return err
+	}
 
 	beacons := validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
 		beacons.Add(validators.NewValidator(peer.ID, 1))
 	}
 
-	genesisBytes := genesis.Genesis(n.Config.NetworkID)
+	genesisBytes, err := genesis.Genesis(n.Config.NetworkID)
+	if err != nil {
+		return err
+	}
 
 	// Create the Platform Chain
 	n.chainManager.ForceCreateChain(chains.ChainParameters{
 		ID:            ids.Empty,
+		SubnetID:      platformvm.DefaultSubnetID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: beacons,
 	})
+
+	return nil
 }
 
 // initAPIServer initializes the server that handles HTTP calls
@@ -400,6 +483,7 @@ func (n *Node) initAPIServer() {
 // Assumes n.DB, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager() {
 	n.chainManager = chains.New(
+		n.Config.EnableStaking,
 		n.Log,
 		n.LogFactory,
 		n.vmManager,
@@ -415,12 +499,20 @@ func (n *Node) initChainManager() {
 		n.ValidatorAPI,
 		&n.APIServer,
 		&n.keystoreServer,
+		&n.sharedMemory,
 	)
 
 	n.chainManager.AddRegistrant(&n.APIServer)
 }
 
-// initWallet initializes the Wallet service
+// initSharedMemory initializes the shared memory for cross chain interation
+func (n *Node) initSharedMemory() {
+	n.Log.Info("initializing SharedMemory")
+	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
+	n.sharedMemory.Initialize(n.Log, sharedMemoryDB)
+}
+
+// initKeystoreAPI initializes the keystore service
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() {
 	n.Log.Info("initializing Keystore API")
@@ -464,24 +556,35 @@ func (n *Node) initIPCAPI() {
 }
 
 // Give chains and VMs aliases as specified by the genesis information
-func (n *Node) initAliases() {
+func (n *Node) initAliases() error {
 	n.Log.Info("initializing aliases")
-	defaultAliases, chainAliases, vmAliases := genesis.Aliases(n.Config.NetworkID)
+	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(n.Config.NetworkID)
+	if err != nil {
+		return err
+	}
+
 	for chainIDKey, aliases := range chainAliases {
 		chainID := ids.NewID(chainIDKey)
 		for _, alias := range aliases {
-			n.Log.AssertNoError(n.chainManager.Alias(chainID, alias))
+			if err := n.chainManager.Alias(chainID, alias); err != nil {
+				return err
+			}
 		}
 	}
 	for vmIDKey, aliases := range vmAliases {
 		vmID := ids.NewID(vmIDKey)
 		for _, alias := range aliases {
-			n.Log.AssertNoError(n.vmManager.Alias(vmID, alias))
+			if err := n.vmManager.Alias(vmID, alias); err != nil {
+				return err
+			}
 		}
 	}
 	for url, aliases := range defaultAliases {
-		n.APIServer.AddAliases(url, aliases...)
+		if err := n.APIServer.AddAliases(url, aliases...); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // Initialize this node
@@ -496,11 +599,16 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 	n.HTTPLog = httpLog
 
-	n.initDatabase() // Set up the node's database
+	if err := n.initDatabase(); err != nil { // Set up the node's database
+		return fmt.Errorf("problem initializing database: %w", err)
+	}
 
 	if err = n.initNodeID(); err != nil { // Derive this node's ID
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
+
+	// initialize shared memory
+	n.initSharedMemory()
 
 	// Start HTTP APIs
 	n.initAPIServer()   // Start the API Server
@@ -511,8 +619,13 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err = n.initNetlib(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
-	n.initValidatorNet()    // Set up the validator handshake + authentication
-	n.initVMManager()       // Set up the vm manager
+	if err := n.initValidatorNet(); err != nil { // Set up the validator handshake + authentication
+		return fmt.Errorf("problem initializing validator network: %w", err)
+	}
+	if err := n.initVMManager(); err != nil { // Set up the vm manager
+		return fmt.Errorf("problem initializing the VM manager: %w", err)
+	}
+
 	n.initEventDispatcher() // Set up the event dipatcher
 	n.initChainManager()    // Set up the chain manager
 	n.initConsensusNet()    // Set up the main consensus network
@@ -524,10 +637,11 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 
 	n.initAdminAPI() // Start the Admin API
 	n.initIPCAPI()   // Start the IPC API
-	n.initAliases()  // Set up aliases
-	n.initChains()   // Start the Platform chain
 
-	return nil
+	if err := n.initAliases(); err != nil { // Set up aliases
+		return err
+	}
+	return n.initChains() // Start the Platform chain
 }
 
 // Shutdown this node

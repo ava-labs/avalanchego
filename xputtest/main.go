@@ -16,7 +16,9 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/platformvm"
+	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/spchainvm"
+	"github.com/ava-labs/gecko/vms/spdagvm"
 )
 
 func main() {
@@ -24,6 +26,7 @@ func main() {
 		fmt.Printf("Failed to parse arguments: %s\n", err)
 	}
 
+	// set up logging
 	config.LoggingConfig.Directory = path.Join(config.LoggingConfig.Directory, "client")
 	log, err := logging.New(config.LoggingConfig)
 	if err != nil {
@@ -33,20 +36,18 @@ func main() {
 
 	defer log.Stop()
 
+	// initialize state based on CLI args
 	net.log = log
 	crypto.EnableCrypto = config.EnableCrypto
 	net.decided = make(chan ids.ID, config.MaxOutstandingTxs)
 
-	if config.Key >= len(genesis.Keys) || config.Key < 0 {
-		log.Fatal("Unknown key specified")
-		return
-	}
-
+	// Init the network
 	log.AssertNoError(net.Initialize())
 
 	net.net.Start()
 	defer net.net.Stop()
 
+	// connect to the node
 	serr := salticidae.NewError()
 	remoteIP := salticidae.NewNetAddrFromIPPortString(config.RemoteIP.String(), true, &serr)
 	if code := serr.GetCode(); code != 0 {
@@ -60,6 +61,7 @@ func main() {
 		return
 	}
 
+	// start a cpu profile
 	file, gErr := os.Create("cpu_client.profile")
 	log.AssertNoError(gErr)
 	gErr = pprof.StartCPUProfile(file)
@@ -71,22 +73,25 @@ func main() {
 
 	net.networkID = config.NetworkID
 
-	platformGenesisBytes := genesis.Genesis(net.networkID)
-	genesisState := &platformvm.Genesis{}
-	log.AssertNoError(platformvm.Codec.Unmarshal(platformGenesisBytes, genesisState))
-	log.AssertNoError(genesisState.Initialize())
-
+	// start the benchmark we want to run
 	switch config.Chain {
 	case spChain:
-		net.benchmarkSPChain(genesisState)
+		tx, err := genesis.VMGenesis(config.NetworkID, spchainvm.ID)
+		log.AssertNoError(err)
+		net.benchmarkSPChain(tx)
 	case spDAG:
-		net.benchmarkSPDAG(genesisState)
+		tx, err := genesis.VMGenesis(config.NetworkID, spdagvm.ID)
+		log.AssertNoError(err)
+		net.benchmarkSPChain(tx)
 	case avmDAG:
-		net.benchmarkAVM(genesisState)
+		tx, err := genesis.VMGenesis(config.NetworkID, avm.ID)
+		log.AssertNoError(err)
+		net.benchmarkSPChain(tx)
 	default:
 		log.Fatal("did not specify whether to test dag or chain. Exiting")
 		return
 	}
 
+	// start processing network messages
 	net.ec.Dispatch()
 }

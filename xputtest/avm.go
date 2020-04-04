@@ -8,30 +8,23 @@ import (
 
 	"github.com/ava-labs/salticidae-go"
 
-	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/networking"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/xputtest/avmwallet"
 )
 
-func (n *network) benchmarkAVM(genesisState *platformvm.Genesis) {
-	avmChain := genesisState.Chains[0]
-	n.log.AssertTrue(avmChain.ChainName == "AVM", "wrong chain name")
-	genesisBytes := avmChain.GenesisData
-
-	wallet, err := avmwallet.NewWallet(n.networkID, avmChain.ID(), config.AvaTxFee)
+// benchmark an instance of the avm
+func (n *network) benchmarkAVM(chain *platformvm.CreateChainTx) {
+	genesisBytes := chain.GenesisData
+	wallet, err := avmwallet.NewWallet(n.log, n.networkID, chain.ID(), config.AvaTxFee)
 	n.log.AssertNoError(err)
 
-	cb58 := formatting.CB58{}
-	keyStr := genesis.Keys[config.Key]
-	n.log.AssertNoError(cb58.FromString(keyStr))
 	factory := crypto.FactorySECP256K1R{}
-	sk, err := factory.ToPrivateKey(cb58.Bytes)
+	sk, err := factory.ToPrivateKey(config.Key)
 	n.log.AssertNoError(err)
 	wallet.ImportKey(sk.(*crypto.PrivateKeySECP256K1R))
 
@@ -56,9 +49,10 @@ func (n *network) benchmarkAVM(genesisState *platformvm.Genesis) {
 
 	n.log.AssertNoError(wallet.GenerateTxs(config.NumTxs, assetID))
 
-	go n.log.RecoverAndPanic(func() { n.IssueAVM(avmChain.ID(), assetID, wallet) })
+	go n.log.RecoverAndPanic(func() { n.IssueAVM(chain.ID(), assetID, wallet) })
 }
 
+// issue transactions to the instance of the avm funded by the provided wallet
 func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wallet) {
 	n.log.Debug("Issuing with %d", wallet.Balance(assetID))
 	numAccepted := 0
@@ -66,11 +60,15 @@ func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wal
 
 	n.decided <- ids.ID{}
 
+	// track the last second of transactions
 	meter := timer.TimedMeter{Duration: time.Second}
 	for d := range n.decided {
+		// display the TPS every 1000 txs
 		if numAccepted%1000 == 0 {
 			n.log.Info("TPS: %d", meter.Ticks())
 		}
+
+		// d is the ID of the tx that was accepted
 		if !d.IsZero() {
 			meter.Tick()
 			n.log.Debug("Finalized %s", d)
@@ -78,10 +76,12 @@ func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wal
 			numPending--
 		}
 
+		// Issue all the txs that we can right now
 		for numPending < config.MaxOutstandingTxs && wallet.Balance(assetID) > 0 && numAccepted+numPending < config.NumTxs {
 			tx := wallet.NextTx()
 			n.log.AssertTrue(tx != nil, "Tx creation failed")
 
+			// send the IssueTx message
 			it, err := n.build.IssueTx(chainID, tx.Bytes())
 			n.log.AssertNoError(err)
 			ds := it.DataStream()
@@ -97,8 +97,11 @@ func (n *network) IssueAVM(chainID ids.ID, assetID ids.ID, wallet *avmwallet.Wal
 			numPending++
 			n.log.Debug("Sent tx, pending = %d, accepted = %d", numPending, numAccepted)
 		}
+
+		// If we are done issuing txs, return from the function
 		if numAccepted+numPending >= config.NumTxs {
 			n.log.Info("done with test")
+			net.ec.Stop()
 			return
 		}
 	}

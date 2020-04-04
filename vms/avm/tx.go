@@ -6,10 +6,12 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
-
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -22,16 +24,14 @@ type UnsignedTx interface {
 	ID() ids.ID
 	Bytes() []byte
 
-	NetworkID() uint32
-	ChainID() ids.ID
-	Outputs() []*TransferableOutput
-	Inputs() []*TransferableInput
-
 	AssetIDs() ids.Set
-	InputUTXOs() []*UTXOID
-	UTXOs() []*UTXO
+	NumCredentials() int
+	InputUTXOs() []*ava.UTXOID
+	UTXOs() []*ava.UTXO
+
 	SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
-	SemanticVerify(vm *VM, uTx *UniqueTx, creds []*Credential) error
+	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error
+	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
 
 // Tx is the core operation that can be performed. The tx uses the UTXO model.
@@ -40,14 +40,14 @@ type UnsignedTx interface {
 // attempting to consume and the inputs consume sufficient state to produce the
 // outputs.
 type Tx struct {
-	UnsignedTx `serialize:"true"`
+	UnsignedTx `serialize:"true" json:"unsignedTx"`
 
-	Creds []*Credential `serialize:"true"` // The credentials of this transaction
+	Creds []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the
 // specified UTXOs. The returned array should not be modified.
-func (t *Tx) Credentials() []*Credential { return t.Creds }
+func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
 
 // SyntacticVerify verifies that this transaction is well-formed.
 func (t *Tx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
@@ -66,8 +66,7 @@ func (t *Tx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
 		}
 	}
 
-	numInputs := len(t.InputUTXOs())
-	if numInputs != len(t.Creds) {
+	if numCreds := t.UnsignedTx.NumCredentials(); numCreds != len(t.Creds) {
 		return errWrongNumberOfCredentials
 	}
 	return nil

@@ -24,6 +24,9 @@ type Set interface {
 	// Add the provided validator to the set.
 	Add(Validator)
 
+	// Get the validator from the set.
+	Get(ids.ShortID) (Validator, bool)
+
 	// Remove the validator with the specified ID.
 	Remove(ids.ShortID)
 
@@ -100,6 +103,22 @@ func (s *set) add(vdr Validator) {
 	s.vdrMap[vdrID.Key()] = i
 	s.vdrSlice = append(s.vdrSlice, vdr)
 	s.sampler.Weights = append(s.sampler.Weights, w)
+}
+
+// Get implements the Set interface.
+func (s *set) Get(vdrID ids.ShortID) (Validator, bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.get(vdrID)
+}
+
+func (s *set) get(vdrID ids.ShortID) (Validator, bool) {
+	index, ok := s.vdrMap[vdrID.Key()]
+	if !ok {
+		return nil, false
+	}
+	return s.vdrSlice[index], true
 }
 
 // Remove implements the Set interface.

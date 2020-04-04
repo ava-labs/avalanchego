@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -67,7 +68,7 @@ func TestStateIDs(t *testing.T) {
 		}
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	result, err = state.IDs(ids.Empty)
 	if err != nil {
@@ -94,7 +95,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Should have errored during cache lookup")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	result, err = state.IDs(ids.Empty)
 	if err == nil {
@@ -174,19 +175,19 @@ func TestStateUTXOs(t *testing.T) {
 	vm := GenesisVM(t)
 	state := vm.state.state
 
-	vm.codec.RegisterType(&testVerifiable{})
+	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
-		Out:   &testVerifiable{},
+		Asset: ava.Asset{ID: ids.Empty},
+		Out:   &ava.TestVerifiable{},
 	}
 
 	if err := state.SetUTXO(ids.Empty, utxo); err != nil {
@@ -202,7 +203,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Wrong UTXO returned")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	result, err = state.UTXO(ids.Empty)
 	if err != nil {
@@ -221,7 +222,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	if err := state.SetUTXO(ids.Empty, &UTXO{}); err == nil {
+	if err := state.SetUTXO(ids.Empty, &ava.UTXO{}); err == nil {
 		t.Fatalf("Should have errored packing the utxo")
 	}
 
@@ -233,7 +234,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
@@ -244,35 +245,31 @@ func TestStateTXs(t *testing.T) {
 	vm := GenesisVM(t)
 	state := vm.state.state
 
-	vm.codec.RegisterType(&TestTransferable{})
+	vm.codec.RegisterType(&ava.TestTransferable{})
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")
 	}
 
-	tx := &Tx{UnsignedTx: &OperationTx{BaseTx: BaseTx{
+	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 0,
-				},
-				Asset: Asset{
-					ID: asset,
-				},
-				In: &secp256k1fx.TransferInput{
-					Amt: 20 * units.KiloAva,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 20 * units.KiloAva,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
-	}}}
+		}},
+	}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {
@@ -287,11 +284,9 @@ func TestStateTXs(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	tx.Creds = append(tx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 
@@ -314,7 +309,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatalf("Wrong Tx returned")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	result, err = state.Tx(ids.Empty)
 	if err != nil {
@@ -341,7 +336,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatalf("Should have errored when reading tx")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")

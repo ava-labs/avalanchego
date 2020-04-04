@@ -18,6 +18,10 @@ func (TreeFactory) New() Consensus { return &Tree{} }
 
 // Tree implements the snowball interface by using a modified patricia tree.
 type Tree struct {
+	// node is the root that represents the first snowball instance in the tree,
+	// and contains references to all the other snowball instances in the tree.
+	node
+
 	// params contains all the configurations of a snowball instance
 	params Parameters
 
@@ -31,10 +35,6 @@ type Tree struct {
 	// that any later traversal into this sub-tree should call
 	// RecordUnsuccessfulPoll before performing any other action.
 	shouldReset bool
-
-	// root is the node that represents the first snowball instance in the tree,
-	// and contains references to all the other snowball instances in the tree.
-	root node
 }
 
 // Initialize implements the Consensus interface
@@ -44,7 +44,7 @@ func (t *Tree) Initialize(params Parameters, choice ids.ID) {
 	snowball := &unarySnowball{}
 	snowball.Initialize(params.BetaVirtuous)
 
-	t.root = &unaryNode{
+	t.node = &unaryNode{
 		tree:         t,
 		preference:   choice,
 		commonPrefix: ids.NumBits, // The initial state has no conflicts
@@ -57,20 +57,17 @@ func (t *Tree) Parameters() Parameters { return t.params }
 
 // Add implements the Consensus interface
 func (t *Tree) Add(choice ids.ID) {
-	prefix := t.root.DecidedPrefix()
+	prefix := t.node.DecidedPrefix()
 	// Make sure that we haven't already decided against this new id
 	if ids.EqualSubset(0, prefix, t.Preference(), choice) {
-		t.root = t.root.Add(choice)
+		t.node = t.node.Add(choice)
 	}
 }
-
-// Preference implements the Consensus interface
-func (t *Tree) Preference() ids.ID { return t.root.Preference() }
 
 // RecordPoll implements the Consensus interface
 func (t *Tree) RecordPoll(votes ids.Bag) {
 	// Get the assumed decided prefix of the root node.
-	decidedPrefix := t.root.DecidedPrefix()
+	decidedPrefix := t.node.DecidedPrefix()
 
 	// If any of the bits differ from the preference in this prefix, the vote is
 	// for a rejected operation. So, we filter out these invalid votes.
@@ -78,7 +75,7 @@ func (t *Tree) RecordPoll(votes ids.Bag) {
 
 	// Now that the votes have been restricted to valid votes, pass them into
 	// the first snowball instance
-	t.root = t.root.RecordPoll(filteredVotes, t.shouldReset)
+	t.node = t.node.RecordPoll(filteredVotes, t.shouldReset)
 
 	// Because we just passed the reset into the snowball instance, we should no
 	// longer reset.
@@ -88,14 +85,11 @@ func (t *Tree) RecordPoll(votes ids.Bag) {
 // RecordUnsuccessfulPoll implements the Consensus interface
 func (t *Tree) RecordUnsuccessfulPoll() { t.shouldReset = true }
 
-// Finalized implements the Consensus interface
-func (t *Tree) Finalized() bool { return t.root.Finalized() }
-
 func (t *Tree) String() string {
 	builder := strings.Builder{}
 
 	prefixes := []string{""}
-	nodes := []node{t.root}
+	nodes := []node{t.node}
 
 	for len(prefixes) > 0 {
 		newSize := len(prefixes) - 1
@@ -321,14 +315,14 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 		u.decidedPrefix, u.commonPrefix, u.preference, newChoice); !found {
 		// If the first difference doesn't exist, then this node shouldn't be
 		// split
-		if u.child != nil && ids.EqualSubset(
-			u.commonPrefix, u.child.DecidedPrefix(), u.preference, newChoice) {
-			// If the choice matched my child's prefix, then the add should be
-			// passed to my child. (Case 1. from above)
+		if u.child != nil {
+			// Because this node will finalize before any children could
+			// finalize, it must be that the newChoice will match my child's
+			// prefix
 			u.child = u.child.Add(newChoice)
 		}
-		// If the choice didn't my child's prefix, then the choice was
-		// previously rejected and the tree should not be modified
+		// if u.child is nil, then we are attempting to add the same choice into
+		// the tree, which should be a noop
 	} else {
 		// The difference was found, so this node must be split
 
@@ -409,13 +403,18 @@ func (u *unaryNode) RecordPoll(votes ids.Bag, reset bool) node {
 		u.snowball.RecordSuccessfulPoll()
 
 		if u.child != nil {
-			decidedPrefix := u.child.DecidedPrefix()
-			filteredVotes := votes.Filter(u.commonPrefix, decidedPrefix, u.preference)
+			// We are guaranteed that u.commonPrefix will equal
+			// u.child.DecidedPrefix(). Otherwise, there must have been a
+			// decision under this node, which isn't possible because
+			// beta1 <= beta2. That means that filtering the votes between
+			// u.commonPrefix and u.child.DecidedPrefix() would always result in
+			// the same set being returned.
+
 			// If I'm now decided, return my child
 			if u.Finalized() {
-				return u.child.RecordPoll(filteredVotes, u.shouldReset)
+				return u.child.RecordPoll(votes, u.shouldReset)
 			}
-			u.child = u.child.RecordPoll(filteredVotes, u.shouldReset)
+			u.child = u.child.RecordPoll(votes, u.shouldReset)
 			// The child's preference may have changed
 			u.preference = u.child.Preference()
 		}
@@ -482,6 +481,10 @@ func (b *binaryNode) Add(id ids.ID) node {
 		ids.EqualSubset(b.bit+1, child.DecidedPrefix(), b.preferences[bit], id) {
 		b.children[bit] = child.Add(id)
 	}
+	// If child is nil, then the id has already been added to the tree, so
+	// nothing should be done
+	// If the decided prefix isn't matched, then a previous decision has made
+	// the id that is being added to have already been rejected
 	return b
 }
 

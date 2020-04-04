@@ -5,6 +5,7 @@ package avalanche
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
@@ -34,6 +35,7 @@ func (v *voter) Update() {
 	if !finished {
 		return
 	}
+	results = v.bubbleVotes(results)
 
 	v.t.Config.Context.Log.Debug("Finishing poll with:\n%s", &results)
 	v.t.Consensus.RecordPoll(results)
@@ -58,7 +60,33 @@ func (v *voter) Update() {
 
 	v.t.Config.Context.Log.Verbo("Avalanche engine can't quiesce")
 
-	if len(v.t.polls.m) == 0 {
+	if len(v.t.polls.m) < v.t.Config.Params.ConcurrentRepolls {
 		v.t.repoll()
 	}
+}
+
+func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
+	bubbledVotes := ids.UniqueBag{}
+	for _, vote := range votes.List() {
+		set := votes.GetSet(vote)
+		vtx, err := v.t.Config.State.GetVertex(vote)
+		if err != nil {
+			continue
+		}
+
+		vts := []avalanche.Vertex{vtx}
+		for len(vts) > 0 {
+			vtx := vts[0]
+			vts = vts[1:]
+
+			if status := vtx.Status(); status.Fetched() && !v.t.Consensus.VertexIssued(vtx) {
+				vts = append(vts, vtx.Parents()...)
+			} else if !status.Decided() && v.t.Consensus.VertexIssued(vtx) {
+				bubbledVotes.UnionSet(vtx.ID(), set)
+			} else {
+				v.t.Config.Context.Log.Debug("Dropping %d vote(s) for %s because the vertex is invalid", set.Len(), vtx.ID())
+			}
+		}
+	}
+	return bubbledVotes
 }

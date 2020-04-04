@@ -13,10 +13,12 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -25,35 +27,42 @@ import (
 type Wallet struct {
 	networkID uint32
 	chainID   ids.ID
-	clock     timer.Clock
-	codec     codec.Codec
-	keychain  *secp256k1fx.Keychain // Mapping from public address to the SigningKeys
-	utxoSet   *UTXOSet              // Mapping from utxoIDs to UTXOs
-	balance   map[[32]byte]uint64
-	txFee     uint64
+
+	clock timer.Clock
+	codec codec.Codec
+	log   logging.Logger
+
+	keychain *secp256k1fx.Keychain // Mapping from public address to the SigningKeys
+	utxoSet  *UTXOSet              // Mapping from utxoIDs to UTXOs
+
+	balance map[[32]byte]uint64
+	txFee   uint64
 
 	txsSent int32
 	txs     []*avm.Tx
 }
 
 // NewWallet returns a new Wallet
-func NewWallet(networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) {
+func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) {
 	c := codec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&avm.BaseTx{}),
 		c.RegisterType(&avm.CreateAssetTx{}),
 		c.RegisterType(&avm.OperationTx{}),
+		c.RegisterType(&avm.ImportTx{}),
+		c.RegisterType(&avm.ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintInput{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
 	)
 	return &Wallet{
 		networkID: networkID,
 		chainID:   chainID,
 		codec:     c,
+		log:       log,
 		keychain:  secp256k1fx.NewKeychain(),
 		utxoSet:   &UTXOSet{},
 		balance:   make(map[[32]byte]uint64),
@@ -86,8 +95,8 @@ func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keychain.Add(sk)
 
 // AddUTXO adds a new UTXO to this wallet if this wallet may spend it
 // The UTXO's output must be an OutputPayment
-func (w *Wallet) AddUTXO(utxo *avm.UTXO) {
-	out, ok := utxo.Out.(avm.FxTransferable)
+func (w *Wallet) AddUTXO(utxo *ava.UTXO) {
+	out, ok := utxo.Out.(ava.Transferable)
 	if !ok {
 		return
 	}
@@ -107,7 +116,7 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 
 	assetID := utxo.AssetID()
 	assetKey := assetID.Key()
-	newBalance := w.balance[assetKey] - utxo.Out.(avm.FxTransferable).Amount()
+	newBalance := w.balance[assetKey] - utxo.Out.(ava.Transferable).Amount()
 	if newBalance == 0 {
 		delete(w.balance, assetKey)
 	} else {
@@ -129,7 +138,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 	amountSpent := uint64(0)
 	time := w.clock.Unix()
 
-	ins := []*avm.TransferableInput{}
+	ins := []*ava.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range w.utxoSet.UTXOs {
 		if !utxo.AssetID().Equals(assetID) {
@@ -139,7 +148,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(avm.FxTransferable)
+		input, ok := inputIntf.(ava.Transferable)
 		if !ok {
 			continue
 		}
@@ -149,9 +158,9 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		}
 		amountSpent = spent
 
-		in := &avm.TransferableInput{
+		in := &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avm.Asset{ID: assetID},
+			Asset:  ava.Asset{ID: assetID},
 			In:     input,
 		}
 
@@ -167,43 +176,39 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		return nil, errors.New("insufficient funds")
 	}
 
-	avm.SortTransferableInputsWithSigners(ins, keys)
+	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*avm.TransferableOutput{
-		&avm.TransferableOutput{
-			Asset: avm.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:      amount,
-				Locktime: 0,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{destAddr},
-				},
+	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      amount,
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{destAddr},
 			},
 		},
-	}
+	}}
 
 	if amountSpent > amount {
 		changeAddr, err := w.GetAddress()
 		if err != nil {
 			return nil, err
 		}
-		outs = append(outs,
-			&avm.TransferableOutput{
-				Asset: avm.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:      amountSpent - amount,
-					Locktime: 0,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      amountSpent - amount,
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
 				},
 			},
-		)
+		})
 	}
 
-	avm.SortTransferableOutputs(outs, w.codec)
+	ava.SortTransferableOutputs(outs, w.codec)
 
 	tx := &avm.Tx{
 		UnsignedTx: &avm.BaseTx{
@@ -232,7 +237,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 
 			cred.Sigs = append(cred.Sigs, fixedSig)
 		}
-		tx.Creds = append(tx.Creds, &avm.Credential{Cred: cred})
+		tx.Creds = append(tx.Creds, cred)
 	}
 
 	b, err := w.codec.Marshal(tx)
@@ -249,9 +254,16 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 // Generate them all on test initialization so tx generation is not bottleneck
 // in testing
 func (w *Wallet) GenerateTxs(numTxs int, assetID ids.ID) error {
+	w.log.Info("Generating %d transactions", numTxs)
+
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = w.networkID
 	ctx.ChainID = w.chainID
+
+	frequency := numTxs / 50
+	if frequency > 1000 {
+		frequency = 1000
+	}
 
 	w.txs = make([]*avm.Tx, numTxs)
 	for i := 0; i < numTxs; i++ {
@@ -271,8 +283,14 @@ func (w *Wallet) GenerateTxs(numTxs int, assetID ids.ID) error {
 			w.AddUTXO(utxo)
 		}
 
+		if numGenerated := i + 1; numGenerated%frequency == 0 {
+			w.log.Info("Generated %d out of %d transactions", numGenerated, numTxs)
+		}
+
 		w.txs[i] = tx
 	}
+
+	w.log.Info("Finished generating %d transactions", numTxs)
 	return nil
 }
 

@@ -22,7 +22,7 @@ func TestAddDefaultSubnetValidator(t *testing.T) {
 }
 
 func TestCreateBlockchainArgsParsing(t *testing.T) {
-	jsonString := `{"vmID":"lol","chainName":"awesome","genesisData":{"key":"value"}}`
+	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "payerNonce":5, "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
 	args := CreateBlockchainArgs{}
 	err := json.Unmarshal([]byte(jsonString), &args)
 	if err != nil {

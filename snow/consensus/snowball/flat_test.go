@@ -65,7 +65,7 @@ func TestFlat(t *testing.T) {
 		t.Fatalf("Finalized too late")
 	}
 
-	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, NumSuccessfulPolls = 3, SF = SF(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, Confidence = 2, Finalized = true))"
+	expected := "SB(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES, NumSuccessfulPolls = 3, SF(Confidence = 2, Finalized = true, SL(Preference = TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES)))"
 	if str := f.String(); str != expected {
 		t.Fatalf("Wrong state. Expected:\n%s\nGot:\n%s", expected, str)
 	}

@@ -24,6 +24,12 @@ type Keystore interface {
 	GetDatabase(username, password string) (database.Database, error)
 }
 
+// SharedMemory ...
+type SharedMemory interface {
+	GetDatabase(id ids.ID) database.Database
+	ReleaseDatabase(id ids.ID)
+}
+
 // AliasLookup ...
 type AliasLookup interface {
 	Lookup(alias string) (ids.ID, error)
@@ -44,6 +50,7 @@ type Context struct {
 	Lock                sync.RWMutex
 	HTTP                Callable
 	Keystore            Keystore
+	SharedMemory        SharedMemory
 	BCLookup            AliasLookup
 }
 
