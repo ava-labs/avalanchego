@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	Genesis = &Blk{
+	Genesis = &TestBlock{
 		id:     ids.Empty.Prefix(0),
 		status: choices.Accepted,
 	}
@@ -79,7 +79,7 @@ func AddTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", Genesis.ID(), pref)
 	}
 
-	dep0 := &Blk{
+	dep0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
@@ -88,7 +88,7 @@ func AddTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", dep0.id, pref)
 	}
 
-	dep1 := &Blk{
+	dep1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(2),
 	}
@@ -97,7 +97,7 @@ func AddTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", dep0.id, pref)
 	}
 
-	dep2 := &Blk{
+	dep2 := &TestBlock{
 		parent: dep0,
 		id:     ids.Empty.Prefix(3),
 	}
@@ -106,8 +106,8 @@ func AddTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", dep2.id, pref)
 	}
 
-	dep3 := &Blk{
-		parent: &Blk{id: ids.Empty.Prefix(4)},
+	dep3 := &TestBlock{
+		parent: &TestBlock{id: ids.Empty.Prefix(4)},
 		id:     ids.Empty.Prefix(5),
 	}
 	sm.Add(dep3)
@@ -125,25 +125,25 @@ func CollectTest(t *testing.T, factory Factory) {
 	}
 	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
 
-	dep1 := &Blk{
+	dep1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(2),
 	}
 	sm.Add(dep1)
 
-	dep0 := &Blk{
+	dep0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
 	sm.Add(dep0)
 
-	dep2 := &Blk{
+	dep2 := &TestBlock{
 		parent: dep0,
 		id:     ids.Empty.Prefix(3),
 	}
 	sm.Add(dep2)
 
-	dep3 := &Blk{
+	dep3 := &TestBlock{
 		parent: dep0,
 		id:     ids.Empty.Prefix(4),
 	}
@@ -265,19 +265,19 @@ func CollectTransRejectTest(t *testing.T, factory Factory) {
 	}
 	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
 
-	dep1 := &Blk{
+	dep1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(2),
 	}
 	sm.Add(dep1)
 
-	dep0 := &Blk{
+	dep0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
 	sm.Add(dep0)
 
-	dep2 := &Blk{
+	dep2 := &TestBlock{
 		parent: dep0,
 		id:     ids.Empty.Prefix(3),
 	}
@@ -324,21 +324,21 @@ func CollectTransResetTest(t *testing.T, factory Factory) {
 	}
 	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
 
-	dep1 := &Blk{
+	dep1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(2),
 		status: choices.Processing,
 	}
 	sm.Add(dep1)
 
-	dep0 := &Blk{
+	dep0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 		status: choices.Processing,
 	}
 	sm.Add(dep0)
 
-	dep2 := &Blk{
+	dep2 := &TestBlock{
 		parent: dep0,
 		id:     ids.Empty.Prefix(3),
 		status: choices.Processing,
@@ -402,31 +402,31 @@ func CollectTransVoteTest(t *testing.T, factory Factory) {
 	}
 	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
 
-	dep0 := &Blk{
+	dep0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
 	sm.Add(dep0)
 
-	dep1 := &Blk{
+	dep1 := &TestBlock{
 		parent: dep0,
 		id:     ids.Empty.Prefix(2),
 	}
 	sm.Add(dep1)
 
-	dep2 := &Blk{
+	dep2 := &TestBlock{
 		parent: dep1,
 		id:     ids.Empty.Prefix(3),
 	}
 	sm.Add(dep2)
 
-	dep3 := &Blk{
+	dep3 := &TestBlock{
 		parent: dep0,
 		id:     ids.Empty.Prefix(4),
 	}
 	sm.Add(dep3)
 
-	dep4 := &Blk{
+	dep4 := &TestBlock{
 		parent: dep3,
 		id:     ids.Empty.Prefix(5),
 	}
@@ -496,13 +496,13 @@ func DivergedVotingTest(t *testing.T, factory Factory) {
 	}
 	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
 
-	dep0 := &Blk{
+	dep0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0x0f}), // 0b1111
 	}
 	sm.Add(dep0)
 
-	dep1 := &Blk{
+	dep1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0x08}), // 0b1000
 	}
@@ -512,7 +512,7 @@ func DivergedVotingTest(t *testing.T, factory Factory) {
 	dep0_1.AddCount(dep0.id, 1)
 	sm.RecordPoll(dep0_1)
 
-	dep2 := &Blk{
+	dep2 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0x01}), // 0b0001
 	}
@@ -520,7 +520,7 @@ func DivergedVotingTest(t *testing.T, factory Factory) {
 
 	// dep2 is already rejected.
 
-	dep3 := &Blk{
+	dep3 := &TestBlock{
 		parent: dep2,
 		id:     ids.Empty.Prefix(3),
 	}
@@ -553,7 +553,7 @@ func IssuedTest(t *testing.T, factory Factory) {
 
 	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
 
-	dep0 := &Blk{
+	dep0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0}),
 		status: choices.Processing,
@@ -569,7 +569,7 @@ func IssuedTest(t *testing.T, factory Factory) {
 		t.Fatalf("Has been issued")
 	}
 
-	dep1 := &Blk{
+	dep1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0x1}), // 0b0001
 		status: choices.Accepted,
