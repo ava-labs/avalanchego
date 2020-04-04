@@ -310,24 +310,26 @@ func (nm *Handshake) connectedToPeer(conn *C.struct_peernetwork_conn_t, addr sal
 	// If we're enforcing staking, use a peer's certificate to uniquely identify them
 	// Otherwise, use a hash of their ip to identify them
 	cert := ids.ShortID{}
+	ipCert := toShortID(ip)
 	if nm.enableStaking {
 		cert = getPeerCert(conn)
 	} else {
-		cert = toShortID(ip)
+		cert = ipCert
 	}
 
 	nm.log.Debug("Connected to %s", ip)
 
-	nm.reconnectTimeout.Remove(cert.LongID())
+	longCert := cert.LongID()
+	nm.reconnectTimeout.Remove(longCert)
+	nm.reconnectTimeout.Remove(ipCert.LongID())
 
 	nm.pending.Add(addr, cert)
 
-	certID := cert.LongID()
 	handler := new(func())
 	*handler = func() {
 		if nm.pending.ContainsIP(addr) {
 			nm.SendGetVersion(addr)
-			nm.versionTimeout.Put(certID, *handler)
+			nm.versionTimeout.Put(longCert, *handler)
 		}
 	}
 	(*handler)()
@@ -345,13 +347,15 @@ func (nm *Handshake) disconnectedFromPeer(addr salticidae.NetAddr) {
 
 	nm.log.Info("Disconnected from %s", toIPDesc(addr))
 
+	longCert := cert.LongID()
 	if nm.vdrs.Contains(cert) {
-		nm.reconnectTimeout.Put(cert.LongID(), func() {
+		nm.reconnectTimeout.Put(longCert, func() {
 			nm.net.DelPeer(addr)
 		})
 	} else {
 		nm.net.DelPeer(addr)
 	}
+	nm.versionTimeout.Remove(longCert)
 
 	if !nm.enableStaking {
 		nm.vdrs.Remove(cert)
@@ -386,9 +390,20 @@ func peerHandler(_conn *C.struct_peernetwork_conn_t, connected C.bool, _ unsafe.
 // unknownPeerHandler notifies of an unknown peer connection attempt
 //export unknownPeerHandler
 func unknownPeerHandler(_addr *C.netaddr_t, _cert *C.x509_t, _ unsafe.Pointer) {
-	addr := salticidae.NetAddrFromC(salticidae.CNetAddr(_addr))
+	addr := salticidae.NetAddrFromC(salticidae.CNetAddr(_addr)).Copy(true)
 	ip := toIPDesc(addr)
 	HandshakeNet.log.Info("Adding peer %s", ip)
+
+	cert := ids.ShortID{}
+	if HandshakeNet.enableStaking {
+		cert = getCert(salticidae.X509FromC(salticidae.CX509(_cert)))
+	} else {
+		cert = toShortID(ip)
+	}
+
+	HandshakeNet.reconnectTimeout.Put(cert.LongID(), func() {
+		HandshakeNet.net.DelPeer(addr)
+	})
 	HandshakeNet.net.AddPeer(addr)
 }
 
@@ -551,16 +566,20 @@ func peerList(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 	cErr := salticidae.NewError()
 	for _, ip := range ips {
 		HandshakeNet.log.Verbo("Trying to adding peer %s", ip)
-		addr := salticidae.NewNetAddrFromIPPortString(ip.String(), false, &cErr)
+		addr := salticidae.NewNetAddrFromIPPortString(ip.String(), true, &cErr)
 		if cErr.GetCode() == 0 && !HandshakeNet.myAddr.IsEq(addr) { // Make sure not to connect to myself
 			ip := toIPDesc(addr)
+			ipCert := toShortID(ip)
 
 			if !HandshakeNet.pending.ContainsIP(addr) && !HandshakeNet.connections.ContainsIP(addr) {
 				HandshakeNet.log.Debug("Adding peer %s", ip)
+
+				HandshakeNet.reconnectTimeout.Put(ipCert.LongID(), func() {
+					HandshakeNet.net.DelPeer(addr)
+				})
 				HandshakeNet.net.AddPeer(addr)
 			}
 		}
-		addr.Free()
 	}
 }
 
