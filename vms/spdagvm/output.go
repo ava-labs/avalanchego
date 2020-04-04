@@ -84,7 +84,7 @@ func (op *OutputPayment) Verify() error {
 		return errOutputUnspendable
 	case op.threshold == 0 && len(op.addresses) > 0:
 		return errOutputUnoptimized
-	case !ids.IsSortedAndUniqueShortIDs(op.addresses): // TODO: Should we allow duplicated addresses
+	case !ids.IsSortedAndUniqueShortIDs(op.addresses):
 		return errAddrsNotSortedUnique
 	default:
 		return nil
@@ -216,7 +216,7 @@ func (otol *OutputTakeOrLeave) Verify() error {
 		return errOutputUnoptimized
 	case otol.locktime1 >= otol.locktime2:
 		return errTimesNotSortedUnique
-	case !ids.IsSortedAndUniqueShortIDs(otol.addresses1) || // TODO: Should we allow duplicated addresses
+	case !ids.IsSortedAndUniqueShortIDs(otol.addresses1) ||
 		!ids.IsSortedAndUniqueShortIDs(otol.addresses2):
 		return errAddrsNotSortedUnique
 	default:
