@@ -364,7 +364,7 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		return
 	}
-	if !validators.Contains(vm.Ctx.NodeID) && vm.stakingEnabled { // This node doesn't validate this blockchain
+	if vm.stakingEnabled && !DefaultSubnetID.Equals(tx.SubnetID) && !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
 		return
 	}
 
