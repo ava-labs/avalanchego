@@ -17,102 +17,107 @@ import (
 )
 
 var (
-	Genesis = &TestBlock{
-		id:     ids.Empty.Prefix(0),
+	GenesisID = ids.Empty.Prefix(0)
+	Genesis   = &TestBlock{
+		id:     GenesisID,
 		status: choices.Accepted,
+	}
+
+	Tests = []func(*testing.T, Factory){
+		ParamsTest,
 	}
 )
 
+// Make sure that the passed in params are returned properly from a call to
+// Parameters
 func ParamsTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Namespace: fmt.Sprintf("gecko_%s", ctx.ChainID),
-		Metrics:   prometheus.NewRegistry(),
-		K:         1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
 	}
 
-	numProcessing := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "processing",
-		})
-	numAccepted := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "accepted",
-		})
-	numRejected := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "rejected",
-		})
+	sm.Initialize(ctx, params, GenesisID)
 
-	params.Metrics.Register(numProcessing)
-	params.Metrics.Register(numAccepted)
-	params.Metrics.Register(numRejected)
-
-	sm.Initialize(ctx, params, Genesis.ID())
-
-	if p := sm.Parameters(); p.K != params.K {
-		t.Fatalf("Wrong K parameter")
-	} else if p.Alpha != params.Alpha {
-		t.Fatalf("Wrong Alpha parameter")
-	} else if p.BetaVirtuous != params.BetaVirtuous {
-		t.Fatalf("Wrong Beta1 parameter")
-	} else if p.BetaRogue != params.BetaRogue {
-		t.Fatalf("Wrong Beta2 parameter")
+	if p := sm.Parameters(); p != params {
+		t.Fatalf("Wrong returned parameters")
 	}
 }
 
 func AddTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
+	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
+	sm.Initialize(ctx, params, GenesisID)
 
-	if pref := sm.Preference(); !pref.Equals(Genesis.ID()) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", Genesis.ID(), pref)
+	if pref := sm.Preference(); !pref.Equals(GenesisID) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", GenesisID, pref)
 	}
 
-	dep0 := &TestBlock{
+	block0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
-	sm.Add(dep0)
-	if pref := sm.Preference(); !pref.Equals(dep0.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep0.id, pref)
+
+	// Adding to the previous preference will update the preference
+	sm.Add(block0)
+
+	if pref := sm.Preference(); !pref.Equals(block0.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block0.id, pref)
 	}
 
-	dep1 := &TestBlock{
+	block1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(2),
 	}
-	sm.Add(dep1)
-	if pref := sm.Preference(); !pref.Equals(dep0.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep0.id, pref)
+
+	// Adding to something other than the previous preference won't update the
+	// preference
+	sm.Add(block1)
+
+	if pref := sm.Preference(); !pref.Equals(block0.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block0.id, pref)
 	}
 
-	dep2 := &TestBlock{
-		parent: dep0,
+	block2 := &TestBlock{
+		parent: block0,
 		id:     ids.Empty.Prefix(3),
 	}
-	sm.Add(dep2)
-	if pref := sm.Preference(); !pref.Equals(dep2.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep2.id, pref)
+
+	// Adding to the previous preference will update the preference
+	sm.Add(block2)
+
+	if pref := sm.Preference(); !pref.Equals(block2.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block2.id, pref)
 	}
 
-	dep3 := &TestBlock{
+	block3 := &TestBlock{
 		parent: &TestBlock{id: ids.Empty.Prefix(4)},
 		id:     ids.Empty.Prefix(5),
 	}
-	sm.Add(dep3)
-	if pref := sm.Preference(); !pref.Equals(dep2.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep2.id, pref)
+
+	// Adding a block with an unknown parent means the parent must have already
+	// been rejected. Therefore the block should be immediately rejected
+	sm.Add(block3)
+
+	if pref := sm.Preference(); !pref.Equals(block2.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block2.id, pref)
+	} else if status := block3.Status(); status != choices.Rejected {
+		t.Fatalf("Should have rejected the block")
 	}
 }
 
