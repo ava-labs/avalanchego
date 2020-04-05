@@ -31,9 +31,8 @@ type Topological struct {
 
 // Tracks the state of a snowman vertex
 type node struct {
-	ts    *Topological
-	blkID ids.ID
-	blk   Block
+	ts  *Topological
+	blk Block
 
 	shouldFalter bool
 	sb           snowball.Consensus
@@ -66,8 +65,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	ts.head = rootID
 	ts.nodes = map[[32]byte]node{
 		rootID.Key(): node{
-			ts:    ts,
-			blkID: rootID,
+			ts: ts,
 		},
 	}
 	ts.tail = rootID
@@ -83,43 +81,50 @@ func (ts *Topological) Add(blk Block) {
 	parentKey := parentID.Key()
 
 	blkID := blk.ID()
+	blkBytes := blk.Bytes()
 
-	bytes := blk.Bytes()
-	ts.ctx.DecisionDispatcher.Issue(ts.ctx.ChainID, blkID, bytes)
-	ts.ctx.ConsensusDispatcher.Issue(ts.ctx.ChainID, blkID, bytes)
+	// Notify anyone listening that this block was issued.
+	ts.ctx.DecisionDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
+	ts.ctx.ConsensusDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
 	ts.metrics.Issued(blkID)
 
-	if parent, ok := ts.nodes[parentKey]; ok {
-		parent.Add(blk)
-		ts.nodes[parentKey] = parent
-
-		ts.nodes[blkID.Key()] = node{
-			ts:    ts,
-			blkID: blkID,
-			blk:   blk,
-		}
-
-		// If we are extending the tail, this is the new tail
-		if ts.tail.Equals(parentID) {
-			ts.tail = blkID
-		}
-	} else {
+	parentNode, ok := ts.nodes[parentKey]
+	if !ok {
 		// If the ancestor is missing, this means the ancestor must have already
-		// been pruned. Therefore, the dependent is transitively rejected.
+		// been pruned. Therefore, the dependent should be transitively
+		// rejected.
 		blk.Reject()
 
-		bytes := blk.Bytes()
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, bytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, bytes)
+		// Notify anyone listening that this block was rejected.
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
 		ts.metrics.Rejected(blkID)
+		return
+	}
+
+	parentNode.Add(blk)
+
+	// TODO: remove this once ts.nodes maps to a pointer
+	ts.nodes[parentKey] = parentNode
+
+	ts.nodes[blkID.Key()] = node{
+		ts:  ts,
+		blk: blk,
+	}
+
+	// If we are extending the tail, this is the new tail
+	if ts.tail.Equals(parentID) {
+		ts.tail = blkID
 	}
 }
 
 // Issued implements the Snowman interface
 func (ts *Topological) Issued(blk Block) bool {
+	// If the block is decided, then it must have been previously issued.
 	if blk.Status().Decided() {
 		return true
 	}
+	// If the block is in the map of current blocks, then the block was issued.
 	_, ok := ts.nodes[blk.ID().Key()]
 	return ok
 }
@@ -145,13 +150,10 @@ func (ts *Topological) RecordPoll(votes ids.Bag) {
 	voteStack := ts.pushVotes(kahnGraph, leaves)
 
 	// Runtime = |live set| ; Space = Constant
-	tail := ts.vote(voteStack)
-	tn := node{}
-	for tn = ts.nodes[tail.Key()]; tn.sb != nil; tn = ts.nodes[tail.Key()] {
-		tail = tn.sb.Preference()
-	}
+	preferred := ts.vote(voteStack)
 
-	ts.tail = tn.blkID
+	// Runtime = |live set| ; Space = Constant
+	ts.tail = ts.getPreferredDecendent(preferred)
 }
 
 // Finalized implements the Snowman interface
@@ -280,7 +282,7 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 		if parentNode.shouldFalter {
 			parentNode.sb.RecordUnsuccessfulPoll()
 			parentNode.shouldFalter = false
-			ts.ctx.Log.Verbo("Reset confidence on %s", parentNode.blkID)
+			ts.ctx.Log.Verbo("Reset confidence below %s", voteGroup.id)
 		}
 		parentNode.sb.RecordPoll(voteGroup.votes)
 
@@ -313,7 +315,7 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 					// The existence check is needed in case the current node
 					// was finalized. However, in this case, we still need to
 					// check for the next id.
-					ts.ctx.Log.Verbo("Defering confidence reset on %s with %d children. NextID: %s", childID, len(parentNode.children), nextID)
+					ts.ctx.Log.Verbo("Defering confidence reset below %s with %d children. NextID: %s", childID, len(parentNode.children), nextID)
 					childNode.shouldFalter = true
 					ts.nodes[childIDBytes] = childNode
 				}
@@ -378,6 +380,16 @@ func (ts *Topological) rejectTransitively(rejected ...ids.ID) {
 			ts.metrics.Rejected(childID)
 		}
 	}
+}
+
+// Get the preferred decendent of the provided block ID
+func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
+	// Traverse from the provided ID to the preferred child until there are no
+	// children.
+	for node := ts.nodes[blkID.Key()]; node.sb != nil; node = ts.nodes[blkID.Key()] {
+		blkID = node.sb.Preference()
+	}
+	return blkID
 }
 
 func (n *node) Add(child Block) {
