@@ -104,8 +104,8 @@ func (ts *Topological) Add(blk Block) {
 		return
 	}
 
+	// add the block as a child of its parent, and add the block to the tree
 	parentNode.AddChild(blk)
-
 	ts.blocks[blkID.Key()] = &snowmanBlock{
 		sm:  ts,
 		blk: blk,
@@ -132,15 +132,28 @@ func (ts *Topological) Issued(blk Block) bool {
 func (ts *Topological) Preference() ids.ID { return ts.tail }
 
 // RecordPoll implements the Snowman interface
-// This performs Kahn’s algorithm.
-// When a node is removed from the leaf queue, it is checked to see if the
-// number of votes is >= alpha. If it is, then it is added to the vote stack.
-// Once there are no nodes in the leaf queue. The vote stack is unwound and
-// voted on. If a decision is made, then that choice is marked as accepted, and
-// all alternative choices are marked as rejected.
+//
+// The votes bag contains at most K votes for blocks in the tree. If there is a
+// vote for a block that isn't in the tree, the vote is dropped.
+//
+// Votes are propagated transitively towards the genesis. All blocks in the tree
+// that result in at least Alpha votes will record the poll on their children.
+// Every other block will have an unsuccessful poll registered.
+//
+// After collecting which blocks should be voted on, the polls are registered
+// and blocks are accepted/rejected as needed. The tail is then updated to equal
+// the leaf on the preferred branch.
+//
+// To optimize the theoretical complexity of the vote propagation, a topological
+// sort is done over the blocks that are reachable from the provided votes.
+// During the sort, votes are pushed towards the genesis. To prevent interating
+// over all blocks that had unsuccessful polls, we set a flag on the block to
+// know that any future traversal through that block should register an
+// unsuccessful poll on that block and every decendant block.
+//
 // The complexity of this function is:
-// Runtime = 3 * |live set| + |votes|
-// Space = |live set| + |votes|
+// - Runtime = 3 * |live set| + |votes|
+// - Space = 2 * |live set| + |votes|
 func (ts *Topological) RecordPoll(votes ids.Bag) {
 	// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
 	kahnGraph, leaves := ts.calculateInDegree(votes)
@@ -394,11 +407,10 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) {
 		delete(ts.blocks, rejectedKey)
 
 		for childIDKey, child := range rejectedNode.children {
-			childID := ids.NewID(childIDKey)
-
 			child.Reject()
 
 			// Notify anyone listening that this block was rejected.
+			childID := ids.NewID(childIDKey)
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
 			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
