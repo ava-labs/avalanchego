@@ -321,58 +321,77 @@ func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
 }
 
 func (ts *Topological) accept(n *snowmanBlock) {
-	// Accept the preference, reject all transitive rejections
+	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
 
-	rejects := []ids.ID(nil)
-	for childIDBytes := range n.children {
-		if childID := ids.NewID(childIDBytes); !childID.Equals(pref) {
-			child := n.children[childIDBytes]
-			child.Reject()
+	ts.ctx.Log.Verbo("Accepting block with ID %s", pref)
 
-			bytes := child.Bytes()
-			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-			ts.metrics.Rejected(childID)
-
-			rejects = append(rejects, childID)
-		}
-	}
-	ts.rejectTransitively(rejects...)
-
-	ts.head = pref
+	// Get the child and accept it
 	child := n.children[pref.Key()]
-	ts.ctx.Log.Verbo("Accepting block with ID %s", child.ID())
-
-	bytes := child.Bytes()
-	ts.ctx.DecisionDispatcher.Accept(ts.ctx.ChainID, child.ID(), bytes)
-	ts.ctx.ConsensusDispatcher.Accept(ts.ctx.ChainID, child.ID(), bytes)
-
 	child.Accept()
+
+	// Notify anyone listening that this block was accepted.
+	bytes := child.Bytes()
+	ts.ctx.DecisionDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
+	ts.ctx.ConsensusDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
 	ts.metrics.Accepted(pref)
+
+	// Because this is the newest accepted block, this is the new head.
+	ts.head = pref
+
+	// Because ts.blocks contains the last accepted block, we don't delete the
+	// block from the blocks map here.
+
+	rejects := []ids.ID(nil)
+	for childIDKey, child := range n.children {
+		childID := ids.NewID(childIDKey)
+		if childID.Equals(pref) {
+			// don't reject the block we just accepted
+			continue
+		}
+
+		child.Reject()
+
+		// Notify anyone listening that this block was rejected.
+		bytes := child.Bytes()
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+		ts.metrics.Rejected(childID)
+
+		// Track which blocks have been directly rejected
+		rejects = append(rejects, childID)
+	}
+
+	// reject all the decendants of the blocks we just rejected
+	ts.rejectTransitively(rejects)
 }
 
-// Takes in a list of newly rejected ids and rejects everything that depends on
-// them
-func (ts *Topological) rejectTransitively(rejected ...ids.ID) {
+// Takes in a list of rejected ids and rejects all decendants of these IDs
+func (ts *Topological) rejectTransitively(rejected []ids.ID) {
 	for len(rejected) > 0 {
+		// pop the rejected ID off the queue
 		newRejectedSize := len(rejected) - 1
-		rejectID := rejected[newRejectedSize]
+		rejectedID := rejected[newRejectedSize]
 		rejected = rejected[:newRejectedSize]
 
-		rejectKey := rejectID.Key()
-		rejectNode := ts.blocks[rejectKey]
-		delete(ts.blocks, rejectKey)
+		// get the rejected node, and remove it from the tree
+		rejectedKey := rejectedID.Key()
+		rejectedNode := ts.blocks[rejectedKey]
+		delete(ts.blocks, rejectedKey)
 
-		for childIDBytes, child := range rejectNode.children {
-			childID := ids.NewID(childIDBytes)
-			rejected = append(rejected, childID)
+		for childIDKey, child := range rejectedNode.children {
+			childID := ids.NewID(childIDKey)
+
 			child.Reject()
 
+			// Notify anyone listening that this block was rejected.
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
 			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
 			ts.metrics.Rejected(childID)
+
+			// add the newly rejected block to the end of the queue
+			rejected = append(rejected, childID)
 		}
 	}
 }
