@@ -219,7 +219,7 @@ func (ts *Topological) calculateInDegree(
 		for n := ts.blocks[parentIDKey]; !n.Accepted(); n = ts.blocks[parentIDKey] {
 			parent := n.blk.Parent()
 			parentID := parent.ID()
-			parentIDKey = parentID.Key()
+			parentIDKey = parentID.Key() // move the loop variable forward
 
 			// Increase the inDegree by one
 			kahn := kahns[parentIDKey]
@@ -242,114 +242,158 @@ func (ts *Topological) calculateInDegree(
 	return kahns, leaves.List()
 }
 
-// convert the tree into a branch of snowball instances with an alpha threshold
+// convert the tree into a branch of snowball instances with at least alpha
+// votes
 func (ts *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode, leaves []ids.ID) []votes {
 	voteStack := []votes(nil)
 	for len(leaves) > 0 {
+		// pop a leaf off the stack
 		newLeavesSize := len(leaves) - 1
-		leaf := leaves[newLeavesSize]
+		leafID := leaves[newLeavesSize]
 		leaves = leaves[:newLeavesSize]
 
-		leafKey := leaf.Key()
-		kahn := kahnNodes[leafKey]
+		// get the block and sort infomation about the block
+		leafIDKey := leafID.Key()
+		kahnNode := kahnNodes[leafIDKey]
+		block := ts.blocks[leafIDKey]
 
-		if node, shouldVote := ts.blocks[leafKey]; shouldVote {
-			if kahn.votes.Len() >= ts.params.Alpha {
-				voteStack = append(voteStack, votes{
-					parentID: leaf,
-					votes:    kahn.votes,
-				})
-			}
+		// If there are at least Alpha votes, then this block needs to record
+		// the poll on the snowball instance
+		if kahnNode.votes.Len() >= ts.params.Alpha {
+			voteStack = append(voteStack, votes{
+				parentID: leafID,
+				votes:    kahnNode.votes,
+			})
+		}
 
-			if node.blk == nil || node.blk.Status().Decided() {
-				continue // Stop traversing once we pass into the decided frontier
-			}
+		// If the block is accepted, then we don't need to push votes to the
+		// parent block
+		if block.Accepted() {
+			continue
+		}
 
-			parentID := node.blk.Parent().ID()
-			parentKey := parentID.Key()
-			if depNode, notPruned := kahnNodes[parentKey]; notPruned {
-				// Remove one of the in-bound edges
-				depNode.inDegree--
-				// Push the votes to my parent
-				depNode.votes.AddCount(leaf, kahn.votes.Len())
-				kahnNodes[parentKey] = depNode
+		parent := block.blk.Parent()
+		parentID := parent.ID()
+		parentIDKey := parentID.Key()
 
-				if depNode.inDegree == 0 {
-					// Once I have no in-bound edges, I'm a leaf
-					leaves = append(leaves, parentID)
-				}
-			}
+		// Remove an inbound edge from the parent kahn node and push the votes.
+		parentKahnNode := kahnNodes[parentIDKey]
+		parentKahnNode.inDegree--
+		parentKahnNode.votes.AddCount(leafID, kahnNode.votes.Len())
+		kahnNodes[parentIDKey] = parentKahnNode
+
+		// If the inDegree is zero, then the parent node is now a leaf
+		if parentKahnNode.inDegree == 0 {
+			leaves = append(leaves, parentID)
 		}
 	}
 	return voteStack
 }
 
+// apply votes to the branch that received an Alpha threshold
 func (ts *Topological) vote(voteStack []votes) ids.ID {
+	// If the voteStack is empty, then the full tree should falter. This won't
+	// change the preferred branch.
 	if len(voteStack) == 0 {
-		headKey := ts.head.Key()
-		headNode := ts.blocks[headKey]
-		headNode.shouldFalter = true
+		ts.ctx.Log.Verbo("No progress was made after a vote with %d pending blocks", len(ts.blocks)-1)
 
-		ts.ctx.Log.Verbo("No progress was made on this vote even though we have %d pending blocks", len(ts.blocks)-1)
+		headKey := ts.head.Key()
+		headBlock := ts.blocks[headKey]
+		headBlock.shouldFalter = true
 		return ts.tail
 	}
 
-	onTail := true
-	tail := ts.head
+	// keep track of the new preferred block
+	newPreferred := ts.head
+	onPreferredBranch := true
 	for len(voteStack) > 0 {
+		// pop a vote off the stack
 		newStackSize := len(voteStack) - 1
-		voteGroup := voteStack[newStackSize]
+		vote := voteStack[newStackSize]
 		voteStack = voteStack[:newStackSize]
 
-		voteParentKey := voteGroup.parentID.Key()
-		parentNode, stillExists := ts.blocks[voteParentKey]
-		if !stillExists {
+		// get the block that we are going to vote on
+		voteParentIDKey := vote.parentID.Key()
+		parentBlock, notRejected := ts.blocks[voteParentIDKey]
+
+		// if the block block we are going to vote on was already rejected, then
+		// we should stop applying the votes
+		if !notRejected {
 			break
 		}
 
-		shouldTransFalter := parentNode.shouldFalter
-		if parentNode.shouldFalter {
-			parentNode.sb.RecordUnsuccessfulPoll()
-			parentNode.shouldFalter = false
-			ts.ctx.Log.Verbo("Reset confidence below %s", voteGroup.parentID)
+		// keep track of transitive falters to propagate to this block's
+		// children
+		shouldTransitivelyFalter := parentBlock.shouldFalter
+
+		// if the block was previously marked as needing to falter, the block
+		// should falter before applying the vote
+		if shouldTransitivelyFalter {
+			ts.ctx.Log.Verbo("Resetting confidence below %s", vote.parentID)
+
+			parentBlock.sb.RecordUnsuccessfulPoll()
+			parentBlock.shouldFalter = false
 		}
-		parentNode.sb.RecordPoll(voteGroup.votes)
+
+		// apply the votes for this snowball instance
+		parentBlock.sb.RecordPoll(vote.votes)
 
 		// Only accept when you are finalized and the head.
-		if parentNode.sb.Finalized() && ts.head.Equals(voteGroup.parentID) {
-			ts.accept(parentNode)
-			tail = parentNode.sb.Preference()
-			delete(ts.blocks, voteParentKey)
+		if parentBlock.sb.Finalized() && ts.head.Equals(vote.parentID) {
+			ts.accept(parentBlock)
+
+			// by accepting the child of parentBlock, the last accepted block is
+			// no longer voteParentID, but its child. So, voteParentID can be
+			// removed from the tree.
+			delete(ts.blocks, voteParentIDKey)
 		}
 
-		// If this is the last id that got votes, default to the empty id. This
-		// will cause all my children to be reset below.
+		// If we are on the preferred branch, then the parent's preference
+		// is the next block on the preferred branch.
+		parentPreference := parentBlock.sb.Preference()
+		if onPreferredBranch {
+			newPreferred = parentPreference
+		}
+
+		// Get the ID of the child that is having a RecordPoll called. All other
+		// children will need to have their confidence reset. If there isn't a
+		// child having RecordPoll called, then the nextID will default to the
+		// nil ID.
 		nextID := ids.ID{}
 		if len(voteStack) > 0 {
 			nextID = voteStack[newStackSize-1].parentID
 		}
 
-		onTail = onTail && nextID.Equals(parentNode.sb.Preference())
-		if onTail {
-			tail = nextID
-		}
+		// If we are on the preferred branch and the nextID is the preference of
+		// the snowball instance, then we are following the preferred branch.
+		onPreferredBranch = onPreferredBranch && nextID.Equals(parentPreference)
 
 		// If there wasn't an alpha threshold on the branch (either on this vote
 		// or a past transitive vote), I should falter now.
-		for childIDBytes := range parentNode.children {
-			if childID := ids.NewID(childIDBytes); shouldTransFalter || !childID.Equals(nextID) {
-				if childNode, childExists := ts.blocks[childIDBytes]; childExists {
-					// The existence check is needed in case the current node
-					// was finalized. However, in this case, we still need to
-					// check for the next id.
-					ts.ctx.Log.Verbo("Defering confidence reset below %s with %d children. NextID: %s", childID, len(parentNode.children), nextID)
-					childNode.shouldFalter = true
-				}
+		for childIDKey := range parentBlock.children {
+			childID := ids.NewID(childIDKey)
+			// If we don't need to transitively falter and the child is going to
+			// have RecordPoll called on it, then there is no reason to reset
+			// the block's confidence
+			if !shouldTransitivelyFalter && childID.Equals(nextID) {
+				continue
+			}
+
+			// If we finalized a child of the current block, then all other
+			// children will have been rejected and removed from the tree.
+			// Therefore, we need to make sure the child is still in the tree.
+			childBlock, notRejected := ts.blocks[childIDKey]
+			if notRejected {
+				ts.ctx.Log.Verbo("Defering confidence reset of %s. Voting for %s", childID, nextID)
+
+				// If the child is ever voted for positively, the confidence
+				// must be reset first.
+				childBlock.shouldFalter = true
 			}
 		}
 	}
-	return tail
+	return newPreferred
 }
 
 // Get the preferred decendent of the provided block ID
