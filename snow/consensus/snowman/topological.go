@@ -173,49 +173,69 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
-// the non-transitively applied votes. Also returns the list of leaf nodes.
+// the non-transitively applied votes. Also returns the list of leaf blocks.
 func (ts *Topological) calculateInDegree(
 	votes ids.Bag) (map[[32]byte]kahnNode, []ids.ID) {
 	kahns := make(map[[32]byte]kahnNode)
 	leaves := ids.Set{}
 
 	for _, vote := range votes.List() {
-		voteNode, validVote := ts.blocks[vote.Key()]
-		// If it is not found, then the vote is either for something rejected,
-		// or something we haven't heard of yet.
-		if validVote && voteNode.blk != nil && !voteNode.blk.Status().Decided() {
-			parentID := voteNode.blk.Parent().ID()
-			parentKey := parentID.Key()
-			kahn, previouslySeen := kahns[parentKey]
-			// Add this new vote to the current bag of votes
-			kahn.votes.AddCount(vote, votes.Count(vote))
-			kahns[parentKey] = kahn
+		voteKey := vote.Key()
+		votedBlock, validVote := ts.blocks[voteKey]
 
-			if !previouslySeen {
-				// If I've never seen this node before, it is currently a leaf.
-				leaves.Add(parentID)
+		// If the vote is for a block that isn't in the current pending set,
+		// then the vote is dropped
+		if !validVote {
+			continue
+		}
 
-				for n, e := ts.blocks[parentKey]; e; n, e = ts.blocks[parentKey] {
-					if n.blk == nil || n.blk.Status().Decided() {
-						break // Ensure that we haven't traversed off the tree
-					}
-					parentID := n.blk.Parent().ID()
-					parentKey = parentID.Key()
+		// If the vote is for the last accepted block, the vote is dropped
+		if votedBlock.Accepted() {
+			continue
+		}
 
-					kahn := kahns[parentKey]
-					kahn.inDegree++
-					kahns[parentKey] = kahn
+		// The parent contains the snowball instance of its children
+		parent := votedBlock.blk.Parent()
+		parentID := parent.ID()
+		parentIDKey := parentID.Key()
 
-					if kahn.inDegree == 1 {
-						// If I am transitively seeing this node for the first
-						// time, it is no longer a leaf.
-						leaves.Remove(parentID)
-					} else {
-						// If I have already traversed this branch, stop.
-						break
-					}
-				}
+		// Add the votes for this block to the parent's set of responces
+		numVotes := votes.Count(vote)
+		kahn, previouslySeen := kahns[parentIDKey]
+		kahn.votes.AddCount(vote, numVotes)
+		kahns[parentIDKey] = kahn
+
+		// If the parent block already had registered votes, then there is no
+		// need to iterate into the parents
+		if previouslySeen {
+			continue
+		}
+
+		// If I've never seen this parent block before, it is currently a leaf.
+		leaves.Add(parentID)
+
+		// iterate through all the block's ancestors and set up the inDegrees of
+		// the blocks
+		for n := ts.blocks[parentIDKey]; !n.Accepted(); n = ts.blocks[parentIDKey] {
+			parent := n.blk.Parent()
+			parentID := parent.ID()
+			parentIDKey = parentID.Key()
+
+			// Increase the inDegree by one
+			kahn := kahns[parentIDKey]
+			kahn.inDegree++
+			kahns[parentIDKey] = kahn
+
+			// If we have already seen this block, then we shouldn't increase
+			// the inDegree of the ancestors through this block again.
+			if kahn.inDegree != 1 {
+				break
 			}
+
+			// If I am transitively seeing this block for the first time, either
+			// the block was previously unknown or it was previously a leaf.
+			// Regardless, it shouldn't be tracked as a leaf.
+			leaves.Remove(parentID)
 		}
 	}
 

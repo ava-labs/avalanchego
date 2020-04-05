@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
@@ -45,4 +46,13 @@ func (n *snowmanBlock) AddChild(child Block) {
 	}
 
 	n.children[childKey] = child
+}
+
+func (n *snowmanBlock) Accepted() bool {
+	// if the block is nil, then this is the genesis which is defined as
+	// accepted
+	if n.blk == nil {
+		return true
+	}
+	return n.blk.Status() == choices.Accepted
 }
