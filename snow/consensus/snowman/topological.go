@@ -25,7 +25,7 @@ type Topological struct {
 	params snowball.Parameters
 
 	head   ids.ID
-	blocks map[[32]byte]snowmanBlock // ParentID -> Snowball instance
+	blocks map[[32]byte]*snowmanBlock // ParentID -> Snowball instance
 	tail   ids.ID
 }
 
@@ -56,9 +56,9 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	}
 
 	ts.head = rootID
-	ts.blocks = map[[32]byte]snowmanBlock{
-		rootID.Key(): snowmanBlock{
-			ts: ts,
+	ts.blocks = map[[32]byte]*snowmanBlock{
+		rootID.Key(): &snowmanBlock{
+			sm: ts,
 		},
 	}
 	ts.tail = rootID
@@ -97,11 +97,8 @@ func (ts *Topological) Add(blk Block) {
 
 	parentNode.AddChild(blk)
 
-	// TODO: remove this once ts.nodes maps to a pointer
-	ts.blocks[parentKey] = parentNode
-
-	ts.blocks[blkID.Key()] = snowmanBlock{
-		ts:  ts,
+	ts.blocks[blkID.Key()] = &snowmanBlock{
+		sm:  ts,
 		blk: blk,
 	}
 
@@ -253,8 +250,6 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 		headNode.shouldFalter = true
 
 		ts.ctx.Log.Verbo("No progress was made on this vote even though we have %d pending blocks", len(ts.blocks)-1)
-
-		ts.blocks[headKey] = headNode
 		return ts.tail
 	}
 
@@ -284,8 +279,6 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 			ts.accept(parentNode)
 			tail = parentNode.sb.Preference()
 			delete(ts.blocks, voteParentKey)
-		} else {
-			ts.blocks[voteParentKey] = parentNode
 		}
 
 		// If this is the last id that got votes, default to the empty id. This
@@ -310,7 +303,6 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 					// check for the next id.
 					ts.ctx.Log.Verbo("Defering confidence reset below %s with %d children. NextID: %s", childID, len(parentNode.children), nextID)
 					childNode.shouldFalter = true
-					ts.blocks[childIDBytes] = childNode
 				}
 			}
 		}
@@ -318,7 +310,17 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 	return tail
 }
 
-func (ts *Topological) accept(n snowmanBlock) {
+// Get the preferred decendent of the provided block ID
+func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
+	// Traverse from the provided ID to the preferred child until there are no
+	// children.
+	for block := ts.blocks[blkID.Key()]; block.sb != nil; block = ts.blocks[blkID.Key()] {
+		blkID = block.sb.Preference()
+	}
+	return blkID
+}
+
+func (ts *Topological) accept(n *snowmanBlock) {
 	// Accept the preference, reject all transitive rejections
 	pref := n.sb.Preference()
 
@@ -373,54 +375,4 @@ func (ts *Topological) rejectTransitively(rejected ...ids.ID) {
 			ts.metrics.Rejected(childID)
 		}
 	}
-}
-
-// Get the preferred decendent of the provided block ID
-func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
-	// Traverse from the provided ID to the preferred child until there are no
-	// children.
-	for node := ts.blocks[blkID.Key()]; node.sb != nil; node = ts.blocks[blkID.Key()] {
-		blkID = node.sb.Preference()
-	}
-	return blkID
-}
-
-// Tracks the state of a snowman block
-type snowmanBlock struct {
-	// pointer to the snowman instance this node is managed by
-	ts *Topological
-
-	// block that this node contains. For the genesis, this value will be nil
-	blk Block
-
-	// shouldFalter is set to true if this node, and all its decendants received
-	// less than Alpha votes
-	shouldFalter bool
-
-	// sb is the snowball instance used to decided which child is the canonical
-	// child of this block. If this node has not had a child issued under it,
-	// this value will be nil
-	sb snowball.Consensus
-
-	// children is the set of blocks that have been issued that name this block
-	// as their parent. If this node has not had a child issued under it, this value
-	// will be nil
-	children map[[32]byte]Block
-}
-
-func (n *snowmanBlock) AddChild(child Block) {
-	childID := child.ID()
-	childKey := childID.Key()
-
-	// if the snowball instance is nil, this is the first child. So the instance
-	// should be initialized.
-	if n.sb == nil {
-		n.sb = &snowball.Tree{}
-		n.sb.Initialize(n.ts.params, childID)
-		n.children = make(map[[32]byte]Block)
-	} else {
-		n.sb.Add(childID)
-	}
-
-	n.children[childKey] = child
 }

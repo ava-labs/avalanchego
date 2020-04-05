@@ -1,0 +1,48 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package snowman
+
+import (
+	"github.com/ava-labs/gecko/snow/consensus/snowball"
+)
+
+// Tracks the state of a snowman block
+type snowmanBlock struct {
+	// pointer to the snowman instance this node is managed by
+	sm Consensus
+
+	// block that this node contains. For the genesis, this value will be nil
+	blk Block
+
+	// shouldFalter is set to true if this node, and all its decendants received
+	// less than Alpha votes
+	shouldFalter bool
+
+	// sb is the snowball instance used to decided which child is the canonical
+	// child of this block. If this node has not had a child issued under it,
+	// this value will be nil
+	sb snowball.Consensus
+
+	// children is the set of blocks that have been issued that name this block
+	// as their parent. If this node has not had a child issued under it, this value
+	// will be nil
+	children map[[32]byte]Block
+}
+
+func (n *snowmanBlock) AddChild(child Block) {
+	childID := child.ID()
+	childKey := childID.Key()
+
+	// if the snowball instance is nil, this is the first child. So the instance
+	// should be initialized.
+	if n.sb == nil {
+		n.sb = &snowball.Tree{}
+		n.sb.Initialize(n.sm.Parameters(), childID)
+		n.children = make(map[[32]byte]Block)
+	} else {
+		n.sb.Add(childID)
+	}
+
+	n.children[childKey] = child
+}
