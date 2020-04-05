@@ -21,12 +21,21 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 type Topological struct {
 	metrics
 
-	ctx    *snow.Context
+	// ctx is the context this snowman instance is executing in
+	ctx *snow.Context
+
+	// params are the parameters that should be used to initialize snowball
+	// instances
 	params snowball.Parameters
 
-	head   ids.ID
-	blocks map[[32]byte]*snowmanBlock // ParentID -> Snowball instance
-	tail   ids.ID
+	// head is the last accepted block
+	head ids.ID
+
+	// blocks stores the last accepted block and all the pending blocks
+	blocks map[[32]byte]*snowmanBlock // blockID -> snowmanBlock
+
+	// tail is the preferred block with no children
+	tail ids.ID
 }
 
 // Used to track the kahn topological sort status
@@ -320,6 +329,9 @@ func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
 	return blkID
 }
 
+// accept the preferred child of the provided snowman block. By accepting the
+// preferred child, all other children will be rejected. When these children are
+// rejected, all their decendants will be rejected.
 func (ts *Topological) accept(n *snowmanBlock) {
 	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
@@ -368,6 +380,8 @@ func (ts *Topological) accept(n *snowmanBlock) {
 
 // Takes in a list of rejected ids and rejects all decendants of these IDs
 func (ts *Topological) rejectTransitively(rejected []ids.ID) {
+	// the rejected array is treated as a queue, with the next element at index
+	// 0 and the last element at the end of the slice.
 	for len(rejected) > 0 {
 		// pop the rejected ID off the queue
 		newRejectedSize := len(rejected) - 1
