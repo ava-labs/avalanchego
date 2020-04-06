@@ -24,13 +24,26 @@ var (
 	}
 
 	Tests = []func(*testing.T, Factory){
-		ParamsTest,
+		InitializeTest,
+		AddToTailTest,
+		AddToNonTailTest,
+		AddToUnknownTest,
+		IssuedPreviouslyAcceptedTest,
+		IssuedPreviouslyRejectedTest,
+		IssuedUnissuedTest,
+		IssuedIssuedTest,
 	}
 )
 
-// Make sure that the passed in params are returned properly from a call to
-// Parameters
-func ParamsTest(t *testing.T, factory Factory) {
+// Execute all tests against a consensus implementation
+func ConsensusTest(t *testing.T, factory Factory) {
+	for _, test := range Tests {
+		test(t, factory)
+	}
+}
+
+// Make sure that initialize sets the state correctly
+func InitializeTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
@@ -48,9 +61,16 @@ func ParamsTest(t *testing.T, factory Factory) {
 	if p := sm.Parameters(); p != params {
 		t.Fatalf("Wrong returned parameters")
 	}
+	if pref := sm.Preference(); !pref.Equals(GenesisID) {
+		t.Fatalf("Wrong preference returned")
+	}
+	if !sm.Finalized() {
+		t.Fatalf("Wrong should have marked the instance as being finalized")
+	}
 }
 
-func AddTest(t *testing.T, factory Factory) {
+// Make sure that adding a block to the tail updates the preference
+func AddToTailTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
@@ -64,60 +84,184 @@ func AddTest(t *testing.T, factory Factory) {
 	}
 	sm.Initialize(ctx, params, GenesisID)
 
-	if pref := sm.Preference(); !pref.Equals(GenesisID) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", GenesisID, pref)
-	}
-
-	block0 := &TestBlock{
+	block := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
 
 	// Adding to the previous preference will update the preference
-	sm.Add(block0)
+	sm.Add(block)
 
-	if pref := sm.Preference(); !pref.Equals(block0.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block0.id, pref)
+	if pref := sm.Preference(); !pref.Equals(block.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block.id, pref)
 	}
+}
 
-	block1 := &TestBlock{
+// Make sure that adding a block not to the tail doesn't change the preference
+func AddToNonTailTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	firstBlock := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+	}
+	secondBlock := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(2),
 	}
 
+	// Adding to the previous preference will update the preference
+	sm.Add(firstBlock)
+
+	if pref := sm.Preference(); !pref.Equals(firstBlock.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.id, pref)
+	}
+
 	// Adding to something other than the previous preference won't update the
 	// preference
-	sm.Add(block1)
+	sm.Add(secondBlock)
 
-	if pref := sm.Preference(); !pref.Equals(block0.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block0.id, pref)
+	if pref := sm.Preference(); !pref.Equals(firstBlock.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.id, pref)
 	}
+}
 
-	block2 := &TestBlock{
-		parent: block0,
-		id:     ids.Empty.Prefix(3),
+// Make sure that adding a block that is detached from the rest of the tree
+// rejects the block
+func AddToUnknownTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
 	}
+	sm.Initialize(ctx, params, GenesisID)
 
-	// Adding to the previous preference will update the preference
-	sm.Add(block2)
-
-	if pref := sm.Preference(); !pref.Equals(block2.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block2.id, pref)
-	}
-
-	block3 := &TestBlock{
-		parent: &TestBlock{id: ids.Empty.Prefix(4)},
-		id:     ids.Empty.Prefix(5),
+	block := &TestBlock{
+		parent: &TestBlock{id: ids.Empty.Prefix(1)},
+		id:     ids.Empty.Prefix(2),
 	}
 
 	// Adding a block with an unknown parent means the parent must have already
 	// been rejected. Therefore the block should be immediately rejected
-	sm.Add(block3)
+	sm.Add(block)
 
-	if pref := sm.Preference(); !pref.Equals(block2.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block2.id, pref)
-	} else if status := block3.Status(); status != choices.Rejected {
+	if pref := sm.Preference(); !pref.Equals(GenesisID) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", GenesisID, pref)
+	} else if status := block.Status(); status != choices.Rejected {
 		t.Fatalf("Should have rejected the block")
+	}
+}
+
+func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	if !sm.Issued(Genesis) {
+		t.Fatalf("Should have marked an accepted block as having been issued")
+	}
+}
+
+func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Rejected,
+	}
+
+	if !sm.Issued(block) {
+		t.Fatalf("Should have marked a rejected block as having been issued")
+	}
+}
+
+func IssuedUnissuedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	if sm.Issued(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as having been issued")
+	}
+}
+
+func IssuedIssuedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	sm.Add(block)
+
+	if !sm.Issued(block) {
+		t.Fatalf("Should have marked a pending block as having been issued")
 	}
 }
 
@@ -545,43 +689,6 @@ func DivergedVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too late")
 	} else if dep0.Status() != choices.Accepted {
 		t.Fatalf("Should be accepted")
-	}
-}
-
-func IssuedTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
-	}
-
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
-
-	dep0 := &TestBlock{
-		parent: Genesis,
-		id:     ids.NewID([32]byte{0}),
-		status: choices.Processing,
-	}
-
-	if sm.Issued(dep0) {
-		t.Fatalf("Hasn't been issued yet")
-	}
-
-	sm.Add(dep0)
-
-	if !sm.Issued(dep0) {
-		t.Fatalf("Has been issued")
-	}
-
-	dep1 := &TestBlock{
-		parent: Genesis,
-		id:     ids.NewID([32]byte{0x1}), // 0b0001
-		status: choices.Accepted,
-	}
-
-	if !sm.Issued(dep1) {
-		t.Fatalf("Has accepted status")
 	}
 }
 

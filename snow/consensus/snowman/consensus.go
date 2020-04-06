@@ -12,7 +12,7 @@ import (
 // Consensus represents a general snowman instance that can be used directly to
 // process a series of dependent operations.
 type Consensus interface {
-	// Takes in alpha, beta1, beta2, and an assumed accepted decision.
+	// Takes in the context, snowball parameters, and the last accepted block.
 	Initialize(*snow.Context, snowball.Parameters, ids.ID)
 
 	// Returns the parameters that describe this snowman instance

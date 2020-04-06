@@ -349,8 +349,8 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 			delete(ts.blocks, voteParentIDKey)
 		}
 
-		// If we are on the preferred branch, then the parent's preference
-		// is the next block on the preferred branch.
+		// If we are on the preferred branch, then the parent's preference is
+		// the next block on the preferred branch.
 		parentPreference := parentBlock.sb.Preference()
 		if onPreferredBranch {
 			newPreferred = parentPreference
