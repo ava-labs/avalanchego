@@ -36,14 +36,6 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
-	case genesis.CascadeID:
-		return []string{
-			"3.227.207.132:21001",
-			"34.207.133.167:21001",
-			"107.23.241.199:21001",
-			"54.197.215.186:21001",
-			"18.234.153.22:21001",
-		}
 	default:
 		return nil
 	}
@@ -64,7 +56,7 @@ func init() {
 	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.CascadeName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", genesis.LocalName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
