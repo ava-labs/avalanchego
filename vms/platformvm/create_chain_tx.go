@@ -52,12 +52,12 @@ type CreateChainTx struct {
 	// Set in SemanticVerify
 	PayerAddress ids.ShortID
 
-	// Signature of key whose account provides the transaction fee
-	PayerSig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
 	// Signatures from Subnet's control keys
 	// Should not empty slice, not nil, if there are no control sigs
 	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
+
+	// Signature of key whose account provides the transaction fee
+	PayerSig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
 
 	vm    *VM
 	id    ids.ID
