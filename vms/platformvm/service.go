@@ -594,21 +594,24 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	return nil
 }
 
-// CreateExportTxArgs are the arguments to CreateExportTx
-type CreateExportTxArgs struct {
-	// ID of the address that will receive the exported funds
+// ExportAVAArgs are the arguments to ExportAVA
+type ExportAVAArgs struct {
+	// X-Chain address (without prepended X-) that will receive the exported AVA
 	To ids.ShortID `json:"to"`
 
-	// Nonce of the account that pays the transaction fee
+	// Nonce of the account that pays the transaction fee and provides the export AVA
 	PayerNonce json.Uint64 `json:"payerNonce"`
 
+	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
 }
 
-// CreateExportTx returns an unsigned transaction to export funds.
-// The unsigned transaction must be signed with the key of [args.Payer]
-func (service *Service) CreateExportTx(_ *http.Request, args *CreateExportTxArgs, response *CreateTxResponse) error {
-	service.vm.Ctx.Log.Debug("platform.createExportTx called")
+// ExportAVA returns an unsigned transaction to export AVA from the P-Chain to the X-Chain.
+// After this tx is accepted, the AVA must be imported on the X-Chain side.
+// The unsigned transaction must be signed with the key of the account exporting the AVA
+// and paying the transaction fee
+func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *CreateTxResponse) error {
+	service.vm.Ctx.Log.Debug("platform.ExportAVA called")
 
 	// Create the transaction
 	tx := ExportTx{UnsignedExportTx: UnsignedExportTx{
@@ -778,7 +781,7 @@ func (service *Service) signCreateSubnetTx(tx *CreateSubnetTx, key *crypto.Priva
 	return tx, nil
 }
 
-// Sign [xt] with [key]
+// Sign [tx] with [key]
 func (service *Service) signExportTx(tx *ExportTx, key *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
 	service.vm.Ctx.Log.Debug("platform.signAddDefaultSubnetValidatorTx called")
 
@@ -854,27 +857,24 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 	return tx, nil
 }
 
-// CreateImportTxArgs are the arguments to CreateImportTx
-type CreateImportTxArgs struct {
-	// Addresses that can be used to sign the import
-	ImportAddresses []ids.ShortID `json:"importAddresses"`
+// ImportAVAArgs are the arguments to ImportAVA
+type ImportAVAArgs struct {
+	// ID of the account that will receive the imported funds, and pay the transaction fee
+	To ids.ShortID `json:"to"`
 
-	// ID of the account that will receive the imported funds, and pay the
-	// import fee
-	AccountID ids.ShortID `json:"accountID"`
-
-	// Nonce of the account that pays the transaction fee
+	// Next unused nonce of the account
 	PayerNonce json.Uint64 `json:"payerNonce"`
 
-	// User that controls the Addresses
+	// User that controls the account
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// CreateImportTx returns an unsigned transaction to import funds.
-// The unsigned transaction must be signed with the key of [args.Payer]
-func (service *Service) CreateImportTx(_ *http.Request, args *CreateImportTxArgs, response *SignResponse) error {
-	service.vm.Ctx.Log.Debug("platform.createImportTx called")
+// ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
+// The AVA must have already been exported from the X-Chain.
+// The unsigned transaction must be signed with the key of the tx fee payer.
+func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *SignResponse) error {
+	service.vm.Ctx.Log.Debug("platform.ImportAVA called")
 
 	// Get the key of the Signer
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -884,26 +884,16 @@ func (service *Service) CreateImportTx(_ *http.Request, args *CreateImportTxArgs
 	user := user{db: db}
 
 	kc := secp256k1fx.NewKeychain()
-	for _, addr := range args.ImportAddresses {
-		key, err := user.getKey(addr)
-		if err != nil {
-			return errDB
-		}
-		kc.Add(key)
-	}
-
-	key, err := user.getKey(args.AccountID)
+	key, err := user.getKey(args.To)
 	if err != nil {
 		return errDB
 	}
 	kc.Add(key)
 
-	addrs := ids.Set{}
-	for _, addr := range args.ImportAddresses {
-		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
-	}
+	addrSet := ids.Set{}
+	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(args.To.Bytes())))
 
-	utxos, err := service.vm.GetAtomicUTXOs(addrs)
+	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
@@ -947,7 +937,7 @@ func (service *Service) CreateImportTx(_ *http.Request, args *CreateImportTxArgs
 	tx := ImportTx{UnsignedImportTx: UnsignedImportTx{
 		NetworkID: service.vm.Ctx.NetworkID,
 		Nonce:     uint64(args.PayerNonce),
-		Account:   args.AccountID,
+		Account:   args.To,
 		Ins:       ins,
 	}}
 

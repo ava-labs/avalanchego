@@ -948,21 +948,26 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 	return nil
 }
 
-// SendImportArgs are arguments for passing into SendImport requests
-type SendImportArgs struct {
+// ImportAVAArgs are arguments for passing into ImportAVA requests
+type ImportAVAArgs struct {
+	// User that controls To
 	Username string `json:"username"`
 	Password string `json:"password"`
-	To       string `json:"to"`
+
+	// Address receiving the imported AVA
+	To string `json:"to"`
 }
 
-// SendImportReply defines the SendImport replies returned from the API
-type SendImportReply struct {
+// ImportAVAReply defines the ImportAVA replies returned from the API
+type ImportAVAReply struct {
 	TxID ids.ID `json:"txID"`
 }
 
-// SendImport returns the ID of the newly created atomic transaction
-func (service *Service) SendImport(_ *http.Request, args *SendImportArgs, reply *SendImportReply) error {
-	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+// ImportAVA imports AVA to this chain from the P-Chain.
+// The AVA must have already been exported from the P-Chain.
+// Returns the ID of the newly created atomic transaction
+func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *ImportAVAReply) error {
+	service.vm.ctx.Log.Verbo("ImportAVA called with username: %s", args.Username)
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
@@ -1089,34 +1094,32 @@ func (service *Service) SendImport(_ *http.Request, args *SendImportArgs, reply 
 	return nil
 }
 
-// SendExportArgs are arguments for passing into SendExport requests
-type SendExportArgs struct {
-	Username string      `json:"username"`
-	Password string      `json:"password"`
-	Amount   json.Uint64 `json:"amount"`
-	To       string      `json:"to"`
+// ExportAVAArgs are arguments for passing into ExportAVA requests
+type ExportAVAArgs struct {
+	// User providing exported AVA
+	Username string `json:"username"`
+	Password string `json:"password"`
+
+	// Amount of nAVA to send
+	Amount json.Uint64 `json:"amount"`
+
+	// ID of P-Chain account that will receive the AVA
+	To ids.ShortID `json:"to"`
 }
 
-// SendExportReply defines the Send replies returned from the API
-type SendExportReply struct {
+// ExportAVAReply defines the Send replies returned from the API
+type ExportAVAReply struct {
 	TxID ids.ID `json:"txID"`
 }
 
-// SendExport returns the ID of the newly created atomic transaction
-func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply *SendExportReply) error {
-	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+// ExportAVA sends AVA from this chain to the P-Chain.
+// After this tx is accepted, the AVA must be imported to the P-chain with an importTx.
+// Returns the ID of the newly created atomic transaction
+func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *ExportAVAReply) error {
+	service.vm.ctx.Log.Verbo("ExportAVA called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidAmount
-	}
-
-	toBytes, err := service.vm.Parse(args.To)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
-	}
-	to, err := ids.ToShortID(toBytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
 	}
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -1194,7 +1197,7 @@ func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply 
 			Locktime: 0,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
+				Addrs:     []ids.ShortID{args.To},
 			},
 		},
 	}}
