@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ava-labs/gecko/vms/wasmvm"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/evm"
@@ -171,6 +173,9 @@ func Aliases(networkID uint32) (generalAliases map[string][]string, chainAliases
 		case timestampvm.ID.Equals(chain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
 			chainAliases[chain.ID().Key()] = []string{"timestamp"}
+		case wasmvm.ID.Equals(chain.VMID):
+			generalAliases["bc/"+chain.ID().String()] = []string{"bc/wasm"}
+			chainAliases[chain.ID().Key()] = []string{"wasm"}
 		}
 	}
 	return

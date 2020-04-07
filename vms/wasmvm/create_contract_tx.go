@@ -64,9 +64,11 @@ func (vm *VM) newCreateContractTx(contractID ids.ID, wasmBytes []byte) (*createC
 	} else if n != 32 {
 		return nil, fmt.Errorf("ID should be 32 bytes but is %d bytes", n)
 	}
-	return &createContractTx{
+	tx := &createContractTx{
 		vm:        vm,
 		ID:        ids.NewID(idBytes),
 		WasmBytes: wasmBytes,
-	}, nil
+	}
+	tx.initialize(vm)
+	return tx, nil
 }

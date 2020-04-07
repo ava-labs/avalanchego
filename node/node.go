@@ -17,6 +17,8 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/ava-labs/gecko/vms/wasmvm"
+
 	"github.com/ava-labs/salticidae-go"
 
 	"github.com/ava-labs/gecko/api"
@@ -328,6 +330,7 @@ func (n *Node) initVMManager() {
 	n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{})
 	n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{})
 	n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{})
+	n.vmManager.RegisterVMFactory(wasmvm.ID, &wasmvm.Factory{})
 }
 
 // Create the EventDispatcher used for hooking events
