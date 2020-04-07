@@ -1,0 +1,1 @@
+int externalDec(int x);

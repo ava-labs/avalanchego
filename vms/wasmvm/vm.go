@@ -3,13 +3,15 @@ package wasmvm
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+
+	"github.com/ava-labs/gecko/ids"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/vms/components/core"
-	"github.com/hashicorp/go-plugin/examples/gecko-2/contract"
 )
 
 // VM defines the Salesforce Chain
@@ -19,8 +21,9 @@ type VM struct {
 	// txs not yet proposed
 	mempool []tx
 
-	// contracts
-	contracts map[[32]byte]contract.Contract
+	// Key: Contract ID
+	// Value: Byte repr. of the Wasm
+	contracts map[[32]byte][]byte
 }
 
 // Initialize this chain
@@ -34,7 +37,13 @@ func (vm *VM) Initialize(
 	ctx.Log.Debug("initiailizing wasmVM chain")
 
 	// Inititalize data structures
-	vm.contracts = make(map[[32]byte]contract.Contract, 0)
+	vm.contracts = make(map[[32]byte][]byte, 0)
+
+	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/counter/counter.wasm")
+	if err != nil {
+		return fmt.Errorf("couldn't find contract")
+	}
+	vm.contracts[ids.Empty.Key()] = wasmBytes
 
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.ParseBlock, msgs); err != nil {
 		return fmt.Errorf("could initialize snowmanVM: %s", err)

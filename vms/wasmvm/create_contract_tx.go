@@ -27,15 +27,21 @@ func (tx *createContractTx) Bytes() []byte {
 	return tx.bytes
 }
 
+// should be called when unmarshaling
 func (tx *createContractTx) initialize(vm *VM) {
 	tx.vm = vm
+	var err error
+	tx.bytes, err = codec.Marshal(tx)
+	if err != nil {
+		tx.vm.Ctx.Log.Error("couldn't initialize tx: %v", err)
+	}
 }
 
 // SyntacticVerify returns nil iff tx is syntactically valid
 func (tx *createContractTx) SyntacticVerify() error {
 	switch {
 	case tx.WasmBytes == nil:
-		return fmt.Errorf("empty WasmBytes")
+		return fmt.Errorf("empty contract")
 	case tx.ID.Equals(ids.Empty):
 		return fmt.Errorf("empty tx ID")
 	}
@@ -43,27 +49,24 @@ func (tx *createContractTx) SyntacticVerify() error {
 }
 
 func (tx *createContractTx) SemanticVerify(database.Database) error {
-	return nil
+	return nil // TODO
 }
 
 func (tx *createContractTx) Accept() {
-	if err := tx.contract.Invoke(tx.Payload, tx.contractDB); err != nil {
-		tx.vm.Ctx.Log.Error("error during invoke: %s", err)
-	}
+	tx.vm.contracts[tx.ID.Key()] = tx.WasmBytes
 }
 
 // Creates a new tx with the given payload and a random ID
-func (vm *VM) newCreateContractTx(contractID ids.ID, payload []byte) (*createContractTx, error) {
+func (vm *VM) newCreateContractTx(contractID ids.ID, wasmBytes []byte) (*createContractTx, error) {
 	var idBytes [32]byte
 	if n, err := rand.Read(idBytes[:32]); err != nil {
 		return nil, fmt.Errorf("couldn't generate new ID: %s", err)
 	} else if n != 32 {
-		return nil, fmt.Errorf("id should be 32 bytes but is %d bytes", n)
+		return nil, fmt.Errorf("ID should be 32 bytes but is %d bytes", n)
 	}
 	return &createContractTx{
-		vm:         vm,
-		ID:         ids.NewID(idBytes),
-		Payload:    payload,
-		ContractID: contractID,
+		vm:        vm,
+		ID:        ids.NewID(idBytes),
+		WasmBytes: wasmBytes,
 	}, nil
 }

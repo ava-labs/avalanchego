@@ -1,0 +1,2 @@
+#!/bin/bash
+wasirun /home/danlaine/go/src/github.com/ava-labs/wasm-playing/add.wasm "$@"
