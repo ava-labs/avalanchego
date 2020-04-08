@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
@@ -15,14 +14,18 @@ import (
 )
 
 var (
-	errInvalidVMID             = errors.New("invalid VM ID")
-	errFxIDsNotSortedAndUnique = errors.New("feature extensions IDs must be sorted and unique")
+	errInvalidVMID                   = errors.New("invalid VM ID")
+	errFxIDsNotSortedAndUnique       = errors.New("feature extensions IDs must be sorted and unique")
+	errControlSigsNotSortedAndUnique = errors.New("control signatures must be sorted and unique")
 )
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx
 type UnsignedCreateChainTx struct {
 	// ID of the network this blockchain exists on
 	NetworkID uint32 `serialize:"true"`
+
+	// ID of the Subnet that validates this blockchain
+	SubnetID ids.ID `serialize:"true"`
 
 	// Next unused nonce of account paying the transaction fee for this transaction.
 	// Currently unused, as there are no tx fees.
@@ -37,7 +40,7 @@ type UnsignedCreateChainTx struct {
 	// IDs of the feature extensions running on the new chain
 	FxIDs []ids.ID `serialize:"true"`
 
-	// Byte representation of state of the new chain
+	// Byte representation of genesis state of the new chain
 	GenesisData []byte `serialize:"true"`
 }
 
@@ -45,11 +48,19 @@ type UnsignedCreateChainTx struct {
 type CreateChainTx struct {
 	UnsignedCreateChainTx `serialize:"true"`
 
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+	// Address of the account that provides the transaction fee
+	// Set in SemanticVerify
+	PayerAddress ids.ShortID
+
+	// Signature of key whose account provides the transaction fee
+	PayerSig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+
+	// Signatures from Subnet's control keys
+	// Should not empty slice, not nil, if there are no control sigs
+	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
 
 	vm    *VM
 	id    ids.ID
-	key   crypto.PublicKey // public key of transaction signer
 	bytes []byte
 }
 
@@ -64,10 +75,6 @@ func (tx *CreateChainTx) initialize(vm *VM) error {
 // ID of this transaction
 func (tx *CreateChainTx) ID() ids.ID { return tx.id }
 
-// Key returns the public key of the signer of this transaction
-// Precondition: tx.Verify() has been called and returned nil
-func (tx *CreateChainTx) Key() crypto.PublicKey { return tx.key }
-
 // Bytes returns the byte representation of a CreateChainTx
 func (tx *CreateChainTx) Bytes() []byte { return tx.bytes }
 
@@ -77,8 +84,8 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.key != nil:
-		return nil // Only verify the transaction once
+	case !tx.PayerAddress.IsZero(): // Only verify the transaction once
+		return nil
 	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
 		return errWrongNetworkID
 	case tx.id.IsZero():
@@ -87,6 +94,8 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return errInvalidVMID
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
+	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
+		return errControlSigsNotSortedAndUnique
 	}
 
 	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
@@ -95,11 +104,11 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return err
 	}
 
-	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
+	payerKey, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.PayerSig[:])
 	if err != nil {
 		return err
 	}
-	tx.key = key
+	tx.PayerAddress = payerKey.Address()
 
 	return nil
 }
@@ -125,10 +134,12 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	}
 
 	// Deduct tx fee from payer's account
-	account, err := tx.vm.getAccount(db, tx.Key().Address())
+	account, err := tx.vm.getAccount(db, tx.PayerAddress)
 	if err != nil {
 		return nil, err
 	}
+	// txFee is removed in account.Remove
+	// TODO: Consider changing Remove to be parameterized on total amount (inc. tx fee) to remove
 	account, err = account.Remove(0, tx.Nonce)
 	if err != nil {
 		return nil, err
@@ -137,20 +148,55 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 
-	// If this proposal is committed, create the new blockchain using the chain manager
+	// Verify that this transaction has sufficient control signatures
+	subnets, err := tx.vm.getSubnets(db) // all subnets that exist
+	if err != nil {
+		return nil, err
+	}
+	var subnet *CreateSubnetTx // the subnet that will validate the new chain
+	for _, sn := range subnets {
+		if sn.id.Equals(tx.SubnetID) {
+			subnet = sn
+			break
+		}
+	}
+	if subnet == nil {
+		return nil, fmt.Errorf("there is no subnet with ID %s", tx.SubnetID)
+	}
+	if len(tx.ControlSigs) != int(subnet.Threshold) {
+		return nil, fmt.Errorf("expected tx to have %d control sigs but has %d", subnet.Threshold, len(tx.ControlSigs))
+	}
+
+	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
+	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte representation of the unsigned transaction
+	if err != nil {
+		return nil, err
+	}
+	unsignedBytesHash := hashing.ComputeHash256(unsignedBytes)
+
+	// Each element is ID of key that signed this tx
+	controlIDs := make([]ids.ShortID, len(tx.ControlSigs))
+	for i, sig := range tx.ControlSigs {
+		key, err := tx.vm.factory.RecoverHashPublicKey(unsignedBytesHash, sig[:])
+		if err != nil {
+			return nil, err
+		}
+		controlIDs[i] = key.Address()
+	}
+
+	// Verify each control signature on this tx is from a control key
+	controlKeys := ids.ShortSet{}
+	controlKeys.Add(subnet.ControlKeys...)
+	for _, controlID := range controlIDs {
+		if !controlKeys.Contains(controlID) {
+			return nil, errors.New("tx has control signature from key not in subnet's ControlKeys")
+		}
+	}
+
+	// If this proposal is committed and this node is a member of the
+	// subnet that validates the blockchain, create the blockchain
 	onAccept := func() {
-		chainParams := chains.ChainParameters{
-			ID:          tx.ID(),
-			GenesisData: tx.GenesisData,
-			VMAlias:     tx.VMID.String(),
-		}
-		for _, fxID := range tx.FxIDs {
-			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-		}
-		// TODO: Not sure how else to make this not nil pointer error during tests
-		if tx.vm.ChainManager != nil {
-			tx.vm.ChainManager.CreateChain(chainParams)
-		}
+		tx.vm.createChain(tx)
 	}
 
 	return onAccept, nil
@@ -166,10 +212,14 @@ func (chains createChainList) Bytes() []byte {
 	return bytes
 }
 
-func (vm *VM) newCreateChainTx(nonce uint64, genesisData []byte, vmID ids.ID, fxIDs []ids.ID, chainName string, networkID uint32, key *crypto.PrivateKeySECP256K1R) (*CreateChainTx, error) {
+func (vm *VM) newCreateChainTx(nonce uint64, subnetID ids.ID, genesisData []byte,
+	vmID ids.ID, fxIDs []ids.ID, chainName string, networkID uint32,
+	controlKeys []*crypto.PrivateKeySECP256K1R,
+	payerKey *crypto.PrivateKeySECP256K1R) (*CreateChainTx, error) {
 	tx := &CreateChainTx{
 		UnsignedCreateChainTx: UnsignedCreateChainTx{
 			NetworkID:   networkID,
+			SubnetID:    subnetID,
 			Nonce:       nonce,
 			GenesisData: genesisData,
 			VMID:        vmID,
@@ -178,17 +228,33 @@ func (vm *VM) newCreateChainTx(nonce uint64, genesisData []byte, vmID ids.ID, fx
 		},
 	}
 
+	// Generate byte repr. of unsigned transaction
 	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction
+	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
 		return nil, err
+	}
+	unsignedBytesHash := hashing.ComputeHash256(unsignedBytes)
+
+	// Sign the tx with control keys
+	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(controlKeys))
+	for i, key := range controlKeys {
+		sig, err := key.SignHash(unsignedBytesHash)
+		if err != nil {
+			return nil, err
+		}
+		copy(tx.ControlSigs[i][:], sig)
 	}
 
-	sig, err := key.Sign(unsignedBytes)
+	// Sort the control signatures
+	crypto.SortSECP2561RSigs(tx.ControlSigs)
+
+	// Sign with the payer key
+	payerSig, err := payerKey.Sign(unsignedBytes)
 	if err != nil {
 		return nil, err
 	}
-	copy(tx.Sig[:], sig)
+	copy(tx.PayerSig[:], payerSig)
 
 	return tx, tx.initialize(vm)
 }
