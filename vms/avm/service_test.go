@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -34,6 +35,31 @@ func setup(t *testing.T) ([]byte, *VM, *Service) {
 	}
 	s := &Service{vm: vm}
 	return genesisBytes, vm, s
+}
+
+func TestServiceIssueTx(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	// TODO: Does this need to be here? Or can the lock be released once the
+	//       VM is initilized?
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	txArgs := &IssueTxArgs{}
+	txReply := &IssueTxReply{}
+	err := s.IssueTx(nil, txArgs, txReply)
+	if err == nil {
+		t.Fatal("Expected empty transaction to return an error")
+	}
+
+	tx := NewTx(t, genesisBytes, vm)
+	txArgs.Tx = formatting.CB58{Bytes: tx.Bytes()}
+	txReply = &IssueTxReply{}
+	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
+		t.Fatal(err)
+	}
+	if !txReply.TxID.Equals(tx.ID()) {
+		t.Fatalf("Expected %q, got %q", txReply.TxID, tx.ID())
+	}
 }
 
 func TestGetAssetDescription(t *testing.T) {
