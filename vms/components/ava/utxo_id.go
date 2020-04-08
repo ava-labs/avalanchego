@@ -4,9 +4,12 @@
 package ava
 
 import (
+	"bytes"
 	"errors"
+	"sort"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils"
 )
 
 var (
@@ -51,4 +54,30 @@ func (utxo *UTXOID) Verify() error {
 	default:
 		return nil
 	}
+}
+
+type innerSortUTXOIDs []*UTXOID
+
+func (utxos innerSortUTXOIDs) Less(i, j int) bool {
+	iID, iIndex := utxos[i].InputSource()
+	jID, jIndex := utxos[j].InputSource()
+
+	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
+	case -1:
+		return true
+	case 0:
+		return iIndex < jIndex
+	default:
+		return false
+	}
+}
+func (utxos innerSortUTXOIDs) Len() int      { return len(utxos) }
+func (utxos innerSortUTXOIDs) Swap(i, j int) { utxos[j], utxos[i] = utxos[i], utxos[j] }
+
+// SortUTXOIDs ...
+func SortUTXOIDs(utxos []*UTXOID) { sort.Sort(innerSortUTXOIDs(utxos)) }
+
+// IsSortedAndUniqueUTXOIDs ...
+func IsSortedAndUniqueUTXOIDs(utxos []*UTXOID) bool {
+	return utils.IsSortedAndUnique(innerSortUTXOIDs(utxos))
 }

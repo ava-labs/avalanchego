@@ -37,7 +37,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		// fxID:
-		0x00, 0x00, 0x00, 0x04,
+		0x00, 0x00, 0x00, 0x07,
 		// secp256k1 Transferable Output:
 		// amount:
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x39,
@@ -66,7 +66,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		// fxID:
-		0x00, 0x00, 0x00, 0x06,
+		0x00, 0x00, 0x00, 0x05,
 		// amount:
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd4, 0x31,
 		// number of signatures:
@@ -112,10 +112,12 @@ func TestBaseTxSerialization(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	b, err := c.Marshal(&tx.UnsignedTx)
@@ -187,10 +189,12 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -237,10 +241,12 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := (*BaseTx)(nil)
@@ -254,10 +260,12 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -304,10 +312,12 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -354,10 +364,12 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -395,10 +407,12 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -459,10 +473,12 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -492,10 +508,12 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -562,10 +580,12 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -624,10 +644,12 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -674,10 +696,12 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
 	c.RegisterType(&OperationTx{})
+	c.RegisterType(&ImportTx{})
+	c.RegisterType(&ExportTx{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
 	tx := &BaseTx{
@@ -973,12 +997,12 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		issuer,
 		[]*common.Fx{
 			&common.Fx{
-				ID: ids.NewID([32]byte{1}),
-				Fx: &testFx{},
-			},
-			&common.Fx{
 				ID: ids.Empty,
 				Fx: &secp256k1fx.Fx{},
+			},
+			&common.Fx{
+				ID: ids.NewID([32]byte{1}),
+				Fx: &testFx{},
 			},
 		},
 	)

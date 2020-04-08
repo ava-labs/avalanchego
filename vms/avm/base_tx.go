@@ -55,6 +55,9 @@ func (t *BaseTx) AssetIDs() ids.Set {
 	return assets
 }
 
+// NumCredentials returns the number of expected credentials
+func (t *BaseTx) NumCredentials() int { return len(t.Ins) }
+
 // UTXOs returns the UTXOs transaction is producing.
 func (t *BaseTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
@@ -139,7 +142,7 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, utxo.Out, in.In, cred); err != nil {
+		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
 			return err
 		}
 	}

@@ -25,6 +25,7 @@ type UnsignedTx interface {
 	Bytes() []byte
 
 	AssetIDs() ids.Set
+	NumCredentials() int
 	InputUTXOs() []*ava.UTXOID
 	UTXOs() []*ava.UTXO
 
@@ -65,8 +66,7 @@ func (t *Tx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
 		}
 	}
 
-	numInputs := len(t.InputUTXOs())
-	if numInputs != len(t.Creds) {
+	if numCreds := t.UnsignedTx.NumCredentials(); numCreds != len(t.Creds) {
 		return errWrongNumberOfCredentials
 	}
 	return nil

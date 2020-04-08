@@ -52,10 +52,10 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 		c.RegisterType(&avm.OperationTx{}),
 		c.RegisterType(&avm.ImportTx{}),
 		c.RegisterType(&avm.ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintInput{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
 	)
 	return &Wallet{

@@ -8,23 +8,22 @@ import (
 
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
 	errWrongVMType         = errors.New("wrong vm type")
 	errWrongTxType         = errors.New("wrong tx type")
+	errWrongOpType         = errors.New("wrong operation type")
 	errWrongUTXOType       = errors.New("wrong utxo type")
 	errWrongOutputType     = errors.New("wrong output type")
 	errWrongInputType      = errors.New("wrong input type")
 	errWrongCredentialType = errors.New("wrong credential type")
 
-	errWrongNumberOfOutputs     = errors.New("wrong number of outputs for an operation")
-	errWrongNumberOfInputs      = errors.New("wrong number of inputs for an operation")
-	errWrongNumberOfCredentials = errors.New("wrong number of credentials for an operation")
+	errWrongNumberOfUTXOs = errors.New("wrong number of utxos for the operation")
 
-	errWrongMintCreated = errors.New("wrong mint output created from the operation")
-
+	errWrongMintCreated               = errors.New("wrong mint output created from the operation")
 	errWrongAmounts                   = errors.New("input is consuming a different amount than expected")
 	errTimelocked                     = errors.New("output is time locked")
 	errTooManySigners                 = errors.New("input has more signers than expected")
@@ -33,92 +32,84 @@ var (
 	errWrongSigner                    = errors.New("credential does not produce expected signer")
 )
 
-// Fx ...
+// Fx describes the secp256k1 feature extension
 type Fx struct {
-	vm          VM
-	secpFactory crypto.FactorySECP256K1R
+	VM          VM
+	SECPFactory crypto.FactorySECP256K1R
 }
 
 // Initialize ...
 func (fx *Fx) Initialize(vmIntf interface{}) error {
+	if err := fx.InitializeVM(vmIntf); err != nil {
+		return err
+	}
+
+	log := fx.VM.Logger()
+	log.Debug("Initializing secp561k1 fx")
+
+	c := fx.VM.Codec()
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&TransferInput{}),
+		c.RegisterType(&MintOutput{}),
+		c.RegisterType(&TransferOutput{}),
+		c.RegisterType(&MintOperation{}),
+		c.RegisterType(&Credential{}),
+	)
+	return errs.Err
+}
+
+// InitializeVM ...
+func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	vm, ok := vmIntf.(VM)
 	if !ok {
 		return errWrongVMType
 	}
-
-	c := vm.Codec()
-	c.RegisterType(&MintOutput{})
-	c.RegisterType(&TransferOutput{})
-	c.RegisterType(&MintInput{})
-	c.RegisterType(&TransferInput{})
-	c.RegisterType(&Credential{})
-
-	fx.vm = vm
+	fx.VM = vm
 	return nil
 }
 
 // VerifyOperation ...
-func (fx *Fx) VerifyOperation(txIntf interface{}, utxosIntf, insIntf, credsIntf, outsIntf []interface{}) error {
+func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return errWrongTxType
 	}
-
-	if len(outsIntf) != 2 {
-		return errWrongNumberOfOutputs
-	}
-	if len(utxosIntf) != 1 || len(insIntf) != 1 {
-		return errWrongNumberOfInputs
-	}
-	if len(credsIntf) != 1 {
-		return errWrongNumberOfCredentials
-	}
-
-	utxo, ok := utxosIntf[0].(*MintOutput)
+	op, ok := opIntf.(*MintOperation)
 	if !ok {
-		return errWrongUTXOType
+		return errWrongOpType
 	}
-	in, ok := insIntf[0].(*MintInput)
-	if !ok {
-		return errWrongInputType
-	}
-	cred, ok := credsIntf[0].(*Credential)
+	cred, ok := credIntf.(*Credential)
 	if !ok {
 		return errWrongCredentialType
 	}
-	newMint, ok := outsIntf[0].(*MintOutput)
-	if !ok {
-		return errWrongOutputType
+	if len(utxosIntf) != 1 {
+		return errWrongNumberOfUTXOs
 	}
-	newOutput, ok := outsIntf[1].(*TransferOutput)
+	out, ok := utxosIntf[0].(*MintOutput)
 	if !ok {
-		return errWrongOutputType
+		return errWrongUTXOType
 	}
-
-	return fx.verifyOperation(tx, utxo, in, cred, newMint, newOutput)
+	return fx.verifyOperation(tx, op, cred, out)
 }
 
-func (fx *Fx) verifyOperation(tx Tx, utxo *MintOutput, in *MintInput, cred *Credential, newMint *MintOutput, newOutput *TransferOutput) error {
-	if err := verify.All(utxo, in, cred, newMint, newOutput); err != nil {
+func (fx *Fx) verifyOperation(tx Tx, op *MintOperation, cred *Credential, utxo *MintOutput) error {
+	if err := verify.All(op, cred, utxo); err != nil {
 		return err
 	}
 
-	if !utxo.Equals(&newMint.OutputOwners) {
+	if !utxo.Equals(&op.MintOutput.OutputOwners) {
 		return errWrongMintCreated
 	}
 
-	return fx.verifyCredentials(tx, &utxo.OutputOwners, &in.Input, cred)
+	return fx.VerifyCredentials(tx, &op.MintInput, cred, &utxo.OutputOwners)
 }
 
 // VerifyTransfer ...
-func (fx *Fx) VerifyTransfer(txIntf, utxoIntf, inIntf, credIntf interface{}) error {
+func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return errWrongTxType
-	}
-	utxo, ok := utxoIntf.(*TransferOutput)
-	if !ok {
-		return errWrongUTXOType
 	}
 	in, ok := inIntf.(*TransferInput)
 	if !ok {
@@ -128,15 +119,20 @@ func (fx *Fx) VerifyTransfer(txIntf, utxoIntf, inIntf, credIntf interface{}) err
 	if !ok {
 		return errWrongCredentialType
 	}
-	return fx.verifyTransfer(tx, utxo, in, cred)
+	out, ok := utxoIntf.(*TransferOutput)
+	if !ok {
+		return errWrongUTXOType
+	}
+	return fx.VerifySpend(tx, in, cred, out)
 }
 
-func (fx *Fx) verifyTransfer(tx Tx, utxo *TransferOutput, in *TransferInput, cred *Credential) error {
+// VerifySpend ensures that the utxo can be sent to any address
+func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *TransferOutput) error {
 	if err := verify.All(utxo, in, cred); err != nil {
 		return err
 	}
 
-	clock := fx.vm.Clock()
+	clock := fx.VM.Clock()
 	switch {
 	case utxo.Amt != in.Amt:
 		return errWrongAmounts
@@ -144,10 +140,12 @@ func (fx *Fx) verifyTransfer(tx Tx, utxo *TransferOutput, in *TransferInput, cre
 		return errTimelocked
 	}
 
-	return fx.verifyCredentials(tx, &utxo.OutputOwners, &in.Input, cred)
+	return fx.VerifyCredentials(tx, &in.Input, cred, &utxo.OutputOwners)
 }
 
-func (fx *Fx) verifyCredentials(tx Tx, out *OutputOwners, in *Input, cred *Credential) error {
+// VerifyCredentials ensures that the output can be spent by the input with the
+// credential. A nil return values means the output can be spent.
+func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputOwners) error {
 	numSigs := len(in.SigIndices)
 	switch {
 	case out.Threshold < uint32(numSigs):
@@ -164,7 +162,7 @@ func (fx *Fx) verifyCredentials(tx Tx, out *OutputOwners, in *Input, cred *Crede
 	for i, index := range in.SigIndices {
 		sig := cred.Sigs[i]
 
-		pk, err := fx.secpFactory.RecoverHashPublicKey(txHash, sig[:])
+		pk, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:])
 		if err != nil {
 			return err
 		}

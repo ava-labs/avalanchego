@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -115,23 +116,23 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
+	c := codec.NewDefault()
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		vm.pubsub.Register("accepted"),
 		vm.pubsub.Register("rejected"),
 		vm.pubsub.Register("verified"),
+
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
 	)
 	if errs.Errored() {
 		return errs.Err
 	}
-
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
 
 	vm.fxs = make([]*parsedFx, len(fxs))
 	for i, fxContainer := range fxs {
@@ -331,6 +332,9 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 
 // Codec returns a reference to the internal codec of this VM
 func (vm *VM) Codec() codec.Codec { return vm.codec }
+
+// Logger returns a reference to the internal logger of this VM
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 /*
  ******************************************************************************

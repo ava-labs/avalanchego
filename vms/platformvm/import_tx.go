@@ -194,7 +194,7 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 			return errAssetIDMismatch
 		}
 
-		if err := tx.vm.fx.VerifyTransfer(tx, utxo.Out, in.In, cred); err != nil {
+		if err := tx.vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
 			return err
 		}
 	}

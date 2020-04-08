@@ -34,9 +34,7 @@ func (t *OperationTx) Operations() []*Operation { return t.Ops }
 func (t *OperationTx) InputUTXOs() []*ava.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, op := range t.Ops {
-		for _, in := range op.Ins {
-			utxos = append(utxos, &in.UTXOID)
-		}
+		utxos = append(utxos, op.UTXOIDs...)
 	}
 	return utxos
 }
@@ -50,6 +48,9 @@ func (t *OperationTx) AssetIDs() ids.Set {
 	return assets
 }
 
+// NumCredentials returns the number of expected credentials
+func (t *OperationTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ops) }
+
 // UTXOs returns the UTXOs transaction is producing.
 func (t *OperationTx) UTXOs() []*ava.UTXO {
 	txID := t.ID()
@@ -57,7 +58,7 @@ func (t *OperationTx) UTXOs() []*ava.UTXO {
 
 	for _, op := range t.Ops {
 		asset := op.AssetID()
-		for _, out := range op.Outs {
+		for _, out := range op.Op.Outs() {
 			utxos = append(utxos, &ava.UTXO{
 				UTXOID: ava.UTXOID{
 					TxID:        txID,
@@ -94,8 +95,8 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 		if err := op.Verify(c); err != nil {
 			return err
 		}
-		for _, in := range op.Ins {
-			inputID := in.InputID()
+		for _, utxoID := range op.UTXOIDs {
+			inputID := utxoID.InputID()
 			if inputs.Contains(inputID) {
 				return errDoubleSpend
 			}
@@ -113,22 +114,14 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verif
 	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
 		return err
 	}
-	offset := len(t.BaseTx.Ins)
-	for _, op := range t.Ops {
+
+	offset := t.BaseTx.NumCredentials()
+	for i, op := range t.Ops {
 		opAssetID := op.AssetID()
 
 		utxos := []interface{}{}
-		ins := []interface{}{}
-		credIntfs := []interface{}{}
-		outs := []interface{}{}
-
-		for i, in := range op.Ins {
-			ins = append(ins, in.In)
-
-			cred := creds[i+offset]
-			credIntfs = append(credIntfs, cred)
-
-			utxo, err := vm.getUTXO(&in.UTXOID)
+		for _, utxoID := range op.UTXOIDs {
+			utxo, err := vm.getUTXO(utxoID)
 			if err != nil {
 				return err
 			}
@@ -139,20 +132,8 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verif
 			}
 			utxos = append(utxos, utxo.Out)
 		}
-		offset += len(op.Ins)
-		for _, out := range op.Outs {
-			outs = append(outs, out)
-		}
 
-		var fxObj interface{}
-		switch {
-		case len(ins) > 0:
-			fxObj = ins[0]
-		case len(outs) > 0:
-			fxObj = outs[0]
-		}
-
-		fxIndex, err := vm.getFx(fxObj)
+		fxIndex, err := vm.getFx(op.Op)
 		if err != nil {
 			return err
 		}
@@ -162,8 +143,7 @@ func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verif
 			return errIncompatibleFx
 		}
 
-		err = fx.VerifyOperation(uTx, utxos, ins, credIntfs, outs)
-		if err != nil {
+		if err := fx.VerifyOperation(uTx, op.Op, creds[offset+i], utxos); err != nil {
 			return err
 		}
 	}
