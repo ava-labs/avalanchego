@@ -191,6 +191,56 @@ func GenesisVM(t *testing.T) *VM {
 	return vm
 }
 
+func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	newTx := &Tx{UnsignedTx: &BaseTx{
+		NetID: networkID,
+		BCID:  chainID,
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: ava.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+	}}
+
+	unsignedBytes, err := vm.codec.Marshal(&newTx.UnsignedTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := keys[0]
+	sig, err := key.Sign(unsignedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixedSig := [crypto.SECP256K1RSigLen]byte{}
+	copy(fixedSig[:], sig)
+
+	newTx.Creds = append(newTx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
+		},
+	})
+
+	b, err := vm.codec.Marshal(newTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newTx.Initialize(b)
+	return newTx
+}
+
 func TestTxSerialization(t *testing.T) {
 	expected := []byte{
 		// txID:
@@ -448,52 +498,7 @@ func TestIssueTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-
-	newTx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
-			UTXOID: ava.UTXOID{
-				TxID:        genesisTx.ID(),
-				OutputIndex: 1,
-			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: 50000,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
-					},
-				},
-			},
-		}},
-	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&newTx.UnsignedTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	newTx.Creds = append(newTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(newTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	newTx.Initialize(b)
+	newTx := NewTx(t, genesisBytes, vm)
 
 	txID, err := vm.IssueTx(newTx.Bytes(), nil)
 	if err != nil {
