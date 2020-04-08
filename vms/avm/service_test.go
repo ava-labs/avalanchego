@@ -6,6 +6,8 @@ package avm
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/snow/choices"
+
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -59,6 +61,47 @@ func TestServiceIssueTx(t *testing.T) {
 	}
 	if !txReply.TxID.Equals(tx.ID()) {
 		t.Fatalf("Expected %q, got %q", txReply.TxID, tx.ID())
+	}
+}
+
+func TestServiceGetTxStatus(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	statusArgs := &GetTxStatusArgs{}
+	statusReply := &GetTxStatusReply{}
+	if err := s.GetTxStatus(nil, statusArgs, statusReply); err == nil {
+		t.Fatal("Expected empty transaction to return an error")
+	}
+
+	tx := NewTx(t, genesisBytes, vm)
+	statusArgs.TxID = tx.ID()
+	statusReply = &GetTxStatusReply{}
+	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
+		t.Fatal(err)
+	}
+	if expected := choices.Unknown; expected != statusReply.Status {
+		t.Fatalf(
+			"Expected an unsubmitted tx to have status %q, got %q",
+			expected.String(), statusReply.Status.String(),
+		)
+	}
+
+	txArgs := &IssueTxArgs{Tx: formatting.CB58{Bytes: tx.Bytes()}}
+	txReply := &IssueTxReply{}
+	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
+		t.Fatal(err)
+	}
+	statusReply = &GetTxStatusReply{}
+	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
+		t.Fatal(err)
+	}
+	if expected := choices.Processing; expected != statusReply.Status {
+		t.Fatalf(
+			"Expected a submitted tx to have status %q, got %q",
+			expected.String(), statusReply.Status.String(),
+		)
 	}
 }
 
