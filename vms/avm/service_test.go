@@ -12,11 +12,11 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-func TestGetAssetDescription(t *testing.T) {
+func setup(t *testing.T) ([]byte, *VM, *Service) {
 	genesisBytes := BuildGenesisTest(t)
 
+	// TODO: Could this initialization be replaced by a call to GenesisVM()
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
 
 	vm := &VM{}
 	err := vm.Initialize(
@@ -32,16 +32,21 @@ func TestGetAssetDescription(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s := &Service{vm: vm}
+	return genesisBytes, vm, s
+}
+
+func TestGetAssetDescription(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
 	defer vm.Shutdown()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
 	avaAssetID := genesisTx.ID()
 
-	s := Service{vm: vm}
-
 	reply := GetAssetDescriptionReply{}
-	err = s.GetAssetDescription(nil, &GetAssetDescriptionArgs{
+	err := s.GetAssetDescription(nil, &GetAssetDescriptionArgs{
 		AssetID: avaAssetID.String(),
 	}, &reply)
 	if err != nil {
@@ -57,35 +62,16 @@ func TestGetAssetDescription(t *testing.T) {
 }
 
 func TestGetBalance(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
+	genesisBytes, vm, s := setup(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		make(chan common.Message, 1),
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer vm.Shutdown()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
 	avaAssetID := genesisTx.ID()
 
-	s := Service{vm: vm}
-
 	reply := GetBalanceReply{}
-	err = s.GetBalance(nil, &GetBalanceArgs{
+	err := s.GetBalance(nil, &GetBalanceArgs{
 		Address: vm.Format(keys[0].PublicKey().Address().Bytes()),
 		AssetID: avaAssetID.String(),
 	}, &reply)
@@ -99,31 +85,12 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestCreateFixedCapAsset(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
+	_, vm, s := setup(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		make(chan common.Message, 1),
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer vm.Shutdown()
 
-	s := Service{vm: vm}
-
 	reply := CreateFixedCapAssetReply{}
-	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
+	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
 		Name:         "test asset",
 		Symbol:       "test",
 		Denomination: 1,
@@ -142,31 +109,12 @@ func TestCreateFixedCapAsset(t *testing.T) {
 }
 
 func TestCreateVariableCapAsset(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
+	_, vm, s := setup(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		make(chan common.Message, 1),
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer vm.Shutdown()
 
-	s := Service{vm: vm}
-
 	reply := CreateVariableCapAssetReply{}
-	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
+	err := s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
 		Name:   "test asset",
 		Symbol: "test",
 		MinterSets: []Owners{
