@@ -4,8 +4,6 @@
 package avalanche
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -28,13 +26,12 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // of the voting results. Assumes that vertices are inserted in topological
 // order.
 type Topological struct {
+	metrics
+
 	// Context used for logging
 	ctx *snow.Context
 	// Threshold for confidence increases
 	params Parameters
-
-	numProcessing            prometheus.Gauge
-	numAccepted, numRejected prometheus.Counter
 
 	// Maps vtxID -> vtx
 	nodes map[[32]byte]Vertex
@@ -64,33 +61,8 @@ func (ta *Topological) Initialize(ctx *snow.Context, params Parameters, frontier
 	ta.ctx = ctx
 	ta.params = params
 
-	ta.numProcessing = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "vtx_processing",
-			Help:      "Number of currently processing vertices",
-		})
-	ta.numAccepted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "vtx_accepted",
-			Help:      "Number of vertices accepted",
-		})
-	ta.numRejected = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "vtx_rejected",
-			Help:      "Number of vertices rejected",
-		})
-
-	if err := ta.params.Metrics.Register(ta.numProcessing); err != nil {
-		ta.ctx.Log.Error("Failed to register vtx_processing statistics due to %s", err)
-	}
-	if err := ta.params.Metrics.Register(ta.numAccepted); err != nil {
-		ta.ctx.Log.Error("Failed to register vtx_accepted statistics due to %s", err)
-	}
-	if err := ta.params.Metrics.Register(ta.numRejected); err != nil {
-		ta.ctx.Log.Error("Failed to register vtx_rejected statistics due to %s", err)
+	if err := ta.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+		ta.ctx.Log.Error("%s", err)
 	}
 
 	ta.nodes = make(map[[32]byte]Vertex)
@@ -133,7 +105,7 @@ func (ta *Topological) Add(vtx Vertex) {
 	}
 
 	ta.nodes[key] = vtx // Add this vertex to the set of nodes
-	ta.numProcessing.Inc()
+	ta.metrics.Issued(vtxID)
 
 	ta.update(vtx) // Update the vertex and it's ancestry
 }
@@ -367,9 +339,8 @@ func (ta *Topological) update(vtx Vertex) {
 	for _, dep := range deps {
 		if status := dep.Status(); status == choices.Rejected {
 			vtx.Reject() // My parent is rejected, so I should be rejected
-			ta.numRejected.Inc()
 			delete(ta.nodes, vtxKey)
-			ta.numProcessing.Dec()
+			ta.metrics.Rejected(vtxID)
 
 			ta.preferenceCache[vtxKey] = false
 			ta.virtuousCache[vtxKey] = false
@@ -420,18 +391,14 @@ func (ta *Topological) update(vtx Vertex) {
 		// I'm acceptable, why not accept?
 		ta.ctx.ConsensusDispatcher.Accept(ta.ctx.ChainID, vtxID, vtx.Bytes())
 		vtx.Accept()
-		ta.numAccepted.Inc()
 		delete(ta.nodes, vtxKey)
-		ta.numProcessing.Dec()
+		ta.metrics.Accepted(vtxID)
 	case rejectable:
 		// I'm rejectable, why not reject?
 		vtx.Reject()
-
 		ta.ctx.ConsensusDispatcher.Reject(ta.ctx.ChainID, vtxID, vtx.Bytes())
-
-		ta.numRejected.Inc()
 		delete(ta.nodes, vtxKey)
-		ta.numProcessing.Dec()
+		ta.metrics.Rejected(vtxID)
 	}
 }
 

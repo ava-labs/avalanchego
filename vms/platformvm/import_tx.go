@@ -163,11 +163,11 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 	if err != nil {
 		return err
 	}
-	account, err = account.Remove(0, tx.Nonce)
+	account, err = account.Add(amount)
 	if err != nil {
 		return err
 	}
-	account, err = account.Add(amount)
+	account, err = account.Remove(0, tx.Nonce)
 	if err != nil {
 		return err
 	}

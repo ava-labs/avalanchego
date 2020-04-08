@@ -451,7 +451,7 @@ func TestRPCAPI(t *testing.T) {
 	// it had (from genesis) minus the 2 amounts it sent to [addr1] minus 2 tx fees
 	if testbal, err := vm.GetBalance(pkToAddr[pks[0]], ""); err != nil {
 		t.Fatalf("GetBalance(%q): %s", pkToAddr[pks[0]], err)
-	} else if testbal != defaultInitBalance-send1Amt-send2Amt-2*txFeeTest { // TODO generalize
+	} else if testbal != defaultInitBalance-send1Amt-send2Amt-2*txFeeTest {
 		t.Fatalf("GetBalance(%q): returned wrong balance - expected: %d; returned: %d", pkToAddr[pks[0]], defaultInitBalance-send1Amt-send2Amt-2*txFeeTest, testbal)
 		// Send [send3Amt] from [addr1] to the address controlled by [pks[0]]
 	} else if _, err = vm.Send(send3Amt, "", pkToAddr[pks[0]], []string{addr1PrivKey}); err != nil {

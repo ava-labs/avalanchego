@@ -9,8 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
@@ -27,11 +25,10 @@ func (DirectedFactory) New() Consensus { return &Directed{} }
 // Directed is an implementation of a multi-color, non-transitive, snowball
 // instance
 type Directed struct {
+	metrics
+
 	ctx    *snow.Context
 	params snowball.Parameters
-
-	numProcessingVirtuous, numProcessingRogue prometheus.Gauge
-	numAccepted, numRejected                  prometheus.Counter
 
 	// Each element of preferences is the ID of a transaction that is preferred.
 	// That is, each transaction has no out edges
@@ -75,42 +72,8 @@ func (dg *Directed) Initialize(ctx *snow.Context, params snowball.Parameters) {
 	dg.ctx = ctx
 	dg.params = params
 
-	dg.numProcessingVirtuous = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "tx_processing_virtuous",
-			Help:      "Number of processing virtuous transactions",
-		})
-	dg.numProcessingRogue = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "tx_processing_rogue",
-			Help:      "Number of processing rogue transactions",
-		})
-	dg.numAccepted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "tx_accepted",
-			Help:      "Number of transactions accepted",
-		})
-	dg.numRejected = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "tx_rejected",
-			Help:      "Number of transactions rejected",
-		})
-
-	if err := dg.params.Metrics.Register(dg.numProcessingVirtuous); err != nil {
-		dg.ctx.Log.Error("Failed to register tx_processing_virtuous statistics due to %s", err)
-	}
-	if err := dg.params.Metrics.Register(dg.numProcessingRogue); err != nil {
-		dg.ctx.Log.Error("Failed to register tx_processing_rogue statistics due to %s", err)
-	}
-	if err := dg.params.Metrics.Register(dg.numAccepted); err != nil {
-		dg.ctx.Log.Error("Failed to register tx_accepted statistics due to %s", err)
-	}
-	if err := dg.params.Metrics.Register(dg.numRejected); err != nil {
-		dg.ctx.Log.Error("Failed to register tx_rejected statistics due to %s", err)
+	if err := dg.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+		dg.ctx.Log.Error("%s", err)
 	}
 
 	dg.spends = make(map[[32]byte]ids.Set)
@@ -169,11 +132,11 @@ func (dg *Directed) Add(tx Tx) {
 	if inputs.Len() == 0 {
 		tx.Accept()
 		dg.ctx.DecisionDispatcher.Accept(dg.ctx.ChainID, txID, bytes)
-		dg.numAccepted.Inc()
+		dg.metrics.Issued(txID)
+		dg.metrics.Accepted(txID)
 		return
 	}
 
-	id := tx.ID()
 	fn := &flatNode{tx: tx}
 
 	// Note: Below, for readability, we sometimes say "transaction" when we actually mean
@@ -194,38 +157,31 @@ func (dg *Directed) Add(tx Tx) {
 			conflictKey := conflictID.Key()
 			conflict := dg.nodes[conflictKey]
 
-			if !conflict.rogue {
-				dg.numProcessingVirtuous.Dec()
-				dg.numProcessingRogue.Inc()
-			}
-
 			dg.virtuous.Remove(conflictID)
 			dg.virtuousVoting.Remove(conflictID)
 
 			conflict.rogue = true
-			conflict.ins.Add(id)
+			conflict.ins.Add(txID)
 
 			dg.nodes[conflictKey] = conflict
 		}
 		// Add Tx to list of transactions consuming UTXO whose ID is id
-		spends.Add(id)
+		spends.Add(txID)
 		dg.spends[inputKey] = spends
 	}
 	fn.rogue = fn.outs.Len() != 0 // Mark this transaction as rogue if it has conflicts
 
 	// Add the node representing Tx to the node set
-	dg.nodes[id.Key()] = fn
+	dg.nodes[txID.Key()] = fn
 	if !fn.rogue {
 		// I'm not rogue
-		dg.virtuous.Add(id)
-		dg.virtuousVoting.Add(id)
+		dg.virtuous.Add(txID)
+		dg.virtuousVoting.Add(txID)
 
 		// If I'm not rogue, I must be preferred
-		dg.preferences.Add(id)
-		dg.numProcessingVirtuous.Inc()
-	} else {
-		dg.numProcessingRogue.Inc()
+		dg.preferences.Add(txID)
 	}
+	dg.metrics.Issued(txID)
 
 	// Tx can be accepted only if the transactions it depends on are also accepted
 	// If any transactions that Tx depends on are rejected, reject Tx
@@ -361,12 +317,6 @@ func (dg *Directed) reject(ids ...ids.ID) {
 		conf := dg.nodes[conflictKey]
 		delete(dg.nodes, conflictKey)
 
-		if conf.rogue {
-			dg.numProcessingRogue.Dec()
-		} else {
-			dg.numProcessingVirtuous.Dec()
-		}
-
 		dg.preferences.Remove(conflict)
 
 		// remove the edge between this node and all its neighbors
@@ -376,7 +326,8 @@ func (dg *Directed) reject(ids ...ids.ID) {
 		// Mark it as rejected
 		conf.tx.Reject()
 		dg.ctx.DecisionDispatcher.Reject(dg.ctx.ChainID, conf.tx.ID(), conf.tx.Bytes())
-		dg.numRejected.Inc()
+		dg.metrics.Rejected(conflict)
+
 		dg.pendingAccept.Abandon(conflict)
 		dg.pendingReject.Fulfill(conflict)
 	}
@@ -466,13 +417,7 @@ func (a *directedAccepter) Update() {
 	a.fn.accepted = true
 	a.fn.tx.Accept()
 	a.dg.ctx.DecisionDispatcher.Accept(a.dg.ctx.ChainID, id, a.fn.tx.Bytes())
-	a.dg.numAccepted.Inc()
-
-	if a.fn.rogue {
-		a.dg.numProcessingRogue.Dec()
-	} else {
-		a.dg.numProcessingVirtuous.Dec()
-	}
+	a.dg.metrics.Accepted(id)
 
 	a.dg.pendingAccept.Fulfill(id)
 	a.dg.pendingReject.Abandon(id)

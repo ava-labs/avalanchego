@@ -869,70 +869,76 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
 
-	inputUTXOs := tx.InputUTXOs()
-	if len(inputUTXOs) != 1 {
+	opTx, ok := tx.UnsignedTx.(*OperationTx)
+	if !ok {
+		return errors.New("transaction must be a mint transaction")
+	}
+	if len(opTx.Ins) != 0 {
 		return errCanOnlySignSingleInputTxs
 	}
-	inputUTXO := inputUTXOs[0]
-
-	inputTxID, utxoIndex := inputUTXO.InputSource()
-	utx := UniqueTx{
-		vm:   service.vm,
-		txID: inputTxID,
+	if len(opTx.Ops) != 1 {
+		return errCanOnlySignSingleInputTxs
 	}
-	if !utx.Status().Fetched() {
-		return errUnknownUTXO
+	op := opTx.Ops[0]
+
+	if len(op.UTXOIDs) != 1 {
+		return errCanOnlySignSingleInputTxs
 	}
-	utxos := utx.UTXOs()
-	if uint32(len(utxos)) <= utxoIndex {
-		return errInvalidUTXO
+	inputUTXO := op.UTXOIDs[0]
+
+	utxo, err := service.vm.getUTXO(inputUTXO)
+	if err != nil {
+		return err
 	}
 
-	utxo := utxos[int(utxoIndex)]
-
-	i := -1
-	size := 0
-	switch out := utxo.Out.(type) {
-	case *secp256k1fx.MintOutput:
-		size = int(out.Threshold)
-		for j, addr := range out.Addrs {
-			if bytes.Equal(addr.Bytes(), minter) {
-				i = j
-				break
-			}
-		}
-	default:
+	out, ok := utxo.Out.(*secp256k1fx.MintOutput)
+	if !ok {
 		return errUnknownOutputType
 	}
-	if i == -1 {
-		return errUnneededAddress
 
+	secpOp, ok := op.Op.(*secp256k1fx.MintOperation)
+	if !ok {
+		return errors.New("unknown mint operation")
+	}
+
+	sigIndex := -1
+	size := int(out.Threshold)
+	for i, addrIndex := range secpOp.MintInput.SigIndices {
+		if addrIndex >= uint32(len(out.Addrs)) {
+			return errors.New("input output mismatch")
+		}
+		if bytes.Equal(out.Addrs[int(addrIndex)].Bytes(), minter) {
+			sigIndex = i
+			break
+		}
+	}
+	if sigIndex == -1 {
+		return errUnneededAddress
 	}
 
 	if len(tx.Creds) == 0 {
 		tx.Creds = append(tx.Creds, &secp256k1fx.Credential{})
 	}
 
-	cred := tx.Creds[0]
-	switch cred := cred.(type) {
-	case *secp256k1fx.Credential:
-		if len(cred.Sigs) != size {
-			cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, size)
-		}
-
-		unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
-		if err != nil {
-			return fmt.Errorf("problem creating transaction: %w", err)
-		}
-
-		sig, err := sk.Sign(unsignedBytes)
-		if err != nil {
-			return fmt.Errorf("problem signing transaction: %w", err)
-		}
-		copy(cred.Sigs[i][:], sig)
-	default:
+	cred, ok := tx.Creds[0].(*secp256k1fx.Credential)
+	if !ok {
 		return errUnknownCredentialType
 	}
+
+	if len(cred.Sigs) != size {
+		cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, size)
+	}
+
+	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	sig, err := sk.Sign(unsignedBytes)
+	if err != nil {
+		return fmt.Errorf("problem signing transaction: %w", err)
+	}
+	copy(cred.Sigs[sigIndex][:], sig)
 
 	txBytes, err := service.vm.codec.Marshal(&tx)
 	if err != nil {
@@ -942,21 +948,26 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 	return nil
 }
 
-// SendImportArgs are arguments for passing into SendImport requests
-type SendImportArgs struct {
+// ImportAVAArgs are arguments for passing into ImportAVA requests
+type ImportAVAArgs struct {
+	// User that controls To
 	Username string `json:"username"`
 	Password string `json:"password"`
-	To       string `json:"to"`
+
+	// Address receiving the imported AVA
+	To string `json:"to"`
 }
 
-// SendImportReply defines the SendImport replies returned from the API
-type SendImportReply struct {
+// ImportAVAReply defines the ImportAVA replies returned from the API
+type ImportAVAReply struct {
 	TxID ids.ID `json:"txID"`
 }
 
-// SendImport returns the ID of the newly created atomic transaction
-func (service *Service) SendImport(_ *http.Request, args *SendImportArgs, reply *SendImportReply) error {
-	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+// ImportAVA imports AVA to this chain from the P-Chain.
+// The AVA must have already been exported from the P-Chain.
+// Returns the ID of the newly created atomic transaction
+func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *ImportAVAReply) error {
+	service.vm.ctx.Log.Verbo("ImportAVA called with username: %s", args.Username)
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
@@ -1083,34 +1094,32 @@ func (service *Service) SendImport(_ *http.Request, args *SendImportArgs, reply 
 	return nil
 }
 
-// SendExportArgs are arguments for passing into SendExport requests
-type SendExportArgs struct {
-	Username string      `json:"username"`
-	Password string      `json:"password"`
-	Amount   json.Uint64 `json:"amount"`
-	To       string      `json:"to"`
+// ExportAVAArgs are arguments for passing into ExportAVA requests
+type ExportAVAArgs struct {
+	// User providing exported AVA
+	Username string `json:"username"`
+	Password string `json:"password"`
+
+	// Amount of nAVA to send
+	Amount json.Uint64 `json:"amount"`
+
+	// ID of P-Chain account that will receive the AVA
+	To ids.ShortID `json:"to"`
 }
 
-// SendExportReply defines the Send replies returned from the API
-type SendExportReply struct {
+// ExportAVAReply defines the Send replies returned from the API
+type ExportAVAReply struct {
 	TxID ids.ID `json:"txID"`
 }
 
-// SendExport returns the ID of the newly created atomic transaction
-func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply *SendExportReply) error {
-	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+// ExportAVA sends AVA from this chain to the P-Chain.
+// After this tx is accepted, the AVA must be imported to the P-chain with an importTx.
+// Returns the ID of the newly created atomic transaction
+func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *ExportAVAReply) error {
+	service.vm.ctx.Log.Verbo("ExportAVA called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidAmount
-	}
-
-	toBytes, err := service.vm.Parse(args.To)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
-	}
-	to, err := ids.ToShortID(toBytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
 	}
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -1188,7 +1197,7 @@ func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply 
 			Locktime: 0,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
+				Addrs:     []ids.ShortID{args.To},
 			},
 		},
 	}}

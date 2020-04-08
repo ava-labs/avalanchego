@@ -86,6 +86,19 @@ func (b *Bag) List() []ID {
 	return idList
 }
 
+// Equals returns true if the bags contain the same elements
+func (b *Bag) Equals(oIDs Bag) bool {
+	if b.Len() != oIDs.Len() {
+		return false
+	}
+	for key, value := range b.counts {
+		if value != oIDs.counts[key] {
+			return false
+		}
+	}
+	return true
+}
+
 // Mode returns the id that has been seen the most and the number of times it
 // has been seen. Ties are broken by the first id to be seen the reported number
 // of times.

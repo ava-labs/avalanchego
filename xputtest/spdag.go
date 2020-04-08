@@ -8,11 +8,9 @@ import (
 
 	"github.com/ava-labs/salticidae-go"
 
-	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/networking"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
@@ -28,11 +26,8 @@ func (n *network) benchmarkSPDAG(chain *platformvm.CreateChainTx) {
 	tx, err := codec.UnmarshalTx(genesisBytes)
 	n.log.AssertNoError(err)
 
-	cb58 := formatting.CB58{}
-	keyStr := genesis.Keys[config.Key]
-	n.log.AssertNoError(cb58.FromString(keyStr))
 	factory := crypto.FactorySECP256K1R{}
-	skGen, err := factory.ToPrivateKey(cb58.Bytes)
+	skGen, err := factory.ToPrivateKey(config.Key)
 	n.log.AssertNoError(err)
 	sk := skGen.(*crypto.PrivateKeySECP256K1R)
 	wallet.ImportKey(sk)

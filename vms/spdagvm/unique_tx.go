@@ -241,7 +241,6 @@ func (tx *UniqueTx) VerifyState() error {
 			txID: inputTx,
 		}
 
-		// TODO: Replace with a switch?
 		if err := parent.Verify(); err != nil {
 			tx.t.validity = errMissingUTXO
 		} else if status := parent.Status(); status.Decided() {

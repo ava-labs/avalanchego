@@ -547,7 +547,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	ctx.Lock.Unlock()
 
 	if len(utxos) != 7 {
-		t.Fatalf("Wrong number of utxos (%d) returned", len(utxos))
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 7, len(utxos))
 	}
 }
 

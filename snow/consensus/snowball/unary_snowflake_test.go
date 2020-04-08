@@ -55,4 +55,13 @@ func TestUnarySnowflake(t *testing.T) {
 	} else if !binarySnowflake.Finalized() {
 		t.Fatalf("Should have finalized")
 	}
+
+	sf.RecordSuccessfulPoll()
+	UnarySnowflakeStateTest(t, sf, 2, true)
+
+	sf.RecordUnsuccessfulPoll()
+	UnarySnowflakeStateTest(t, sf, 0, true)
+
+	sf.RecordSuccessfulPoll()
+	UnarySnowflakeStateTest(t, sf, 1, true)
 }

@@ -77,78 +77,75 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				Denomination: byte(assetDefinition.Denomination),
 			},
 		}
-		for assetType, initialStates := range assetDefinition.InitialState {
-			switch assetType {
-			case "fixedCap":
-				initialState := &InitialState{
-					FxID: 0, // TODO: Should lookup secp256k1fx FxID
-				}
-				for _, state := range initialStates {
-					b, err := json.Marshal(state)
-					if err != nil {
-						return err
-					}
-					holder := Holder{}
-					if err := json.Unmarshal(b, &holder); err != nil {
-						return err
-					}
-					cb58 := formatting.CB58{}
-					if err := cb58.FromString(holder.Address); err != nil {
-						return err
-					}
-					addr, err := ids.ToShortID(cb58.Bytes)
-					if err != nil {
-						return err
-					}
-					initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
-						Amt: uint64(holder.Amount),
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{addr},
-						},
-					})
-				}
-				initialState.Sort(c)
-				asset.States = append(asset.States, initialState)
-			case "variableCap":
-				initialState := &InitialState{
-					FxID: 0, // TODO: Should lookup secp256k1fx FxID
-				}
-				for _, state := range initialStates {
-					b, err := json.Marshal(state)
-					if err != nil {
-						return err
-					}
-					owners := Owners{}
-					if err := json.Unmarshal(b, &owners); err != nil {
-						return err
-					}
-
-					out := &secp256k1fx.MintOutput{
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-						},
-					}
-					for _, address := range owners.Minters {
+		if len(assetDefinition.InitialState) > 0 {
+			initialState := &InitialState{
+				FxID: 0, // TODO: Should lookup secp256k1fx FxID
+			}
+			for assetType, initialStates := range assetDefinition.InitialState {
+				switch assetType {
+				case "fixedCap":
+					for _, state := range initialStates {
+						b, err := json.Marshal(state)
+						if err != nil {
+							return err
+						}
+						holder := Holder{}
+						if err := json.Unmarshal(b, &holder); err != nil {
+							return err
+						}
 						cb58 := formatting.CB58{}
-						if err := cb58.FromString(address); err != nil {
+						if err := cb58.FromString(holder.Address); err != nil {
 							return err
 						}
 						addr, err := ids.ToShortID(cb58.Bytes)
 						if err != nil {
 							return err
 						}
-						out.Addrs = append(out.Addrs, addr)
+						initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
+							Amt: uint64(holder.Amount),
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{addr},
+							},
+						})
 					}
-					out.Sort()
+				case "variableCap":
+					for _, state := range initialStates {
+						b, err := json.Marshal(state)
+						if err != nil {
+							return err
+						}
+						owners := Owners{}
+						if err := json.Unmarshal(b, &owners); err != nil {
+							return err
+						}
 
-					initialState.Outs = append(initialState.Outs, out)
+						out := &secp256k1fx.MintOutput{
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+							},
+						}
+						for _, address := range owners.Minters {
+							cb58 := formatting.CB58{}
+							if err := cb58.FromString(address); err != nil {
+								return err
+							}
+							addr, err := ids.ToShortID(cb58.Bytes)
+							if err != nil {
+								return err
+							}
+							out.Addrs = append(out.Addrs, addr)
+						}
+						out.Sort()
+
+						initialState.Outs = append(initialState.Outs, out)
+					}
+				default:
+					return errUnknownAssetType
 				}
-				initialState.Sort(c)
-				asset.States = append(asset.States, initialState)
-			default:
-				return errUnknownAssetType
 			}
+			initialState.Sort(c)
+			asset.States = append(asset.States, initialState)
 		}
 		asset.Sort()
 		g.Txs = append(g.Txs, &asset)

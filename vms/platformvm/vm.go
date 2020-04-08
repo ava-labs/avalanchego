@@ -40,15 +40,19 @@ const (
 	subnetsTypeID
 
 	// Delta is the synchrony bound used for safe decision making
-	Delta = 10 * time.Second // TODO change to longer period (2 minutes?) before release
-
-	// InflationRate is the maximum inflation rate of AVA from staking
-	InflationRate = 1.04
+	Delta = 10 * time.Second
 
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
 
-	// TODO: Incorporate these constants + turn them into governable parameters
+	// NumberOfShares is the number of shares that a delegator is
+	// rewarded
+	NumberOfShares = 1000000
+
+	// TODO: Turn these constants into governable parameters
+
+	// InflationRate is the maximum inflation rate of AVA from staking
+	InflationRate = 1.04
 
 	// MinimumStakeAmount is the minimum amount of $AVA one must bond to be a staker
 	MinimumStakeAmount = 10 * units.MicroAva
@@ -60,10 +64,6 @@ const (
 	// MaximumStakingDuration is the longest amount of time a staker can bond
 	// their funds for.
 	MaximumStakingDuration = 365 * 24 * time.Hour
-
-	// NumberOfShares is the number of shares that a delegator is
-	// rewarded
-	NumberOfShares = 1000000
 )
 
 var (
@@ -364,7 +364,7 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		return
 	}
-	if !validators.Contains(vm.Ctx.NodeID) && vm.stakingEnabled { // This node doesn't validate this blockchain
+	if vm.stakingEnabled && !DefaultSubnetID.Equals(tx.SubnetID) && !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
 		return
 	}
 

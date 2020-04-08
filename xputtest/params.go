@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
@@ -55,7 +56,7 @@ func init() {
 	spchain := fs.Bool("sp-chain", false, "Execute simple payment chain transactions")
 	spdag := fs.Bool("sp-dag", false, "Execute simple payment dag transactions")
 	avm := fs.Bool("avm", false, "Execute avm transactions")
-	fs.IntVar(&config.Key, "key", 0, "Index of the genesis key list to use")
+	key := fs.String("key", "", "Funded key in the genesis key to use to issue transactions")
 	fs.IntVar(&config.NumTxs, "num-txs", 25000, "Total number of transaction to issue")
 	fs.IntVar(&config.MaxOutstandingTxs, "max-outstanding", 1000, "Maximum number of transactions to leave outstanding")
 
@@ -85,6 +86,10 @@ func init() {
 		IP:   parsedIP,
 		Port: uint16(*port),
 	}
+
+	cb58 := formatting.CB58{}
+	errs.Add(cb58.FromString(*key))
+	config.Key = cb58.Bytes
 
 	// Logging:
 	if *logsDir != "" {
