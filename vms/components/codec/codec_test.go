@@ -412,6 +412,33 @@ func TestSerializeUnexportedField(t *testing.T) {
 	}
 }
 
+func TestSerializeOfNoSerializeField(t *testing.T) {
+	type s struct {
+		SerializedField   string `serialize:"true"`
+		UnserializedField string `serialize:"false"`
+		UnmarkedField     string
+	}
+	myS := s{
+		SerializedField:   "Serialize me",
+		UnserializedField: "Do not serialize me",
+		UnmarkedField:     "No declared serialize",
+	}
+	codec := NewDefault()
+	marshalled, err := codec.Marshal(myS)
+	if err != nil {
+		t.Fatalf("Unexpected error %q", err)
+	}
+	unmarshalled := s{}
+	err = codec.Unmarshal(marshalled, &unmarshalled)
+	if err != nil {
+		t.Fatalf("Unexpected error %q", err)
+	}
+	expectedUnmarshalled := s{SerializedField: "Serialize me"}
+	if !reflect.DeepEqual(unmarshalled, expectedUnmarshalled) {
+		t.Fatalf("Got %#v, expected %#v", unmarshalled, expectedUnmarshalled)
+	}
+}
+
 type simpleSliceStruct struct {
 	Arr []uint32 `serialize:"true"`
 }
