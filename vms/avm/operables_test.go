@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 func TestOperableInputVerifyNil(t *testing.T) {
@@ -25,10 +26,8 @@ func TestOperableInputVerifyNilFx(t *testing.T) {
 
 func TestOperableInputVerify(t *testing.T) {
 	oi := &OperableInput{
-		UTXOID: UTXOID{
-			TxID: ids.Empty,
-		},
-		In: &testVerifiable{},
+		UTXOID: ava.UTXOID{TxID: ids.Empty},
+		In:     &ava.TestVerifiable{},
 	}
 	if err := oi.Verify(); err != nil {
 		t.Fatal(err)
@@ -41,32 +40,32 @@ func TestOperableInputVerify(t *testing.T) {
 func TestOperableInputSorting(t *testing.T) {
 	ins := []*OperableInput{
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 1,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 		&OperableInput{
-			UTXOID: UTXOID{
+			UTXOID: ava.UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 0,
 			},
-			In: &testVerifiable{},
+			In: &ava.TestVerifiable{},
 		},
 	}
 	if isSortedAndUniqueOperableInputs(ins) {
@@ -95,11 +94,11 @@ func TestOperableInputSorting(t *testing.T) {
 		t.Fatalf("OutputIndex expected: %s ; result: %s", ids.Empty, result)
 	}
 	ins = append(ins, &OperableInput{
-		UTXOID: UTXOID{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		In: &testVerifiable{},
+		In: &ava.TestVerifiable{},
 	})
 	if isSortedAndUniqueOperableInputs(ins) {
 		t.Fatalf("Shouldn't be unique")

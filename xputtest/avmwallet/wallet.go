@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -49,6 +50,8 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 		c.RegisterType(&avm.BaseTx{}),
 		c.RegisterType(&avm.CreateAssetTx{}),
 		c.RegisterType(&avm.OperationTx{}),
+		c.RegisterType(&avm.ImportTx{}),
+		c.RegisterType(&avm.ExportTx{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintInput{}),
@@ -92,8 +95,8 @@ func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keychain.Add(sk)
 
 // AddUTXO adds a new UTXO to this wallet if this wallet may spend it
 // The UTXO's output must be an OutputPayment
-func (w *Wallet) AddUTXO(utxo *avm.UTXO) {
-	out, ok := utxo.Out.(avm.FxTransferable)
+func (w *Wallet) AddUTXO(utxo *ava.UTXO) {
+	out, ok := utxo.Out.(ava.Transferable)
 	if !ok {
 		return
 	}
@@ -113,7 +116,7 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 
 	assetID := utxo.AssetID()
 	assetKey := assetID.Key()
-	newBalance := w.balance[assetKey] - utxo.Out.(avm.FxTransferable).Amount()
+	newBalance := w.balance[assetKey] - utxo.Out.(ava.Transferable).Amount()
 	if newBalance == 0 {
 		delete(w.balance, assetKey)
 	} else {
@@ -135,7 +138,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 	amountSpent := uint64(0)
 	time := w.clock.Unix()
 
-	ins := []*avm.TransferableInput{}
+	ins := []*ava.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range w.utxoSet.UTXOs {
 		if !utxo.AssetID().Equals(assetID) {
@@ -145,7 +148,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(avm.FxTransferable)
+		input, ok := inputIntf.(ava.Transferable)
 		if !ok {
 			continue
 		}
@@ -155,9 +158,9 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		}
 		amountSpent = spent
 
-		in := &avm.TransferableInput{
+		in := &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avm.Asset{ID: assetID},
+			Asset:  ava.Asset{ID: assetID},
 			In:     input,
 		}
 
@@ -173,43 +176,39 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		return nil, errors.New("insufficient funds")
 	}
 
-	avm.SortTransferableInputsWithSigners(ins, keys)
+	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*avm.TransferableOutput{
-		&avm.TransferableOutput{
-			Asset: avm.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:      amount,
-				Locktime: 0,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{destAddr},
-				},
+	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      amount,
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{destAddr},
 			},
 		},
-	}
+	}}
 
 	if amountSpent > amount {
 		changeAddr, err := w.GetAddress()
 		if err != nil {
 			return nil, err
 		}
-		outs = append(outs,
-			&avm.TransferableOutput{
-				Asset: avm.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:      amountSpent - amount,
-					Locktime: 0,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      amountSpent - amount,
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
 				},
 			},
-		)
+		})
 	}
 
-	avm.SortTransferableOutputs(outs, w.codec)
+	ava.SortTransferableOutputs(outs, w.codec)
 
 	tx := &avm.Tx{
 		UnsignedTx: &avm.BaseTx{

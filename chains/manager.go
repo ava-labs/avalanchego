@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/keystore"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
@@ -110,6 +111,7 @@ type manager struct {
 	awaiter         Awaiter               // Waits for required connections before running bootstrapping
 	server          *api.Server           // Handles HTTP API calls
 	keystore        *keystore.Keystore
+	sharedMemory    *atomic.SharedMemory
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -137,6 +139,7 @@ func New(
 	awaiter Awaiter,
 	server *api.Server,
 	keystore *keystore.Keystore,
+	sharedMemory *atomic.SharedMemory,
 ) Manager {
 	timeoutManager := timeout.Manager{}
 	timeoutManager.Initialize(requestTimeout)
@@ -162,6 +165,7 @@ func New(
 		awaiter:         awaiter,
 		server:          server,
 		keystore:        keystore,
+		sharedMemory:    sharedMemory,
 	}
 	m.Initialize()
 	return m
@@ -249,6 +253,7 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		NodeID:              m.nodeID,
 		HTTP:                m.server,
 		Keystore:            m.keystore.NewBlockchainKeyStore(chain.ID),
+		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chain.ID),
 		BCLookup:            m,
 	}
 	consensusParams := m.consensusParams

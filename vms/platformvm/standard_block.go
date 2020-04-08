@@ -49,9 +49,10 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
+	parentBlock := sb.parentBlock()
 	// StandardBlock is not a modifier on a proposal block, so its parent must
 	// be a decision.
-	parent, ok := sb.parentBlock().(decision)
+	parent, ok := parentBlock.(decision)
 	if !ok {
 		return errInvalidBlockType
 	}

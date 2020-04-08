@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -401,4 +402,30 @@ func VMGenesis(networkID uint32, vmID ids.ID) *platformvm.CreateChainTx {
 		}
 	}
 	return nil
+}
+
+// AVAAssetID ...
+func AVAAssetID(networkID uint32) ids.ID {
+	createAVM := VMGenesis(networkID, avm.ID)
+
+	c := codec.NewDefault()
+	c.RegisterType(&avm.BaseTx{})
+	c.RegisterType(&avm.CreateAssetTx{})
+	c.RegisterType(&avm.OperationTx{})
+	c.RegisterType(&avm.ImportTx{})
+	c.RegisterType(&avm.ExportTx{})
+	c.RegisterType(&secp256k1fx.MintOutput{})
+	c.RegisterType(&secp256k1fx.TransferOutput{})
+	c.RegisterType(&secp256k1fx.MintInput{})
+	c.RegisterType(&secp256k1fx.TransferInput{})
+	c.RegisterType(&secp256k1fx.Credential{})
+
+	genesis := avm.Genesis{}
+	c.Unmarshal(createAVM.GenesisData, &genesis)
+
+	genesisTx := genesis.Txs[0]
+	tx := avm.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
+	txBytes, _ := c.Marshal(&tx)
+	tx.Initialize(txBytes)
+	return tx.ID()
 }

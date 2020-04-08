@@ -309,7 +309,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) {
 		}
 
 		// Force allows for a conflict to be issued
-		if txID := tx.ID(); !overlaps && !issuedTxs.Contains(txID) && (force || (t.Consensus.IsVirtuous(tx))) && !tx.Status().Decided() {
+		if txID := tx.ID(); !overlaps && !issuedTxs.Contains(txID) && (force || t.Consensus.IsVirtuous(tx)) && !tx.Status().Decided() {
 			batch = append(batch, tx)
 			issuedTxs.Add(txID)
 			consumed.Union(inputs)

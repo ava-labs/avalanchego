@@ -8,16 +8,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -74,6 +73,10 @@ type GetTxStatusArgs struct {
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
+
+var (
+	errNilTxID = errors.New("nil transaction ID")
+)
 
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, reply *GetTxStatusReply) error {
@@ -214,7 +217,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 	for _, utxo := range utxos {
 		if utxo.AssetID().Equals(assetID) {
-			transferable, ok := utxo.Out.(FxTransferable)
+			transferable, ok := utxo.Out.(ava.Transferable)
 			if !ok {
 				continue
 			}
@@ -596,7 +599,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 	amountSpent := uint64(0)
 	time := service.vm.clock.Unix()
 
-	ins := []*TransferableInput{}
+	ins := []*ava.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(assetID) {
@@ -606,7 +609,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(FxTransferable)
+		input, ok := inputIntf.(ava.Transferable)
 		if !ok {
 			continue
 		}
@@ -616,9 +619,9 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		}
 		amountSpent = spent
 
-		in := &TransferableInput{
+		in := &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  Asset{ID: assetID},
+			Asset:  ava.Asset{ID: assetID},
 			In:     input,
 		}
 
@@ -634,44 +637,36 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		return errInsufficientFunds
 	}
 
-	SortTransferableInputsWithSigners(ins, keys)
+	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*TransferableOutput{
-		&TransferableOutput{
-			Asset: Asset{
-				ID: assetID,
-			},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:      uint64(args.Amount),
-				Locktime: 0,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
-				},
+	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      uint64(args.Amount),
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
 			},
 		},
-	}
+	}}
 
 	if amountSpent > uint64(args.Amount) {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs,
-			&TransferableOutput{
-				Asset: Asset{
-					ID: assetID,
-				},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:      amountSpent - uint64(args.Amount),
-					Locktime: 0,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{changeAddr},
-					},
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      amountSpent - uint64(args.Amount),
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
 				},
 			},
-		)
+		})
 	}
 
-	SortTransferableOutputs(outs, service.vm.codec)
+	ava.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{
 		UnsignedTx: &BaseTx{
@@ -715,42 +710,6 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 	reply.TxID = txID
 	return nil
-}
-
-type innerSortTransferableInputsWithSigners struct {
-	ins     []*TransferableInput
-	signers [][]*crypto.PrivateKeySECP256K1R
-}
-
-func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
-	iID, iIndex := ins.ins[i].InputSource()
-	jID, jIndex := ins.ins[j].InputSource()
-
-	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
-	case -1:
-		return true
-	case 0:
-		return iIndex < jIndex
-	default:
-		return false
-	}
-}
-func (ins *innerSortTransferableInputsWithSigners) Len() int { return len(ins.ins) }
-func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
-	ins.ins[j], ins.ins[i] = ins.ins[i], ins.ins[j]
-	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
-}
-
-// SortTransferableInputsWithSigners sorts the inputs and signers based on the
-// input's utxo ID
-func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
-	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
-}
-
-// IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
-// sorted and unique
-func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
-	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 
 // CreateMintTxArgs are arguments for passing into CreateMintTx requests
@@ -836,9 +795,7 @@ func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, re
 					},
 					Ops: []*Operation{
 						&Operation{
-							Asset: Asset{
-								ID: assetID,
-							},
+							Asset: ava.Asset{ID: assetID},
 							Ins: []*OperableInput{
 								&OperableInput{
 									UTXOID: utxo.UTXOID,
@@ -988,5 +945,319 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
 	reply.Tx.Bytes = txBytes
+	return nil
+}
+
+// SendImportArgs are arguments for passing into SendImport requests
+type SendImportArgs struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	To       string `json:"to"`
+}
+
+// SendImportReply defines the SendImport replies returned from the API
+type SendImportReply struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// SendImport returns the ID of the newly created atomic transaction
+func (service *Service) SendImport(_ *http.Request, args *SendImportArgs, reply *SendImportReply) error {
+	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+
+	toBytes, err := service.vm.Parse(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+	to, err := ids.ToShortID(toBytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := userState{vm: service.vm}
+
+	addresses, _ := user.Addresses(db)
+
+	addrs := ids.Set{}
+	addrs.Add(addresses...)
+	utxos, err := service.vm.GetAtomicUTXOs(addrs)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
+	}
+
+	kc := secp256k1fx.NewKeychain()
+	for _, addr := range addresses {
+		sk, err := user.Key(db, addr)
+		if err != nil {
+			return fmt.Errorf("problem retrieving private key: %w", err)
+		}
+		kc.Add(sk)
+	}
+
+	amount := uint64(0)
+	time := service.vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		if !utxo.AssetID().Equals(service.vm.ava) {
+			continue
+		}
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			continue
+		}
+		input, ok := inputIntf.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		spent, err := math.Add64(amount, input.Amount())
+		if err != nil {
+			return errSpendOverflow
+		}
+		amount = spent
+
+		in := &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: service.vm.ava},
+			In:     input,
+		}
+
+		ins = append(ins, in)
+		keys = append(keys, signers)
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+
+	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: service.vm.ava},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      amount,
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
+		},
+	}}
+
+	tx := Tx{UnsignedTx: &ImportTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+			Outs:  outs,
+		},
+		Ins: ins,
+	}}
+
+	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	for _, credKeys := range keys {
+		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	b, err := service.vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	txID, err := service.vm.IssueTx(b, nil)
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
+	return nil
+}
+
+// SendExportArgs are arguments for passing into SendExport requests
+type SendExportArgs struct {
+	Username string      `json:"username"`
+	Password string      `json:"password"`
+	Amount   json.Uint64 `json:"amount"`
+	To       string      `json:"to"`
+}
+
+// SendExportReply defines the Send replies returned from the API
+type SendExportReply struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// SendExport returns the ID of the newly created atomic transaction
+func (service *Service) SendExport(_ *http.Request, args *SendExportArgs, reply *SendExportReply) error {
+	service.vm.ctx.Log.Verbo("SendExport called with username: %s", args.Username)
+
+	if args.Amount == 0 {
+		return errInvalidAmount
+	}
+
+	toBytes, err := service.vm.Parse(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+	to, err := ids.ToShortID(toBytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := userState{vm: service.vm}
+
+	addresses, _ := user.Addresses(db)
+
+	addrs := ids.Set{}
+	addrs.Add(addresses...)
+	utxos, err := service.vm.GetUTXOs(addrs)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
+	}
+
+	kc := secp256k1fx.NewKeychain()
+	for _, addr := range addresses {
+		sk, err := user.Key(db, addr)
+		if err != nil {
+			return fmt.Errorf("problem retrieving private key: %w", err)
+		}
+		kc.Add(sk)
+	}
+
+	amountSpent := uint64(0)
+	time := service.vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		if !utxo.AssetID().Equals(service.vm.ava) {
+			continue
+		}
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			continue
+		}
+		input, ok := inputIntf.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		spent, err := math.Add64(amountSpent, input.Amount())
+		if err != nil {
+			return errSpendOverflow
+		}
+		amountSpent = spent
+
+		in := &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: service.vm.ava},
+			In:     input,
+		}
+
+		ins = append(ins, in)
+		keys = append(keys, signers)
+
+		if amountSpent >= uint64(args.Amount) {
+			break
+		}
+	}
+
+	if amountSpent < uint64(args.Amount) {
+		return errInsufficientFunds
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+
+	exportOuts := []*ava.TransferableOutput{&ava.TransferableOutput{
+		Asset: ava.Asset{ID: service.vm.ava},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      uint64(args.Amount),
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
+		},
+	}}
+
+	outs := []*ava.TransferableOutput{}
+	if amountSpent > uint64(args.Amount) {
+		changeAddr := kc.Keys[0].PublicKey().Address()
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: service.vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      amountSpent - uint64(args.Amount),
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	ava.SortTransferableOutputs(outs, service.vm.codec)
+
+	tx := Tx{UnsignedTx: &ExportTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+			Outs:  outs,
+			Ins:   ins,
+		},
+		Outs: exportOuts,
+	}}
+
+	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	for _, credKeys := range keys {
+		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	b, err := service.vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	txID, err := service.vm.IssueTx(b, nil)
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
 	return nil
 }

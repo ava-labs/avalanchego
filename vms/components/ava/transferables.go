@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+package ava
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -21,15 +22,25 @@ var (
 	errNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
 )
 
+// Transferable is the interface a feature extension must provide to transfer
+// value between features extensions.
+type Transferable interface {
+	verify.Verifiable
+
+	// Amount returns how much value this output consumes of the asset in its
+	// transaction.
+	Amount() uint64
+}
+
 // TransferableOutput ...
 type TransferableOutput struct {
 	Asset `serialize:"true"`
 
-	Out FxTransferable `serialize:"true" json:"output"`
+	Out Transferable `serialize:"true" json:"output"`
 }
 
 // Output returns the feature extension output that this Output is using.
-func (out *TransferableOutput) Output() FxTransferable { return out.Out }
+func (out *TransferableOutput) Output() Transferable { return out.Out }
 
 // Verify implements the verify.Verifiable interface
 func (out *TransferableOutput) Verify() error {
@@ -90,11 +101,11 @@ type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
 
-	In FxTransferable `serialize:"true" json:"input"`
+	In Transferable `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.
-func (in *TransferableInput) Input() FxTransferable { return in.In }
+func (in *TransferableInput) Input() Transferable { return in.In }
 
 // Verify implements the verify.Verifiable interface
 func (in *TransferableInput) Verify() error {
@@ -126,7 +137,46 @@ func (ins innerSortTransferableInputs) Less(i, j int) bool {
 func (ins innerSortTransferableInputs) Len() int      { return len(ins) }
 func (ins innerSortTransferableInputs) Swap(i, j int) { ins[j], ins[i] = ins[i], ins[j] }
 
-func sortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTransferableInputs(ins)) }
-func isSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
+// SortTransferableInputs ...
+func SortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTransferableInputs(ins)) }
+
+// IsSortedAndUniqueTransferableInputs ...
+func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
 	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
+}
+
+type innerSortTransferableInputsWithSigners struct {
+	ins     []*TransferableInput
+	signers [][]*crypto.PrivateKeySECP256K1R
+}
+
+func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
+	iID, iIndex := ins.ins[i].InputSource()
+	jID, jIndex := ins.ins[j].InputSource()
+
+	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
+	case -1:
+		return true
+	case 0:
+		return iIndex < jIndex
+	default:
+		return false
+	}
+}
+func (ins *innerSortTransferableInputsWithSigners) Len() int { return len(ins.ins) }
+func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
+	ins.ins[j], ins.ins[i] = ins.ins[i], ins.ins[j]
+	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]
+}
+
+// SortTransferableInputsWithSigners sorts the inputs and signers based on the
+// input's utxo ID
+func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
+	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
+}
+
+// IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
+// sorted and unique
+func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
+	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }

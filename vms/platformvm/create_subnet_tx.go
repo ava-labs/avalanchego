@@ -25,9 +25,6 @@ var (
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
-	// The VM this tx exists within
-	vm *VM
-
 	// NetworkID is the ID of the network this tx was issued on
 	NetworkID uint32 `serialize:"true"`
 
@@ -54,6 +51,9 @@ type CreateSubnetTx struct {
 	// (ie the account whose ID is [key].Address())
 	// [key] is non-nil iff this tx is valid
 	key crypto.PublicKey
+
+	// The VM this tx exists within
+	vm *VM
 
 	// ID is this transaction's ID
 	id ids.ID
@@ -135,7 +135,7 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 
 	// Register new subnet in validator manager
 	onAccept := func() {
-		tx.vm.Validators.PutValidatorSet(tx.id, validators.NewSet())
+		tx.vm.validators.PutValidatorSet(tx.id, validators.NewSet())
 	}
 
 	return onAccept, nil
@@ -171,15 +171,12 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []ids.ShortID,
 	threshold uint16, payerKey *crypto.PrivateKeySECP256K1R,
 ) (*CreateSubnetTx, error) {
-	tx := &CreateSubnetTx{
-		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
-			vm:          vm,
-			NetworkID:   networkID,
-			Nonce:       nonce,
-			ControlKeys: controlKeys,
-			Threshold:   threshold,
-		},
-	}
+	tx := &CreateSubnetTx{UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
+		NetworkID:   networkID,
+		Nonce:       nonce,
+		ControlKeys: controlKeys,
+		Threshold:   threshold,
+	}}
 
 	if threshold == 0 && len(tx.ControlKeys) > 0 {
 		return nil, errUnneededKeys

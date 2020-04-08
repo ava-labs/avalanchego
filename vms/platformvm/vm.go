@@ -24,8 +24,10 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 const (
@@ -108,6 +110,13 @@ func init() {
 		Codec.RegisterType(&Abort{}),
 		Codec.RegisterType(&Commit{}),
 		Codec.RegisterType(&StandardBlock{}),
+		Codec.RegisterType(&AtomicBlock{}),
+
+		Codec.RegisterType(&secp256k1fx.MintOutput{}),
+		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
+		Codec.RegisterType(&secp256k1fx.MintInput{}),
+		Codec.RegisterType(&secp256k1fx.TransferInput{}),
+		Codec.RegisterType(&secp256k1fx.Credential{}),
 
 		Codec.RegisterType(&UnsignedAddDefaultSubnetValidatorTx{}),
 		Codec.RegisterType(&addDefaultSubnetValidatorTx{}),
@@ -124,6 +133,12 @@ func init() {
 		Codec.RegisterType(&UnsignedCreateSubnetTx{}),
 		Codec.RegisterType(&CreateSubnetTx{}),
 
+		Codec.RegisterType(&UnsignedImportTx{}),
+		Codec.RegisterType(&ImportTx{}),
+
+		Codec.RegisterType(&UnsignedExportTx{}),
+		Codec.RegisterType(&ExportTx{}),
+
 		Codec.RegisterType(&advanceTimeTx{}),
 		Codec.RegisterType(&rewardValidatorTx{}),
 	)
@@ -137,14 +152,23 @@ type VM struct {
 	*core.SnowmanVM
 
 	// Node's validator manager
-	// Maps Subnets --> nodes in the Subnet
-	Validators validators.Manager
+	// Maps Subnets --> nodes in the Subnet HEAD
+	validators validators.Manager
 
 	// true if the node is being run with staking enabled
-	StakingEnabled bool
+	stakingEnabled bool
 
 	// The node's chain manager
-	ChainManager chains.Manager
+	chainManager chains.Manager
+
+	// AVA asset ID
+	ava ids.ID
+
+	// AVM is the ID of the ava virtual machine
+	avm ids.ID
+
+	fx    secp256k1fx.Fx
+	codec codec.Codec
 
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
@@ -159,6 +183,7 @@ type VM struct {
 	// Transactions that have not been put into blocks yet
 	unissuedEvents      *EventHeap
 	unissuedDecisionTxs []DecisionTx
+	unissuedAtomicTxs   []AtomicTx
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
@@ -185,6 +210,12 @@ func (vm *VM) Initialize(
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
 		return err
 	}
+
+	vm.codec = codec.NewDefault()
+	if err := vm.fx.Initialize(vm); err != nil {
+		return err
+	}
+	vm.codec = Codec
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()
@@ -327,12 +358,12 @@ func (vm *VM) initSubnets() error {
 // the Subnet that validates the chain
 func (vm *VM) createChain(tx *CreateChainTx) {
 	// The validators that compose the Subnet that validates this chain
-	validators, subnetExists := vm.Validators.GetValidatorSet(tx.SubnetID)
+	validators, subnetExists := vm.validators.GetValidatorSet(tx.SubnetID)
 	if !subnetExists {
 		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		return
 	}
-	if !validators.Contains(vm.Ctx.NodeID) && vm.StakingEnabled { // This node doesn't validate this blockchain
+	if !validators.Contains(vm.Ctx.NodeID) && vm.stakingEnabled { // This node doesn't validate this blockchain
 		return
 	}
 
@@ -345,7 +376,7 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 	for _, fxID := range tx.FxIDs {
 		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
 	}
-	vm.ChainManager.CreateChain(chainParams)
+	vm.chainManager.CreateChain(chainParams)
 }
 
 // Shutdown this blockchain
@@ -370,6 +401,24 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		var txs []DecisionTx
 		txs, vm.unissuedDecisionTxs = vm.unissuedDecisionTxs[:numTxs], vm.unissuedDecisionTxs[numTxs:]
 		blk, err := vm.newStandardBlock(preferredID, txs)
+		if err != nil {
+			return nil, err
+		}
+		if err := blk.Verify(); err != nil {
+			vm.resetTimer()
+			return nil, err
+		}
+		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+			return nil, err
+		}
+		return blk, vm.DB.Commit()
+	}
+
+	// If there is a pending atomic tx, build a block with it
+	if len(vm.unissuedAtomicTxs) > 0 {
+		tx := vm.unissuedAtomicTxs[0]
+		vm.unissuedAtomicTxs = vm.unissuedAtomicTxs[1:]
+		blk, err := vm.newAtomicBlock(preferredID, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -547,9 +596,9 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 // Check if there is a block ready to be added to consensus
 // If so, notify the consensus engine
 func (vm *VM) resetTimer() {
-	// If there is a pending CreateChainTx, trigger building of a block
-	// with that transaction
-	if len(vm.unissuedDecisionTxs) > 0 {
+	// If there is a pending transaction, trigger building of a block with that
+	// transaction
+	if len(vm.unissuedDecisionTxs) > 0 || len(vm.unissuedAtomicTxs) > 0 {
 		vm.SnowmanVM.NotifyBlockReady()
 		return
 	}
@@ -723,10 +772,10 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 
 // update the node's validator manager to contain the current validator set of the given Subnet
 func (vm *VM) updateValidators(subnetID ids.ID) error {
-	validatorSet, subnetInitialized := vm.Validators.GetValidatorSet(subnetID)
+	validatorSet, subnetInitialized := vm.validators.GetValidatorSet(subnetID)
 	if !subnetInitialized { // validator manager doesn't know about this subnet yet
 		validatorSet = validators.NewSet()
-		vm.Validators.PutValidatorSet(subnetID, validatorSet)
+		vm.validators.PutValidatorSet(subnetID, validatorSet)
 	}
 
 	currentValidators, err := vm.getCurrentValidators(vm.DB, subnetID)
@@ -737,4 +786,35 @@ func (vm *VM) updateValidators(subnetID ids.ID) error {
 	validators := vm.getValidators(currentValidators)
 	validatorSet.Set(validators)
 	return nil
+}
+
+// Codec ...
+func (vm *VM) Codec() codec.Codec { return vm.codec }
+
+// Clock ...
+func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+
+	utxoIDs := ids.Set{}
+	for _, addr := range addrs.List() {
+		utxos, _ := state.AVMFunds(addr)
+		utxoIDs.Add(utxos...)
+	}
+
+	utxos := []*ava.UTXO{}
+	for _, utxoID := range utxoIDs.List() {
+		utxo, err := state.AVMUTXO(utxoID)
+		if err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
 }

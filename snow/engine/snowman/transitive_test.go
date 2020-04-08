@@ -280,6 +280,18 @@ func TestEngineQuery(t *testing.T) {
 		if !bytes.Equal(b, blk1.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
+
+		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+			switch {
+			case blkID.Equals(blk.ID()):
+				return blk, nil
+			case blkID.Equals(blk1.ID()):
+				return blk1, nil
+			}
+			t.Fatalf("Wrong block requested")
+			panic("Should have failed")
+		}
+
 		return blk1, nil
 	}
 	te.Put(vdr.ID(), *getRequestID, blk1.ID(), blk1.Bytes())
@@ -419,6 +431,17 @@ func TestEngineMultipleQuery(t *testing.T) {
 	te.Chits(vdr1.ID(), *queryRequestID, blkSet)
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+			switch {
+			case blkID.Equals(blk0.ID()):
+				return blk0, nil
+			case blkID.Equals(blk1.ID()):
+				return blk1, nil
+			}
+			t.Fatalf("Wrong block requested")
+			panic("Should have failed")
+		}
+
 		return blk1, nil
 	}
 
@@ -1076,5 +1099,62 @@ func TestEngineRetryFetch(t *testing.T) {
 
 	if !*called {
 		t.Fatalf("Should have requested the block again")
+	}
+}
+
+func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
+	vdr, _, sender, vm, te, gBlk := setup(t)
+
+	sender.Default(true)
+
+	validBlk := &Blk{
+		parent: gBlk,
+		id:     GenerateID(),
+		height: 1,
+		status: choices.Processing,
+		bytes:  []byte{1},
+	}
+
+	invalidBlk := &Blk{
+		parent:   validBlk,
+		id:       GenerateID(),
+		height:   2,
+		status:   choices.Processing,
+		validity: errors.New("invalid due to an undeclared dependency"),
+		bytes:    []byte{2},
+	}
+
+	validBlkID := validBlk.ID()
+	invalidBlkID := invalidBlk.ID()
+
+	reqID := new(uint32)
+	sender.PushQueryF = func(_ ids.ShortSet, requestID uint32, _ ids.ID, _ []byte) {
+		*reqID = requestID
+	}
+
+	te.insert(validBlk)
+
+	sender.PushQueryF = nil
+
+	te.insert(invalidBlk)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID.Equals(validBlkID):
+			return validBlk, nil
+		case blkID.Equals(invalidBlkID):
+			return invalidBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	votes := ids.Set{}
+	votes.Add(invalidBlkID)
+	te.Chits(vdr.ID(), *reqID, votes)
+
+	vm.GetBlockF = nil
+
+	if status := validBlk.Status(); status != choices.Accepted {
+		t.Fatalf("Should have bubbled invalid votes to the valid parent")
 	}
 }

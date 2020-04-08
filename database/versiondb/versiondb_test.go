@@ -256,6 +256,72 @@ func TestCommitClosedDelete(t *testing.T) {
 	}
 }
 
+func TestAbort(t *testing.T) {
+	baseDB := memdb.New()
+	db := New(baseDB)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	if err := db.Put(key1, value1); err != nil {
+		t.Fatalf("Unexpected error on db.Put: %s", err)
+	}
+
+	if value, err := db.Get(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(value, value1) {
+		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
+	} else if has, err := baseDB.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, false)
+	}
+
+	db.Abort()
+
+	if has, err := db.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, false)
+	} else if has, err := baseDB.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, false)
+	}
+}
+
+func TestCommitBatch(t *testing.T) {
+	baseDB := memdb.New()
+	db := New(baseDB)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	if err := db.Put(key1, value1); err != nil {
+		t.Fatalf("Unexpected error on db.Put: %s", err)
+	}
+
+	batch, err := db.CommitBatch()
+	if err != nil {
+		t.Fatalf("Unexpected error on db.CommitBatch: %s", err)
+	}
+	db.Abort()
+
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+
+	if value, err := db.Get(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(value, value1) {
+		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
+	} else if value, err := baseDB.Get(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(value, value1) {
+		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
+	}
+}
+
 func TestSetDatabase(t *testing.T) {
 	baseDB := memdb.New()
 	newDB := memdb.New()

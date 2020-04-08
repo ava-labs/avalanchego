@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -19,7 +20,7 @@ var (
 
 // OperableInput ...
 type OperableInput struct {
-	UTXOID `serialize:"true"`
+	ava.UTXOID `serialize:"true"`
 
 	In verify.Verifiable `serialize:"true" json:"input"`
 }

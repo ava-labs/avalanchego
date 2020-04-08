@@ -19,13 +19,17 @@ type Factory struct {
 	ChainManager   chains.Manager
 	Validators     validators.Manager
 	StakingEnabled bool
+	AVA            ids.ID
+	AVM            ids.ID
 }
 
 // New returns a new instance of the Platform Chain
 func (f *Factory) New() interface{} {
 	return &VM{
-		ChainManager:   f.ChainManager,
-		Validators:     f.Validators,
-		StakingEnabled: f.StakingEnabled,
+		chainManager:   f.ChainManager,
+		validators:     f.Validators,
+		stakingEnabled: f.StakingEnabled,
+		ava:            f.AVA,
+		avm:            f.AVM,
 	}
 }

@@ -184,6 +184,9 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 	return updateError(replay.err)
 }
 
+// Inner returns itself
+func (b *batch) Inner() database.Batch { return b }
+
 type replayer struct {
 	writer database.KeyValueWriter
 	err    error
