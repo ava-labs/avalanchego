@@ -16,7 +16,6 @@ void add(int x) {
 }
 
 void dec() {
-    void *ctx;
     count = externalDec(count);
 }
 

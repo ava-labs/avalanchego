@@ -9,6 +9,6 @@ type testFx struct {
 
 func (fx *testFx) Initialize(_ interface{}) error              { return fx.initialize }
 func (fx *testFx) VerifyTransfer(_, _, _, _ interface{}) error { return fx.verifyTransfer }
-func (fx *testFx) VerifyOperation(_ interface{}, _, _, _, _ []interface{}) error {
+func (fx *testFx) VerifyOperation(_, _, _ interface{}, _ []interface{}) error {
 	return fx.verifyOperation
 }

@@ -34,7 +34,14 @@ func (vm *VM) Initialize(
 	msgs chan<- common.Message,
 	_ []*common.Fx,
 ) error {
-	ctx.Log.Debug("initiailizing wasmVM chain")
+	ctx.Log.Debug("initiailizing wasm chain")
+
+	if err := vm.SnowmanVM.Initialize(ctx, db, vm.ParseBlock, msgs); err != nil {
+		return fmt.Errorf("could initialize snowmanVM: %s", err)
+	}
+	if err := vm.registerDBTypes(); err != nil {
+		return fmt.Errorf("error initializing state: %v", err)
+	}
 
 	// Inititalize data structures
 	vm.contracts = make(map[[32]byte][]byte, 0)
@@ -43,10 +50,23 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("couldn't find contract")
 	}
-	vm.contracts[ids.Empty.Key()] = wasmBytes
 
-	if err := vm.SnowmanVM.Initialize(ctx, db, vm.ParseBlock, msgs); err != nil {
-		return fmt.Errorf("could initialize snowmanVM: %s", err)
+	if !vm.DBInitialized() {
+		ctx.Log.Debug("initializing state from genesis bytes") // TODO delete
+		genesisTx, err := vm.newCreateContractTx(
+			wasmBytes,
+		)
+		if err != nil {
+			return fmt.Errorf("couldn't make genesis tx: %v", err)
+		}
+		genesisTx.ID = ids.Empty
+		genesisBlock, err := vm.newBlock(ids.Empty, []tx{genesisTx})
+		if err != nil {
+			return fmt.Errorf("couldn't make genesis block: %v", err)
+		}
+		genesisBlock.Accept()
+		vm.SetDBInitialized()
+		vm.DB.Commit()
 	}
 
 	return nil

@@ -21,8 +21,10 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
@@ -48,6 +50,9 @@ var (
 // VM implements the avalanche.DAGVM interface
 type VM struct {
 	ids.Aliaser
+
+	ava      ids.ID
+	platform ids.ID
 
 	// Contains information of where this VM is executing
 	ctx *snow.Context
@@ -111,35 +116,23 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
+	c := codec.NewDefault()
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		vm.pubsub.Register("accepted"),
 		vm.pubsub.Register("rejected"),
 		vm.pubsub.Register("verified"),
+
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
 	)
 	if errs.Errored() {
 		return errs.Err
 	}
-
-	vm.state = &prefixedState{
-		state: &state{
-			c:  &cache.LRU{Size: stateCacheSize},
-			vm: vm,
-		},
-
-		tx:       &cache.LRU{Size: idCacheSize},
-		utxo:     &cache.LRU{Size: idCacheSize},
-		txStatus: &cache.LRU{Size: idCacheSize},
-		funds:    &cache.LRU{Size: idCacheSize},
-
-		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
-	}
-
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
 
 	vm.fxs = make([]*parsedFx, len(fxs))
 	for i, fxContainer := range fxs {
@@ -165,6 +158,21 @@ func (vm *VM) Initialize(
 	}
 
 	vm.codec = c
+
+	vm.state = &prefixedState{
+		state: &state{State: ava.State{
+			Cache: &cache.LRU{Size: stateCacheSize},
+			DB:    vm.db,
+			Codec: vm.codec,
+		}},
+
+		tx:       &cache.LRU{Size: idCacheSize},
+		utxo:     &cache.LRU{Size: idCacheSize},
+		txStatus: &cache.LRU{Size: idCacheSize},
+		funds:    &cache.LRU{Size: idCacheSize},
+
+		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
+	}
 
 	if err := vm.initAliases(genesisBytes); err != nil {
 		return err
@@ -268,16 +276,41 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+
+	utxoIDs := ids.Set{}
+	for _, addr := range addrs.List() {
+		utxos, _ := state.PlatformFunds(addr)
+		utxoIDs.Add(utxos...)
+	}
+
+	utxos := []*ava.UTXO{}
+	for _, utxoID := range utxoIDs.List() {
+		utxo, err := state.PlatformUTXO(utxoID)
+		if err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
+}
+
 // GetUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
-func (vm *VM) GetUTXOs(addrs ids.Set) ([]*UTXO, error) {
+func (vm *VM) GetUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
 		utxos, _ := vm.state.Funds(addr)
 		utxoIDs.Add(utxos...)
 	}
 
-	utxos := []*UTXO{}
+	utxos := []*ava.UTXO{}
 	for _, utxoID := range utxoIDs.List() {
 		utxo, err := vm.state.UTXO(utxoID)
 		if err != nil {
@@ -299,6 +332,9 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 
 // Codec returns a reference to the internal codec of this VM
 func (vm *VM) Codec() codec.Codec { return vm.codec }
+
+// Logger returns a reference to the internal logger of this VM
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 /*
  ******************************************************************************
@@ -430,6 +466,32 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 	case len(vm.txs) == 1:
 		vm.timer.SetTimeoutIn(vm.batchTimeout)
 	}
+}
+
+func (vm *VM) getUTXO(utxoID *ava.UTXOID) (*ava.UTXO, error) {
+	inputID := utxoID.InputID()
+	utxo, err := vm.state.UTXO(inputID)
+	if err == nil {
+		return utxo, nil
+	}
+
+	inputTx, inputIndex := utxoID.InputSource()
+	parent := UniqueTx{
+		vm:   vm,
+		txID: inputTx,
+	}
+
+	if err := parent.Verify(); err != nil {
+		return nil, errMissingUTXO
+	} else if status := parent.Status(); status.Decided() {
+		return nil, errMissingUTXO
+	}
+
+	parentUTXOs := parent.UTXOs()
+	if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
+		return nil, errInvalidUTXO
+	}
+	return parentUTXOs[int(inputIndex)], nil
 }
 
 func (vm *VM) getFx(val interface{}) (int, error) {

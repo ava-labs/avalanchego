@@ -45,4 +45,4 @@ db*
 bin/
 build/
 
-*/mykey/staker.*
+keys/staker.*

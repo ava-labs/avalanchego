@@ -69,6 +69,9 @@ func (*Batch) Reset() {}
 // Replay does nothing
 func (*Batch) Replay(database.KeyValueWriter) error { return database.ErrClosed }
 
+// Inner returns itself
+func (b *Batch) Inner() database.Batch { return b }
+
 // Iterator does nothing
 type Iterator struct{ Err error }
 

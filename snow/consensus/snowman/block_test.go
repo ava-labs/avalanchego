@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 )
 
-type Blk struct {
+type TestBlock struct {
 	parent Block
 	id     ids.ID
 	height int
@@ -18,28 +18,28 @@ type Blk struct {
 	bytes  []byte
 }
 
-func (b *Blk) Parent() Block          { return b.parent }
-func (b *Blk) ID() ids.ID             { return b.id }
-func (b *Blk) Status() choices.Status { return b.status }
-func (b *Blk) Accept() {
+func (b *TestBlock) Parent() Block          { return b.parent }
+func (b *TestBlock) ID() ids.ID             { return b.id }
+func (b *TestBlock) Status() choices.Status { return b.status }
+func (b *TestBlock) Accept() {
 	if b.status.Decided() && b.status != choices.Accepted {
 		panic("Dis-agreement")
 	}
 	b.status = choices.Accepted
 }
-func (b *Blk) Reject() {
+func (b *TestBlock) Reject() {
 	if b.status.Decided() && b.status != choices.Rejected {
 		panic("Dis-agreement")
 	}
 	b.status = choices.Rejected
 }
-func (b *Blk) Verify() error { return nil }
-func (b *Blk) Bytes() []byte { return b.bytes }
+func (b *TestBlock) Verify() error { return nil }
+func (b *TestBlock) Bytes() []byte { return b.bytes }
 
-type sortBlks []*Blk
+type sortBlocks []*TestBlock
 
-func (sb sortBlks) Less(i, j int) bool { return sb[i].height < sb[j].height }
-func (sb sortBlks) Len() int           { return len(sb) }
-func (sb sortBlks) Swap(i, j int)      { sb[j], sb[i] = sb[i], sb[j] }
+func (sb sortBlocks) Less(i, j int) bool { return sb[i].height < sb[j].height }
+func (sb sortBlocks) Len() int           { return len(sb) }
+func (sb sortBlocks) Swap(i, j int)      { sb[j], sb[i] = sb[i], sb[j] }
 
-func SortVts(blks []*Blk) { sort.Sort(sortBlks(blks)) }
+func SortVts(blocks []*TestBlock) { sort.Sort(sortBlocks(blocks)) }

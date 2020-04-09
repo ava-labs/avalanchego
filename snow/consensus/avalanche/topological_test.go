@@ -27,12 +27,12 @@ func TestTopologicalTxIssued(t *testing.T) { TxIssuedTest(t, TopologicalFactory{
 func TestAvalancheVoting(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    2,
-			Alpha:                2,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -87,7 +87,7 @@ func TestAvalancheVoting(t *testing.T) {
 
 	if ta.Finalized() {
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !Matches([]ids.ID{vtx1.id}, ta.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx1.id}, ta.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
@@ -95,7 +95,7 @@ func TestAvalancheVoting(t *testing.T) {
 
 	if !ta.Finalized() {
 		t.Fatalf("An avalanche instance finalized too late")
-	} else if !Matches([]ids.ID{vtx1.id}, ta.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx1.id}, ta.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	} else if tx0.Status() != choices.Rejected {
 		t.Fatalf("Tx should have been rejected")
@@ -107,12 +107,12 @@ func TestAvalancheVoting(t *testing.T) {
 func TestAvalancheTransitiveVoting(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    2,
-			Alpha:                2,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -176,7 +176,7 @@ func TestAvalancheTransitiveVoting(t *testing.T) {
 
 	if ta.Finalized() {
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !Matches([]ids.ID{vtx2.id}, ta.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx2.id}, ta.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	} else if tx0.Status() != choices.Accepted {
 		t.Fatalf("Tx should have been accepted")
@@ -189,7 +189,7 @@ func TestAvalancheTransitiveVoting(t *testing.T) {
 
 	if !ta.Finalized() {
 		t.Fatalf("An avalanche instance finalized too late")
-	} else if !Matches([]ids.ID{vtx2.id}, ta.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx2.id}, ta.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	} else if tx0.Status() != choices.Accepted {
 		t.Fatalf("Tx should have been accepted")
@@ -201,12 +201,12 @@ func TestAvalancheTransitiveVoting(t *testing.T) {
 func TestAvalancheSplitVoting(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    2,
-			Alpha:                2,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -255,7 +255,7 @@ func TestAvalancheSplitVoting(t *testing.T) {
 
 	if !ta.Finalized() {
 		t.Fatalf("An avalanche instance finalized too late")
-	} else if !Matches([]ids.ID{vtx0.id, vtx1.id}, ta.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx0.id, vtx1.id}, ta.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	} else if tx0.Status() != choices.Accepted {
 		t.Fatalf("Tx should have been accepted")
@@ -265,12 +265,12 @@ func TestAvalancheSplitVoting(t *testing.T) {
 func TestAvalancheTransitiveRejection(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    2,
-			Alpha:                2,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -340,7 +340,7 @@ func TestAvalancheTransitiveRejection(t *testing.T) {
 
 	if ta.Finalized() {
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !Matches([]ids.ID{vtx1.id}, ta.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx1.id}, ta.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
@@ -348,7 +348,7 @@ func TestAvalancheTransitiveRejection(t *testing.T) {
 
 	if ta.Finalized() {
 		t.Fatalf("An avalanche instance finalized too early")
-	} else if !Matches([]ids.ID{vtx1.id}, ta.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx1.id}, ta.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	} else if tx0.Status() != choices.Rejected {
 		t.Fatalf("Tx should have been rejected")
@@ -367,12 +367,12 @@ func TestAvalancheTransitiveRejection(t *testing.T) {
 func TestAvalancheVirtuous(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    2,
-			Alpha:                2,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -489,12 +489,12 @@ func TestAvalancheVirtuous(t *testing.T) {
 func TestAvalancheIsVirtuous(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    2,
-			Alpha:                2,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -573,12 +573,12 @@ func TestAvalancheIsVirtuous(t *testing.T) {
 func TestAvalancheQuiesce(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    1,
-			Alpha:                1,
-			BetaVirtuous:         1,
-			BetaRogue:            1,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 1,
+			Alpha:             1,
+			BetaVirtuous:      1,
+			BetaRogue:         1,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -667,12 +667,12 @@ func TestAvalancheQuiesce(t *testing.T) {
 func TestAvalancheOrphans(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:              prometheus.NewRegistry(),
-			K:                    1,
-			Alpha:                1,
-			BetaVirtuous:         math.MaxInt32,
-			BetaRogue:            math.MaxInt32,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 1,
+			Alpha:             1,
+			BetaVirtuous:      math.MaxInt32,
+			BetaRogue:         math.MaxInt32,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,

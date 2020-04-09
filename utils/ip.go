@@ -55,9 +55,3 @@ func ToIPDesc(str string) (IPDesc, error) {
 		Port: uint16(port),
 	}, nil
 }
-
-// MyIP ...
-func MyIP() net.IP {
-	// TODO: Change this to consult a json-returning external service
-	return net.ParseIP("127.0.0.1")
-}

@@ -25,8 +25,9 @@ type Blk struct {
 	parent snowman.Block
 	id     ids.ID
 
-	height int
-	status choices.Status
+	height   int
+	status   choices.Status
+	validity error
 
 	bytes []byte
 }
@@ -36,7 +37,7 @@ func (b *Blk) Parent() snowman.Block  { return b.parent }
 func (b *Blk) Accept()                { b.status = choices.Accepted }
 func (b *Blk) Reject()                { b.status = choices.Rejected }
 func (b *Blk) Status() choices.Status { return b.status }
-func (b *Blk) Verify() error          { return nil }
+func (b *Blk) Verify() error          { return b.validity }
 func (b *Blk) Bytes() []byte          { return b.bytes }
 
 type sortBks []*Blk

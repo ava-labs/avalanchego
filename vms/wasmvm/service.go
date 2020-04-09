@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -15,7 +14,7 @@ import (
 // * values are API handlers
 // See API documentation for more information
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
-	handler := vm.SnowmanVM.NewHandler("salesforce", &Service{vm: vm})
+	handler := vm.SnowmanVM.NewHandler("wasm", &Service{vm: vm})
 	return map[string]*common.HTTPHandler{"": handler}
 }
 
@@ -24,6 +23,7 @@ type Service struct {
 	vm *VM
 }
 
+/*
 // ArgAPI is the API repr of a function argument
 type ArgAPI struct {
 	Type  string
@@ -54,12 +54,25 @@ func (arg *ArgAPI) toArg() (Argument, error) {
 		return Argument{}, errors.New("arg type must be int or string")
 	}
 }
+*/
 
 // InvokeArgs ...
 type InvokeArgs struct {
-	ContractID ids.ID   `json:"contractID"`
-	Function   string   `json:"function"`
-	Args       []ArgAPI `json:"args"`
+	ContractID ids.ID        `json:"contractID"`
+	Function   string        `json:"function"`
+	Args       []interface{} `json:"args"`
+}
+
+func (args *InvokeArgs) validate() error {
+	/*
+		if args.ContractID.Equals(ids.Empty) {
+			return errors.New("contractID not specified")
+		}
+	*/
+	if args.Function == "" {
+		return errors.New("function not specified")
+	}
+	return nil
 }
 
 // InvokeResponse ...
@@ -70,16 +83,11 @@ type InvokeResponse struct {
 // Invoke ...
 func (s *Service) Invoke(_ *http.Request, args *InvokeArgs, response *InvokeResponse) error {
 	s.vm.Ctx.Log.Debug("in invoke")
-	var fnArgs []Argument
-	for _, arg := range args.Args {
-		fnArg, err := arg.toArg()
-		if err != nil {
-			return fmt.Errorf("bad argument: %v", err)
-		}
-		fnArgs = append(fnArgs, fnArg)
+	if err := args.validate(); err != nil {
+		return fmt.Errorf("arguments failed validation: %v", err)
 	}
 
-	tx, err := s.vm.newInvokeTx(args.ContractID, args.Function, fnArgs)
+	tx, err := s.vm.newInvokeTx(args.ContractID, args.Function, args.Args)
 	if err != nil {
 		return fmt.Errorf("error creating tx: %s", err)
 	}

@@ -9,10 +9,12 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 var (
 	errAssetIDMismatch = errors.New("asset IDs in the input don't match the utxo")
+	errWrongAssetID    = errors.New("asset ID must be AVA in the atomic tx")
 	errMissingUTXO     = errors.New("missing utxo")
 	errUnknownTx       = errors.New("transaction is unknown")
 	errRejectedTx      = errors.New("transaction is rejected")
@@ -22,6 +24,7 @@ var (
 // performance boost
 type UniqueTx struct {
 	*TxState
+
 	vm   *VM
 	txID ids.ID
 }
@@ -34,8 +37,8 @@ type TxState struct {
 	validity                          error
 
 	inputs     ids.Set
-	inputUTXOs []*UTXOID
-	utxos      []*UTXO
+	inputUTXOs []*ava.UTXOID
+	utxos      []*ava.UTXO
 	deps       []snowstorm.Tx
 
 	status choices.Status
@@ -97,13 +100,20 @@ func (tx *UniqueTx) ID() ids.ID { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() {
+	defer tx.vm.db.Abort()
+
 	if err := tx.setStatus(choices.Accepted); err != nil {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
 		return
 	}
 
 	// Remove spent utxos
-	for _, utxoID := range tx.InputIDs().List() {
+	for _, utxo := range tx.InputUTXOs() {
+		if utxo.Symbolic() {
+			// If the UTXO is symbolic, it can't be spent
+			continue
+		}
+		utxoID := utxo.InputID()
 		if err := tx.vm.state.SpendUTXO(utxoID); err != nil {
 			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
 			return
@@ -119,11 +129,18 @@ func (tx *UniqueTx) Accept() {
 	}
 
 	txID := tx.ID()
-	tx.vm.ctx.Log.Verbo("Accepting Tx: %s", txID)
-
-	if err := tx.vm.db.Commit(); err != nil {
-		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", tx.txID, err)
+	commitBatch, err := tx.vm.db.CommitBatch()
+	if err != nil {
+		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
+		return
 	}
+
+	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
+		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
+		return
+	}
+
+	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish("accepted", txID)
 
@@ -136,6 +153,8 @@ func (tx *UniqueTx) Accept() {
 
 // Reject is called when the transaction was finalized as rejected by consensus
 func (tx *UniqueTx) Reject() {
+	defer tx.vm.db.Abort()
+
 	if err := tx.setStatus(choices.Rejected); err != nil {
 		tx.vm.ctx.Log.Error("Failed to reject tx %s due to %s", tx.txID, err)
 		return
@@ -172,6 +191,9 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 
 	txIDs := ids.Set{}
 	for _, in := range tx.InputUTXOs() {
+		if in.Symbolic() {
+			continue
+		}
 		txID, _ := in.InputSource()
 		if !txIDs.Contains(txID) {
 			txIDs.Add(txID)
@@ -207,7 +229,7 @@ func (tx *UniqueTx) InputIDs() ids.Set {
 }
 
 // InputUTXOs returns the utxos that will be consumed on tx acceptance
-func (tx *UniqueTx) InputUTXOs() []*UTXOID {
+func (tx *UniqueTx) InputUTXOs() []*ava.UTXOID {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.inputUTXOs) != 0 {
 		return tx.inputUTXOs
@@ -217,7 +239,7 @@ func (tx *UniqueTx) InputUTXOs() []*UTXOID {
 }
 
 // UTXOs returns the utxos that will be added to the UTXO set on tx acceptance
-func (tx *UniqueTx) UTXOs() []*UTXO {
+func (tx *UniqueTx) UTXOs() []*ava.UTXO {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.utxos) != 0 {
 		return tx.utxos
@@ -271,18 +293,18 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	tx.verifiedState = true
-	tx.validity = tx.Tx.SemanticVerify(tx.vm, tx)
-
-	if tx.validity == nil {
-		tx.vm.pubsub.Publish("verified", tx.ID())
+	if err := tx.Tx.SemanticVerify(tx.vm, tx); err != nil {
+		return err
 	}
-	return tx.validity
+
+	tx.verifiedState = true
+	tx.vm.pubsub.Publish("verified", tx.ID())
+	return nil
 }
 
 // UnsignedBytes returns the unsigned bytes of the transaction
 func (tx *UniqueTx) UnsignedBytes() []byte {
-	b, err := tx.vm.codec.Marshal(&tx.Tx.UnsignedTx)
+	b, err := tx.vm.codec.Marshal(&tx.UnsignedTx)
 	tx.vm.ctx.Log.AssertNoError(err)
 	return b
 }

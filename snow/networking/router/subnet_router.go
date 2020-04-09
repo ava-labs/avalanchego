@@ -38,7 +38,9 @@ func (sr *ChainRouter) AddChain(chain *handler.Handler) {
 	sr.lock.Lock()
 	defer sr.lock.Unlock()
 
-	sr.chains[chain.Context().ChainID.Key()] = chain
+	chainID := chain.Context().ChainID
+	sr.log.Debug("Adding %s to the routing table", chainID)
+	sr.chains[chainID.Key()] = chain
 }
 
 // RemoveChain removes the specified chain so that incoming

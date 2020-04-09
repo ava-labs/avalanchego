@@ -15,13 +15,13 @@ import (
 
 type Network struct {
 	params         snowball.Parameters
-	colors         []*Blk
+	colors         []*TestBlock
 	nodes, running []Consensus
 }
 
 func (n *Network) shuffleColors() {
 	s := random.Uniform{N: len(n.colors)}
-	colors := []*Blk(nil)
+	colors := []*TestBlock(nil)
 	for s.CanSample() {
 		colors = append(colors, n.colors[s.Sample()])
 	}
@@ -31,7 +31,7 @@ func (n *Network) shuffleColors() {
 
 func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 	n.params = params
-	n.colors = append(n.colors, &Blk{
+	n.colors = append(n.colors, &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
 		status: choices.Processing,
@@ -39,7 +39,7 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 
 	for i := 1; i < numColors; i++ {
 		dependency := n.colors[random.Rand(0, len(n.colors))]
-		n.colors = append(n.colors, &Blk{
+		n.colors = append(n.colors, &TestBlock{
 			parent: dependency,
 			id:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
 			height: dependency.height + 1,
@@ -58,7 +58,7 @@ func (n *Network) AddNode(sm Consensus) {
 		if !found {
 			myDep = blk.parent
 		}
-		myVtx := &Blk{
+		myVtx := &TestBlock{
 			parent: myDep,
 			id:     blk.id,
 			height: blk.height,

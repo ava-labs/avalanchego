@@ -33,6 +33,14 @@ var (
 	Err    error
 )
 
+// GetIPs returns the default IPs for each network
+func GetIPs(networkID uint32) []string {
+	switch networkID {
+	default:
+		return nil
+	}
+}
+
 var (
 	errBootstrapMismatch = errors.New("more bootstrap IDs provided than bootstrap IPs")
 )
@@ -73,22 +81,22 @@ func init() {
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
 
 	// Bootstrapping:
-	bootstrapIPs := fs.String("bootstrap-ips", "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	bootstrapIDs := fs.String("bootstrap-ids", "", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	bootstrapIPs := fs.String("bootstrap-ips", "default", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
 	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
-	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "", "TLS private key file for staking connections")
-	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "", "TLS certificate file for staking connections")
+	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "keys/staker.key", "TLS private key file for staking connections")
+	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "keys/staker.crt", "TLS certificate file for staking connections")
 
 	// Logging:
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
 	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 
-	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 20, "Number of nodes to query for each network poll")
-	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 18, "Alpha value to use for required number positive results")
+	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 5, "Number of nodes to query for each network poll")
+	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 4, "Alpha value to use for required number positive results")
 	fs.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 20, "Beta value to use for virtuous transactions")
 	fs.IntVar(&Config.ConsensusParams.BetaRogue, "snow-rogue-commit-threshold", 30, "Beta value to use for rogue transactions")
 	fs.IntVar(&Config.ConsensusParams.Parents, "snow-avalanche-num-parents", 5, "Number of vertexes for reference from each new vertex")
@@ -120,10 +128,6 @@ func init() {
 	networkID, err := genesis.NetworkID(*networkName)
 	errs.Add(err)
 
-	if networkID != genesis.LocalID {
-		errs.Add(fmt.Errorf("the only supported networkID is: %s", genesis.LocalName))
-	}
-
 	Config.NetworkID = networkID
 
 	// DB:
@@ -143,7 +147,11 @@ func init() {
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
 		ip, err = Config.Nat.ExternalIP()
-		errs.Add(fmt.Errorf("%s\nIf you are trying to create a local network, try adding --public-ip=127.0.0.1", err))
+		errs.Add(fmt.Errorf(
+			"%s\n"+
+				"If you are trying to create a local network, try adding --public-ip=127.0.0.1\n"+
+				"If you are attempting to connect to a public network, you may need to manually report your IP and perform port forwarding",
+			err))
 	} else {
 		ip = net.ParseIP(*consensusIP)
 	}
@@ -157,6 +165,9 @@ func init() {
 	}
 
 	// Bootstrapping:
+	if *bootstrapIPs == "default" {
+		*bootstrapIPs = strings.Join(GetIPs(networkID), ",")
+	}
 	for _, ip := range strings.Split(*bootstrapIPs, ",") {
 		if ip != "" {
 			addr, err := utils.ToIPDesc(ip)
@@ -164,6 +175,14 @@ func init() {
 			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
 				IP: addr,
 			})
+		}
+	}
+
+	if *bootstrapIDs == "default" {
+		if *bootstrapIPs == "" {
+			*bootstrapIDs = ""
+		} else {
+			*bootstrapIDs = strings.Join(genesis.GetConfig(networkID).StakerIDs, ",")
 		}
 	}
 	if Config.EnableStaking {

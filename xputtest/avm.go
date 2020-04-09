@@ -8,11 +8,9 @@ import (
 
 	"github.com/ava-labs/salticidae-go"
 
-	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/networking"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/platformvm"
@@ -25,11 +23,8 @@ func (n *network) benchmarkAVM(chain *platformvm.CreateChainTx) {
 	wallet, err := avmwallet.NewWallet(n.log, n.networkID, chain.ID(), config.AvaTxFee)
 	n.log.AssertNoError(err)
 
-	cb58 := formatting.CB58{}
-	keyStr := genesis.Keys[config.Key]
-	n.log.AssertNoError(cb58.FromString(keyStr))
 	factory := crypto.FactorySECP256K1R{}
-	sk, err := factory.ToPrivateKey(cb58.Bytes)
+	sk, err := factory.ToPrivateKey(config.Key)
 	n.log.AssertNoError(err)
 	wallet.ImportKey(sk.(*crypto.PrivateKeySECP256K1R))
 

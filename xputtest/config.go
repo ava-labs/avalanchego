@@ -23,8 +23,10 @@ type Config struct {
 	LoggingConfig logging.Config
 
 	// Key describes which key to use to issue transactions
+	Key []byte
+
 	// NumTxs describes the number of transactions to issue
 	// MaxOutstandingTxs describes how many txs to pipeline
-	Key, NumTxs, MaxOutstandingTxs int
-	Chain                          ChainType
+	NumTxs, MaxOutstandingTxs int
+	Chain                     ChainType
 }

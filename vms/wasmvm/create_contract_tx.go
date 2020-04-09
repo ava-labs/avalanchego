@@ -12,7 +12,7 @@ import (
 type createContractTx struct {
 	vm *VM
 
-	// ID of this tx
+	// ID of this tx and the contract being created
 	ID ids.ID `serialize:"true"`
 
 	// Byte rept. of the transaction
@@ -53,11 +53,17 @@ func (tx *createContractTx) SemanticVerify(database.Database) error {
 }
 
 func (tx *createContractTx) Accept() {
-	tx.vm.contracts[tx.ID.Key()] = tx.WasmBytes
+	tx.vm.Ctx.Log.Debug("creating contract %s", tx.ID) // TODO delete
+	if err := tx.vm.putContract(tx.vm.DB, tx.ID, tx.WasmBytes); err != nil {
+		tx.vm.Ctx.Log.Error("couldn't put new contract in db: %v", err)
+	}
+	if err := tx.vm.putContractState(tx.vm.DB, tx.ID, []byte{}); err != nil {
+		tx.vm.Ctx.Log.Error("couldn't initialize contract's state in db: %v", err)
+	}
 }
 
 // Creates a new tx with the given payload and a random ID
-func (vm *VM) newCreateContractTx(contractID ids.ID, wasmBytes []byte) (*createContractTx, error) {
+func (vm *VM) newCreateContractTx(wasmBytes []byte) (*createContractTx, error) {
 	var idBytes [32]byte
 	if n, err := rand.Read(idBytes[:32]); err != nil {
 		return nil, fmt.Errorf("couldn't generate new ID: %s", err)

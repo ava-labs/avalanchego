@@ -4,7 +4,10 @@
 package common
 
 import (
+	stdmath "math"
+
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/math"
 )
 
 // Bootstrapper implements the Engine interface.
@@ -15,7 +18,7 @@ type Bootstrapper struct {
 	acceptedFrontier        ids.Set
 
 	pendingAccepted ids.ShortSet
-	accepted        ids.Bag
+	acceptedVotes   map[[32]byte]uint64
 
 	RequestID uint32
 }
@@ -30,7 +33,7 @@ func (b *Bootstrapper) Initialize(config Config) {
 		b.pendingAccepted.Add(vdrID)
 	}
 
-	b.accepted.SetThreshold(config.Alpha)
+	b.acceptedVotes = make(map[[32]byte]uint64)
 }
 
 // Startup implements the Engine interface.
@@ -95,10 +98,29 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	}
 	b.pendingAccepted.Remove(validatorID)
 
-	b.accepted.Add(containerIDs.List()...)
+	weight := uint64(0)
+	if vdr, ok := b.Validators.Get(validatorID); ok {
+		weight = vdr.Weight()
+	}
+
+	for _, containerID := range containerIDs.List() {
+		key := containerID.Key()
+		previousWeight := b.acceptedVotes[key]
+		newWeight, err := math.Add64(weight, previousWeight)
+		if err != nil {
+			newWeight = stdmath.MaxUint64
+		}
+		b.acceptedVotes[key] = newWeight
+	}
 
 	if b.pendingAccepted.Len() == 0 {
-		accepted := b.accepted.Threshold()
+		accepted := ids.Set{}
+		for key, weight := range b.acceptedVotes {
+			if weight >= b.Config.Alpha {
+				accepted.Add(ids.NewID(key))
+			}
+		}
+
 		if size := accepted.Len(); size == 0 && b.Config.Beacons.Len() > 0 {
 			b.Context.Log.Warn("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this network yet")
 		} else {
