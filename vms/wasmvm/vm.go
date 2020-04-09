@@ -43,9 +43,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("error initializing state: %v", err)
 	}
 
-	// Inititalize data structures
-	vm.contracts = make(map[[32]byte][]byte, 0)
-
 	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/counter/counter.wasm")
 	if err != nil {
 		return fmt.Errorf("couldn't find contract")

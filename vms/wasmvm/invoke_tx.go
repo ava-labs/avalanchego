@@ -91,7 +91,7 @@ func (tx *invokeTx) Accept() {
 	// Call the function
 	val, err := fn(tx.Arguments...)
 	if err != nil {
-		tx.vm.Ctx.Log.Error("error during call to function '%s': err", tx.FunctionName, err)
+		tx.vm.Ctx.Log.Error("error during call to function '%s': %v", tx.FunctionName, err)
 	}
 
 	fmt.Printf("call to '%s' returned: %v\n", tx.FunctionName, val) // TODO how to get returned values out?

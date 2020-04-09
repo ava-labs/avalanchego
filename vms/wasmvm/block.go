@@ -24,7 +24,6 @@ func (b *Block) Initialize(bytes []byte, vm *VM) {
 
 // Accept this block
 func (b *Block) Accept() {
-	b.vm.Ctx.Log.Debug("accepting block %s", b.ID())
 	b.Block.Accept()
 	for _, tx := range b.Txs {
 		tx.Accept()
@@ -48,6 +47,7 @@ func (b *Block) Verify() error {
 		}
 	}
 
+	// TODO: If there's an error, return other txs to mempool
 	for _, tx := range b.Txs {
 		if err := tx.SemanticVerify(nil); err != nil { // TODO pass DB here
 			return err

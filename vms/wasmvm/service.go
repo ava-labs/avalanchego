@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -23,44 +24,53 @@ type Service struct {
 	vm *VM
 }
 
-/*
 // ArgAPI is the API repr of a function argument
 type ArgAPI struct {
 	Type  string
 	Value interface{}
 }
 
-func (arg *ArgAPI) toArg() (Argument, error) {
+// Return argument as its go type
+func (arg *ArgAPI) toFnArg() (interface{}, error) {
 	switch strings.ToLower(arg.Type) {
-	case "string":
-		s, ok := arg.Value.(string)
-		if !ok {
-			return Argument{}, errors.New("arg type is string but value given is not a string")
+	case "int32":
+		if valInt32, ok := arg.Value.(int32); ok {
+			return valInt32, nil
 		}
-		return Argument{
-			Type:  String,
-			Value: s,
-		}, nil
-	case "int":
-		i, ok := arg.Value.(int)
-		if !ok {
-			return Argument{}, errors.New("arg type is int but value given is not an int")
+		if valInt64, ok := arg.Value.(int64); ok {
+			return int32(valInt64), nil
 		}
-		return Argument{
-			Type:  String,
-			Value: i,
-		}, nil
+		if valFloat32, ok := arg.Value.(float32); ok {
+			return int32(valFloat32), nil
+		}
+		if valFloat64, ok := arg.Value.(float64); ok {
+			return int32(valFloat64), nil
+		}
+		return nil, fmt.Errorf("value '%v' is not convertible to int32", arg.Value)
+	case "int64":
+		if valInt32, ok := arg.Value.(int32); ok {
+			return int64(valInt32), nil
+		}
+		if valInt64, ok := arg.Value.(int64); ok {
+			return valInt64, nil
+		}
+		if valFloat32, ok := arg.Value.(float32); ok {
+			return int64(valFloat32), nil
+		}
+		if valFloat64, ok := arg.Value.(float64); ok {
+			return int64(valFloat64), nil
+		}
+		return nil, fmt.Errorf("value '%v' is not convertible to int64", arg.Value)
 	default:
-		return Argument{}, errors.New("arg type must be int or string")
+		return nil, errors.New("arg type must be one of: int32, int64")
 	}
 }
-*/
 
 // InvokeArgs ...
 type InvokeArgs struct {
-	ContractID ids.ID        `json:"contractID"`
-	Function   string        `json:"function"`
-	Args       []interface{} `json:"args"`
+	ContractID ids.ID   `json:"contractID"`
+	Function   string   `json:"function"`
+	Args       []ArgAPI `json:"args"`
 }
 
 func (args *InvokeArgs) validate() error {
@@ -87,7 +97,16 @@ func (s *Service) Invoke(_ *http.Request, args *InvokeArgs, response *InvokeResp
 		return fmt.Errorf("arguments failed validation: %v", err)
 	}
 
-	tx, err := s.vm.newInvokeTx(args.ContractID, args.Function, args.Args)
+	fnArgs := make([]interface{}, len(args.Args))
+	var err error
+	for i, arg := range args.Args {
+		fnArgs[i], err = arg.toFnArg()
+		if err != nil {
+			return fmt.Errorf("couldn't parse arg '%+v': %s", arg, err)
+		}
+	}
+
+	tx, err := s.vm.newInvokeTx(args.ContractID, args.Function, fnArgs)
 	if err != nil {
 		return fmt.Errorf("error creating tx: %s", err)
 	}
