@@ -24,6 +24,22 @@ var (
 	errMissing       = errors.New("missing")
 )
 
+func TestEngineShutdown(t *testing.T) {
+	config := DefaultConfig()
+	vmShutdownCalled := false
+	vm := &VMTest{}
+	vm.ShutdownF = func() { vmShutdownCalled = true }
+	config.VM = vm
+
+	transitive := &Transitive{}
+
+	transitive.Initialize(config)
+	transitive.finishBootstrapping()
+	transitive.Shutdown()
+	if !vmShutdownCalled {
+		t.Fatal("Shutting down the Transitive did not shutdown the VM")
+	}
+}
 func TestEngineAdd(t *testing.T) {
 	config := DefaultConfig()
 
