@@ -4,6 +4,7 @@
 package sender
 
 import (
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +17,20 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/logging"
 )
+
+func TestSenderContext(t *testing.T) {
+	context := snow.DefaultContextTest()
+	sender := Sender{}
+	sender.Initialize(
+		context,
+		&ExternalSenderTest{},
+		&router.ChainRouter{},
+		&timeout.Manager{},
+	)
+	if res := sender.Context(); !reflect.DeepEqual(res, context) {
+		t.Fatalf("Got %#v, expected %#v", res, context)
+	}
+}
 
 func TestTimeout(t *testing.T) {
 	tm := timeout.Manager{}
