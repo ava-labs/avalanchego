@@ -232,29 +232,23 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	return nil
 }
 
-// ListAssetsArgs are arguments for calling into ListAssets
-type ListAssetsArgs struct {
+// GetAllBalancesArgs are arguments for calling into GetAllBalances
+type GetAllBalancesArgs struct {
 	Address string `json:"address"`
 }
 
-type listAssetsReplyElement struct {
-	AssetID string      `json:"assetID"`
-	Balance json.Uint64 `json:"balance"`
+// GetAllBalancesReply is the response from a call to GetAllBalances
+type GetAllBalancesReply struct {
+	Balances map[string]json.Uint64 `json:"balances"`
 }
 
-// ListAssetsReply is the response from a call to ListAssets
-type ListAssetsReply struct {
-	Assets []listAssetsReplyElement `json:"assets"`
-}
-
-// ListAssets returns a list of maps where each map is:
+// GetAllBalances returns a map where:
 //   Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
 //   Value: The balance of the asset held by the address
-// Returns null if the address holds no assets
 // Note that balances include assets that the address only _partially_ owns
 // (ie is one of several addresses specified in a multi-sig)
-func (service *Service) ListAssets(r *http.Request, args *ListAssetsArgs, reply *ListAssetsReply) error {
-	service.vm.ctx.Log.Verbo("ListAssets called with address: %s", args.Address)
+func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
+	service.vm.ctx.Log.Verbo("GetAllBalances called with address: %s", args.Address)
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
@@ -291,8 +285,9 @@ func (service *Service) ListAssets(r *http.Request, args *ListAssetsArgs, reply 
 
 	sortedAssetIDs := assetIDs.List() // sort so response is always in same order
 	ids.SortIDs(sortedAssetIDs)
+	reply.Balances = make(map[string]json.Uint64, len(sortedAssetIDs))
 	for _, assetID := range sortedAssetIDs {
-		reply.Assets = append(reply.Assets, listAssetsReplyElement{assetID.String(), json.Uint64(balances[assetID.Key()])})
+		reply.Balances[assetID.String()] = json.Uint64(balances[assetID.Key()])
 	}
 
 	return nil
