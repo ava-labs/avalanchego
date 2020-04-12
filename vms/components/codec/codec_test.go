@@ -46,6 +46,7 @@ type myStruct struct {
 	InnerStruct  MyInnerStruct      `serialize:"true"`
 	InnerStruct2 *MyInnerStruct     `serialize:"true"`
 	Member1      int64              `serialize:"true"`
+	Member2      uint16             `serialize:"true"`
 	MyArray2     [5]string          `serialize:"true"`
 	MyArray3     [3]MyInnerStruct   `serialize:"true"`
 	MyArray4     [2]*MyInnerStruct2 `serialize:"true"`
@@ -67,6 +68,7 @@ func TestStruct(t *testing.T) {
 		InnerStruct:  MyInnerStruct{"hello"},
 		InnerStruct2: &MyInnerStruct{"yello"},
 		Member1:      1,
+		Member2:      2,
 		MySlice:      []byte{1, 2, 3, 4},
 		MySlice2:     []string{"one", "two", "three"},
 		MySlice3:     []MyInnerStruct{MyInnerStruct{"a"}, MyInnerStruct{"b"}, MyInnerStruct{"c"}},
@@ -407,6 +409,33 @@ func TestSerializeUnexportedField(t *testing.T) {
 	codec := NewDefault()
 	if _, err := codec.Marshal(myS); err != errMarshalUnexportedField {
 		t.Fatalf("expected err to be errUnexportedField but was %v", err)
+	}
+}
+
+func TestSerializeOfNoSerializeField(t *testing.T) {
+	type s struct {
+		SerializedField   string `serialize:"true"`
+		UnserializedField string `serialize:"false"`
+		UnmarkedField     string
+	}
+	myS := s{
+		SerializedField:   "Serialize me",
+		UnserializedField: "Do not serialize me",
+		UnmarkedField:     "No declared serialize",
+	}
+	codec := NewDefault()
+	marshalled, err := codec.Marshal(myS)
+	if err != nil {
+		t.Fatalf("Unexpected error %q", err)
+	}
+	unmarshalled := s{}
+	err = codec.Unmarshal(marshalled, &unmarshalled)
+	if err != nil {
+		t.Fatalf("Unexpected error %q", err)
+	}
+	expectedUnmarshalled := s{SerializedField: "Serialize me"}
+	if !reflect.DeepEqual(unmarshalled, expectedUnmarshalled) {
+		t.Fatalf("Got %#v, expected %#v", unmarshalled, expectedUnmarshalled)
 	}
 }
 
