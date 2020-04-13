@@ -37,6 +37,7 @@ func (tx *invokeTx) SyntacticVerify() error {
 	case tx.FunctionName == "":
 		return errors.New("function name is empty")
 	}
+	// TODO add more
 	return nil
 }
 
@@ -56,7 +57,7 @@ func (tx *invokeTx) Accept() {
 
 	// Parse contract to from bytes
 	imports := standardImports()
-	contract, err := wasm.NewInstanceWithImports(contractBytes, imports)
+	contract, err := wasm.NewInstanceWithImports(contractBytes, imports) // TODO: cache the contract object
 	if err != nil {
 		tx.vm.Ctx.Log.Error("couldn't instantiate contract: %v", err)
 		return

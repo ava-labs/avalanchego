@@ -1,12 +1,12 @@
 static mut COUNT: i32 = 0;
 
 extern "C" {
-    fn extSum(x: i32, y: i32) -> i32;
+    fn externalDec(count: i32) -> i32;
 }
 
 #[no_mangle]
-pub extern fn sum(x: i32, y: i32) -> i32 {
-    unsafe {extSum(x,y)}
+pub extern fn dec() {
+    unsafe {COUNT = externalDec(COUNT)}
 }
 
 #[no_mangle]
@@ -17,4 +17,9 @@ pub extern fn inc() {
 #[no_mangle]
 pub extern fn getCount() -> i32 {
     unsafe {return COUNT}
+}
+
+#[no_mangle]
+pub extern fn add(x: i32) {
+    unsafe {COUNT += x}
 }

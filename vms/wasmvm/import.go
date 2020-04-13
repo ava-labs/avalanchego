@@ -16,7 +16,8 @@ func externalDec(context unsafe.Pointer, x C.int) C.int {
 
 // Return the standard imports needed by all smart contracts
 func standardImports() *wasm.Imports {
-	imports, err := wasm.NewDefaultWasiImportObject().Imports()
+	// TODO: Do we need to use WASI?
+	imports, err := wasm.NewImportObject().Imports()
 	if err != nil {
 		panic(fmt.Sprintf("couldn't append wasi imports to imports: %v", err))
 	}

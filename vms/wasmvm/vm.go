@@ -43,7 +43,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("error initializing state: %v", err)
 	}
 
-	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/counter/counter.wasm")
+	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust-counter/pkg/rust_counter_bg.wasm")
 	if err != nil {
 		return fmt.Errorf("couldn't find contract")
 	}

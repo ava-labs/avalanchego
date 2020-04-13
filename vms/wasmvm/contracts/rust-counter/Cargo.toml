@@ -1,5 +1,5 @@
 [package]
-name = "rust-wasm-playing"
+name = "rust-counter"
 version = "0.1.0"
 authors = ["Dan Laine <daniel.laine@avalabs.org>"]
 edition = "2018"

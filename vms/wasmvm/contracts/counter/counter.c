@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include "mylib.h"
 
 int count = 0;
