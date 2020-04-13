@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/gecko/snow/choices"
@@ -104,6 +105,84 @@ func TestServiceGetTxStatus(t *testing.T) {
 			"Expected a submitted tx to have status %q, got %q",
 			expected.String(), statusReply.Status.String(),
 		)
+	}
+}
+
+func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
+	_, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	addr0 := keys[0].PublicKey().Address()
+	tests := []struct {
+		label string
+		args  *GetUTXOsArgs
+	}{
+		{"[", &GetUTXOsArgs{[]string{""}}},
+		{"[-]", &GetUTXOsArgs{[]string{"-"}}},
+		{"[foo]", &GetUTXOsArgs{[]string{"foo"}}},
+		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}}},
+		{"[<ChainID>]", &GetUTXOsArgs{[]string{ctx.ChainID.String()}}},
+		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}}},
+		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			utxosReply := &GetUTXOsReply{}
+			if err := s.GetUTXOs(nil, tt.args, utxosReply); err == nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestServiceGetUTXOs(t *testing.T) {
+	_, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	addr0 := keys[0].PublicKey().Address()
+	tests := []struct {
+		label string
+		args  *GetUTXOsArgs
+		count int
+	}{
+		{
+			"Empty",
+			&GetUTXOsArgs{},
+			0,
+		}, {
+			"[<ChainID>-<unrelated address>]",
+			&GetUTXOsArgs{[]string{
+				// TODO: Should GetUTXOs() raise an error for this? The address portion is
+				//		 longer than addr0.String()
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+			}},
+			0,
+		}, {
+			"[<ChainID>-<addr0>]",
+			&GetUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			}},
+			7,
+		}, {
+			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
+			&GetUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			}},
+			7,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			utxosReply := &GetUTXOsReply{}
+			if err := s.GetUTXOs(nil, tt.args, utxosReply); err != nil {
+				t.Error(err)
+			} else if tt.count != len(utxosReply.UTXOs) {
+				t.Errorf("Expected %d utxos, got %#v", tt.count, len(utxosReply.UTXOs))
+			}
+		})
 	}
 }
 
