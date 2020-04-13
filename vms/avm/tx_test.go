@@ -20,6 +20,9 @@ func TestTxNil(t *testing.T) {
 	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
+	if err := tx.SemanticVerify(nil, nil); err == nil {
+		t.Fatalf("Should have errored due to nil tx")
+	}
 }
 
 func TestTxEmpty(t *testing.T) {
