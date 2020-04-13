@@ -166,18 +166,20 @@ func BuildGenesisTest(t *testing.T) []byte {
 	return reply.Bytes.Bytes
 }
 
-func GenesisVM(t *testing.T) *VM {
+func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	genesisBytes := BuildGenesisTest(t)
 
+	// NB: this lock is intentionally left locked when this function returns.
+	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
 
+	issuer := make(chan common.Message, 1)
 	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
 		genesisBytes,
-		make(chan common.Message, 1),
+		issuer,
 		[]*common.Fx{&common.Fx{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
@@ -188,7 +190,7 @@ func GenesisVM(t *testing.T) *VM {
 	}
 	vm.batchTimeout = 0
 
-	return vm
+	return genesisBytes, issuer, vm
 }
 
 func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
@@ -477,26 +479,7 @@ type testTxBytes struct{ unsignedBytes []byte }
 func (tx *testTxBytes) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func TestIssueTx(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
+	genesisBytes, issuer, vm := GenesisVM(t)
 
 	newTx := NewTx(t, genesisBytes, vm)
 
@@ -520,24 +503,7 @@ func TestIssueTx(t *testing.T) {
 }
 
 func TestGenesisGetUTXOs(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		make(chan common.Message, 1),
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
+	_, _, vm := GenesisVM(t)
 
 	shortAddr := keys[0].PublicKey().Address()
 	addr := ids.NewID(hashing.ComputeHash256Array(shortAddr.Bytes()))
@@ -559,26 +525,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // Test issuing a transaction that consumes a currently pending UTXO. The
 // transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
+	genesisBytes, issuer, vm := GenesisVM(t)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 

@@ -743,28 +743,8 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerify(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
+	genesisBytes, _, vm := GenesisVM(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -827,28 +807,8 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
+	genesisBytes, _, vm := GenesisVM(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
 
 	vm.codec.RegisterType(&ava.TestVerifiable{})
 
@@ -896,28 +856,8 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
+	genesisBytes, _, vm := GenesisVM(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
 
 	vm.codec.RegisterType(&ava.TestVerifiable{})
 
@@ -1073,28 +1013,8 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
+	genesisBytes, _, vm := GenesisVM(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1144,28 +1064,8 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
+	genesisBytes, _, vm := GenesisVM(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1228,28 +1128,8 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
+	genesisBytes, _, vm := GenesisVM(t)
 	defer ctx.Lock.Unlock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1312,27 +1192,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
+	genesisBytes, issuer, vm := GenesisVM(t)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1463,27 +1323,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
-
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		issuer,
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.batchTimeout = 0
+	genesisBytes, issuer, vm := GenesisVM(t)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 

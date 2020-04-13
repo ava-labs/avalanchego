@@ -18,9 +18,11 @@ import (
 func setup(t *testing.T) ([]byte, *VM, *Service) {
 	genesisBytes := BuildGenesisTest(t)
 
-	// TODO: Could this initialization be replaced by a call to GenesisVM()
 	ctx.Lock.Lock()
 
+	// This is VM initilialzation is very silimar to that done by GenesisVM().
+	// However that function also sets vm.batchTimeout = 0, which causes the
+	// tests in this module to deadlock.
 	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
