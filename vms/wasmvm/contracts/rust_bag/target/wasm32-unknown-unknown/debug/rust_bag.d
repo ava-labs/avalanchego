@@ -1,0 +1,1 @@
+/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/target/wasm32-unknown-unknown/debug/rust_bag.wasm: /home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/src/lib.rs
