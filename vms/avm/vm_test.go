@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/propertyfx"
@@ -50,18 +49,7 @@ func init() {
 }
 
 func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
-
+	c := setupCodec()
 	genesis := Genesis{}
 	if err := c.Unmarshal(genesisBytes, &genesis); err != nil {
 		t.Fatal(err)
@@ -338,18 +326,7 @@ func TestTxSerialization(t *testing.T) {
 		})
 	}
 
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
-
+	c := setupCodec()
 	b, err := c.Marshal(tx)
 	if err != nil {
 		t.Fatal(err)
