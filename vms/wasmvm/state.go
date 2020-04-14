@@ -13,12 +13,12 @@ const (
 )
 
 // put a contract (in its raw byte form) in the database
-func (vm *VM) putContract(db database.Database, ID ids.ID, contract []byte) error {
+func (vm *VM) putContractBytes(db database.Database, ID ids.ID, contract []byte) error {
 	return vm.State.Put(db, contractTypeID, ID, bytes{contract})
 }
 
 // get a contract (in its raw byte form) by its ID
-func (vm *VM) getContract(db database.Database, ID ids.ID) ([]byte, error) {
+func (vm *VM) getContractBytes(db database.Database, ID ids.ID) ([]byte, error) {
 	contractIntf, err := vm.State.Get(db, contractTypeID, ID)
 	if err != nil {
 		return nil, err

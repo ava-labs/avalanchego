@@ -57,7 +57,7 @@ func (tx *createContractTx) SemanticVerify(database.Database) error {
 
 func (tx *createContractTx) Accept() {
 	tx.vm.Ctx.Log.Debug("creating contract %s", tx.ID) // TODO delete
-	if err := tx.vm.putContract(tx.vm.DB, tx.ID, tx.WasmBytes); err != nil {
+	if err := tx.vm.putContractBytes(tx.vm.DB, tx.ID, tx.WasmBytes); err != nil {
 		tx.vm.Ctx.Log.Error("couldn't put new contract in db: %v", err)
 	}
 	if err := tx.vm.putContractState(tx.vm.DB, tx.ID, []byte{}); err != nil {

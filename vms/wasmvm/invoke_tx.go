@@ -58,8 +58,8 @@ func (tx *invokeTx) SemanticVerify(database.Database) error {
 func (tx *invokeTx) Accept() {
 	// TODO: Move most of this to semanticVerify
 
-	// Get the contract's bytes
-	contractBytes, err := tx.vm.getContract(tx.vm.DB, tx.ContractID)
+	// Get the contract's byte repr.
+	contractBytes, err := tx.vm.getContractBytes(tx.vm.DB, tx.ContractID)
 	if err != nil {
 		tx.vm.Ctx.Log.Error("couldn't get contract %s", tx.ContractID, err)
 		return
