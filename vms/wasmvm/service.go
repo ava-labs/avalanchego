@@ -26,8 +26,8 @@ type Service struct {
 
 // ArgAPI is the API repr of a function argument
 type ArgAPI struct {
-	Type  string
-	Value interface{}
+	Type  string      `json:"type"`
+	Value interface{} `json:"value"`
 }
 
 // Return argument as its go type

@@ -95,7 +95,7 @@ func (tx *invokeTx) Accept() {
 		tx.vm.Ctx.Log.Error("error during call to function '%s': %v", tx.FunctionName, err)
 	}
 
-	fmt.Printf("call to '%s' returned: %v\n", tx.FunctionName, val) // TODO how to get returned values out?
+	tx.vm.Ctx.Log.Info("call to '%s' returned: %v", tx.FunctionName, val) // TODO how to get returned values out?
 
 	// Save the contract's state
 	state = contract.Memory.Data()

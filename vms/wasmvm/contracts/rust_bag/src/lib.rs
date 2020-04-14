@@ -22,44 +22,141 @@ pub struct Owner {
 
 pub struct Bag {
     pub id: u32,
+    pub price: u32,
     pub owner_id: u32,
-    pub condition: Condition,
-    pub num_transfers: u32
+    pub num_transfers: u32,
+    pub condition: Condition
 }
 
 // Create a new owner
-// TODO: Error handling...what if owner with this ID already exists?
-pub extern fn create_owner(id: u32) {
-    OWNERS.lock().unwrap().insert(id, 
-        Owner{
-            id: id,
-            bags: Vec::new()
+// Returns 0 on success
+// Returns -1 otherwise
+#[no_mangle]
+pub extern fn create_owner(id: u32) -> i32 {
+    let mut owners = OWNERS.lock().unwrap();
+    match owners.get(&id) {
+        Some(_) => -1,
+        None => {
+            owners.insert(id, Owner{
+                id: id,
+                bags: Vec::new()
+            });
+            0
         }
-    );
-}
-
-pub extern fn get_owner(id: u32) -> &'static Owner {
-    OWNERS.lock().unwrap().get(&id).unwrap()
+    }
 }
 
 // Create a new bag
 // Precondition: There is an owner with the specified ID
-// TODO error handling
-pub extern fn create_bag(id: u32, owner_id: u32) {
-    // Create the bag
-    BAGS.lock().unwrap().insert(id, 
-        Bag{
+// Returns 0 on success
+// Returns -1 otherwise
+#[no_mangle]
+pub extern fn create_bag(id: u32, owner_id: u32, price: u32) -> i32 {
+    // Check that the bag doesn't exist and the owner does 
+    let mut bags = BAGS.lock().unwrap();
+    if let Some(_) = bags.get(&id) {
+        return -1
+    }
+
+    let owners = &mut OWNERS.lock().unwrap();
+    if let None = owners.get(&owner_id) {
+        return -1
+    }
+
+    // Update bag list
+    bags.insert(id, Bag{
             id: id,
             owner_id: owner_id,
-            condition: Condition::New,
-            num_transfers: 0
+            num_transfers: 0,
+            price: price,
+            condition: Condition::New
         }
     );
     
-    // Update the owner TODO this
-    let owners = &mut OWNERS.lock().unwrap();
+    // Update the owner
     owners.get_mut(&owner_id).unwrap().bags.push(id);
+    0 //success
 }
 
-// Update the specified bag
-// pub extern update_bag(id: u32,)
+// Update the specified bag's price
+// Returns 0 on success
+// Returns -1 if the bag doesn't exist
+#[no_mangle]
+pub extern fn update_bag_price(id: u32, price: u32) -> i32 {
+    let bags = &mut BAGS.lock().unwrap();
+    if let Some(bag) = bags.get_mut(&id) {
+        bag.price=price;
+        0
+    } else {
+        -1
+    }
+}
+
+// Get a bag's price
+// Returns -1 if the bag doesn't exist
+#[no_mangle]
+pub extern fn get_bag_price(id: u32) -> i32 {
+    if let Some(bag) = BAGS.lock().unwrap().get(&id) {
+        bag.price as i32
+    } else {
+        -1
+    }
+}
+
+// Return the number of bags the specified owner owns
+// Returns -1 if the owner doesn't exist
+#[no_mangle]
+pub extern fn get_num_bags(id: u32) -> i32 {
+    if let Some(owner) = OWNERS.lock().unwrap().get(&id) {
+        owner.bags.len() as i32
+    } else {
+        -1
+    }
+}
+
+// Return the ID of the owner of the specified bag
+// Returns -1 if the bag doesn't exist
+#[no_mangle]
+pub extern fn get_owner(id: u32) -> i32 {
+    if let Some(bag) = BAGS.lock().unwrap().get(&id) {
+        bag.owner_id as i32
+    } else {
+        -1
+    }
+}
+
+// Transfer a bag to a new owner
+// Returns -1 if the bag or new owner don't exist
+#[no_mangle]
+pub extern fn transfer_bag(id: u32, new_owner_id:u32) -> i32 {
+    // Check that the bag and new owner exist 
+    let mut bags = BAGS.lock().unwrap();
+    let bag: &mut Bag;
+    if let Some(_bag) = bags.get_mut(&id) {
+      bag = _bag;
+    } else {
+        return -1 // bag doesn't exist
+    }
+
+    let owners = &mut OWNERS.lock().unwrap();
+    let new_owner: &mut Owner;
+    if let Some(owner) = owners.get_mut(&new_owner_id) {
+        new_owner = owner;
+    } else {
+        return -1 // new owner doesn't exist
+    }
+
+    // Update the new owner
+    new_owner.bags.push(bag.id);
+
+    // Update the bag's current owner
+    // get the index of the bag in the current owner's bag list
+    let current_owner = owners.get_mut(&bag.owner_id).unwrap();
+    let index = current_owner.bags.iter().position(|&r| r == id).unwrap();
+    owners.get_mut(&bag.owner_id).unwrap().bags.remove(index);
+
+    // Update the bag
+    bag.owner_id = new_owner_id;    
+
+    0 // success
+}

@@ -43,12 +43,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("error initializing state: %v", err)
 	}
 
-	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust-counter/pkg/rust_counter_bg.wasm")
+	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/pkg/bag_bg.wasm")
 	if err != nil {
 		return fmt.Errorf("couldn't find contract")
 	}
 
-	if !vm.DBInitialized() {
+	//if !vm.DBInitialized() {
+	if true {
 		ctx.Log.Debug("initializing state from genesis bytes") // TODO delete
 		genesisTx, err := vm.newCreateContractTx(
 			wasmBytes,
