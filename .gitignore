@@ -44,5 +44,6 @@ db*
 
 bin/
 build/
+**/contracts/**/target/**
 
 keys/staker.*
