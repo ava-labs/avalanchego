@@ -1,9 +1,10 @@
 package wasmvm
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
+
+	"github.com/ava-labs/gecko/utils/hashing"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -18,7 +19,7 @@ type invokeTx struct {
 	bytes []byte
 
 	// ID of this tx
-	ID ids.ID `serialize:"true"`
+	ID ids.ID
 
 	// ID of contract to invoke
 	ContractID ids.ID `serialize:"true"`
@@ -104,31 +105,28 @@ func (tx *invokeTx) Accept() {
 	}
 }
 
-func (tx *invokeTx) initialize(vm *VM) {
+// Set tx.vm, tx.bytes, tx.id
+func (tx *invokeTx) initialize(vm *VM) error {
 	tx.vm = vm
-	tx.vm.Ctx.Log.Verbo("initializing tx: %+v", tx)
 	var err error
 	tx.bytes, err = codec.Marshal(tx)
 	if err != nil {
-		tx.vm.Ctx.Log.Error("couldn't initialize tx: %v", err)
+		return fmt.Errorf("couldn't marshal invokeTx: %v", err)
 	}
+	tx.ID = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
+	return nil
 }
 
 // Creates a new, initialized tx
 func (vm *VM) newInvokeTx(contractID ids.ID, functionName string, args []interface{}) (*invokeTx, error) {
-	var idBytes [32]byte
-	if n, err := rand.Read(idBytes[:32]); err != nil {
-		return nil, fmt.Errorf("couldn't generate new ID: %s", err)
-	} else if n != 32 {
-		return nil, fmt.Errorf("ID should be 32 bytes but is %d bytes", n)
-	}
 	tx := &invokeTx{
 		vm:           vm,
-		ID:           ids.NewID(idBytes),
 		ContractID:   contractID,
 		FunctionName: functionName,
 		Arguments:    args,
 	}
-	tx.initialize(vm)
+	if err := tx.initialize(vm); err != nil {
+		return nil, err
+	}
 	return tx, nil
 }

@@ -1,8 +1,9 @@
 package wasmvm
 
 import (
-	"crypto/rand"
 	"fmt"
+
+	"github.com/ava-labs/gecko/utils/hashing"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -13,7 +14,7 @@ type createContractTx struct {
 	vm *VM
 
 	// ID of this tx and the contract being created
-	ID ids.ID `serialize:"true"`
+	ID ids.ID
 
 	// Byte rept. of the transaction
 	WasmBytes []byte `serialize:"true"`
@@ -28,13 +29,15 @@ func (tx *createContractTx) Bytes() []byte {
 }
 
 // should be called when unmarshaling
-func (tx *createContractTx) initialize(vm *VM) {
+func (tx *createContractTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
 	tx.bytes, err = codec.Marshal(tx)
 	if err != nil {
-		tx.vm.Ctx.Log.Error("couldn't initialize tx: %v", err)
+		return fmt.Errorf("couldn't initialize tx: %v", err)
 	}
+	tx.ID = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
+	return nil
 }
 
 // SyntacticVerify returns nil iff tx is syntactically valid
@@ -64,17 +67,12 @@ func (tx *createContractTx) Accept() {
 
 // Creates a new tx with the given payload and a random ID
 func (vm *VM) newCreateContractTx(wasmBytes []byte) (*createContractTx, error) {
-	var idBytes [32]byte
-	if n, err := rand.Read(idBytes[:32]); err != nil {
-		return nil, fmt.Errorf("couldn't generate new ID: %s", err)
-	} else if n != 32 {
-		return nil, fmt.Errorf("ID should be 32 bytes but is %d bytes", n)
-	}
 	tx := &createContractTx{
 		vm:        vm,
-		ID:        ids.NewID(idBytes),
 		WasmBytes: wasmBytes,
 	}
-	tx.initialize(vm)
+	if err := tx.initialize(vm); err != nil {
+		return nil, err
+	}
 	return tx, nil
 }

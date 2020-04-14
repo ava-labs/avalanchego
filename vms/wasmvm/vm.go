@@ -50,7 +50,7 @@ func (vm *VM) Initialize(
 
 	//if !vm.DBInitialized() {
 	if true {
-		ctx.Log.Debug("initializing state from genesis bytes") // TODO delete
+		ctx.Log.Debug("initializing state from genesis bytes")
 		genesisTx, err := vm.newCreateContractTx(
 			wasmBytes,
 		)
@@ -105,7 +105,9 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 	}
 	block.Initialize(bytes, vm)
 	for _, tx := range block.Txs {
-		tx.initialize(vm)
+		if err := tx.initialize(vm); err != nil {
+			return nil, fmt.Errorf("error initializing tx: %s", err)
+		}
 	}
 	return &block, nil
 }
