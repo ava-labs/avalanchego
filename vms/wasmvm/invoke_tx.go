@@ -38,7 +38,16 @@ func (tx *invokeTx) SyntacticVerify() error {
 	case tx.FunctionName == "":
 		return errors.New("function name is empty")
 	}
-	// TODO add more
+
+	// Ensure all arguments are floats or ints
+	for _, arg := range tx.Arguments {
+		switch argType := arg.(type) {
+		case int32, int64, float32, float64:
+		default:
+			return fmt.Errorf("an argument has type %v. Must be one of: int32, int64, float32, float64", argType)
+		}
+	}
+	// TODO add more validation
 	return nil
 }
 
@@ -58,7 +67,7 @@ func (tx *invokeTx) Accept() {
 
 	// Parse contract to from bytes
 	imports := standardImports()
-	contract, err := wasm.NewInstanceWithImports(contractBytes, imports) // TODO: cache the contract object
+	contract, err := wasm.NewInstanceWithImports(contractBytes, imports) // TODO: cache the contract struct
 	if err != nil {
 		tx.vm.Ctx.Log.Error("couldn't instantiate contract: %v", err)
 		return
