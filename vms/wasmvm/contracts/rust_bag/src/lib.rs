@@ -38,6 +38,10 @@ pub extern fn create_owner(id: u32) {
     );
 }
 
+pub extern fn get_owner(id: u32) -> &'static Owner {
+    OWNERS.lock().unwrap().get(&id).unwrap()
+}
+
 // Create a new bag
 // Precondition: There is an owner with the specified ID
 // TODO error handling
@@ -53,15 +57,9 @@ pub extern fn create_bag(id: u32, owner_id: u32) {
     );
     
     // Update the owner TODO this
-    OWNERS.lock().unwrap().insert(id, 
-        Bag{
-            id: id,
-            owner_id: owner_id,
-            condition: Condition::New,
-            num_transfers: 0
-        }
-    );
+    let owners = &mut OWNERS.lock().unwrap();
+    owners.get_mut(&owner_id).unwrap().bags.push(id);
 }
 
 // Update the specified bag
-pub extern update_bag(id: u32,)
+// pub extern update_bag(id: u32,)
