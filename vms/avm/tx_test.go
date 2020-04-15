@@ -20,9 +20,12 @@ func TestTxNil(t *testing.T) {
 	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
+	if err := tx.SemanticVerify(nil, nil); err == nil {
+		t.Fatalf("Should have errored due to nil tx")
+	}
 }
 
-func TestTxEmpty(t *testing.T) {
+func setupCodec() codec.Codec {
 	c := codec.NewDefault()
 	c.RegisterType(&BaseTx{})
 	c.RegisterType(&CreateAssetTx{})
@@ -34,7 +37,11 @@ func TestTxEmpty(t *testing.T) {
 	c.RegisterType(&secp256k1fx.TransferOutput{})
 	c.RegisterType(&secp256k1fx.MintOperation{})
 	c.RegisterType(&secp256k1fx.Credential{})
+	return c
+}
 
+func TestTxEmpty(t *testing.T) {
+	c := setupCodec()
 	tx := &Tx{}
 	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
@@ -42,17 +49,7 @@ func TestTxEmpty(t *testing.T) {
 }
 
 func TestTxInvalidCredential(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 	c.RegisterType(&ava.TestVerifiable{})
 
 	tx := &Tx{
@@ -90,17 +87,7 @@ func TestTxInvalidCredential(t *testing.T) {
 }
 
 func TestTxInvalidUnsignedTx(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 	c.RegisterType(&ava.TestVerifiable{})
 
 	tx := &Tx{
@@ -158,17 +145,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 }
 
 func TestTxInvalidNumberOfCredentials(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 	c.RegisterType(&ava.TestVerifiable{})
 
 	tx := &Tx{
