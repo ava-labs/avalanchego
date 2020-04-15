@@ -21,9 +21,10 @@ func setup(t *testing.T) ([]byte, *VM, *Service) {
 
 	ctx.Lock.Lock()
 
-	// This is VM initilialzation is very silimar to that done by GenesisVM().
-	// However that function also sets vm.batchTimeout = 0, which causes the
-	// tests in this module to deadlock.
+	// This VM initilialzation is very similar to that done by GenesisVM().
+	// However replacing the body of this function, with a call to GenesisVM
+	// causes a timeout while executing the test suite.
+	// https://github.com/ava-labs/gecko/pull/59#pullrequestreview-392478636
 	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
