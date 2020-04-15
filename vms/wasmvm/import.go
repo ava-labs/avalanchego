@@ -1,7 +1,5 @@
 package wasmvm
 
-// int externalDec(void *context, int x);
-import "C"
 import (
 	"fmt"
 
@@ -12,7 +10,7 @@ import (
 func standardImports() *wasm.Imports {
 	imports, err := wasm.NewImportObject().Imports()
 	if err != nil {
-		panic(fmt.Sprintf("couldn't append wasi imports to imports: %v", err))
+		panic(fmt.Sprintf("couldn't create wasm imports: %v", err))
 	}
 	return imports
 }
