@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
-	wasm "github.com/wasmerio/go-ext-wasm/wasmer"
 )
 
 const bytesPerPage = 65 * 1024 // according to go-ext-wasm
@@ -58,39 +57,12 @@ func (tx *invokeTx) SemanticVerify(database.Database) error {
 func (tx *invokeTx) Accept() {
 	// TODO: Move most of this to semanticVerify
 
-	// Get the contract's byte repr.
-	contractBytes, err := tx.vm.getContractBytes(tx.vm.DB, tx.ContractID)
+	// Get the contract. Its state is also loaded.
+	contract, err := tx.vm.getContract(tx.vm.DB, tx.ContractID)
 	if err != nil {
-		tx.vm.Ctx.Log.Error("couldn't get contract %s", tx.ContractID, err)
+		tx.vm.Ctx.Log.Error("couldn't load contract %s: %s", tx.ContractID, err)
 		return
 	}
-
-	// Parse contract to from bytes
-	imports := standardImports()
-	contract, err := wasm.NewInstanceWithImports(contractBytes, imports) // TODO: cache the contract struct
-	if err != nil {
-		tx.vm.Ctx.Log.Error("couldn't instantiate contract: %v", err)
-		return
-	}
-	defer contract.Close()
-
-	// Set the contract's state to be what it was after last call
-	state, err := tx.vm.getContractState(tx.vm.DB, tx.ContractID)
-	if err != nil {
-		tx.vm.Ctx.Log.Error("couldn't get contract's state: %v", err)
-		return
-	}
-	memory := contract.Memory // The contract's memory
-
-	if needMoreMemory := uint32(len(state)) > memory.Length(); needMoreMemory {
-		additionalBytesNeeded := uint32(len(state)) - memory.Length()
-		additionalPagesNeeded := (additionalBytesNeeded / bytesPerPage) + 1 //round up
-		if err := memory.Grow(uint32(additionalPagesNeeded)); err != nil {
-			tx.vm.Ctx.Log.Error("couldn't grow contract's state: %v", err)
-			return
-		}
-	}
-	copy(memory.Data(), state) // Copy the state over
 
 	// Get the function to call
 	fn, exists := contract.Exports[tx.FunctionName]
@@ -108,8 +80,7 @@ func (tx *invokeTx) Accept() {
 	tx.vm.Ctx.Log.Info("call to '%s' returned: %v", tx.FunctionName, val) // TODO how to get returned values out?
 
 	// Save the contract's state
-	state = contract.Memory.Data()
-	if err := tx.vm.putContractState(tx.vm.DB, tx.ContractID, state); err != nil {
+	if err := tx.vm.putContractState(tx.vm.DB, tx.ContractID, contract.Memory.Data()); err != nil {
 		tx.vm.Ctx.Log.Error("couldn't save contract's state: %v", err)
 	}
 }

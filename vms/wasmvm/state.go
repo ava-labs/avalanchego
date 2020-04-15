@@ -5,25 +5,72 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	wasm "github.com/wasmerio/go-ext-wasm/wasmer"
 )
 
 const (
-	contractTypeID uint64 = iota
+	contractBytesTypeID uint64 = iota
 	stateTypeID
 )
 
 // put a contract (in its raw byte form) in the database
 func (vm *VM) putContractBytes(db database.Database, ID ids.ID, contract []byte) error {
-	return vm.State.Put(db, contractTypeID, ID, bytes{contract})
+	return vm.State.Put(db, contractBytesTypeID, ID, bytes{contract})
 }
 
 // get a contract (in its raw byte form) by its ID
 func (vm *VM) getContractBytes(db database.Database, ID ids.ID) ([]byte, error) {
-	contractIntf, err := vm.State.Get(db, contractTypeID, ID)
+	contractIntf, err := vm.State.Get(db, contractBytesTypeID, ID)
 	if err != nil {
 		return nil, err
 	}
 	return contractIntf.([]byte), nil
+}
+
+// get the contract with the given ID.
+func (vm *VM) getContract(db database.Database, ID ids.ID) (*wasm.Instance, error) {
+	// Check the cache for the contract
+	var contract *wasm.Instance
+	contractIntf, ok := vm.contracts.Get(ID)
+	if ok { // It is in the cache
+		contract, ok = contractIntf.(*wasm.Instance)
+		if ok {
+			return contract, nil
+		}
+		vm.Ctx.Log.Error("expected *wasm.Instance from cache but got another type...will try to parse contract from bytes")
+	}
+	// It is not in the cache
+	// Get the contract's byte repr.
+	contractBytes, err := vm.getContractBytes(db, ID)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't find contract %s", ID)
+	}
+
+	// Parse contract from bytes
+	imports := standardImports()
+	contractStruct, err := wasm.NewInstanceWithImports(contractBytes, imports)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't instantiate contract: %v", err)
+	}
+	contract = &contractStruct
+
+	// Set the contract's state to be what it was after last call
+	state, err := vm.getContractState(db, ID)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get contract's state: %v", err)
+	}
+	memory := contract.Memory // The contract's memory
+
+	if needMoreMemory := uint32(len(state)) > memory.Length(); needMoreMemory {
+		additionalBytesNeeded := uint32(len(state)) - memory.Length()
+		additionalPagesNeeded := (additionalBytesNeeded / bytesPerPage) + 1 //round up
+		if err := memory.Grow(uint32(additionalPagesNeeded)); err != nil {
+			return nil, fmt.Errorf("couldn't grow contract's state: %v", err)
+		}
+	}
+	copy(memory.Data(), state)     // Copy the state over
+	vm.contracts.Put(ID, contract) // put contract in cache
+	return contract, nil
 }
 
 // put a contract's state (ie its whole memory) in the database
@@ -42,7 +89,7 @@ func (vm *VM) getContractState(db database.Database, ID ids.ID) ([]byte, error) 
 
 func (vm *VM) registerDBTypes() error {
 	unmarshalBytesFunc := func(bytes []byte) (interface{}, error) { return bytes, nil }
-	if err := vm.State.RegisterType(contractTypeID, unmarshalBytesFunc); err != nil {
+	if err := vm.State.RegisterType(contractBytesTypeID, unmarshalBytesFunc); err != nil {
 		return fmt.Errorf("error registering contract type with state: %v", err)
 	}
 	if err := vm.State.RegisterType(stateTypeID, unmarshalBytesFunc); err != nil {

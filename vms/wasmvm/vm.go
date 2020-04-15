@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 
 	"github.com/ava-labs/gecko/database"
@@ -14,6 +15,8 @@ import (
 	"github.com/ava-labs/gecko/vms/components/core"
 )
 
+const cacheSize = 128
+
 // VM defines the Salesforce Chain
 type VM struct {
 	*core.SnowmanVM
@@ -22,8 +25,8 @@ type VM struct {
 	mempool []tx
 
 	// Key: Contract ID
-	// Value: Byte repr. of the Wasm
-	contracts map[[32]byte][]byte
+	// Value: Smart contract (*wasm.Instance)
+	contracts cache.LRUCloser
 }
 
 // Initialize this chain
@@ -42,6 +45,7 @@ func (vm *VM) Initialize(
 	if err := vm.registerDBTypes(); err != nil {
 		return fmt.Errorf("error initializing state: %v", err)
 	}
+	vm.contracts = cache.LRUCloser{Size: cacheSize}
 
 	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/pkg/bag_bg.wasm")
 	if err != nil {
