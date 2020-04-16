@@ -1,4 +1,1 @@
-use bag;
-
-fn main() {
-}
+fn main() {}

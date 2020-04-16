@@ -53,6 +53,7 @@ func (vm *VM) getContract(db database.Database, ID ids.ID) (*wasm.Instance, erro
 		return nil, fmt.Errorf("couldn't instantiate contract: %v", err)
 	}
 	contract = &contractStruct
+	contract.SetContextData(ctx{contract.Memory})
 
 	// Set the contract's state to be what it was after last call
 	state, err := vm.getContractState(db, ID)

@@ -1,6 +1,11 @@
 use std::collections::HashMap;
+use std::mem;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
+
+extern "C" {
+    fn print(ptr: u32, len: u32);
+}
 
 lazy_static! {
     pub static ref OWNERS: Mutex<HashMap<u32, Owner>> = Mutex::new(HashMap::new());
@@ -159,4 +164,11 @@ pub extern fn transfer_bag(id: u32, new_owner_id:u32) -> i32 {
     bag.owner_id = new_owner_id;    
 
     0 // success
+}
+
+// Prints "Hello, world!"
+#[no_mangle]
+pub extern fn say_hello() {
+    let ptr = b"Hello, world!\n".as_ptr();
+    unsafe {print(ptr as u32, 14);}
 }
