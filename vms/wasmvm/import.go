@@ -6,22 +6,32 @@ import (
 	"fmt"
 	"unsafe"
 
+	"github.com/ava-labs/gecko/utils/math"
+
+	"github.com/ava-labs/gecko/utils/logging"
 	wasm "github.com/wasmerio/go-ext-wasm/wasmer"
 )
 
 type ctx struct {
-	memory *wasm.Memory // the instance's memory
+	log    logging.Logger // this chain's logger
+	memory *wasm.Memory   // the instance's memory
 }
 
+// Print bytes in the smart contract's memory
 //export print
-func print(context unsafe.Pointer, ptr C.int, len C.int) {
+func print(context unsafe.Pointer, ptr C.int, strLen C.int) {
 	ctxRaw := wasm.IntoInstanceContext(context)
 	ctx := ctxRaw.Data().(ctx)
-	instanceMemoryData := ctx.memory.Data()
-	fmt.Printf("Print from smart contract: %v\n", string(instanceMemoryData[ptr:ptr+len]))
+	instanceMemory := ctx.memory.Data()
+	finalIndex, err := math.Add32(uint32(ptr), uint32(strLen))
+	if err != nil || int(finalIndex) > len(instanceMemory) {
+		ctx.log.Error("Print from smart contract failed. Index out of bounds.")
+		return
+	}
+	ctx.log.Info("Print from smart contract: %v", string(instanceMemory[ptr:finalIndex]))
 }
 
-// Return the standard imports needed by all smart contracts
+// Return the standard imports available by all smart contracts
 func standardImports() *wasm.Imports {
 	imports, err := wasm.NewImportObject().Imports()
 	if err != nil {

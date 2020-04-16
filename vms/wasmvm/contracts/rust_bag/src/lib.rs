@@ -169,6 +169,6 @@ pub extern fn transfer_bag(id: u32, new_owner_id:u32) -> i32 {
 // Prints "Hello, world!"
 #[no_mangle]
 pub extern fn say_hello() {
-    let ptr = b"Hello, world!\n".as_ptr();
-    unsafe {print(ptr as u32, 14);}
+    let ptr = b"Hello, world!".as_ptr();
+    unsafe {print(ptr as u32, 13);}
 }

@@ -36,6 +36,14 @@ func Add64(a, b uint64) (uint64, error) {
 	return a + b, nil
 }
 
+// Add32 ...
+func Add32(a, b uint32) (uint32, error) {
+	if a > math.MaxUint32-b {
+		return 0, errOverflow
+	}
+	return a + b, nil
+}
+
 // Sub64 returns:
 // 1) a - b
 // 2) If there is underflow, an error
