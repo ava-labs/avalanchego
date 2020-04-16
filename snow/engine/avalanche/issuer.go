@@ -63,10 +63,6 @@ func (i *issuer) Update() {
 		return
 	}
 
-	i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
-
-	i.t.Consensus.Add(i.vtx)
-
 	p := i.t.Consensus.Parameters()
 	vdrs := i.t.Config.Validators.Sample(p.K) // Validators to sample
 
@@ -75,13 +71,31 @@ func (i *issuer) Update() {
 		vdrSet.Add(vdr.ID())
 	}
 
-	i.t.RequestID++
 	polled := false
-	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
-		i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
-		polled = true
-	} else if numVdrs < p.K {
-		i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
+
+	if (len(txs) != 0) {
+		i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
+		i.t.Consensus.Add(i.vtx)
+		i.t.RequestID++
+		if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
+			i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+			polled = true
+		} else if numVdrs < p.K {
+			i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
+		}
+
+	} else {
+		i.t.Config.Context.Log.Verbo("Skipping empty vertex vertex:\n%s", i.vtx)
+		frontierVts := i.t.getFrontier()
+		for _, fv := range frontierVts {
+			i.t.RequestID++
+			if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
+				i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, fv.ID(), fv.Bytes())
+				polled = true
+			} else if numVdrs < p.K {
+				i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
+			}
+		}
 	}
 
 	i.t.vtxBlocked.Fulfill(vtxID)

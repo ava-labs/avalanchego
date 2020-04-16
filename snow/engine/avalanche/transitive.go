@@ -48,16 +48,22 @@ func (t *Transitive) Initialize(config Config) {
 	t.polls.m = make(map[uint32]poll)
 }
 
+func (t *Transitive) getFrontier() []avalanche.Vertex {
+       // Load the vertices that were last saved as the accepted frontier
+       frontier := []avalanche.Vertex(nil)
+       t.Config.Context.Log.Verbo("CONFIG: %v", t.Config.State)
+       for _, vtxID := range t.Config.State.Edge() {
+               if vtx, err := t.Config.State.GetVertex(vtxID); err == nil {
+                       frontier = append(frontier, vtx)
+               } else {
+                       t.Config.Context.Log.Error("Vertex %s failed to be loaded from the frontier with %s", vtxID, err)
+               }
+       }
+       return frontier
+}
+
 func (t *Transitive) finishBootstrapping() {
-	// Load the vertices that were last saved as the accepted frontier
-	frontier := []avalanche.Vertex(nil)
-	for _, vtxID := range t.Config.State.Edge() {
-		if vtx, err := t.Config.State.GetVertex(vtxID); err == nil {
-			frontier = append(frontier, vtx)
-		} else {
-			t.Config.Context.Log.Error("Vertex %s failed to be loaded from the frontier with %s", vtxID, err)
-		}
-	}
+	frontier := getFrontier()
 	t.Consensus.Initialize(t.Config.Context, t.Params, frontier)
 	t.bootstrapped = true
 }
