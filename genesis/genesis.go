@@ -6,13 +6,7 @@ package genesis
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
-
-	"github.com/ava-labs/coreth/core"
-
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/params"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -21,7 +15,6 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/components/codec"
-	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"
@@ -29,6 +22,11 @@ import (
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
+)
+
+// ID of the EVM VM
+var (
+	EVMID = ids.NewID([32]byte{'e', 'v', 'm'})
 )
 
 // Genesis returns the genesis data of the Platform Chain.
@@ -76,50 +74,6 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 
 	avmSS := avm.StaticService{}
 	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
-	if err != nil {
-		panic(err)
-	}
-
-	// Specify the genesis state of Athereum (the built-in instance of the EVM)
-	evmBalance, success := new(big.Int).SetString("33b2e3c9fd0804000000000", 16)
-	if success != true {
-		return nil, errors.New("problem creating evm genesis state")
-	}
-
-	alloc := core.GenesisAlloc{}
-	for _, addr := range config.FundedEVMAddresses {
-		alloc[common.HexToAddress(addr)] = core.GenesisAccount{
-			Balance: evmBalance,
-		}
-	}
-	evmArgs := core.Genesis{
-		Config: &params.ChainConfig{
-			ChainID:             big.NewInt(43110),
-			HomesteadBlock:      big.NewInt(0),
-			DAOForkBlock:        big.NewInt(0),
-			DAOForkSupport:      true,
-			EIP150Block:         big.NewInt(0),
-			EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
-			EIP155Block:         big.NewInt(0),
-			EIP158Block:         big.NewInt(0),
-			ByzantiumBlock:      big.NewInt(0),
-			ConstantinopleBlock: big.NewInt(0),
-			PetersburgBlock:     big.NewInt(0),
-		},
-		Nonce:      0,
-		Timestamp:  0,
-		ExtraData:  []byte{0},
-		GasLimit:   100000000,
-		Difficulty: big.NewInt(0),
-		Mixhash:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		Coinbase:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-		Alloc:      alloc,
-		Number:     0,
-		GasUsed:    0,
-		ParentHash: common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
-	}
-	evmSS := evm.StaticService{}
-	evmReply, err := evmSS.BuildGenesis(nil, &evmArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -214,9 +168,9 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 			Name: "X-Chain",
 		},
 		platformvm.APIChain{
-			GenesisData: evmReply,
+			GenesisData: formatting.CB58{Bytes: config.EVMBytes},
 			SubnetID:    platformvm.DefaultSubnetID,
-			VMID:        evm.ID,
+			VMID:        EVMID,
 			Name:        "C-Chain",
 		},
 		platformvm.APIChain{
