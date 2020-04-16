@@ -4,7 +4,8 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/gecko/vms/rpcchainvm"
-	"github.com/ava-labs/gecko/x/plugin/evm"
+
+	"github.com/ava-labs/coreth/plugin/evm"
 )
 
 func main() {
