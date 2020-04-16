@@ -45,8 +45,6 @@ func setup(t *testing.T) ([]byte, *VM, *Service) {
 
 func TestServiceIssueTx(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	// TODO: Does this need to be here? Or can the lock be released once the
-	//       VM is initilized?
 	defer ctx.Lock.Unlock()
 	defer vm.Shutdown()
 
