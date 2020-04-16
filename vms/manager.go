@@ -16,7 +16,7 @@ import (
 
 // A VMFactory creates new instances of a VM
 type VMFactory interface {
-	New() interface{}
+	New() (interface{}, error)
 }
 
 // Manager is a VM manager.
@@ -110,10 +110,17 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 	vmFactory, err := m.GetVMFactory(vmID)
 	m.log.AssertNoError(err)
 	m.log.Debug("adding static API for VM with ID %s", vmID)
-	vm := vmFactory.New()
+	vm, err := vmFactory.New()
+	if err != nil {
+		return
+	}
 
 	staticVM, ok := vm.(common.StaticVM)
 	if !ok {
+		staticVM, ok := vm.(common.VM)
+		if ok {
+			staticVM.Shutdown()
+		}
 		return
 	}
 

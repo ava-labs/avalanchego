@@ -12,12 +12,11 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ava-labs/go-ethereum/p2p/nat"
-
 	"github.com/ava-labs/gecko/database/leveldb"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/utils"
@@ -90,6 +89,9 @@ func init() {
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "keys/staker.key", "TLS private key file for staking connections")
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "keys/staker.crt", "TLS certificate file for staking connections")
 
+	// Plugins:
+	fs.StringVar(&Config.PluginDir, "plugin-dir", "./build/plugins", "Plugin directory for Ava VMs")
+
 	// Logging:
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
 	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
@@ -141,12 +143,12 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.Any()
+	Config.Nat = nat.NewRouter()
 
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		ip, err = Config.Nat.ExternalIP()
+		ip, err = Config.Nat.IP()
 		errs.Add(fmt.Errorf(
 			"%s\n"+
 				"If you are trying to create a local network, try adding --public-ip=127.0.0.1\n"+

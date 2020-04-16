@@ -83,6 +83,10 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 
 // Shutdown this vm
 func (svm *SnowmanVM) Shutdown() {
+	if svm.DB == nil {
+		return
+	}
+
 	svm.DB.Commit()              // Flush DB
 	svm.DB.GetDatabase().Close() // close underlying database
 	svm.DB.Close()               // close versionDB
