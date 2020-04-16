@@ -29,6 +29,7 @@ awscpu
 *.ava
 
 db*
+
 *cpu[0-9]*
 *mem[0-9]*
 *lock[0-9]*
@@ -47,3 +48,8 @@ build/
 **/contracts/**/target/**
 
 keys/staker.*
+
+!*.go
+!*.proto
+
+plugins/

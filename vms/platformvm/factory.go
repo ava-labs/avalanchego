@@ -24,12 +24,12 @@ type Factory struct {
 }
 
 // New returns a new instance of the Platform Chain
-func (f *Factory) New() interface{} {
+func (f *Factory) New() (interface{}, error) {
 	return &VM{
 		chainManager:   f.ChainManager,
 		validators:     f.Validators,
 		stakingEnabled: f.StakingEnabled,
 		ava:            f.AVA,
 		avm:            f.AVM,
-	}
+	}, nil
 }

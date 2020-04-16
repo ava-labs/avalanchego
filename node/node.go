@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path"
 	"sync"
 	"unsafe"
 
@@ -41,10 +42,10 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"
+	"github.com/ava-labs/gecko/vms/rpcchainvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
@@ -361,7 +362,7 @@ func (n *Node) initNodeID() error {
 }
 
 // Create the vmManager and register the following vms:
-// AVM, EVM, Simple Payments DAG, Simple Payments Chain
+// AVM, Simple Payments DAG, Simple Payments Chain
 // The Platform VM is registered in initStaking because
 // its factory needs to reference n.chainManager, which is nil right now
 func (n *Node) initVMManager() error {
@@ -378,7 +379,7 @@ func (n *Node) initVMManager() error {
 			AVA:      avaAssetID,
 			Platform: ids.Empty,
 		}),
-		n.vmManager.RegisterVMFactory(evm.ID, &evm.Factory{}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
