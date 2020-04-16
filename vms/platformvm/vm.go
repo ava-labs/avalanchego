@@ -382,6 +382,10 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown() {
+	if vm.timer == nil {
+		return
+	}
+
 	vm.timer.Stop()
 	if err := vm.DB.Close(); err != nil {
 		vm.Ctx.Log.Error("Closing the database failed with %s", err)

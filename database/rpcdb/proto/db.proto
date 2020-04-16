@@ -1,0 +1,108 @@
+syntax = "proto3";
+package proto;
+
+message HasRequest {
+    bytes key = 1;
+}
+
+message HasResponse {
+    bool has = 1;
+}
+
+message GetRequest {
+    bytes key = 1;
+}
+
+message GetResponse {
+    bytes value = 1;
+}
+
+message PutRequest {
+    bytes key = 1;
+    bytes value = 2;
+}
+
+message PutResponse {}
+
+message DeleteRequest {
+    bytes key = 1;
+}
+
+message DeleteResponse {}
+
+message StatRequest {
+    string property = 1;
+}
+
+message StatResponse {
+    string stat = 1;
+}
+
+message CompactRequest {
+    bytes start = 1;
+    bytes limit = 2;
+}
+
+message CompactResponse {}
+
+message CloseRequest {}
+
+message CloseResponse {}
+
+message WriteBatchRequest {
+    repeated PutRequest puts = 1;
+    repeated DeleteRequest deletes = 2;
+}
+
+message WriteBatchResponse {}
+
+message NewIteratorRequest {}
+
+message NewIteratorWithStartAndPrefixRequest {
+    bytes start = 1;
+    bytes prefix = 2;
+}
+
+message NewIteratorWithStartAndPrefixResponse {
+    uint64 id = 1;
+}
+
+message IteratorNextRequest {
+    uint64 id = 1;
+}
+
+message IteratorNextResponse {
+    bool foundNext = 1;
+    bytes key = 2;
+    bytes value = 3;
+}
+
+message IteratorErrorRequest {
+    uint64 id = 1;
+}
+
+message IteratorErrorResponse {}
+
+message IteratorReleaseRequest {
+    uint64 id = 1;
+}
+
+message IteratorReleaseResponse {}
+
+service Database {
+    rpc Has(HasRequest) returns (HasResponse);
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Put(PutRequest) returns (PutResponse);
+    rpc Delete(DeleteRequest) returns (DeleteResponse);
+    rpc Stat(StatRequest) returns (StatResponse);
+    rpc Compact(CompactRequest) returns (CompactResponse);
+    rpc Close(CloseRequest) returns (CloseResponse);
+
+    rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
+
+    rpc NewIteratorWithStartAndPrefix(NewIteratorWithStartAndPrefixRequest) returns (NewIteratorWithStartAndPrefixResponse);
+
+    rpc IteratorNext(IteratorNextRequest) returns (IteratorNextResponse);
+    rpc IteratorError(IteratorErrorRequest) returns (IteratorErrorResponse);
+    rpc IteratorRelease(IteratorReleaseRequest) returns (IteratorReleaseResponse);
+}

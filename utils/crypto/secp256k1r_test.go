@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRecover(t *testing.T) {
@@ -72,4 +74,25 @@ func TestGenRecreate(t *testing.T) {
 			t.Fatalf("Wrong public key")
 		}
 	}
+}
+
+func TestVerifyMutatedSignature(t *testing.T) {
+	factory := FactorySECP256K1R{}
+
+	sk, err := factory.NewPrivateKey()
+	assert.NoError(t, err)
+
+	msg := []byte{'h', 'e', 'l', 'l', 'o'}
+
+	sig, err := sk.Sign(msg)
+	assert.NoError(t, err)
+
+	var s secp256k1.ModNScalar
+	s.SetByteSlice(sig[32:64])
+	s.Negate()
+	newSBytes := s.Bytes()
+	copy(sig[32:], newSBytes[:])
+
+	_, err = factory.RecoverPublicKey(msg, sig)
+	assert.Error(t, err)
 }

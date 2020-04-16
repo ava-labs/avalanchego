@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
@@ -97,7 +96,7 @@ func TestAliases(t *testing.T) {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
-	} else if _, exists := generalAliases["vm/"+evm.ID.String()]; !exists {
+	} else if _, exists := generalAliases["vm/"+EVMID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+spdagvm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
@@ -135,12 +134,12 @@ func TestVMGenesis(t *testing.T) {
 		},
 		{
 			networkID:  CascadeID,
-			vmID:       evm.ID,
+			vmID:       EVMID,
 			expectedID: "2mUYSXfLrDtigwbzj1LxKVsHwELghc5sisoXrzJwLqAAQHF4i",
 		},
 		{
 			networkID:  LocalID,
-			vmID:       evm.ID,
+			vmID:       EVMID,
 			expectedID: "tZGm6RCkeGpVETUTp11DW3UYFZmm69zfqxchpHrSF7wgy8rmw",
 		},
 	}
