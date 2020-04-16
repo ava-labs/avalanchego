@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -108,17 +107,7 @@ func TestBaseTxSerialization(t *testing.T) {
 		}},
 	}}
 
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	b, err := c.Marshal(&tx.UnsignedTx)
 	if err != nil {
@@ -185,17 +174,7 @@ func TestBaseTxGetters(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerify(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -237,17 +216,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyNil(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := (*BaseTx)(nil)
 	if err := tx.SyntacticVerify(ctx, c, 0); err == nil {
@@ -256,17 +225,7 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: 0,
@@ -308,17 +267,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -360,17 +309,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -403,17 +342,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -469,17 +398,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -504,17 +423,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -576,17 +485,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -640,17 +539,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
@@ -692,17 +581,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
-	c.RegisterType(&ImportTx{})
-	c.RegisterType(&ExportTx{})
-	c.RegisterType(&secp256k1fx.TransferInput{})
-	c.RegisterType(&secp256k1fx.MintOutput{})
-	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintOperation{})
-	c.RegisterType(&secp256k1fx.Credential{})
+	c := setupCodec()
 
 	tx := &BaseTx{
 		NetID: networkID,
