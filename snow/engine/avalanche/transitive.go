@@ -51,7 +51,6 @@ func (t *Transitive) Initialize(config Config) {
 func (t *Transitive) getFrontier() []avalanche.Vertex {
        // Load the vertices that were last saved as the accepted frontier
        frontier := []avalanche.Vertex(nil)
-       t.Config.Context.Log.Verbo("CONFIG: %v", t.Config.State)
        for _, vtxID := range t.Config.State.Edge() {
                if vtx, err := t.Config.State.GetVertex(vtxID); err == nil {
                        frontier = append(frontier, vtx)
