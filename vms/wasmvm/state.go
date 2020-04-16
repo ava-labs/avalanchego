@@ -55,6 +55,7 @@ func (vm *VM) getContract(db database.Database, ID ids.ID) (*wasm.Instance, erro
 	contract = &contractStruct
 	contract.SetContextData(ctx{
 		log:    vm.Ctx.Log,
+		db:     vm.DB, // TODO provide each SC its own prefixed data to write to
 		memory: contract.Memory,
 	})
 
