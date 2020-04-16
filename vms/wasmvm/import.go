@@ -1,7 +1,7 @@
 package wasmvm
 
 // void print(void *context, int ptr, int len);
-// void dbPut(void *context, int key, int keyLen, int value, int valueLen);
+// int dbPut(void *context, int key, int keyLen, int value, int valueLen);
 // int dbGet(void *context, int key, int keyLen, int value);
 import "C"
 import (
@@ -35,42 +35,56 @@ func print(context unsafe.Pointer, ptr C.int, strLen C.int) {
 	ctx.log.Info("Print from smart contract: %v", string(instanceMemory[ptr:finalIndex]))
 }
 
+// Put a KV pair where the key/value are defined by a pointer to the first byte
+// and the length of the key/value.
+// Returns 0 if successful, otherwise unsuccessful
 //export dbPut
-func dbPut(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int, valueLen C.int) {
+func dbPut(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int, valueLen C.int) C.int {
+	// Get the context
 	ctxRaw := wasm.IntoInstanceContext(context)
 	ctx := ctxRaw.Data().(ctx)
+
 	// Validate arguments
 	if keyPtr < 0 || keyLen < 0 {
 		ctx.log.Error("dbPut failed. Key pointer and length must be non-negative")
-		return
+		return 1
 	} else if valuePtr < 0 || valueLen < 0 {
 		ctx.log.Error("dbPut failed. Value pointer and length must be non-negative")
-		return
+		return 1
 	}
 	keyFinalIndex, err := math.Add32(uint32(keyPtr), uint32(keyLen))
 	if err != nil {
 		ctx.log.Error("dbPut failed. Key index out of bounds.")
-		return
+		return 1
 	}
 	valueFinalIndex, err := math.Add32(uint32(valuePtr), uint32(valueLen))
 	if err != nil {
 		ctx.log.Error("dbPut failed. Value index out of bounds.")
-		return
+		return 1
 	}
 
+	// Do the put
 	contractState := ctx.memory.Data()
 	key := contractState[keyPtr:keyFinalIndex]
 	value := contractState[valuePtr:valueFinalIndex]
 	ctx.log.Verbo("Putting K/V pair for contract.\n  key: %v\n  value: %v", key, value)
 	if err := ctx.db.Put(key, value); err != nil {
-		ctx.log.Error("dbPut failed: %s")
+		ctx.log.Error("dbPut failed: %s", err)
+		return 1
 	}
+	return 0
 }
 
+// Get a value from the database. The key is in the contract's memory.
+// It starts at [keyPtr] and is [keyLen] bytes long.
+// The value is written to the contract's memory starting at [valuePtr]
+// Returns the length of the returned value, or -1 if the get failed.
 //export dbGet
 func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C.int {
+	// Get the context
 	ctxRaw := wasm.IntoInstanceContext(context)
 	ctx := ctxRaw.Data().(ctx)
+
 	// Validate arguments
 	if keyPtr < 0 || keyLen < 0 {
 		ctx.log.Error("dbGet failed. Key pointer and length must be non-negative")
@@ -81,7 +95,7 @@ func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C
 	}
 	keyFinalIndex, err := math.Add32(uint32(keyPtr), uint32(keyLen))
 	if err != nil {
-		ctx.log.Error("dbGet failed. Key index out of bounds.")
+		ctx.log.Error("dbGet failed. Key index out of bounds")
 		return -1
 	}
 
@@ -89,7 +103,8 @@ func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C
 	key := contractState[keyPtr:keyFinalIndex]
 	value, err := ctx.db.Get(key)
 	if err != nil {
-		panic(err)
+		ctx.log.Error("dbGet failed: %s", err)
+		return -1
 	}
 	ctx.log.Verbo("dbGet returning\n  key: %v\n value: %v\n", key, value)
 	copy(contractState[valuePtr:], value)

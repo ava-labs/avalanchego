@@ -14,8 +14,8 @@ var (
 type Factory struct{}
 
 // New returns a new instance of the Wasm Chain
-func (f *Factory) New() interface{} {
+func (f *Factory) New() (interface{}, error) {
 	return &VM{
 		SnowmanVM: &core.SnowmanVM{},
-	}
+	}, nil
 }
