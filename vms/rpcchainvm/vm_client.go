@@ -55,6 +55,7 @@ func NewClient(client vmproto.VMClient, broker *plugin.GRPCBroker) *VMClient {
 	return &VMClient{
 		client: client,
 		broker: broker,
+		blks:   make(map[[32]byte]*BlockClient),
 	}
 }
 
