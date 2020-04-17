@@ -16,6 +16,6 @@ var (
 type Factory struct{ TxFee uint64 }
 
 // New ...
-func (f *Factory) New() interface{} {
-	return &VM{TxFee: f.TxFee} // Use the tx fee from the config
+func (f *Factory) New() (interface{}, error) {
+	return &VM{TxFee: f.TxFee}, nil
 }

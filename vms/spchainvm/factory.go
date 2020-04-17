@@ -16,4 +16,4 @@ var (
 type Factory struct{}
 
 // New ...
-func (f *Factory) New() interface{} { return &VM{} }
+func (f *Factory) New() (interface{}, error) { return &VM{}, nil }
