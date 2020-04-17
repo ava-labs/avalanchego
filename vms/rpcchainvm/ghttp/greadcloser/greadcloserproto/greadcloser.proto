@@ -1,5 +1,5 @@
 syntax = "proto3";
-package proto;
+package greadcloserproto;
 
 message ReadRequest {
     int32 length = 1;
@@ -11,6 +11,11 @@ message ReadResponse {
     bool errored = 3;
 }
 
+message CloseRequest {}
+
+message CloseResponse {}
+
 service Reader {
     rpc Read(ReadRequest) returns (ReadResponse);
+    rpc Close(CloseRequest) returns (CloseResponse);
 }

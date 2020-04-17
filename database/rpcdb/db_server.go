@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/rpcdb/proto"
+	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
 )
 
 var (
@@ -35,54 +35,54 @@ func NewServer(db database.Database) *DatabaseServer {
 }
 
 // Has ...
-func (db *DatabaseServer) Has(_ context.Context, req *proto.HasRequest) (*proto.HasResponse, error) {
+func (db *DatabaseServer) Has(_ context.Context, req *rpcdbproto.HasRequest) (*rpcdbproto.HasResponse, error) {
 	has, err := db.db.Has(req.Key)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.HasResponse{Has: has}, nil
+	return &rpcdbproto.HasResponse{Has: has}, nil
 }
 
 // Get ...
-func (db *DatabaseServer) Get(_ context.Context, req *proto.GetRequest) (*proto.GetResponse, error) {
+func (db *DatabaseServer) Get(_ context.Context, req *rpcdbproto.GetRequest) (*rpcdbproto.GetResponse, error) {
 	value, err := db.db.Get(req.Key)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.GetResponse{Value: value}, nil
+	return &rpcdbproto.GetResponse{Value: value}, nil
 }
 
 // Put ...
-func (db *DatabaseServer) Put(_ context.Context, req *proto.PutRequest) (*proto.PutResponse, error) {
-	return &proto.PutResponse{}, db.db.Put(req.Key, req.Value)
+func (db *DatabaseServer) Put(_ context.Context, req *rpcdbproto.PutRequest) (*rpcdbproto.PutResponse, error) {
+	return &rpcdbproto.PutResponse{}, db.db.Put(req.Key, req.Value)
 }
 
 // Delete ...
-func (db *DatabaseServer) Delete(_ context.Context, req *proto.DeleteRequest) (*proto.DeleteResponse, error) {
-	return &proto.DeleteResponse{}, db.db.Delete(req.Key)
+func (db *DatabaseServer) Delete(_ context.Context, req *rpcdbproto.DeleteRequest) (*rpcdbproto.DeleteResponse, error) {
+	return &rpcdbproto.DeleteResponse{}, db.db.Delete(req.Key)
 }
 
 // Stat ...
-func (db *DatabaseServer) Stat(_ context.Context, req *proto.StatRequest) (*proto.StatResponse, error) {
+func (db *DatabaseServer) Stat(_ context.Context, req *rpcdbproto.StatRequest) (*rpcdbproto.StatResponse, error) {
 	stat, err := db.db.Stat(req.Property)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.StatResponse{Stat: stat}, nil
+	return &rpcdbproto.StatResponse{Stat: stat}, nil
 }
 
 // Compact ...
-func (db *DatabaseServer) Compact(_ context.Context, req *proto.CompactRequest) (*proto.CompactResponse, error) {
-	return &proto.CompactResponse{}, db.db.Compact(req.Start, req.Limit)
+func (db *DatabaseServer) Compact(_ context.Context, req *rpcdbproto.CompactRequest) (*rpcdbproto.CompactResponse, error) {
+	return &rpcdbproto.CompactResponse{}, db.db.Compact(req.Start, req.Limit)
 }
 
 // Close ...
-func (db *DatabaseServer) Close(_ context.Context, _ *proto.CloseRequest) (*proto.CloseResponse, error) {
-	return &proto.CloseResponse{}, db.db.Close()
+func (db *DatabaseServer) Close(_ context.Context, _ *rpcdbproto.CloseRequest) (*rpcdbproto.CloseResponse, error) {
+	return &rpcdbproto.CloseResponse{}, db.db.Close()
 }
 
 // WriteBatch ...
-func (db *DatabaseServer) WriteBatch(_ context.Context, req *proto.WriteBatchRequest) (*proto.WriteBatchResponse, error) {
+func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbproto.WriteBatchRequest) (*rpcdbproto.WriteBatchResponse, error) {
 	db.batch.Reset()
 
 	for _, put := range req.Puts {
@@ -97,26 +97,26 @@ func (db *DatabaseServer) WriteBatch(_ context.Context, req *proto.WriteBatchReq
 		}
 	}
 
-	return &proto.WriteBatchResponse{}, db.batch.Write()
+	return &rpcdbproto.WriteBatchResponse{}, db.batch.Write()
 }
 
 // NewIteratorWithStartAndPrefix ...
-func (db *DatabaseServer) NewIteratorWithStartAndPrefix(_ context.Context, req *proto.NewIteratorWithStartAndPrefixRequest) (*proto.NewIteratorWithStartAndPrefixResponse, error) {
+func (db *DatabaseServer) NewIteratorWithStartAndPrefix(_ context.Context, req *rpcdbproto.NewIteratorWithStartAndPrefixRequest) (*rpcdbproto.NewIteratorWithStartAndPrefixResponse, error) {
 	id := db.nextIteratorID
 	it := db.db.NewIteratorWithStartAndPrefix(req.Start, req.Prefix)
 	db.iterators[id] = it
 
 	db.nextIteratorID++
-	return &proto.NewIteratorWithStartAndPrefixResponse{Id: id}, nil
+	return &rpcdbproto.NewIteratorWithStartAndPrefixResponse{Id: id}, nil
 }
 
 // IteratorNext ...
-func (db *DatabaseServer) IteratorNext(_ context.Context, req *proto.IteratorNextRequest) (*proto.IteratorNextResponse, error) {
+func (db *DatabaseServer) IteratorNext(_ context.Context, req *rpcdbproto.IteratorNextRequest) (*rpcdbproto.IteratorNextResponse, error) {
 	it, exists := db.iterators[req.Id]
 	if !exists {
 		return nil, errUnknownIterator
 	}
-	return &proto.IteratorNextResponse{
+	return &rpcdbproto.IteratorNextResponse{
 		FoundNext: it.Next(),
 		Key:       it.Key(),
 		Value:     it.Value(),
@@ -124,20 +124,20 @@ func (db *DatabaseServer) IteratorNext(_ context.Context, req *proto.IteratorNex
 }
 
 // IteratorError ...
-func (db *DatabaseServer) IteratorError(_ context.Context, req *proto.IteratorErrorRequest) (*proto.IteratorErrorResponse, error) {
+func (db *DatabaseServer) IteratorError(_ context.Context, req *rpcdbproto.IteratorErrorRequest) (*rpcdbproto.IteratorErrorResponse, error) {
 	it, exists := db.iterators[req.Id]
 	if !exists {
 		return nil, errUnknownIterator
 	}
-	return &proto.IteratorErrorResponse{}, it.Error()
+	return &rpcdbproto.IteratorErrorResponse{}, it.Error()
 }
 
 // IteratorRelease ...
-func (db *DatabaseServer) IteratorRelease(_ context.Context, req *proto.IteratorReleaseRequest) (*proto.IteratorReleaseResponse, error) {
+func (db *DatabaseServer) IteratorRelease(_ context.Context, req *rpcdbproto.IteratorReleaseRequest) (*rpcdbproto.IteratorReleaseResponse, error) {
 	it, exists := db.iterators[req.Id]
 	if exists {
 		delete(db.iterators, req.Id)
 		it.Release()
 	}
-	return &proto.IteratorReleaseResponse{}, nil
+	return &rpcdbproto.IteratorReleaseResponse{}, nil
 }

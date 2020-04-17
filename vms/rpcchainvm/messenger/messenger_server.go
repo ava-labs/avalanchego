@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
 )
 
 var (
@@ -26,11 +26,11 @@ func NewServer(messenger chan<- common.Message) *Server {
 }
 
 // Notify ...
-func (s *Server) Notify(_ context.Context, req *proto.NotifyRequest) (*proto.NotifyResponse, error) {
+func (s *Server) Notify(_ context.Context, req *messengerproto.NotifyRequest) (*messengerproto.NotifyResponse, error) {
 	msg := common.Message(req.Message)
 	select {
 	case s.messenger <- msg:
-		return &proto.NotifyResponse{}, nil
+		return &messengerproto.NotifyResponse{}, nil
 	default:
 		return nil, errFullQueue
 	}

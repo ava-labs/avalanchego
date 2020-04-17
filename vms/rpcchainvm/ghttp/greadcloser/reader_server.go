@@ -7,7 +7,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -19,10 +19,10 @@ func NewServer(readCloser io.ReadCloser) *Server {
 }
 
 // Read ...
-func (s *Server) Read(ctx context.Context, req *proto.ReadRequest) (*proto.ReadResponse, error) {
+func (s *Server) Read(ctx context.Context, req *greadcloserproto.ReadRequest) (*greadcloserproto.ReadResponse, error) {
 	buf := make([]byte, int(req.Length))
 	n, err := s.readCloser.Read(buf)
-	resp := &proto.ReadResponse{
+	resp := &greadcloserproto.ReadResponse{
 		Read: buf[:n],
 	}
 	if err != nil {
@@ -33,6 +33,6 @@ func (s *Server) Read(ctx context.Context, req *proto.ReadRequest) (*proto.ReadR
 }
 
 // Close ...
-func (s *Server) Close(ctx context.Context, req *proto.CloseRequest) (*proto.CloseResponse, error) {
-	return &proto.CloseResponse{}, s.readCloser.Close()
+func (s *Server) Close(ctx context.Context, req *greadcloserproto.CloseRequest) (*greadcloserproto.CloseResponse, error) {
+	return &greadcloserproto.CloseResponse{}, s.readCloser.Close()
 }

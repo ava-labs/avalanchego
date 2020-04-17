@@ -1,5 +1,5 @@
 syntax = "proto3";
-package proto;
+package gconnproto;
 
 message ReadRequest {
     int32 length = 1;

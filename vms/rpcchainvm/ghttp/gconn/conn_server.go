@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -20,10 +20,10 @@ func NewServer(conn net.Conn) *Server {
 }
 
 // Read ...
-func (s *Server) Read(ctx context.Context, req *proto.ReadRequest) (*proto.ReadResponse, error) {
+func (s *Server) Read(ctx context.Context, req *gconnproto.ReadRequest) (*gconnproto.ReadResponse, error) {
 	buf := make([]byte, int(req.Length))
 	n, err := s.conn.Read(buf)
-	resp := &proto.ReadResponse{
+	resp := &gconnproto.ReadResponse{
 		Read: buf[:n],
 	}
 	if err != nil {
@@ -34,47 +34,47 @@ func (s *Server) Read(ctx context.Context, req *proto.ReadRequest) (*proto.ReadR
 }
 
 // Write ...
-func (s *Server) Write(ctx context.Context, req *proto.WriteRequest) (*proto.WriteResponse, error) {
+func (s *Server) Write(ctx context.Context, req *gconnproto.WriteRequest) (*gconnproto.WriteResponse, error) {
 	n, err := s.conn.Write(req.Payload)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.WriteResponse{
+	return &gconnproto.WriteResponse{
 		Length: int32(n),
 	}, nil
 }
 
 // Close ...
-func (s *Server) Close(ctx context.Context, req *proto.CloseRequest) (*proto.CloseResponse, error) {
-	return &proto.CloseResponse{}, s.conn.Close()
+func (s *Server) Close(ctx context.Context, req *gconnproto.CloseRequest) (*gconnproto.CloseResponse, error) {
+	return &gconnproto.CloseResponse{}, s.conn.Close()
 }
 
 // SetDeadline ...
-func (s *Server) SetDeadline(ctx context.Context, req *proto.SetDeadlineRequest) (*proto.SetDeadlineResponse, error) {
+func (s *Server) SetDeadline(ctx context.Context, req *gconnproto.SetDeadlineRequest) (*gconnproto.SetDeadlineResponse, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.SetDeadlineResponse{}, s.conn.SetDeadline(deadline)
+	return &gconnproto.SetDeadlineResponse{}, s.conn.SetDeadline(deadline)
 }
 
 // SetReadDeadline ...
-func (s *Server) SetReadDeadline(ctx context.Context, req *proto.SetReadDeadlineRequest) (*proto.SetReadDeadlineResponse, error) {
+func (s *Server) SetReadDeadline(ctx context.Context, req *gconnproto.SetReadDeadlineRequest) (*gconnproto.SetReadDeadlineResponse, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.SetReadDeadlineResponse{}, s.conn.SetReadDeadline(deadline)
+	return &gconnproto.SetReadDeadlineResponse{}, s.conn.SetReadDeadline(deadline)
 }
 
 // SetWriteDeadline ...
-func (s *Server) SetWriteDeadline(ctx context.Context, req *proto.SetWriteDeadlineRequest) (*proto.SetWriteDeadlineResponse, error) {
+func (s *Server) SetWriteDeadline(ctx context.Context, req *gconnproto.SetWriteDeadlineRequest) (*gconnproto.SetWriteDeadlineResponse, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.SetWriteDeadlineResponse{}, s.conn.SetWriteDeadline(deadline)
+	return &gconnproto.SetWriteDeadlineResponse{}, s.conn.SetWriteDeadline(deadline)
 }

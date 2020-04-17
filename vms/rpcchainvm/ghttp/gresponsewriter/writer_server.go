@@ -8,17 +8,17 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter"
-
-	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
-	connproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/proto"
-	readerproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/proto"
-	responsewriterproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/proto"
-	writerproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/proto"
+	"github.com/hashicorp/go-plugin"
+
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/greaderproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -36,7 +36,7 @@ func NewServer(writer http.ResponseWriter, broker *plugin.GRPCBroker) *Server {
 }
 
 // Write ...
-func (s *Server) Write(ctx context.Context, req *responsewriterproto.WriteRequest) (*responsewriterproto.WriteResponse, error) {
+func (s *Server) Write(ctx context.Context, req *gresponsewriterproto.WriteRequest) (*gresponsewriterproto.WriteResponse, error) {
 	headers := s.writer.Header()
 	for key := range headers {
 		delete(headers, key)
@@ -49,13 +49,13 @@ func (s *Server) Write(ctx context.Context, req *responsewriterproto.WriteReques
 	if err != nil {
 		return nil, err
 	}
-	return &responsewriterproto.WriteResponse{
+	return &gresponsewriterproto.WriteResponse{
 		Written: int32(n),
 	}, nil
 }
 
 // WriteHeader ...
-func (s *Server) WriteHeader(ctx context.Context, req *responsewriterproto.WriteHeaderRequest) (*responsewriterproto.WriteHeaderResponse, error) {
+func (s *Server) WriteHeader(ctx context.Context, req *gresponsewriterproto.WriteHeaderRequest) (*gresponsewriterproto.WriteHeaderResponse, error) {
 	headers := s.writer.Header()
 	for key := range headers {
 		delete(headers, key)
@@ -64,21 +64,21 @@ func (s *Server) WriteHeader(ctx context.Context, req *responsewriterproto.Write
 		headers[header.Key] = header.Values
 	}
 	s.writer.WriteHeader(int(req.StatusCode))
-	return &responsewriterproto.WriteHeaderResponse{}, nil
+	return &gresponsewriterproto.WriteHeaderResponse{}, nil
 }
 
 // Flush ...
-func (s *Server) Flush(ctx context.Context, req *responsewriterproto.FlushRequest) (*responsewriterproto.FlushResponse, error) {
+func (s *Server) Flush(ctx context.Context, req *gresponsewriterproto.FlushRequest) (*gresponsewriterproto.FlushResponse, error) {
 	flusher, ok := s.writer.(http.Flusher)
 	if !ok {
 		return nil, errors.New("response writer doesn't support flushing")
 	}
 	flusher.Flush()
-	return &responsewriterproto.FlushResponse{}, nil
+	return &gresponsewriterproto.FlushResponse{}, nil
 }
 
 // Hijack ...
-func (s *Server) Hijack(ctx context.Context, req *responsewriterproto.HijackRequest) (*responsewriterproto.HijackResponse, error) {
+func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackRequest) (*gresponsewriterproto.HijackResponse, error) {
 	hijacker, ok := s.writer.(http.Hijacker)
 	if !ok {
 		return nil, errors.New("response writer doesn't support hijacking")
@@ -94,24 +94,24 @@ func (s *Server) Hijack(ctx context.Context, req *responsewriterproto.HijackRequ
 
 	go s.broker.AcceptAndServe(connID, func(opts []grpc.ServerOption) *grpc.Server {
 		connServer := grpc.NewServer(opts...)
-		connproto.RegisterConnServer(connServer, gconn.NewServer(conn))
+		gconnproto.RegisterConnServer(connServer, gconn.NewServer(conn))
 		return connServer
 	})
 	go s.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
 		readerServer := grpc.NewServer(opts...)
-		readerproto.RegisterReaderServer(readerServer, greader.NewServer(readWriter))
+		greaderproto.RegisterReaderServer(readerServer, greader.NewServer(readWriter))
 		return readerServer
 	})
 	go s.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
 		writerServer := grpc.NewServer(opts...)
-		writerproto.RegisterWriterServer(writerServer, gwriter.NewServer(readWriter))
+		gwriterproto.RegisterWriterServer(writerServer, gwriter.NewServer(readWriter))
 		return writerServer
 	})
 
 	local := conn.LocalAddr()
 	remote := conn.RemoteAddr()
 
-	return &responsewriterproto.HijackResponse{
+	return &gresponsewriterproto.HijackResponse{
 		ConnServer:    connID,
 		LocalNetwork:  local.Network(),
 		LocalString:   local.String(),

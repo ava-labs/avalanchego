@@ -7,20 +7,20 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
-type Client struct{ client proto.WriterClient }
+type Client struct{ client gwriterproto.WriterClient }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client proto.WriterClient) *Client {
+func NewClient(client gwriterproto.WriterClient) *Client {
 	return &Client{client: client}
 }
 
 // Write ...
 func (c *Client) Write(p []byte) (int, error) {
-	resp, err := c.client.Write(context.Background(), &proto.WriteRequest{
+	resp, err := c.client.Write(context.Background(), &gwriterproto.WriteRequest{
 		Payload: p,
 	})
 	if err != nil {

@@ -11,19 +11,19 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
 type Client struct {
-	client  proto.ConnClient
+	client  gconnproto.ConnClient
 	local   net.Addr
 	remote  net.Addr
 	toClose []io.Closer
 }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client proto.ConnClient, local, remote net.Addr, toClose ...io.Closer) *Client {
+func NewClient(client gconnproto.ConnClient, local, remote net.Addr, toClose ...io.Closer) *Client {
 	return &Client{
 		client:  client,
 		local:   local,
@@ -34,7 +34,7 @@ func NewClient(client proto.ConnClient, local, remote net.Addr, toClose ...io.Cl
 
 // Read ...
 func (c *Client) Read(p []byte) (int, error) {
-	resp, err := c.client.Read(context.Background(), &proto.ReadRequest{
+	resp, err := c.client.Read(context.Background(), &gconnproto.ReadRequest{
 		Length: int32(len(p)),
 	})
 	if err != nil {
@@ -51,7 +51,7 @@ func (c *Client) Read(p []byte) (int, error) {
 
 // Write ...
 func (c *Client) Write(b []byte) (int, error) {
-	resp, err := c.client.Write(context.Background(), &proto.WriteRequest{
+	resp, err := c.client.Write(context.Background(), &gconnproto.WriteRequest{
 		Payload: b,
 	})
 	if err != nil {
@@ -66,7 +66,7 @@ func (c *Client) Write(b []byte) (int, error) {
 
 // Close ...
 func (c *Client) Close() error {
-	_, err := c.client.Close(context.Background(), &proto.CloseRequest{})
+	_, err := c.client.Close(context.Background(), &gconnproto.CloseRequest{})
 	errs := wrappers.Errs{}
 	errs.Add(err)
 	for _, toClose := range c.toClose {
@@ -87,7 +87,7 @@ func (c *Client) SetDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetDeadline(context.Background(), &proto.SetDeadlineRequest{
+	_, err = c.client.SetDeadline(context.Background(), &gconnproto.SetDeadlineRequest{
 		Time: bytes,
 	})
 	return err
@@ -99,7 +99,7 @@ func (c *Client) SetReadDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetReadDeadline(context.Background(), &proto.SetReadDeadlineRequest{
+	_, err = c.client.SetReadDeadline(context.Background(), &gconnproto.SetReadDeadlineRequest{
 		Time: bytes,
 	})
 	return err
@@ -111,7 +111,7 @@ func (c *Client) SetWriteDeadline(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.client.SetWriteDeadline(context.Background(), &proto.SetWriteDeadlineRequest{
+	_, err = c.client.SetWriteDeadline(context.Background(), &gconnproto.SetWriteDeadlineRequest{
 		Time: bytes,
 	})
 	return err

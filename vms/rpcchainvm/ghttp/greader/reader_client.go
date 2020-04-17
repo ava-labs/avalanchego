@@ -7,20 +7,20 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/greaderproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
-type Client struct{ client proto.ReaderClient }
+type Client struct{ client greaderproto.ReaderClient }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client proto.ReaderClient) *Client {
+func NewClient(client greaderproto.ReaderClient) *Client {
 	return &Client{client: client}
 }
 
 // Read ...
 func (c *Client) Read(p []byte) (int, error) {
-	resp, err := c.client.Read(context.Background(), &proto.ReadRequest{
+	resp, err := c.client.Read(context.Background(), &greaderproto.ReadRequest{
 		Length: int32(len(p)),
 	})
 	if err != nil {
