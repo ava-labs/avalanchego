@@ -10,22 +10,21 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter"
-
-	readcloserproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/proto"
-	responsewriterproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/proto"
-	httpproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
 type Client struct {
-	client httpproto.HTTPClient
+	client ghttpproto.HTTPClient
 	broker *plugin.GRPCBroker
 }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client httpproto.HTTPClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(client ghttpproto.HTTPClient, broker *plugin.GRPCBroker) *Client {
 	return &Client{
 		client: client,
 		broker: broker,
@@ -40,21 +39,21 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	readerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
 		reader = grpc.NewServer(opts...)
-		readcloserproto.RegisterReaderServer(reader, greadcloser.NewServer(r.Body))
+		greadcloserproto.RegisterReaderServer(reader, greadcloser.NewServer(r.Body))
 
 		return reader
 	})
 	writerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
 		writer = grpc.NewServer(opts...)
-		responsewriterproto.RegisterWriterServer(writer, gresponsewriter.NewServer(w, c.broker))
+		gresponsewriterproto.RegisterWriterServer(writer, gresponsewriter.NewServer(w, c.broker))
 
 		return writer
 	})
 
-	req := &httpproto.HTTPRequest{
+	req := &ghttpproto.HTTPRequest{
 		ResponseWriter: writerID,
-		Request: &httpproto.Request{
+		Request: &ghttpproto.Request{
 			Method:           r.Method,
 			Proto:            r.Proto,
 			ProtoMajor:       int32(r.ProtoMajor),
@@ -67,32 +66,32 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			RequestURI:       r.RequestURI,
 		},
 	}
-	req.Request.Header = make([]*httpproto.Element, 0, len(r.Header))
+	req.Request.Header = make([]*ghttpproto.Element, 0, len(r.Header))
 	for key, values := range r.Header {
-		req.Request.Header = append(req.Request.Header, &httpproto.Element{
+		req.Request.Header = append(req.Request.Header, &ghttpproto.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 
-	req.Request.Form = make([]*httpproto.Element, 0, len(r.Form))
+	req.Request.Form = make([]*ghttpproto.Element, 0, len(r.Form))
 	for key, values := range r.Form {
-		req.Request.Form = append(req.Request.Form, &httpproto.Element{
+		req.Request.Form = append(req.Request.Form, &ghttpproto.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 
-	req.Request.PostForm = make([]*httpproto.Element, 0, len(r.PostForm))
+	req.Request.PostForm = make([]*ghttpproto.Element, 0, len(r.PostForm))
 	for key, values := range r.PostForm {
-		req.Request.PostForm = append(req.Request.PostForm, &httpproto.Element{
+		req.Request.PostForm = append(req.Request.PostForm, &ghttpproto.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 
 	if r.URL != nil {
-		req.Request.Url = &httpproto.URL{
+		req.Request.Url = &ghttpproto.URL{
 			Scheme:     r.URL.Scheme,
 			Opaque:     r.URL.Opaque,
 			Host:       r.URL.Host,
@@ -104,7 +103,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if r.URL.User != nil {
-			req.Request.Url.User = &httpproto.Userinfo{
+			req.Request.Url.User = &ghttpproto.Userinfo{
 				Username: r.URL.User.Username(),
 			}
 			pwd, set := r.URL.User.Password()
@@ -114,7 +113,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.TLS != nil {
-		req.Request.Tls = &httpproto.ConnectionState{
+		req.Request.Tls = &ghttpproto.ConnectionState{
 			Version:                     uint32(r.TLS.Version),
 			HandshakeComplete:           r.TLS.HandshakeComplete,
 			DidResume:                   r.TLS.DidResume,
@@ -127,16 +126,16 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			TlsUnique:                   r.TLS.TLSUnique,
 		}
 
-		req.Request.Tls.PeerCertificates = &httpproto.Certificates{
+		req.Request.Tls.PeerCertificates = &ghttpproto.Certificates{
 			Cert: make([][]byte, len(r.TLS.PeerCertificates)),
 		}
 		for i, cert := range r.TLS.PeerCertificates {
 			req.Request.Tls.PeerCertificates.Cert[i] = cert.Raw
 		}
 
-		req.Request.Tls.VerifiedChains = make([]*httpproto.Certificates, len(r.TLS.VerifiedChains))
+		req.Request.Tls.VerifiedChains = make([]*ghttpproto.Certificates, len(r.TLS.VerifiedChains))
 		for i, chain := range r.TLS.VerifiedChains {
-			req.Request.Tls.VerifiedChains[i] = &httpproto.Certificates{
+			req.Request.Tls.VerifiedChains[i] = &ghttpproto.Certificates{
 				Cert: make([][]byte, len(chain)),
 			}
 			for j, cert := range chain {

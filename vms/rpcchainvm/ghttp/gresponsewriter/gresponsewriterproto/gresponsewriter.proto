@@ -1,5 +1,6 @@
 syntax = "proto3";
-package proto;
+package gresponsewriterproto;
+option go_package = "gresponsewriterproto";
 
 message Header {
     string key = 1;

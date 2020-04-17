@@ -12,12 +12,11 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter"
-
-	readcloserproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/proto"
-	responsewriterproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/proto"
-	httpproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -35,7 +34,7 @@ func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
 }
 
 // Handle ...
-func (s *Server) Handle(ctx context.Context, req *httpproto.HTTPRequest) (*httpproto.HTTPResponse, error) {
+func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghttpproto.HTTPResponse, error) {
 	writerConn, err := s.broker.Dial(req.ResponseWriter)
 	if err != nil {
 		return nil, err
@@ -48,8 +47,8 @@ func (s *Server) Handle(ctx context.Context, req *httpproto.HTTPRequest) (*httpp
 	}
 	defer readerConn.Close()
 
-	writer := gresponsewriter.NewClient(responsewriterproto.NewWriterClient(writerConn), s.broker)
-	reader := greadcloser.NewClient(readcloserproto.NewReaderClient(readerConn))
+	writer := gresponsewriter.NewClient(gresponsewriterproto.NewWriterClient(writerConn), s.broker)
+	reader := greadcloser.NewClient(greadcloserproto.NewReaderClient(readerConn))
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
@@ -143,5 +142,5 @@ func (s *Server) Handle(ctx context.Context, req *httpproto.HTTPRequest) (*httpp
 	s.handler.ServeHTTP(writer, request)
 
 	// return the response
-	return &httpproto.HTTPResponse{}, nil
+	return &ghttpproto.HTTPResponse{}, nil
 }

@@ -7,7 +7,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -19,9 +19,9 @@ func NewServer(writer io.Writer) *Server {
 }
 
 // Write ...
-func (s *Server) Write(ctx context.Context, req *proto.WriteRequest) (*proto.WriteResponse, error) {
+func (s *Server) Write(ctx context.Context, req *gwriterproto.WriteRequest) (*gwriterproto.WriteResponse, error) {
 	n, err := s.writer.Write(req.Payload)
-	resp := &proto.WriteResponse{
+	resp := &gwriterproto.WriteResponse{
 		Written: int32(n),
 	}
 	if err != nil {

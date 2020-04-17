@@ -1,5 +1,5 @@
 syntax = "proto3";
-package proto;
+package vmproto;
 
 message InitializeRequest {
     uint32 dbServer = 1;

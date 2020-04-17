@@ -12,24 +12,23 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/greaderproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter"
-
-	connproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/proto"
-	readerproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/proto"
-	responsewriterproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/proto"
-	writerproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
 type Client struct {
-	client responsewriterproto.WriterClient
+	client gresponsewriterproto.WriterClient
 	header http.Header
 	broker *plugin.GRPCBroker
 }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client responsewriterproto.WriterClient, broker *plugin.GRPCBroker) *Client {
+func NewClient(client gresponsewriterproto.WriterClient, broker *plugin.GRPCBroker) *Client {
 	return &Client{
 		client: client,
 		header: make(http.Header),
@@ -42,12 +41,12 @@ func (c *Client) Header() http.Header { return c.header }
 
 // Write ...
 func (c *Client) Write(payload []byte) (int, error) {
-	req := &responsewriterproto.WriteRequest{
-		Headers: make([]*responsewriterproto.Header, 0, len(c.header)),
+	req := &gresponsewriterproto.WriteRequest{
+		Headers: make([]*gresponsewriterproto.Header, 0, len(c.header)),
 		Payload: payload,
 	}
 	for key, values := range c.header {
-		req.Headers = append(req.Headers, &responsewriterproto.Header{
+		req.Headers = append(req.Headers, &gresponsewriterproto.Header{
 			Key:    key,
 			Values: values,
 		})
@@ -61,12 +60,12 @@ func (c *Client) Write(payload []byte) (int, error) {
 
 // WriteHeader ...
 func (c *Client) WriteHeader(statusCode int) {
-	req := &responsewriterproto.WriteHeaderRequest{
-		Headers:    make([]*responsewriterproto.Header, 0, len(c.header)),
+	req := &gresponsewriterproto.WriteHeaderRequest{
+		Headers:    make([]*gresponsewriterproto.Header, 0, len(c.header)),
 		StatusCode: int32(statusCode),
 	}
 	for key, values := range c.header {
-		req.Headers = append(req.Headers, &responsewriterproto.Header{
+		req.Headers = append(req.Headers, &gresponsewriterproto.Header{
 			Key:    key,
 			Values: values,
 		})
@@ -78,7 +77,7 @@ func (c *Client) WriteHeader(statusCode int) {
 // Flush ...
 func (c *Client) Flush() {
 	// TODO: How should we handle an error here?
-	c.client.Flush(context.Background(), &responsewriterproto.FlushRequest{})
+	c.client.Flush(context.Background(), &gresponsewriterproto.FlushRequest{})
 }
 
 type addr struct {
@@ -91,7 +90,7 @@ func (a *addr) String() string  { return a.str }
 
 // Hijack ...
 func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	resp, err := c.client.Hijack(context.Background(), &responsewriterproto.HijackRequest{})
+	resp, err := c.client.Hijack(context.Background(), &gresponsewriterproto.HijackRequest{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -114,7 +113,7 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, err
 	}
 
-	conn := gconn.NewClient(connproto.NewConnClient(connConn), &addr{
+	conn := gconn.NewClient(gconnproto.NewConnClient(connConn), &addr{
 		network: resp.LocalNetwork,
 		str:     resp.LocalString,
 	}, &addr{
@@ -122,8 +121,8 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		str:     resp.RemoteString,
 	}, connConn, readerConn, writerConn)
 
-	reader := greader.NewClient(readerproto.NewReaderClient(readerConn))
-	writer := gwriter.NewClient(writerproto.NewWriterClient(writerConn))
+	reader := greader.NewClient(greaderproto.NewReaderClient(readerConn))
+	writer := gwriter.NewClient(gwriterproto.NewWriterClient(writerConn))
 
 	readWriter := bufio.NewReadWriter(
 		bufio.NewReader(reader),
