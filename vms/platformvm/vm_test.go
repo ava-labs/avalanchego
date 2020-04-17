@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -18,7 +20,10 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/timestampvm"
 )
 
@@ -35,16 +40,17 @@ var (
 	// each key corresponds to an account that has $AVA and a genesis validator
 	keys []*crypto.PrivateKeySECP256K1R
 
-	// amount all genesis validators stake
+	// amount all genesis validators stake in defaultVM
 	defaultStakeAmount uint64
 
-	// balance of accounts that exist at genesis
+	// balance of accounts that exist at genesis in defaultVM
 	defaultBalance = 100 * MinimumStakeAmount
 
 	// At genesis this account has AVA and is validating the default subnet
 	defaultKey *crypto.PrivateKeySECP256K1R
 
-	// non-default subnet that exists at genesis in defaultVM
+	// non-default Subnet that exists at genesis in defaultVM
+	// Its controlKeys are keys[0], keys[1], keys[2]
 	testSubnet1            *CreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 )
@@ -112,12 +118,13 @@ func defaultVM() *VM {
 	}
 
 	vm := &VM{
-		SnowmanVM: &core.SnowmanVM{},
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
 	}
 
 	defaultSubnet := validators.NewSet()
-	vm.Validators = validators.NewManager()
-	vm.Validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
+	vm.validators = validators.NewManager()
+	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
 	db := memdb.New()
@@ -132,7 +139,7 @@ func defaultVM() *VM {
 		testNetworkID,
 		0,
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()}, // control keys are keys[0], keys[1], keys[2]
-		2, // 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
+		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		keys[0],
 	)
 	if err != nil {
@@ -149,7 +156,7 @@ func defaultVM() *VM {
 		&EventHeap{
 			SortByStartTime: false,
 		},
-		tx.ID,
+		tx.id,
 	)
 	if err != nil {
 		panic(err)
@@ -159,7 +166,7 @@ func defaultVM() *VM {
 		&EventHeap{
 			SortByStartTime: true,
 		},
-		tx.ID,
+		tx.id,
 	)
 	if err != nil {
 		panic(err)
@@ -433,7 +440,7 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		keys[0],
@@ -478,7 +485,7 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 	commit.Accept() // accept the proposal
 
 	// Verify that new validator is in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.ID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,7 +513,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		testSubnet1.ID,
+		testSubnet1.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		keys[0],
@@ -551,7 +558,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 	abort.Accept() // reject the proposal
 
 	// Verify that new validator NOT in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.ID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,11 +768,13 @@ func TestCreateChain(t *testing.T) {
 
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
+		testSubnet1.id,
 		nil,
 		timestampvm.ID,
 		nil,
-		"name ",
+		"name",
 		testNetworkID,
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		keys[0],
 	)
 	if err != nil {
@@ -802,7 +811,7 @@ func TestCreateChain(t *testing.T) {
 	}
 
 	// Verify tx fee was deducted
-	account, err := vm.getAccount(vm.DB, tx.Key().Address())
+	account, err := vm.getAccount(vm.DB, tx.PayerAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -881,7 +890,7 @@ func TestCreateSubnet(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		createSubnetTx.ID,
+		createSubnetTx.id,
 		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0],
@@ -931,7 +940,7 @@ func TestCreateSubnet(t *testing.T) {
 	commit.Accept() // add the validator to pending validator set
 
 	// Verify validator is in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.ID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -985,7 +994,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Verify validator no longer in pending validator set
 	// Verify validator is in pending validator set
-	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID)
+	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -994,7 +1003,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Verify validator is in current validator set
-	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.ID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1044,19 +1053,177 @@ func TestCreateSubnet(t *testing.T) {
 	commit.Accept() // remove validator from current validator set
 
 	// pending validators and current validator should be empty
-	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID)
+	pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if pendingValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
 	}
-	currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.ID)
+	currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if currentValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
 	}
+}
 
+// test asset import
+func TestAtomicImport(t *testing.T) {
+	vm := defaultVM()
+
+	avmID := ids.Empty.Prefix(0)
+	utxoID := ava.UTXOID{
+		TxID:        ids.Empty.Prefix(1),
+		OutputIndex: 1,
+	}
+	assetID := ids.Empty.Prefix(2)
+	amount := uint64(50000)
+	key := keys[0]
+
+	sm := &atomic.SharedMemory{}
+	sm.Initialize(logging.NoLog{}, memdb.New())
+
+	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+
+	tx, err := vm.newImportTx(
+		defaultNonce+1,
+		testNetworkID,
+		[]*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: utxoID,
+			Asset:  ava.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   amount,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+		[][]*crypto.PrivateKeySECP256K1R{[]*crypto.PrivateKeySECP256K1R{key}},
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.Lock.Lock()
+	defer vm.Ctx.Lock.Unlock()
+
+	vm.ava = assetID
+	vm.avm = avmID
+
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+	if _, err := vm.BuildBlock(); err == nil {
+		t.Fatalf("should have errored due to missing utxos")
+	}
+
+	// Provide the avm UTXO:
+
+	smDB := vm.Ctx.SharedMemory.GetDatabase(avmID)
+
+	utxo := &ava.UTXO{
+		UTXOID: utxoID,
+		Asset:  ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{key.PublicKey().Address()},
+			},
+		},
+	}
+
+	state := ava.NewPrefixedState(smDB, Codec)
+	if err := state.FundAVMUTXO(utxo); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
+
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	blk.Accept()
+
+	smDB = vm.Ctx.SharedMemory.GetDatabase(avmID)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
+
+	state = ava.NewPrefixedState(smDB, vm.codec)
+	if _, err := state.AVMUTXO(utxoID.InputID()); err == nil {
+		t.Fatalf("shouldn't have been able to read the utxo")
+	}
+}
+
+// test optimistic asset import
+func TestOptimisticAtomicImport(t *testing.T) {
+	vm := defaultVM()
+
+	avmID := ids.Empty.Prefix(0)
+	utxoID := ava.UTXOID{
+		TxID:        ids.Empty.Prefix(1),
+		OutputIndex: 1,
+	}
+	assetID := ids.Empty.Prefix(2)
+	amount := uint64(50000)
+	key := keys[0]
+
+	sm := &atomic.SharedMemory{}
+	sm.Initialize(logging.NoLog{}, memdb.New())
+
+	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+
+	tx, err := vm.newImportTx(
+		defaultNonce+1,
+		testNetworkID,
+		[]*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: utxoID,
+			Asset:  ava.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   amount,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+		[][]*crypto.PrivateKeySECP256K1R{[]*crypto.PrivateKeySECP256K1R{key}},
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.Lock.Lock()
+	defer vm.Ctx.Lock.Unlock()
+
+	vm.ava = assetID
+	vm.avm = avmID
+
+	blk, err := vm.newAtomicBlock(vm.Preferred(), tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err == nil {
+		t.Fatalf("should have errored due to an invalid atomic utxo")
+	}
+
+	previousAccount, err := vm.getAccount(vm.DB, key.PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blk.Accept()
+
+	newAccount, err := vm.getAccount(vm.DB, key.PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if newAccount.Balance != previousAccount.Balance+amount {
+		t.Fatalf("failed to provide funds")
+	}
 }

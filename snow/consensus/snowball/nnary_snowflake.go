@@ -12,6 +12,9 @@ import (
 // nnarySnowflake is the implementation of a snowflake instance with an
 // unbounded number of choices
 type nnarySnowflake struct {
+	// wrap the n-nary slush logic
+	nnarySlush
+
 	// betaVirtuous is the number of consecutive successful queries required for
 	// finalization on a virtuous instance.
 	betaVirtuous int
@@ -24,11 +27,6 @@ type nnarySnowflake struct {
 	// returned the preference
 	confidence int
 
-	// preference is the choice that last had a successful poll. Unless there
-	// hasn't been a successful poll, in which case it is the initially provided
-	// choice.
-	preference ids.ID
-
 	// rogue tracks if this instance has multiple choices or only one
 	rogue bool
 
@@ -39,32 +37,31 @@ type nnarySnowflake struct {
 
 // Initialize implements the NnarySnowflake interface
 func (sf *nnarySnowflake) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
+	sf.nnarySlush.Initialize(choice)
 	sf.betaVirtuous = betaVirtuous
 	sf.betaRogue = betaRogue
-	sf.preference = choice
 }
 
 // Add implements the NnarySnowflake interface
 func (sf *nnarySnowflake) Add(choice ids.ID) { sf.rogue = sf.rogue || !choice.Equals(sf.preference) }
 
-// Preference implements the NnarySnowflake interface
-func (sf *nnarySnowflake) Preference() ids.ID { return sf.preference }
-
 // RecordSuccessfulPoll implements the NnarySnowflake interface
 func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
-	if sf.Finalized() {
-		return
+	if sf.finalized {
+		return // This instace is already decided.
 	}
 
-	if sf.preference.Equals(choice) {
+	if preference := sf.nnarySlush.Preference(); preference.Equals(choice) {
 		sf.confidence++
 	} else {
+		// confidence is set to 1 because there has already been 1 successful
+		// poll, namely this poll.
 		sf.confidence = 1
-		sf.preference = choice
 	}
 
 	sf.finalized = (!sf.rogue && sf.confidence >= sf.betaVirtuous) ||
 		sf.confidence >= sf.betaRogue
+	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 
 // RecordUnsuccessfulPoll implements the NnarySnowflake interface
@@ -74,8 +71,8 @@ func (sf *nnarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
 func (sf *nnarySnowflake) Finalized() bool { return sf.finalized }
 
 func (sf *nnarySnowflake) String() string {
-	return fmt.Sprintf("SF(Preference = %s, Confidence = %d, Finalized = %v)",
-		sf.preference,
+	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",
 		sf.confidence,
-		sf.Finalized())
+		sf.finalized,
+		&sf.nnarySlush)
 }

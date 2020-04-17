@@ -5,13 +5,11 @@ package crypto
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/rand"
-	"math/big"
+	"errors"
 	"sort"
 
-	"github.com/ava-labs/go-ethereum/crypto"
-	"github.com/ava-labs/go-ethereum/crypto/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/ecdsa"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
@@ -27,6 +25,18 @@ const (
 	// SECP256K1RSKLen is the number of bytes in a secp2561k recoverable private
 	// key
 	SECP256K1RSKLen = 32
+
+	// SECP256K1RPKLen is the number of bytes in a secp2561k recoverable public
+	// key
+	SECP256K1RPKLen = 33
+
+	// from the decred library:
+	// compactSigMagicOffset is a value used when creating the compact signature
+	// recovery code inherited from Bitcoin and has no meaning, but has been
+	// retained for compatibility.  For historical purposes, it was originally
+	// picked to avoid a binary representation that would allow compact
+	// signatures to be mistaken for other components.
+	compactSigMagicOffset = 27
 )
 
 // FactorySECP256K1R ...
@@ -34,16 +44,13 @@ type FactorySECP256K1R struct{ Cache cache.LRU }
 
 // NewPrivateKey implements the Factory interface
 func (*FactorySECP256K1R) NewPrivateKey() (PrivateKey, error) {
-	k, err := ecdsa.GenerateKey(secp256k1.S256(), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-	return &PrivateKeySECP256K1R{sk: k}, nil
+	k, err := secp256k1.GeneratePrivateKey()
+	return &PrivateKeySECP256K1R{sk: k}, err
 }
 
 // ToPublicKey implements the Factory interface
 func (*FactorySECP256K1R) ToPublicKey(b []byte) (PublicKey, error) {
-	key, err := crypto.DecompressPubkey(b)
+	key, err := secp256k1.ParsePubKey(b)
 	return &PublicKeySECP256K1R{
 		pk:    key,
 		bytes: b,
@@ -52,11 +59,10 @@ func (*FactorySECP256K1R) ToPublicKey(b []byte) (PublicKey, error) {
 
 // ToPrivateKey implements the Factory interface
 func (*FactorySECP256K1R) ToPrivateKey(b []byte) (PrivateKey, error) {
-	key, err := crypto.ToECDSA(b)
 	return &PrivateKeySECP256K1R{
-		sk:    key,
+		sk:    secp256k1.PrivKeyFromBytes(b),
 		bytes: b,
-	}, err
+	}, nil
 }
 
 // RecoverPublicKey returns the public key from a 65 byte signature
@@ -71,25 +77,35 @@ func (f *FactorySECP256K1R) RecoverHashPublicKey(hash, sig []byte) (PublicKey, e
 	copy(cacheBytes[len(hash):], sig)
 	id := ids.NewID(hashing.ComputeHash256Array(cacheBytes))
 	if cachedPublicKey, ok := f.Cache.Get(id); ok {
-		return cachedPublicKey.(*PublicKeySECP256K1), nil
+		return cachedPublicKey.(*PublicKeySECP256K1R), nil
 	}
 
 	if err := verifySECP256K1RSignatureFormat(sig); err != nil {
 		return nil, err
 	}
 
-	rawPubkey, err := crypto.SigToPub(hash, sig)
+	sig, err := sigToRawSig(sig)
 	if err != nil {
 		return nil, err
 	}
-	pubkey := &PublicKeySECP256K1{pk: rawPubkey}
+
+	rawPubkey, compressed, err := ecdsa.RecoverCompact(sig, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if compressed {
+		return nil, errors.New("wasn't expecting a compresses key")
+	}
+
+	pubkey := &PublicKeySECP256K1R{pk: rawPubkey}
 	f.Cache.Put(id, pubkey)
 	return pubkey, nil
 }
 
 // PublicKeySECP256K1R ...
 type PublicKeySECP256K1R struct {
-	pk    *ecdsa.PublicKey
+	pk    *secp256k1.PublicKey
 	addr  ids.ShortID
 	bytes []byte
 }
@@ -101,10 +117,12 @@ func (k *PublicKeySECP256K1R) Verify(msg, sig []byte) bool {
 
 // VerifyHash implements the PublicKey interface
 func (k *PublicKeySECP256K1R) VerifyHash(hash, sig []byte) bool {
-	if verifySECP256K1RSignatureFormat(sig) != nil {
+	factory := FactorySECP256K1R{}
+	pk, err := factory.RecoverHashPublicKey(hash, sig)
+	if err != nil {
 		return false
 	}
-	return crypto.VerifySignature(k.Bytes(), hash, sig[:SECP256K1RSigLen-1])
+	return k.Address().Equals(pk.Address())
 }
 
 // Address implements the PublicKey interface
@@ -122,14 +140,14 @@ func (k *PublicKeySECP256K1R) Address() ids.ShortID {
 // Bytes implements the PublicKey interface
 func (k *PublicKeySECP256K1R) Bytes() []byte {
 	if k.bytes == nil {
-		k.bytes = crypto.CompressPubkey(k.pk)
+		k.bytes = k.pk.SerializeCompressed()
 	}
 	return k.bytes
 }
 
 // PrivateKeySECP256K1R ...
 type PrivateKeySECP256K1R struct {
-	sk    *ecdsa.PrivateKey
+	sk    *secp256k1.PrivateKey
 	pk    *PublicKeySECP256K1R
 	bytes []byte
 }
@@ -137,7 +155,7 @@ type PrivateKeySECP256K1R struct {
 // PublicKey implements the PrivateKey interface
 func (k *PrivateKeySECP256K1R) PublicKey() PublicKey {
 	if k.pk == nil {
-		k.pk = &PublicKeySECP256K1R{pk: (*ecdsa.PublicKey)(&k.sk.PublicKey)}
+		k.pk = &PublicKeySECP256K1R{pk: k.sk.PubKey()}
 	}
 	return k.pk
 }
@@ -149,27 +167,49 @@ func (k *PrivateKeySECP256K1R) Sign(msg []byte) ([]byte, error) {
 
 // SignHash implements the PrivateKey interface
 func (k *PrivateKeySECP256K1R) SignHash(hash []byte) ([]byte, error) {
-	return crypto.Sign(hash, k.sk)
+	sig := ecdsa.SignCompact(k.sk, hash, false) // returns [v || r || s]
+	return rawSigToSig(sig)
 }
 
 // Bytes implements the PrivateKey interface
 func (k *PrivateKeySECP256K1R) Bytes() []byte {
 	if k.bytes == nil {
-		k.bytes = make([]byte, SECP256K1RSKLen)
-		bytes := k.sk.D.Bytes()
-		copy(k.bytes[SECP256K1RSKLen-len(bytes):], bytes)
+		k.bytes = k.sk.Serialize()
 	}
 	return k.bytes
 }
 
+// raw sig has format [v || r || s] whereas the sig has format [r || s || v]
+func rawSigToSig(sig []byte) ([]byte, error) {
+	if len(sig) != SECP256K1RSigLen {
+		return nil, errInvalidSigLen
+	}
+	recCode := sig[0]
+	copy(sig, sig[1:])
+	sig[SECP256K1RSigLen-1] = recCode - compactSigMagicOffset
+	return sig, nil
+}
+
+// sig has format [r || s || v] whereas the raw sig has format [v || r || s]
+func sigToRawSig(sig []byte) ([]byte, error) {
+	if len(sig) != SECP256K1RSigLen {
+		return nil, errInvalidSigLen
+	}
+	newSig := make([]byte, SECP256K1RSigLen)
+	newSig[0] = sig[SECP256K1RSigLen-1] + compactSigMagicOffset
+	copy(newSig[1:], sig)
+	return newSig, nil
+}
+
+// verifies the signature format in format [r || s || v]
 func verifySECP256K1RSignatureFormat(sig []byte) error {
 	if len(sig) != SECP256K1RSigLen {
 		return errInvalidSigLen
 	}
-	var r, s big.Int
-	r.SetBytes(sig[:32])
-	s.SetBytes(sig[32:64])
-	if !crypto.ValidateSignatureValues(sig[64], &r, &s, true) {
+
+	var s secp256k1.ModNScalar
+	s.SetByteSlice(sig[32:64])
+	if s.IsOverHalfOrder() {
 		return errMutatedSig
 	}
 	return nil

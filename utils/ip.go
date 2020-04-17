@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 )
 
 var (
@@ -33,21 +32,21 @@ func (ipDesc IPDesc) PortString() string {
 }
 
 func (ipDesc IPDesc) String() string {
-	return fmt.Sprintf("%s%s", ipDesc.IP, ipDesc.PortString())
+	return net.JoinHostPort(ipDesc.IP.String(), fmt.Sprintf("%d", ipDesc.Port))
 }
 
 // ToIPDesc ...
-// TODO: this was kinda hacked together, it should be verified.
 func ToIPDesc(str string) (IPDesc, error) {
-	parts := strings.Split(str, ":")
-	if len(parts) != 2 {
+	host, portStr, err := net.SplitHostPort(str)
+	if err != nil {
 		return IPDesc{}, errBadIP
 	}
-	port, err := strconv.ParseUint(parts[1], 10 /*=base*/, 16 /*=size*/)
+	port, err := strconv.ParseUint(portStr, 10 /*=base*/, 16 /*=size*/)
 	if err != nil {
+		// TODO: Should this return a locally defined error? (e.g. errBadPort)
 		return IPDesc{}, err
 	}
-	ip := net.ParseIP(parts[0])
+	ip := net.ParseIP(host)
 	if ip == nil {
 		return IPDesc{}, errBadIP
 	}
@@ -55,10 +54,4 @@ func ToIPDesc(str string) (IPDesc, error) {
 		IP:   ip,
 		Port: uint16(port),
 	}, nil
-}
-
-// MyIP ...
-func MyIP() net.IP {
-	// TODO: Change this to consult a json-returning external service
-	return net.ParseIP("127.0.0.1")
 }

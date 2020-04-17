@@ -1,0 +1,23 @@
+package propertyfx
+
+import (
+	"testing"
+
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
+)
+
+func TestBurnOperationInvalid(t *testing.T) {
+	op := BurnOperation{Input: secp256k1fx.Input{
+		SigIndices: []uint32{1, 0},
+	}}
+	if err := op.Verify(); err == nil {
+		t.Fatalf("operation should have failed verification")
+	}
+}
+
+func TestBurnOperationNumberOfOutput(t *testing.T) {
+	op := BurnOperation{}
+	if outs := op.Outs(); len(outs) != 0 {
+		t.Fatalf("wrong number of outputs")
+	}
+}

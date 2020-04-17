@@ -6,6 +6,7 @@ package avalanche
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
 type issuer struct {
@@ -44,12 +45,22 @@ func (i *issuer) Update() {
 	vtxID := i.vtx.ID()
 	i.t.pending.Remove(vtxID)
 
-	for _, tx := range i.vtx.Txs() {
+	txs := i.vtx.Txs()
+	validTxs := []snowstorm.Tx{}
+	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
-			i.t.Config.Context.Log.Debug("Transaction failed verification due to %s, dropping vertex", err)
-			i.t.vtxBlocked.Abandon(vtxID)
-			return
+			i.t.Config.Context.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
+		} else {
+			validTxs = append(validTxs, tx)
 		}
+	}
+
+	if len(validTxs) != len(txs) {
+		i.t.Config.Context.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
+
+		i.t.batch(validTxs, false /*=force*/, false /*=empty*/)
+		i.t.vtxBlocked.Abandon(vtxID)
+		return
 	}
 
 	i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
@@ -65,8 +76,10 @@ func (i *issuer) Update() {
 	}
 
 	i.t.RequestID++
+	polled := false
 	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
 		i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+		polled = true
 	} else if numVdrs < p.K {
 		i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
@@ -74,6 +87,10 @@ func (i *issuer) Update() {
 	i.t.vtxBlocked.Fulfill(vtxID)
 	for _, tx := range i.vtx.Txs() {
 		i.t.txBlocked.Fulfill(tx.ID())
+	}
+
+	if polled && len(i.t.polls.m) < i.t.Params.ConcurrentRepolls {
+		i.t.repoll()
 	}
 }
 

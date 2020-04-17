@@ -16,6 +16,11 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
+func GenerateID() ids.ID {
+	offset++
+	return ids.Empty.Prefix(offset)
+}
+
 var (
 	Genesis = GenerateID()
 	offset  = uint64(0)
@@ -100,7 +105,7 @@ func AddTest(t *testing.T, factory Factory) {
 
 	if !avl.Finalized() {
 		t.Fatalf("An empty avalanche instance is not finalized")
-	} else if !Matches([]ids.ID{vts[0].ID(), vts[1].ID()}, avl.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vts[0].ID(), vts[1].ID()}, avl.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
@@ -119,7 +124,7 @@ func AddTest(t *testing.T, factory Factory) {
 
 	if avl.Finalized() {
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !Matches([]ids.ID{vtx0.id}, avl.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx0.id}, avl.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
@@ -138,7 +143,7 @@ func AddTest(t *testing.T, factory Factory) {
 
 	if avl.Finalized() {
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !Matches([]ids.ID{vtx0.id}, avl.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx0.id}, avl.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
@@ -146,7 +151,7 @@ func AddTest(t *testing.T, factory Factory) {
 
 	if avl.Finalized() {
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !Matches([]ids.ID{vtx0.id}, avl.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx0.id}, avl.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 
@@ -154,7 +159,7 @@ func AddTest(t *testing.T, factory Factory) {
 
 	if avl.Finalized() {
 		t.Fatalf("A non-empty avalanche instance is finalized")
-	} else if !Matches([]ids.ID{vtx0.id}, avl.Preferences().List()) {
+	} else if !ids.UnsortedEquals([]ids.ID{vtx0.id}, avl.Preferences().List()) {
 		t.Fatalf("Initial frontier failed to be set")
 	}
 }

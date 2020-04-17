@@ -1,17 +1,16 @@
-import sys
+#!/usr/bin/env python3
+"""
+Start a number of AVA nodes on Amazon EC2
+"""
+
 import boto3
 
-ec2 = boto3.client("ec2")
-
-# Should be called with python3 aws_create.py $numBootstraps $numNodes
-numBootstraps = int(sys.argv[1])
-numNodes = int(sys.argv[2])
 
 bootstapNode = "Borealis-Bootstrap"
 fullNode = "Borealis-Node"
 
 
-def runInstances(num: int, name: str):
+def runInstances(ec2, num: int, name: str):
     if num > 0:
         ec2.run_instances(
             ImageId="ami-0badd1c10cb7673e9",
@@ -28,8 +27,18 @@ def runInstances(num: int, name: str):
 
 
 def main():
-    runInstances(numBootstraps, bootstapNode)
-    runInstances(numNodes, fullNode)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+    )
+    parser.add_argument('numBootstraps', type=int)
+    parser.add_argument('numNodes', type=int)
+    args = parser.parse_args()
+
+    ec2 = boto3.client("ec2")
+    runInstances(ec2, args.numBootstraps, bootstapNode)
+    runInstances(ec2, args.numNodes, fullNode)
 
 
 if __name__ == "__main__":

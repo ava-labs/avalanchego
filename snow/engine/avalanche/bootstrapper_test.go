@@ -69,7 +69,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 		Context:    ctx,
 		Validators: peers,
 		Beacons:    peers,
-		Alpha:      peers.Len()/2 + 1,
+		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
 	}
 	return BootstrapConfig{
@@ -955,5 +955,55 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	}
 	if accepted.Contains(vtxID2) {
 		t.Fatalf("Vtx shouldn't be accepted")
+	}
+}
+
+func TestBootstrapperPartialFetch(t *testing.T) {
+	config, _, sender, state, _ := newConfig(t)
+
+	vtxID0 := ids.Empty.Prefix(0)
+	vtxID1 := ids.Empty.Prefix(1)
+
+	vtxBytes0 := []byte{0}
+
+	vtx0 := &Vtx{
+		id:     vtxID0,
+		height: 0,
+		status: choices.Processing,
+		bytes:  vtxBytes0,
+	}
+
+	bs := bootstrapper{}
+	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
+	bs.Initialize(config)
+
+	acceptedIDs := ids.Set{}
+	acceptedIDs.Add(
+		vtxID0,
+		vtxID1,
+	)
+
+	state.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case vtxID.Equals(vtxID0):
+			return vtx0, nil
+		case vtxID.Equals(vtxID1):
+			return nil, errUnknownVertex
+		default:
+			t.Fatal(errUnknownVertex)
+			panic(errUnknownVertex)
+		}
+	}
+
+	sender.CantGet = false
+
+	bs.ForceAccepted(acceptedIDs)
+
+	if bs.finished {
+		t.Fatalf("should have requested a vertex")
+	}
+
+	if bs.pending.Len() != 1 {
+		t.Fatalf("wrong number pending")
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/keystore"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
@@ -26,6 +27,7 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms"
 
 	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
@@ -92,6 +94,7 @@ type manager struct {
 	// That is, [chainID].String() is an alias for the chain, too
 	ids.Aliaser
 
+	stakingEnabled  bool // True iff the network has staking enabled
 	log             logging.Logger
 	logFactory      logging.Factory
 	vmManager       vms.Manager // Manage mappings from vm ID --> vm
@@ -109,6 +112,7 @@ type manager struct {
 	awaiter         Awaiter               // Waits for required connections before running bootstrapping
 	server          *api.Server           // Handles HTTP API calls
 	keystore        *keystore.Keystore
+	sharedMemory    *atomic.SharedMemory
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -120,6 +124,7 @@ type manager struct {
 //     <validators> validate this chain
 // TODO: Make this function take less arguments
 func New(
+	stakingEnabled bool,
 	log logging.Logger,
 	logFactory logging.Factory,
 	vmManager vms.Manager,
@@ -135,6 +140,7 @@ func New(
 	awaiter Awaiter,
 	server *api.Server,
 	keystore *keystore.Keystore,
+	sharedMemory *atomic.SharedMemory,
 ) Manager {
 	timeoutManager := timeout.Manager{}
 	timeoutManager.Initialize(requestTimeout)
@@ -143,6 +149,7 @@ func New(
 	router.Initialize(log, &timeoutManager)
 
 	m := &manager{
+		stakingEnabled:  stakingEnabled,
 		log:             log,
 		logFactory:      logFactory,
 		vmManager:       vmManager,
@@ -159,6 +166,7 @@ func New(
 		awaiter:         awaiter,
 		server:          server,
 		keystore:        keystore,
+		sharedMemory:    sharedMemory,
 	}
 	m.Initialize()
 	return m
@@ -206,7 +214,12 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 	}
 
 	// Create the chain
-	vm := vmFactory.New()
+	vm, err := vmFactory.New()
+	if err != nil {
+		m.log.Error("error while creating vm: %s", err)
+		return
+	}
+	// TODO: Shutdown VM if an error occurs
 
 	fxs := make([]*common.Fx, len(chain.FxAliases))
 	for i, fxAlias := range chain.FxAliases {
@@ -223,10 +236,16 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 			return
 		}
 
+		fx, err := fxFactory.New()
+		if err != nil {
+			m.log.Error("error while creating fx: %s", err)
+			return
+		}
+
 		// Create the fx
 		fxs[i] = &common.Fx{
 			ID: fxID,
-			Fx: fxFactory.New(),
+			Fx: fx,
 		}
 	}
 
@@ -246,6 +265,7 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		NodeID:              m.nodeID,
 		HTTP:                m.server,
 		Keystore:            m.keystore.NewBlockchainKeyStore(chain.ID),
+		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chain.ID),
 		BCLookup:            m,
 	}
 	consensusParams := m.consensusParams
@@ -256,7 +276,13 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 	}
 
 	// The validators of this blockchain
-	validators, ok := m.validators.GetValidatorSet(ids.Empty) // TODO: Change argument to chain.SubnetID
+	var validators validators.Set // Validators validating this blockchain
+	var ok bool
+	if m.stakingEnabled {
+		validators, ok = m.validators.GetValidatorSet(chain.SubnetID)
+	} else { // Staking is disabled. Every peer validates every subnet.
+		validators, ok = m.validators.GetValidatorSet(ids.Empty) // ids.Empty is the default subnet ID. TODO: Move to const package so we can use it here.
+	}
 	if !ok {
 		m.log.Error("couldn't get validator set of subnet with ID %s. The subnet may not exist", chain.SubnetID)
 		return
@@ -353,7 +379,7 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
-		return err
+		return fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
 	// Handles serialization/deserialization of vertices and also the
@@ -376,13 +402,22 @@ func (m *manager) createAvalancheChain(
 		},
 	}
 
+	bootstrapWeight := uint64(0)
+	for _, beacon := range beacons.List() {
+		newWeight, err := math.Add64(bootstrapWeight, beacon.Weight())
+		if err != nil {
+			return err
+		}
+		bootstrapWeight = newWeight
+	}
+
 	engine.Initialize(avaeng.Config{
 		BootstrapConfig: avaeng.BootstrapConfig{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      (beacons.Len() + 1) / 2,
+				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			VtxBlocked: vtxBlocker,
@@ -403,6 +438,8 @@ func (m *manager) createAvalancheChain(
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	awaiting := &networking.AwaitingConnections{
+		Requested:      beacons,
+		WeightRequired: (3*bootstrapWeight + 3) / 4, // 75% must be connected to
 		Finish: func() {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
@@ -410,10 +447,6 @@ func (m *manager) createAvalancheChain(
 			engine.Startup()
 		},
 	}
-	for _, vdr := range beacons.List() {
-		awaiting.Requested.Add(vdr.ID())
-	}
-	awaiting.NumRequired = (3*awaiting.Requested.Len() + 3) / 4 // 75% must be connected to
 	m.awaiter.AwaitConnections(awaiting)
 
 	return nil
@@ -454,6 +487,15 @@ func (m *manager) createSnowmanChain(
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.sender, m.chainRouter, m.timeoutManager)
 
+	bootstrapWeight := uint64(0)
+	for _, beacon := range beacons.List() {
+		newWeight, err := math.Add64(bootstrapWeight, beacon.Weight())
+		if err != nil {
+			return err
+		}
+		bootstrapWeight = newWeight
+	}
+
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	engine.Initialize(smeng.Config{
@@ -462,7 +504,7 @@ func (m *manager) createSnowmanChain(
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      (beacons.Len() + 1) / 2,
+				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			Blocked:      blocked,
@@ -482,6 +524,8 @@ func (m *manager) createSnowmanChain(
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	awaiting := &networking.AwaitingConnections{
+		Requested:      beacons,
+		WeightRequired: (3*bootstrapWeight + 3) / 4, // 75% must be connected to
 		Finish: func() {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
@@ -489,10 +533,6 @@ func (m *manager) createSnowmanChain(
 			engine.Startup()
 		},
 	}
-	for _, vdr := range beacons.List() {
-		awaiting.Requested.Add(vdr.ID())
-	}
-	awaiting.NumRequired = (3*awaiting.Requested.Len() + 3) / 4 // 75% must be connected to
 	m.awaiter.AwaitConnections(awaiting)
 	return nil
 }

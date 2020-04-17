@@ -12,18 +12,6 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
-// Type is an identifier for a codec
-type Type uint32
-
-// Codec types
-const (
-	NoType Type = iota
-	GenericType
-	CustomType
-	// TODO: Utilize a standard serialization library. Must have a canonical
-	// serialization format.
-)
-
 const (
 	defaultMaxSize        = 1 << 18 // default max size, in bytes, of something being marshalled by Marshal()
 	defaultMaxSliceLength = 1 << 18 // default max length of a slice being marshalled by Marshal()
@@ -44,30 +32,6 @@ var (
 	errOutOfMemory               = errors.New("out of memory")
 	errSliceTooLarge             = errors.New("slice too large")
 )
-
-// Verify that the codec is a known codec value. Returns nil if the codec is
-// valid.
-func (c Type) Verify() error {
-	switch c {
-	case NoType, GenericType, CustomType:
-		return nil
-	default:
-		return errBadCodec
-	}
-}
-
-func (c Type) String() string {
-	switch c {
-	case NoType:
-		return "No Codec"
-	case GenericType:
-		return "Generic Codec"
-	case CustomType:
-		return "Custom Codec"
-	default:
-		return "Unknown Codec"
-	}
-}
 
 // Codec handles marshaling and unmarshaling of structs
 type codec struct {
@@ -323,6 +287,11 @@ func (c codec) unmarshal(p *wrappers.Packer, field reflect.Value) error {
 		typ, ok := c.typeIDToType[typeID]
 		if !ok {
 			return errUnmarshalUnregisteredType
+		}
+		// Ensure struct actually does implement the interface
+		fieldType := field.Type()
+		if !typ.Implements(fieldType) {
+			return fmt.Errorf("%s does not implement interface %s", typ, fieldType)
 		}
 		concreteInstancePtr := reflect.New(typ) // instance of the proper type
 		// Unmarshal into the struct

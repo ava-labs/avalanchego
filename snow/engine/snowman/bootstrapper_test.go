@@ -62,7 +62,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 		Context:    ctx,
 		Validators: peers,
 		Beacons:    peers,
-		Alpha:      peers.Len()/2 + 1,
+		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
 	}
 	return BootstrapConfig{
@@ -423,5 +423,56 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	}
 	if accepted.Contains(blkID2) {
 		t.Fatalf("Blk shouldn't be accepted")
+	}
+}
+
+func TestBootstrapperPartialFetch(t *testing.T) {
+	config, _, sender, vm := newConfig(t)
+
+	blkID0 := ids.Empty.Prefix(0)
+	blkID1 := ids.Empty.Prefix(1)
+
+	blkBytes0 := []byte{0}
+
+	blk0 := &Blk{
+		id:     blkID0,
+		height: 0,
+		status: choices.Accepted,
+		bytes:  blkBytes0,
+	}
+
+	bs := bootstrapper{}
+	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
+	bs.Initialize(config)
+
+	acceptedIDs := ids.Set{}
+	acceptedIDs.Add(
+		blkID0,
+		blkID1,
+	)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID.Equals(blkID0):
+			return blk0, nil
+		case blkID.Equals(blkID1):
+			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock)
+			panic(errUnknownBlock)
+		}
+	}
+
+	sender.CantGet = false
+	bs.onFinished = func() {}
+
+	bs.ForceAccepted(acceptedIDs)
+
+	if bs.finished {
+		t.Fatalf("should have requested a block")
+	}
+
+	if bs.pending.Len() != 1 {
+		t.Fatalf("wrong number pending")
 	}
 }

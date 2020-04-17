@@ -3,20 +3,10 @@
 
 package avm
 
-type testVerifiable struct{ err error }
-
-func (v *testVerifiable) Verify() error { return v.err }
-
-type TestTransferable struct {
-	testVerifiable
-
-	Val uint64 `serialize:"true"`
-}
-
-func (t *TestTransferable) Amount() uint64 { return t.Val }
+import "github.com/ava-labs/gecko/vms/components/ava"
 
 type testAddressable struct {
-	TestTransferable `serialize:"true"`
+	ava.TestTransferable `serialize:"true"`
 
 	Addrs [][]byte `serialize:"true"`
 }

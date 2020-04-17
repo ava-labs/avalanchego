@@ -4,6 +4,7 @@
 package secp256k1fx
 
 import (
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/components/codec"
 )
@@ -12,4 +13,21 @@ import (
 type VM interface {
 	Codec() codec.Codec
 	Clock() *timer.Clock
+	Logger() logging.Logger
 }
+
+// TestVM is a minimal implementation of a VM
+type TestVM struct {
+	CLK  *timer.Clock
+	Code codec.Codec
+	Log  logging.Logger
+}
+
+// Clock returns CLK
+func (vm *TestVM) Clock() *timer.Clock { return vm.CLK }
+
+// Codec returns Code
+func (vm *TestVM) Codec() codec.Codec { return vm.Code }
+
+// Logger returns Log
+func (vm *TestVM) Logger() logging.Logger { return vm.Log }

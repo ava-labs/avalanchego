@@ -69,6 +69,23 @@ type NnarySnowflake interface {
 	Finalized() bool
 }
 
+// NnarySlush is a slush instance deciding between an unbounded number of
+// values. After performing a network sample of k nodes, if you have alpha
+// votes for one of the choices, you should vote for that choice.
+type NnarySlush interface {
+	fmt.Stringer
+
+	// Takes in the initial choice
+	Initialize(initialPreference ids.ID)
+
+	// Returns the currently preferred choice to be finalized
+	Preference() ids.ID
+
+	// RecordSuccessfulPoll records a successful poll towards finalizing the
+	// specified choice. Assumes the choice was previously added.
+	RecordSuccessfulPoll(choice ids.ID)
+}
+
 // BinarySnowball augments BinarySnowflake with a counter that tracks the total
 // number of positive responses from a network sample.
 type BinarySnowball interface{ BinarySnowflake }
@@ -97,6 +114,23 @@ type BinarySnowflake interface {
 	Finalized() bool
 }
 
+// BinarySlush is a slush instance deciding between two values. After performing
+// a network sample of k nodes, if you have alpha votes for one of the choices,
+// you should vote for that choice.
+type BinarySlush interface {
+	fmt.Stringer
+
+	// Takes in the initial choice
+	Initialize(initialPreference int)
+
+	// Returns the currently preferred choice to be finalized
+	Preference() int
+
+	// RecordSuccessfulPoll records a successful poll towards finalizing the
+	// specified choice
+	RecordSuccessfulPoll(choice int)
+}
+
 // UnarySnowball is a snowball instance deciding on one value. After performing
 // a network sample of k nodes, if you have alpha votes for the choice, you
 // should vote. Otherwise, you should reset.
@@ -121,4 +155,30 @@ type UnarySnowball interface {
 
 	// Returns a new unary snowball instance with the same state
 	Clone() UnarySnowball
+}
+
+// UnarySnowflake is a snowflake instance deciding on one value. After
+// performing a network sample of k nodes, if you have alpha votes for the
+// choice, you should vote. Otherwise, you should reset.
+type UnarySnowflake interface {
+	fmt.Stringer
+
+	// Takes in the beta value
+	Initialize(beta int)
+
+	// RecordSuccessfulPoll records a successful poll towards finalizing
+	RecordSuccessfulPoll()
+
+	// RecordUnsuccessfulPoll resets the snowflake counter of this instance
+	RecordUnsuccessfulPoll()
+
+	// Return whether a choice has been finalized
+	Finalized() bool
+
+	// Returns a new binary snowball instance with the agreement parameters
+	// transferred. Takes in the new beta value and the original choice
+	Extend(beta, originalPreference int) BinarySnowflake
+
+	// Returns a new unary snowflake instance with the same state
+	Clone() UnarySnowflake
 }

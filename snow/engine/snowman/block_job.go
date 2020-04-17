@@ -51,12 +51,9 @@ func (b *blockJob) Execute() {
 	case choices.Unknown, choices.Rejected:
 		b.numDropped.Inc()
 	case choices.Processing:
-		if err := b.blk.Verify(); err == nil {
-			b.blk.Accept()
-			b.numAccepted.Inc()
-		} else {
-			b.numDropped.Inc()
-		}
+		b.blk.Verify()
+		b.blk.Accept()
+		b.numAccepted.Inc()
 	}
 }
 func (b *blockJob) Bytes() []byte { return b.blk.Bytes() }

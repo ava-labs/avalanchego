@@ -130,6 +130,10 @@ func (vm *VM) Initialize(
 
 // Shutdown implements the avalanche.DAGVM interface
 func (vm *VM) Shutdown() {
+	if vm.timer == nil {
+		return
+	}
+
 	vm.timer.Stop()
 	if err := vm.baseDB.Close(); err != nil {
 		vm.ctx.Log.Error("Closing the database failed with %s", err)
@@ -315,7 +319,7 @@ func (vm *VM) Send(amount uint64, assetID, toAddrStr string, fromPKs []string) (
 	}
 
 	// Add all of the keys in [fromPKs] to a keychain
-	keychain := KeyChain{}
+	keychain := NewKeychain(vm.ctx.NetworkID, vm.ctx.ChainID)
 	factory := crypto.FactorySECP256K1R{}
 	cb58 := formatting.CB58{}
 	for _, fpk := range fromPKs {
@@ -359,7 +363,7 @@ func (vm *VM) Send(amount uint64, assetID, toAddrStr string, fromPKs []string) (
 		ChainID:   vm.ctx.ChainID,
 	}
 	currentTime := vm.clock.Unix()
-	tx, err := builder.NewTxFromUTXOs(&keychain, utxos, amount, vm.TxFee, 0, 1, toAddrs, outAddr, currentTime)
+	tx, err := builder.NewTxFromUTXOs(keychain, utxos, amount, vm.TxFee, 0, 1, toAddrs, outAddr, currentTime)
 	if err != nil {
 		return "", err
 	}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/json"
 
 	"github.com/ava-labs/gecko/utils/formatting"
 )
@@ -50,10 +51,10 @@ func (s *Service) ProposeBlock(_ *http.Request, args *ProposeBlockArgs, reply *P
 
 // APIBlock is the API representation of a block
 type APIBlock struct {
-	Timestamp int64  `json:"timestamp"` // Timestamp of most recent block
-	Data      string `json:"data"`      // Data in the most recent block. Base 58 repr. of 5 bytes.
-	ID        string `json:"id"`        // String repr. of ID of the most recent block
-	ParentID  string `json:"parentID"`  // String repr. of ID of the most recent block's parent
+	Timestamp json.Uint64 `json:"timestamp"` // Timestamp of most recent block
+	Data      string      `json:"data"`      // Data in the most recent block. Base 58 repr. of 5 bytes.
+	ID        string      `json:"id"`        // String repr. of ID of the most recent block
+	ParentID  string      `json:"parentID"`  // String repr. of ID of the most recent block's parent
 }
 
 // GetBlockArgs are the arguments to GetBlock
@@ -93,7 +94,7 @@ func (s *Service) GetBlock(_ *http.Request, args *GetBlockArgs, reply *GetBlockR
 	}
 
 	reply.APIBlock.ID = block.ID().String()
-	reply.APIBlock.Timestamp = block.Timestamp
+	reply.APIBlock.Timestamp = json.Uint64(block.Timestamp)
 	reply.APIBlock.ParentID = block.ParentID().String()
 	byteFormatter := formatting.CB58{Bytes: block.Data[:]}
 	reply.Data = byteFormatter.String()

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/vms/components/codec"
 )
@@ -39,6 +40,8 @@ type testVM struct{ clock timer.Clock }
 func (vm *testVM) Codec() codec.Codec { return codec.NewDefault() }
 
 func (vm *testVM) Clock() *timer.Clock { return &vm.clock }
+
+func (vm *testVM) Logger() logging.Logger { return logging.NoLog{} }
 
 type testCodec struct{}
 
@@ -98,8 +101,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err != nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -134,8 +136,7 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(nil, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(nil, in, cred, out); err == nil {
 		t.Fatalf("Should have failed verification due to a nil tx")
 	}
 }
@@ -163,8 +164,7 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, nil, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, nil); err == nil {
 		t.Fatalf("Should have failed verification due to a nil output")
 	}
 }
@@ -196,8 +196,7 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, nil, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, nil, cred, out); err == nil {
 		t.Fatalf("Should have failed verification due to a nil input")
 	}
 }
@@ -230,8 +229,7 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, nil)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, nil, out); err == nil {
 		t.Fatalf("Should have failed verification due to a nil credential")
 	}
 }
@@ -269,8 +267,7 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to an invalid output")
 	}
 }
@@ -308,8 +305,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to different amounts")
 	}
 }
@@ -347,8 +343,7 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to a timelocked output")
 	}
 }
@@ -387,8 +382,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to too many signers")
 	}
 }
@@ -424,8 +418,7 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 		Sigs: [][crypto.SECP256K1RSigLen]byte{},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to too few signers")
 	}
 }
@@ -464,8 +457,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to too mismatched signers")
 	}
 }
@@ -503,8 +495,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to an invalid signature")
 	}
 }
@@ -542,8 +533,7 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 		},
 	}
 
-	err := fx.VerifyTransfer(tx, out, in, cred)
-	if err == nil {
+	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to a wrong signer")
 	}
 }
@@ -567,9 +557,27 @@ func TestFxVerifyOperation(t *testing.T) {
 			},
 		},
 	}
-	in := &MintInput{
-		Input: Input{
+	op := &MintOperation{
+		MintInput: Input{
 			SigIndices: []uint32{0},
+		},
+		MintOutput: MintOutput{
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
+		},
+		TransferOutput: TransferOutput{
+			Amt:      1,
+			Locktime: 0,
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
 		},
 	}
 	cred := &Credential{
@@ -577,30 +585,9 @@ func TestFxVerifyOperation(t *testing.T) {
 			sigBytes,
 		},
 	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
 
 	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,9 +609,27 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 			},
 		},
 	}
-	in := &MintInput{
-		Input: Input{
+	op := &MintOperation{
+		MintInput: Input{
 			SigIndices: []uint32{0},
+		},
+		MintOutput: MintOutput{
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
+		},
+		TransferOutput: TransferOutput{
+			Amt:      1,
+			Locktime: 0,
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
 		},
 	}
 	cred := &Credential{
@@ -632,84 +637,15 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 			sigBytes,
 		},
 	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
 
 	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(nil, utxos, ins, creds, outs)
+	err := fx.VerifyOperation(nil, op, cred, utxos)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid tx type")
 	}
 }
 
-func TestFxVerifyOperationWrongNumberOfOutputs(t *testing.T) {
-	vm := testVM{}
-	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.clock.Set(date)
-	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	tx := &testTx{
-		bytes: txBytes,
-	}
-	utxo := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	in := &MintInput{
-		Input: Input{
-			SigIndices: []uint32{0},
-		},
-	}
-	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			sigBytes,
-		},
-	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-
-	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
-	if err == nil {
-		t.Fatalf("Should have errored due to a wrong number of outputs")
-	}
-}
-
-func TestFxVerifyOperationWrongNumberOfInputs(t *testing.T) {
+func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	vm := testVM{}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.clock.Set(date)
@@ -733,35 +669,15 @@ func TestFxVerifyOperationWrongNumberOfInputs(t *testing.T) {
 			sigBytes,
 		},
 	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
 
 	utxos := []interface{}{utxo}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, nil, creds, outs)
+	err := fx.VerifyOperation(tx, nil, cred, utxos)
 	if err == nil {
-		t.Fatalf("Should have errored due to a wrong number of inputs")
+		t.Fatalf("Should have errored due to an invalid operation type")
 	}
 }
 
-func TestFxVerifyOperationWrongNumberOfCredentials(t *testing.T) {
+func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 	vm := testVM{}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.clock.Set(date)
@@ -780,40 +696,38 @@ func TestFxVerifyOperationWrongNumberOfCredentials(t *testing.T) {
 			},
 		},
 	}
-	in := &MintInput{
-		Input: Input{
+	op := &MintOperation{
+		MintInput: Input{
 			SigIndices: []uint32{0},
 		},
-	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+		MintOutput: MintOutput{
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
 			},
 		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+		TransferOutput: TransferOutput{
+			Amt:      1,
+			Locktime: 0,
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
 			},
 		},
 	}
 
 	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, nil, outs)
+	err := fx.VerifyOperation(tx, op, nil, utxos)
 	if err == nil {
-		t.Fatalf("Should have errored due to a wrong number of credentials")
+		t.Fatalf("Should have errored due to an invalid credential type")
 	}
 }
 
-func TestFxVerifyOperationWrongUTXOType(t *testing.T) {
+func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 	vm := testVM{}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.clock.Set(date)
@@ -824,9 +738,7 @@ func TestFxVerifyOperationWrongUTXOType(t *testing.T) {
 	tx := &testTx{
 		bytes: txBytes,
 	}
-	utxo := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+	utxo := &MintOutput{
 		OutputOwners: OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
@@ -834,9 +746,27 @@ func TestFxVerifyOperationWrongUTXOType(t *testing.T) {
 			},
 		},
 	}
-	in := &MintInput{
-		Input: Input{
+	op := &MintOperation{
+		MintInput: Input{
 			SigIndices: []uint32{0},
+		},
+		MintOutput: MintOutput{
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
+		},
+		TransferOutput: TransferOutput{
+			Amt:      1,
+			Locktime: 0,
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
 		},
 	}
 	cred := &Credential{
@@ -844,36 +774,15 @@ func TestFxVerifyOperationWrongUTXOType(t *testing.T) {
 			sigBytes,
 		},
 	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
 
-	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
+	utxos := []interface{}{utxo, utxo}
+	err := fx.VerifyOperation(tx, op, cred, utxos)
 	if err == nil {
-		t.Fatalf("Should have errored due to a wrong utxo type")
+		t.Fatalf("Should have errored due to a wrong number of utxos")
 	}
 }
 
-func TestFxVerifyOperationWrongInputType(t *testing.T) {
+func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 	vm := testVM{}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.clock.Set(date)
@@ -884,18 +793,27 @@ func TestFxVerifyOperationWrongInputType(t *testing.T) {
 	tx := &testTx{
 		bytes: txBytes,
 	}
-	utxo := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+	op := &MintOperation{
+		MintInput: Input{
+			SigIndices: []uint32{0},
+		},
+		MintOutput: MintOutput{
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
 			},
 		},
-	}
-	in := &TransferInput{
-		Amt: 1,
-		Input: Input{
-			SigIndices: []uint32{0},
+		TransferOutput: TransferOutput{
+			Amt:      1,
+			Locktime: 0,
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
 		},
 	}
 	cred := &Credential{
@@ -903,36 +821,15 @@ func TestFxVerifyOperationWrongInputType(t *testing.T) {
 			sigBytes,
 		},
 	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
 
-	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
+	utxos := []interface{}{nil}
+	err := fx.VerifyOperation(tx, op, cred, utxos)
 	if err == nil {
-		t.Fatalf("Should have errored due to a wrong input type")
+		t.Fatalf("Should have errored due to an invalid utxo type")
 	}
 }
 
-func TestFxVerifyOperationWrongCredentialType(t *testing.T) {
+func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 	vm := testVM{}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.clock.Set(date)
@@ -951,62 +848,24 @@ func TestFxVerifyOperationWrongCredentialType(t *testing.T) {
 			},
 		},
 	}
-	in := &MintInput{
-		Input: Input{
+	op := &MintOperation{
+		MintInput: Input{
 			SigIndices: []uint32{0},
 		},
-	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+		MintOutput: MintOutput{
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
 			},
 		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
+		TransferOutput: TransferOutput{
+			Amt:      1,
+			Locktime: 0,
+			OutputOwners: OutputOwners{
+				Threshold: 1,
 			},
-		},
-	}
-
-	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{nil}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
-	if err == nil {
-		t.Fatalf("Should have errored due to a wrong credential type")
-	}
-}
-
-func TestFxVerifyOperationWrongMintType(t *testing.T) {
-	vm := testVM{}
-	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.clock.Set(date)
-	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	tx := &testTx{
-		bytes: txBytes,
-	}
-	utxo := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	in := &MintInput{
-		Input: Input{
-			SigIndices: []uint32{0},
 		},
 	}
 	cred := &Credential{
@@ -1014,38 +873,15 @@ func TestFxVerifyOperationWrongMintType(t *testing.T) {
 			sigBytes,
 		},
 	}
-	mintOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
 
 	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
 	if err == nil {
-		t.Fatalf("Should have errored due to a wrong output type")
+		t.Fatalf("Should have errored due to a failed verify")
 	}
 }
 
-func TestFxVerifyOperationWrongTransferType(t *testing.T) {
+func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	vm := testVM{}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
 	vm.clock.Set(date)
@@ -1064,9 +900,22 @@ func TestFxVerifyOperationWrongTransferType(t *testing.T) {
 			},
 		},
 	}
-	in := &MintInput{
-		Input: Input{
+	op := &MintOperation{
+		MintInput: Input{
 			SigIndices: []uint32{0},
+		},
+		MintOutput: MintOutput{
+			OutputOwners: OutputOwners{},
+		},
+		TransferOutput: TransferOutput{
+			Amt:      1,
+			Locktime: 0,
+			OutputOwners: OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.NewShortID(addrBytes),
+				},
+			},
 		},
 	}
 	cred := &Credential{
@@ -1074,142 +923,10 @@ func TestFxVerifyOperationWrongTransferType(t *testing.T) {
 			sigBytes,
 		},
 	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
 
 	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
 	if err == nil {
-		t.Fatalf("Should have errored due to a wrong output type")
-	}
-}
-
-func TestFxVerifyOperationInvalid(t *testing.T) {
-	vm := testVM{}
-	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.clock.Set(date)
-	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	tx := &testTx{
-		bytes: txBytes,
-	}
-	utxo := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	in := &MintInput{
-		Input: Input{
-			SigIndices: []uint32{0},
-		},
-	}
-	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			sigBytes,
-		},
-	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 0,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-
-	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
-	if err == nil {
-		t.Fatalf("Should have errored due to an invalid output")
-	}
-}
-
-func TestFxVerifyOperationMismatchedMintOutput(t *testing.T) {
-	vm := testVM{}
-	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.clock.Set(date)
-	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
-	tx := &testTx{
-		bytes: txBytes,
-	}
-	utxo := &MintOutput{
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-	in := &MintInput{
-		Input: Input{
-			SigIndices: []uint32{0},
-		},
-	}
-	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			sigBytes,
-		},
-	}
-	mintOutput := &MintOutput{
-		OutputOwners: OutputOwners{
-			Addrs: []ids.ShortID{},
-		},
-	}
-	transferOutput := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
-		OutputOwners: OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.NewShortID(addrBytes),
-			},
-		},
-	}
-
-	utxos := []interface{}{utxo}
-	ins := []interface{}{in}
-	creds := []interface{}{cred}
-	outs := []interface{}{mintOutput, transferOutput}
-	err := fx.VerifyOperation(tx, utxos, ins, creds, outs)
-	if err == nil {
-		t.Fatalf("Should have errored due to a mismatched mint output")
+		t.Fatalf("Should have errored due to the wrong MintOutput being created")
 	}
 }

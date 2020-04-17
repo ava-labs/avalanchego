@@ -18,7 +18,7 @@ func TestTreeParams(t *testing.T) { ParamsTest(t, TreeFactory{}) }
 func TestSnowballSingleton(t *testing.T) {
 	params := Parameters{
 		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 5,
 	}
 	tree := Tree{}
 	tree.Initialize(params, Red)
@@ -30,6 +30,14 @@ func TestSnowballSingleton(t *testing.T) {
 	oneRed := ids.Bag{}
 	oneRed.Add(Red)
 	tree.RecordPoll(oneRed)
+
+	if tree.Finalized() {
+		t.Fatalf("Snowball is finalized too soon")
+	}
+
+
+	empty := ids.Bag{}
+	tree.RecordPoll(empty)
 
 	if tree.Finalized() {
 		t.Fatalf("Snowball is finalized too soon")
@@ -170,10 +178,13 @@ func TestSnowballLastBinary(t *testing.T) {
 	tree.Initialize(params, zero)
 	tree.Add(one)
 
-	expected := "SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [0, 255)\n" +
-		"    SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 0, Finalized = false)) Bit = 255"
+	// Should do nothing
+	tree.Add(one)
+
+	expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 255)\n" +
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 255"
 	if str := tree.String(); expected != str {
-		t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+		t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 	} else if pref := tree.Preference(); !zero.Equals(pref) {
 		t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
 	} else if tree.Finalized() {
@@ -196,6 +207,238 @@ func TestSnowballLastBinary(t *testing.T) {
 		t.Fatalf("Wrong preference. Expected %s got %s", one, pref)
 	} else if !tree.Finalized() {
 		t.Fatalf("Finalized too late")
+	}
+}
+
+func TestSnowballAddPreviouslyRejected(t *testing.T) {
+	zero := ids.NewID([32]byte{0b00000000})
+	one :=  ids.NewID([32]byte{0b00000001})
+	two :=  ids.NewID([32]byte{0b00000010})
+	four := ids.NewID([32]byte{0b00000100})
+
+	params := Parameters{
+		Metrics: prometheus.NewRegistry(),
+		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	}
+	tree := Tree{}
+	tree.Initialize(params, zero)
+	tree.Add(one)
+	tree.Add(four)
+
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 2)\n"+
+		"        SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 2\n"+
+		"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+	zeroBag := ids.Bag{}
+	zeroBag.Add(zero)
+	tree.RecordPoll(zeroBag)
+
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2\n"+
+		"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+	tree.Add(two)
+
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2\n"+
+		"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+}
+
+func TestSnowballNewUnary(t *testing.T) {
+	zero := ids.NewID([32]byte{0b00000000})
+	one :=  ids.NewID([32]byte{0b00000001})
+
+	params := Parameters{
+		Metrics: prometheus.NewRegistry(),
+		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 3,
+	}
+	tree := Tree{}
+	tree.Initialize(params, zero)
+	tree.Add(one)
+
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+	oneBag := ids.Bag{}
+	oneBag.Add(one)
+	tree.RecordPoll(oneBag)
+
+	{
+		expected := "SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 0\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)\n"+
+		"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [1, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !one.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", one, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+	tree.RecordPoll(oneBag)
+
+	{
+		expected := "SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 2, SF(Confidence = 2, Finalized = false, SL(Preference = 1))) Bit = 0\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)\n"+
+		"    SB(NumSuccessfulPolls = 2, SF(Confidence = 2, Finalized = true)) Bits = [1, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !one.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", one, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+}
+
+func TestSnowballTransitiveReset(t *testing.T) {
+	zero := ids.NewID([32]byte{0b00000000})
+	two := ids.NewID([32]byte{0b00000010})
+	eight := ids.NewID([32]byte{0b00001000})
+
+	params := Parameters{
+		Metrics: prometheus.NewRegistry(),
+		K:       1, Alpha: 1, BetaVirtuous: 2, BetaRogue: 2,
+	}
+	tree := Tree{}
+	tree.Initialize(params, zero)
+	tree.Add(two)
+	tree.Add(eight)
+
+	{
+		expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 1)\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 1\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 3)\n"+
+		"            SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 3\n"+
+		"                SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [4, 256)\n"+
+		"                SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [4, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+	zeroBag := ids.Bag{}
+	zeroBag.Add(zero)
+	tree.RecordPoll(zeroBag)
+
+	{
+		expected := "SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [0, 1)\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1\n"+
+		"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 3)\n"+
+		"            SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 3\n"+
+		"                SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [4, 256)\n"+
+		"                SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [4, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+
+	emptyBag := ids.Bag{}
+	tree.RecordPoll(emptyBag)
+
+	{
+		expected := "SB(NumSuccessfulPolls = 1, SF(Confidence = 0, Finalized = false)) Bits = [0, 1)\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1\n"+
+		"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [2, 3)\n"+
+		"            SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 3\n"+
+		"                SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [4, 256)\n"+
+		"                SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [4, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+	tree.RecordPoll(zeroBag)
+
+	{
+		expected := "SB(NumSuccessfulPolls = 2, SF(Confidence = 1, Finalized = false)) Bits = [0, 1)\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 2, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 1\n"+
+		"        SB(NumSuccessfulPolls = 2, SF(Confidence = 1, Finalized = false)) Bits = [2, 3)\n"+
+		"            SB(Preference = 0, NumSuccessfulPolls[0] = 2, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 3\n"+
+		"                SB(NumSuccessfulPolls = 2, SF(Confidence = 1, Finalized = false)) Bits = [4, 256)\n"+
+		"                SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [4, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		}
+	}
+
+	tree.RecordPoll(zeroBag)
+
+	{
+		expected := "SB(NumSuccessfulPolls = 3, SF(Confidence = 2, Finalized = true)) Bits = [4, 256)"
+		if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		} else if pref := tree.Preference(); !zero.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", zero, pref)
+		} else if !tree.Finalized() {
+			t.Fatalf("Finalized too late")
+		}
 	}
 }
 
@@ -256,7 +499,7 @@ func TestSnowballTrinary(t *testing.T) {
 	tree.RecordPoll(redBag)
 
 	if pref := tree.Preference(); !Blue.Equals(pref) {
-		t.Fatalf("Wrong preference. Expected %s got %s", Green, pref)
+		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if tree.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
@@ -378,9 +621,9 @@ func TestSnowballFineGrained(t *testing.T) {
 	tree := Tree{}
 	tree.Initialize(params, c0000)
 	{
-		expected := "SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [0, 256)"
+		expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0000.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
@@ -390,11 +633,11 @@ func TestSnowballFineGrained(t *testing.T) {
 
 	tree.Add(c1100)
 	{
-		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 0, Finalized = false)) Bit = 0\n" +
-			"    SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [1, 256)\n" +
-			"    SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [1, 256)"
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n" +
+			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)\n" +
+			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0000.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
@@ -404,13 +647,13 @@ func TestSnowballFineGrained(t *testing.T) {
 
 	tree.Add(c1000)
 	{
-		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 0, Finalized = false)) Bit = 0\n" +
-			"    SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [1, 256)\n" +
-			"    SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 1, Confidence = 0, Finalized = false)) Bit = 1\n" +
-			"        SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [2, 256)\n" +
-			"        SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [2, 256)"
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n" +
+			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)\n" +
+			"    SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 1))) Bit = 1\n" +
+			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)\n" +
+			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0000.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
@@ -420,16 +663,16 @@ func TestSnowballFineGrained(t *testing.T) {
 
 	tree.Add(c0010)
 	{
-		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 0, Finalized = false)) Bit = 0\n" +
-			"    SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [1, 2)\n" +
-			"        SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 0, Finalized = false)) Bit = 2\n" +
-			"            SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [3, 256)\n" +
-			"            SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [3, 256)\n" +
-			"    SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 1, Confidence = 0, Finalized = false)) Bit = 1\n" +
-			"        SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [2, 256)\n" +
-			"        SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [2, 256)"
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n" +
+			"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 2)\n" +
+			"        SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 2\n" +
+			"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n" +
+			"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n" +
+			"    SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 1))) Bit = 1\n" +
+			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)\n" +
+			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0000.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
@@ -441,15 +684,15 @@ func TestSnowballFineGrained(t *testing.T) {
 	c0000Bag.Add(c0000)
 	tree.RecordPoll(c0000Bag)
 	{
-		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 1, Finalized = false)) Bit = 0\n" +
-			"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 1, Finalized = false)) Bit = 2\n" +
-			"        SB(NumSuccessfulPolls = 1, Confidence = 1, Finalized = true) Bits = [3, 256)\n" +
-			"        SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [3, 256)\n" +
-			"    SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 1, Confidence = 0, Finalized = false)) Bit = 1\n" +
-			"        SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [2, 256)\n" +
-			"        SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [2, 256)"
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0\n" +
+			"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2\n" +
+			"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n" +
+			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n" +
+			"    SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 1))) Bit = 1\n" +
+			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)\n" +
+			"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [2, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0000.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
@@ -461,11 +704,11 @@ func TestSnowballFineGrained(t *testing.T) {
 	c0010Bag.Add(c0010)
 	tree.RecordPoll(c0010Bag)
 	{
-		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 1, SF = SF(Preference = 1, Confidence = 1, Finalized = false)) Bit = 2\n" +
-			"    SB(NumSuccessfulPolls = 1, Confidence = 1, Finalized = true) Bits = [3, 256)\n" +
-			"    SB(NumSuccessfulPolls = 1, Confidence = 1, Finalized = true) Bits = [3, 256)"
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 2\n" +
+			"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n" +
+			"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0000.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
 		} else if tree.Finalized() {
@@ -475,9 +718,9 @@ func TestSnowballFineGrained(t *testing.T) {
 
 	tree.RecordPoll(c0010Bag)
 	{
-		expected := "SB(NumSuccessfulPolls = 2, Confidence = 2, Finalized = true) Bits = [3, 256)"
+		expected := "SB(NumSuccessfulPolls = 2, SF(Confidence = 2, Finalized = true)) Bits = [3, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !c0010.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", c0010, pref)
 		} else if !tree.Finalized() {
@@ -496,9 +739,9 @@ func TestSnowballDoubleAdd(t *testing.T) {
 	tree.Add(Red)
 
 	{
-		expected := "SB(NumSuccessfulPolls = 0, Confidence = 0, Finalized = false) Bits = [0, 256)"
+		expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
 		if str := tree.String(); expected != str {
-			t.Fatalf("Wrong string. Expected %s got %s", expected, str)
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
 		} else if pref := tree.Preference(); !Red.Equals(pref) {
 			t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 		} else if tree.Finalized() {
@@ -531,5 +774,110 @@ func TestSnowballConsistent(t *testing.T) {
 
 	if !n.Agreement() {
 		t.Fatalf("Network agreed on inconsistent values")
+	}
+}
+
+func TestSnowballFilterBinaryChildren(t *testing.T) {
+	c0000 := ids.NewID([32]byte{0b00000000})
+	c1000 := ids.NewID([32]byte{0b00000001})
+	c0100 := ids.NewID([32]byte{0b00000010})
+	c0010 := ids.NewID([32]byte{0b00000100})
+
+	params := Parameters{
+		Metrics: prometheus.NewRegistry(),
+		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	}
+	tree := Tree{}
+	tree.Initialize(params, c0000)
+	{
+		expected := "SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [0, 256)"
+		if pref := tree.Preference(); !c0000.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		} else if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		}
+	}
+
+	tree.Add(c1000)
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if pref := tree.Preference(); !c0000.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		} else if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		}
+	}
+
+	tree.Add(c0010)
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 2)\n"+
+		"        SB(Preference = 0, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 2\n"+
+		"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"            SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if pref := tree.Preference(); !c0000.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		} else if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		}
+	}
+
+	c0000Bag := ids.Bag{}
+	c0000Bag.Add(c0000)
+	tree.RecordPoll(c0000Bag)
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2\n"+
+		"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if pref := tree.Preference(); !c0000.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		} else if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		}
+	}
+
+	tree.Add(c0100)
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 0\n"+
+		"    SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0))) Bit = 2\n"+
+		"        SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n"+
+		"        SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [1, 256)"
+		if pref := tree.Preference(); !c0000.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		} else if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		}
+	}
+
+	c0100Bag := ids.Bag{}
+	c0100Bag.Add(c0100)
+	tree.RecordPoll(c0100Bag)
+	{
+		expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 1, NumSuccessfulPolls[1] = 0, SF(Confidence = 0, Finalized = false, SL(Preference = 0))) Bit = 2\n"+
+		"    SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = true)) Bits = [3, 256)\n"+
+		"    SB(NumSuccessfulPolls = 0, SF(Confidence = 0, Finalized = false)) Bits = [3, 256)"
+		if pref := tree.Preference(); !c0000.Equals(pref) {
+			t.Fatalf("Wrong preference. Expected %s got %s", c0000, pref)
+		} else if tree.Finalized() {
+			t.Fatalf("Finalized too early")
+		} else if str := tree.String(); expected != str {
+			t.Fatalf("Wrong string. Expected:\n%s\ngot:\n%s", expected, str)
+		}
 	}
 }

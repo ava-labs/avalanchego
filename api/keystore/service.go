@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/encdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
@@ -21,10 +22,30 @@ import (
 	"github.com/ava-labs/gecko/vms/components/codec"
 
 	jsoncodec "github.com/ava-labs/gecko/utils/json"
+	zxcvbn "github.com/nbutton23/zxcvbn-go"
+)
+
+const (
+	// maxUserPassLen is the maximum length of the username or password allowed
+	maxUserPassLen = 1024
+
+	// requiredPassScore defines the score a password must achieve to be accepted
+	// as a password with strong characteristics by the zxcvbn package
+	//
+	// The scoring mechanism defined is as follows;
+	//
+	// 0 # too guessable: risky password. (guesses < 10^3)
+	// 1 # very guessable: protection from throttled online attacks. (guesses < 10^6)
+	// 2 # somewhat guessable: protection from unthrottled online attacks. (guesses < 10^8)
+	// 3 # safely unguessable: moderate protection from offline slow-hash scenario. (guesses < 10^10)
+	// 4 # very unguessable: strong protection from offline slow-hash scenario. (guesses >= 10^10)
+	requiredPassScore = 2
 )
 
 var (
-	errEmptyUsername = errors.New("username can't be the empty string")
+	errEmptyUsername     = errors.New("username can't be the empty string")
+	errUserPassMaxLength = fmt.Errorf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen)
+	errWeakPassword      = errors.New("Failed to create user as the given password is too weak. A stronger password is one of 8 or more characters containing attributes of upper and lowercase letters, numbers, and/or special characters")
 )
 
 // KeyValuePair ...
@@ -114,13 +135,21 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("CreateUser called with %s", args.Username)
+	ks.log.Verbo("CreateUser called with %.*s", maxUserPassLen, args.Username)
+
+	if len(args.Username) > maxUserPassLen || len(args.Password) > maxUserPassLen {
+		return errUserPassMaxLength
+	}
 
 	if args.Username == "" {
 		return errEmptyUsername
 	}
 	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
 		return fmt.Errorf("user already exists: %s", args.Username)
+	}
+
+	if zxcvbn.PasswordStrength(args.Password, nil).Score < requiredPassScore {
+		return errWeakPassword
 	}
 
 	usr := &User{}
@@ -174,7 +203,7 @@ type ExportUserArgs struct {
 
 // ExportUserReply is the reply from ExportUser
 type ExportUserReply struct {
-	User string `json:"user"`
+	User formatting.CB58 `json:"user"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
@@ -214,16 +243,15 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 	if err != nil {
 		return err
 	}
-	cb58 := formatting.CB58{Bytes: b}
-	reply.User = cb58.String()
+	reply.User.Bytes = b
 	return nil
 }
 
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	User     string `json:"user"`
+	Username string          `json:"username"`
+	Password string          `json:"password"`
+	User     formatting.CB58 `json:"user"`
 }
 
 // ImportUserReply is the response for ImportUser
@@ -242,13 +270,8 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 		return fmt.Errorf("user already exists: %s", args.Username)
 	}
 
-	cb58 := formatting.CB58{}
-	if err := cb58.FromString(args.User); err != nil {
-		return err
-	}
-
 	userData := UserDB{}
-	if err := ks.codec.Unmarshal(cb58.Bytes, &userData); err != nil {
+	if err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
 		return err
 	}
 
@@ -257,22 +280,25 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 		return err
 	}
 
-	// TODO: Should add batching to prevent creating a user without importing
-	// the account
-	if err := ks.userDB.Put([]byte(args.Username), usrBytes); err != nil {
+	userBatch := ks.userDB.NewBatch()
+	if err := userBatch.Put([]byte(args.Username), usrBytes); err != nil {
 		return err
 	}
-	ks.users[args.Username] = &userData.User
 
-	userDB := prefixdb.New([]byte(args.Username), ks.bcDB)
-	batch := userDB.NewBatch()
-
+	userDataDB := prefixdb.New([]byte(args.Username), ks.bcDB)
+	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
-		batch.Put(kvp.Key, kvp.Value)
+		dataBatch.Put(kvp.Key, kvp.Value)
 	}
 
+	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
+		return err
+	}
+
+	ks.users[args.Username] = &userData.User
+
 	reply.Success = true
-	return batch.Write()
+	return nil
 }
 
 // NewBlockchainKeyStore ...

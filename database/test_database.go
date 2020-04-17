@@ -16,7 +16,10 @@ var (
 		TestBatchPut,
 		TestBatchDelete,
 		TestBatchReset,
+		TestBatchReuse,
+		TestBatchRewrite,
 		TestBatchReplay,
+		TestBatchInner,
 		TestIterator,
 		TestIteratorStart,
 		TestIteratorPrefix,
@@ -235,6 +238,105 @@ func TestBatchReset(t *testing.T, db Database) {
 	}
 }
 
+// TestBatchReuse ...
+func TestBatchReuse(t *testing.T, db Database) {
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
+
+	batch := db.NewBatch()
+	if batch == nil {
+		t.Fatalf("db.NewBatch returned nil")
+	}
+
+	if err := batch.Put(key1, value1); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+
+	if err := db.Delete(key1); err != nil {
+		t.Fatalf("Unexpected error on database.Delete: %s", err)
+	}
+
+	if has, err := db.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("db.Has unexpectedly returned true on key %s", key1)
+	}
+
+	batch.Reset()
+
+	if err := batch.Put(key2, value2); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+
+	if has, err := db.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("db.Has unexpectedly returned true on key %s", key1)
+	} else if has, err := db.Has(key2); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if !has {
+		t.Fatalf("db.Has unexpectedly returned false on key %s", key2)
+	} else if v, err := db.Get(key2); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(value2, v) {
+		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value2)
+	}
+}
+
+// TestBatchRewrite ...
+func TestBatchRewrite(t *testing.T, db Database) {
+	key := []byte("hello1")
+	value := []byte("world1")
+
+	batch := db.NewBatch()
+	if batch == nil {
+		t.Fatalf("db.NewBatch returned nil")
+	}
+
+	if err := batch.Put(key, value); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+
+	if err := db.Delete(key); err != nil {
+		t.Fatalf("Unexpected error on database.Delete: %s", err)
+	}
+
+	if has, err := db.Has(key); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("db.Has unexpectedly returned true on key %s", key)
+	}
+
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+
+	if has, err := db.Has(key); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if !has {
+		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
+	} else if v, err := db.Get(key); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(value, v) {
+		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
+	}
+}
+
 // TestBatchReplay ...
 func TestBatchReplay(t *testing.T, db Database) {
 	key1 := []byte("hello1")
@@ -296,6 +398,62 @@ func TestBatchReplay(t *testing.T, db Database) {
 		t.Fatalf("Expected %s on batch.Replay", ErrClosed)
 	} else if err := thirdBatch.Replay(db); err != ErrClosed {
 		t.Fatalf("Expected %s on batch.Replay", ErrClosed)
+	}
+}
+
+// TestBatchInner ...
+func TestBatchInner(t *testing.T, db Database) {
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
+
+	firstBatch := db.NewBatch()
+	if firstBatch == nil {
+		t.Fatalf("db.NewBatch returned nil")
+	}
+
+	if err := firstBatch.Put(key1, value1); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	secondBatch := db.NewBatch()
+	if secondBatch == nil {
+		t.Fatalf("db.NewBatch returned nil")
+	}
+
+	if err := secondBatch.Put(key2, value2); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	innerFirstBatch := firstBatch.Inner()
+	innerSecondBatch := secondBatch.Inner()
+
+	if err := innerFirstBatch.Replay(innerSecondBatch); err != nil {
+		t.Fatalf("Unexpected error on batch.Replay: %s", err)
+	}
+
+	if err := innerSecondBatch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+
+	if has, err := db.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if !has {
+		t.Fatalf("db.Has unexpectedly returned false on key %s", key1)
+	} else if v, err := db.Get(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(value1, v) {
+		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value1)
+	} else if has, err := db.Has(key2); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if !has {
+		t.Fatalf("db.Has unexpectedly returned false on key %s", key2)
+	} else if v, err := db.Get(key2); err != nil {
+		t.Fatalf("Unexpected error on db.Get: %s", err)
+	} else if !bytes.Equal(value2, v) {
+		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value2)
 	}
 }
 

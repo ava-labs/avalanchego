@@ -6,10 +6,12 @@ package platformvm
 import (
 	"errors"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/missing"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -87,6 +89,8 @@ type Block interface {
 	// [bytes] is the byte representation of this block
 	initialize(vm *VM, bytes []byte) error
 
+	conflicts(ids.Set) bool
+
 	// parentBlock returns the parent block, similarly to Parent. However, it
 	// provides the more specific staking.Block interface.
 	parentBlock() Block
@@ -140,6 +144,14 @@ func (cb *CommonBlock) free() {
 	delete(cb.vm.currentBlocks, cb.ID().Key())
 	cb.parent = nil
 	cb.children = nil
+}
+
+// Reject implements the snowman.Block interface
+func (cb *CommonBlock) conflicts(s ids.Set) bool {
+	if cb.Status() == choices.Accepted {
+		return false
+	}
+	return cb.parentBlock().conflicts(s)
 }
 
 // Parent returns this block's parent

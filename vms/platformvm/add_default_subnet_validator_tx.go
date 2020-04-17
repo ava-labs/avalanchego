@@ -184,10 +184,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// If this proposal is aborted, chain state doesn't change
 	onAbortDB := versiondb.New(db)
 
-	onAccept := func() {
-		tx.vm.resetTimer()
-	}
-	return onCommitDB, onAbortDB, onAccept, nil, nil
+	return onCommitDB, onAbortDB, tx.vm.resetTimer, nil, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
