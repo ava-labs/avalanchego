@@ -4,61 +4,149 @@
 package ghttp
 
 import (
-	"io/ioutil"
 	"net/http"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
+	"google.golang.org/grpc"
+
+	"github.com/hashicorp/go-plugin"
+
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter"
+
+	readcloserproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/proto"
+	responsewriterproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/proto"
+	httpproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
-type Client struct{ client proto.HTTPClient }
+type Client struct {
+	client httpproto.HTTPClient
+	broker *plugin.GRPCBroker
+}
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client proto.HTTPClient) *Client {
-	return &Client{client: client}
+func NewClient(client httpproto.HTTPClient, broker *plugin.GRPCBroker) *Client {
+	return &Client{
+		client: client,
+		broker: broker,
+	}
 }
 
 // Handle ...
 func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// get the headers
-	inboundHeaders := make([]*proto.Header, len(r.Header))[:0]
+	var reader *grpc.Server
+	var writer *grpc.Server
+
+	readerID := c.broker.NextId()
+	go c.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
+		reader = grpc.NewServer(opts...)
+		readcloserproto.RegisterReaderServer(reader, greadcloser.NewServer(r.Body))
+
+		return reader
+	})
+	writerID := c.broker.NextId()
+	go c.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
+		writer = grpc.NewServer(opts...)
+		responsewriterproto.RegisterWriterServer(writer, gresponsewriter.NewServer(w, c.broker))
+
+		return writer
+	})
+
+	req := &httpproto.HTTPRequest{
+		ResponseWriter: writerID,
+		Request: &httpproto.Request{
+			Method:           r.Method,
+			Proto:            r.Proto,
+			ProtoMajor:       int32(r.ProtoMajor),
+			ProtoMinor:       int32(r.ProtoMinor),
+			Body:             readerID,
+			ContentLength:    r.ContentLength,
+			TransferEncoding: r.TransferEncoding,
+			Host:             r.Host,
+			RemoteAddr:       r.RemoteAddr,
+			RequestURI:       r.RequestURI,
+		},
+	}
+	req.Request.Header = make([]*httpproto.Element, 0, len(r.Header))
 	for key, values := range r.Header {
-		inboundHeaders = append(inboundHeaders, &proto.Header{
+		req.Request.Header = append(req.Request.Header, &httpproto.Element{
 			Key:    key,
 			Values: values,
 		})
 	}
 
-	// get the body
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	req.Request.Form = make([]*httpproto.Element, 0, len(r.Form))
+	for key, values := range r.Form {
+		req.Request.Form = append(req.Request.Form, &httpproto.Element{
+			Key:    key,
+			Values: values,
+		})
 	}
 
-	// execute the call
-	resp, err := c.client.Handle(r.Context(), &proto.HTTPRequest{
-		Url:     r.RequestURI,
-		Method:  r.Method,
-		Headers: inboundHeaders,
-		Body:    body,
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	req.Request.PostForm = make([]*httpproto.Element, 0, len(r.PostForm))
+	for key, values := range r.PostForm {
+		req.Request.PostForm = append(req.Request.PostForm, &httpproto.Element{
+			Key:    key,
+			Values: values,
+		})
 	}
 
-	// return the code
-	w.WriteHeader(int(resp.Code))
+	if r.URL != nil {
+		req.Request.Url = &httpproto.URL{
+			Scheme:     r.URL.Scheme,
+			Opaque:     r.URL.Opaque,
+			Host:       r.URL.Host,
+			Path:       r.URL.Path,
+			RawPath:    r.URL.RawPath,
+			ForceQuery: r.URL.ForceQuery,
+			RawQuery:   r.URL.RawQuery,
+			Fragment:   r.URL.Fragment,
+		}
 
-	// return the headers
-	outboundHeaders := w.Header()
-	for _, header := range resp.Headers {
-		outboundHeaders[header.Key] = header.Values
+		if r.URL.User != nil {
+			req.Request.Url.User = &httpproto.Userinfo{
+				Username: r.URL.User.Username(),
+			}
+			pwd, set := r.URL.User.Password()
+			req.Request.Url.User.Password = pwd
+			req.Request.Url.User.PasswordSet = set
+		}
 	}
 
-	// return the body
-	if _, err := w.Write(resp.Body); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if r.TLS != nil {
+		req.Request.Tls = &httpproto.ConnectionState{
+			Version:                     uint32(r.TLS.Version),
+			HandshakeComplete:           r.TLS.HandshakeComplete,
+			DidResume:                   r.TLS.DidResume,
+			CipherSuite:                 uint32(r.TLS.CipherSuite),
+			NegotiatedProtocol:          r.TLS.NegotiatedProtocol,
+			NegotiatedProtocolIsMutual:  r.TLS.NegotiatedProtocolIsMutual,
+			ServerName:                  r.TLS.ServerName,
+			SignedCertificateTimestamps: r.TLS.SignedCertificateTimestamps,
+			OcspResponse:                r.TLS.OCSPResponse,
+			TlsUnique:                   r.TLS.TLSUnique,
+		}
+
+		req.Request.Tls.PeerCertificates = &httpproto.Certificates{
+			Cert: make([][]byte, len(r.TLS.PeerCertificates)),
+		}
+		for i, cert := range r.TLS.PeerCertificates {
+			req.Request.Tls.PeerCertificates.Cert[i] = cert.Raw
+		}
+
+		req.Request.Tls.VerifiedChains = make([]*httpproto.Certificates, len(r.TLS.VerifiedChains))
+		for i, chain := range r.TLS.VerifiedChains {
+			req.Request.Tls.VerifiedChains[i] = &httpproto.Certificates{
+				Cert: make([][]byte, len(chain)),
+			}
+			for j, cert := range chain {
+				req.Request.Tls.VerifiedChains[i].Cert[j] = cert.Raw
+			}
+		}
 	}
+
+	c.client.Handle(r.Context(), req)
+
+	reader.Stop()
+	writer.Stop()
 }

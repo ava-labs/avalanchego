@@ -172,7 +172,7 @@ func (vm *VMClient) CreateHandlers() map[string]*common.HTTPHandler {
 		vm.conns = append(vm.conns, conn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httpproto.NewHTTPClient(conn)),
+			Handler:     ghttp.NewClient(httpproto.NewHTTPClient(conn), vm.broker),
 		}
 	}
 	return handlers

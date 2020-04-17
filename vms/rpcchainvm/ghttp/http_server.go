@@ -4,59 +4,144 @@
 package ghttp
 
 import (
-	"bytes"
 	"context"
-	"io/ioutil"
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
-	"net/http/httptest"
+	"net/url"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
+	"github.com/hashicorp/go-plugin"
+
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter"
+
+	readcloserproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/proto"
+	responsewriterproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/proto"
+	httpproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
 )
 
 // Server is a http.Handler that is managed over RPC.
-type Server struct{ handler http.Handler }
+type Server struct {
+	handler http.Handler
+	broker  *plugin.GRPCBroker
+}
 
 // NewServer returns a http.Handler instance manage remotely
-func NewServer(handler http.Handler) *Server {
-	return &Server{handler: handler}
+func NewServer(handler http.Handler, broker *plugin.GRPCBroker) *Server {
+	return &Server{
+		handler: handler,
+		broker:  broker,
+	}
 }
 
 // Handle ...
-func (s Server) Handle(ctx context.Context, req *proto.HTTPRequest) (*proto.HTTPResponse, error) {
+func (s *Server) Handle(ctx context.Context, req *httpproto.HTTPRequest) (*httpproto.HTTPResponse, error) {
+	writerConn, err := s.broker.Dial(req.ResponseWriter)
+	if err != nil {
+		return nil, err
+	}
+	defer writerConn.Close()
+
+	readerConn, err := s.broker.Dial(req.Request.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer readerConn.Close()
+
+	writer := gresponsewriter.NewClient(responsewriterproto.NewWriterClient(writerConn), s.broker)
+	reader := greadcloser.NewClient(readcloserproto.NewReaderClient(readerConn))
+
 	// create the request with the current context
-	r, err := http.NewRequestWithContext(
+	request, err := http.NewRequestWithContext(
 		ctx,
-		req.Method,
-		req.Url,
-		ioutil.NopCloser(bytes.NewReader(req.Body)),
+		req.Request.Method,
+		req.Request.RequestURI,
+		reader,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// populate the headers
-	for _, header := range req.Headers {
-		r.Header[header.Key] = header.Values
+	if req.Request.Url != nil {
+		request.URL = &url.URL{
+			Scheme:     req.Request.Url.Scheme,
+			Opaque:     req.Request.Url.Opaque,
+			Host:       req.Request.Url.Host,
+			Path:       req.Request.Url.Path,
+			RawPath:    req.Request.Url.RawPath,
+			ForceQuery: req.Request.Url.ForceQuery,
+			RawQuery:   req.Request.Url.RawQuery,
+			Fragment:   req.Request.Url.Fragment,
+		}
+		if req.Request.Url.User != nil {
+			if req.Request.Url.User.PasswordSet {
+				request.URL.User = url.UserPassword(req.Request.Url.User.Username, req.Request.Url.User.Password)
+			} else {
+				request.URL.User = url.User(req.Request.Url.User.Username)
+			}
+		}
 	}
 
-	// send the request to the recorder
-	recorder := httptest.NewRecorder()
-	s.handler.ServeHTTP(recorder, r)
-
-	// get the returned headers
-	returnedHeaders := recorder.Header()
-	headers := make([]*proto.Header, len(returnedHeaders))[:0]
-	for key, values := range returnedHeaders {
-		headers = append(headers, &proto.Header{
-			Key:    key,
-			Values: values,
-		})
+	request.Proto = req.Request.Proto
+	request.ProtoMajor = int(req.Request.ProtoMajor)
+	request.ProtoMinor = int(req.Request.ProtoMinor)
+	request.Header = make(http.Header, len(req.Request.Header))
+	for _, elem := range req.Request.Header {
+		request.Header[elem.Key] = elem.Values
 	}
+	request.ContentLength = req.Request.ContentLength
+	request.TransferEncoding = req.Request.TransferEncoding
+	request.Host = req.Request.Host
+	request.Form = make(url.Values, len(req.Request.Form))
+	for _, elem := range req.Request.Form {
+		request.Form[elem.Key] = elem.Values
+	}
+	request.PostForm = make(url.Values, len(req.Request.PostForm))
+	for _, elem := range req.Request.PostForm {
+		request.PostForm[elem.Key] = elem.Values
+	}
+	request.Trailer = make(http.Header)
+	request.RemoteAddr = req.Request.RemoteAddr
+	request.RequestURI = req.Request.RequestURI
+
+	if req.Request.Tls != nil {
+		request.TLS = &tls.ConnectionState{
+			Version:                     uint16(req.Request.Tls.Version),
+			HandshakeComplete:           req.Request.Tls.HandshakeComplete,
+			DidResume:                   req.Request.Tls.DidResume,
+			CipherSuite:                 uint16(req.Request.Tls.CipherSuite),
+			NegotiatedProtocol:          req.Request.Tls.NegotiatedProtocol,
+			NegotiatedProtocolIsMutual:  req.Request.Tls.NegotiatedProtocolIsMutual,
+			ServerName:                  req.Request.Tls.ServerName,
+			SignedCertificateTimestamps: req.Request.Tls.SignedCertificateTimestamps,
+			OCSPResponse:                req.Request.Tls.OcspResponse,
+			TLSUnique:                   req.Request.Tls.TlsUnique,
+		}
+
+		request.TLS.PeerCertificates = make([]*x509.Certificate, len(req.Request.Tls.PeerCertificates.Cert))
+		for i, certBytes := range req.Request.Tls.PeerCertificates.Cert {
+			cert, err := x509.ParseCertificate(certBytes)
+			if err != nil {
+				return nil, err
+			}
+			request.TLS.PeerCertificates[i] = cert
+		}
+
+		request.TLS.VerifiedChains = make([][]*x509.Certificate, len(req.Request.Tls.VerifiedChains))
+		for i, chain := range req.Request.Tls.VerifiedChains {
+			request.TLS.VerifiedChains[i] = make([]*x509.Certificate, len(chain.Cert))
+			for j, certBytes := range chain.Cert {
+				cert, err := x509.ParseCertificate(certBytes)
+				if err != nil {
+					return nil, err
+				}
+				request.TLS.VerifiedChains[i][j] = cert
+			}
+		}
+	}
+
+	s.handler.ServeHTTP(writer, request)
 
 	// return the response
-	return &proto.HTTPResponse{
-		Code:    int32(recorder.Code),
-		Headers: headers,
-		Body:    recorder.Body.Bytes(),
-	}, nil
+	return &httpproto.HTTPResponse{}, nil
 }
