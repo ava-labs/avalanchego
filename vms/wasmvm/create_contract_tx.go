@@ -14,7 +14,7 @@ type createContractTx struct {
 	vm *VM
 
 	// ID of this tx and the contract being created
-	ID ids.ID
+	id ids.ID
 
 	// Byte rept. of the transaction
 	WasmBytes []byte `serialize:"true"`
@@ -28,6 +28,12 @@ func (tx *createContractTx) Bytes() []byte {
 	return tx.bytes
 }
 
+// ID returns this tx's ID
+// Should only be called after tx is initialized
+func (tx *createContractTx) ID() ids.ID {
+	return tx.id
+}
+
 // should be called when unmarshaling
 func (tx *createContractTx) initialize(vm *VM) error {
 	tx.vm = vm
@@ -36,7 +42,7 @@ func (tx *createContractTx) initialize(vm *VM) error {
 	if err != nil {
 		return fmt.Errorf("couldn't initialize tx: %v", err)
 	}
-	tx.ID = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return nil
 }
 
@@ -45,7 +51,7 @@ func (tx *createContractTx) SyntacticVerify() error {
 	switch {
 	case tx.WasmBytes == nil:
 		return fmt.Errorf("empty contract")
-	case tx.ID.Equals(ids.Empty):
+	case tx.id.Equals(ids.Empty):
 		return fmt.Errorf("empty tx ID")
 	}
 	return nil
@@ -56,11 +62,11 @@ func (tx *createContractTx) SemanticVerify(database.Database) error {
 }
 
 func (tx *createContractTx) Accept() {
-	tx.vm.Ctx.Log.Debug("creating contract %s", tx.ID) // TODO delete
-	if err := tx.vm.putContractBytes(tx.vm.DB, tx.ID, tx.WasmBytes); err != nil {
+	tx.vm.Ctx.Log.Debug("creating contract %s", tx.id) // TODO delete
+	if err := tx.vm.putContractBytes(tx.vm.DB, tx.id, tx.WasmBytes); err != nil {
 		tx.vm.Ctx.Log.Error("couldn't put new contract in db: %v", err)
 	}
-	if err := tx.vm.putContractState(tx.vm.DB, tx.ID, []byte{}); err != nil {
+	if err := tx.vm.putContractState(tx.vm.DB, tx.id, []byte{}); err != nil {
 		tx.vm.Ctx.Log.Error("couldn't initialize contract's state in db: %v", err)
 	}
 }

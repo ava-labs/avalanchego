@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ava-labs/gecko/utils/formatting"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
 )
@@ -68,9 +70,10 @@ func (arg *ArgAPI) toFnArg() (interface{}, error) {
 
 // InvokeArgs ...
 type InvokeArgs struct {
-	ContractID ids.ID   `json:"contractID"`
-	Function   string   `json:"function"`
-	Args       []ArgAPI `json:"args"`
+	ContractID ids.ID          `json:"contractID"`
+	Function   string          `json:"function"`
+	Args       []ArgAPI        `json:"args"`
+	ByteArgs   formatting.CB58 `json:"byteArgs"`
 }
 
 func (args *InvokeArgs) validate() error {
@@ -106,7 +109,7 @@ func (s *Service) Invoke(_ *http.Request, args *InvokeArgs, response *InvokeResp
 		}
 	}
 
-	tx, err := s.vm.newInvokeTx(args.ContractID, args.Function, fnArgs)
+	tx, err := s.vm.newInvokeTx(args.ContractID, args.Function, fnArgs, args.ByteArgs.Bytes)
 	if err != nil {
 		return fmt.Errorf("error creating tx: %s", err)
 	}

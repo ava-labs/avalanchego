@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/ava-labs/gecko/database/prefixdb"
+
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 
@@ -17,6 +19,8 @@ import (
 
 const cacheSize = 128
 
+var contractDBPrefix = []byte{'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+
 // VM defines the Salesforce Chain
 type VM struct {
 	*core.SnowmanVM
@@ -27,6 +31,10 @@ type VM struct {
 	// Key: Contract ID
 	// Value: Smart contract (*wasm.Instance)
 	contracts cache.LRUCloser
+
+	// For contracts to read/write from
+	// TODO: Give each contract its own db
+	contractDB database.Database
 }
 
 // Initialize this chain
@@ -46,6 +54,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("error initializing state: %v", err)
 	}
 	vm.contracts = cache.LRUCloser{Size: cacheSize}
+	vm.contractDB = prefixdb.New(contractDBPrefix, vm.DB)
 
 	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/pkg/bag_bg.wasm")
 	if err != nil {
@@ -61,7 +70,7 @@ func (vm *VM) Initialize(
 		if err != nil {
 			return fmt.Errorf("couldn't make genesis tx: %v", err)
 		}
-		genesisTx.ID = ids.Empty
+		genesisTx.id = ids.Empty
 		genesisBlock, err := vm.newBlock(ids.Empty, []tx{genesisTx})
 		if err != nil {
 			return fmt.Errorf("couldn't make genesis block: %v", err)

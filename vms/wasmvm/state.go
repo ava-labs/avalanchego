@@ -3,6 +3,8 @@ package wasmvm
 import (
 	"fmt"
 
+	"github.com/ava-labs/gecko/snow/choices"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	wasm "github.com/wasmerio/go-ext-wasm/wasmer"
@@ -56,7 +58,7 @@ func (vm *VM) getContract(db database.Database, ID ids.ID) (*wasm.Instance, erro
 	contract = &contractStruct
 	contract.SetContextData(ctx{
 		log:    vm.Ctx.Log,
-		db:     vm.DB, // TODO provide each SC its own prefixed data to write to
+		db:     vm.contractDB, // TODO provide each SC its own prefixed database to write to
 		memory: contract.Memory,
 	})
 
@@ -91,6 +93,16 @@ func (vm *VM) getContractState(db database.Database, ID ids.ID) ([]byte, error) 
 		return nil, err
 	}
 	return stateIntf.([]byte), nil
+}
+
+// Persist a transaction's status
+func (vm *VM) putTxStatus(db database.Database, txID ids.ID, status choices.Status) error {
+	return vm.State.PutStatus(db, txID, status)
+}
+
+// Get a transaction's status
+func (vm *VM) getTxStatus(db database.Database, txID ids.ID) choices.Status {
+	return vm.State.GetStatus(db, txID)
 }
 
 // Persist the return value returned by a smart invocation

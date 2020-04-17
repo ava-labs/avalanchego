@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/gecko/snow/choices"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -27,6 +29,7 @@ func (b *Block) Accept() {
 	b.Block.Accept()
 	for _, tx := range b.Txs {
 		tx.Accept()
+		b.vm.putTxStatus(b.vm.DB, tx.ID(), choices.Accepted)
 	}
 	b.vm.DB.Commit()
 }

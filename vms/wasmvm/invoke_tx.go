@@ -18,7 +18,7 @@ type invokeTx struct {
 	bytes []byte
 
 	// ID of this tx
-	ID ids.ID
+	id ids.ID
 
 	// ID of contract to invoke
 	ContractID ids.ID `serialize:"true"`
@@ -28,11 +28,21 @@ type invokeTx struct {
 
 	// Arguments to the function
 	Arguments []interface{} `serialize:"true"`
+
+	// Byte arguments to pass to the method
+	// Should be in the form of a JSON
+	ByteArguments []byte `serialize:"true"`
+}
+
+// ID returns this tx's ID
+// Should only be called after initialize
+func (tx *invokeTx) ID() ids.ID {
+	return tx.id
 }
 
 func (tx *invokeTx) SyntacticVerify() error {
 	switch {
-	case tx.ID.Equals(ids.Empty):
+	case tx.id.Equals(ids.Empty):
 		return errors.New("tx ID is empty")
 	case tx.FunctionName == "":
 		return errors.New("function name is empty")
@@ -71,6 +81,12 @@ func (tx *invokeTx) Accept() {
 		return
 	}
 
+	// Set the byteArguments to pass to function
+	if err := tx.vm.contractDB.Put([]byte{}, tx.ByteArguments); err != nil {
+		tx.vm.Ctx.Log.Error("couldn't set byte arguments", err)
+		return
+	}
+
 	// Call the function
 	val, err := fn(tx.Arguments...)
 	if err != nil {
@@ -93,17 +109,18 @@ func (tx *invokeTx) initialize(vm *VM) error {
 	if err != nil {
 		return fmt.Errorf("couldn't marshal invokeTx: %v", err)
 	}
-	tx.ID = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return nil
 }
 
 // Creates a new, initialized tx
-func (vm *VM) newInvokeTx(contractID ids.ID, functionName string, args []interface{}) (*invokeTx, error) {
+func (vm *VM) newInvokeTx(contractID ids.ID, functionName string, args []interface{}, byteArgs []byte) (*invokeTx, error) {
 	tx := &invokeTx{
-		vm:           vm,
-		ContractID:   contractID,
-		FunctionName: functionName,
-		Arguments:    args,
+		vm:            vm,
+		ContractID:    contractID,
+		FunctionName:  functionName,
+		Arguments:     args,
+		ByteArguments: byteArgs,
 	}
 	if err := tx.initialize(vm); err != nil {
 		return nil, err
