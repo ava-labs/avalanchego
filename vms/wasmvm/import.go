@@ -3,6 +3,8 @@ package wasmvm
 // void print(void *context, int ptr, int len);
 // int dbPut(void *context, int key, int keyLen, int value, int valueLen);
 // int dbGet(void *context, int key, int keyLen, int value);
+// int returnValue(void *context, int valuePtr, int valueLen);
+// int dbGetValueLen(void *context, int keyPtr, int keyLen);
 import "C"
 import (
 	"fmt"
@@ -90,7 +92,7 @@ func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C
 		ctx.log.Error("dbGet failed. Key pointer and length must be non-negative")
 		return -1
 	} else if valuePtr < 0 {
-		ctx.log.Error("dbGet failed. Value pointermust be non-negative")
+		ctx.log.Error("dbGet failed. Value pointer must be non-negative")
 		return -1
 	}
 	contractState := ctx.memory.Data()
@@ -108,6 +110,36 @@ func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C
 	}
 	ctx.log.Verbo("dbGet returning\n  key: %v\n value: %v\n", key, value)
 	copy(contractState[valuePtr:], value)
+	return C.int(len(value))
+}
+
+// Get the length in bytes of the value associated with a key in the database.
+// The key is in the contract's memory at [keyPtr, keyLen]
+//export dbGetValueLen
+func dbGetValueLen(context unsafe.Pointer, keyPtr C.int, keyLen C.int) C.int {
+	// Get the context
+	ctxRaw := wasm.IntoInstanceContext(context)
+	ctx := ctxRaw.Data().(ctx)
+
+	// Validate arguments
+	if keyPtr < 0 || keyLen < 0 {
+		ctx.log.Error("dbGetValueLen failed. Key pointer and length must be non-negative")
+		return -1
+	}
+	contractState := ctx.memory.Data()
+	keyFinalIndex, err := math.Add32(uint32(keyPtr), uint32(keyLen))
+	if err != nil || int(keyFinalIndex) > len(contractState) {
+		ctx.log.Error("dbGetValueLen failed. Key index out of bounds")
+		return -1
+	}
+
+	key := contractState[keyPtr:keyFinalIndex]
+	value, err := ctx.db.Get(key)
+	if err != nil {
+		ctx.log.Error("dbGetValueLen failed: %s", err)
+		return -1
+	}
+	ctx.log.Verbo("dbGetValueLen returning %v", len(value))
 	return C.int(len(value))
 }
 
@@ -140,7 +172,7 @@ func returnValue(context unsafe.Pointer, valuePtr C.int, valueLen C.int) C.int {
 	return 0
 }
 
-// Return the standard imports available by all smart contracts
+// Return the imports (host methods) available to smart contracts
 func standardImports() *wasm.Imports {
 	imports, err := wasm.NewImportObject().Imports()
 	if err != nil {
@@ -157,6 +189,10 @@ func standardImports() *wasm.Imports {
 	imports, err = imports.AppendFunction("dbGet", dbGet, C.dbGet)
 	if err != nil {
 		panic(fmt.Sprintf("couldn't add dbGet import: %v", err))
+	}
+	imports, err = imports.AppendFunction("returnValue", returnValue, C.returnValue)
+	if err != nil {
+		panic(fmt.Sprintf("couldn't add returnValue import: %v", err))
 	}
 	return imports
 }

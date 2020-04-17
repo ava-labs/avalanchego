@@ -12,6 +12,12 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 )
 
+// CreateStaticHandlers returns a map where:
+// Keys: The path extension for this VM's static API
+// Values: The handler for that static API
+// We return nil because this VM has no static API
+func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler { return nil }
+
 // CreateHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
