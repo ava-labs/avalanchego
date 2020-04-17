@@ -31,7 +31,7 @@ sudo apt-get install libssl-dev libuv1-dev cmake make curl g++
 Clone the Gecko repository:
 
 ```sh
-go get github.com/ava-labs/gecko
+go get -v -d github.com/ava-labs/gecko/...
 cd $GOPATH/src/github.com/ava-labs/gecko
 ```
 
