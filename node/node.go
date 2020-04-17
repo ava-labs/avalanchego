@@ -154,9 +154,10 @@ func (n *Node) initNetlib() error {
 
 	// Create peer network config, may have tls enabled
 	peerConfig := salticidae.NewPeerNetworkConfig()
+	msgConfig := peerConfig.AsMsgNetworkConfig()
+	msgConfig.MaxMsgSize(maxMessageSize)
+
 	if n.Config.EnableStaking {
-		msgConfig := peerConfig.AsMsgNetworkConfig()
-		msgConfig.MaxMsgSize(maxMessageSize)
 		msgConfig.EnableTLS(true)
 		msgConfig.TLSKeyFile(n.Config.StakingKeyFile)
 		msgConfig.TLSCertFile(n.Config.StakingCertFile)

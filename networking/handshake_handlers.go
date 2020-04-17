@@ -79,7 +79,7 @@ const (
 	GetVersionTimeout = 2 * time.Second
 	// ReconnectTimeout is the amount of time to wait to reconnect to a staker
 	// before giving up
-	ReconnectTimeout = 1 * time.Minute
+	ReconnectTimeout = 10 * time.Minute
 )
 
 // Manager is the struct that will be accessed on event calls
