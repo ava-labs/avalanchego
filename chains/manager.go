@@ -214,7 +214,12 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 	}
 
 	// Create the chain
-	vm := vmFactory.New()
+	vm, err := vmFactory.New()
+	if err != nil {
+		m.log.Error("error while creating vm: %s", err)
+		return
+	}
+	// TODO: Shutdown VM if an error occurs
 
 	fxs := make([]*common.Fx, len(chain.FxAliases))
 	for i, fxAlias := range chain.FxAliases {
@@ -231,10 +236,16 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 			return
 		}
 
+		fx, err := fxFactory.New()
+		if err != nil {
+			m.log.Error("error while creating fx: %s", err)
+			return
+		}
+
 		// Create the fx
 		fxs[i] = &common.Fx{
 			ID: fxID,
-			Fx: fxFactory.New(),
+			Fx: fx,
 		}
 	}
 

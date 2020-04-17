@@ -6,7 +6,6 @@ package genesis
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"
@@ -21,7 +20,7 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 	generalAliases := map[string][]string{
 		"vm/" + platformvm.ID.String():  []string{"vm/platform"},
 		"vm/" + avm.ID.String():         []string{"vm/avm"},
-		"vm/" + evm.ID.String():         []string{"vm/evm"},
+		"vm/" + EVMID.String():          []string{"vm/evm"},
 		"vm/" + spdagvm.ID.String():     []string{"vm/spdag"},
 		"vm/" + spchainvm.ID.String():   []string{"vm/spchain"},
 		"vm/" + timestampvm.ID.String(): []string{"vm/timestamp"},
@@ -33,7 +32,7 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 	vmAliases := map[[32]byte][]string{
 		platformvm.ID.Key():  []string{"platform"},
 		avm.ID.Key():         []string{"avm"},
-		evm.ID.Key():         []string{"evm"},
+		EVMID.Key():          []string{"evm"},
 		spdagvm.ID.Key():     []string{"spdag"},
 		spchainvm.ID.Key():   []string{"spchain"},
 		timestampvm.ID.Key(): []string{"timestamp"},
@@ -60,7 +59,7 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 		case avm.ID.Equals(chain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
 			chainAliases[chain.ID().Key()] = []string{"X", "avm"}
-		case evm.ID.Equals(chain.VMID):
+		case EVMID.Equals(chain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
 			chainAliases[chain.ID().Key()] = []string{"C", "evm"}
 		case spdagvm.ID.Equals(chain.VMID):

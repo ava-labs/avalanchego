@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/go-ethereum/p2p/nat"
 )
 
 // main is the primary entry point to Ava. This can either create a CLI to an
@@ -61,26 +61,11 @@ func main() {
 		log.Warn("assertions are enabled. This may slow down execution")
 	}
 
-	natChan := make(chan struct{})
-	defer close(natChan)
+	mapper := nat.NewDefaultMapper(log, Config.Nat, nat.TCP, "gecko")
+	defer mapper.UnmapAllPorts()
 
-	go nat.Map(
-		/*nat=*/ Config.Nat,
-		/*closeChannel=*/ natChan,
-		/*protocol=*/ "TCP",
-		/*internetPort=*/ int(Config.StakingIP.Port),
-		/*localPort=*/ int(Config.StakingIP.Port),
-		/*name=*/ "Gecko Staking Server",
-	)
-
-	go nat.Map(
-		/*nat=*/ Config.Nat,
-		/*closeChannel=*/ natChan,
-		/*protocol=*/ "TCP",
-		/*internetPort=*/ int(Config.HTTPPort),
-		/*localPort=*/ int(Config.HTTPPort),
-		/*name=*/ "Gecko HTTP Server",
-	)
+	mapper.MapPort(Config.StakingIP.Port, Config.StakingIP.Port)
+	mapper.MapPort(Config.HTTPPort, Config.HTTPPort)
 
 	log.Debug("initializing node state")
 	// MainNode is a global variable in the node.go file
