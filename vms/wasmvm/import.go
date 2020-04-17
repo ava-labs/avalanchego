@@ -24,6 +24,7 @@ type ctx struct {
 }
 
 // Print bytes in the smart contract's memory
+// The bytes are interpreted as a string
 //export print
 func print(context unsafe.Pointer, ptr C.int, strLen C.int) {
 	ctxRaw := wasm.IntoInstanceContext(context)
@@ -115,6 +116,7 @@ func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C
 
 // Get the length in bytes of the value associated with a key in the database.
 // The key is in the contract's memory at [keyPtr, keyLen]
+// Returns -1 if the value corresponding to the key couldn't be found
 //export dbGetValueLen
 func dbGetValueLen(context unsafe.Pointer, keyPtr C.int, keyLen C.int) C.int {
 	// Get the context
