@@ -52,19 +52,19 @@ func dbPut(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int, v
 		ctx.log.Error("dbPut failed. Value pointer and length must be non-negative")
 		return 1
 	}
+	contractState := ctx.memory.Data()
 	keyFinalIndex, err := math.Add32(uint32(keyPtr), uint32(keyLen))
-	if err != nil {
+	if err != nil || int(keyFinalIndex) > len(contractState) {
 		ctx.log.Error("dbPut failed. Key index out of bounds.")
 		return 1
 	}
 	valueFinalIndex, err := math.Add32(uint32(valuePtr), uint32(valueLen))
-	if err != nil {
+	if err != nil || int(valueFinalIndex) > len(contractState) {
 		ctx.log.Error("dbPut failed. Value index out of bounds.")
 		return 1
 	}
 
 	// Do the put
-	contractState := ctx.memory.Data()
 	key := contractState[keyPtr:keyFinalIndex]
 	value := contractState[valuePtr:valueFinalIndex]
 	ctx.log.Verbo("Putting K/V pair for contract.\n  key: %v\n  value: %v", key, value)
@@ -93,13 +93,13 @@ func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C
 		ctx.log.Error("dbGet failed. Value pointermust be non-negative")
 		return -1
 	}
+	contractState := ctx.memory.Data()
 	keyFinalIndex, err := math.Add32(uint32(keyPtr), uint32(keyLen))
-	if err != nil {
+	if err != nil || int(keyFinalIndex) > len(contractState) {
 		ctx.log.Error("dbGet failed. Key index out of bounds")
 		return -1
 	}
 
-	contractState := ctx.memory.Data()
 	key := contractState[keyPtr:keyFinalIndex]
 	value, err := ctx.db.Get(key)
 	if err != nil {
@@ -109,6 +109,35 @@ func dbGet(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int) C
 	ctx.log.Verbo("dbGet returning\n  key: %v\n value: %v\n", key, value)
 	copy(contractState[valuePtr:], value)
 	return C.int(len(value))
+}
+
+// Smart contract methods call this method to return a value
+// Creates a mapping:
+//   Key: Tx ID of tx that invoked smart contract
+//   Value: contract's memory in [ptr,ptr+len)
+// Can only called at most once by a smart contract
+// Returns 0 on success, other return value indicates failure
+//export returnValue
+func returnValue(context unsafe.Pointer, valuePtr C.int, valueLen C.int) C.int {
+	// Get the context
+	ctxRaw := wasm.IntoInstanceContext(context)
+	ctx := ctxRaw.Data().(ctx)
+
+	// Validate arguments
+	if valuePtr < 0 || valueLen < 0 {
+		ctx.log.Error("returnValue failed. Value pointer and length must be non-negative")
+		return -1
+	}
+	contractState := ctx.memory.Data()
+	finalIndex, err := math.Add32(uint32(valuePtr), uint32(valueLen))
+	if err != nil || int(finalIndex) > len(contractState) {
+		ctx.log.Error("returnValue failed. Index out of bounds")
+		return -1
+	}
+
+	value := contractState[valuePtr:finalIndex] // TODO do something with the returned value
+	ctx.log.Verbo("returned value: %v", value)
+	return 0
 }
 
 // Return the standard imports available by all smart contracts

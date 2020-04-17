@@ -11,6 +11,7 @@ import (
 const (
 	contractBytesTypeID uint64 = iota
 	stateTypeID
+	returnValueTypeID
 )
 
 // put a contract (in its raw byte form) in the database
@@ -92,6 +93,22 @@ func (vm *VM) getContractState(db database.Database, ID ids.ID) ([]byte, error) 
 	return stateIntf.([]byte), nil
 }
 
+// Persist the return value returned by a smart invocation
+// [txID] is the transaction and [value] is the returned value
+func (vm *VM) putReturnValue(db database.Database, txID ids.ID, value []byte) error {
+	return vm.State.Put(db, returnValueTypeID, txID, bytes{value})
+}
+
+// Get the return value returned by a smart invocation
+// [txID] is the transaction
+func (vm *VM) getReturnValue(db database.Database, txID ids.ID) ([]byte, error) {
+	valueIntf, err := vm.State.Get(db, returnValueTypeID, txID)
+	if err != nil {
+		return nil, err
+	}
+	return valueIntf.([]byte), nil
+}
+
 func (vm *VM) registerDBTypes() error {
 	unmarshalBytesFunc := func(bytes []byte) (interface{}, error) { return bytes, nil }
 	if err := vm.State.RegisterType(contractBytesTypeID, unmarshalBytesFunc); err != nil {
@@ -99,6 +116,9 @@ func (vm *VM) registerDBTypes() error {
 	}
 	if err := vm.State.RegisterType(stateTypeID, unmarshalBytesFunc); err != nil {
 		return fmt.Errorf("error registering contract type with state: %v", err)
+	}
+	if err := vm.State.RegisterType(returnValueTypeID, unmarshalBytesFunc); err != nil {
+		return fmt.Errorf("error registering return value type with state: %v", err)
 	}
 	return nil
 }
