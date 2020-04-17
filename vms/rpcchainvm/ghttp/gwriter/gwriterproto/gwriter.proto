@@ -1,0 +1,16 @@
+syntax = "proto3";
+package gwriterproto;
+
+message WriteRequest {
+    bytes payload = 1;
+}
+
+message WriteResponse {
+    int32 written = 1;
+    string error = 2;
+    bool errored = 3;
+}
+
+service Writer {
+    rpc Write(WriteRequest) returns (WriteResponse);
+}

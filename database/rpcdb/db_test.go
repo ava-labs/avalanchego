@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/rpcdb/proto"
+	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
 )
 
 const (
@@ -26,7 +26,7 @@ func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		listener := bufconn.Listen(bufSize)
 		server := grpc.NewServer()
-		proto.RegisterDatabaseServer(server, NewServer(memdb.New()))
+		rpcdbproto.RegisterDatabaseServer(server, NewServer(memdb.New()))
 		go func() {
 			if err := server.Serve(listener); err != nil {
 				log.Fatalf("Server exited with error: %v", err)
@@ -44,7 +44,7 @@ func TestInterface(t *testing.T) {
 			t.Fatalf("Failed to dial: %s", err)
 		}
 
-		db := NewClient(proto.NewDatabaseClient(conn))
+		db := NewClient(rpcdbproto.NewDatabaseClient(conn))
 		test(t, db)
 		conn.Close()
 	}

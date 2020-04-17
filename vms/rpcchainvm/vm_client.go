@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/rpcdb"
+	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -21,12 +22,10 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/vms/components/missing"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
-
-	dbproto "github.com/ava-labs/gecko/database/rpcdb/proto"
-	httpproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
-	msgproto "github.com/ava-labs/gecko/vms/rpcchainvm/messenger/proto"
-	vmproto "github.com/ava-labs/gecko/vms/rpcchainvm/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
 )
 
 var (
@@ -109,7 +108,7 @@ func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
 		vm.servers = append(vm.servers, server)
 	}
 
-	dbproto.RegisterDatabaseServer(server, vm.db)
+	rpcdbproto.RegisterDatabaseServer(server, vm.db)
 	return server
 }
 
@@ -125,7 +124,7 @@ func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server 
 		vm.servers = append(vm.servers, server)
 	}
 
-	msgproto.RegisterMessengerServer(server, vm.messenger)
+	messengerproto.RegisterMessengerServer(server, vm.messenger)
 	return server
 }
 
@@ -172,7 +171,7 @@ func (vm *VMClient) CreateHandlers() map[string]*common.HTTPHandler {
 		vm.conns = append(vm.conns, conn)
 		handlers[handler.Prefix] = &common.HTTPHandler{
 			LockOptions: common.LockOption(handler.LockOptions),
-			Handler:     ghttp.NewClient(httpproto.NewHTTPClient(conn)),
+			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
 		}
 	}
 	return handlers
