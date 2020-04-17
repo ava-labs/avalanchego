@@ -127,7 +127,7 @@ func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandler
 				vm.servers = append(vm.servers, server)
 			}
 
-			httpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
+			httpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
 			return server
 		})
 
