@@ -174,7 +174,7 @@ func (cb *CommonBlock) parentBlock() Block {
 	parentID := cb.ParentID()
 	parent, err := cb.vm.getBlock(parentID)
 	if err != nil {
-		cb.vm.Ctx.Log.Warn("could not get parent (ID %s) of block %s", parentID, cb.ID())
+		cb.vm.Ctx.Log.Debug("could not get parent (ID %s) of block %s", parentID, cb.ID())
 		return nil
 	}
 	cb.parent = parent
