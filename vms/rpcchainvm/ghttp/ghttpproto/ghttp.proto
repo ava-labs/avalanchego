@@ -1,6 +1,5 @@
 syntax = "proto3";
-package proto;
-
+package ghttpproto;
 
 message Userinfo {
     string username = 1;

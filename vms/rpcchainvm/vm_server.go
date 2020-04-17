@@ -12,18 +12,17 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/gecko/database/rpcdb"
+	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/snowman"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
-
-	dbproto "github.com/ava-labs/gecko/database/rpcdb/proto"
-	httpproto "github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/proto"
-	msgproto "github.com/ava-labs/gecko/vms/rpcchainvm/messenger/proto"
-	vmproto "github.com/ava-labs/gecko/vms/rpcchainvm/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
 )
 
 // VMServer is a VM that is managed over RPC.
@@ -59,8 +58,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 
-	dbClient := rpcdb.NewClient(dbproto.NewDatabaseClient(dbConn))
-	msgClient := messenger.NewClient(msgproto.NewMessengerClient(msgConn))
+	dbClient := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
+	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
 
 	toEngine := make(chan common.Message, 1)
 	go func() {
@@ -127,7 +126,7 @@ func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandler
 				vm.servers = append(vm.servers, server)
 			}
 
-			httpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
 			return server
 		})
 

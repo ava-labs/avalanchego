@@ -7,7 +7,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/greaderproto"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -19,10 +19,10 @@ func NewServer(reader io.Reader) *Server {
 }
 
 // Read ...
-func (s *Server) Read(ctx context.Context, req *proto.ReadRequest) (*proto.ReadResponse, error) {
+func (s *Server) Read(ctx context.Context, req *greaderproto.ReadRequest) (*greaderproto.ReadResponse, error) {
 	buf := make([]byte, int(req.Length))
 	n, err := s.reader.Read(buf)
-	resp := &proto.ReadResponse{
+	resp := &greaderproto.ReadResponse{
 		Read: buf[:n],
 	}
 	if err != nil {

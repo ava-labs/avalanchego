@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/gecko/snow/engine/snowman"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/proto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
 )
 
 // Handshake is a common handshake that is shared by plugin and host.
@@ -40,11 +40,11 @@ func New(vm snowman.ChainVM) *Plugin { return &Plugin{vm: vm} }
 
 // GRPCServer ...
 func (p *Plugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	proto.RegisterVMServer(s, NewServer(p.vm, broker))
+	vmproto.RegisterVMServer(s, NewServer(p.vm, broker))
 	return nil
 }
 
 // GRPCClient ...
 func (p *Plugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewClient(proto.NewVMClient(c), broker), nil
+	return NewClient(vmproto.NewVMClient(c), broker), nil
 }
