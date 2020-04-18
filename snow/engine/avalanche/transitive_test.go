@@ -677,6 +677,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 
 	st.Default(true)
 	st.cantEdge = false
+	st.cantGetVertex = false
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -697,6 +698,18 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	te.insert(vtx)
 
 	sender.PushQueryF = nil
+
+	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+                switch {
+                case id.Equals(gVtx.ID()):
+			return gVtx, nil
+                case id.Equals(mVtx.ID()):
+                        return mVtx, nil
+                }
+                t.Fatalf("Unknown vertex")
+                panic("Should have errored")
+	}
 
 	st.buildVertex = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		consumers := []snowstorm.Tx{}
@@ -953,6 +966,8 @@ func TestEngineIssueRepoll(t *testing.T) {
 	config.State = st
 
 	st.Default(true)
+	st.cantEdge = false
+	st.cantGetVertex = false
 
 	gVtx := &Vtx{
 		id:     GenerateID(),
@@ -1002,7 +1017,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 	sender.PushQueryF = func(vdrs ids.ShortSet, _ uint32, vtxID ids.ID, vtx []byte) {
 		vdrSet := ids.ShortSet{}
 		vdrSet.Add(vdr.ID())
-		if !vdrs.Equals(vdrSet) || !vtxID.Equals(*newVtxID) {
+		if !vdrs.Equals(vdrSet) || (!vtxID.Equals(gVtx.ID()) && !vtxID.Equals(mVtx.ID())) {
 			t.Fatalf("Wrong query message")
 		}
 	}
@@ -1661,26 +1676,45 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
+	utxos := []ids.ID{GenerateID(), GenerateID(), GenerateID()}
+
+	tx0 := &TestTx{
+		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	}
+	tx0.Ins.Add(utxos[0])
 
 	missingVtx := &Vtx{
 		parents: vts,
 		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx0},
 		height:  1,
 		status:  choices.Unknown,
 		bytes:   []byte{0, 1, 2, 3},
 	}
 
+	tx1 := &TestTx{
+		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	}
+	tx1.Ins.Add(utxos[1])
+
 	parentVtx := &Vtx{
 		parents: []avalanche.Vertex{missingVtx},
 		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx1},
 		height:  1,
 		status:  choices.Processing,
 		bytes:   []byte{1, 1, 2, 3},
 	}
 
+	tx2 := &TestTx{
+		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	}
+	tx2.Ins.Add(utxos[2])
+
 	blockingVtx := &Vtx{
 		parents: []avalanche.Vertex{parentVtx},
 		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx2},
 		height:  1,
 		status:  choices.Processing,
 		bytes:   []byte{2, 1, 2, 3},
@@ -1769,25 +1803,45 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	issuedVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	utxos := []ids.ID{GenerateID(), GenerateID(), GenerateID()}
+
+	tx0 := &TestTx{
+		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
 	}
+	tx0.Ins.Add(utxos[0])
 
 	missingVtx := &Vtx{
 		parents: vts,
 		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx0},
 		height:  1,
 		status:  choices.Unknown,
 		bytes:   []byte{0, 1, 2, 3},
 	}
 
+	tx1 := &TestTx{
+		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	}
+	tx1.Ins.Add(utxos[1])
+
+	issuedVtx := &Vtx{
+		parents: vts,
+		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx1},
+		height:  1,
+		status:  choices.Processing,
+		bytes:   []byte{0, 1, 2, 3},
+	}
+
+	tx2 := &TestTx{
+		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	}
+	tx2.Ins.Add(utxos[2])
+
 	blockingVtx := &Vtx{
 		parents: []avalanche.Vertex{missingVtx},
 		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx2},           
 		height:  1,
 		status:  choices.Processing,
 		bytes:   []byte{2, 1, 2, 3},
@@ -1886,28 +1940,48 @@ func TestEngineMissingTx(t *testing.T) {
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	issuedVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
-	}
+	utxos := []ids.ID{GenerateID(), GenerateID(), GenerateID()}
 
-	missingVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   []byte{0, 1, 2, 3},
-	}
+        tx0 := &TestTx{
+                TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+        }
+        tx0.Ins.Add(utxos[0])
 
-	blockingVtx := &Vtx{
-		parents: []avalanche.Vertex{missingVtx},
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{2, 1, 2, 3},
+        missingVtx := &Vtx{
+                parents: vts,
+                id:      GenerateID(),
+                txs:     []snowstorm.Tx{tx0},
+                height:  1,
+                status:  choices.Unknown,
+                bytes:   []byte{0, 1, 2, 3},
+        }
+
+        tx1 := &TestTx{
+                TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+        }
+        tx1.Ins.Add(utxos[1])
+
+        issuedVtx := &Vtx{
+                parents: vts,
+                id:      GenerateID(),
+                txs:     []snowstorm.Tx{tx1},
+                height:  1,
+                status:  choices.Processing,
+                bytes:   []byte{0, 1, 2, 3},
+        }
+
+        tx2 := &TestTx{
+                TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+        }
+        tx2.Ins.Add(utxos[2])
+
+        blockingVtx := &Vtx{
+                parents: []avalanche.Vertex{missingVtx},
+                id:      GenerateID(),
+                txs:     []snowstorm.Tx{tx2},
+                height:  1,
+                status:  choices.Processing,
+                bytes:   []byte{2, 1, 2, 3},
 	}
 
 	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }

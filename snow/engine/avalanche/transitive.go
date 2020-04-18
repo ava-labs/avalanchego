@@ -62,7 +62,7 @@ func (t *Transitive) getFrontier() []avalanche.Vertex {
 }
 
 func (t *Transitive) finishBootstrapping() {
-	frontier := getFrontier()
+	frontier := t.getFrontier()
 	t.Consensus.Initialize(t.Config.Context, t.Params, frontier)
 	t.bootstrapped = true
 }
