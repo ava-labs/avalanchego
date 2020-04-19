@@ -16,6 +16,7 @@ import (
 
 func TestStateIDs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
 	state := vm.state.state
 
@@ -126,6 +127,7 @@ func TestStateIDs(t *testing.T) {
 
 func TestStateStatuses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
 	state := vm.state.state
 
@@ -175,6 +177,7 @@ func TestStateStatuses(t *testing.T) {
 
 func TestStateUTXOs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
 	state := vm.state.state
 
@@ -246,6 +249,7 @@ func TestStateUTXOs(t *testing.T) {
 
 func TestStateTXs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
 	state := vm.state.state
 

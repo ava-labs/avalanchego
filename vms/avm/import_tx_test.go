@@ -222,6 +222,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	ctx.Lock.Unlock()
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 
 	msg := <-issuer
 	if msg != common.PendingTxs {
@@ -265,6 +266,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	vm := &VM{platform: platformID}
+	defer vm.Shutdown()
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
