@@ -18,6 +18,8 @@ func TestStateIDs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
+
+	// FIXME? is it safe to access vm.state.state without the lock?
 	state := vm.state.state
 
 	id0 := ids.NewID([32]byte{0xff, 0})
@@ -129,6 +131,8 @@ func TestStateStatuses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
+
+	// FIXME? is it safe to access vm.state.state without the lock?
 	state := vm.state.state
 
 	if _, err := state.Status(ids.Empty); err == nil {
@@ -179,8 +183,11 @@ func TestStateUTXOs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
+
+	// FIXME? is it safe to access vm.state.state without the lock?
 	state := vm.state.state
 
+	// FIXME? Is it safe to call vm.codec.RegisterType() without the lock?
 	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
@@ -251,8 +258,11 @@ func TestStateTXs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 	ctx.Lock.Unlock()
+
+	// FIXME? is it safe to access vm.state.state without the lock?
 	state := vm.state.state
 
+	// FIXME? Is it safe to call vm.codec.RegisterType() without the lock?
 	vm.codec.RegisterType(&ava.TestTransferable{})
 
 	if _, err := state.Tx(ids.Empty); err == nil {
@@ -279,6 +289,7 @@ func TestStateTXs(t *testing.T) {
 		}},
 	}}
 
+	// FIXME? Is it safe to call vm.codec.Marshal() without the lock?
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
@@ -298,6 +309,7 @@ func TestStateTXs(t *testing.T) {
 		},
 	})
 
+	// FIXME? Is it safe to call vm.codec.Marshal() without the lock?
 	b, err := vm.codec.Marshal(tx)
 	if err != nil {
 		t.Fatal(err)

@@ -478,6 +478,7 @@ func TestIssueTx(t *testing.T) {
 		t.Fatalf("Wrong message")
 	}
 
+	// FIXME? vm.PendingTxs called after lock released.
 	if txs := vm.PendingTxs(); len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -628,6 +629,7 @@ func TestIssueDependentTx(t *testing.T) {
 		t.Fatalf("Wrong message")
 	}
 
+	// FIXME? vm.PendingTxs called after lock released.
 	if txs := vm.PendingTxs(); len(txs) != 2 {
 		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
