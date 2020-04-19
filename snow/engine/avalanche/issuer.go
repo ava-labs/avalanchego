@@ -73,7 +73,7 @@ func (i *issuer) Update() {
 
 	polled := false
 
-	if (len(txs) != 0) {
+	if len(txs) != 0 {
 		i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
 		i.t.Consensus.Add(i.vtx)
 		i.t.RequestID++
@@ -86,11 +86,17 @@ func (i *issuer) Update() {
 
 	} else {
 		i.t.Config.Context.Log.Verbo("Skipping empty vertex vertex:\n%s", i.vtx)
-		frontierVts := i.t.getFrontier()
-		for _, fv := range frontierVts {
+
+		for fvID, _ := range i.t.Consensus.Preferences() {
+			fvtx, err := i.t.Config.State.GetVertex(ids.NewID(fvID))
+			if err != nil {
+				i.t.Config.Context.Log.Error("Query for %s was dropped due to failing to load preference", fvID)
+				continue
+			}
+
 			i.t.RequestID++
 			if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
-				i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, fv.ID(), fv.Bytes())
+				i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, fvtx.ID(), fvtx.Bytes())
 				polled = true
 			} else if numVdrs < p.K {
 				i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
