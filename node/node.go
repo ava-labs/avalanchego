@@ -275,11 +275,12 @@ func (n *Node) StartConsensusServer() error {
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
-			bootstrapIP := salticidae.NewNetAddrFromIPPortString(peer.IP.String(), true, &err)
-			if code := err.GetCode(); code != 0 {
-				return fmt.Errorf("failed to create bootstrap ip addr: %s", salticidae.StrError(code))
-			}
-			n.PeerNet.AddPeer(bootstrapIP)
+			// TODO: Add the bootstrap IP
+			// bootstrapIP := salticidae.NewNetAddrFromIPPortString(peer.IP.String(), true, &err)
+			// if code := err.GetCode(); code != 0 {
+			// 	return fmt.Errorf("failed to create bootstrap ip addr: %s", salticidae.StrError(code))
+			// }
+			// n.PeerNet.AddPeer(bootstrapIP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
 		}
