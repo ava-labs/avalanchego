@@ -18,7 +18,7 @@ else
     go get -t -v -d "$CORETH_PKG/..."
 fi
 cd "$CORETH_PATH"
-git branch tags/v0.1.0
+git -c advice.detachedHead=false checkout v0.1.0
 cd -
 
 GECKO_PKG=github.com/ava-labs/gecko
