@@ -71,8 +71,14 @@ func (ipDesc IPDesc) IsPrivate() bool {
 			return true
 		}
 	}
-	// added so that default ips will be marked as private
-	return len(ip) == 0 ||
+	return true
+}
+
+// IsZero returns if the IP or port is zeroed out
+func (ipDesc IPDesc) IsZero() bool {
+	ip := ipDesc.IP
+	return ipDesc.Port == 0 ||
+		len(ip) == 0 ||
 		ip.Equal(net.IPv4zero) ||
 		ip.Equal(net.IPv6zero)
 }
