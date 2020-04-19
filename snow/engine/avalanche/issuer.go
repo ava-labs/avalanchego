@@ -85,7 +85,7 @@ func (i *issuer) Update() {
 		}
 
 	} else {
-		i.t.Config.Context.Log.Verbo("Skipping empty vertex vertex:\n%s", i.vtx)
+		i.t.Config.Context.Log.Verbo("Skipping empty vertex:\n%s", i.vtx)
 
 		for fvID, _ := range i.t.Consensus.Preferences() {
 			fvtx, err := i.t.Config.State.GetVertex(ids.NewID(fvID))

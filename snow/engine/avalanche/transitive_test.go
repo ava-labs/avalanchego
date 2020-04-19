@@ -706,6 +706,8 @@ func TestEngineScheduleRepoll(t *testing.T) {
 			return gVtx, nil
                 case id.Equals(mVtx.ID()):
                         return mVtx, nil
+		case id.Equals(vtx.ID()):
+			return vtx, nil
                 }
                 t.Fatalf("Unknown vertex")
                 panic("Should have errored")
