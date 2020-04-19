@@ -246,8 +246,20 @@ func (c *connections) conns() ([]salticidae.PeerID, []ids.ShortID, []utils.IPDes
 func (c *connections) len() int { return len(c.idToPeerID) }
 
 func toID(peer salticidae.PeerID) [32]byte {
-	// TODO: need to get the hash from the peer
-	return [32]byte{}
+	ds := salticidae.NewDataStream(false)
+
+	peerInt := peer.AsUInt256()
+	peerInt.Serialize(ds)
+
+	size := ds.Size()
+	dsb := ds.GetDataInPlace(size)
+	idBytes := dsb.Get()
+
+	id := [32]byte{}
+	copy(id[:], idBytes)
+
+	ds.Free()
+	return id
 }
 
 func toIPDesc(addr salticidae.NetAddr) utils.IPDesc {

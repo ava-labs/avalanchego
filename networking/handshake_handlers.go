@@ -4,7 +4,7 @@
 package networking
 
 // #include "salticidae/network.h"
-// bool checkPeerCertificate(msgnetwork_conn_t *, bool, void *);
+// bool connHandler(msgnetwork_conn_t *, bool, void *);
 // void unknownPeerHandler(netaddr_t *, x509_t *, void *);
 // void peerHandler(peernetwork_conn_t *, bool, void *);
 // void ping(msg_t *, msgnetwork_conn_t *, void *);
@@ -143,7 +143,7 @@ func (nm *Handshake) Initialize(
 
 	net := peerNet.AsMsgNetwork()
 
-	net.RegConnHandler(salticidae.MsgNetworkConnCallback(C.checkPeerCertificate), nil)
+	net.RegConnHandler(salticidae.MsgNetworkConnCallback(C.connHandler), nil)
 	peerNet.RegPeerHandler(salticidae.PeerNetworkPeerCallback(C.peerHandler), nil)
 	peerNet.RegUnknownPeerHandler(salticidae.PeerNetworkUnknownPeerCallback(C.unknownPeerHandler), nil)
 	net.RegHandler(Ping, salticidae.MsgNetworkMsgCallback(C.ping), nil)
@@ -303,9 +303,10 @@ func (nm *Handshake) send(msg Msg, peers ...salticidae.PeerID) {
 	}
 }
 
-// checkPeerCertificate of a new inbound connection
-//export checkPeerCertificate
-func checkPeerCertificate(_ *C.struct_msgnetwork_conn_t, connected C.bool, _ unsafe.Pointer) C.bool {
+// connHandler notifies of a new inbound connection
+//export connHandler
+func connHandler(_ *C.struct_msgnetwork_conn_t, connected C.bool, _ unsafe.Pointer) C.bool {
+	HandshakeNet.log.Error("connHandler called")
 	return connected
 }
 
@@ -381,6 +382,8 @@ func (nm *Handshake) disconnectedFromPeer(peer salticidae.PeerID, addr salticida
 // connected is false if a formerly connected peer has disconnected
 //export peerHandler
 func peerHandler(_conn *C.struct_peernetwork_conn_t, connected C.bool, _ unsafe.Pointer) {
+	HandshakeNet.log.Error("peerHandler called")
+
 	pConn := salticidae.PeerNetworkConnFromC(salticidae.CPeerNetworkConn(_conn))
 	addr := pConn.GetPeerAddr(true)
 	peer := pConn.GetPeerID(true)
@@ -395,6 +398,8 @@ func peerHandler(_conn *C.struct_peernetwork_conn_t, connected C.bool, _ unsafe.
 // unknownPeerHandler notifies of an unknown peer connection attempt
 //export unknownPeerHandler
 func unknownPeerHandler(_addr *C.netaddr_t, _cert *C.x509_t, _ unsafe.Pointer) {
+	HandshakeNet.log.Error("unknownPeerHandler called")
+
 	addr := salticidae.NetAddrFromC(salticidae.CNetAddr(_addr)).Copy(true)
 	ip := toIPDesc(addr)
 
@@ -555,6 +560,8 @@ func peerList(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 		return
 	}
 
+	msgNet := HandshakeNet.net.AsMsgNetwork()
+
 	ips := pMsg.Get(Peers).([]utils.IPDesc)
 	cErr := salticidae.NewError()
 	for _, ip := range ips {
@@ -565,12 +572,7 @@ func peerList(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 			if !HandshakeNet.pending.ContainsIP(ip) && !HandshakeNet.connections.ContainsIP(ip) {
 				HandshakeNet.log.Debug("Adding peer %s", ip)
 
-				// TODO: Attempt to connect to the IP
-				// ipCert := toShortID(ip)
-				// HandshakeNet.reconnectTimeout.Put(ipCert.LongID(), func() {
-				// 	HandshakeNet.net.DelPeer(addr)
-				// })
-				// HandshakeNet.net.AddPeer(addr)
+				msgNet.Connect(addr)
 			}
 		}
 	}
