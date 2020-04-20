@@ -7,6 +7,7 @@ extern "C" {
     fn print(ptr: u32, len: u32);
     fn dbPut(key_ptr: u32, key_len: u32, value_ptr: u32, value_len: u32) -> u32;
     fn dbGet(key_ptr: u32, key_len: u32, value_ptr: u32) -> i32;
+    fn dbGetValueLen(key_ptr: u32, key_len: u32) -> i32;
 }
 
 lazy_static! {
@@ -181,6 +182,25 @@ pub extern fn put_hello() {
     let key_ptr = b"hello".as_ptr();
     let value_ptr = b"world".as_ptr();
     unsafe {dbPut(key_ptr as u32, 5, value_ptr as u32, 5);}
+}
+
+// Parse the byte args to this method, parse them to JSON, and print them
+#[no_mangle]
+pub extern fn parse_json() -> i32 {
+    unsafe { 
+        let args_len = dbGetValueLen(0, 0);
+        if args_len == -1 { // couldn't get args len
+            return -1
+        }
+        let mut buffer: std::vec::Vec<u8> = Vec::with_capacity(args_len as usize);
+        let pointer = buffer.as_mut_ptr();
+        let success = dbGet(0,0, pointer as u32);
+        if success == -1 {
+            return -1
+        }
+        print(pointer as u32, args_len as u32);
+    }
+    return 1;
 }
 
 /*

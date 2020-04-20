@@ -196,5 +196,9 @@ func standardImports() *wasm.Imports {
 	if err != nil {
 		panic(fmt.Sprintf("couldn't add returnValue import: %v", err))
 	}
+	imports, err = imports.AppendFunction("dbGetValueLen", dbGetValueLen, C.dbGetValueLen)
+	if err != nil {
+		panic(fmt.Sprintf("couldn't add dbGetValueLen import: %v", err))
+	}
 	return imports
 }
