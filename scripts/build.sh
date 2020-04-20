@@ -17,6 +17,9 @@ if [[ -d "$CORETH_PATH/.git" ]]; then
 else
     go get -t -v -d "$CORETH_PKG/..."
 fi
+cd "$CORETH_PATH"
+git -c advice.detachedHead=false checkout v0.1.0
+cd -
 
 GECKO_PKG=github.com/ava-labs/gecko
 GECKO_PATH="$GOPATH/src/$GECKO_PKG"

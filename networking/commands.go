@@ -17,6 +17,7 @@ const (
 	VersionStr     Field = iota // Used in handshake
 	NetworkID                   // Used in handshake
 	MyTime                      // Used in handshake
+	IP                          // Used in handshake
 	Peers                       // Used in handshake
 	ChainID                     // Used for dispatching
 	RequestID                   // Used for all messages
@@ -38,6 +39,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackInt
 	case MyTime:
 		return wrappers.TryPackLong
+	case IP:
+		return wrappers.TryPackIP
 	case Peers:
 		return wrappers.TryPackIPList
 	case ChainID: // TODO: This will be shortened to use a modified varint spec
@@ -72,6 +75,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackInt
 	case MyTime:
 		return wrappers.TryUnpackLong
+	case IP:
+		return wrappers.TryUnpackIP
 	case Peers:
 		return wrappers.TryUnpackIPList
 	case ChainID: // TODO: This will be shortened to use a modified varint spec
@@ -105,6 +110,8 @@ func (f Field) String() string {
 		return "NetworkID"
 	case MyTime:
 		return "MyTime"
+	case IP:
+		return "IP"
 	case Peers:
 		return "Peers"
 	case ChainID:
@@ -161,7 +168,7 @@ var (
 	Messages = map[salticidae.Opcode][]Field{
 		// Handshake:
 		GetVersion:  []Field{},
-		Version:     []Field{NetworkID, MyTime, VersionStr},
+		Version:     []Field{NetworkID, MyTime, IP, VersionStr},
 		GetPeerList: []Field{},
 		PeerList:    []Field{Peers},
 		// Bootstrapping:

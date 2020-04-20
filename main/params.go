@@ -157,11 +157,9 @@ func init() {
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
 		ip, err = Config.Nat.IP()
-		errs.Add(fmt.Errorf(
-			"%s\n"+
-				"If you are trying to create a local network, try adding --public-ip=127.0.0.1\n"+
-				"If you are attempting to connect to a public network, you may need to manually report your IP and perform port forwarding",
-			err))
+		if err != nil {
+			ip = net.IPv4zero
+		}
 	} else {
 		ip = net.ParseIP(*consensusIP)
 	}

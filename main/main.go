@@ -40,6 +40,10 @@ func main() {
 	defer log.StopOnPanic()
 	defer Config.DB.Close()
 
+	if Config.StakingIP.IsZero() {
+		log.Warn("NAT traversal has failed. If this node becomes a staker, it may lose its reward due to being unreachable.")
+	}
+
 	// Track if sybil control is enforced
 	if !Config.EnableStaking {
 		log.Warn("Staking and p2p encryption are disabled. Packet spoofing is possible.")
