@@ -187,8 +187,8 @@ func (c *connections) getID(peer salticidae.PeerID) (ids.ShortID, bool) {
 }
 
 func (c *connections) remove(peer salticidae.PeerID, id ids.ShortID) {
-	c.removeID(id)
 	c.removePeerID(peer)
+	c.removeID(id)
 }
 
 func (c *connections) removePeerID(peer salticidae.PeerID) {
