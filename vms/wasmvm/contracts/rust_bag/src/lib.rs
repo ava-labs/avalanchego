@@ -184,9 +184,9 @@ pub extern fn put_hello() {
     unsafe {dbPut(key_ptr as u32, 5, value_ptr as u32, 5);}
 }
 
-// Parse the byte args to this method, parse them to JSON, and print them
+// print byte arguments to this method
 #[no_mangle]
-pub extern fn parse_json() -> i32 {
+pub extern fn print_byte_args() -> i32 {
     unsafe { 
         let args_len = dbGetValueLen(0, 0);
         if args_len == -1 { // couldn't get args len
