@@ -69,8 +69,13 @@ func (s *Serializer) ParseVertex(b []byte) (avacon.Vertex, error) {
 		return nil, err
 	}
 	if len(vtx.txs) == 0 {
-		return vtx, nil
+		nVtx := &noopVertex{
+			serializer: s,
+			vtxID:      vtx.ID(),
+		}
+		return nVtx, nil
 	}
+
 	uVtx := &uniqueVertex{
 		serializer: s,
 		vtxID:      vtx.ID(),
@@ -113,7 +118,11 @@ func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avacon.
 	vtx.id = ids.NewID(hashing.ComputeHash256Array(vtx.bytes))
 
 	if len(vtx.txs) == 0 {
-		return vtx, nil
+		nVtx := &noopVertex{
+			serializer: s,
+			vtxID:      vtx.ID(),
+		}
+		return nVtx, nil
 	}
 
 	uVtx := &uniqueVertex{
