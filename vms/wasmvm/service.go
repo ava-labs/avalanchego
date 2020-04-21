@@ -96,7 +96,7 @@ func (args *InvokeArgs) validate() error {
 
 // InvokeResponse ...
 type InvokeResponse struct {
-	TxIssued bool `json:"txIssued"`
+	TxID ids.ID `json:"txID"`
 }
 
 // Invoke ...
@@ -117,13 +117,59 @@ func (s *Service) Invoke(_ *http.Request, args *InvokeArgs, response *InvokeResp
 
 	tx, err := s.vm.newInvokeTx(args.ContractID, args.Function, fnArgs, args.ByteArgs.Bytes)
 	if err != nil {
-		return fmt.Errorf("error creating tx: %s", err)
+		return fmt.Errorf("couldn't create tx: %s", err)
 	}
 
 	// Add tx to mempool
 	s.vm.mempool = append(s.vm.mempool, tx)
 	s.vm.NotifyBlockReady()
 
-	response.TxIssued = true
+	response.TxID = tx.ID()
+	return nil
+}
+
+// CreateContractArgs ...
+type CreateContractArgs struct {
+	// The byte representation of the contract.
+	// Must be a valid wasm file.
+	Contract formatting.CB58 `json:"contract"`
+}
+
+// CreateContract creates a new contract
+// The contract's ID is the ID of the tx that creates it, which is returned by this method
+func (s *Service) CreateContract(_ *http.Request, args *CreateContractArgs, response *ids.ID) error {
+	s.vm.Ctx.Log.Debug("in createContract")
+
+	tx, err := s.vm.newCreateContractTx(args.Contract.Bytes)
+	if err != nil {
+		return fmt.Errorf("couldn't create tx: %v", err)
+	}
+
+	// Add tx to mempool
+	s.vm.mempool = append(s.vm.mempool, tx)
+	s.vm.NotifyBlockReady()
+
+	*response = tx.ID()
+	return nil
+
+}
+
+// GetTxArgs ...
+type GetTxArgs struct {
+	ID ids.ID `json:"id"`
+}
+
+// GetTxResponse ...
+type GetTxResponse struct {
+	Tx *txReturnValue `json:"tx"`
+}
+
+// GetTx returns a tx by its ID
+func (s *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
+	tx, err := s.vm.getTx(s.vm.DB, args.ID)
+	if err != nil {
+		return fmt.Errorf("couldn't find tx with ID %s", args.ID)
+	}
+	response.Tx = tx
 	return nil
 }

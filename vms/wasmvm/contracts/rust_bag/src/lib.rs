@@ -193,12 +193,12 @@ pub extern fn print_byte_args() -> i32 {
             return -1
         }
         let mut buffer: std::vec::Vec<u8> = Vec::with_capacity(args_len as usize);
-        let pointer = buffer.as_mut_ptr();
-        let success = dbGet(0,0, pointer as u32);
+        let pointer = buffer.as_mut_ptr() as u32;
+        let success = dbGet(0,0, pointer);
         if success == -1 {
             return -1
         }
-        print(pointer as u32, args_len as u32);
+        print(pointer, args_len as u32);
     }
     return 1;
 }

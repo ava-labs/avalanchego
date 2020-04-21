@@ -1,8 +1,17 @@
 package wasmvm
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/ava-labs/gecko/utils/formatting"
+
+	"github.com/wasmerio/go-ext-wasm/wasmer"
+
+	"github.com/ava-labs/gecko/snow/choices"
+
+	"github.com/ava-labs/gecko/database/prefixdb"
 
 	"github.com/ava-labs/gecko/utils/hashing"
 
@@ -60,46 +69,94 @@ func (tx *invokeTx) SyntacticVerify() error {
 	return nil
 }
 
-func (tx *invokeTx) SemanticVerify(database.Database) error {
-	return nil // TODO
-}
-
-func (tx *invokeTx) Accept() {
-	// TODO: Move most of this to semanticVerify
-
-	// Get the contract. Its state is also loaded.
-	contract, err := tx.vm.getContract(tx.vm.DB, tx.ContractID)
+// SemanticVerify ensures the state transition of this tx is valid.
+// It writes state changes to [db].
+// [db] will only be comitted (actually change the chain's state) if this method returns nil.
+// This method must set the contract's context before invoking the SC method.
+//
+// Byte arguments to the SC method are mapped to by the empty byte array (ie []byte{}) in the SC's database.
+//
+// A SC method has two ways to return information to the chain.
+// The first is the literal return value of the method. A return value of 0 indicates the SC method
+// executed successfully. Any other return value indicates failure.
+// All SC method's must follow this convention.
+//
+// The other way is for the SC to create a KV pair in its database where the key is a byte array
+// containing only 1 (ie []byte{1}) and the value is the return value of the method.
+// A SC method need not do this. Such a method will be considered to have returned "void".
+func (tx *invokeTx) SemanticVerify(db database.Database) error {
+	// Get the contract and its state
+	contract, err := tx.vm.getContract(db, tx.ContractID)
 	if err != nil {
-		tx.vm.Ctx.Log.Error("couldn't load contract %s: %s", tx.ContractID, err)
-		return
+		return fmt.Errorf("couldn't load contract %s: %s", tx.ContractID, err)
 	}
+
+	// Prefixed database for the contract to read/write
+	// TODO: Find a way to do this without creating a new prefixdb with every invocation
+	prefix := tx.ContractID.Key()
+	contractDb := prefixdb.New(prefix[:], db)
+
+	// Update the contract's context
+	contract.SetContextData(ctx{
+		log:    tx.vm.Ctx.Log,
+		db:     contractDb,
+		memory: contract.Memory,
+		txID:   tx.ID(),
+	})
 
 	// Get the function to call
 	fn, exists := contract.Exports[tx.FunctionName]
 	if !exists {
-		tx.vm.Ctx.Log.Error("contract has no function '%s'", tx.FunctionName)
-		return
+		return fmt.Errorf("contract has no function '%s'", tx.FunctionName)
 	}
 
 	// Set the byteArguments to pass to function
-	if err := tx.vm.contractDB.Put([]byte{}, tx.ByteArguments); err != nil {
-		tx.vm.Ctx.Log.Error("couldn't set byte arguments", err)
-		return
+	// They're mapped to by the empty key in the contract's db
+	if err := contractDb.Put([]byte{}, tx.ByteArguments); err != nil {
+		return fmt.Errorf("couldn't set byte arguments: %v", err)
 	}
 
 	// Call the function
 	val, err := fn(tx.Arguments...)
 	if err != nil {
-		tx.vm.Ctx.Log.Error("error during call to function '%s': %v", tx.FunctionName, err)
+		return fmt.Errorf("error during call to function '%s': %v", tx.FunctionName, err)
 	}
 
-	tx.vm.Ctx.Log.Info("call to '%s' returned: %v", tx.FunctionName, val) // TODO how to get returned values out?
+	var success bool
+	switch val.GetType() {
+	case wasmer.TypeI32:
+		success = val.ToI32() == int32(0)
+	case wasmer.TypeI64:
+		success = val.ToI64() == int64(0)
+	default:
+		return fmt.Errorf("smart contract method must return int32 or int64")
+	}
+
+	tx.vm.Ctx.Log.Info("call to '%s' returned: %v", tx.FunctionName, val)
+	val.GetType()
 
 	// Save the contract's state
-	if err := tx.vm.putContractState(tx.vm.DB, tx.ContractID, contract.Memory.Data()); err != nil {
-		tx.vm.Ctx.Log.Error("couldn't save contract's state: %v", err)
+	if err := tx.vm.putContractState(db, tx.ContractID, contract.Memory.Data()); err != nil {
+		return fmt.Errorf("couldn't save contract's state: %v", err)
 	}
+
+	// Persist the transaction and its return value
+	returnValue := []byte{}
+	returnValue, _ = contractDb.Get([]byte{1})
+	rv := &txReturnValue{ // TODO: persist tx in every execution of this method
+		Tx:                   tx,
+		Status:               choices.Accepted,
+		InvocationSuccessful: success,
+		ReturnValue:          returnValue,
+	}
+	if err := tx.vm.putTx(db, rv); err != nil {
+		return fmt.Errorf("couldn't persist transaction: %v", err)
+	}
+
+	return nil
 }
+
+func (tx *invokeTx) Accept() {}
 
 // Set tx.vm, tx.bytes, tx.id
 func (tx *invokeTx) initialize(vm *VM) error {
@@ -126,4 +183,14 @@ func (vm *VM) newInvokeTx(contractID ids.ID, functionName string, args []interfa
 		return nil, err
 	}
 	return tx, nil
+}
+
+func (tx *invokeTx) MarshalJSON() ([]byte, error) {
+	asMap := make(map[string]interface{}, 4)
+	asMap["contractID"] = tx.ContractID.String()
+	asMap["function"] = tx.FunctionName
+	asMap["arguments"] = tx.Arguments
+	byteArgs := formatting.CB58{Bytes: tx.ByteArguments}
+	asMap["byteArguments"] = byteArgs.String()
+	return json.Marshal(asMap)
 }

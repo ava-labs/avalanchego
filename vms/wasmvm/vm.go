@@ -18,6 +18,7 @@ import (
 )
 
 const cacheSize = 128
+const bagContractLocation = "/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/pkg/bag_bg.wasm"
 
 var contractDBPrefix = []byte{'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
 
@@ -56,7 +57,7 @@ func (vm *VM) Initialize(
 	vm.contracts = cache.LRUCloser{Size: cacheSize}
 	vm.contractDB = prefixdb.New(contractDBPrefix, vm.DB)
 
-	wasmBytes, err := ioutil.ReadFile("/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/pkg/bag_bg.wasm")
+	wasmBytes, err := ioutil.ReadFile(bagContractLocation)
 	if err != nil {
 		return fmt.Errorf("couldn't find contract")
 	}
@@ -74,6 +75,9 @@ func (vm *VM) Initialize(
 		genesisBlock, err := vm.newBlock(ids.Empty, []tx{genesisTx})
 		if err != nil {
 			return fmt.Errorf("couldn't make genesis block: %v", err)
+		}
+		if err := genesisBlock.Verify(); err != nil {
+			return fmt.Errorf("couldn't verify genesis block: %v", err)
 		}
 		genesisBlock.Accept()
 		vm.SetDBInitialized()

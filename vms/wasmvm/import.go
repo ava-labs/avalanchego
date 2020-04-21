@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"unsafe"
 
+	"github.com/ava-labs/gecko/ids"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/utils/math"
 
@@ -21,6 +23,7 @@ type ctx struct {
 	log    logging.Logger    // this chain's logger
 	db     database.Database // DB for the contract to read/write
 	memory *wasm.Memory      // the instance's memory
+	txID   ids.ID            // ID of transaction that triggered current SC method invocation
 }
 
 // Print bytes in the smart contract's memory

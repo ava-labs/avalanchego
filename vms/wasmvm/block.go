@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/gecko/database/versiondb"
+
 	"github.com/ava-labs/gecko/snow/choices"
 
 	"github.com/ava-labs/gecko/ids"
@@ -52,8 +54,15 @@ func (b *Block) Verify() error {
 
 	// TODO: If there's an error, return other txs to mempool
 	for _, tx := range b.Txs {
-		if err := tx.SemanticVerify(nil); err != nil { // TODO pass DB here
+		db := versiondb.New(b.vm.DB)
+		if err := tx.SemanticVerify(db); err != nil { // TODO pass DB here
 			return err
+		}
+		if err := db.Commit(); err != nil {
+			return fmt.Errorf("couldn't commit versiondb: %v", err)
+		}
+		if err := db.Close(); err != nil {
+			return fmt.Errorf("couldn't close versiondb: %v", err)
 		}
 	}
 
@@ -66,6 +75,7 @@ func (vm *VM) newBlock(parentID ids.ID, txs []tx) (*Block, error) {
 		Block: core.NewBlock(parentID),
 		Txs:   txs,
 	}
+	
 
 	bytes, err := codec.Marshal(block)
 	if err != nil {

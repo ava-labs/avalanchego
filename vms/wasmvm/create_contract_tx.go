@@ -1,7 +1,12 @@
 package wasmvm
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"github.com/ava-labs/gecko/snow/choices"
+
+	"github.com/ava-labs/gecko/utils/formatting"
 
 	"github.com/ava-labs/gecko/utils/hashing"
 
@@ -51,25 +56,33 @@ func (tx *createContractTx) SyntacticVerify() error {
 	switch {
 	case tx.WasmBytes == nil:
 		return fmt.Errorf("empty contract")
-	case tx.id.Equals(ids.Empty):
-		return fmt.Errorf("empty tx ID")
+		/* TODO: Put back this check once we stop hard-coding contracts
+		case tx.id.Equals(ids.Empty):
+			return fmt.Errorf("empty tx ID")
+		*/
 	}
 	return nil
 }
 
-func (tx *createContractTx) SemanticVerify(database.Database) error {
-	return nil // TODO
+func (tx *createContractTx) SemanticVerify(db database.Database) error {
+	tx.vm.Ctx.Log.Debug("creating contract %s", tx.id) // TODO delete
+	if err := tx.vm.putContractBytes(db, tx.id, tx.WasmBytes); err != nil {
+		return fmt.Errorf("couldn't put new contract in db: %v", err)
+	}
+	if err := tx.vm.putContractState(db, tx.id, []byte{}); err != nil {
+		return fmt.Errorf("couldn't initialize contract's state in db: %v", err)
+	}
+	persistedTx := &txReturnValue{ // TODO: always persist the tx, even if it was unsuccessful
+		Tx:     tx,
+		Status: choices.Accepted,
+	}
+	if err := tx.vm.putTx(db, persistedTx); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (tx *createContractTx) Accept() {
-	tx.vm.Ctx.Log.Debug("creating contract %s", tx.id) // TODO delete
-	if err := tx.vm.putContractBytes(tx.vm.DB, tx.id, tx.WasmBytes); err != nil {
-		tx.vm.Ctx.Log.Error("couldn't put new contract in db: %v", err)
-	}
-	if err := tx.vm.putContractState(tx.vm.DB, tx.id, []byte{}); err != nil {
-		tx.vm.Ctx.Log.Error("couldn't initialize contract's state in db: %v", err)
-	}
-}
+func (tx *createContractTx) Accept() {}
 
 // Creates a new tx with the given payload and a random ID
 func (vm *VM) newCreateContractTx(wasmBytes []byte) (*createContractTx, error) {
@@ -81,4 +94,12 @@ func (vm *VM) newCreateContractTx(wasmBytes []byte) (*createContractTx, error) {
 		return nil, err
 	}
 	return tx, nil
+}
+
+func (tx *createContractTx) MarshalJSON() ([]byte, error) {
+	asMap := make(map[string]interface{}, 2)
+	asMap["id"] = tx.ID()
+	byteFormatter := formatting.CB58{Bytes: tx.WasmBytes}
+	asMap["contract"] = byteFormatter.String()
+	return json.Marshal(asMap)
 }
