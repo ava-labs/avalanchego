@@ -73,7 +73,7 @@ func dbPut(context unsafe.Pointer, keyPtr C.int, keyLen C.int, valuePtr C.int, v
 	// Do the put
 	key := contractState[keyPtr:keyFinalIndex]
 	value := contractState[valuePtr:valueFinalIndex]
-	ctx.log.Verbo("Putting K/V pair for contract.\n  key: %v\n  value: %v", key, value)
+	ctx.log.Debug("Putting K/V pair for contract.\n  key: %v\n  value: %v", key, value)
 	if err := ctx.db.Put(key, value); err != nil {
 		ctx.log.Error("dbPut failed: %s", err)
 		return 1

@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::mem;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 
 extern "C" {
     fn print(ptr: u32, len: u32);
-    fn dbPut(key_ptr: u32, key_len: u32, value_ptr: u32, value_len: u32) -> u32;
+    fn dbPut(key_ptr: u32, key_len: u32, value_ptr: u32, value_len: u32) -> i32;
     fn dbGet(key_ptr: u32, key_len: u32, value_ptr: u32) -> i32;
     fn dbGetValueLen(key_ptr: u32, key_len: u32) -> i32;
 }
@@ -38,12 +37,12 @@ pub struct Bag {
 
 // Create a new owner
 // Returns 0 on success
-// Returns -1 otherwise
+// Returns 1 otherwise
 #[no_mangle]
 pub extern fn create_owner(id: u32) -> i32 {
     let mut owners = OWNERS.lock().unwrap();
     match owners.get(&id) {
-        Some(_) => -1,
+        Some(_) => 1,
         None => {
             owners.insert(id, Owner{
                 id: id,
@@ -63,12 +62,12 @@ pub extern fn create_bag(id: u32, owner_id: u32, price: u32) -> i32 {
     // Check that the bag doesn't exist and the owner does 
     let mut bags = BAGS.lock().unwrap();
     if let Some(_) = bags.get(&id) {
-        return -1
+        return 1 // failure
     }
 
     let owners = &mut OWNERS.lock().unwrap();
     if let None = owners.get(&owner_id) {
-        return -1
+        return 1
     }
 
     // Update bag list
@@ -88,7 +87,7 @@ pub extern fn create_bag(id: u32, owner_id: u32, price: u32) -> i32 {
 
 // Update the specified bag's price
 // Returns 0 on success
-// Returns -1 if the bag doesn't exist
+// Returns 1 if the bag doesn't exist
 #[no_mangle]
 pub extern fn update_bag_price(id: u32, price: u32) -> i32 {
     let bags = &mut BAGS.lock().unwrap();
@@ -96,45 +95,51 @@ pub extern fn update_bag_price(id: u32, price: u32) -> i32 {
         bag.price=price;
         0
     } else {
-        -1
+        1
     }
 }
 
 // Get a bag's price
-// Returns -1 if the bag doesn't exist
+// Returns 1 if the bag doesn't exist
 #[no_mangle]
 pub extern fn get_bag_price(id: u32) -> i32 {
-    if let Some(bag) = BAGS.lock().unwrap().get(&id) {
-        bag.price as i32
-    } else {
-        -1
+    unsafe {
+        if let Some(bag) = BAGS.lock().unwrap().get(&id) {
+            return dbPut(return_key().as_ptr() as u32, 1, bag.price.to_be_bytes().as_ptr() as u32, 4);
+        } else {
+            1
+        }
     }
 }
 
 // Return the number of bags the specified owner owns
-// Returns -1 if the owner doesn't exist
+// Returns 1 if the owner doesn't exist
 #[no_mangle]
 pub extern fn get_num_bags(id: u32) -> i32 {
-    if let Some(owner) = OWNERS.lock().unwrap().get(&id) {
-        owner.bags.len() as i32
-    } else {
-        -1
+    unsafe {
+        if let Some(owner) = OWNERS.lock().unwrap().get(&id) {
+            return dbPut(return_key().as_ptr() as u32, 1, owner.bags.len().to_be_bytes().as_ptr() as u32, 4)
+        } else {
+            1
+        }
     }
 }
 
 // Return the ID of the owner of the specified bag
-// Returns -1 if the bag doesn't exist
+// Returns 1 if the bag doesn't exist
 #[no_mangle]
 pub extern fn get_owner(id: u32) -> i32 {
-    if let Some(bag) = BAGS.lock().unwrap().get(&id) {
-        bag.owner_id as i32
-    } else {
-        -1
+    unsafe {
+        if let Some(bag) = BAGS.lock().unwrap().get(&id) {
+            return dbPut(return_key().as_ptr() as u32, 1, bag.owner_id.to_be_bytes().as_ptr() as u32, 4)
+        } else {
+            1
+        }
     }
 }
 
 // Transfer a bag to a new owner
-// Returns -1 if the bag or new owner don't exist
+// Returns 1 if the bag or new owner don't exist
 #[no_mangle]
 pub extern fn transfer_bag(id: u32, new_owner_id:u32) -> i32 {
     // Check that the bag and new owner exist 
@@ -143,7 +148,7 @@ pub extern fn transfer_bag(id: u32, new_owner_id:u32) -> i32 {
     if let Some(_bag) = bags.get_mut(&id) {
       bag = _bag;
     } else {
-        return -1 // bag doesn't exist
+        return 1 // bag doesn't exist
     }
 
     let owners = &mut OWNERS.lock().unwrap();
@@ -151,7 +156,7 @@ pub extern fn transfer_bag(id: u32, new_owner_id:u32) -> i32 {
     if let Some(owner) = owners.get_mut(&new_owner_id) {
         new_owner = owner;
     } else {
-        return -1 // new owner doesn't exist
+        return 1 // new owner doesn't exist
     }
 
     // Update the new owner
@@ -190,15 +195,21 @@ pub extern fn print_byte_args() -> i32 {
     unsafe { 
         let args_len = dbGetValueLen(0, 0);
         if args_len == -1 { // couldn't get args len
-            return -1
+            return 1
         }
         let mut buffer: std::vec::Vec<u8> = Vec::with_capacity(args_len as usize);
         let pointer = buffer.as_mut_ptr() as u32;
         let success = dbGet(0,0, pointer);
         if success == -1 {
-            return -1
+            return 1
         }
         print(pointer, args_len as u32);
+        return 0;
     }
-    return 1;
+}
+
+fn return_key() -> Vec<u8> {
+    let mut buffer: std::vec::Vec<u8> = Vec::with_capacity(1);
+    buffer.push(1);
+    return buffer;
 }
