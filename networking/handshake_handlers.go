@@ -74,6 +74,10 @@ const (
 	// PeerListStakerGossipFraction calculates the fraction of stakers that are
 	// gossiped to. If set to 1, then only stakers will be gossiped to.
 	PeerListStakerGossipFraction = 2
+
+	// ConnectTimeout is the amount of time to wait before attempt to connect to
+	// an unknown peer
+	ConnectTimeout = time.Second
 	// GetVersionTimeout is the amount of time to wait before sending a
 	// getVersion message to a partially connected peer
 	GetVersionTimeout = 2 * time.Second
@@ -96,27 +100,37 @@ var (
 type Handshake struct {
 	handshakeMetrics
 
-	networkID uint32
+	networkID uint32 // ID of the network I'm running, used to prevent connecting to the wrong network
 
 	log           logging.Logger
-	vdrs          validators.Set
-	myAddr        salticidae.NetAddr
-	myID          ids.ShortID
-	net           salticidae.PeerNetwork
-	enableStaking bool // Should only be false for local tests
+	vdrs          validators.Set         // set of current validators in the AVAnet
+	myAddr        salticidae.NetAddr     // IP I communicate to peers
+	myID          ids.ShortID            // ID that identifies myself as a staker or not
+	net           salticidae.PeerNetwork // C messaging network
+	enableStaking bool                   // Should only be false for local tests
 
-	clock       timer.Clock
-	pending     Connections // Connections that I haven't gotten version messages from
-	connections Connections // Connections that I think are connected
+	clock timer.Clock
 
-	versionTimeout   timer.TimeoutManager
+	// Connections that I have added by IP, but haven't gotten an ID from
+	requestedLock    sync.Mutex
+	requested        map[string]struct{}
+	requestedTimeout timer.TimeoutManager
+
+	// Connections that I have added as a peer, but haven't gotten a version
+	// message from
+	pending        Connections
+	versionTimeout timer.TimeoutManager
+
+	// Connections that I have gotten a valid version message from
+	connections      Connections
 	reconnectTimeout timer.TimeoutManager
+
+	// IPs of nodes I'm connected to will be repeatedly gossiped throughout the network
 	peerListGossiper *timer.Repeater
 
+	// If any chain is blocked on connecting to peers, track these blockers here
 	awaitingLock sync.Mutex
 	awaiting     []*networking.AwaitingConnections
-
-	requestedConnections map[string]struct{}
 }
 
 // Initialize to the c networking library. This should only be done once during
@@ -132,19 +146,34 @@ func (nm *Handshake) Initialize(
 	networkID uint32,
 ) {
 	log.AssertTrue(nm.net == nil, "Should only register network handlers once")
+
+	nm.handshakeMetrics.Initialize(log, registerer)
+
+	nm.networkID = networkID
+
 	nm.log = log
 	nm.vdrs = vdrs
 	nm.myAddr = myAddr
 	nm.myID = myID
 	nm.net = peerNet
 	nm.enableStaking = enableStaking
-	nm.networkID = networkID
+
+	nm.requested = make(map[string]struct{})
+	nm.requestedTimeout.Initialize(ConnectTimeout)
+	go nm.log.RecoverAndPanic(nm.requestedTimeout.Dispatch)
 
 	nm.pending = NewConnections()
+	nm.versionTimeout.Initialize(GetVersionTimeout)
+	go nm.log.RecoverAndPanic(nm.versionTimeout.Dispatch)
+
 	nm.connections = NewConnections()
+	nm.reconnectTimeout.Initialize(ReconnectTimeout)
+	go nm.log.RecoverAndPanic(nm.reconnectTimeout.Dispatch)
 
-	nm.requestedConnections = make(map[string]struct{})
+	nm.peerListGossiper = timer.NewRepeater(nm.gossipPeerList, PeerListGossipSpacing)
+	go nm.log.RecoverAndPanic(nm.peerListGossiper.Dispatch)
 
+	// register c message callbacks
 	net := peerNet.AsMsgNetwork()
 
 	net.RegConnHandler(salticidae.MsgNetworkConnCallback(C.connHandler), nil)
@@ -156,30 +185,41 @@ func (nm *Handshake) Initialize(
 	net.RegHandler(Version, salticidae.MsgNetworkMsgCallback(C.version), nil)
 	net.RegHandler(GetPeerList, salticidae.MsgNetworkMsgCallback(C.getPeerList), nil)
 	net.RegHandler(PeerList, salticidae.MsgNetworkMsgCallback(C.peerList), nil)
+}
 
-	nm.handshakeMetrics.Initialize(nm.log, registerer)
+// ConnectTo add the peer as a connection and connects to them. Will free peer
+func (nm *Handshake) ConnectTo(peer salticidae.PeerID, addr salticidae.NetAddr) {
+	if !nm.pending.ContainsPeerID(peer) && !nm.connections.ContainsPeerID(peer) {
+		HandshakeNet.net.AddPeer(peer)
+		HandshakeNet.net.SetPeerAddr(peer, addr)
+		HandshakeNet.net.ConnPeer(peer, 600, 1)
 
-	nm.versionTimeout.Initialize(GetVersionTimeout)
-	go nm.log.RecoverAndPanic(nm.versionTimeout.Dispatch)
+		// TODO: Should add the peer to the pending set, register a timeout to
+		// remove the peer
+	}
 
-	nm.reconnectTimeout.Initialize(ReconnectTimeout)
-	go nm.log.RecoverAndPanic(nm.reconnectTimeout.Dispatch)
-
-	nm.peerListGossiper = timer.NewRepeater(nm.gossipPeerList, PeerListGossipSpacing)
-	go nm.log.RecoverAndPanic(nm.peerListGossiper.Dispatch)
+	peer.Free()
 }
 
 // Connect ...
 func (nm *Handshake) Connect(addr salticidae.NetAddr) {
+	ip := toIPDesc(addr)
+	ipStr := ip.String()
+	if nm.pending.ContainsIP(ip) || nm.connections.ContainsIP(ip) {
+		return
+	}
+
+	nm.log.Debug("Adding peer %s", ip)
+
+	//TODO:
+
 	if !nm.enableStaking {
 		peer := salticidae.NewPeerIDFromNetAddr(addr, false)
-		nm.net.AddPeer(peer)
-		nm.net.SetPeerAddr(peer, addr)
-		nm.net.ConnPeer(peer, 600, 1)
-		peer.Free()
+		nm.ConnectTo(peer, addr)
 	} else {
-		ip := toIPDesc(addr)
-		nm.requestedConnections[ip.String()] = struct{}{}
+		nm.requestedConnections[ipStr] = struct{}{}
+
+		nm.log.Verbo("Attempting to discover peer at %s", ipStr)
 
 		msgNet := nm.net.AsMsgNetwork()
 		msgNet.Connect(addr)
@@ -344,12 +384,7 @@ func connHandler(_conn *C.struct_msgnetwork_conn_t, connected C.bool, _ unsafe.P
 
 	cert := conn.GetPeerCert()
 	peer := salticidae.NewPeerIDFromX509(cert, false)
-
-	HandshakeNet.net.AddPeer(peer)
-	HandshakeNet.net.SetPeerAddr(peer, addr)
-	HandshakeNet.net.ConnPeer(peer, 600, 1)
-
-	peer.Free()
+	HandshakeNet.ConnectTo(peer, addr)
 	return true
 }
 
@@ -388,13 +423,13 @@ func (nm *Handshake) disconnectedFromPeer(peer salticidae.PeerID) {
 	cert := ids.ShortID{}
 	if pendingCert, exists := nm.pending.GetID(peer); exists {
 		cert = pendingCert
+		nm.log.Info("Disconnected from pending peer %s", cert)
 	} else if connectedCert, exists := nm.connections.GetID(peer); exists {
 		cert = connectedCert
+		nm.log.Info("Disconnected from peer %s", cert)
 	} else {
 		return
 	}
-
-	nm.log.Info("Disconnected from %s", cert)
 
 	peerBytes := toID(peer)
 	peerID := ids.NewID(peerBytes)
@@ -612,20 +647,14 @@ func peerList(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 	cErr := salticidae.NewError()
 	for _, ip := range ips {
 		addr := salticidae.NewNetAddrFromIPPortString(ip.String(), true, &cErr)
-		if cErr.GetCode() == 0 && !HandshakeNet.myAddr.IsEq(addr) { // Make sure not to connect to myself
-			ip := toIPDesc(addr)
-			if !HandshakeNet.pending.ContainsIP(ip) && !HandshakeNet.connections.ContainsIP(ip) {
-				HandshakeNet.log.Debug("Adding peer %s", ip)
 
-				HandshakeNet.Connect(addr)
-			}
+		if cErr.GetCode() != 0 || HandshakeNet.myAddr.IsEq(addr) {
+			// Make sure not to connect to myself
+			continue
 		}
-	}
-}
 
-func getMsgCert(_conn *C.struct_msgnetwork_conn_t) ids.ShortID {
-	conn := salticidae.MsgNetworkConnFromC(salticidae.CMsgNetworkConn(_conn))
-	return getCert(conn.GetPeerCert())
+		HandshakeNet.Connect(addr)
+	}
 }
 
 func getPeerCert(_conn *C.struct_peernetwork_conn_t) ids.ShortID {
@@ -635,13 +664,12 @@ func getPeerCert(_conn *C.struct_peernetwork_conn_t) ids.ShortID {
 
 func getCert(cert salticidae.X509) ids.ShortID {
 	der := cert.GetDer(false)
-	defer der.Free()
-
 	certDS := salticidae.NewDataStreamMovedFromByteArray(der, false)
-	defer certDS.Free()
-
 	certBytes := certDS.GetDataInPlace(certDS.Size()).Get()
 	certID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(certBytes))
+
+	certDS.Free()
+	der.Free()
 	HandshakeNet.log.AssertNoError(err)
 	return certID
 }
@@ -650,14 +678,4 @@ func getCert(cert salticidae.X509) ids.ShortID {
 func checkCompatibility(myVersion string, peerVersion string) bool {
 	// At the moment, we are all compatible.
 	return true
-}
-
-func toAddr(ip utils.IPDesc, autoFree bool) salticidae.NetAddr {
-	err := salticidae.NewError()
-	addr := salticidae.NewNetAddrFromIPPortString(ip.String(), autoFree, &err)
-	HandshakeNet.log.AssertTrue(err.GetCode() == 0, "IP Failed parsing")
-	return addr
-}
-func toShortID(ip utils.IPDesc) ids.ShortID {
-	return ids.NewShortID(hashing.ComputeHash160Array([]byte(ip.String())))
 }

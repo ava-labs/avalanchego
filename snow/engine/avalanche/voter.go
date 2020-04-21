@@ -79,12 +79,23 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 			vtx := vts[0]
 			vts = vts[1:]
 
-			if status := vtx.Status(); status.Fetched() && !v.t.Consensus.VertexIssued(vtx) {
-				vts = append(vts, vtx.Parents()...)
-			} else if !status.Decided() && v.t.Consensus.VertexIssued(vtx) {
+			status := vtx.Status()
+			if !status.Fetched() {
+				v.t.Config.Context.Log.Debug("Dropping %d vote(s) for %s because the vertex is unknown", set.Len(), vtx.ID())
+				continue
+			}
+
+			if status.Decided() {
+				v.t.Config.Context.Log.Debug("Dropping %d vote(s) for %s because the vertex is accepted", set.Len(), vtx.ID())
+				continue
+			}
+
+			if v.t.Consensus.VertexIssued(vtx) {
+				v.t.Config.Context.Log.Debug("Applying %d vote(s) for %s", set.Len(), vtx.ID())
 				bubbledVotes.UnionSet(vtx.ID(), set)
 			} else {
-				v.t.Config.Context.Log.Debug("Dropping %d vote(s) for %s because the vertex is invalid", set.Len(), vtx.ID())
+				v.t.Config.Context.Log.Debug("Bubbling %d vote(s) for %s because the vertex isn't issued", set.Len(), vtx.ID())
+				vts = append(vts, vtx.Parents()...)
 			}
 		}
 	}

@@ -5,7 +5,7 @@ package node
 
 // #include "salticidae/network.h"
 // void onTerm(int sig, void *);
-// void errorHandler(SalticidaeCError *, bool, void *);
+// void errorHandler(SalticidaeCError *, bool, int32_t, void *);
 import "C"
 
 import (
@@ -130,14 +130,14 @@ func onTerm(C.int, unsafe.Pointer) {
 }
 
 //export errorHandler
-func errorHandler(_err *C.struct_SalticidaeCError, fatal C.bool, _ unsafe.Pointer) {
+func errorHandler(_err *C.struct_SalticidaeCError, fatal C.bool, asyncID C.int32_t, _ unsafe.Pointer) {
 	err := (*salticidae.Error)(unsafe.Pointer(_err))
 	if fatal {
 		MainNode.Log.Fatal("Error during async call: %s", salticidae.StrError(err.GetCode()))
 		MainNode.EC.Stop()
 		return
 	}
-	MainNode.Log.Error("Error during async call: %s", salticidae.StrError(err.GetCode()))
+	MainNode.Log.Error("Error during async with ID %d call: %s", asyncID, salticidae.StrError(err.GetCode()))
 }
 
 func (n *Node) initNetlib() error {
