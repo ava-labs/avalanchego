@@ -226,6 +226,7 @@ func TestGenesis(t *testing.T) {
 	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	// Ensure the genesis block has been accepted and stored
+	// FIXME? Calling vm.LastAccepted() without the lock
 	genesisBlockID := vm.LastAccepted() // lastAccepted should be ID of genesis block
 	genesisBlock, err := vm.getBlock(genesisBlockID)
 	if err != nil {
@@ -771,6 +772,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 	vm := defaultVM()
 	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
+	// FIXME? Calling vm.BuildBlock without the lock
 	if _, err := vm.BuildBlock(); err == nil {
 		t.Fatalf("Should have errored on BuildBlock")
 	}
