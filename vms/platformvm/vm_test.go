@@ -130,6 +130,8 @@ func defaultVM() *VM {
 	db := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
 	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
 		panic(err)
 	}
@@ -221,6 +223,7 @@ func GenesisCurrentValidators() *EventHeap {
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	// Ensure the genesis block has been accepted and stored
 	genesisBlockID := vm.LastAccepted() // lastAccepted should be ID of genesis block
@@ -290,6 +293,8 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
@@ -357,6 +362,8 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 // Reject proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
@@ -428,6 +435,8 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 // Accept proposal to add validator to non-default subnet
 func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 
@@ -499,6 +508,8 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to non-default subnet
 func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
@@ -572,6 +583,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 // Test case where default subnet validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
@@ -664,6 +676,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where default subnet validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
@@ -756,6 +769,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	if _, err := vm.BuildBlock(); err == nil {
 		t.Fatalf("Should have errored on BuildBlock")
@@ -765,6 +779,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
@@ -827,6 +842,7 @@ func TestCreateChain(t *testing.T) {
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	createSubnetTx, err := vm.newCreateSubnetTx(
 		testNetworkID,
@@ -1072,6 +1088,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	avmID := ids.Empty.Prefix(0)
 	utxoID := ava.UTXOID{
@@ -1163,6 +1180,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	avmID := ids.Empty.Prefix(0)
 	utxoID := ava.UTXOID{
