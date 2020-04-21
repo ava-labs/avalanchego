@@ -66,6 +66,7 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 
 		// Initialize the VM
 		vm := &VM{}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		ctx.Lock.Lock()
 		if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, nil); err != nil {
 			b.Fatal(err)
@@ -198,6 +199,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		vm := &VM{
 			onAccept: func(ids.ID) { wg.Done() },
 		}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		ctx.Lock.Lock()
 		if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, nil); err != nil {
 			b.Fatal(err)
