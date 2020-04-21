@@ -6,8 +6,6 @@ import (
 
 	"github.com/ava-labs/gecko/database/versiondb"
 
-	"github.com/ava-labs/gecko/snow/choices"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -17,6 +15,9 @@ type Block struct {
 	vm          *VM
 	*core.Block `serialize:"true"`
 	Txs         []tx `serialize:"true"`
+
+	// The state of the chain if this block is accepted
+	onAcceptDb *versiondb.Database
 }
 
 // Initialize this block
@@ -28,11 +29,16 @@ func (b *Block) Initialize(bytes []byte, vm *VM) {
 
 // Accept this block
 func (b *Block) Accept() {
+	b.onAcceptDb.Commit()
+	b.onAcceptDb.Close()
 	b.Block.Accept()
-	for _, tx := range b.Txs {
-		tx.Accept()
-		b.vm.putTxStatus(b.vm.DB, tx.ID(), choices.Accepted)
-	}
+	b.vm.DB.Commit()
+}
+
+// Reject this block
+func (b *Block) Reject() {
+	b.onAcceptDb.Close()
+	b.Block.Reject()
 	b.vm.DB.Commit()
 }
 
@@ -54,28 +60,20 @@ func (b *Block) Verify() error {
 
 	// TODO: If there's an error, return other txs to mempool
 	for _, tx := range b.Txs {
-		db := versiondb.New(b.vm.DB)
-		if err := tx.SemanticVerify(db); err != nil { // TODO pass DB here
+		if err := tx.SemanticVerify(b.onAcceptDb); err != nil {
 			return err
 		}
-		if err := db.Commit(); err != nil {
-			return fmt.Errorf("couldn't commit versiondb: %v", err)
-		}
-		if err := db.Close(); err != nil {
-			return fmt.Errorf("couldn't close versiondb: %v", err)
-		}
 	}
-
 	return nil
 }
 
 // return a new, initialized block
 func (vm *VM) newBlock(parentID ids.ID, txs []tx) (*Block, error) {
 	block := &Block{
-		Block: core.NewBlock(parentID),
-		Txs:   txs,
+		Block:      core.NewBlock(parentID),
+		Txs:        txs,
+		onAcceptDb: versiondb.New(vm.DB),
 	}
-	
 
 	bytes, err := codec.Marshal(block)
 	if err != nil {

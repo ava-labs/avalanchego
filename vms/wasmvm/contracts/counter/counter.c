@@ -1,21 +1,27 @@
-#include "mylib.h"
-
 int count = 0;
 
-void inc() {
+int inc() {
     count++;
+    return 0;
 }
 
 int getCount() {
     return count;
 }
 
-void add(int x) {
+int add(int x) {
     count += x;
+    return 0;
 }
 
-void dec() {
-    count = externalDec(count);
+int dec() {
+    count -= 1;
+    return 0;
+}
+
+int sub(int x) {
+    count -= x;
+    return 0;
 }
 
 int main() {};

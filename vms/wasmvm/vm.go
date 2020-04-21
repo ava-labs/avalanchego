@@ -3,9 +3,8 @@ package wasmvm
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 
-	"github.com/ava-labs/gecko/database/prefixdb"
+	"github.com/ava-labs/gecko/database/versiondb"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
@@ -18,9 +17,6 @@ import (
 )
 
 const cacheSize = 128
-const bagContractLocation = "/home/danlaine/go/src/github.com/ava-labs/gecko/vms/wasmvm/contracts/rust_bag/pkg/bag_bg.wasm"
-
-var contractDBPrefix = []byte{'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
 
 // VM defines the Salesforce Chain
 type VM struct {
@@ -55,30 +51,18 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("error initializing state: %v", err)
 	}
 	vm.contracts = cache.LRUCloser{Size: cacheSize}
-	vm.contractDB = prefixdb.New(contractDBPrefix, vm.DB)
 
-	wasmBytes, err := ioutil.ReadFile(bagContractLocation)
-	if err != nil {
-		return fmt.Errorf("couldn't find contract")
-	}
-
-	//if !vm.DBInitialized() {
-	if true {
+	if !vm.DBInitialized() {
 		ctx.Log.Debug("initializing state from genesis bytes")
-		genesisTx, err := vm.newCreateContractTx(
-			wasmBytes,
-		)
-		if err != nil {
-			return fmt.Errorf("couldn't make genesis tx: %v", err)
+		// manually create genesis block
+		genesisBlock := &Block{
+			vm:         vm,
+			Block:      core.NewBlock(ids.Empty),
+			Txs:        []tx{},
+			onAcceptDb: versiondb.New(vm.DB),
 		}
-		genesisTx.id = ids.Empty
-		genesisBlock, err := vm.newBlock(ids.Empty, []tx{genesisTx})
-		if err != nil {
-			return fmt.Errorf("couldn't make genesis block: %v", err)
-		}
-		if err := genesisBlock.Verify(); err != nil {
-			return fmt.Errorf("couldn't verify genesis block: %v", err)
-		}
+		genesisBlockBytes := genesisBlock.Bytes()
+		genesisBlock.Block.Initialize(genesisBlockBytes, vm.SnowmanVM)
 		genesisBlock.Accept()
 		vm.SetDBInitialized()
 		vm.DB.Commit()
@@ -100,6 +84,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, errors.New("no transactions to propose")
 	}
 
+	// TODO: Have blocks contain >1 tx
 	var proposedTx tx
 	proposedTx, vm.mempool = vm.mempool[0], vm.mempool[1:]
 	if len(vm.mempool) != 0 {

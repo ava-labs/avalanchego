@@ -9,7 +9,6 @@ type tx interface {
 	ID() ids.ID
 	SyntacticVerify() error
 	SemanticVerify(database.Database) error
-	Accept()
 
 	// To be called when tx is created or unmarshalled
 	initialize(*VM) error

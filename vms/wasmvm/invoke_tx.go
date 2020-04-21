@@ -19,7 +19,8 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
-const bytesPerPage = 65 * 1024 // according to go-ext-wasm
+// A SC's return value is mapped to by this key in the SC's database
+var returnKey = []byte{1}
 
 // invokes a function of a contract
 type invokeTx struct {
@@ -116,6 +117,9 @@ func (tx *invokeTx) SemanticVerify(db database.Database) error {
 		return fmt.Errorf("couldn't set byte arguments: %v", err)
 	}
 
+	// Clear the old return value
+	db.Delete(returnKey)
+
 	// Call the function
 	val, err := fn(tx.Arguments...)
 	if err != nil {
@@ -142,7 +146,7 @@ func (tx *invokeTx) SemanticVerify(db database.Database) error {
 
 	// Persist the transaction and its return value
 	returnValue := []byte{}
-	returnValue, _ = contractDb.Get([]byte{1})
+	returnValue, _ = contractDb.Get(returnKey)
 	rv := &txReturnValue{ // TODO: persist tx in every execution of this method
 		Tx:                   tx,
 		Status:               choices.Accepted,
@@ -155,8 +159,6 @@ func (tx *invokeTx) SemanticVerify(db database.Database) error {
 
 	return nil
 }
-
-func (tx *invokeTx) Accept() {}
 
 // Set tx.vm, tx.bytes, tx.id
 func (tx *invokeTx) initialize(vm *VM) error {

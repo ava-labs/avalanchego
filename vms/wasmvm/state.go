@@ -10,6 +10,8 @@ import (
 	wasm "github.com/wasmerio/go-ext-wasm/wasmer"
 )
 
+const bytesPerPage = 65 * 1024 // according to go-ext-wasm
+
 const (
 	contractBytesTypeID uint64 = iota
 	stateTypeID
@@ -107,11 +109,18 @@ func (vm *VM) putTx(db database.Database, tx *txReturnValue) error {
 
 // Get a transaction
 func (vm *VM) getTx(db database.Database, txID ids.ID) (*txReturnValue, error) {
-	valueIntf, err := vm.State.Get(db, txTypeID, txID)
+	txIntf, err := vm.State.Get(db, txTypeID, txID)
 	if err != nil {
 		return nil, err
 	}
-	return valueIntf.(*txReturnValue), nil
+	tx, ok := txIntf.(*txReturnValue)
+	if !ok {
+		return nil, fmt.Errorf("expected *txReturnValue from database but got different type")
+	}
+	if err := tx.Tx.initialize(vm); err != nil {
+		return nil, fmt.Errorf("couldn't initialize tx: %v", err)
+	}
+	return tx, nil
 }
 
 func (vm *VM) registerDBTypes() error {

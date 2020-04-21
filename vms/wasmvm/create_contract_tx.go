@@ -65,7 +65,6 @@ func (tx *createContractTx) SyntacticVerify() error {
 }
 
 func (tx *createContractTx) SemanticVerify(db database.Database) error {
-	tx.vm.Ctx.Log.Debug("creating contract %s", tx.id) // TODO delete
 	if err := tx.vm.putContractBytes(db, tx.id, tx.WasmBytes); err != nil {
 		return fmt.Errorf("couldn't put new contract in db: %v", err)
 	}
@@ -82,8 +81,6 @@ func (tx *createContractTx) SemanticVerify(db database.Database) error {
 	return nil
 }
 
-func (tx *createContractTx) Accept() {}
-
 // Creates a new tx with the given payload and a random ID
 func (vm *VM) newCreateContractTx(wasmBytes []byte) (*createContractTx, error) {
 	tx := &createContractTx{
@@ -98,7 +95,7 @@ func (vm *VM) newCreateContractTx(wasmBytes []byte) (*createContractTx, error) {
 
 func (tx *createContractTx) MarshalJSON() ([]byte, error) {
 	asMap := make(map[string]interface{}, 2)
-	asMap["id"] = tx.ID()
+	asMap["id"] = tx.ID().String()
 	byteFormatter := formatting.CB58{Bytes: tx.WasmBytes}
 	asMap["contract"] = byteFormatter.String()
 	return json.Marshal(asMap)

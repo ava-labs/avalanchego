@@ -202,15 +202,3 @@ pub extern fn print_byte_args() -> i32 {
     }
     return 1;
 }
-
-/*
-// Get value mapped to by "hello" in the contract's DB
-#[no_mangle]
-pub extern fn get_hello() {
-    let keyPtr = b"hello".as_ptr();
-
-    unsafe {
-        let valueLen = dbGet(keyPtr: u32, keyLen: u32, valuePtr: u32)(ptr as u32, 5);
-    }
-}
-*/
