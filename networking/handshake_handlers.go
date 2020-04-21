@@ -77,7 +77,7 @@ const (
 
 	// ConnectTimeout is the amount of time to wait before attempt to connect to
 	// an unknown peer
-	ConnectTimeout = time.Second
+	ConnectTimeout = 6 * time.Second
 	// GetVersionTimeout is the amount of time to wait before sending a
 	// getVersion message to a partially connected peer
 	GetVersionTimeout = 2 * time.Second
@@ -222,22 +222,32 @@ func (nm *Handshake) Connect(addr salticidae.NetAddr) {
 		return
 	}
 
-	nm.log.Info("Adding peer %s", ip)
-
 	if !nm.enableStaking {
+		nm.log.Info("Adding peer %s", ip)
+
 		peer := salticidae.NewPeerIDFromNetAddr(addr, true)
 		nm.ConnectTo(peer, toShortID(ip), addr)
 		return
 	}
 
+	nm.requestedLock.Lock()
+	_, exists := nm.requested[ipStr]
+	nm.requestedLock.Unlock()
+
+	if exists {
+		return
+	}
+
+	nm.log.Info("Adding peer %s", ip)
+
 	count := new(int)
-	*count = 600
+	*count = 100
 	handler := new(func())
 	*handler = func() {
 		nm.requestedLock.Lock()
 		defer nm.requestedLock.Unlock()
 
-		if *count == 600 {
+		if *count == 100 {
 			nm.requested[ipStr] = struct{}{}
 		}
 

@@ -137,7 +137,7 @@ func errorHandler(_err *C.struct_SalticidaeCError, fatal C.bool, asyncID C.int32
 		MainNode.EC.Stop()
 		return
 	}
-	MainNode.Log.Error("Error during async with ID %d call: %s", asyncID, salticidae.StrError(err.GetCode()))
+	MainNode.Log.Debug("Error during async with ID %d call: %s", asyncID, salticidae.StrError(err.GetCode()))
 }
 
 func (n *Node) initNetlib() error {
