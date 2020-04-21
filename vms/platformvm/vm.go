@@ -386,7 +386,12 @@ func (vm *VM) Shutdown() {
 		return
 	}
 
+	// There is a potential deadlock if the timer is about to execute a timeout.
+	// So, the lock must be released before stopping the timer.
+	vm.Ctx.Lock.Unlock()
 	vm.timer.Stop()
+	vm.Ctx.Lock.Lock()
+
 	if err := vm.DB.Close(); err != nil {
 		vm.Ctx.Log.Error("Closing the database failed with %s", err)
 	}
