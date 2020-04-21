@@ -187,18 +187,26 @@ func (nm *Handshake) Initialize(
 	net.RegHandler(PeerList, salticidae.MsgNetworkMsgCallback(C.peerList), nil)
 }
 
-// ConnectTo add the peer as a connection and connects to them. Will free peer
-func (nm *Handshake) ConnectTo(peer salticidae.PeerID, addr salticidae.NetAddr) {
-	if !nm.pending.ContainsPeerID(peer) && !nm.connections.ContainsPeerID(peer) {
-		HandshakeNet.net.AddPeer(peer)
-		HandshakeNet.net.SetPeerAddr(peer, addr)
-		HandshakeNet.net.ConnPeer(peer, 600, 1)
-
-		// TODO: Should add the peer to the pending set, register a timeout to
-		// remove the peer
+// ConnectTo add the peer as a connection and connects to them.
+func (nm *Handshake) ConnectTo(peer salticidae.PeerID, stakerID ids.ShortID, addr salticidae.NetAddr) {
+	if nm.pending.ContainsPeerID(peer) || nm.connections.ContainsPeerID(peer) {
+		return
 	}
 
-	peer.Free()
+	nm.net.AddPeer(peer)
+	nm.net.SetPeerAddr(peer, addr)
+	nm.net.ConnPeer(peer, 600, 1)
+
+	ip := toIPDesc(addr)
+	nm.pending.Add(peer, stakerID, ip)
+
+	peerBytes := toID(peer)
+	peerID := ids.NewID(peerBytes)
+
+	nm.reconnectTimeout.Put(peerID, func() {
+		nm.pending.Remove(peer, stakerID)
+		nm.net.DelPeer(peer)
+	})
 }
 
 // Connect ...
@@ -211,19 +219,37 @@ func (nm *Handshake) Connect(addr salticidae.NetAddr) {
 
 	nm.log.Debug("Adding peer %s", ip)
 
-	//TODO:
-
 	if !nm.enableStaking {
-		peer := salticidae.NewPeerIDFromNetAddr(addr, false)
+		peer := salticidae.NewPeerIDFromNetAddr(addr, true)
 		nm.ConnectTo(peer, addr)
-	} else {
-		nm.requestedConnections[ipStr] = struct{}{}
+		return
+	}
+
+	count := new(int)
+	*count = 600
+	handler := new(func())
+	*handler = func() {
+		nm.requestedLock.Lock()
+		defer nm.requestedLock.Unlock()
+
+		if *count <= 0 {
+			delete(nm.requested, ipStr)
+			return
+		}
+		*count--
+
+		if nm.pending.ContainsIP(ip) || nm.connections.ContainsIP(ip) {
+			return
+		}
 
 		nm.log.Verbo("Attempting to discover peer at %s", ipStr)
+
+		nm.requested[ipStr] = struct{}{}
 
 		msgNet := nm.net.AsMsgNetwork()
 		msgNet.Connect(addr)
 	}
+	(*handler)()
 }
 
 // AwaitConnections ...
@@ -383,7 +409,8 @@ func connHandler(_conn *C.struct_msgnetwork_conn_t, connected C.bool, _ unsafe.P
 	delete(HandshakeNet.requestedConnections, ipStr)
 
 	cert := conn.GetPeerCert()
-	peer := salticidae.NewPeerIDFromX509(cert, false)
+	peer := salticidae.NewPeerIDFromX509(cert, true)
+
 	HandshakeNet.ConnectTo(peer, addr)
 	return true
 }
