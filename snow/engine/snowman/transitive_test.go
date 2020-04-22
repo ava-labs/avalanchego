@@ -1169,3 +1169,94 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		t.Fatalf("Should have bubbled invalid votes to the valid parent")
 	}
 }
+
+func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
+	vdr, vdrs, sender, vm, te, gBlk := setup(t)
+
+	secondVdr := validators.GenerateRandomValidator(1)
+	vdrs.Add(secondVdr)
+
+	sender.Default(true)
+
+	missingBlk := &Blk{
+		parent: gBlk,
+		id:     GenerateID(),
+		height: 1,
+		status: choices.Unknown,
+		bytes:  []byte{1},
+	}
+
+	pendingBlk := &Blk{
+		parent: missingBlk,
+		id:     GenerateID(),
+		height: 2,
+		status: choices.Processing,
+		bytes:  []byte{2},
+	}
+
+	parsed := new(bool)
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, pendingBlk.Bytes()):
+			*parsed = true
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !*parsed {
+			return nil, errUnknownBlock
+		}
+
+		switch {
+		case blkID.Equals(pendingBlk.ID()):
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	reqID := new(uint32)
+	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+		*reqID = requestID
+		if !reqVdr.Equals(vdr.ID()) {
+			t.Fatalf("Wrong validator requested")
+		}
+		if !blkID.Equals(missingBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+	}
+
+	te.PushQuery(vdr.ID(), 0, pendingBlk.ID(), pendingBlk.Bytes())
+
+	te.Put(secondVdr.ID(), *reqID, missingBlk.ID(), []byte{3})
+
+	*parsed = false
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, missingBlk.Bytes()):
+			*parsed = true
+			return missingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !*parsed {
+			return nil, errUnknownBlock
+		}
+
+		switch {
+		case blkID.Equals(missingBlk.ID()):
+			return missingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+	sender.CantPushQuery = false
+
+	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
+
+	pref := te.Consensus.Preference()
+	if !pref.Equals(pendingBlk.ID()) {
+		t.Fatalf("Shouldn't have abandoned the pending block")
+	}
+}
