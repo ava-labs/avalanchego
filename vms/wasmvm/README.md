@@ -146,3 +146,190 @@ The resulting transaction's ID is returned:
     "id": 1
 }
 ```
+
+Now we can see this transaction's result by calling `wasm.getTx`:
+
+```sh
+curl --location --request POST 'localhost:9650/ext/bc/wasm' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "jsonrpc": "2.0",
+    "method": "wasm.getTx",
+    "params": {
+        "id": "QSGQSXYjYkx4kZAhCPTqNcfJuoCJbMwx5oSFEbRhoWGcRT7YQ"
+    },
+    "id": 1
+}'
+```
+
+The response indicates that the transaction was a contract invocation and that the method being called didn't return an error.
+The response show the arguments to the invoked method as well as the returned value.
+`byteArguments` and `returnValue` are both encoded with base 58 and a checksum.
+In this case, both have value `"45PJLL"`, which is the encoding for an empty byte array.
+That is, this method received no `byteArguments` and returned nothing (void.) 
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "tx": {
+            "invocationSuccessful": true,
+            "returnValue": "45PJLL",
+            "status": "Accepted",
+            "tx": {
+                "arguments": [
+                    1
+                ],
+                "byteArguments": "45PJLL",
+                "contractID": "2JeuXkXVhk7QQEdJprU8DUgEZs4upMyCK82tjLaTCQcdwtmnVD",
+                "function": "create_owner"
+            },
+            "type": "contract invocation"
+        }
+    },
+    "id": 1
+}
+```
+
+## Imported Functions
+
+WASM smart contracts may (and in practice do) need to import information/functionality from the "outside world" (ie the WASM chain.)
+The WASM chain provides an interface for the contracts to use.
+Part of this interface is a key/value database.
+Each contract has its database that only it reads/writes.
+
+Right now, the following methods are provided to contracts:
+
+* void print(int ptr, int len)
+    * Print to the chain's log
+    * `ptr` is a pointer to the first element of a byte array
+    * `len` is the byte array's length  
+* int dbPut(int key, int keyLen, int value, int valueLen)
+    * Put a key/value pair in the smart contract's database
+    * `key` is a pointer to the first element of a byte array (the key.)
+    * `len` is the byte array's length  
+    * Similar for `value` and `valueLen`
+    * Returns 0 on success, otherwise non 0
+* int dbGet(int key, int keyLen, int value)
+    * Get a value from the smart contract's database.
+    * `key` and `keyLen` specify the key.
+    * `value` is a pointer to a buffer to write the value to.
+    * Returns the length of the value, or -1 on failure.
+* int dbGetValueLen(int keyPtr, int keyLen)
+    * Return the length of the value whose key is specified by `keyPtr` and `keyLen`
+    * Return -1 on failure
+
+## Calling Conventions
+
+WASM methods can only take as arguments integers and floats, and can only return an integer or a float.
+This model is rather restrictive, so we've created a calling convention to allow WASM smart contract methods to handle more expressive arguments and return values.
+
+### Byte Arguments
+
+One can pass a byte array to a contract method by providing argument `byteArgs` when calling `wasm.Invoke`.
+
+You may be thinking, "wait, didn't you just say WASM methods can't take byte array aruments?" Well, that's true. To get around that, at the start of every contract method invocation, we write `byteArgs` to the contract's database. Then, the contract can read `byteArgs` and use them however it likes. The convention is that `byteArgs` is mapped to in the contract's database by the empty key (that is, an empmty byte array.)
+
+#### Example
+
+The method `print_byte_args` in the contract we defined above reads the byte arguments to it, then uses `print` to print them.
+
+When we call it:
+
+```sh
+{
+    "jsonrpc": "2.0",
+    "method": "wasm.invoke",
+    "params": {
+        "contractID": "2JeuXkXVhk7QQEdJprU8DUgEZs4upMyCK82tjLaTCQcdwtmnVD",
+        "function": "print_byte_args",
+        "args": [],
+        "byteArgs":"U1Gavwb6Dr7nwea5Qgp2hPNv1fDg2o5XAzHpWtcEBS5cq6F78Nv5GUxp"
+    },
+    "id": 1
+}
+```
+
+The following line is printed to the node's output:
+
+```
+Print from smart contract: {"fizz":{"buzz":["baz"]},"foo":"bar"}
+```
+
+That JSON is the `byteArgs` we passed in.
+
+### Return Values
+
+We also have a calling convention to allow returning complex values from a contract method.
+
+The convention is that a method's literal return value (ie `return X`) is solely a success/failure indicator. If a method executes successfully, it returns 0. Otherwise, it returns some other integer. This determines the value of `invocationSuccessful` when calling `getTx`.
+
+If the method wants to return a value, it converts it to a byte array and writes it to the database, where the key is the byte array containing only 1 (ie `[1]`) This determines the `returnValue` retrieved when calling `getTx`.
+
+#### Example
+
+Let's invoke contract method `get_num_bags`, which returns the number of bags that a given owner owns. This method takes one argument, the owner's ID.
+
+```sh
+{
+    "jsonrpc": "2.0",
+    "method": "wasm.invoke",
+    "params": {
+        "contractID": "2JeuXkXVhk7QQEdJprU8DUgEZs4upMyCK82tjLaTCQcdwtmnVD",
+        "function": "get_num_bags",
+        "args": [
+            {
+                "type": "int32",
+                "value": 123
+            }
+        ]
+    },
+    "id": 1
+}
+```
+
+This returns `txID` `8UMzqASLDGo1ehWrgfnN151zZZtZh3ZDrRt4njQNRTHEmNHZv`.
+
+To look at the return value, we call `wasm.getTx`:
+
+```sh
+{
+    "jsonrpc": "2.0",
+    "method": "wasm.getTx",
+    "params": {
+        "id": "8UMzqASLDGo1ehWrgfnN151zZZtZh3ZDrRt4njQNRTHEmNHZv"
+    },
+    "id": 1
+}
+```
+
+The `returnValue`, when decoded, is byte array `[0 0 0 0]`. Interpreted as a big-endian integer, this is 0. (As in, the owner owns 0 bags.) 
+
+```sh
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "tx": {
+            "invocationSuccessful": true,
+            "returnValue": "1111XiaYg",
+            "status": "Accepted",
+            "tx": {
+                "arguments": [
+                    1
+                ],
+                "byteArguments": "45PJLL",
+                "contractID": "8UMzqASLDGo1ehWrgfnN151zZZtZh3ZDrRt4njQNRTHEmNHZv",
+                "function": "get_num_bags"
+            },
+            "type": "contract invocation"
+        }
+    },
+    "id": 1
+}
+```
+
+## State Management
+
+The contract's state is persisted after every method invocation, and loaded before every method invocation.
+
+That means that global variables, etc. in the contract that are updated internally are persisted across calls.
