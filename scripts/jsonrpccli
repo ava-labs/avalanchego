@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+
+"""Bare bones JSON-RPC client for Ava."""
+
+import argparse
+import json
+import sys
+import time
+import urllib.parse
+import urllib.request
+
+from typing import Any
+
+METHOD_MAP = {
+    'admin': 'ext/admin',
+    'avm': 'ext/bc/X',
+    'keystore': 'ext/keystore',
+    'platform': 'ext/bc/P',
+}
+
+def parse_param(param: str) -> (str, Any):
+    param_key, _, param_val = param.partition(':')
+    try:
+        param_val = int(param_val, base=10)
+    except ValueError:
+        pass
+    return param_key, param_val
+
+
+def main(args=None):
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument('-s', '--server', metavar='URL',
+                        default='http://localhost:9650',
+                        help='Base URL of the JSON RPC service')
+    parser.add_argument('-m', '--method', metavar='NAME',
+                        default='admin.peers',
+                        help='RPC method to call')
+    parser.add_argument('-i', '--indent', metavar='N',
+                        default=2,
+                        type=int,
+                        help='If non-zero then pretty print the result')
+    parser.add_argument('params',
+                        metavar='PARAM:VAL',
+                        nargs='*',
+                        type=parse_param,
+                        help='Parameters for the method')
+
+    args = parser.parse_args()
+    args.params = dict(args.params)
+
+    path = METHOD_MAP[args.method.partition('.')[0]]
+    url = urllib.parse.urljoin(args.server, path)
+    req_str = json.dumps({
+        'jsonrpc': '2.0',
+        'method': args.method,
+        'params': args.params,
+        'id': int(1000*time.time()),  # Milliseonds since unix epoch
+    })
+    req_bytes = req_str.encode('utf-8')
+    req = urllib.request.Request(
+        url,
+        data=req_bytes,
+        headers={
+            'Content-Length': len(req_bytes),
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+    with urllib.request.urlopen(req) as resp:
+        resp_bytes = resp.read()
+    try:
+        resp_obj = json.loads(resp_bytes)
+        result = resp_obj['result']
+    except Exception as err:
+        print(resp_bytes, file=sys.stderr)
+        print(err, file=sys.stderr)
+        sys.exit(1)
+
+    if args.indent:
+        output = json.dumps(result, indent=args.indent)
+    else:
+        output = json.dumps(result)
+    
+    print(output)
+
+
+if __name__ == '__main__':
+    main()
