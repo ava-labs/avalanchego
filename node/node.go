@@ -254,7 +254,7 @@ func (n *Node) StartConsensusServer() error {
 	// Listen for P2P messages
 	n.PeerNet.Listen(serverIP, &err)
 	if code := err.GetCode(); code != 0 {
-		return fmt.Errorf("failed to start consensus server: %s", salticidae.StrError(code))
+		return fmt.Errorf("failed to listen on consensus server at %s: %s", n.Config.StakingIP, salticidae.StrError(code))
 	}
 
 	// Start a server to handle throughput tests if configuration says to. Disabled by default.
@@ -268,7 +268,7 @@ func (n *Node) StartConsensusServer() error {
 
 		n.ClientNet.Listen(clientIP, &err)
 		if code := err.GetCode(); code != 0 {
-			return fmt.Errorf("failed to listen on xput server: %s", salticidae.StrError(code))
+			return fmt.Errorf("failed to listen on xput server at 127.0.0.1:%d: %s", n.Config.ThroughputPort, salticidae.StrError(code))
 		}
 	}
 
