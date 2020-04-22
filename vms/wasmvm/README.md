@@ -23,6 +23,7 @@ A bag has a handful of properties, such as price.
 Each bag has an owner, and each owner has 0 or more bags.
 
 The smart contract allows for the creation of owners and bags, the transfer of bags between owners, and the update of bag prices.
+All data is stored in two global variables, `OWNERS` and `BAGS`.
 
 To compile the Rust code to WASM, we use the [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) tool in the Rust code's directory:
 
@@ -200,22 +201,22 @@ Each contract has its database that only it reads/writes.
 
 Right now, the following methods are provided to contracts:
 
-* void print(int ptr, int len)
+* `void print(int ptr, int len)`
     * Print to the chain's log
     * `ptr` is a pointer to the first element of a byte array
     * `len` is the byte array's length  
-* int dbPut(int key, int keyLen, int value, int valueLen)
+* `int dbPut(int key, int keyLen, int value, int valueLen)`
     * Put a key/value pair in the smart contract's database
     * `key` is a pointer to the first element of a byte array (the key.)
     * `len` is the byte array's length  
     * Similar for `value` and `valueLen`
     * Returns 0 on success, otherwise non 0
-* int dbGet(int key, int keyLen, int value)
+* `int dbGet(int key, int keyLen, int value)`
     * Get a value from the smart contract's database.
     * `key` and `keyLen` specify the key.
     * `value` is a pointer to a buffer to write the value to.
     * Returns the length of the value, or -1 on failure.
-* int dbGetValueLen(int keyPtr, int keyLen)
+* `int dbGetValueLen(int keyPtr, int keyLen)`
     * Return the length of the value whose key is specified by `keyPtr` and `keyLen`
     * Return -1 on failure
 
