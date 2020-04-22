@@ -152,6 +152,8 @@ func (n *Node) initNetlib() error {
 
 	// Create peer network config, may have tls enabled
 	peerConfig := salticidae.NewPeerNetworkConfig()
+	peerConfig.ConnTimeout(60)
+
 	msgConfig := peerConfig.AsMsgNetworkConfig()
 	msgConfig.MaxMsgSize(maxMessageSize)
 
