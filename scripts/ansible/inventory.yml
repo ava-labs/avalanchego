@@ -28,6 +28,7 @@ borealis_bootstrap:
     staking_tls_enabled: true
     staking_tls_key_file: "/home/ubuntu/keys/staker.key"
     staking_tls_cert_file: "/home/ubuntu/keys/staker.crt"
+    plugin_dir: "/home/ubuntu/go/src/github.com/ava-labs/gecko/build/plugins"
     log_dir: "/home/ubuntu/.gecko"
     log_level: debug
     snow_sample_size: 3
@@ -73,6 +74,7 @@ borealis_node:
     staking_tls_enabled: true
     staking_tls_key_file: "/home/ubuntu/keys/staker.key"
     staking_tls_cert_file: "/home/ubuntu/keys/staker.crt"
+    plugin_dir: "/home/ubuntu/go/src/github.com/ava-labs/gecko/build/plugins"
     log_dir: "/home/ubuntu/.gecko"
     log_level: debug
     snow_sample_size: 3

@@ -194,8 +194,11 @@ func (c *connections) remove(peer salticidae.PeerID, id ids.ShortID) {
 func (c *connections) removePeerID(peer salticidae.PeerID) {
 	peerID := toID(peer)
 	if id, exists := c.peerIDToID[peerID]; exists {
+		idKey := id.Key()
+
 		delete(c.peerIDToID, peerID)
-		delete(c.idToPeerID, id.Key())
+		delete(c.idToPeerID, idKey)
+		delete(c.idToIP, idKey)
 	}
 }
 
@@ -204,6 +207,7 @@ func (c *connections) removeID(id ids.ShortID) {
 	if peer, exists := c.idToPeerID[idKey]; exists {
 		delete(c.peerIDToID, toID(peer))
 		delete(c.idToPeerID, idKey)
+		delete(c.idToIP, idKey)
 	}
 }
 
