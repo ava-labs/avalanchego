@@ -34,3 +34,4 @@ fi
 go build -o "$PREFIX/ava" "$GECKO_PATH/main/"*.go
 go build -o "$PREFIX/xputtest" "$GECKO_PATH/xputtest/"*.go
 go build -o "$PLUGIN_PREFIX/evm" "$CORETH_PATH/plugin/"*.go
+echo "Build Successful"
