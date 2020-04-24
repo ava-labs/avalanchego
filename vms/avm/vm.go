@@ -91,8 +91,10 @@ func (cr *codecRegistry) RegisterType(val interface{}) error {
 	cr.typeToFxIndex[valType] = cr.index
 	return cr.codec.RegisterType(val)
 }
-func (cr *codecRegistry) Marshal(val interface{}) ([]byte, error)   { return cr.codec.Marshal(val) }
-func (cr *codecRegistry) Unmarshal(b []byte, val interface{}) error { return cr.codec.Unmarshal(b, val) }
+func (cr *codecRegistry) Marshal(val interface{}) ([]byte, error) { return cr.codec.Marshal(val) }
+func (cr *codecRegistry) Unmarshal(b []byte, val interface{}) error {
+	return cr.codec.Unmarshal(b, val)
+}
 
 /*
  ******************************************************************************
@@ -456,7 +458,10 @@ func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
 		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
-		tx.setStatus(choices.Processing)
+
+		if err := tx.setStatus(choices.Processing); err != nil {
+			return nil, err
+		}
 	}
 
 	return tx, nil
