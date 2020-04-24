@@ -19,6 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -61,9 +63,23 @@ Attempt reconnections
     node isn't connected to after awhile delete the connection.
 */
 
+// Version this avalanche instance is executing.
+var (
+	VersionPrefix    = "avalanche/"
+	VersionSeparator = "."
+	MajorVersion     = 0
+	MinorVersion     = 1
+	PatchVersion     = 0
+	ClientVersion    = fmt.Sprintf("%s%d%s%d%s%d",
+		VersionPrefix,
+		MajorVersion,
+		VersionSeparator,
+		MinorVersion,
+		VersionSeparator,
+		PatchVersion)
+)
+
 const (
-	// CurrentVersion this avalanche instance is executing.
-	CurrentVersion = "avalanche/0.0.1"
 	// MaxClockDifference allowed between connected nodes.
 	MaxClockDifference = time.Minute
 	// PeerListGossipSpacing is the amount of time to wait between pushing this
@@ -356,7 +372,7 @@ func (nm *Handshake) SendGetVersion(peer salticidae.PeerID) {
 // SendVersion to the requested peer
 func (nm *Handshake) SendVersion(peer salticidae.PeerID) error {
 	build := Builder{}
-	v, err := build.Version(nm.networkID, nm.clock.Unix(), toIPDesc(nm.myAddr), CurrentVersion)
+	v, err := build.Version(nm.networkID, nm.clock.Unix(), toIPDesc(nm.myAddr), ClientVersion)
 	if err != nil {
 		return fmt.Errorf("packing Version failed due to %s", err)
 	}
@@ -518,6 +534,59 @@ func (nm *Handshake) disconnectedFromPeer(peer salticidae.PeerID) {
 	}
 }
 
+// checkCompatibility Check to make sure that the peer and I speak the same language.
+func (nm *Handshake) checkCompatibility(peerVersion string) bool {
+	if !strings.HasPrefix(peerVersion, VersionPrefix) {
+		nm.log.Warn("Peer attempted to connect with an invalid version prefix")
+		return false
+	}
+	peerVersion = peerVersion[len(VersionPrefix):]
+	splitPeerVersion := strings.SplitN(peerVersion, VersionSeparator, 3)
+	if len(splitPeerVersion) != 3 {
+		nm.log.Warn("Peer attempted to connect with an invalid number of subversions")
+		return false
+	}
+
+	major, err := strconv.Atoi(splitPeerVersion[0])
+	if err != nil {
+		nm.log.Warn("Peer attempted to connect with an invalid major version")
+		return false
+	}
+	minor, err := strconv.Atoi(splitPeerVersion[1])
+	if err != nil {
+		nm.log.Warn("Peer attempted to connect with an invalid minor version")
+		return false
+	}
+	patch, err := strconv.Atoi(splitPeerVersion[2])
+	if err != nil {
+		nm.log.Warn("Peer attempted to connect with an invalid patch version")
+		return false
+	}
+
+	switch {
+	case major < MajorVersion:
+		// peers major version is too low
+		return false
+	case major > MajorVersion:
+		nm.log.Warn("Peer attempted to connect with a higher major version, this client may need to be updated")
+		return false
+	}
+
+	switch {
+	case minor < MinorVersion:
+		// peers minor version is too low
+		return false
+	case minor > MinorVersion:
+		nm.log.Warn("Peer attempted to connect with a higher minor version, this client may need to be updated")
+		return false
+	}
+
+	if patch > PatchVersion {
+		nm.log.Warn("Peer is connecting with a higher patch version, this client may need to be updated")
+	}
+	return true
+}
+
 // peerHandler notifies a change to the set of connected peers
 // connected is true if a new peer is connected
 // connected is false if a formerly connected peer has disconnected
@@ -645,7 +714,7 @@ func version(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.P
 		return
 	}
 
-	if peerVersion := pMsg.Get(VersionStr).(string); !checkCompatibility(CurrentVersion, peerVersion) {
+	if peerVersion := pMsg.Get(VersionStr).(string); !HandshakeNet.checkCompatibility(peerVersion) {
 		HandshakeNet.log.Warn("Bad version")
 
 		HandshakeNet.net.DelPeer(peer)
@@ -739,12 +808,6 @@ func getCert(cert salticidae.X509) ids.ShortID {
 	der.Free()
 	HandshakeNet.log.AssertNoError(err)
 	return certID
-}
-
-// checkCompatibility Check to make sure that the peer and I speak the same language.
-func checkCompatibility(myVersion string, peerVersion string) bool {
-	// At the moment, we are all compatible.
-	return true
 }
 
 func toShortID(ip utils.IPDesc) ids.ShortID {
