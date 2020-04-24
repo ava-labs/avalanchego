@@ -131,6 +131,8 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 	// register the static endpoints
 	for extension, service := range staticVM.CreateStaticHandlers() {
 		m.log.Verbo("adding static API endpoint: %s", defaultEndpoint+extension)
-		m.apiServer.AddRoute(service, lock, defaultEndpoint, extension, m.log)
+		if err := m.apiServer.AddRoute(service, lock, defaultEndpoint, extension, m.log); err != nil {
+			m.log.Warn("failed to add static API endpoint %s: %v", fmt.Sprintf("%s%s", defaultEndpoint, extension), err)
+		}
 	}
 }
