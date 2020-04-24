@@ -389,7 +389,9 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 
 		txID := tx.ID()
 
-		vm.Alias(txID, genesisTx.Alias)
+		if err = vm.Alias(txID, genesisTx.Alias); err != nil {
+			return err
+		}
 	}
 
 	return nil
