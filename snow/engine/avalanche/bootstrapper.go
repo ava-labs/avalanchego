@@ -177,9 +177,7 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 				}
 			}
 
-			for _, parent := range vtx.Parents() {
-				vts = append(vts, parent)
-			}
+			vts = append(vts, vtx.Parents()...)
 		case choices.Accepted:
 			b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", vtxID)
 		case choices.Rejected:
