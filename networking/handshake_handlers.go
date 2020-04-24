@@ -715,7 +715,7 @@ func version(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.P
 	}
 
 	if peerVersion := pMsg.Get(VersionStr).(string); !HandshakeNet.checkCompatibility(peerVersion) {
-		HandshakeNet.log.Warn("Bad version")
+		HandshakeNet.log.Debug("Dropping connection due to an incompatible version from peer")
 
 		HandshakeNet.net.DelPeer(peer)
 		return
