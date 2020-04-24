@@ -44,7 +44,7 @@ type APIAccount struct {
 // is sent when this staker is done staking.
 type APIValidator struct {
 	StartTime   json.Uint64  `json:"startTime"`
-	EndTime     json.Uint64  `json:"endtime"`
+	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 	ID          ids.ShortID  `json:"id"`
