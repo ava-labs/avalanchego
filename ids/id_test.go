@@ -150,7 +150,7 @@ func TestIDUnmarshalJSON(t *testing.T) {
 
 func TestIDHex(t *testing.T) {
 	id := NewID([32]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
-	expected := "617661206c61627300000000000000000000000000000000000000000000000000"
+	expected := "617661206c616273000000000000000000000000000000000000000000000000"
 	actual := id.Hex()
 	if actual != expected {
 		t.Fatalf("got %s, expected %s", actual, expected)
