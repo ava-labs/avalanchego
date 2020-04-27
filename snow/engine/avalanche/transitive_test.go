@@ -698,23 +698,12 @@ func TestEngineScheduleRepoll(t *testing.T) {
 
 	sender.PushQueryF = nil
 
-	st.buildVertex = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-		consumers := []snowstorm.Tx{}
-		for _, tx := range txs {
-			consumers = append(consumers, tx)
-		}
-		return &Vtx{
-			parents: []avalanche.Vertex{gVtx, mVtx},
-			id:      GenerateID(),
-			txs:     consumers,
-			status:  choices.Processing,
-			bytes:   []byte{1},
-		}, nil
-	}
-
 	repolled := new(bool)
-	sender.PushQueryF = func(_ ids.ShortSet, _ uint32, _ ids.ID, _ []byte) {
+	sender.PullQueryF = func(_ ids.ShortSet, _ uint32, vtxID ids.ID) {
 		*repolled = true
+		if !vtxID.Equals(vtx.ID()) {
+			t.Fatalf("Wrong vertex queried")
+		}
 	}
 
 	te.QueryFailed(vdr.ID(), *requestID)
@@ -979,31 +968,14 @@ func TestEngineIssueRepoll(t *testing.T) {
 	te.Initialize(config)
 	te.finishBootstrapping()
 
-	newVtxID := new(ids.ID)
-
-	st.buildVertex = func(s ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-		if len(txs) != 0 {
-			t.Fatalf("Wrong vertex issued")
-		}
-		if s.Len() != 2 || !s.Contains(gVtx.ID()) || !s.Contains(mVtx.ID()) {
-			t.Fatalf("Wrong vertex issued")
-		}
-
-		vtx := &Vtx{
-			parents: []avalanche.Vertex{gVtx, mVtx},
-			id:      GenerateID(),
-			status:  choices.Processing,
-			bytes:   []byte{1},
-		}
-		*newVtxID = vtx.ID()
-		return vtx, nil
-	}
-
-	sender.PushQueryF = func(vdrs ids.ShortSet, _ uint32, vtxID ids.ID, vtx []byte) {
+	sender.PullQueryF = func(vdrs ids.ShortSet, _ uint32, vtxID ids.ID) {
 		vdrSet := ids.ShortSet{}
 		vdrSet.Add(vdr.ID())
-		if !vdrs.Equals(vdrSet) || !vtxID.Equals(*newVtxID) {
-			t.Fatalf("Wrong query message")
+		if !vdrs.Equals(vdrSet) {
+			t.Fatalf("Wrong query recipients")
+		}
+		if !vtxID.Equals(gVtx.ID()) && !vtxID.Equals(mVtx.ID()) {
+			t.Fatalf("Unknown re-query")
 		}
 	}
 

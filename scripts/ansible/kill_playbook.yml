@@ -1,0 +1,9 @@
+
+---
+- name: Update the network
+  connection: ssh
+  gather_facts: false
+  hosts: all
+  tasks:
+    - name: Kill Node
+      command: killall ava
