@@ -26,6 +26,10 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
+const (
+	dbVersion = "v0.1.0"
+)
+
 // Results of parsing the CLI
 var (
 	Config = node.Config{}
@@ -143,7 +147,7 @@ func init() {
 	// DB:
 	if *db && err == nil {
 		// TODO: Add better params here
-		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID))
+		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
 		Config.DB = db
 		errs.Add(err)
