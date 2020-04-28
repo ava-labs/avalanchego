@@ -43,7 +43,10 @@ type ProposalBlock struct {
 }
 
 // Accept implements the snowman.Block interface
-func (pb *ProposalBlock) Accept() { pb.SetStatus(choices.Accepted) }
+func (pb *ProposalBlock) Accept() {
+	pb.SetStatus(choices.Accepted)
+	pb.VM.LastAcceptedID = pb.ID()
+}
 
 // Initialize this block.
 // Sets [pb.vm] to [vm] and populates non-serialized fields

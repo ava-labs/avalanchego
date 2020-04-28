@@ -10,13 +10,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/networking/handler"
+	"github.com/ava-labs/gecko/snow/networking/router"
+	"github.com/ava-labs/gecko/snow/networking/sender"
+	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -25,6 +34,9 @@ import (
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/timestampvm"
+
+	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
+	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
 )
 
 var (
@@ -1426,4 +1438,161 @@ func TestRestartFullyAccepted(t *testing.T) {
 	if lastAccepted := secondVM.LastAccepted(); !firstOption.ID().Equals(lastAccepted) {
 		t.Fatalf("Should have changed the genesis")
 	}
+}
+
+// test bootstrapping the node
+func TestBootstrapPartiallyAccepted(t *testing.T) {
+	genesisAccounts := GenesisAccounts()
+	genesisValidators := GenesisCurrentValidators()
+	genesisChains := make([]*CreateChainTx, 0)
+
+	genesisState := Genesis{
+		Accounts:   genesisAccounts,
+		Validators: genesisValidators,
+		Chains:     genesisChains,
+		Timestamp:  uint64(defaultGenesisTime.Unix()),
+	}
+
+	genesisBytes, err := Codec.Marshal(genesisState)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := memdb.New()
+	vmDB := prefixdb.New([]byte("vm"), db)
+	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), db)
+
+	blocked, err := queue.New(bootstrappingDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm := &VM{
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
+	}
+	defer vm.Shutdown()
+
+	defaultSubnet := validators.NewSet()
+	vm.validators = validators.NewManager()
+	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
+
+	vm.clock.Set(defaultGenesisTime)
+	ctx := defaultContext()
+	msgChan := make(chan common.Message, 1)
+
+	ctx.Lock.Lock()
+	if err := vm.Initialize(ctx, vmDB, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	genesisID := vm.Preferred()
+
+	advanceTimeTx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), advanceTimeTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceTimeBlkID := advanceTimeBlk.ID()
+	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
+
+	advanceTimePreference := advanceTimeBlk.Options()[0]
+
+	vdrs := validators.NewSet()
+	vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+	beacons := vdrs
+
+	timeoutManager := timeout.Manager{}
+	timeoutManager.Initialize(2 * time.Second)
+	go timeoutManager.Dispatch()
+
+	router := &router.ChainRouter{}
+	router.Initialize(logging.NoLog{}, &timeoutManager)
+
+	externalSender := &sender.ExternalSenderTest{T: t}
+	externalSender.Default(true)
+
+	// Passes messages from the consensus engine to the network
+	sender := sender.Sender{}
+
+	sender.Initialize(ctx, externalSender, router, &timeoutManager)
+
+	// The engine handles consensus
+	engine := smeng.Transitive{}
+	engine.Initialize(smeng.Config{
+		BootstrapConfig: smeng.BootstrapConfig{
+			Config: common.Config{
+				Context:    ctx,
+				Validators: vdrs,
+				Beacons:    beacons,
+				Alpha:      uint64(beacons.Len()/2 + 1),
+				Sender:     &sender,
+			},
+			Blocked: blocked,
+			VM:      vm,
+		},
+		Params: snowball.Parameters{
+			Metrics:           prometheus.NewRegistry(),
+			K:                 1,
+			Alpha:             1,
+			BetaVirtuous:      20,
+			BetaRogue:         20,
+			ConcurrentRepolls: 1,
+		},
+		Consensus: &smcon.Topological{},
+	})
+
+	// Asynchronously passes messages from the network to the consensus engine
+	handler := &handler.Handler{}
+	handler.Initialize(&engine, msgChan, 1000)
+
+	// Allow incoming messages to be routed to the new chain
+	router.AddChain(handler)
+	go ctx.Log.RecoverAndPanic(handler.Dispatch)
+
+	reqID := new(uint32)
+	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32) {
+		*reqID = requestID
+	}
+
+	engine.Startup()
+
+	externalSender.GetAcceptedFrontierF = nil
+	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ ids.Set) {
+		*reqID = requestID
+	}
+
+	frontier := ids.Set{}
+	frontier.Add(advanceTimeBlkID)
+	engine.AcceptedFrontier(ctx.NodeID, *reqID, frontier)
+
+	externalSender.GetAcceptedF = nil
+	externalSender.GetF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
+		*reqID = requestID
+		if !containerID.Equals(advanceTimeBlkID) {
+			t.Fatalf("wrong block requested")
+		}
+	}
+
+	engine.Accepted(ctx.NodeID, *reqID, frontier)
+
+	externalSender.GetF = nil
+	externalSender.CantPushQuery = false
+
+	engine.Put(ctx.NodeID, *reqID, advanceTimeBlkID, advanceTimeBlkBytes)
+
+	externalSender.CantPushQuery = true
+
+	if pref := vm.Preferred(); !pref.Equals(advanceTimePreference.ID()) {
+		t.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
+			pref,
+			advanceTimePreference.ID(),
+			genesisID)
+	}
+	ctx.Lock.Unlock()
+
+	router.Shutdown()
 }

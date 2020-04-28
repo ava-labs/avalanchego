@@ -45,7 +45,7 @@ type SnowmanVM struct {
 	preferred ids.ID
 
 	// ID of the last accepted block
-	lastAccepted ids.ID
+	LastAcceptedID ids.ID
 
 	// unmarshals bytes to a block
 	unmarshalBlockFunc func([]byte) (snowman.Block, error)
@@ -61,7 +61,7 @@ func (svm *SnowmanVM) SetPreference(ID ids.ID) { svm.preferred = ID }
 func (svm *SnowmanVM) Preferred() ids.ID { return svm.preferred }
 
 // LastAccepted returns the block most recently accepted
-func (svm *SnowmanVM) LastAccepted() ids.ID { return svm.lastAccepted }
+func (svm *SnowmanVM) LastAccepted() ids.ID { return svm.LastAcceptedID }
 
 // ParseBlock parses [bytes] to a block
 func (svm *SnowmanVM) ParseBlock(bytes []byte) (snowman.Block, error) {
@@ -161,10 +161,10 @@ func (svm *SnowmanVM) Initialize(
 	}
 
 	if svm.DBInitialized() {
-		if svm.lastAccepted, err = svm.State.GetLastAccepted(svm.DB); err != nil {
+		if svm.LastAcceptedID, err = svm.State.GetLastAccepted(svm.DB); err != nil {
 			return err
 		}
-		svm.preferred = svm.lastAccepted
+		svm.preferred = svm.LastAcceptedID
 	}
 
 	return nil

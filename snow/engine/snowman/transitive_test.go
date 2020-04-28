@@ -56,8 +56,17 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 	te := &Transitive{}
 
 	te.Initialize(config)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !blkID.Equals(gBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
 	te.finishBootstrapping()
 
+	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
@@ -369,8 +378,17 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !blkID.Equals(gBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
 	te.finishBootstrapping()
 
+	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
