@@ -34,17 +34,41 @@ type ExternalHandler interface {
 // FrontierHandler defines how a consensus engine reacts to frontier messages
 // from other validators
 type FrontierHandler interface {
-	// GetAcceptedFrontier notifies this consensus engine that its accepted
-	// frontier is requested by the specified validator
+	// Notify this engine of a request for the accepted frontier of vertices.
+	//
+	// The accepted frontier is the set of accepted vertices that do not have
+	// any accepted decendants.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is utilizing a unique requestID. However, the validatorID is
+	// assumed to be authenticated.
+	//
+	// This engine should respond with an AcceptedFrontier message with the same
+	// requestID, and the engine's current accepted frontier.
 	GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32)
 
-	// AcceptedFrontier notifies this consensus engine of the specified
-	// validators current accepted frontier
-	AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
+	// Notify this engine of an accepted frontier.
+	//
+	// This function can be called by any validator. It is not safe to assume
+	// this message is in response to a GetAcceptedFrontier message, is utilizing a
+	// unique requestID, or that the containerIDs from a valid frontier.
+	// However, the validatorID is  assumed to be authenticated.
+	AcceptedFrontier(
+		validatorID ids.ShortID,
+		requestID uint32,
+		containerIDs ids.Set,
+	)
 
-	// GetAcceptedFrontierFailed notifies this consensus engine that the
-	// requested accepted frontier from the specified validator should be
-	// considered lost
+	// Notify this engine that a get accepted frontier request it issued has
+	// failed.
+	//
+	// This function will be called if the engine sent a GetAcceptedFrontier
+	// message that is not anticipated to be responded to. This could be because
+	// the recipient of the message is unknown or if the message request has
+	// timed out.
+	//
+	// The validatorID, and requestID, are assumed to be the same as those sent
+	// in the GetAcceptedFrontier message.
 	GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32)
 }
 
@@ -62,7 +86,7 @@ type AcceptedHandler interface {
 	// are accepted.
 	GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
 
-	// Notify this engine of an accepted frontier.
+	// Notify this engine of a set of accepted vertices.
 	//
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a GetAccepted message, is utilizing a
