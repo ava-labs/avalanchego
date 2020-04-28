@@ -341,8 +341,5 @@ func (c codec) unmarshal(p *wrappers.Packer, field reflect.Value) error {
 
 // Returns true iff [field] should be serialized
 func shouldSerialize(field reflect.StructField) bool {
-	if field.Tag.Get("serialize") == "true" {
-		return true
-	}
-	return false
+	return field.Tag.Get("serialize") == "true"
 }

@@ -95,10 +95,7 @@ func (svm *SnowmanVM) Shutdown() {
 // DBInitialized returns true iff [svm]'s database has values in it already
 func (svm *SnowmanVM) DBInitialized() bool {
 	status := svm.State.GetStatus(svm.DB, dbInitializedID)
-	if status == choices.Accepted {
-		return true
-	}
-	return false
+	return status == choices.Accepted
 }
 
 // SetDBInitialized marks the database as initialized
