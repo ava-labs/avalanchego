@@ -11,7 +11,7 @@ import (
 // Commit being accepted results in the proposal of its parent (which must be a proposal block)
 // being enacted.
 type Commit struct {
-	CommonDecisionBlock `serialize:"true"`
+	DoubleDecisionBlock `serialize:"true"`
 }
 
 // Verify this block performs a valid state transition.
@@ -35,14 +35,10 @@ func (c *Commit) Verify() error {
 // newCommitBlock returns a new *Commit block where the block's parent, a
 // proposal block, has ID [parentID].
 func (vm *VM) newCommitBlock(parentID ids.ID) *Commit {
-	commit := &Commit{
-		CommonDecisionBlock: CommonDecisionBlock{
-			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID),
-				vm:    vm,
-			},
-		},
-	}
+	commit := &Commit{DoubleDecisionBlock: DoubleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
+		Block: core.NewBlock(parentID),
+		vm:    vm,
+	}}}}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block

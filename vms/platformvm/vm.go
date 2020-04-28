@@ -81,22 +81,23 @@ var (
 )
 
 var (
-	errEndOfTime              = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
-	errTimeTooAdvanced        = errors.New("this is proposing a time too far in the future")
-	errNoPendingBlocks        = errors.New("no pending blocks")
-	errUnsupportedFXs         = errors.New("unsupported feature extensions")
-	errDB                     = errors.New("problem retrieving/putting value from/in database")
-	errDBCurrentValidators    = errors.New("couldn't retrieve current validators from database")
-	errDBPutCurrentValidators = errors.New("couldn't put current validators in database")
-	errDBPendingValidators    = errors.New("couldn't retrieve pending validators from database")
-	errDBPutPendingValidators = errors.New("couldn't put pending validators in database")
-	errDBAccount              = errors.New("couldn't retrieve account from database")
-	errDBPutAccount           = errors.New("couldn't put account in database")
-	errDBChains               = errors.New("couldn't retrieve chain list from database")
-	errDBPutChains            = errors.New("couldn't put chain list in database")
-	errDBPutBlock             = errors.New("couldn't put block in database")
-	errRegisteringType        = errors.New("error registering type with database")
-	errMissingBlock           = errors.New("missing block")
+	errEndOfTime                = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
+	errTimeTooAdvanced          = errors.New("this is proposing a time too far in the future")
+	errNoPendingBlocks          = errors.New("no pending blocks")
+	errUnsupportedFXs           = errors.New("unsupported feature extensions")
+	errDB                       = errors.New("problem retrieving/putting value from/in database")
+	errDBCurrentValidators      = errors.New("couldn't retrieve current validators from database")
+	errDBPutCurrentValidators   = errors.New("couldn't put current validators in database")
+	errDBPendingValidators      = errors.New("couldn't retrieve pending validators from database")
+	errDBPutPendingValidators   = errors.New("couldn't put pending validators in database")
+	errDBAccount                = errors.New("couldn't retrieve account from database")
+	errDBPutAccount             = errors.New("couldn't put account in database")
+	errDBChains                 = errors.New("couldn't retrieve chain list from database")
+	errDBPutChains              = errors.New("couldn't put chain list in database")
+	errDBPutBlock               = errors.New("couldn't put block in database")
+	errRegisteringType          = errors.New("error registering type with database")
+	errMissingBlock             = errors.New("missing block")
+	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
 )
 
 // Codec does serialization and deserialization
@@ -287,6 +288,10 @@ func (vm *VM) Initialize(
 		genesisBlock.CommonBlock.Accept()
 
 		vm.SetDBInitialized()
+
+		if err := vm.DB.Commit(); err != nil {
+			return errDB
+		}
 	}
 
 	// Transactions from clients that have not yet been put into blocks
@@ -313,8 +318,22 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	lastAcceptedID := vm.LastAccepted()
+	vm.Ctx.Log.Info("Initializing last accepted block as %s", lastAcceptedID)
+
 	// Build off the most recently accepted block
-	vm.SetPreference(vm.LastAccepted())
+	vm.SetPreference(lastAcceptedID)
+
+	// Sanity check to make sure the DB is in a valid state
+	lastAcceptedIntf, err := vm.getBlock(lastAcceptedID)
+	if err != nil {
+		vm.Ctx.Log.Error("Error fetching the last accepted block (%s), %s", vm.Preferred(), err)
+		return err
+	}
+	if _, ok := lastAcceptedIntf.(decision); !ok {
+		vm.Ctx.Log.Fatal("The last accepted block, %s, must always be a decision block", lastAcceptedID)
+		return errInvalidLastAcceptedBlock
+	}
 
 	return nil
 }
@@ -609,16 +628,19 @@ func (vm *VM) resetTimer() {
 	}
 
 	// Get the preferred block
-	preferred, err := vm.getBlock(vm.Preferred())
-	vm.Ctx.Log.AssertNoError(err)
+	preferredIntf, err := vm.getBlock(vm.Preferred())
+	if err != nil {
+		vm.Ctx.Log.Error("Error fetching the preferred block (%s), %s", vm.Preferred(), err)
+		return
+	}
 
 	// The database if the preferred block were to be committed
 	var db database.Database
 	// The preferred block should always be a decision block
-	if preferred, ok := preferred.(decision); ok {
+	if preferred, ok := preferredIntf.(decision); ok {
 		db = preferred.onAccept()
 	} else {
-		vm.Ctx.Log.Error("The preferred block should always be a decision block")
+		vm.Ctx.Log.Error("The preferred block, %s, should always be a decision block", vm.Preferred())
 		return
 	}
 

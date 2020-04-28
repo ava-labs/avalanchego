@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -39,6 +40,12 @@ type ProposalBlock struct {
 	onCommitFunc func()
 	// The function to execute if this block's proposal is aborted
 	onAbortFunc func()
+}
+
+// Accept implements the snowman.Block interface
+func (pb *ProposalBlock) Accept() {
+	pb.SetStatus(choices.Accepted)
+	pb.VM.LastAcceptedID = pb.ID()
 }
 
 // Initialize this block.

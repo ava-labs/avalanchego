@@ -36,7 +36,7 @@ type AtomicTx interface {
 // AtomicBlock being accepted results in the transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
-	CommonDecisionBlock `serialize:"true"`
+	SingleDecisionBlock `serialize:"true"`
 
 	Tx AtomicTx `serialize:"true"`
 
@@ -45,7 +45,7 @@ type AtomicBlock struct {
 
 // initialize this block
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
-	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
+	if err := ab.SingleDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
 	return ab.Tx.initialize(vm)
@@ -133,12 +133,12 @@ func (ab *AtomicBlock) Accept() {
 // decision block, has ID [parentID].
 func (vm *VM) newAtomicBlock(parentID ids.ID, tx AtomicTx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
-		CommonDecisionBlock: CommonDecisionBlock{
+		SingleDecisionBlock: SingleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{
 				Block: core.NewBlock(parentID),
 				vm:    vm,
 			},
-		},
+		}},
 		Tx: tx,
 	}
 
