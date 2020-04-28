@@ -25,14 +25,14 @@ type DecisionTx interface {
 // StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
-	CommonDecisionBlock `serialize:"true"`
+	SingleDecisionBlock `serialize:"true"`
 
 	Txs []DecisionTx `serialize:"true"`
 }
 
 // initialize this block
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
-	if err := sb.CommonDecisionBlock.initialize(vm, bytes); err != nil {
+	if err := sb.SingleDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
 	for _, tx := range sb.Txs {
@@ -90,12 +90,10 @@ func (sb *StandardBlock) Verify() error {
 // decision block, has ID [parentID].
 func (vm *VM) newStandardBlock(parentID ids.ID, txs []DecisionTx) (*StandardBlock, error) {
 	sb := &StandardBlock{
-		CommonDecisionBlock: CommonDecisionBlock{
-			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID),
-				vm:    vm,
-			},
-		},
+		SingleDecisionBlock: SingleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
+			Block: core.NewBlock(parentID),
+			vm:    vm,
+		}}},
 		Txs: txs,
 	}
 

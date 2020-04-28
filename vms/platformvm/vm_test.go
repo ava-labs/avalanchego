@@ -1227,3 +1227,203 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatalf("failed to provide funds")
 	}
 }
+
+// test restarting the node
+func TestRestartPartiallyAccepted(t *testing.T) {
+	genesisAccounts := GenesisAccounts()
+	genesisValidators := GenesisCurrentValidators()
+	genesisChains := make([]*CreateChainTx, 0)
+
+	genesisState := Genesis{
+		Accounts:   genesisAccounts,
+		Validators: genesisValidators,
+		Chains:     genesisChains,
+		Timestamp:  uint64(defaultGenesisTime.Unix()),
+	}
+
+	genesisBytes, err := Codec.Marshal(genesisState)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := memdb.New()
+
+	firstVM := &VM{
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
+	}
+
+	firstDefaultSubnet := validators.NewSet()
+	firstVM.validators = validators.NewManager()
+	firstVM.validators.PutValidatorSet(DefaultSubnetID, firstDefaultSubnet)
+
+	firstVM.clock.Set(defaultGenesisTime)
+	firstCtx := defaultContext()
+	firstMsgChan := make(chan common.Message, 1)
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	genesisID := firstVM.LastAccepted()
+
+	firstAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstAdvanceTimeTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstVM.clock.Set(defaultGenesisTime.Add(2 * time.Second))
+	if err := firstAdvanceTimeBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	options := firstAdvanceTimeBlk.Options()
+	firstOption := options[0]
+	secondOption := options[1]
+
+	if err := firstOption.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := secondOption.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	firstAdvanceTimeBlk.Accept()
+
+	secondAdvanceTimeBlkBytes := []byte{
+		0x00, 0x00, 0x00, 0x00, 0xad, 0x64, 0x34, 0x49,
+		0xa5, 0x05, 0xd8, 0xda, 0xc6, 0xd1, 0xb8, 0x2c,
+		0x5c, 0xe6, 0x06, 0x81, 0xf3, 0x54, 0xbf, 0x0f,
+		0xf7, 0xc4, 0xb1, 0xc2, 0xa9, 0x6e, 0x92, 0xc1,
+		0xd8, 0xd8, 0xf0, 0xce, 0x00, 0x00, 0x00, 0x18,
+		0x00, 0x00, 0x00, 0x00, 0x5e, 0xa7, 0xbc, 0x7c,
+	}
+	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
+		t.Fatal(err)
+	}
+
+	firstVM.Shutdown()
+
+	secondVM := &VM{
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
+	}
+
+	secondDefaultSubnet := validators.NewSet()
+	secondVM.validators = validators.NewManager()
+	secondVM.validators.PutValidatorSet(DefaultSubnetID, secondDefaultSubnet)
+
+	secondVM.clock.Set(defaultGenesisTime)
+	secondCtx := defaultContext()
+	secondMsgChan := make(chan common.Message, 1)
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if lastAccepted := secondVM.LastAccepted(); !genesisID.Equals(lastAccepted) {
+		t.Fatalf("Shouldn't have changed the genesis")
+	}
+}
+
+// test restarting the node
+func TestRestartFullyAccepted(t *testing.T) {
+	genesisAccounts := GenesisAccounts()
+	genesisValidators := GenesisCurrentValidators()
+	genesisChains := make([]*CreateChainTx, 0)
+
+	genesisState := Genesis{
+		Accounts:   genesisAccounts,
+		Validators: genesisValidators,
+		Chains:     genesisChains,
+		Timestamp:  uint64(defaultGenesisTime.Unix()),
+	}
+
+	genesisBytes, err := Codec.Marshal(genesisState)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := memdb.New()
+
+	firstVM := &VM{
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
+	}
+
+	firstDefaultSubnet := validators.NewSet()
+	firstVM.validators = validators.NewManager()
+	firstVM.validators.PutValidatorSet(DefaultSubnetID, firstDefaultSubnet)
+
+	firstVM.clock.Set(defaultGenesisTime)
+	firstCtx := defaultContext()
+	firstMsgChan := make(chan common.Message, 1)
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	firstAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstAdvanceTimeTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstVM.clock.Set(defaultGenesisTime.Add(2 * time.Second))
+	if err := firstAdvanceTimeBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	options := firstAdvanceTimeBlk.Options()
+	firstOption := options[0]
+	secondOption := options[1]
+
+	if err := firstOption.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := secondOption.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	firstAdvanceTimeBlk.Accept()
+	firstOption.Accept()
+	secondOption.Reject()
+
+	secondAdvanceTimeBlkBytes := []byte{
+		0x00, 0x00, 0x00, 0x00, 0xad, 0x64, 0x34, 0x49,
+		0xa5, 0x05, 0xd8, 0xda, 0xc6, 0xd1, 0xb8, 0x2c,
+		0x5c, 0xe6, 0x06, 0x81, 0xf3, 0x54, 0xbf, 0x0f,
+		0xf7, 0xc4, 0xb1, 0xc2, 0xa9, 0x6e, 0x92, 0xc1,
+		0xd8, 0xd8, 0xf0, 0xce, 0x00, 0x00, 0x00, 0x18,
+		0x00, 0x00, 0x00, 0x00, 0x5e, 0xa7, 0xbc, 0x7c,
+	}
+	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
+		t.Fatal(err)
+	}
+
+	firstVM.Shutdown()
+
+	secondVM := &VM{
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
+	}
+
+	secondDefaultSubnet := validators.NewSet()
+	secondVM.validators = validators.NewManager()
+	secondVM.validators.PutValidatorSet(DefaultSubnetID, secondDefaultSubnet)
+
+	secondVM.clock.Set(defaultGenesisTime)
+	secondCtx := defaultContext()
+	secondMsgChan := make(chan common.Message, 1)
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if lastAccepted := secondVM.LastAccepted(); !firstOption.ID().Equals(lastAccepted) {
+		t.Fatalf("Should have changed the genesis")
+	}
+}
