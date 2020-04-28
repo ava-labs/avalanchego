@@ -316,8 +316,37 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) {
 		}
 	}
 
-	if len(batch) > 0 || (empty && !issued) {
+	if len(batch) > 0 {
 		t.issueBatch(batch)
+	} else if empty && !issued {
+		t.issueRepoll()
+	}
+}
+
+func (t *Transitive) issueRepoll() {
+	preferredIDs := t.Consensus.Preferences().List()
+	numPreferredIDs := len(preferredIDs)
+	if numPreferredIDs == 0 {
+		t.Config.Context.Log.Error("Re-query attempt was dropped due to no pending vertices")
+		return
+	}
+
+	sampler := random.Uniform{N: len(preferredIDs)}
+	vtxID := preferredIDs[sampler.Sample()]
+
+	p := t.Consensus.Parameters()
+	vdrs := t.Config.Validators.Sample(p.K) // Validators to sample
+
+	vdrSet := ids.ShortSet{} // Validators to sample repr. as a set
+	for _, vdr := range vdrs {
+		vdrSet.Add(vdr.ID())
+	}
+
+	t.RequestID++
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet.Len()) {
+		t.Config.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
+	} else if numVdrs < p.K {
+		t.Config.Context.Log.Error("Re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 }
 

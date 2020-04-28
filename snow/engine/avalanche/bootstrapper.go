@@ -177,9 +177,7 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 				}
 			}
 
-			for _, parent := range vtx.Parents() {
-				vts = append(vts, parent)
-			}
+			vts = append(vts, vtx.Parents()...)
 		case choices.Accepted:
 			b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", vtxID)
 		case choices.Rejected:
@@ -207,6 +205,7 @@ func (b *bootstrapper) finish() {
 func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) {
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
+		b.BootstrapConfig.Context.Log.Debug("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
 			b.BootstrapConfig.Context.Log.Warn("Error executing: %s", err)
 		}

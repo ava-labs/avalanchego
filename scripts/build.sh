@@ -17,6 +17,9 @@ if [[ -d "$CORETH_PATH/.git" ]]; then
 else
     go get -t -v -d "$CORETH_PKG/..."
 fi
+cd "$CORETH_PATH"
+git -c advice.detachedHead=false checkout v0.1.0
+cd -
 
 GECKO_PKG=github.com/ava-labs/gecko
 GECKO_PATH="$GOPATH/src/$GECKO_PKG"
@@ -31,3 +34,8 @@ fi
 go build -o "$PREFIX/ava" "$GECKO_PATH/main/"*.go
 go build -o "$PREFIX/xputtest" "$GECKO_PATH/xputtest/"*.go
 go build -o "$PLUGIN_PREFIX/evm" "$CORETH_PATH/plugin/"*.go
+if [[ -f "$PREFIX/ava" && -f "$PREFIX/xputtest" && -f "$PLUGIN_PREFIX/evm" ]]; then
+        echo "Build Successful" 
+else
+        echo "Build failure" 
+fi

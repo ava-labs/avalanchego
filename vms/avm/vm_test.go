@@ -943,3 +943,51 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestVMFormat(t *testing.T) {
+	_, _, vm := GenesisVM(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	tests := []struct {
+		in       string
+		expected string
+	}{
+		{"", "3D7sudhzUKTYFkYj4Zoe7GgSKhuyP9bYwXunHwhZsmQe1z9Mp-45PJLL"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if res := vm.Format([]byte(tt.in)); tt.expected != res {
+				t.Errorf("Expected %q, got %q", tt.expected, res)
+			}
+		})
+	}
+}
+
+func TestVMFormatAliased(t *testing.T) {
+	_, _, vm := GenesisVM(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	origAliases := ctx.BCLookup
+	defer func() { ctx.BCLookup = origAliases }()
+
+	tmpAliases := &ids.Aliaser{}
+	tmpAliases.Initialize()
+	tmpAliases.Alias(ctx.ChainID, "X")
+	ctx.BCLookup = tmpAliases
+
+	tests := []struct {
+		in       string
+		expected string
+	}{
+		{"", "X-45PJLL"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if res := vm.Format([]byte(tt.in)); tt.expected != res {
+				t.Errorf("Expected %q, got %q", tt.expected, res)
+			}
+		})
+	}
+}

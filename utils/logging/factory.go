@@ -43,7 +43,7 @@ func (f *factory) Make() (Logger, error) {
 // MakeChain ...
 func (f *factory) MakeChain(chainID ids.ID, subdir string) (Logger, error) {
 	config := f.config
-	config.MsgPrefix = "SN " + chainID.String()
+	config.MsgPrefix = "chain " + chainID.String()
 	config.Directory = path.Join(config.Directory, "chain", chainID.String(), subdir)
 
 	log, err := New(config)

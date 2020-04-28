@@ -26,6 +26,10 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
+const (
+	dbVersion = "v0.1.0"
+)
+
 // Results of parsing the CLI
 var (
 	Config = node.Config{}
@@ -143,7 +147,7 @@ func init() {
 	// DB:
 	if *db && err == nil {
 		// TODO: Add better params here
-		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID))
+		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
 		Config.DB = db
 		errs.Add(err)
@@ -157,11 +161,9 @@ func init() {
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
 		ip, err = Config.Nat.IP()
-		errs.Add(fmt.Errorf(
-			"%s\n"+
-				"If you are trying to create a local network, try adding --public-ip=127.0.0.1\n"+
-				"If you are attempting to connect to a public network, you may need to manually report your IP and perform port forwarding",
-			err))
+		if err != nil {
+			ip = net.IPv4zero
+		}
 	} else {
 		ip = net.ParseIP(*consensusIP)
 	}
