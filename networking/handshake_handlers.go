@@ -68,7 +68,7 @@ var (
 	VersionPrefix    = "avalanche/"
 	VersionSeparator = "."
 	MajorVersion     = 0
-	MinorVersion     = 1
+	MinorVersion     = 2
 	PatchVersion     = 0
 	ClientVersion    = fmt.Sprintf("%s%d%s%d%s%d",
 		VersionPrefix,

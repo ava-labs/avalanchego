@@ -8,7 +8,7 @@
     ava_binary: ~/go/src/github.com/ava-labs/gecko/build/ava
     repo_folder: ~/go/src/github.com/ava-labs/gecko
     repo_name: ava-labs/gecko-internal
-    repo_branch: retry-connections
+    repo_branch: platformvm-proposal-accept
   tasks:
     - name: Kill Node
       command: killall ava
