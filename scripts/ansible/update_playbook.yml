@@ -9,10 +9,9 @@
     repo_folder: ~/go/src/github.com/ava-labs/gecko
     repo_name: ava-labs/gecko-internal
     repo_branch: platformvm-proposal-accept
+  roles:
+    - name: ava-stop
   tasks:
-    - name: Kill Node
-      command: killall ava
-      ignore_errors: yes
     - git:
         repo: ssh://git@github.com/{{ repo_name }}.git
         dest: "{{ repo_folder }}"

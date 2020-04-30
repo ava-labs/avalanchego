@@ -1,0 +1,3 @@
+- name: Kill Node
+  command: killall ava
+  ignore_errors: true
