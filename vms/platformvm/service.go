@@ -1227,6 +1227,10 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	db := block.onAccept()
 
 	chains, err := service.vm.getChains(db)
+	if err != nil {
+		return false, err
+	}
+
 	for _, chain := range chains {
 		if chain.ID().Equals(chainID) {
 			return true, nil
