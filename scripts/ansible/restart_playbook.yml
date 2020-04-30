@@ -11,18 +11,8 @@
     repo_branch: platformvm-proposal-accept
   roles:
     - name: ava-stop
+    - name: ava-build
   tasks:
-    - git:
-        repo: ssh://git@github.com/{{ repo_name }}.git
-        dest: "{{ repo_folder }}"
-        version: "{{ repo_branch }}"
-        update: yes
-    - name: Build project
-      command: ./scripts/build.sh
-      args:
-        chdir: "{{ repo_folder }}"
-      environment:
-        PATH: /sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin:/snap/bin
     - name: Remove previous database
       file:
         path: "{{ db_dir }}"
