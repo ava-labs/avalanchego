@@ -1,15 +1,14 @@
 borealis_bootstrap:
   hosts:
       bootstrap1:
-        ansible_host: 3.227.207.132
-        http_tls_enabled: true
-        http_tls_key_file: "/home/ubuntu/ssl/privkey.pem"
-        http_tls_cert_file: "/home/ubuntu/ssl/fullchain.pem"
+        ansible_host: 3.84.129.247
+        staking_tls_key_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker1.key"
+        staking_tls_cert_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker1.crt"
   vars:
     ansible_connection: ssh
     ansible_user: ubuntu
 
-    network_id: "cascade"
+    network_id: "local"
     api_admin_enabled: true
     api_keystore_enabled: true
     api_metrics_enabled: true
@@ -28,6 +27,7 @@ borealis_bootstrap:
     staking_tls_enabled: true
     staking_tls_key_file: "/home/ubuntu/keys/staker.key"
     staking_tls_cert_file: "/home/ubuntu/keys/staker.crt"
+    plugin_dir: "/home/ubuntu/go/src/github.com/ava-labs/gecko/build/plugins"
     log_dir: "/home/ubuntu/.gecko"
     log_level: debug
     snow_sample_size: 3
@@ -43,18 +43,26 @@ borealis_bootstrap:
 borealis_node:
   hosts:
       node1:
-        ansible_host: 34.207.133.167
+        ansible_host: 35.153.99.244
+        staking_tls_key_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker2.key"
+        staking_tls_cert_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker2.crt"
       node2:
-        ansible_host: 107.23.241.199
+        ansible_host: 34.201.137.119
+        staking_tls_key_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker3.key"
+        staking_tls_cert_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker3.crt"
       node3:
-        ansible_host: 54.197.215.186
+        ansible_host: 54.146.1.110
+        staking_tls_key_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker4.key"
+        staking_tls_cert_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker4.crt"
       node4:
-        ansible_host: 18.234.153.22
+        ansible_host: 54.91.255.231
+        staking_tls_key_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker5.key"
+        staking_tls_cert_file: "/home/ubuntu/go/src/github.com/ava-labs/gecko/keys/local/staker5.crt"
   vars:
     ansible_connection: ssh
     ansible_user: ubuntu
 
-    network_id: "cascade"
+    network_id: "local"
     api_admin_enabled: true
     api_keystore_enabled: true
     api_metrics_enabled: true
@@ -67,12 +75,13 @@ borealis_node:
     http_tls_enabled: false
     http_tls_key_file: ""
     http_tls_cert_file: ""
-    bootstrap_ips: "3.227.207.132:21001"
-    bootstrap_ids: "NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co"
+    bootstrap_ips: "3.84.129.247:21001"
+    bootstrap_ids: "7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg"
     staking_port: 21001
     staking_tls_enabled: true
     staking_tls_key_file: "/home/ubuntu/keys/staker.key"
     staking_tls_cert_file: "/home/ubuntu/keys/staker.crt"
+    plugin_dir: "/home/ubuntu/go/src/github.com/ava-labs/gecko/build/plugins"
     log_dir: "/home/ubuntu/.gecko"
     log_level: debug
     snow_sample_size: 3

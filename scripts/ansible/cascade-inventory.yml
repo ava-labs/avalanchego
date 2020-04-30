@@ -1,0 +1,88 @@
+borealis_bootstrap:
+  hosts:
+      bootstrap1:
+        ansible_host: 3.227.207.132
+        http_tls_enabled: true
+        http_tls_key_file: "/home/ubuntu/ssl/privkey.pem"
+        http_tls_cert_file: "/home/ubuntu/ssl/fullchain.pem"
+  vars:
+    ansible_connection: ssh
+    ansible_user: ubuntu
+
+    network_id: "cascade"
+    api_admin_enabled: true
+    api_keystore_enabled: true
+    api_metrics_enabled: true
+    ava_tx_fee: 0
+    assertions_enabled: true
+    signature_verification_enabled: true
+    db_enabled: true
+    db_dir: "/home/ubuntu/db"
+    http_port: 21000
+    http_tls_enabled: false
+    http_tls_key_file: ""
+    http_tls_cert_file: ""
+    bootstrap_ips: ""
+    bootstrap_ids: ""
+    staking_port: 21001
+    staking_tls_enabled: true
+    staking_tls_key_file: "/home/ubuntu/keys/staker.key"
+    staking_tls_cert_file: "/home/ubuntu/keys/staker.crt"
+    plugin_dir: "/home/ubuntu/go/src/github.com/ava-labs/gecko/build/plugins"
+    log_dir: "/home/ubuntu/.gecko"
+    log_level: debug
+    snow_sample_size: 3
+    snow_quorum_size: 2
+    snow_virtuous_commit_threshold: 20
+    snow_rogue_commit_threshold: 30
+    snow_avalanche_num_parents: 5
+    snow_avalanche_batch_size: 30
+    api_ipcs_enabled: false
+    xput_server_enabled: false
+    xput_server_port: 21002
+
+borealis_node:
+  hosts:
+      node1:
+        ansible_host: 34.207.133.167
+      node2:
+        ansible_host: 107.23.241.199
+      node3:
+        ansible_host: 54.197.215.186
+      node4:
+        ansible_host: 18.234.153.22
+  vars:
+    ansible_connection: ssh
+    ansible_user: ubuntu
+
+    network_id: "cascade"
+    api_admin_enabled: true
+    api_keystore_enabled: true
+    api_metrics_enabled: true
+    ava_tx_fee: 0
+    assertions_enabled: true
+    signature_verification_enabled: true
+    db_enabled: true
+    db_dir: "/home/ubuntu/db"
+    http_port: 21000
+    http_tls_enabled: false
+    http_tls_key_file: ""
+    http_tls_cert_file: ""
+    bootstrap_ips: "3.227.207.132:21001"
+    bootstrap_ids: "NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co"
+    staking_port: 21001
+    staking_tls_enabled: true
+    staking_tls_key_file: "/home/ubuntu/keys/staker.key"
+    staking_tls_cert_file: "/home/ubuntu/keys/staker.crt"
+    plugin_dir: "/home/ubuntu/go/src/github.com/ava-labs/gecko/build/plugins"
+    log_dir: "/home/ubuntu/.gecko"
+    log_level: debug
+    snow_sample_size: 3
+    snow_quorum_size: 2
+    snow_virtuous_commit_threshold: 20
+    snow_rogue_commit_threshold: 30
+    snow_avalanche_num_parents: 5
+    snow_avalanche_batch_size: 30
+    api_ipcs_enabled: false
+    xput_server_enabled: false
+    xput_server_port: 21002

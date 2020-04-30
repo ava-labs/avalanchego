@@ -89,12 +89,12 @@ func (s *Voting) Shutdown() { s.executor.Stop() }
 
 // Accept is called after every consensus decision
 func (s *Voting) Accept(chainID, containerID ids.ID, container []byte) error {
-	addrs := []salticidae.NetAddr(nil)
+	peers := []salticidae.PeerID(nil)
 
-	allAddrs, allIDs := s.conns.RawConns()
+	allPeers, allIDs, _ := s.conns.Conns()
 	for i, id := range allIDs {
 		if !s.vdrs.Contains(id) {
-			addrs = append(addrs, allAddrs[i])
+			peers = append(peers, allPeers[i])
 		}
 	}
 
@@ -109,25 +109,25 @@ func (s *Voting) Accept(chainID, containerID ids.ID, container []byte) error {
 		"\nChain: %s"+
 		"\nContainer ID: %s"+
 		"\nContainer:\n%s",
-		len(addrs),
+		len(peers),
 		chainID,
 		containerID,
 		formatting.DumpBytes{Bytes: container},
 	)
-	s.send(msg, addrs...)
-	s.numPutSent.Add(float64(len(addrs)))
+	s.send(msg, peers...)
+	s.numPutSent.Add(float64(len(peers)))
 	return nil
 }
 
 // GetAcceptedFrontier implements the Sender interface.
 func (s *Voting) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32) {
-	addrs := []salticidae.NetAddr(nil)
+	peers := []salticidae.PeerID(nil)
 	validatorIDList := validatorIDs.List()
 	for _, validatorID := range validatorIDList {
 		vID := validatorID
-		if addr, exists := s.conns.GetIP(vID); exists {
-			addrs = append(addrs, addr)
-			s.log.Verbo("Sending a GetAcceptedFrontier to %s", toIPDesc(addr))
+		if peer, exists := s.conns.GetPeerID(vID); exists {
+			peers = append(peers, peer)
+			s.log.Verbo("Sending a GetAcceptedFrontier to %s", vID)
 		} else {
 			s.log.Debug("Attempted to send a GetAcceptedFrontier message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.GetAcceptedFrontierFailed(vID, chainID, requestID) })
@@ -142,17 +142,17 @@ func (s *Voting) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, 
 		"\nNumber of Validators: %d"+
 		"\nChain: %s"+
 		"\nRequest ID: %d",
-		len(addrs),
+		len(peers),
 		chainID,
 		requestID,
 	)
-	s.send(msg, addrs...)
-	s.numGetAcceptedFrontierSent.Add(float64(len(addrs)))
+	s.send(msg, peers...)
+	s.numGetAcceptedFrontierSent.Add(float64(len(peers)))
 }
 
 // AcceptedFrontier implements the Sender interface.
 func (s *Voting) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
-	addr, exists := s.conns.GetIP(validatorID)
+	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
 		s.log.Debug("Attempted to send an AcceptedFrontier message to a disconnected validator: %s", validatorID)
 		return // Validator is not connected
@@ -167,29 +167,27 @@ func (s *Voting) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, reque
 
 	s.log.Verbo("Sending an AcceptedFrontier message."+
 		"\nValidator: %s"+
-		"\nDestination: %s"+
 		"\nChain: %s"+
 		"\nRequest ID: %d"+
 		"\nContainer IDs: %s",
 		validatorID,
-		toIPDesc(addr),
 		chainID,
 		requestID,
 		containerIDs,
 	)
-	s.send(msg, addr)
+	s.send(msg, peer)
 	s.numAcceptedFrontierSent.Inc()
 }
 
 // GetAccepted implements the Sender interface.
 func (s *Voting) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
-	addrs := []salticidae.NetAddr(nil)
+	peers := []salticidae.PeerID(nil)
 	validatorIDList := validatorIDs.List()
 	for _, validatorID := range validatorIDList {
 		vID := validatorID
-		if addr, exists := s.conns.GetIP(validatorID); exists {
-			addrs = append(addrs, addr)
-			s.log.Verbo("Sending a GetAccepted to %s", toIPDesc(addr))
+		if peer, exists := s.conns.GetPeerID(validatorID); exists {
+			peers = append(peers, peer)
+			s.log.Verbo("Sending a GetAccepted to %s", vID)
 		} else {
 			s.log.Debug("Attempted to send a GetAccepted message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.GetAcceptedFailed(vID, chainID, requestID) })
@@ -199,8 +197,8 @@ func (s *Voting) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestI
 	build := Builder{}
 	msg, err := build.GetAccepted(chainID, requestID, containerIDs)
 	if err != nil {
-		for _, addr := range addrs {
-			if validatorID, exists := s.conns.GetID(addr); exists {
+		for _, peer := range peers {
+			if validatorID, exists := s.conns.GetID(peer); exists {
 				s.executor.Add(func() { s.router.GetAcceptedFailed(validatorID, chainID, requestID) })
 			}
 		}
@@ -213,18 +211,18 @@ func (s *Voting) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestI
 		"\nChain: %s"+
 		"\nRequest ID: %d"+
 		"\nContainer IDs:%s",
-		len(addrs),
+		len(peers),
 		chainID,
 		requestID,
 		containerIDs,
 	)
-	s.send(msg, addrs...)
-	s.numGetAcceptedSent.Add(float64(len(addrs)))
+	s.send(msg, peers...)
+	s.numGetAcceptedSent.Add(float64(len(peers)))
 }
 
 // Accepted implements the Sender interface.
 func (s *Voting) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
-	addr, exists := s.conns.GetIP(validatorID)
+	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
 		s.log.Debug("Attempted to send an Accepted message to a disconnected validator: %s", validatorID)
 		return // Validator is not connected
@@ -239,23 +237,21 @@ func (s *Voting) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uin
 
 	s.log.Verbo("Sending an Accepted message."+
 		"\nValidator: %s"+
-		"\nDestination: %s"+
 		"\nChain: %s"+
 		"\nRequest ID: %d"+
 		"\nContainer IDs: %s",
 		validatorID,
-		toIPDesc(addr),
 		chainID,
 		requestID,
 		containerIDs,
 	)
-	s.send(msg, addr)
+	s.send(msg, peer)
 	s.numAcceptedSent.Inc()
 }
 
 // Get implements the Sender interface.
 func (s *Voting) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
-	addr, exists := s.conns.GetIP(validatorID)
+	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
 		s.log.Debug("Attempted to send a Get message to a disconnected validator: %s", validatorID)
 		s.executor.Add(func() { s.router.GetFailed(validatorID, chainID, requestID, containerID) })
@@ -268,23 +264,21 @@ func (s *Voting) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, 
 
 	s.log.Verbo("Sending a Get message."+
 		"\nValidator: %s"+
-		"\nDestination: %s"+
 		"\nChain: %s"+
 		"\nRequest ID: %d"+
 		"\nContainer ID: %s",
 		validatorID,
-		toIPDesc(addr),
 		chainID,
 		requestID,
 		containerID,
 	)
-	s.send(msg, addr)
+	s.send(msg, peer)
 	s.numGetSent.Inc()
 }
 
 // Put implements the Sender interface.
 func (s *Voting) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	addr, exists := s.conns.GetIP(validatorID)
+	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
 		s.log.Debug("Attempted to send a Container message to a disconnected validator: %s", validatorID)
 		return // Validator is not connected
@@ -299,31 +293,29 @@ func (s *Voting) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, 
 
 	s.log.Verbo("Sending a Container message."+
 		"\nValidator: %s"+
-		"\nDestination: %s"+
 		"\nChain: %s"+
 		"\nRequest ID: %d"+
 		"\nContainer ID: %s"+
 		"\nContainer:\n%s",
 		validatorID,
-		toIPDesc(addr),
 		chainID,
 		requestID,
 		containerID,
 		formatting.DumpBytes{Bytes: container},
 	)
-	s.send(msg, addr)
+	s.send(msg, peer)
 	s.numPutSent.Inc()
 }
 
 // PushQuery implements the Sender interface.
 func (s *Voting) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	addrs := []salticidae.NetAddr(nil)
+	peers := []salticidae.PeerID(nil)
 	validatorIDList := validatorIDs.List()
 	for _, validatorID := range validatorIDList {
 		vID := validatorID
-		if addr, exists := s.conns.GetIP(vID); exists {
-			addrs = append(addrs, addr)
-			s.log.Verbo("Sending a PushQuery to %s", toIPDesc(addr))
+		if peer, exists := s.conns.GetPeerID(vID); exists {
+			peers = append(peers, peer)
+			s.log.Verbo("Sending a PushQuery to %s", vID)
 		} else {
 			s.log.Debug("Attempted to send a PushQuery message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.QueryFailed(vID, chainID, requestID) })
@@ -333,8 +325,8 @@ func (s *Voting) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 	build := Builder{}
 	msg, err := build.PushQuery(chainID, requestID, containerID, container)
 	if err != nil {
-		for _, addr := range addrs {
-			if validatorID, exists := s.conns.GetID(addr); exists {
+		for _, peer := range peers {
+			if validatorID, exists := s.conns.GetID(peer); exists {
 				s.executor.Add(func() { s.router.QueryFailed(validatorID, chainID, requestID) })
 			}
 		}
@@ -348,25 +340,25 @@ func (s *Voting) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 		"\nRequest ID: %d"+
 		"\nContainer ID: %s"+
 		"\nContainer:\n%s",
-		len(addrs),
+		len(peers),
 		chainID,
 		requestID,
 		containerID,
 		formatting.DumpBytes{Bytes: container},
 	)
-	s.send(msg, addrs...)
-	s.numPushQuerySent.Add(float64(len(addrs)))
+	s.send(msg, peers...)
+	s.numPushQuerySent.Add(float64(len(peers)))
 }
 
 // PullQuery implements the Sender interface.
 func (s *Voting) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID) {
-	addrs := []salticidae.NetAddr(nil)
+	peers := []salticidae.PeerID(nil)
 	validatorIDList := validatorIDs.List()
 	for _, validatorID := range validatorIDList {
 		vID := validatorID
-		if addr, exists := s.conns.GetIP(vID); exists {
-			addrs = append(addrs, addr)
-			s.log.Verbo("Sending a PullQuery to %s", toIPDesc(addr))
+		if peer, exists := s.conns.GetPeerID(vID); exists {
+			peers = append(peers, peer)
+			s.log.Verbo("Sending a PullQuery to %s", vID)
 		} else {
 			s.log.Warn("Attempted to send a PullQuery message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.QueryFailed(vID, chainID, requestID) })
@@ -382,18 +374,18 @@ func (s *Voting) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 		"\nChain: %s"+
 		"\nRequest ID: %d"+
 		"\nContainer ID: %s",
-		len(addrs),
+		len(peers),
 		chainID,
 		requestID,
 		containerID,
 	)
-	s.send(msg, addrs...)
-	s.numPullQuerySent.Add(float64(len(addrs)))
+	s.send(msg, peers...)
+	s.numPullQuerySent.Add(float64(len(peers)))
 }
 
 // Chits implements the Sender interface.
 func (s *Voting) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
-	addr, exists := s.conns.GetIP(validatorID)
+	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
 		s.log.Debug("Attempted to send a Chits message to a disconnected validator: %s", validatorID)
 		return // Validator is not connected
@@ -408,21 +400,19 @@ func (s *Voting) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32
 
 	s.log.Verbo("Sending a Chits message."+
 		"\nValidator: %s"+
-		"\nDestination: %s"+
 		"\nChain: %s"+
 		"\nRequest ID: %d"+
 		"\nNumber of Chits: %d",
 		validatorID,
-		toIPDesc(addr),
 		chainID,
 		requestID,
 		votes.Len(),
 	)
-	s.send(msg, addr)
+	s.send(msg, peer)
 	s.numChitsSent.Inc()
 }
 
-func (s *Voting) send(msg Msg, addrs ...salticidae.NetAddr) {
+func (s *Voting) send(msg Msg, peers ...salticidae.PeerID) {
 	ds := msg.DataStream()
 	defer ds.Free()
 	ba := salticidae.NewByteArrayMovedFromDataStream(ds, false)
@@ -430,12 +420,12 @@ func (s *Voting) send(msg Msg, addrs ...salticidae.NetAddr) {
 	cMsg := salticidae.NewMsgMovedFromByteArray(msg.Op(), ba, false)
 	defer cMsg.Free()
 
-	switch len(addrs) {
+	switch len(peers) {
 	case 0:
 	case 1:
-		s.net.SendMsg(cMsg, addrs[0])
+		s.net.SendMsg(cMsg, peers[0])
 	default:
-		s.net.MulticastMsgByMove(cMsg, addrs)
+		s.net.MulticastMsgByMove(cMsg, peers)
 	}
 }
 
@@ -620,17 +610,15 @@ func chits(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Poi
 
 func (s *Voting) sanitize(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, op salticidae.Opcode) (ids.ShortID, ids.ID, uint32, Msg, error) {
 	conn := salticidae.PeerNetworkConnFromC(salticidae.CPeerNetworkConn((*C.peernetwork_conn_t)(_conn)))
-	addr := conn.GetPeerAddr(false)
-	defer addr.Free()
-	if addr.IsNull() {
-		return ids.ShortID{}, ids.ID{}, 0, nil, errConnectionDropped
-	}
-	s.log.Verbo("Receiving message from %s", toIPDesc(addr))
+	peer := conn.GetPeerID(false)
+	defer peer.Free()
 
-	validatorID, exists := s.conns.GetID(addr)
+	validatorID, exists := s.conns.GetID(peer)
 	if !exists {
-		return ids.ShortID{}, ids.ID{}, 0, nil, fmt.Errorf("message received from an un-registered source: %s", toIPDesc(addr))
+		return ids.ShortID{}, ids.ID{}, 0, nil, fmt.Errorf("message received from an un-registered peer")
 	}
+
+	s.log.Verbo("Receiving message from %s", validatorID)
 
 	msg := salticidae.MsgFromC(salticidae.CMsg(_msg))
 	codec := Codec{}

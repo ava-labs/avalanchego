@@ -11,7 +11,7 @@ import (
 // Abort being accepted results in the proposal of its parent (which must be a proposal block)
 // being rejected.
 type Abort struct {
-	CommonDecisionBlock `serialize:"true"`
+	DoubleDecisionBlock `serialize:"true"`
 }
 
 // Verify this block performs a valid state transition.
@@ -35,14 +35,10 @@ func (a *Abort) Verify() error {
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
 // block, has ID [parentID].
 func (vm *VM) newAbortBlock(parentID ids.ID) *Abort {
-	abort := &Abort{
-		CommonDecisionBlock: CommonDecisionBlock{
-			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID),
-				vm:    vm,
-			},
-		},
-	}
+	abort := &Abort{DoubleDecisionBlock: DoubleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
+		Block: core.NewBlock(parentID),
+		vm:    vm,
+	}}}}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block

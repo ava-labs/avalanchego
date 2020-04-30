@@ -8,7 +8,7 @@ import (
 )
 
 // LockOption allows the vm to specify their lock option based on their endpoint
-type LockOption int
+type LockOption uint32
 
 // List of all allowed options
 const (

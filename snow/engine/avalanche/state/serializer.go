@@ -82,6 +82,10 @@ func (s *Serializer) ParseVertex(b []byte) (avacon.Vertex, error) {
 
 // BuildVertex implements the avalanche.State interface
 func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avacon.Vertex, error) {
+	if len(txs) == 0 {
+		return nil, errNoTxs
+	}
+
 	parentIDs := parentSet.List()
 	ids.SortIDs(parentIDs)
 	sortTxs(txs)
