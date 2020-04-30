@@ -19,3 +19,6 @@ jobs:
             scripts/ansible/ping_playbook.yml
             scripts/ansible/restart_playbook.yml
             scripts/ansible/update_playbook.yml
+
+          args:
+            -c scripts/ansible/.ansible-lint
