@@ -92,15 +92,18 @@ func (pb *ProposalBlock) onAbort() (*versiondb.Database, func()) {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
-	// pdb is the database if this block's parent is accepted
-	var pdb database.Database
-	parent := pb.parentBlock()
+	parentIntf := pb.parentBlock()
+
 	// The parent of a proposal block (ie this block) must be a decision block
-	if parent, ok := parent.(decision); ok {
-		pdb = parent.onAccept()
-	} else {
+	parent, ok := parentIntf.(decision)
+	if !ok {
 		return errInvalidBlockType
 	}
+
+	// pdb is the database if this block's parent is accepted
+	pdb := parent.onAccept()
+
+	pb.vm.Ctx.Log.Warn("Got %+v from %p", pdb, parentIntf)
 
 	var err error
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
@@ -109,7 +112,7 @@ func (pb *ProposalBlock) Verify() error {
 	}
 
 	pb.vm.currentBlocks[pb.ID().Key()] = pb
-	parent.addChild(pb)
+	parentIntf.addChild(pb)
 	return nil
 }
 
