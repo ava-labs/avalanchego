@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -393,6 +394,89 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
+
+	assetID, err := service.vm.IssueTx(b, nil)
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.AssetID = assetID
+
+	return nil
+}
+
+// CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
+type CreateNFTAssetArgs struct {
+	Username   string   `json:"username"`
+	Password   string   `json:"password"`
+	Name       string   `json:"name"`
+	Symbol     string   `json:"symbol"`
+	MinterSets []Owners `json:"minterSets"`
+}
+
+// CreateNFTAssetReply defines the CreateNFTAsset replies returned from the API
+type CreateNFTAssetReply struct {
+	AssetID ids.ID `json:"assetID"`
+}
+
+// CreateNFTAsset returns ID of the newly created asset
+func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs, reply *CreateNFTAssetReply) error {
+	service.vm.ctx.Log.Verbo("CreateNFTAsset called with name: %s symbol: %s number of minters: %d",
+		args.Name,
+		args.Symbol,
+		len(args.MinterSets),
+	)
+
+	if len(args.MinterSets) == 0 {
+		return errNoMinters
+	}
+
+	initialState := &InitialState{
+		FxID: 1, // TODO: Should lookup nftfx FxID
+	}
+
+	tx := &Tx{UnsignedTx: &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+		},
+		Name:         args.Name,
+		Symbol:       args.Symbol,
+		Denomination: 0, // NFTs are non-fungible
+		States: []*InitialState{
+			initialState,
+		},
+	}}
+
+	for i, owner := range args.MinterSets {
+		minter := &nftfx.MintOutput{
+			GroupID: uint32(i),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: uint32(owner.Threshold),
+			},
+		}
+		for _, address := range owner.Minters {
+			addrBytes, err := service.vm.Parse(address)
+			if err != nil {
+				return err
+			}
+			addr, err := ids.ToShortID(addrBytes)
+			if err != nil {
+				return err
+			}
+			minter.Addrs = append(minter.Addrs, addr)
+		}
+		ids.SortShortIDs(minter.Addrs)
+		initialState.Outs = append(initialState.Outs, minter)
+	}
+	initialState.Sort(service.vm.codec)
+
+	b, err := service.vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	service.vm.ctx.Log.Fatal("\n%s", formatting.DumpBytes{Bytes: b})
 
 	assetID, err := service.vm.IssueTx(b, nil)
 	if err != nil {
@@ -945,6 +1029,387 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
 	reply.Tx.Bytes = txBytes
+	return nil
+}
+
+// CreateMintNFTTxArgs are arguments for passing into CreateMintNFTTx requests
+type CreateMintNFTTxArgs struct {
+	AssetID string          `json:"assetID"`
+	To      string          `json:"to"`
+	Payload formatting.CB58 `json:"payload"`
+	Minters []string        `json:"minters"`
+}
+
+// CreateMintNFTTxReply defines the CreateMintNFTTx replies returned from the API
+type CreateMintNFTTxReply struct {
+	Tx formatting.CB58 `json:"tx"`
+}
+
+// CreateMintNFTTx returns the newly created unsigned transaction
+func (service *Service) CreateMintNFTTx(r *http.Request, args *CreateMintNFTTxArgs, reply *CreateMintNFTTxReply) error {
+	service.vm.ctx.Log.Verbo("CreateMintNFTTx called")
+
+	assetID, err := service.vm.Lookup(args.AssetID)
+	if err != nil {
+		assetID, err = ids.FromString(args.AssetID)
+		if err != nil {
+			return fmt.Errorf("asset '%s' not found", args.AssetID)
+		}
+	}
+
+	toBytes, err := service.vm.Parse(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address '%s': %w", args.To, err)
+	}
+	to, err := ids.ToShortID(toBytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address '%s': %w", args.To, err)
+	}
+
+	addrs := ids.Set{}
+	minters := ids.ShortSet{}
+	for _, minter := range args.Minters {
+		addrBytes, err := service.vm.Parse(minter)
+		if err != nil {
+			return fmt.Errorf("problem parsing minter address '%s': %w", minter, err)
+		}
+		addr, err := ids.ToShortID(addrBytes)
+		if err != nil {
+			return fmt.Errorf("problem parsing minter address '%s': %w", minter, err)
+		}
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
+		minters.Add(addr)
+	}
+
+	utxos, err := service.vm.GetUTXOs(addrs)
+	if err != nil {
+		return fmt.Errorf("problem getting user's UTXOs: %w", err)
+	}
+
+	for _, utxo := range utxos {
+		if !utxo.AssetID().Equals(assetID) {
+			continue
+		}
+
+		switch out := utxo.Out.(type) {
+		case *nftfx.MintOutput:
+			sigs := []uint32{}
+			for i := uint32(0); i < uint32(len(out.Addrs)) && uint32(len(sigs)) < out.Threshold; i++ {
+				if minters.Contains(out.Addrs[i]) {
+					sigs = append(sigs, i)
+				}
+			}
+
+			if uint32(len(sigs)) != out.Threshold {
+				continue
+			}
+
+			tx := Tx{UnsignedTx: &OperationTx{
+				BaseTx: BaseTx{
+					NetID: service.vm.ctx.NetworkID,
+					BCID:  service.vm.ctx.ChainID,
+				},
+				Ops: []*Operation{
+					&Operation{
+						Asset: ava.Asset{ID: assetID},
+						UTXOIDs: []*ava.UTXOID{
+							&utxo.UTXOID,
+						},
+						Op: &nftfx.MintOperation{
+							MintInput: secp256k1fx.Input{
+								SigIndices: sigs,
+							},
+							GroupID: out.GroupID,
+							Payload: args.Payload.Bytes,
+							Outputs: []*secp256k1fx.OutputOwners{&secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{to},
+							}},
+						},
+					},
+				},
+			}}
+
+			txBytes, err := service.vm.codec.Marshal(&tx)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			reply.Tx.Bytes = txBytes
+			return nil
+		}
+	}
+
+	return errAddressesCantMintAsset
+}
+
+// SignMintNFTTxArgs are arguments for passing into SignMintNFTTx requests
+type SignMintNFTTxArgs struct {
+	Username string          `json:"username"`
+	Password string          `json:"password"`
+	Minter   string          `json:"minter"`
+	Tx       formatting.CB58 `json:"tx"`
+}
+
+// SignMintNFTTxReply defines the SignMintNFTTx replies returned from the API
+type SignMintNFTTxReply struct {
+	Tx formatting.CB58 `json:"tx"`
+}
+
+// SignMintNFTTx returns the newly signed transaction
+func (service *Service) SignMintNFTTx(r *http.Request, args *SignMintNFTTxArgs, reply *SignMintNFTTxReply) error {
+	service.vm.ctx.Log.Verbo("SignMintNFTTx called")
+
+	minter, err := service.vm.Parse(args.Minter)
+	if err != nil {
+		return fmt.Errorf("problem parsing address '%s': %w", args.Minter, err)
+	}
+
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := userState{vm: service.vm}
+
+	addr := ids.NewID(hashing.ComputeHash256Array(minter))
+	sk, err := user.Key(db, addr)
+	if err != nil {
+		return fmt.Errorf("problem retriving private key: %w", err)
+	}
+
+	tx := Tx{}
+	if err := service.vm.codec.Unmarshal(args.Tx.Bytes, &tx); err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	opTx, ok := tx.UnsignedTx.(*OperationTx)
+	if !ok {
+		return errors.New("transaction must be a mint transaction")
+	}
+	if len(opTx.Ins) != 0 {
+		return errCanOnlySignSingleInputTxs
+	}
+	if len(opTx.Ops) != 1 {
+		return errCanOnlySignSingleInputTxs
+	}
+	op := opTx.Ops[0]
+
+	if len(op.UTXOIDs) != 1 {
+		return errCanOnlySignSingleInputTxs
+	}
+	inputUTXO := op.UTXOIDs[0]
+
+	utxo, err := service.vm.getUTXO(inputUTXO)
+	if err != nil {
+		service.vm.ctx.Log.Fatal("%+v", utxo)
+		return err
+	}
+
+	out, ok := utxo.Out.(*nftfx.MintOutput)
+	if !ok {
+		service.vm.ctx.Log.Fatal("%+v", utxo)
+		return errUnknownOutputType
+	}
+
+	secpOp, ok := op.Op.(*nftfx.MintOperation)
+	if !ok {
+		service.vm.ctx.Log.Fatal("%+v", utxo)
+		return errors.New("unknown mint operation")
+	}
+
+	sigIndex := -1
+	size := int(out.Threshold)
+	for i, addrIndex := range secpOp.MintInput.SigIndices {
+		if addrIndex >= uint32(len(out.Addrs)) {
+			return errors.New("input output mismatch")
+		}
+		if bytes.Equal(out.Addrs[int(addrIndex)].Bytes(), minter) {
+			sigIndex = i
+			break
+		}
+	}
+	if sigIndex == -1 {
+		return errUnneededAddress
+	}
+
+	if len(tx.Creds) == 0 {
+		tx.Creds = append(tx.Creds, &nftfx.Credential{})
+	}
+
+	cred, ok := tx.Creds[0].(*nftfx.Credential)
+	if !ok {
+		return errUnknownCredentialType
+	}
+
+	if len(cred.Sigs) != size {
+		cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, size)
+	}
+
+	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	sig, err := sk.Sign(unsignedBytes)
+	if err != nil {
+		return fmt.Errorf("problem signing transaction: %w", err)
+	}
+	copy(cred.Sigs[sigIndex][:], sig)
+
+	txBytes, err := service.vm.codec.Marshal(&tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	reply.Tx.Bytes = txBytes
+	return nil
+}
+
+// SendNFTArgs are arguments for passing into SendNFT requests
+type SendNFTArgs struct {
+	Username string      `json:"username"`
+	Password string      `json:"password"`
+	AssetID  string      `json:"assetID"`
+	GroupID  json.Uint32 `json:"groupID"`
+	To       string      `json:"to"`
+}
+
+// SendNFTReply defines the SendNFT replies returned from the API
+type SendNFTReply struct {
+	TxID ids.ID `json:"tx"`
+}
+
+// SendNFT sends an NFT
+func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *SendNFTReply) error {
+	service.vm.ctx.Log.Verbo("SendNFT called with username: %s", args.Username)
+
+	assetID, err := service.vm.Lookup(args.AssetID)
+	if err != nil {
+		assetID, err = ids.FromString(args.AssetID)
+		if err != nil {
+			return fmt.Errorf("asset '%s' not found", args.AssetID)
+		}
+	}
+
+	toBytes, err := service.vm.Parse(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+	to, err := ids.ToShortID(toBytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address: %w", err)
+	}
+
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := userState{vm: service.vm}
+
+	addresses, _ := user.Addresses(db)
+
+	addrs := ids.Set{}
+	addrs.Add(addresses...)
+	utxos, err := service.vm.GetUTXOs(addrs)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
+	}
+
+	kc := secp256k1fx.NewKeychain()
+	for _, addr := range addresses {
+		sk, err := user.Key(db, addr)
+		if err != nil {
+			return fmt.Errorf("problem retrieving private key: %w", err)
+		}
+		kc.Add(sk)
+	}
+
+	var (
+		utxo    *ava.UTXO
+		out     *nftfx.TransferOutput
+		indices []uint32
+		signers []*crypto.PrivateKeySECP256K1R
+		ok      bool
+	)
+	for _, utxo = range utxos {
+		if !utxo.AssetID().Equals(assetID) {
+			service.vm.ctx.Log.Info("Skipping UTXO due to wrong AssetID")
+			continue
+		}
+		out, ok = utxo.Out.(*nftfx.TransferOutput)
+		if !ok {
+			service.vm.ctx.Log.Info("Skipping UTXO due to output type")
+			continue
+		}
+		if out.GroupID != uint32(args.GroupID) {
+			service.vm.ctx.Log.Info("Skipping UTXO due to groupID")
+			ok = false
+			continue
+		}
+		indices, signers, ok = kc.Match(&out.OutputOwners)
+		if ok {
+			service.vm.ctx.Log.Info("Skipping UTXO due to failed key matches")
+			break
+		}
+	}
+	if !ok {
+		return errInsufficientFunds
+	}
+
+	tx := Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+		},
+		Ops: []*Operation{&Operation{
+			Asset:   utxo.Asset,
+			UTXOIDs: []*ava.UTXOID{&utxo.UTXOID},
+			Op: &nftfx.TransferOperation{
+				Input: secp256k1fx.Input{
+					SigIndices: indices,
+				},
+				Output: nftfx.TransferOutput{
+					GroupID: out.GroupID,
+					Payload: out.Payload,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{to},
+					},
+				},
+			},
+		}},
+	}}
+
+	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	cred := &nftfx.Credential{}
+	for _, signer := range signers {
+		sig, err := signer.SignHash(hash)
+		if err != nil {
+			return fmt.Errorf("problem creating transaction: %w", err)
+		}
+		fixedSig := [crypto.SECP256K1RSigLen]byte{}
+		copy(fixedSig[:], sig)
+
+		cred.Sigs = append(cred.Sigs, fixedSig)
+	}
+	tx.Creds = append(tx.Creds, cred)
+
+	b, err := service.vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	txID, err := service.vm.IssueTx(b, nil)
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
 	return nil
 }
 
