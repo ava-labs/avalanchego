@@ -37,7 +37,7 @@ type FrontierHandler interface {
 	// Notify this engine of a request for the accepted frontier of vertices.
 	//
 	// The accepted frontier is the set of accepted vertices that do not have
-	// any accepted decendants.
+	// any accepted descendants.
 	//
 	// This function can be called by any validator. It is not safe to assume
 	// this message is utilizing a unique requestID. However, the validatorID is
@@ -149,9 +149,9 @@ type FetchHandler interface {
 	// anticipated to be responded to. This could be because the recipient of
 	// the message is unknown or if the message request has timed out.
 	//
-	// The validatorID, requestID, and containerID are assumed to be the same as
-	// those sent in the Get message.
-	GetFailed(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
+	// The validatorID and requestID are assumed to be the same as those sent in
+	// the Get message.
+	GetFailed(validatorID ids.ShortID, requestID uint32)
 }
 
 // QueryHandler defines how a consensus engine reacts to query messages from
