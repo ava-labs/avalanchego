@@ -24,10 +24,12 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/mitchellh/go-homedir"
 )
 
 const (
-	dbVersion = "v0.2.0"
+	dbVersion    = "v0.2.0"
+	defaultDbDir = "~/.gecko/db"
 )
 
 // Results of parsing the CLI
@@ -80,7 +82,7 @@ func init() {
 
 	// Database:
 	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := fs.String("db-dir", "db", "Database directory for Ava state")
+	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Ava state")
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
@@ -147,6 +149,11 @@ func init() {
 	// DB:
 	if *db && err == nil {
 		// TODO: Add better params here
+		if *dbDir == defaultDbDir {
+			if *dbDir, err = homedir.Expand(defaultDbDir); err != nil {
+				errs.Add(fmt.Errorf("couldn't resolve default db path: %v", err))
+			}
+		}
 		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
 		Config.DB = db
