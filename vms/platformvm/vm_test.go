@@ -1596,3 +1596,81 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	router.Shutdown()
 }
+
+func TestUnverifiedParent(t *testing.T) {
+	genesisAccounts := GenesisAccounts()
+	genesisValidators := GenesisCurrentValidators()
+	genesisChains := make([]*CreateChainTx, 0)
+
+	genesisState := Genesis{
+		Accounts:   genesisAccounts,
+		Validators: genesisValidators,
+		Chains:     genesisChains,
+		Timestamp:  uint64(defaultGenesisTime.Unix()),
+	}
+
+	genesisBytes, err := Codec.Marshal(genesisState)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := memdb.New()
+
+	vm := &VM{
+		SnowmanVM:    &core.SnowmanVM{},
+		chainManager: chains.MockManager{},
+	}
+
+	defaultSubnet := validators.NewSet()
+	vm.validators = validators.NewManager()
+	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
+
+	vm.clock.Set(defaultGenesisTime)
+	ctx := defaultContext()
+	msgChan := make(chan common.Message, 1)
+	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	firstAdvanceTimeTx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), firstAdvanceTimeTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm.clock.Set(defaultGenesisTime.Add(2 * time.Second))
+	if err := firstAdvanceTimeBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	options := firstAdvanceTimeBlk.Options()
+	firstOption := options[0]
+	secondOption := options[1]
+
+	secondAdvanceTimeTx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), secondAdvanceTimeTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parentBlk := secondAdvanceTimeBlk.Parent()
+	if parentBlkID := parentBlk.ID(); !parentBlkID.Equals(firstOption.ID()) {
+		t.Fatalf("Wrong parent block ID returned")
+	}
+
+	if err := firstOption.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := secondOption.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := secondAdvanceTimeBlk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+}

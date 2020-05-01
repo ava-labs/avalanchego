@@ -21,11 +21,12 @@ type Commit struct {
 // This function also sets the onCommit databases if the verification passes.
 func (c *Commit) Verify() error {
 	// the parent of an Commit block should always be a proposal
-	if parent, ok := c.parentBlock().(*ProposalBlock); ok {
-		c.onAcceptDB, c.onAcceptFunc = parent.onCommit()
-	} else {
+	parent, ok := c.parentBlock().(*ProposalBlock)
+	if !ok {
 		return errInvalidBlockType
 	}
+
+	c.onAcceptDB, c.onAcceptFunc = parent.onCommit()
 
 	c.vm.currentBlocks[c.ID().Key()] = c
 	c.parentBlock().addChild(c)
