@@ -20,12 +20,13 @@ type Abort struct {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (a *Abort) Verify() error {
+	parent, ok := a.parentBlock().(*ProposalBlock)
 	// Abort is a decision, so its parent must be a proposal
-	if parent, ok := a.parentBlock().(*ProposalBlock); ok {
-		a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
-	} else {
+	if !ok {
 		return errInvalidBlockType
 	}
+
+	a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
 
 	a.vm.currentBlocks[a.ID().Key()] = a
 	a.parentBlock().addChild(a)
