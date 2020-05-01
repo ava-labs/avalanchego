@@ -12,12 +12,11 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ava-labs/go-ethereum/p2p/nat"
-
 	"github.com/ava-labs/gecko/database/leveldb"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/utils"
@@ -25,6 +24,12 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/mitchellh/go-homedir"
+)
+
+const (
+	dbVersion    = "v0.2.0"
+	defaultDbDir = "~/.gecko/db"
 )
 
 // Results of parsing the CLI
@@ -36,6 +41,14 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
+	case genesis.CascadeID:
+		return []string{
+			"3.227.207.132:21001",
+			"34.207.133.167:21001",
+			"107.23.241.199:21001",
+			"54.197.215.186:21001",
+			"18.234.153.22:21001",
+		}
 	default:
 		return nil
 	}
@@ -56,7 +69,7 @@ func init() {
 	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.LocalName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", genesis.CascadeName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
@@ -69,7 +82,7 @@ func init() {
 
 	// Database:
 	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := fs.String("db-dir", "db", "Database directory for Ava state")
+	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Ava state")
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
@@ -89,6 +102,9 @@ func init() {
 	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "keys/staker.key", "TLS private key file for staking connections")
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "keys/staker.crt", "TLS certificate file for staking connections")
+
+	// Plugins:
+	fs.StringVar(&Config.PluginDir, "plugin-dir", "./build/plugins", "Plugin directory for Ava VMs")
 
 	// Logging:
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
@@ -133,7 +149,12 @@ func init() {
 	// DB:
 	if *db && err == nil {
 		// TODO: Add better params here
-		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID))
+		if *dbDir == defaultDbDir {
+			if *dbDir, err = homedir.Expand(defaultDbDir); err != nil {
+				errs.Add(fmt.Errorf("couldn't resolve default db path: %v", err))
+			}
+		}
+		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
 		Config.DB = db
 		errs.Add(err)
@@ -141,17 +162,15 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.Any()
+	Config.Nat = nat.NewRouter()
 
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		ip, err = Config.Nat.ExternalIP()
-		errs.Add(fmt.Errorf(
-			"%s\n"+
-				"If you are trying to create a local network, try adding --public-ip=127.0.0.1\n"+
-				"If you are attempting to connect to a public network, you may need to manually report your IP and perform port forwarding",
-			err))
+		ip, err = Config.Nat.IP()
+		if err != nil {
+			ip = net.IPv4zero
+		}
 	} else {
 		ip = net.ParseIP(*consensusIP)
 	}

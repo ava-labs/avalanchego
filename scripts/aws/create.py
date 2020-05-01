@@ -6,14 +6,14 @@ Start a number of AVA nodes on Amazon EC2
 import boto3
 
 
-bootstapNode = "Borealis-Bootstrap"
-fullNode = "Borealis-Node"
+bootstapNode = "Cascade-Bootstrap"
+fullNode = "Cascade-Node"
 
 
 def runInstances(ec2, num: int, name: str):
     if num > 0:
         ec2.run_instances(
-            ImageId="ami-0badd1c10cb7673e9",
+            ImageId="ami-0c088c21fbcdb8a48",
             InstanceType="c5.large",
             MaxCount=num,
             MinCount=num,
@@ -29,11 +29,9 @@ def runInstances(ec2, num: int, name: str):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-    )
-    parser.add_argument('numBootstraps', type=int)
-    parser.add_argument('numNodes', type=int)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("numBootstraps", type=int)
+    parser.add_argument("numNodes", type=int)
     args = parser.parse_args()
 
     ec2 = boto3.client("ec2")

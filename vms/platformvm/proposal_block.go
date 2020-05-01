@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -39,6 +40,12 @@ type ProposalBlock struct {
 	onCommitFunc func()
 	// The function to execute if this block's proposal is aborted
 	onAbortFunc func()
+}
+
+// Accept implements the snowman.Block interface
+func (pb *ProposalBlock) Accept() {
+	pb.SetStatus(choices.Accepted)
+	pb.VM.LastAcceptedID = pb.ID()
 }
 
 // Initialize this block.
@@ -85,15 +92,16 @@ func (pb *ProposalBlock) onAbort() (*versiondb.Database, func()) {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
-	// pdb is the database if this block's parent is accepted
-	var pdb database.Database
-	parent := pb.parentBlock()
+	parentIntf := pb.parentBlock()
+
 	// The parent of a proposal block (ie this block) must be a decision block
-	if parent, ok := parent.(decision); ok {
-		pdb = parent.onAccept()
-	} else {
+	parent, ok := parentIntf.(decision)
+	if !ok {
 		return errInvalidBlockType
 	}
+
+	// pdb is the database if this block's parent is accepted
+	pdb := parent.onAccept()
 
 	var err error
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
@@ -102,7 +110,7 @@ func (pb *ProposalBlock) Verify() error {
 	}
 
 	pb.vm.currentBlocks[pb.ID().Key()] = pb
-	parent.addChild(pb)
+	parentIntf.addChild(pb)
 	return nil
 }
 

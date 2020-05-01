@@ -45,10 +45,24 @@ func (t *Transitive) Initialize(config Config) {
 }
 
 func (t *Transitive) finishBootstrapping() {
-	tail := t.Config.VM.LastAccepted()
-	t.Config.VM.SetPreference(tail)
-	t.Consensus.Initialize(t.Config.Context, t.Params, tail)
 	t.bootstrapped = true
+	tailID := t.Config.VM.LastAccepted()
+	t.Consensus.Initialize(t.Config.Context, t.Params, tailID)
+
+	tail, err := t.Config.VM.GetBlock(tailID)
+	if err != nil {
+		t.Config.Context.Log.Error("Failed to get last accepted block due to: %s", err)
+		return
+	}
+
+	switch blk := tail.(type) {
+	case OracleBlock:
+		for _, blk := range blk.Options() {
+			t.deliver(blk)
+		}
+	default:
+		t.Config.VM.SetPreference(tailID)
+	}
 }
 
 // Shutdown implements the Engine interface

@@ -5,7 +5,7 @@ package node
 
 // #include "salticidae/network.h"
 // void onTerm(int sig, void *);
-// void errorHandler(SalticidaeCError *, bool, void *);
+// void errorHandler(SalticidaeCError *, bool, int32_t, void *);
 import "C"
 
 import (
@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path"
 	"sync"
 	"unsafe"
 
@@ -39,10 +40,10 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/evm"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"
+	"github.com/ava-labs/gecko/vms/rpcchainvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
@@ -129,14 +130,14 @@ func onTerm(C.int, unsafe.Pointer) {
 }
 
 //export errorHandler
-func errorHandler(_err *C.struct_SalticidaeCError, fatal C.bool, _ unsafe.Pointer) {
+func errorHandler(_err *C.struct_SalticidaeCError, fatal C.bool, asyncID C.int32_t, _ unsafe.Pointer) {
 	err := (*salticidae.Error)(unsafe.Pointer(_err))
 	if fatal {
 		MainNode.Log.Fatal("Error during async call: %s", salticidae.StrError(err.GetCode()))
 		MainNode.EC.Stop()
 		return
 	}
-	MainNode.Log.Error("Error during async call: %s", salticidae.StrError(err.GetCode()))
+	MainNode.Log.Debug("Error during async with ID %d call: %s", asyncID, salticidae.StrError(err.GetCode()))
 }
 
 func (n *Node) initNetlib() error {
@@ -151,9 +152,12 @@ func (n *Node) initNetlib() error {
 
 	// Create peer network config, may have tls enabled
 	peerConfig := salticidae.NewPeerNetworkConfig()
+	peerConfig.ConnTimeout(60)
+
+	msgConfig := peerConfig.AsMsgNetworkConfig()
+	msgConfig.MaxMsgSize(maxMessageSize)
+
 	if n.Config.EnableStaking {
-		msgConfig := peerConfig.AsMsgNetworkConfig()
-		msgConfig.MaxMsgSize(maxMessageSize)
 		msgConfig.EnableTLS(true)
 		msgConfig.TLSKeyFile(n.Config.StakingKeyFile)
 		msgConfig.TLSCertFile(n.Config.StakingCertFile)
@@ -252,7 +256,7 @@ func (n *Node) StartConsensusServer() error {
 	// Listen for P2P messages
 	n.PeerNet.Listen(serverIP, &err)
 	if code := err.GetCode(); code != 0 {
-		return fmt.Errorf("failed to start consensus server: %s", salticidae.StrError(code))
+		return fmt.Errorf("failed to listen on consensus server at %s: %s", n.Config.StakingIP, salticidae.StrError(code))
 	}
 
 	// Start a server to handle throughput tests if configuration says to. Disabled by default.
@@ -266,18 +270,19 @@ func (n *Node) StartConsensusServer() error {
 
 		n.ClientNet.Listen(clientIP, &err)
 		if code := err.GetCode(); code != 0 {
-			return fmt.Errorf("failed to listen on xput server: %s", salticidae.StrError(code))
+			return fmt.Errorf("failed to listen on xput server at 127.0.0.1:%d: %s", n.Config.ThroughputPort, salticidae.StrError(code))
 		}
 	}
 
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
-			bootstrapIP := salticidae.NewNetAddrFromIPPortString(peer.IP.String(), true, &err)
+			bootstrapAddr := salticidae.NewNetAddrFromIPPortString(peer.IP.String(), true, &err)
 			if code := err.GetCode(); code != 0 {
 				return fmt.Errorf("failed to create bootstrap ip addr: %s", salticidae.StrError(code))
 			}
-			n.PeerNet.AddPeer(bootstrapIP)
+
+			n.ValidatorAPI.Connect(bootstrapAddr)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
 		}
@@ -359,7 +364,7 @@ func (n *Node) initNodeID() error {
 }
 
 // Create the vmManager and register the following vms:
-// AVM, EVM, Simple Payments DAG, Simple Payments Chain
+// AVM, Simple Payments DAG, Simple Payments Chain
 // The Platform VM is registered in initStaking because
 // its factory needs to reference n.chainManager, which is nil right now
 func (n *Node) initVMManager() error {
@@ -376,7 +381,7 @@ func (n *Node) initVMManager() error {
 			AVA:      avaAssetID,
 			Platform: ids.Empty,
 		}),
-		n.vmManager.RegisterVMFactory(evm.ID, &evm.Factory{}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),

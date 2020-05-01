@@ -1,0 +1,47 @@
+syntax = "proto3";
+package gresponsewriterproto;
+option go_package = "gresponsewriterproto";
+
+message Header {
+    string key = 1;
+    repeated string values = 2;
+}
+
+message WriteRequest {
+    repeated Header headers = 1;
+    bytes payload = 2;
+}
+
+message WriteResponse {
+    int32 written = 1;
+}
+
+message WriteHeaderRequest {
+    repeated Header headers = 1;
+    int32 statusCode = 2;
+}
+
+message WriteHeaderResponse {}
+
+message FlushRequest {}
+
+message FlushResponse {}
+
+message HijackRequest {}
+
+message HijackResponse {
+    uint32 connServer = 1;
+    string localNetwork = 2;
+    string localString = 3;
+    string remoteNetwork = 4;
+    string remoteString = 5;
+    uint32 readerServer = 6;
+    uint32 writerServer = 7;
+}
+
+service Writer {
+    rpc Write(WriteRequest) returns (WriteResponse);
+    rpc WriteHeader(WriteHeaderRequest) returns (WriteHeaderResponse);
+    rpc Flush(FlushRequest) returns (FlushResponse);
+    rpc Hijack(HijackRequest) returns (HijackResponse);
+}

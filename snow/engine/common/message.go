@@ -10,7 +10,7 @@ import (
 // TODO: Consider renaming Message to, say, VMMessage
 
 // Message is an enum of the message types that vms can send to consensus
-type Message int
+type Message uint32
 
 const (
 	// PendingTxs notifies a consensus engine that

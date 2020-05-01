@@ -130,6 +130,10 @@ func (vm *VM) Initialize(
 
 // Shutdown implements the avalanche.DAGVM interface
 func (vm *VM) Shutdown() {
+	if vm.timer == nil {
+		return
+	}
+
 	vm.timer.Stop()
 	if err := vm.baseDB.Close(); err != nil {
 		vm.ctx.Log.Error("Closing the database failed with %s", err)

@@ -19,9 +19,9 @@ type Factory struct {
 }
 
 // New ...
-func (f *Factory) New() interface{} {
+func (f *Factory) New() (interface{}, error) {
 	return &VM{
 		ava:      f.AVA,
 		platform: f.Platform,
-	}
+	}, nil
 }

@@ -9,7 +9,9 @@ import (
 
 func TestFactory(t *testing.T) {
 	factory := Factory{}
-	if fx := factory.New(); fx == nil {
+	if fx, err := factory.New(); err != nil {
+		t.Fatal(err)
+	} else if fx == nil {
 		t.Fatalf("Factory.New returned nil")
 	}
 }

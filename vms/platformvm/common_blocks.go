@@ -124,10 +124,6 @@ type CommonBlock struct {
 	*core.Block `serialize:"true"`
 	vm          *VM
 
-	// This block's parent.
-	// nil before parentBlock() is called on this block
-	parent Block
-
 	// This block's children
 	children []Block
 }
@@ -142,7 +138,6 @@ func (cb *CommonBlock) Reject() {
 // free removes this block from memory
 func (cb *CommonBlock) free() {
 	delete(cb.vm.currentBlocks, cb.ID().Key())
-	cb.parent = nil
 	cb.children = nil
 }
 
@@ -165,19 +160,13 @@ func (cb *CommonBlock) Parent() snowman.Block {
 
 // parentBlock returns this block's parent
 func (cb *CommonBlock) parentBlock() Block {
-	// Check if the block already has a reference to its parent
-	if cb.parent != nil {
-		return cb.parent
-	}
-
 	// Get the parent from database
 	parentID := cb.ParentID()
 	parent, err := cb.vm.getBlock(parentID)
 	if err != nil {
-		cb.vm.Ctx.Log.Warn("could not get parent (ID %s) of block %s", parentID, cb.ID())
+		cb.vm.Ctx.Log.Debug("could not get parent (ID %s) of block %s", parentID, cb.ID())
 		return nil
 	}
-	cb.parent = parent
 	return parent.(Block)
 }
 
@@ -185,7 +174,6 @@ func (cb *CommonBlock) parentBlock() Block {
 func (cb *CommonBlock) addChild(child Block) { cb.children = append(cb.children, child) }
 
 // CommonDecisionBlock contains the fields and methods common to all decision blocks
-// (ie *Commit and *Abort)
 type CommonDecisionBlock struct {
 	CommonBlock `serialize:"true"`
 
@@ -220,29 +208,70 @@ func (cdb *CommonDecisionBlock) onAccept() database.Database {
 	return cdb.onAcceptDB
 }
 
-// Accept implements the snowman.Block interface
-func (cdb *CommonDecisionBlock) Accept() {
-	cdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", cdb.ID())
+// SingleDecisionBlock contains the accept for standalone decision blocks
+type SingleDecisionBlock struct {
+	CommonDecisionBlock `serialize:"true"`
+}
 
-	cdb.CommonBlock.Accept()
+// Accept implements the snowman.Block interface
+func (sdb *SingleDecisionBlock) Accept() {
+	sdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", sdb.ID())
+
+	sdb.CommonBlock.Accept()
 
 	// Update the state of the chain in the database
-	if err := cdb.onAcceptDB.Commit(); err != nil {
-		cdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+	if err := sdb.onAcceptDB.Commit(); err != nil {
+		sdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
 	}
-	if err := cdb.vm.DB.Commit(); err != nil {
-		cdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
-	}
-
-	for _, child := range cdb.children {
-		child.setBaseDatabase(cdb.vm.DB)
-	}
-	if cdb.onAcceptFunc != nil {
-		cdb.onAcceptFunc()
+	if err := sdb.vm.DB.Commit(); err != nil {
+		sdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
 	}
 
-	parent := cdb.parentBlock()
+	for _, child := range sdb.children {
+		child.setBaseDatabase(sdb.vm.DB)
+	}
+	if sdb.onAcceptFunc != nil {
+		sdb.onAcceptFunc()
+	}
+
+	sdb.free()
+}
+
+// DoubleDecisionBlock contains the accept for a pair of blocks
+type DoubleDecisionBlock struct {
+	CommonDecisionBlock `serialize:"true"`
+}
+
+// Accept implements the snowman.Block interface
+func (ddb *DoubleDecisionBlock) Accept() {
+	ddb.VM.Ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
+
+	parent, ok := ddb.parentBlock().(*ProposalBlock)
+	if !ok {
+		ddb.vm.Ctx.Log.Error("double decision block should only follow a proposal block")
+		return
+	}
+
+	parent.CommonBlock.Accept()
+
+	ddb.CommonBlock.Accept()
+
+	// Update the state of the chain in the database
+	if err := ddb.onAcceptDB.Commit(); err != nil {
+		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+	}
+	if err := ddb.vm.DB.Commit(); err != nil {
+		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+	}
+
+	for _, child := range ddb.children {
+		child.setBaseDatabase(ddb.vm.DB)
+	}
+	if ddb.onAcceptFunc != nil {
+		ddb.onAcceptFunc()
+	}
+
 	// remove this block and its parent from memory
 	parent.free()
-	cdb.free()
+	ddb.free()
 }

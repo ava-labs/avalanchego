@@ -16,7 +16,8 @@ import (
 )
 
 func TestPrefixedSetsAndGets(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	ctx.Lock.Unlock()
 	state := vm.state
 
 	vm.codec.RegisterType(&ava.TestVerifiable{})
@@ -110,7 +111,8 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 }
 
 func TestPrefixedFundingNoAddresses(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	ctx.Lock.Unlock()
 	state := vm.state
 
 	vm.codec.RegisterType(&ava.TestVerifiable{})
@@ -133,7 +135,8 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 }
 
 func TestPrefixedFundingAddresses(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	ctx.Lock.Unlock()
 	state := vm.state
 
 	vm.codec.RegisterType(&testAddressable{})

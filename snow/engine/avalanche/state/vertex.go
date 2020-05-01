@@ -24,6 +24,7 @@ var (
 	errExtraSpace     = errors.New("trailing buffer space")
 	errInvalidParents = errors.New("vertex contains non-sorted or duplicated parentIDs")
 	errInvalidTxs     = errors.New("vertex contains non-sorted or duplicated transactions")
+	errNoTxs          = errors.New("vertex contains no transactions")
 )
 
 type vertex struct {
@@ -45,6 +46,8 @@ func (vtx *vertex) Verify() error {
 	switch {
 	case !ids.IsSortedAndUniqueIDs(vtx.parentIDs):
 		return errInvalidParents
+	case len(vtx.txs) == 0:
+		return errNoTxs
 	case !isSortedAndUniqueTxs(vtx.txs):
 		return errInvalidTxs
 	default:
@@ -55,7 +58,7 @@ func (vtx *vertex) Verify() error {
 /*
  * Vertex:
  * Codec        | 04 Bytes
- * Chain       | 32 Bytes
+ * Chain        | 32 Bytes
  * Height       | 08 Bytes
  * NumParents   | 04 Bytes
  * Repeated (NumParents):
