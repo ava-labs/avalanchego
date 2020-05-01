@@ -30,6 +30,9 @@ type bootstrapper struct {
 	metrics
 	common.Bootstrapper
 
+	// vtxReqs prevents asking validators for the same vertex
+	vtxReqs common.Requests
+
 	pending    ids.Set
 	finished   bool
 	onFinished func()
@@ -99,7 +102,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 		b.BootstrapConfig.Context.Log.Warn("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
-		b.GetFailed(vdr, requestID, vtxID)
+		b.GetFailed(vdr, requestID)
 		return
 	}
 
@@ -107,7 +110,16 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 }
 
 // GetFailed ...
-func (b *bootstrapper) GetFailed(_ ids.ShortID, _ uint32, vtxID ids.ID) { b.sendRequest(vtxID) }
+func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
+	vtxID, ok := b.vtxReqs.Remove(vdr, requestID)
+	if !ok {
+		b.BootstrapConfig.Context.Log.Warn("GetFailed called without sending the corresponding Get message from %s",
+			vdr)
+		return
+	}
+
+	b.sendRequest(vtxID)
+}
 
 func (b *bootstrapper) fetch(vtxID ids.ID) {
 	if b.pending.Contains(vtxID) {
@@ -130,6 +142,9 @@ func (b *bootstrapper) sendRequest(vtxID ids.ID) {
 	}
 	validatorID := validators[0].ID()
 	b.RequestID++
+
+	b.vtxReqs.RemoveAny(vtxID)
+	b.vtxReqs.Add(validatorID, b.RequestID, vtxID)
 
 	b.pending.Add(vtxID)
 	b.BootstrapConfig.Sender.Get(validatorID, b.RequestID, vtxID)

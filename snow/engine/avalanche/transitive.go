@@ -23,8 +23,10 @@ type Transitive struct {
 	polls polls // track people I have asked for their preference
 
 	// vtxReqs prevents asking validators for the same vertex
+	vtxReqs common.Requests
+
 	// missingTxs tracks transaction that are missing
-	vtxReqs, missingTxs, pending ids.Set
+	missingTxs, pending ids.Set
 
 	// vtxBlocked tracks operations that are blocked on vertices
 	// txBlocked tracks operations that are blocked on transactions
@@ -93,22 +95,27 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 		t.Config.Context.Log.Warn("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
-		t.GetFailed(vdr, requestID, vtxID)
+		t.GetFailed(vdr, requestID)
 		return
 	}
 	t.insertFrom(vdr, vtx)
 }
 
 // GetFailed implements the Engine interface
-func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) {
 	if !t.bootstrapped {
-		t.bootstrapper.GetFailed(vdr, requestID, vtxID)
+		t.bootstrapper.GetFailed(vdr, requestID)
 		return
 	}
 
-	t.pending.Remove(vtxID)
+	vtxID, ok := t.vtxReqs.Remove(vdr, requestID)
+	if !ok {
+		t.Config.Context.Log.Warn("GetFailed called without sending the corresponding Get message from %s",
+			vdr)
+		return
+	}
+
 	t.vtxBlocked.Abandon(vtxID)
-	t.vtxReqs.Remove(vtxID)
 
 	if t.vtxReqs.Len() == 0 {
 		for _, txID := range t.missingTxs.List() {
@@ -120,7 +127,6 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len()))
 	t.numTxRequests.Set(float64(t.missingTxs.Len()))
-	t.numBlockedVtx.Set(float64(t.pending.Len()))
 }
 
 // PullQuery implements the Engine interface
@@ -244,7 +250,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) {
 	vtxID := vtx.ID()
 
 	t.pending.Add(vtxID)
-	t.vtxReqs.Remove(vtxID)
+	t.vtxReqs.RemoveAny(vtxID)
 
 	i := &issuer{
 		t:   t,
@@ -373,10 +379,10 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 		return
 	}
 
-	t.vtxReqs.Add(vtxID)
+	t.RequestID++
+
+	t.vtxReqs.Add(vdr, t.RequestID, vtxID)
+	t.Config.Sender.Get(vdr, t.RequestID, vtxID)
 
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len())) // Tracks performance statistics
-
-	t.RequestID++
-	t.Config.Sender.Get(vdr, t.RequestID, vtxID)
 }

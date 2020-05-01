@@ -88,7 +88,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 	// Add a timeout -- if we don't get a response before the timeout expires,
 	// send this consensus engine a GetFailed message
 	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
-		s.router.GetFailed(validatorID, s.ctx.ChainID, requestID, containerID)
+		s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 	})
 	s.sender.Get(validatorID, s.ctx.ChainID, requestID, containerID)
 }

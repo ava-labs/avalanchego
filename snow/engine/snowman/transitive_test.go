@@ -102,7 +102,9 @@ func TestEngineAdd(t *testing.T) {
 	}
 
 	asked := new(bool)
-	sender.GetF = func(inVdr ids.ShortID, _ uint32, blkID ids.ID) {
+	reqID := new(uint32)
+	sender.GetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+		*reqID = requestID
 		if *asked {
 			t.Fatalf("Asked multiple times")
 		}
@@ -136,7 +138,7 @@ func TestEngineAdd(t *testing.T) {
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errParseBlock }
 
-	te.Put(vdr.ID(), 0, blk.Parent().ID(), nil)
+	te.Put(vdr.ID(), *reqID, blk.Parent().ID(), nil)
 
 	vm.ParseBlockF = nil
 
@@ -906,7 +908,11 @@ func TestEngineAbandonQuery(t *testing.T) {
 			panic("Should have failed")
 		}
 	}
-	sender.CantGet = false
+
+	reqID := new(uint32)
+	sender.GetF = func(_ ids.ShortID, requestID uint32, _ ids.ID) {
+		*reqID = requestID
+	}
 
 	te.PullQuery(vdr.ID(), 0, blkID)
 
@@ -914,7 +920,7 @@ func TestEngineAbandonQuery(t *testing.T) {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr.ID(), 0, blkID)
+	te.GetFailed(vdr.ID(), *reqID)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -947,7 +953,12 @@ func TestEngineAbandonChit(t *testing.T) {
 			panic("Should have failed")
 		}
 	}
-	sender.CantGet = false
+
+	reqID := new(uint32)
+	sender.GetF = func(_ ids.ShortID, requestID uint32, _ ids.ID) {
+		*reqID = requestID
+	}
+
 	fakeBlkIDSet := ids.Set{}
 	fakeBlkIDSet.Add(fakeBlkID)
 	te.Chits(vdr.ID(), 0, fakeBlkIDSet)
@@ -956,7 +967,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr.ID(), 0, fakeBlkID)
+	te.GetFailed(vdr.ID(), *reqID)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -1105,14 +1116,18 @@ func TestEngineRetryFetch(t *testing.T) {
 	}
 
 	vm.CantGetBlock = false
-	sender.CantGet = false
+
+	reqID := new(uint32)
+	sender.GetF = func(_ ids.ShortID, requestID uint32, _ ids.ID) {
+		*reqID = requestID
+	}
 
 	te.PullQuery(vdr.ID(), 0, missingBlk.ID())
 
 	vm.CantGetBlock = true
-	sender.CantGet = true
+	sender.GetF = nil
 
-	te.GetFailed(vdr.ID(), 0, missingBlk.ID())
+	te.GetFailed(vdr.ID(), *reqID)
 
 	vm.CantGetBlock = false
 
@@ -1124,7 +1139,7 @@ func TestEngineRetryFetch(t *testing.T) {
 	te.PullQuery(vdr.ID(), 0, missingBlk.ID())
 
 	vm.CantGetBlock = true
-	sender.CantGet = true
+	sender.GetF = nil
 
 	if !*called {
 		t.Fatalf("Should have requested the block again")
@@ -1270,6 +1285,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 	sender.CantPushQuery = false
+	sender.CantChits = false
 
 	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
 

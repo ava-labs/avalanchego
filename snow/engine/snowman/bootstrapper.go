@@ -20,6 +20,9 @@ type BootstrapConfig struct {
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.Jobs
 
+	// blocks that have outstanding get requests
+	blkReqs common.Requests
+
 	VM ChainVM
 
 	Bootstrapped func()
@@ -93,7 +96,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 		b.BootstrapConfig.Context.Log.Warn("ParseBlock failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: blkBytes})
-		b.GetFailed(vdr, requestID, blkID)
+		b.GetFailed(vdr, requestID)
 		return
 	}
 
@@ -101,7 +104,15 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 }
 
 // GetFailed ...
-func (b *bootstrapper) GetFailed(_ ids.ShortID, _ uint32, blkID ids.ID) { b.sendRequest(blkID) }
+func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
+	blkID, ok := b.blkReqs.Remove(vdr, requestID)
+	if !ok {
+		b.BootstrapConfig.Context.Log.Warn("GetFailed called without sending the corresponding Get message from %s",
+			vdr)
+		return
+	}
+	b.sendRequest(blkID)
+}
 
 func (b *bootstrapper) fetch(blkID ids.ID) {
 	if b.pending.Contains(blkID) {
@@ -124,6 +135,9 @@ func (b *bootstrapper) sendRequest(blkID ids.ID) {
 	}
 	validatorID := validators[0].ID()
 	b.RequestID++
+
+	b.blkReqs.RemoveAny(blkID)
+	b.blkReqs.Add(validatorID, b.RequestID, blkID)
 
 	b.pending.Add(blkID)
 	b.BootstrapConfig.Sender.Get(validatorID, b.RequestID, blkID)

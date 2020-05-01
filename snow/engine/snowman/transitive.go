@@ -22,8 +22,8 @@ type Transitive struct {
 	// track outstanding preference requests
 	polls polls
 
-	// blocks that have outstaning get requests
-	blkReqs Requests
+	// blocks that have outstanding get requests
+	blkReqs common.Requests
 
 	// blocks that are fetched but haven't been issued due to missing
 	// dependencies
@@ -341,7 +341,7 @@ func (t *Transitive) insert(blk snowman.Block) {
 	blkID := blk.ID()
 
 	t.pending.Add(blkID)
-	t.blkReqs.Remove(blkID)
+	t.blkReqs.RemoveAny(blkID)
 
 	i := &issuer{
 		t:   t,
