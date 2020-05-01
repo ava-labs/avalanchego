@@ -271,22 +271,17 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 		}
 		assetID := utxo.AssetID()
 		assetIDs.Add(assetID)
-		if balance, ok := balances[assetID.Key()]; ok {
-			balance, err := safemath.Add64(transferable.Amount(), balance)
-			if err != nil {
-				balances[assetID.Key()] = math.MaxUint64
-			} else {
-				balances[assetID.Key()] = balance
-			}
+		balance := balances[assetID.Key()] // 0 if key doesn't exist
+		balance, err := safemath.Add64(transferable.Amount(), balance)
+		if err != nil {
+			balances[assetID.Key()] = math.MaxUint64
 		} else {
-			balances[assetID.Key()] = transferable.Amount()
+			balances[assetID.Key()] = balance
 		}
 	}
 
-	sortedAssetIDs := assetIDs.List() // sort so response is always in same order
-	ids.SortIDs(sortedAssetIDs)
-	reply.Balances = make(map[string]json.Uint64, len(sortedAssetIDs))
-	for _, assetID := range sortedAssetIDs {
+	reply.Balances = make(map[string]json.Uint64, assetIDs.Len())
+	for _, assetID := range assetIDs.List() {
 		reply.Balances[assetID.String()] = json.Uint64(balances[assetID.Key()])
 	}
 
