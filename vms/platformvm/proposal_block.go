@@ -103,8 +103,6 @@ func (pb *ProposalBlock) Verify() error {
 	// pdb is the database if this block's parent is accepted
 	pdb := parent.onAccept()
 
-	pb.vm.Ctx.Log.Warn("Got %+v from %p", pdb, parentIntf)
-
 	var err error
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
 	if err != nil {
