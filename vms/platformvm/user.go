@@ -104,6 +104,9 @@ func (u *user) getKey(accountID ids.ShortID) (*crypto.PrivateKeySECP256K1R, erro
 	if u.db == nil {
 		return nil, errDbNil
 	}
+	if accountID.IsZero() {
+		return nil, errEmptyAccountAddress
+	}
 
 	factory := crypto.FactorySECP256K1R{}
 	bytes, err := u.db.Get(accountID.Bytes())
