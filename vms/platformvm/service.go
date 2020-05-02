@@ -322,7 +322,7 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 		return errGetAccounts
 	}
 
-	var accounts []APIAccount
+	reply.Accounts = []APIAccount{}
 	for _, accountID := range accountIDs {
 		account, err := service.vm.getAccount(service.vm.DB, accountID) // Get account whose ID is [accountID]
 		if err != nil && err != database.ErrNotFound {
@@ -331,13 +331,12 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 		} else if err == database.ErrNotFound {
 			account = newAccount(accountID, 0, 0)
 		}
-		accounts = append(accounts, APIAccount{
+		reply.Accounts = append(reply.Accounts, APIAccount{
 			Address: accountID,
 			Nonce:   json.Uint64(account.Nonce),
 			Balance: json.Uint64(account.Balance),
 		})
 	}
-	reply.Accounts = accounts
 	return nil
 }
 
