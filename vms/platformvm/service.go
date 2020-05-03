@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -278,7 +279,7 @@ type GetAccountReply struct {
 func (service *Service) GetAccount(_ *http.Request, args *GetAccountArgs, reply *GetAccountReply) error {
 	account, err := service.vm.getAccount(service.vm.DB, args.Address)
 	if err != nil && err != database.ErrNotFound {
-		return errGetAccount
+		return fmt.Errorf("couldn't get account: %v", err)
 	} else if err == database.ErrNotFound {
 		account = newAccount(args.Address, 0, 0)
 	}
@@ -308,7 +309,7 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 	// db holds the user's info that pertains to the Platform Chain
 	userDB, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return errGetUser
+		return fmt.Errorf("couldn't get user: %v", err)
 	}
 
 	// The user
@@ -319,7 +320,7 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 	// IDs of accounts controlled by this user
 	accountIDs, err := user.getAccountIDs()
 	if err != nil {
-		return errGetAccounts
+		return fmt.Errorf("couldn't get accounts held by user: %v", err)
 	}
 
 	reply.Accounts = []APIAccount{}
@@ -370,7 +371,7 @@ func (service *Service) CreateAccount(_ *http.Request, args *CreateAccountArgs, 
 	// userDB holds the user's info that pertains to the Platform Chain
 	userDB, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return errGetUser
+		return fmt.Errorf("couldn't get user: %v", err)
 	}
 
 	// The user creating a new account
@@ -428,7 +429,7 @@ type CreateTxResponse struct {
 type AddDefaultSubnetValidatorArgs struct {
 	APIDefaultSubnetValidator
 
-	// Next unused nonce of the account the staked $AVA and tx fee are paid from
+	// Next nonce of the sender
 	PayerNonce json.Uint64 `json:"payerNonce"`
 }
 
@@ -437,8 +438,13 @@ type AddDefaultSubnetValidatorArgs struct {
 func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *CreateTxResponse) error {
 	service.vm.Ctx.Log.Debug("AddDefaultSubnetValidator called")
 
-	if args.ID.IsZero() { // If ID unspecified, use this node's ID as validator ID
+	switch {
+	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
 		args.ID = service.vm.Ctx.NodeID
+	case args.PayerNonce == 0:
+		return fmt.Errorf("sender's next nonce not specified")
+	case int64(args.StartTime) < time.Now().Unix():
+		return fmt.Errorf("start time must be in the future")
 	}
 
 	// Create the transaction
@@ -482,8 +488,13 @@ type AddDefaultSubnetDelegatorArgs struct {
 func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *CreateTxResponse) error {
 	service.vm.Ctx.Log.Debug("AddDefaultSubnetDelegator called")
 
-	if args.ID.IsZero() { // If ID unspecified, use this node's ID as validator ID
+	switch {
+	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
 		args.ID = service.vm.Ctx.NodeID
+	case args.PayerNonce == 0:
+		return fmt.Errorf("sender's next unused nonce not specified")
+	case int64(args.StartTime) < time.Now().Unix():
+		return fmt.Errorf("start time must be in the future")
 	}
 
 	// Create the transaction
@@ -571,6 +582,11 @@ type CreateSubnetArgs struct {
 func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *CreateTxResponse) error {
 	service.vm.Ctx.Log.Debug("platform.createSubnet called")
 
+	switch {
+	case args.PayerNonce == 0:
+		return fmt.Errorf("sender's next nonce not specified")
+	}
+
 	// Create the transaction
 	tx := CreateSubnetTx{
 		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
@@ -611,6 +627,13 @@ type ExportAVAArgs struct {
 // and paying the transaction fee
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *CreateTxResponse) error {
 	service.vm.Ctx.Log.Debug("platform.ExportAVA called")
+
+	switch {
+	case args.PayerNonce == 0:
+		return fmt.Errorf("sender's next nonce not specified")
+	case uint64(args.Amount) == 0:
+		return fmt.Errorf("amount must be >0")
+	}
 
 	// Create the transaction
 	tx := ExportTx{UnsignedExportTx: UnsignedExportTx{
@@ -666,6 +689,11 @@ type SignResponse struct {
 // Sign [args.bytes]
 func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignResponse) error {
 	service.vm.Ctx.Log.Debug("sign called")
+
+	switch {
+	case args.Signer.Equals(ids.ShortEmpty):
+		return fmt.Errorf("signer not specified")
+	}
 
 	// Get the key of the Signer
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -861,7 +889,7 @@ type ImportAVAArgs struct {
 	// ID of the account that will receive the imported funds, and pay the transaction fee
 	To ids.ShortID `json:"to"`
 
-	// Next unused nonce of the account
+	// Next nonce of the sender
 	PayerNonce json.Uint64 `json:"payerNonce"`
 
 	// User that controls the account
@@ -875,10 +903,15 @@ type ImportAVAArgs struct {
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *SignResponse) error {
 	service.vm.Ctx.Log.Debug("platform.ImportAVA called")
 
+	switch {
+	case args.PayerNonce == 0:
+		return fmt.Errorf("sender's next nonce not specified")
+	}
+
 	// Get the key of the Signer
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get data for user '%s'. Does user exist?", args.Username)
+		return fmt.Errorf("couldn't get user: %v", err)
 	}
 	user := user{db: db}
 
@@ -1099,7 +1132,7 @@ type CreateBlockchainArgs struct {
 	// Human-readable name for the new blockchain, not necessarily unique
 	Name string `json:"name"`
 
-	// Next unused nonce of the account paying the transaction fee
+	// Next nonce of the sender
 	PayerNonce json.Uint64 `json:"payerNonce"`
 
 	// Genesis state of the blockchain being created
@@ -1110,6 +1143,15 @@ type CreateBlockchainArgs struct {
 // Must be signed with the Subnet's control keys and with a key that pays the transaction fee before issuance
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *CreateTxResponse) error {
 	service.vm.Ctx.Log.Debug("createBlockchain called")
+
+	switch {
+	case args.PayerNonce == 0:
+		return errors.New("sender's next nonce not specified")
+	case args.VMID == "":
+		return errors.New("VM not specified")
+	case args.SubnetID.Equals(ids.Empty):
+		return errors.New("subnet not specified")
+	}
 
 	vmID, err := service.vm.chainManager.LookupVM(args.VMID)
 	if err != nil {
@@ -1179,6 +1221,11 @@ type GetBlockchainStatusReply struct {
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
 func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
 	service.vm.Ctx.Log.Debug("getBlockchainStatus called")
+
+	switch {
+	case args.BlockchainID == "":
+		return errors.New("'blockchainID' not given")
+	}
 
 	_, err := service.vm.chainManager.Lookup(args.BlockchainID)
 	if err == nil {
@@ -1255,6 +1302,11 @@ type ValidatedByResponse struct {
 func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	service.vm.Ctx.Log.Debug("validatedBy called")
 
+	switch {
+	case args.BlockchainID.Equals(ids.Empty):
+		return errors.New("'blockchainID' not specified")
+	}
+
 	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
 	if err != nil {
 		return err
@@ -1276,6 +1328,11 @@ type ValidatesResponse struct {
 // Validates returns the IDs of the blockchains validated by [args.SubnetID]
 func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response *ValidatesResponse) error {
 	service.vm.Ctx.Log.Debug("validates called")
+
+	switch {
+	case args.SubnetID.Equals(ids.Empty):
+		return errors.New("'subnetID' not specified")
+	}
 
 	// Verify that the Subnet exists
 	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil {
