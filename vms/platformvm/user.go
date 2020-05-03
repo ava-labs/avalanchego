@@ -15,7 +15,10 @@ import (
 // account IDs this user controls
 var accountIDsKey = ids.Empty.Bytes()
 
-var errDbNil = errors.New("db uninitialized")
+var (
+	errDBNil  = errors.New("db uninitialized")
+	errKeyNil = errors.New("key uninitialized")
+)
 
 type user struct {
 	// This user's database, acquired from the keystore
@@ -25,7 +28,7 @@ type user struct {
 // Get the IDs of the accounts controlled by this user
 func (u *user) getAccountIDs() ([]ids.ShortID, error) {
 	if u.db == nil {
-		return nil, errDbNil
+		return nil, errDBNil
 	}
 
 	// If user has no accounts, return empty list
@@ -34,8 +37,9 @@ func (u *user) getAccountIDs() ([]ids.ShortID, error) {
 		return nil, errDB
 	}
 	if !hasAccounts {
-		return make([]ids.ShortID, 0), nil
+		return nil, nil
 	}
+
 	// User has accounts. Get them.
 	bytes, err := u.db.Get(accountIDsKey)
 	if err != nil {
@@ -50,21 +54,24 @@ func (u *user) getAccountIDs() ([]ids.ShortID, error) {
 
 // controlsAccount returns true iff this user controls the account
 // with the specified ID
-func (u *user) controlsAccount(ID ids.ShortID) (bool, error) {
+func (u *user) controlsAccount(accountID ids.ShortID) (bool, error) {
 	if u.db == nil {
-		return false, errDbNil
+		return false, errDBNil
 	}
-
-	if _, err := u.db.Get(ID.Bytes()); err == nil {
-		return true, nil
+	if accountID.IsZero() {
+		return false, errEmptyAccountAddress
 	}
-	return false, nil
+	return u.db.Has(accountID.Bytes())
 }
 
 // putAccount persists that this user controls the account whose ID is
 // [privKey].PublicKey().Address()
 func (u *user) putAccount(privKey *crypto.PrivateKeySECP256K1R) error {
-	newAccountID := privKey.PublicKey().Address() // Account thie privKey controls
+	if privKey == nil {
+		return errKeyNil
+	}
+
+	newAccountID := privKey.PublicKey().Address() // Account the privKey controls
 	controlsAccount, err := u.controlsAccount(newAccountID)
 	if err != nil {
 		return err
@@ -102,7 +109,10 @@ func (u *user) putAccount(privKey *crypto.PrivateKeySECP256K1R) error {
 // Key returns the private key that controls the account with the specified ID
 func (u *user) getKey(accountID ids.ShortID) (*crypto.PrivateKeySECP256K1R, error) {
 	if u.db == nil {
-		return nil, errDbNil
+		return nil, errDBNil
+	}
+	if accountID.IsZero() {
+		return nil, errEmptyAccountAddress
 	}
 
 	factory := crypto.FactorySECP256K1R{}
