@@ -87,15 +87,21 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
 func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) {
 	b.BootstrapConfig.Context.Log.Verbo("Put called for blkID %s", blkID)
 
-	if !b.pending.Contains(blkID) {
-		return
-	}
-
 	blk, err := b.VM.ParseBlock(blkBytes)
 	if err != nil {
 		b.BootstrapConfig.Context.Log.Warn("ParseBlock failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: blkBytes})
+
+		b.GetFailed(vdr, requestID)
+		return
+	}
+
+	if !b.pending.Contains(blk.ID()) {
+		b.BootstrapConfig.Context.Log.Warn("Validator %s sent an unrequested block:\n%s",
+			vdr,
+			formatting.DumpBytes{Bytes: blkBytes})
+
 		b.GetFailed(vdr, requestID)
 		return
 	}

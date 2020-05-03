@@ -93,15 +93,21 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
 func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) {
 	b.BootstrapConfig.Context.Log.Verbo("Put called for vertexID %s", vtxID)
 
-	if !b.pending.Contains(vtxID) {
-		return
-	}
-
 	vtx, err := b.State.ParseVertex(vtxBytes)
 	if err != nil {
 		b.BootstrapConfig.Context.Log.Warn("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
+
+		b.GetFailed(vdr, requestID)
+		return
+	}
+
+	if !b.pending.Contains(vtx.ID()) {
+		b.BootstrapConfig.Context.Log.Warn("Validator %s sent an unrequested vertex:\n%s",
+			vdr,
+			formatting.DumpBytes{Bytes: vtxBytes})
+
 		b.GetFailed(vdr, requestID)
 		return
 	}
