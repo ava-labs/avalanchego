@@ -1287,6 +1287,8 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
+	missingBlk.status = choices.Processing
+
 	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
 
 	pref := te.Consensus.Preference()

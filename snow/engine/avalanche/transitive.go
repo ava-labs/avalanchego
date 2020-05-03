@@ -151,13 +151,21 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 }
 
 // PushQuery implements the Engine interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []byte) {
+func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) {
 	if !t.bootstrapped {
 		t.Config.Context.Log.Debug("Dropping PushQuery for %s due to bootstrapping", vtxID)
 		return
 	}
 
-	t.Put(vdr, requestID, vtxID, vtx)
+	vtx, err := t.Config.State.ParseVertex(vtxBytes)
+	if err != nil {
+		t.Config.Context.Log.Warn("ParseVertex failed due to %s for block:\n%s",
+			err,
+			formatting.DumpBytes{Bytes: vtxBytes})
+		return
+	}
+	t.insertFrom(vdr, vtx)
+
 	t.PullQuery(vdr, requestID, vtxID)
 }
 
@@ -204,8 +212,16 @@ func (t *Transitive) Notify(msg common.Message) {
 }
 
 func (t *Transitive) repoll() {
+	if len(t.polls.m) >= t.Params.ConcurrentRepolls {
+		return
+	}
+
 	txs := t.Config.VM.PendingTxs()
 	t.batch(txs, false /*=force*/, true /*=empty*/)
+
+	for i := len(t.polls.m); i < t.Params.ConcurrentRepolls; i++ {
+		t.batch(nil, false /*=force*/, true /*=empty*/)
+	}
 }
 
 func (t *Transitive) reinsertFrom(vdr ids.ShortID, vtxID ids.ID) bool {
