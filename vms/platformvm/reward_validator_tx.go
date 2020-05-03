@@ -63,7 +63,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		return nil, nil, nil, nil, err
 	}
 	if db == nil {
-		return nil, nil, nil, nil, errDbNil
+		return nil, nil, nil, nil, errDBNil
 	}
 
 	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
