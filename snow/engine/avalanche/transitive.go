@@ -166,7 +166,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 	}
 	t.insertFrom(vdr, vtx)
 
-	t.PullQuery(vdr, requestID, vtxID)
+	t.PullQuery(vdr, requestID, vtx.ID())
 }
 
 // Chits implements the Engine interface
