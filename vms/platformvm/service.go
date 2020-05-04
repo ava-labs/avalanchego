@@ -77,7 +77,7 @@ type GetSubnetsResponse struct {
 func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *GetSubnetsResponse) error {
 	subnets, err := service.vm.getSubnets(service.vm.DB) // all subnets
 	if err != nil {
-		return fmt.Errorf("error getting subnets from database: %v", err)
+		return fmt.Errorf("error getting subnets from database: %w", err)
 	}
 
 	getAll := len(args.IDs) == 0
@@ -279,7 +279,7 @@ type GetAccountReply struct {
 func (service *Service) GetAccount(_ *http.Request, args *GetAccountArgs, reply *GetAccountReply) error {
 	account, err := service.vm.getAccount(service.vm.DB, args.Address)
 	if err != nil && err != database.ErrNotFound {
-		return fmt.Errorf("couldn't get account: %v", err)
+		return fmt.Errorf("couldn't get account: %w", err)
 	} else if err == database.ErrNotFound {
 		account = newAccount(args.Address, 0, 0)
 	}
@@ -309,7 +309,7 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 	// db holds the user's info that pertains to the Platform Chain
 	userDB, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user: %v", err)
+		return fmt.Errorf("couldn't get user: %w", err)
 	}
 
 	// The user
@@ -320,14 +320,14 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 	// IDs of accounts controlled by this user
 	accountIDs, err := user.getAccountIDs()
 	if err != nil {
-		return fmt.Errorf("couldn't get accounts held by user: %v", err)
+		return fmt.Errorf("couldn't get accounts held by user: %w", err)
 	}
 
 	reply.Accounts = []APIAccount{}
 	for _, accountID := range accountIDs {
 		account, err := service.vm.getAccount(service.vm.DB, accountID) // Get account whose ID is [accountID]
 		if err != nil && err != database.ErrNotFound {
-			service.vm.Ctx.Log.Error("couldn't get account from database: %v", err)
+			service.vm.Ctx.Log.Error("couldn't get account from database: %w", err)
 			continue
 		} else if err == database.ErrNotFound {
 			account = newAccount(accountID, 0, 0)
@@ -371,7 +371,7 @@ func (service *Service) CreateAccount(_ *http.Request, args *CreateAccountArgs, 
 	// userDB holds the user's info that pertains to the Platform Chain
 	userDB, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user: %v", err)
+		return fmt.Errorf("couldn't get user: %w", err)
 	}
 
 	// The user creating a new account
@@ -747,7 +747,7 @@ func (service *Service) signAddDefaultSubnetValidatorTx(tx *addDefaultSubnetVali
 	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetValidatorTx)
 	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+		return nil, fmt.Errorf("error serializing unsigned tx: %w", err)
 	}
 
 	sig, err := key.Sign(unsignedTxBytes)
@@ -770,7 +770,7 @@ func (service *Service) signAddDefaultSubnetDelegatorTx(tx *addDefaultSubnetDele
 	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetDelegatorTx)
 	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+		return nil, fmt.Errorf("error serializing unsigned tx: %w", err)
 	}
 
 	sig, err := key.Sign(unsignedTxBytes)
@@ -793,7 +793,7 @@ func (service *Service) signCreateSubnetTx(tx *CreateSubnetTx, key *crypto.Priva
 	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)
 	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+		return nil, fmt.Errorf("error serializing unsigned tx: %w", err)
 	}
 
 	sig, err := key.Sign(unsignedTxBytes)
@@ -816,7 +816,7 @@ func (service *Service) signExportTx(tx *ExportTx, key *crypto.PrivateKeySECP256
 	unsignedIntf := interface{}(&tx.UnsignedExportTx)
 	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+		return nil, fmt.Errorf("error serializing unsigned tx: %w", err)
 	}
 
 	sig, err := key.Sign(unsignedTxBytes)
@@ -844,7 +844,7 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 	unsignedIntf := interface{}(&tx.UnsignedAddNonDefaultSubnetValidatorTx)
 	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+		return nil, fmt.Errorf("error serializing unsigned tx: %w", err)
 	}
 	sig, err := key.Sign(unsignedTxBytes)
 	if err != nil {
@@ -857,7 +857,7 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 	// Get information about the subnet
 	subnet, err := service.vm.getSubnet(service.vm.DB, tx.SubnetID())
 	if err != nil {
-		return nil, fmt.Errorf("problem getting subnet information: %v", err)
+		return nil, fmt.Errorf("problem getting subnet information: %w", err)
 	}
 
 	// Find the location at which [key] should put its signature.
@@ -911,7 +911,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	// Get the key of the Signer
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user: %v", err)
+		return fmt.Errorf("couldn't get user: %w", err)
 	}
 	user := user{db: db}
 
@@ -1024,7 +1024,7 @@ func (service *Service) signCreateChainTx(tx *CreateChainTx, key *crypto.Private
 	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
 	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return nil, fmt.Errorf("error serializing unsigned tx: %v", err)
+		return nil, fmt.Errorf("error serializing unsigned tx: %w", err)
 	}
 	sig, err := key.Sign(unsignedTxBytes)
 	if err != nil {
@@ -1037,7 +1037,7 @@ func (service *Service) signCreateChainTx(tx *CreateChainTx, key *crypto.Private
 	// Get information about the subnet
 	subnet, err := service.vm.getSubnet(service.vm.DB, tx.SubnetID)
 	if err != nil {
-		return nil, fmt.Errorf("problem getting subnet information: %v", err)
+		return nil, fmt.Errorf("problem getting subnet information: %w", err)
 	}
 
 	// Find the location at which [key] should put its signature.
@@ -1198,7 +1198,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 
 	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
 	if err != nil {
-		service.vm.Ctx.Log.Error("problem marshaling createChainTx: %v", err)
+		service.vm.Ctx.Log.Error("problem marshaling createChainTx: %w", err)
 		return errCreatingTransaction
 	}
 
@@ -1379,7 +1379,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 
 	chains, err := service.vm.getChains(service.vm.DB)
 	if err != nil {
-		return fmt.Errorf("couldn't retrieve blockchains: %v", err)
+		return fmt.Errorf("couldn't retrieve blockchains: %w", err)
 	}
 
 	for _, chain := range chains {
