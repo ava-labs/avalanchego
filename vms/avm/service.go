@@ -232,6 +232,12 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	return nil
 }
 
+// Balance ...
+type Balance struct {
+	AssetID string      `json:"assetID"`
+	Balance json.Uint64 `json:"balance"`
+}
+
 // GetAllBalancesArgs are arguments for calling into GetAllBalances
 type GetAllBalancesArgs struct {
 	Address string `json:"address"`
@@ -239,7 +245,7 @@ type GetAllBalancesArgs struct {
 
 // GetAllBalancesReply is the response from a call to GetAllBalances
 type GetAllBalancesReply struct {
-	Balances map[string]json.Uint64 `json:"balances"`
+	Balances []Balance `json:"balances"`
 }
 
 // GetAllBalances returns a map where:
@@ -285,13 +291,15 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 		return errors.New("couldn't get asset ID of AVA")
 	}
 
-	reply.Balances = make(map[string]json.Uint64, assetIDs.Len())
-	for _, assetID := range assetIDs.List() {
+	reply.Balances = make([]Balance, assetIDs.Len())
+	for i, assetID := range assetIDs.List() {
+		var b Balance
 		if assetID.Equals(avaAssetID) {
-			reply.Balances["AVA"] = json.Uint64(balances[assetID.Key()])
+			b = Balance{AssetID: "AVA", Balance: json.Uint64(balances[assetID.Key()])}
 		} else {
-			reply.Balances[assetID.String()] = json.Uint64(balances[assetID.Key()])
+			b = Balance{AssetID: assetID.String(), Balance: json.Uint64(balances[assetID.Key()])}
 		}
+		reply.Balances[i] = b
 	}
 
 	return nil
