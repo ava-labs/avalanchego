@@ -234,7 +234,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 // Balance ...
 type Balance struct {
-	AssetID string      `json:"assetID"`
+	AssetID string      `json:"asset"`
 	Balance json.Uint64 `json:"balance"`
 }
 
@@ -286,20 +286,19 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 		}
 	}
 
-	avaAssetID, err := service.vm.Lookup("AVA")
-	if err != nil {
-		return errors.New("couldn't get asset ID of AVA")
-	}
-
 	reply.Balances = make([]Balance, assetIDs.Len())
 	for i, assetID := range assetIDs.List() {
-		var b Balance
-		if assetID.Equals(avaAssetID) {
-			b = Balance{AssetID: "AVA", Balance: json.Uint64(balances[assetID.Key()])}
+		if alias, err := service.vm.PrimaryAlias(assetID); err == nil {
+			reply.Balances[i] = Balance{
+				AssetID: alias,
+				Balance: json.Uint64(balances[assetID.Key()]),
+			}
 		} else {
-			b = Balance{AssetID: assetID.String(), Balance: json.Uint64(balances[assetID.Key()])}
+			reply.Balances[i] = Balance{
+				AssetID: assetID.String(),
+				Balance: json.Uint64(balances[assetID.Key()]),
+			}
 		}
-		reply.Balances[i] = b
 	}
 
 	return nil
