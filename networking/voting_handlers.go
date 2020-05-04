@@ -18,6 +18,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"math"
 	"unsafe"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,7 +30,13 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/random"
 	"github.com/ava-labs/gecko/utils/timer"
+)
+
+// GossipSize is the maximum number of peers to gossip a container to
+const (
+	GossipSize = 50
 )
 
 var (
@@ -89,34 +96,7 @@ func (s *Voting) Shutdown() { s.executor.Stop() }
 
 // Accept is called after every consensus decision
 func (s *Voting) Accept(chainID, containerID ids.ID, container []byte) error {
-	peers := []salticidae.PeerID(nil)
-
-	allPeers, allIDs, _ := s.conns.Conns()
-	for i, id := range allIDs {
-		if !s.vdrs.Contains(id) {
-			peers = append(peers, allPeers[i])
-		}
-	}
-
-	build := Builder{}
-	msg, err := build.Put(chainID, 0, containerID, container)
-	if err != nil {
-		return fmt.Errorf("Attempted to pack too large of a Put message.\nContainer length: %d: %w", len(container), err)
-	}
-
-	s.log.Verbo("Sending a Put message to non-validators."+
-		"\nNumber of Non-Validators: %d"+
-		"\nChain: %s"+
-		"\nContainer ID: %s"+
-		"\nContainer:\n%s",
-		len(peers),
-		chainID,
-		containerID,
-		formatting.DumpBytes{Bytes: container},
-	)
-	s.send(msg, peers...)
-	s.numPutSent.Add(float64(len(peers)))
-	return nil
+	return s.gossip(chainID, containerID, container)
 }
 
 // GetAcceptedFrontier implements the Sender interface.
@@ -412,6 +392,13 @@ func (s *Voting) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32
 	s.numChitsSent.Inc()
 }
 
+// Gossip attempts to gossip the container to the network
+func (s *Voting) Gossip(chainID, containerID ids.ID, container []byte) {
+	if err := s.gossip(chainID, containerID, container); err != nil {
+		s.log.Error("Error gossiping container %s to %s\n%s", containerID, chainID, err)
+	}
+}
+
 func (s *Voting) send(msg Msg, peers ...salticidae.PeerID) {
 	ds := msg.DataStream()
 	defer ds.Free()
@@ -427,6 +414,41 @@ func (s *Voting) send(msg Msg, peers ...salticidae.PeerID) {
 	default:
 		s.net.MulticastMsgByMove(cMsg, peers)
 	}
+}
+
+func (s *Voting) gossip(chainID, containerID ids.ID, container []byte) error {
+	allPeers := s.conns.PeerIDs()
+
+	numToGossip := GossipSize
+	if numToGossip > len(allPeers) {
+		numToGossip = len(allPeers)
+	}
+	peers := make([]salticidae.PeerID, numToGossip)
+
+	sampler := random.Uniform{N: len(allPeers)}
+	for i := range peers {
+		peers[i] = allPeers[sampler.Sample()]
+	}
+
+	build := Builder{}
+	msg, err := build.Put(chainID, math.MaxUint32, containerID, container)
+	if err != nil {
+		return fmt.Errorf("Attempted to pack too large of a Put message.\nContainer length: %d: %w", len(container), err)
+	}
+
+	s.log.Verbo("Sending a Put message to non-validators."+
+		"\nNumber of Non-Validators: %d"+
+		"\nChain: %s"+
+		"\nContainer ID: %s"+
+		"\nContainer:\n%s",
+		len(peers),
+		chainID,
+		containerID,
+		formatting.DumpBytes{Bytes: container},
+	)
+	s.send(msg, peers...)
+	s.numPutSent.Add(float64(len(peers)))
+	return nil
 }
 
 // getAcceptedFrontier handles the recept of a getAcceptedFrontier container

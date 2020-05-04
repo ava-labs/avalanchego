@@ -14,6 +14,7 @@ type Sender interface {
 	AcceptedSender
 	FetchSender
 	QuerySender
+	Gossiper
 }
 
 // FrontierSender defines how a consensus engine sends frontier messages to
@@ -69,4 +70,11 @@ type QuerySender interface {
 
 	// Chits sends chits to the specified validator
 	Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set)
+}
+
+// Gossiper defines how a consensus engine gossips a container on the accepted
+// frontier to other validators
+type Gossiper interface {
+	// Gossip gossips the provided container throughout the network
+	Gossip(containerID ids.ID, container []byte)
 }

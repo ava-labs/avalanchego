@@ -163,3 +163,9 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set)
 	}
 	s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
 }
+
+// Gossip the provided container
+func (s *Sender) Gossip(containerID ids.ID, container []byte) {
+	s.ctx.Log.Verbo("Gossiping %s", containerID)
+	s.sender.Gossip(s.ctx.ChainID, containerID, container)
+}
