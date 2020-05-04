@@ -280,9 +280,18 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 		}
 	}
 
+	avaAssetID, err := service.vm.Lookup("AVA")
+	if err != nil {
+		return errors.New("couldn't get asset ID of AVA")
+	}
+
 	reply.Balances = make(map[string]json.Uint64, assetIDs.Len())
 	for _, assetID := range assetIDs.List() {
-		reply.Balances[assetID.String()] = json.Uint64(balances[assetID.Key()])
+		if assetID.Equals(avaAssetID) {
+			reply.Balances["AVA"] = json.Uint64(balances[assetID.Key()])
+		} else {
+			reply.Balances[assetID.String()] = json.Uint64(balances[assetID.Key()])
+		}
 	}
 
 	return nil
