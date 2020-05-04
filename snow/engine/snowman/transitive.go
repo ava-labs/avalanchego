@@ -74,7 +74,7 @@ func (t *Transitive) Gossip() {
 		return
 	}
 
-	t.Config.Context.Log.Info("Gossiping %s as accepted to the network", blkID)
+	t.Config.Context.Log.Debug("Gossiping %s as accepted to the network", blkID)
 	t.Config.Sender.Gossip(blkID, blk.Bytes())
 }
 

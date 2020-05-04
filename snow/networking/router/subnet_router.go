@@ -34,6 +34,8 @@ func (sr *ChainRouter) Initialize(log logging.Logger, timeouts *timeout.Manager,
 	sr.chains = make(map[[32]byte]*handler.Handler)
 	sr.timeouts = timeouts
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
+
+	go log.RecoverAndPanic(sr.gossiper.Dispatch)
 }
 
 // AddChain registers the specified chain so that incoming
@@ -259,6 +261,7 @@ func (sr *ChainRouter) shutdown() {
 	for _, chain := range sr.chains {
 		chain.Shutdown()
 	}
+	sr.gossiper.Stop()
 }
 
 // Gossip accepted containers
