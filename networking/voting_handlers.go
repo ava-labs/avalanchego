@@ -436,8 +436,8 @@ func (s *Voting) gossip(chainID, containerID ids.ID, container []byte) error {
 		return fmt.Errorf("Attempted to pack too large of a Put message.\nContainer length: %d: %w", len(container), err)
 	}
 
-	s.log.Verbo("Sending a Put message to non-validators."+
-		"\nNumber of Non-Validators: %d"+
+	s.log.Verbo("Sending a Put message to peers."+
+		"\nNumber of Peers: %d"+
 		"\nChain: %s"+
 		"\nContainer ID: %s"+
 		"\nContainer:\n%s",
