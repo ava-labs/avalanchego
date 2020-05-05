@@ -26,9 +26,14 @@ type ChainRouter struct {
 	gossiper *timer.Repeater
 }
 
-// Initialize the router
-// When this router receives an incoming message, it cancels the timeout in [timeouts]
-// associated with the request that caused the incoming message, if applicable
+// Initialize the router.
+//
+// When this router receives an incoming message, it cancels the timeout in
+// [timeouts] associated with the request that caused the incoming message, if
+// applicable.
+//
+// This router also fires a gossip event every [gossipFrequency] to the engine,
+// notifying the engine it should gossip it's accepted set.
 func (sr *ChainRouter) Initialize(log logging.Logger, timeouts *timeout.Manager, gossipFrequency time.Duration) {
 	sr.log = log
 	sr.chains = make(map[[32]byte]*handler.Handler)
