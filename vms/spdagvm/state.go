@@ -130,8 +130,6 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 		return s.vm.db.Delete(id.Bytes())
 	}
 
-	s.c.Put(id, status)
-
 	p := wrappers.Packer{Bytes: make([]byte, 4)}
 
 	p.PackInt(uint32(status))
@@ -143,6 +141,8 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 	if p.Errored() {
 		return p.Err
 	}
+
+	s.c.Put(id, status)
 	return s.vm.db.Put(id.Bytes(), p.Bytes)
 }
 
@@ -186,8 +186,6 @@ func (s *state) SetIDs(id ids.ID, idSlice []ids.ID) error {
 		return s.vm.db.Delete(id.Bytes())
 	}
 
-	s.c.Put(id, idSlice)
-
 	size := wrappers.IntLen + hashing.HashLen*len(idSlice)
 	p := wrappers.Packer{Bytes: make([]byte, size)}
 
@@ -203,5 +201,7 @@ func (s *state) SetIDs(id ids.ID, idSlice []ids.ID) error {
 	if p.Errored() {
 		return p.Err
 	}
+
+	s.c.Put(id, idSlice)
 	return s.vm.db.Put(id.Bytes(), p.Bytes)
 }
