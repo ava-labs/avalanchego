@@ -47,3 +47,9 @@ go build -o "$BUILD_DIR/xputtest" "$GECKO_PATH/xputtest/"*.go
 
 echo "Building EVM plugin binary..."
 go build -o "$BUILD_DIR/plugins/evm" "$CORETH_PATH/plugin/"*.go
+
+if [[ -f "$BUILD_DIR/ava" && -f "$BUILD_DIR/xputtest" && -f "$BUILD_DIR/plugins/evm" ]]; then
+        echo "Build successful" 
+else
+        echo "Build failed" 
+fi
