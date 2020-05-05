@@ -644,7 +644,7 @@ func TestIteratorMemorySafety(t *testing.T, db Database) {
 
 	iterator := db.NewIterator()
 	if iterator == nil {
-		t.Fatalf("db.NewIteratorWithStartAndPrefix returned nil")
+		t.Fatalf("db.NewIterator returned nil")
 	}
 	defer iterator.Release()
 
