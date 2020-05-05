@@ -1,10 +1,7 @@
 #!/bin/bash -e
 
-CORETH_VER="v0.1.0"     # Must match coreth version in go.mod
-CORETH_PATH=$GOPATH/pkg/mod/github.com/ava-labs/coreth@$CORETH_VER
-
-SALTICIDAE_VER="v0.3.0" # Must match salticidae version in go.mod
-SALTICIDAE_PATH=$GOPATH/pkg/mod/github.com/ava-labs/salticidae@$SALTICIDAE_VER
+GECKO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
+source ${GECKO_PATH}/scripts/env.sh 
 
 # Fetch Gecko dependencies, including salticidae-go and coreth
 echo "Fetching dependencies..."
@@ -42,9 +39,6 @@ else
 fi
 
 # Build the binaries
-GECKO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
-BUILD_DIR="${GECKO_PATH}/build" # Where binaries go
-
 echo "Building Gecko binary..."
 go build -o "$BUILD_DIR/ava" "$GECKO_PATH/main/"*.go
 

@@ -1,13 +1,9 @@
-#!/bin/bash
+#!/bin/bash -e
 
-# Ted: contact me when you make any changes
+export CORETH_VER="v0.1.0"     # Must match coreth version in go.mod
+export CORETH_PATH=$GOPATH/pkg/mod/github.com/ava-labs/coreth@$CORETH_VER
 
-# resolve the required env for salticidae-go
-GOPATH="$(go env GOPATH)"
-SALTICIDAE_GO_HOME="$GOPATH/src/github.com/ava-labs/salticidae-go/"
+export SALTICIDAE_VER="v0.3.0" # Must match salticidae version in go.mod
+export SALTICIDAE_PATH=$GOPATH/pkg/mod/github.com/ava-labs/salticidae@$SALTICIDAE_VER
 
-if [[ -f "$SALTICIDAE_GO_HOME/salticidae/libsalticidae.a" ]]; then
-    source "$SALTICIDAE_GO_HOME/scripts/env.sh"
-else
-    source /dev/stdin <<<"$(curl -sS https://raw.githubusercontent.com/ava-labs/salticidae-go/v0.1.0/setup.sh)"
-fi
+export BUILD_DIR="${GECKO_PATH}/build" # Where binaries go

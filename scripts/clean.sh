@@ -7,5 +7,6 @@ source ${GECKO_PATH}/scripts/env.sh
 # Remove binaries
 rm -r ${BUILD_DIR}/*
 
-# Call salticidae-go's clean script
-sh $SALTICIDAE_GO_PATH/scripts/clean.sh
+# Remove salticidae
+rm $SALTICIDAE_PATH/build/lib/*
+
