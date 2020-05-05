@@ -8,6 +8,7 @@ require (
 	github.com/ava-labs/coreth v0.1.0 // indirect
 	github.com/ava-labs/go-ethereum v1.9.3 // indirect
 	github.com/ava-labs/salticidae-go v0.1.0
+	github.com/ava-labs/salticidae v0.3.0 // Manually added to this file so salticidae is fetched. Don't delete.
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.3
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200501185720-787d3f5c0f1c
