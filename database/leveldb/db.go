@@ -208,7 +208,14 @@ func (r *replayer) Delete(key []byte) {
 
 type iter struct{ iterator.Iterator }
 
-func (i *iter) Error() error { return updateError(i.Iterator.Error()) }
+// Error implements the Iterator interface
+func (it *iter) Error() error { return updateError(it.Iterator.Error()) }
+
+// Key implements the Iterator interface
+func (it *iter) Key() []byte { return copyBytes(it.Iterator.Key()) }
+
+// Value implements the Iterator interface
+func (it *iter) Value() []byte { return copyBytes(it.Iterator.Value()) }
 
 func updateError(err error) error {
 	switch err {
@@ -219,4 +226,14 @@ func updateError(err error) error {
 	default:
 		return err
 	}
+}
+
+func copyBytes(bytes []byte) []byte {
+	if bytes == nil {
+		return nil
+	}
+
+	copiedBytes := make([]byte, len(bytes))
+	copy(copiedBytes, bytes)
+	return copiedBytes
 }
