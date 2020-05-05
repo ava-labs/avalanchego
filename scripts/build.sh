@@ -9,11 +9,11 @@ go mod download
 
 # Make sure specified versions of salticidae and coreth exist
 if [ ! -d $CORETH_PATH ]; then
-    echo "couldn't find coreth version ${CORETH_VER}"
+    echo "couldn't find coreth version ${CORETH_VER} at ${CORETH_PATH}"
     echo "build failed"
     exit 1
 elif [ ! -d $SALTICIDAE_PATH ]; then
-    echo "couldn't find salticidae version ${SALTICIDAE_VER}"
+    echo "couldn't find salticidae version ${SALTICIDAE_VER} at ${SALTICIDAE_PATH}"
     echo "build failed"
     exit 1
 fi
