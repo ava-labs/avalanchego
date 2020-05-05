@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/nodb"
 	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
+	"github.com/ava-labs/gecko/utils"
 )
 
 var (
@@ -137,13 +138,13 @@ type batch struct {
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), copyBytes(value), false})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
 	b.size += len(value)
 	return nil
 }
 
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), nil, true})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
 	b.size++
 	return nil
 }
@@ -244,12 +245,6 @@ func (it *iterator) Release() {
 	it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
 		Id: it.id,
 	})
-}
-
-func copyBytes(bytes []byte) []byte {
-	copiedBytes := make([]byte, len(bytes))
-	copy(copiedBytes, bytes)
-	return copiedBytes
 }
 
 func updateError(err error) error {
