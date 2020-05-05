@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/nodb"
+	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
 
@@ -174,13 +175,13 @@ type batch struct {
 
 // Put implements the Batch interface
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), copyBytes(value), false})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
 	return b.Batch.Put(b.db.prefix(key), value)
 }
 
 // Delete implements the Batch interface
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), nil, true})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
 	return b.Batch.Delete(b.db.prefix(key))
 }
 
@@ -228,10 +229,4 @@ func (it *iterator) Key() []byte {
 		return key[prefixLen:]
 	}
 	return key
-}
-
-func copyBytes(bytes []byte) []byte {
-	copiedBytes := make([]byte, len(bytes))
-	copy(copiedBytes, bytes)
-	return copiedBytes
 }
