@@ -7,6 +7,7 @@ import (
 	"bytes"
 
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -212,10 +213,10 @@ type iter struct{ iterator.Iterator }
 func (it *iter) Error() error { return updateError(it.Iterator.Error()) }
 
 // Key implements the Iterator interface
-func (it *iter) Key() []byte { return copyBytes(it.Iterator.Key()) }
+func (it *iter) Key() []byte { return utils.CopyBytes(it.Iterator.Key()) }
 
 // Value implements the Iterator interface
-func (it *iter) Value() []byte { return copyBytes(it.Iterator.Value()) }
+func (it *iter) Value() []byte { return utils.CopyBytes(it.Iterator.Value()) }
 
 func updateError(err error) error {
 	switch err {
@@ -226,14 +227,4 @@ func updateError(err error) error {
 	default:
 		return err
 	}
-}
-
-func copyBytes(bytes []byte) []byte {
-	if bytes == nil {
-		return nil
-	}
-
-	copiedBytes := make([]byte, len(bytes))
-	copy(copiedBytes, bytes)
-	return copiedBytes
 }
