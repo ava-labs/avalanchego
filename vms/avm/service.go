@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
@@ -15,7 +16,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -221,13 +222,85 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 			if !ok {
 				continue
 			}
-			amt, err := math.Add64(transferable.Amount(), uint64(reply.Balance))
+			amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
 			if err != nil {
 				return err
 			}
 			reply.Balance = json.Uint64(amt)
 		}
 	}
+	return nil
+}
+
+// Balance ...
+type Balance struct {
+	AssetID string      `json:"asset"`
+	Balance json.Uint64 `json:"balance"`
+}
+
+// GetAllBalancesArgs are arguments for calling into GetAllBalances
+type GetAllBalancesArgs struct {
+	Address string `json:"address"`
+}
+
+// GetAllBalancesReply is the response from a call to GetAllBalances
+type GetAllBalancesReply struct {
+	Balances []Balance `json:"balances"`
+}
+
+// GetAllBalances returns a map where:
+//   Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
+//   Value: The balance of the asset held by the address
+// Note that balances include assets that the address only _partially_ owns
+// (ie is one of several addresses specified in a multi-sig)
+func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
+	service.vm.ctx.Log.Verbo("GetAllBalances called with address: %s", args.Address)
+
+	address, err := service.vm.Parse(args.Address)
+	if err != nil {
+		return fmt.Errorf("couldn't parse given address: %s", err)
+	}
+	addrAsSet := ids.Set{}
+	addrAsSet.Add(ids.NewID(hashing.ComputeHash256Array(address)))
+
+	utxos, err := service.vm.GetUTXOs(addrAsSet)
+	if err != nil {
+		return fmt.Errorf("couldn't get address's UTXOs: %s", err)
+	}
+
+	assetIDs := ids.Set{}                    // IDs of assets the address has a non-zero balance of
+	balances := make(map[[32]byte]uint64, 0) // key: ID (as bytes). value: balance of that asset
+	for _, utxo := range utxos {
+		transferable, ok := utxo.Out.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		assetID := utxo.AssetID()
+		assetIDs.Add(assetID)
+		balance := balances[assetID.Key()] // 0 if key doesn't exist
+		balance, err := safemath.Add64(transferable.Amount(), balance)
+		if err != nil {
+			balances[assetID.Key()] = math.MaxUint64
+		} else {
+			balances[assetID.Key()] = balance
+		}
+	}
+
+	reply.Balances = make([]Balance, assetIDs.Len())
+	for i, assetID := range assetIDs.List() {
+		if alias, err := service.vm.PrimaryAlias(assetID); err == nil {
+			reply.Balances[i] = Balance{
+				AssetID: alias,
+				Balance: json.Uint64(balances[assetID.Key()]),
+			}
+		} else {
+			reply.Balances[i] = Balance{
+				AssetID: assetID.String(),
+				Balance: json.Uint64(balances[assetID.Key()]),
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -613,7 +686,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		if !ok {
 			continue
 		}
-		spent, err := math.Add64(amountSpent, input.Amount())
+		spent, err := safemath.Add64(amountSpent, input.Amount())
 		if err != nil {
 			return errSpendOverflow
 		}
@@ -1020,7 +1093,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 		if !ok {
 			continue
 		}
-		spent, err := math.Add64(amount, input.Amount())
+		spent, err := safemath.Add64(amount, input.Amount())
 		if err != nil {
 			return errSpendOverflow
 		}
@@ -1164,7 +1237,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 		if !ok {
 			continue
 		}
-		spent, err := math.Add64(amountSpent, input.Amount())
+		spent, err := safemath.Add64(amountSpent, input.Amount())
 		if err != nil {
 			return errSpendOverflow
 		}
