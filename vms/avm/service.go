@@ -448,21 +448,21 @@ func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, 
 	return nil
 }
 
-// GetAddressesArgs ...
-type GetAddressesArgs struct {
+// ListAddressesArgs ...
+type ListAddressesArgs struct {
 	// User that we're listing the addresses of
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// GetAddressesResponse ...
-type GetAddressesResponse struct {
+// ListAddressesResponse ...
+type ListAddressesResponse struct {
 	// Each element is an address controlled by specified account
 	Addresses []string `json:"addresses"`
 }
 
-// GetAddresses returns all of the addresses controlled by user [args.Username]
-func (service *Service) GetAddresses(_ *http.Request, args *GetAddressesArgs, response *GetAddressesResponse) error {
+// ListAddresses returns all of the addresses controlled by user [args.Username]
+func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, response *ListAddressesResponse) error {
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user: %w", err)
