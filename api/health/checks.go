@@ -53,7 +53,7 @@ func (c gosundheitCheck) Execute() (interface{}, error) { return c.checkFn() }
 
 // heartbeater provides a getter to the most recently observed heartbeat
 type heartbeater interface {
-	GetHeartbeat() time.Time
+	GetHeartbeat() int64
 }
 
 // HeartbeatCheckFn returns a CheckFn that checks the given heartbeater has
@@ -62,11 +62,11 @@ func HeartbeatCheckFn(hb heartbeater, max time.Duration) CheckFn {
 	return func() (data interface{}, err error) {
 		// Get the heartbeat and create a data set to return to the caller
 		hb := hb.GetHeartbeat()
-		data = map[string]int64{"heartbeat": hb.UTC().Unix()}
+		data = map[string]int64{"heartbeat": hb}
 
 		// If the current time is after the last known heartbeat + the limit then
 		// mark our check as failed
-		if hb.Add(max).Before(time.Now()) {
+		if time.Unix(hb, 0).Add(max).Before(time.Now()) {
 			err = ErrHeartbeatNotDetected
 		}
 		return data, err

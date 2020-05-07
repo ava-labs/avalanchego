@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -148,7 +149,7 @@ type Handshake struct {
 	awaitingLock sync.Mutex
 	awaiting     []*networking.AwaitingConnections
 
-	lastHeartbeat time.Time
+	lastHeartbeat int64
 }
 
 // Initialize to the c networking library. This should only be done once during
@@ -599,12 +600,12 @@ func (nm *Handshake) checkCompatibility(peerVersion string) bool {
 
 // heartbeat registers a new heartbeat to signal liveness
 func (nm *Handshake) heartbeat() {
-	nm.lastHeartbeat = nm.clock.Time()
+	atomic.StoreInt64(&nm.lastHeartbeat, nm.clock.Time().Unix())
 }
 
 // GetHeartbeat returns the most recent heartbeat time
-func (nm *Handshake) GetHeartbeat() time.Time {
-	return nm.lastHeartbeat
+func (nm *Handshake) GetHeartbeat() int64 {
+	return atomic.LoadInt64(&nm.lastHeartbeat)
 }
 
 // peerHandler notifies a change to the set of connected peers
