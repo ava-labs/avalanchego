@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -105,6 +106,43 @@ func TestServiceGetTxStatus(t *testing.T) {
 			expected.String(), statusReply.Status.String(),
 		)
 	}
+}
+
+func TestServiceGetTx(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTxBytes := genesisTx.Bytes()
+	txID := genesisTx.ID()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{
+		TxID: txID,
+	}, &reply)
+	assert.NoError(t, err)
+	assert.Equal(t, genesisTxBytes, reply.Tx.Bytes, "Wrong tx returned from service.GetTx")
+}
+
+func TestServiceGetNilTx(t *testing.T) {
+	_, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{}, &reply)
+	assert.Error(t, err, "Nil TxID should have returned an error")
+}
+
+func TestServiceGetUnknownTx(t *testing.T) {
+	_, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{TxID: ids.Empty}, &reply)
+	assert.Error(t, err, "Unknown TxID should have returned an error")
 }
 
 func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
