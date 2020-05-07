@@ -62,18 +62,18 @@ func (h *Health) RegisterCheck(c Check) error {
 	})
 }
 
-// GetHealthArgs are the arguments for GetHealth
-type GetHealthArgs struct{}
+// GetLivenessArgs are the arguments for GetLiveness
+type GetLivenessArgs struct{}
 
-// GetHealthReply is the response for GetHealth
-type GetHealthReply struct {
+// GetLivenessReply is the response for GetLiveness
+type GetLivenessReply struct {
 	Checks  map[string]health.Result `json:"checks"`
 	Healthy bool                     `json:"healthy"`
 }
 
-// GetHealth returns a summation of the health of the node
-func (service *Health) GetHealth(_ *http.Request, _ *GetHealthArgs, reply *GetHealthReply) error {
-	service.log.Debug("Health: GetHealth called")
+// GetLiveness returns a summation of the health of the node
+func (service *Health) GetLiveness(_ *http.Request, _ *GetLivenessArgs, reply *GetLivenessReply) error {
+	service.log.Debug("Health: GetLiveness called")
 	reply.Checks, reply.Healthy = service.health.Results()
 	return nil
 }
