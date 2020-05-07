@@ -281,7 +281,7 @@ func (nm *Handshake) Connect(addr salticidae.NetAddr) {
 			return
 		}
 
-		nm.log.Info("Attempting to discover peer at %s", ipStr)
+		nm.log.Debug("Attempting to discover peer at %s", ipStr)
 
 		msgNet := nm.net.AsMsgNetwork()
 		msgNet.Connect(addr)
