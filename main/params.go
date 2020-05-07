@@ -156,12 +156,12 @@ func init() {
 	// DB:
 	if *db {
 		*dbDir, err = homedir.Expand(*dbDir)
-		if errs.Add(fmt.Errorf("couldn't resolve db path: %w", err)); errs.Errored() {
+		if errs.Add(fmt.Errorf("couldn't resolve db path: %w", err)); err != nil {
 			return
 		}
 		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
-		if errs.Add(fmt.Errorf("couldn't create db: %w", err)); errs.Errored() {
+		if errs.Add(fmt.Errorf("couldn't create db: %w", err)); err != nil {
 			return
 		}
 		Config.DB = db
@@ -199,8 +199,7 @@ func init() {
 	for _, ip := range strings.Split(*bootstrapIPs, ",") {
 		if ip != "" {
 			addr, err := utils.ToIPDesc(ip)
-			if err != nil {
-				errs.Add(fmt.Errorf("couldn't parse ip: %w", err))
+			if errs.Add(fmt.Errorf("couldn't parse ip: %w", err)); err != nil {
 				return
 			}
 			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
@@ -223,8 +222,9 @@ func init() {
 			if id != "" {
 				err = cb58.FromString(id)
 				if err != nil {
-					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err))
-					return
+					if errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err)); err != nil {
+						return
+					}
 				}
 				peerID, err := ids.ToShortID(cb58.Bytes)
 				if err != nil {
