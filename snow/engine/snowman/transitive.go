@@ -65,6 +65,19 @@ func (t *Transitive) finishBootstrapping() {
 	}
 }
 
+// Gossip implements the Engine interface
+func (t *Transitive) Gossip() {
+	blkID := t.Config.VM.LastAccepted()
+	blk, err := t.Config.VM.GetBlock(blkID)
+	if err != nil {
+		t.Config.Context.Log.Warn("Dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
+		return
+	}
+
+	t.Config.Context.Log.Debug("Gossiping %s as accepted to the network", blkID)
+	t.Config.Sender.Gossip(blkID, blk.Bytes())
+}
+
 // Shutdown implements the Engine interface
 func (t *Transitive) Shutdown() {
 	t.Config.Context.Log.Info("Shutting down Snowman consensus")

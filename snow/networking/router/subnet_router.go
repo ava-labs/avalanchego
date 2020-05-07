@@ -5,11 +5,13 @@ package router
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 // ChainRouter routes incoming messages from the validator network
@@ -21,15 +23,24 @@ type ChainRouter struct {
 	lock     sync.RWMutex
 	chains   map[[32]byte]*handler.Handler
 	timeouts *timeout.Manager
+	gossiper *timer.Repeater
 }
 
-// Initialize the router
-// When this router receives an incoming message, it cancels the timeout in [timeouts]
-// associated with the request that caused the incoming message, if applicable
-func (sr *ChainRouter) Initialize(log logging.Logger, timeouts *timeout.Manager) {
+// Initialize the router.
+//
+// When this router receives an incoming message, it cancels the timeout in
+// [timeouts] associated with the request that caused the incoming message, if
+// applicable.
+//
+// This router also fires a gossip event every [gossipFrequency] to the engine,
+// notifying the engine it should gossip it's accepted set.
+func (sr *ChainRouter) Initialize(log logging.Logger, timeouts *timeout.Manager, gossipFrequency time.Duration) {
 	sr.log = log
 	sr.chains = make(map[[32]byte]*handler.Handler)
 	sr.timeouts = timeouts
+	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
+
+	go log.RecoverAndPanic(sr.gossiper.Dispatch)
 }
 
 // AddChain registers the specified chain so that incoming
@@ -254,5 +265,20 @@ func (sr *ChainRouter) Shutdown() {
 func (sr *ChainRouter) shutdown() {
 	for _, chain := range sr.chains {
 		chain.Shutdown()
+	}
+	sr.gossiper.Stop()
+}
+
+// Gossip accepted containers
+func (sr *ChainRouter) Gossip() {
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	sr.gossip()
+}
+
+func (sr *ChainRouter) gossip() {
+	for _, chain := range sr.chains {
+		chain.Gossip()
 	}
 }

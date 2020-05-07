@@ -29,6 +29,7 @@ const (
 	chitsMsg
 	queryFailedMsg
 	notifyMsg
+	gossipMsg
 	shutdownMsg
 )
 
@@ -87,6 +88,8 @@ func (t msgType) String() string {
 		return "Query Failed Message"
 	case notifyMsg:
 		return "Notify Message"
+	case gossipMsg:
+		return "Gossip Message"
 	case shutdownMsg:
 		return "Shutdown Message"
 	default:
