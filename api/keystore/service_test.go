@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
@@ -278,5 +279,53 @@ func TestServiceExportImport(t *testing.T) {
 		} else if !bytes.Equal(val, []byte("world")) {
 			t.Fatalf("Should have read '%s' from the db", "world")
 		}
+	}
+}
+
+func TestServiceDeleteUser(t *testing.T) {
+	testUser := "testUser"
+	password := "passwTest@fake01ord"
+	tests := []struct {
+		desc      string
+		request   *DeleteUserArgs
+		want      *DeleteUserReply
+		wantError bool
+	}{{
+		desc:      "empty user name case",
+		request:   &DeleteUserArgs{},
+		wantError: true,
+	}, {
+		desc:      "user not exists case",
+		request:   &DeleteUserArgs{Username: "dummy"},
+		wantError: true,
+	}, {
+		desc:      "user exists and invalid password case",
+		request:   &DeleteUserArgs{Username: testUser, Password: "password"},
+		wantError: true,
+	}, {
+		desc:    "user exists and valid password case",
+		request: &DeleteUserArgs{Username: testUser, Password: password},
+		want:    &DeleteUserReply{Success: true},
+	}}
+
+	ks := Keystore{}
+	ks.Initialize(logging.NoLog{}, memdb.New())
+
+	if err := ks.CreateUser(nil, &CreateUserArgs{Username: "testUser", Password: "passwTest@fake01ord"}, &CreateUserReply{}); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := &DeleteUserReply{}
+			err := ks.DeleteUser(nil, tt.request, got)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
+			}
+
+			if !tt.wantError && !reflect.DeepEqual(tt.want, got) {
+				t.Fatalf("DeleteUser() failed: got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
