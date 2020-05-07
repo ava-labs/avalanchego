@@ -161,12 +161,6 @@ func (n *Node) initNetlib() error {
 		}
 	}()
 
-	// Set up interrupt signal and terminate signal handlers
-	evInt := salticidae.NewSigEvent(n.EC, salticidae.SigEventCallback(C.onTerm), nil)
-	evInt.Add(salticidae.SIGINT)
-	evTerm := salticidae.NewSigEvent(n.EC, salticidae.SigEventCallback(C.onTerm), nil)
-	evTerm.Add(salticidae.SIGTERM)
-
 	// Create peer network config, may have tls enabled
 	peerConfig := salticidae.NewPeerNetworkConfig()
 	peerConfig.ConnTimeout(60)
