@@ -669,16 +669,16 @@ type SignResponse struct {
 func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignResponse) error {
 	service.vm.Ctx.Log.Debug("sign called")
 
+	if args.Signer.IsZero() {
+		return errNilSigner
+	}
+
 	// Get the key of the Signer
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("couldn't get data for user '%s'. Does user exist?", args.Username)
 	}
 	user := user{db: db}
-
-	if args.Signer.IsZero() {
-		return errNilSigner
-	}
 
 	key, err := user.getKey(args.Signer) // Key of [args.Signer]
 	if err != nil {
@@ -881,16 +881,16 @@ type ImportAVAArgs struct {
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *SignResponse) error {
 	service.vm.Ctx.Log.Debug("platform.ImportAVA called")
 
+	if args.To.IsZero() {
+		return errNilTo
+	}
+
 	// Get the key of the Signer
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("couldn't get data for user '%s'. Does user exist?", args.Username)
 	}
 	user := user{db: db}
-
-	if args.To.IsZero() {
-		return errNilTo
-	}
 
 	kc := secp256k1fx.NewKeychain()
 	key, err := user.getKey(args.To)
