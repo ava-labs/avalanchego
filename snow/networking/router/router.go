@@ -4,6 +4,8 @@
 package router
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -19,7 +21,7 @@ type Router interface {
 	AddChain(chain *handler.Handler)
 	RemoveChain(chainID ids.ID)
 	Shutdown()
-	Initialize(log logging.Logger, timeouts *timeout.Manager)
+	Initialize(log logging.Logger, timeouts *timeout.Manager, gossipFrequency time.Duration)
 }
 
 // ExternalRouter routes messages from the network to the

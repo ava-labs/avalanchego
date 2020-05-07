@@ -90,7 +90,9 @@ func (s *State) Status(id ids.ID) (choices.Status, error) {
 	}
 
 	var status choices.Status
-	s.Codec.Unmarshal(bytes, &status)
+	if err := s.Codec.Unmarshal(bytes, &status); err != nil {
+		return choices.Unknown, err
+	}
 
 	s.Cache.Put(id, status)
 	return status, nil
@@ -103,12 +105,12 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 		return s.DB.Delete(id.Bytes())
 	}
 
-	s.Cache.Put(id, status)
-
 	bytes, err := s.Codec.Marshal(status)
 	if err != nil {
 		return err
 	}
+
+	s.Cache.Put(id, status)
 	return s.DB.Put(id.Bytes(), bytes)
 }
 
@@ -142,12 +144,11 @@ func (s *State) SetIDs(id ids.ID, idSlice []ids.ID) error {
 		return s.DB.Delete(id.Bytes())
 	}
 
-	s.Cache.Put(id, idSlice)
-
 	bytes, err := s.Codec.Marshal(idSlice)
 	if err != nil {
 		return err
 	}
 
+	s.Cache.Put(id, idSlice)
 	return s.DB.Put(id.Bytes(), bytes)
 }
