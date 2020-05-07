@@ -301,13 +301,13 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	return nil
 }
 
-// DeleteUserArgs are arguments for passing into CreateUser requests
+// DeleteUserArgs are arguments for passing into DeleteUser requests
 type DeleteUserArgs struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// DeleteUserReply is the response from calling CreateUser
+// DeleteUserReply is the response from calling DeleteUser
 type DeleteUserReply struct {
 	Success bool `json:"success"`
 }
