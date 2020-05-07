@@ -62,7 +62,7 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		go timeoutManager.Dispatch()
 
 		router := &router.ChainRouter{}
-		router.Initialize(logging.NoLog{}, &timeoutManager)
+		router.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
 
 		// Initialize the VM
 		vm := &VM{}
@@ -189,7 +189,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		go timeoutManager.Dispatch()
 
 		router := &router.ChainRouter{}
-		router.Initialize(logging.NoLog{}, &timeoutManager)
+		router.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
 
 		wg := sync.WaitGroup{}
 		wg.Add(numBlocks)
