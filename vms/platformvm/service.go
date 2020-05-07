@@ -34,6 +34,8 @@ var (
 	errGetStakeSource        = errors.New("couldn't get account specified in 'stakeSource'")
 	errNoBlockchainWithAlias = errors.New("there is no blockchain with the specified alias")
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
+	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
+	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -674,6 +676,10 @@ func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignRespons
 	}
 	user := user{db: db}
 
+	if args.Signer.IsZero() {
+		return errNilSigner
+	}
+
 	key, err := user.getKey(args.Signer) // Key of [args.Signer]
 	if err != nil {
 		return errDB
@@ -881,6 +887,10 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		return fmt.Errorf("couldn't get data for user '%s'. Does user exist?", args.Username)
 	}
 	user := user{db: db}
+
+	if args.To.IsZero() {
+		return errNilTo
+	}
 
 	kc := secp256k1fx.NewKeychain()
 	key, err := user.getKey(args.To)
