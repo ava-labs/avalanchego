@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/ava-labs/gecko/database/leveldb"
@@ -25,20 +26,19 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/mitchellh/go-homedir"
 )
 
 const (
-	dbVersion    = "v0.2.0"
-	defaultDbDir = "~/.gecko/db"
+	dbVersion = "v0.2.0"
 )
 
 // Results of parsing the CLI
 var (
 	Config                 = node.Config{}
 	Err                    error
-	defaultStakingKeyPath  = "~/.gecko/staking/staker.key"
-	defaultStakingCertPath = "~/.gecko/staking/staker.crt"
+	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
+	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
+	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
 )
 
 var (
@@ -147,7 +147,7 @@ func init() {
 	}
 
 	networkID, err := genesis.NetworkID(*networkName)
-	if errs.Add(err); errs.Errored() {
+	if errs.Add(err); err != nil {
 		return
 	}
 
@@ -155,13 +155,11 @@ func init() {
 
 	// DB:
 	if *db {
-		*dbDir, err = homedir.Expand(*dbDir)
-		if errs.Add(fmt.Errorf("couldn't resolve db path: %w", err)); err != nil {
-			return
-		}
+		*dbDir = os.ExpandEnv(*dbDir) // parse any env variables
 		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
-		if errs.Add(fmt.Errorf("couldn't create db: %w", err)); err != nil {
+		if err != nil {
+			errs.Add(fmt.Errorf("couldn't create db at %s: %w", dbPath, err))
 			return
 		}
 		Config.DB = db
@@ -199,7 +197,8 @@ func init() {
 	for _, ip := range strings.Split(*bootstrapIPs, ",") {
 		if ip != "" {
 			addr, err := utils.ToIPDesc(ip)
-			if errs.Add(fmt.Errorf("couldn't parse ip: %w", err)); err != nil {
+			if err != nil {
+				errs.Add(fmt.Errorf("couldn't parse ip: %w", err))
 				return
 			}
 			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
@@ -222,7 +221,8 @@ func init() {
 			if id != "" {
 				err = cb58.FromString(id)
 				if err != nil {
-					if errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err)); err != nil {
+					if err != nil {
+						errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err))
 						return
 					}
 				}
@@ -250,22 +250,11 @@ func init() {
 	}
 
 	// Staking
-	Config.StakingKeyFile, err = homedir.Expand(Config.StakingKeyFile)
-	if err != nil {
-		errs.Add(fmt.Errorf("couldn't resolve staking key path: %w", err))
-		return
-	}
-	Config.StakingCertFile, err = homedir.Expand(Config.StakingCertFile)
-	if err != nil {
-		errs.Add(fmt.Errorf("couldn't resolve staking cert path: %v", err))
-		return
-	}
-	defaultKeyPath, _ := homedir.Expand(defaultStakingKeyPath)
-	defaultStakingCertPath, _ := homedir.Expand(defaultStakingCertPath)
-
+	Config.StakingCertFile = os.ExpandEnv(Config.StakingCertFile) // parse any env variable
+	Config.StakingKeyFile = os.ExpandEnv(Config.StakingKeyFile)
 	switch {
 	// If staking key/cert locations are specified but not found, error
-	case Config.StakingKeyFile != defaultKeyPath || Config.StakingCertFile != defaultStakingCertPath:
+	case Config.StakingKeyFile != defaultStakingKeyPath || Config.StakingCertFile != defaultStakingCertPath:
 		if _, err := os.Stat(Config.StakingKeyFile); os.IsNotExist(err) {
 			errs.Add(fmt.Errorf("couldn't find staking key at %s", Config.StakingKeyFile))
 			return
@@ -289,7 +278,7 @@ func init() {
 		loggingConfig.Directory = *logsDir
 	}
 	logFileLevel, err := logging.ToLevel(*logLevel)
-	if errs.Add(err); errs.Errored() {
+	if errs.Add(err); err != nil {
 		return
 	}
 	loggingConfig.LogLevel = logFileLevel
@@ -298,7 +287,7 @@ func init() {
 		*logDisplayLevel = *logLevel
 	}
 	displayLevel, err := logging.ToLevel(*logDisplayLevel)
-	if errs.Add(err); errs.Errored() {
+	if errs.Add(err); err != nil {
 		return
 	}
 	loggingConfig.DisplayLevel = displayLevel
