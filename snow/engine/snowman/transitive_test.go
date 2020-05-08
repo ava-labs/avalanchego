@@ -56,8 +56,17 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 	te := &Transitive{}
 
 	te.Initialize(config)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !blkID.Equals(gBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
 	te.finishBootstrapping()
 
+	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
@@ -369,8 +378,17 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !blkID.Equals(gBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
 	te.finishBootstrapping()
 
+	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
@@ -1167,5 +1185,38 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	if status := validBlk.Status(); status != choices.Accepted {
 		t.Fatalf("Should have bubbled invalid votes to the valid parent")
+	}
+}
+
+func TestEngineGossip(t *testing.T) {
+	_, _, sender, vm, te, gBlk := setup(t)
+
+	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID.Equals(gBlk.ID()):
+			return gBlk, nil
+		}
+		t.Fatal(errUnknownBlock)
+		return nil, errUnknownBlock
+	}
+
+	called := new(bool)
+	sender.GossipF = func(blkID ids.ID, blkBytes []byte) {
+		*called = true
+		switch {
+		case !blkID.Equals(gBlk.ID()):
+			t.Fatal(errUnknownBlock)
+		}
+		switch {
+		case !bytes.Equal(blkBytes, gBlk.Bytes()):
+			t.Fatal(errUnknownBytes)
+		}
+	}
+
+	te.Gossip()
+
+	if !*called {
+		t.Fatalf("Should have gossiped the block")
 	}
 }

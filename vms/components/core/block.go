@@ -57,7 +57,7 @@ func (b *Block) Accept() {
 	b.SetStatus(choices.Accepted)                           // Change state of this block
 	b.VM.State.PutStatus(b.VM.DB, b.ID(), choices.Accepted) // Persist data
 	b.VM.State.PutLastAccepted(b.VM.DB, b.ID())
-	b.VM.lastAccepted = b.ID() // Change state of VM
+	b.VM.LastAcceptedID = b.ID() // Change state of VM
 }
 
 // Reject sets this block's status to Rejected and saves the status in state
