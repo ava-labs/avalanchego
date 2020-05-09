@@ -1,0 +1,5 @@
+ava_daemon_bin_dir: "/usr/bin"
+ava_daemon_data_dir: "/var/lib/{{ ava_daemon_user }}"
+ava_daemon_keys_dir: "{{ ava_daemon_data_dir }}/keys"
+ava_daemon_plugin_dir: "/usr/lib/ava/plugins"
+log_level: info

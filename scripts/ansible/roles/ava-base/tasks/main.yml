@@ -1,0 +1,16 @@
+- name: Install deps
+  become: true
+  apt:
+    name:
+      # Build
+      - cmake
+      - curl
+      - g++
+      - golang-go  # Assumes Ubuntu 20.04, where this installs Go 1.13
+      - libssl-dev
+      - libuv1-dev
+      - make
+      # Staking key management
+      - openssl
+      - python3-cryptography
+    state: present

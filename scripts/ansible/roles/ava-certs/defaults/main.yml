@@ -1,0 +1,3 @@
+staking_tls_key_file: "{{ repo_folder }}/keys/staker.key"
+staking_tls_csr_file: "{{ repo_folder }}/keys/staker.csr"
+staking_tls_cert_file: "{{ repo_folder }}/keys/staker.crt"

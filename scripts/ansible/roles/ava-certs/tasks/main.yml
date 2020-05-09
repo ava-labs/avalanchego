@@ -1,0 +1,31 @@
+- name: Create staker key
+  openssl_privatekey:
+    path: "{{ staking_tls_key_file }}"
+    type: RSA
+    size: 4096
+
+- name: Create staker certificate request
+  openssl_csr:
+    path: "{{ staking_tls_csr_file }}"
+    C: US
+    ST: NY
+    O: Avalabs
+    CN: ava
+    privatekey_path: "{{ staking_tls_key_file }}"
+    digest: sha256
+    # genStaker.sh doesn't include a subjectAltName in the signing request.
+    # If subject_alt_name isn't specified, then Ansible defaults to using
+    # the CN as the SAN.
+    use_common_name_for_san: false
+
+# genStaker.sh generates a certificate valid for 365250 days (1000 years).
+# That duration is not replicated here, because specifying a relative
+# time to ownca_not_after would make this task non-idempotent.
+- name: Create staker certificate
+  openssl_certificate:
+    path: "{{ staking_tls_cert_file }}"
+    csr_path: "{{ staking_tls_csr_file }}"
+    ownca_path: "{{ repo_folder }}/keys/rootCA.crt"
+    ownca_privatekey_path: "{{ repo_folder }}/keys/rootCA.key"
+    ownca_digest: sha256
+    provider: ownca
