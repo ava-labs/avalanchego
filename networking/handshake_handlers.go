@@ -209,7 +209,7 @@ func (nm *Handshake) ConnectTo(peer salticidae.PeerID, stakerID ids.ShortID, add
 		return
 	}
 
-	nm.log.Info("Attempting to connect to %s", stakerID)
+	nm.log.Debug("attempting to connect to %s", stakerID)
 
 	nm.net.AddPeer(peer)
 	nm.net.SetPeerAddr(peer, addr)
@@ -239,7 +239,7 @@ func (nm *Handshake) Connect(addr salticidae.NetAddr) {
 	}
 
 	if !nm.enableStaking {
-		nm.log.Info("Adding peer %s", ip)
+		nm.log.Debug("adding peer %s", ip)
 
 		peer := salticidae.NewPeerIDFromNetAddr(addr, true)
 		nm.ConnectTo(peer, toShortID(ip), addr)
@@ -254,7 +254,7 @@ func (nm *Handshake) Connect(addr salticidae.NetAddr) {
 		return
 	}
 
-	nm.log.Info("Adding peer %s", ip)
+	nm.log.Debug("adding peer %s", ip)
 
 	count := new(int)
 	*count = 100
@@ -281,7 +281,7 @@ func (nm *Handshake) Connect(addr salticidae.NetAddr) {
 			return
 		}
 
-		nm.log.Debug("Attempting to discover peer at %s", ipStr)
+		nm.log.Debug("attempting to discover peer at %s", ipStr)
 
 		msgNet := nm.net.AsMsgNetwork()
 		msgNet.Connect(addr)
@@ -374,7 +374,7 @@ func (nm *Handshake) SendVersion(peer salticidae.PeerID) error {
 	build := Builder{}
 	v, err := build.Version(nm.networkID, nm.clock.Unix(), toIPDesc(nm.myAddr), ClientVersion)
 	if err != nil {
-		return fmt.Errorf("packing Version failed due to %s", err)
+		return fmt.Errorf("packing version failed due to: %w", err)
 	}
 	nm.send(v, peer)
 	nm.numVersionSent.Inc()
@@ -397,16 +397,16 @@ func (nm *Handshake) SendPeerList(peers ...salticidae.PeerID) error {
 	}
 
 	if len(ipsToSend) == 0 {
-		nm.log.Debug("No IPs to send to %d peer(s)", len(peers))
+		nm.log.Debug("no IPs to send to %d peer(s)", len(peers))
 		return nil
 	}
 
-	nm.log.Verbo("Sending %d ips to %d peer(s)", len(ipsToSend), len(peers))
+	nm.log.Verbo("sending %d ips to %d peer(s)", len(ipsToSend), len(peers))
 
 	build := Builder{}
 	pl, err := build.PeerList(ipsToSend)
 	if err != nil {
-		return fmt.Errorf("Packing Peerlist failed due to %w", err)
+		return fmt.Errorf("packing Peerlist failed due to: %w", err)
 	}
 	nm.send(pl, peers...)
 	nm.numPeerlistSent.Add(float64(len(peers)))
@@ -476,7 +476,7 @@ func (nm *Handshake) connectedToPeer(conn *C.struct_peernetwork_conn_t, peer sal
 		cert = ids.NewShortID(key)
 	}
 
-	nm.log.Debug("Connected to %s", cert)
+	nm.log.Debug("connected to %s", cert)
 
 	nm.reconnectTimeout.Remove(peerID)
 
@@ -494,10 +494,10 @@ func (nm *Handshake) disconnectedFromPeer(peer salticidae.PeerID) {
 	cert := ids.ShortID{}
 	if pendingCert, exists := nm.pending.GetID(peer); exists {
 		cert = pendingCert
-		nm.log.Info("Disconnected from pending peer %s", cert)
+		nm.log.Debug("disconnected from pending peer %s", cert)
 	} else if connectedCert, exists := nm.connections.GetID(peer); exists {
 		cert = connectedCert
-		nm.log.Info("Disconnected from peer %s", cert)
+		nm.log.Debug("disconnected from peer %s", cert)
 	} else {
 		return
 	}
@@ -537,29 +537,29 @@ func (nm *Handshake) disconnectedFromPeer(peer salticidae.PeerID) {
 // checkCompatibility Check to make sure that the peer and I speak the same language.
 func (nm *Handshake) checkCompatibility(peerVersion string) bool {
 	if !strings.HasPrefix(peerVersion, VersionPrefix) {
-		nm.log.Warn("Peer attempted to connect with an invalid version prefix")
+		nm.log.Debug("peer attempted to connect with an invalid version prefix")
 		return false
 	}
 	peerVersion = peerVersion[len(VersionPrefix):]
 	splitPeerVersion := strings.SplitN(peerVersion, VersionSeparator, 3)
 	if len(splitPeerVersion) != 3 {
-		nm.log.Warn("Peer attempted to connect with an invalid number of subversions")
+		nm.log.Debug("peer attempted to connect with an invalid number of subversions")
 		return false
 	}
 
 	major, err := strconv.Atoi(splitPeerVersion[0])
 	if err != nil {
-		nm.log.Warn("Peer attempted to connect with an invalid major version")
+		nm.log.Debug("peer attempted to connect with an invalid major version")
 		return false
 	}
 	minor, err := strconv.Atoi(splitPeerVersion[1])
 	if err != nil {
-		nm.log.Warn("Peer attempted to connect with an invalid minor version")
+		nm.log.Debug("peer attempted to connect with an invalid minor version")
 		return false
 	}
 	patch, err := strconv.Atoi(splitPeerVersion[2])
 	if err != nil {
-		nm.log.Warn("Peer attempted to connect with an invalid patch version")
+		nm.log.Debug("peer attempted to connect with an invalid patch version")
 		return false
 	}
 
@@ -568,7 +568,7 @@ func (nm *Handshake) checkCompatibility(peerVersion string) bool {
 		// peers major version is too low
 		return false
 	case major > MajorVersion:
-		nm.log.Warn("Peer attempted to connect with a higher major version, this client may need to be updated")
+		nm.log.Debug("peer attempted to connect with a higher major version, this client may need to be updated")
 		return false
 	}
 
@@ -577,12 +577,12 @@ func (nm *Handshake) checkCompatibility(peerVersion string) bool {
 		// peers minor version is too low
 		return false
 	case minor > MinorVersion:
-		nm.log.Warn("Peer attempted to connect with a higher minor version, this client may need to be updated")
+		nm.log.Debug("peer attempted to connect with a higher minor version, this client may need to be updated")
 		return false
 	}
 
 	if patch > PatchVersion {
-		nm.log.Warn("Peer is connecting with a higher patch version, this client may need to be updated")
+		nm.log.Debug("peer is connecting with a higher patch version, this client may need to be updated")
 	}
 	return true
 }
@@ -612,7 +612,7 @@ func unknownPeerHandler(_addr *C.netaddr_t, _cert *C.x509_t, _ unsafe.Pointer) {
 	addr := salticidae.NetAddrFromC(salticidae.CNetAddr(_addr)).Copy(true)
 	ip := toIPDesc(addr)
 
-	HandshakeNet.log.Info("Adding peer %s", ip)
+	HandshakeNet.log.Debug("adding peer %s", ip)
 
 	var peer salticidae.PeerID
 	var id ids.ShortID
@@ -685,7 +685,7 @@ func version(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.P
 
 	id, exists := HandshakeNet.pending.GetID(peer)
 	if !exists {
-		HandshakeNet.log.Warn("Dropping Version message because the peer isn't pending")
+		HandshakeNet.log.Debug("dropping Version message because the peer isn't pending")
 		return
 	}
 	HandshakeNet.pending.Remove(peer, id)
@@ -693,14 +693,14 @@ func version(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.P
 	build := Builder{}
 	pMsg, err := build.Parse(Version, msg.GetPayloadByMove())
 	if err != nil {
-		HandshakeNet.log.Warn("Failed to parse Version message")
+		HandshakeNet.log.Debug("failed to parse Version message")
 
 		HandshakeNet.net.DelPeer(peer)
 		return
 	}
 
 	if networkID := pMsg.Get(NetworkID).(uint32); networkID != HandshakeNet.networkID {
-		HandshakeNet.log.Warn("Peer's network ID doesn't match our networkID: Peer's = %d ; Ours = %d", networkID, HandshakeNet.networkID)
+		HandshakeNet.log.Debug("peer's network ID doesn't match our networkID: Peer's = %d ; Ours = %d", networkID, HandshakeNet.networkID)
 
 		HandshakeNet.net.DelPeer(peer)
 		return
@@ -708,14 +708,14 @@ func version(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.P
 
 	myTime := float64(HandshakeNet.clock.Unix())
 	if peerTime := float64(pMsg.Get(MyTime).(uint64)); math.Abs(peerTime-myTime) > MaxClockDifference.Seconds() {
-		HandshakeNet.log.Warn("Peer's clock is too far out of sync with mine. His = %d, Mine = %d (seconds)", uint64(peerTime), uint64(myTime))
+		HandshakeNet.log.Debug("peer's clock is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)", uint64(peerTime), uint64(myTime))
 
 		HandshakeNet.net.DelPeer(peer)
 		return
 	}
 
 	if peerVersion := pMsg.Get(VersionStr).(string); !HandshakeNet.checkCompatibility(peerVersion) {
-		HandshakeNet.log.Debug("Dropping connection due to an incompatible version from peer")
+		HandshakeNet.log.Debug("peer version, %s, is not compatible. dropping connection.", peerVersion)
 
 		HandshakeNet.net.DelPeer(peer)
 		return
@@ -774,7 +774,7 @@ func peerList(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 	build := Builder{}
 	pMsg, err := build.Parse(PeerList, msg.GetPayloadByMove())
 	if err != nil {
-		HandshakeNet.log.Warn("Failed to parse PeerList message due to %s", err)
+		HandshakeNet.log.Debug("failed to parse PeerList message due to %s", err)
 		// TODO: What should we do here?
 		return
 	}

@@ -340,7 +340,7 @@ func (s *Voting) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 			peers = append(peers, peer)
 			s.log.Verbo("Sending a PullQuery to %s", vID)
 		} else {
-			s.log.Warn("attempted to send a PullQuery message to a disconnected validator: %s", vID)
+			s.log.Debug("attempted to send a PullQuery message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.QueryFailed(vID, chainID, requestID) })
 		}
 	}
