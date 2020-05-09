@@ -5,8 +5,6 @@
   gather_facts: false
   hosts: all
   vars:
-    ava_binary: ~/go/src/github.com/ava-labs/gecko/build/ava
-    repo_folder: ~/go/src/github.com/ava-labs/gecko
     repo_name: ava-labs/gecko-internal
     repo_branch: platformvm-proposal-accept
   roles:
