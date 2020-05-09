@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/nodb"
+	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/codec"
 )
@@ -174,7 +175,7 @@ type batch struct {
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), copyBytes(value), false})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
 	encValue, err := b.db.encrypt(value)
 	if err != nil {
 		return err
@@ -183,7 +184,7 @@ func (b *batch) Put(key, value []byte) error {
 }
 
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), nil, true})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
 	return b.Batch.Delete(key)
 }
 
@@ -250,12 +251,6 @@ func (it *iterator) Error() error {
 }
 
 func (it *iterator) Value() []byte { return it.val }
-
-func copyBytes(bytes []byte) []byte {
-	copiedBytes := make([]byte, len(bytes))
-	copy(copiedBytes, bytes)
-	return copiedBytes
-}
 
 type encryptedValue struct {
 	Ciphertext []byte `serialize:"true"`

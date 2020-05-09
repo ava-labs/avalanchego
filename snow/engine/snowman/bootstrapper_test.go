@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -54,7 +55,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 
 	handler.Initialize(engine, make(chan common.Message), 1)
 	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts)
+	router.Initialize(ctx.Log, timeouts, time.Hour)
 
 	blocker, _ := queue.New(db)
 

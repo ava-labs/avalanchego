@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/nodb"
+	"github.com/ava-labs/gecko/utils"
 )
 
 // Database implements the Database interface by living on top of another
@@ -61,7 +62,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		if val.delete {
 			return nil, database.ErrNotFound
 		}
-		return copyBytes(val.value), nil
+		return utils.CopyBytes(val.value), nil
 	}
 	return db.db.Get(key)
 }
@@ -262,14 +263,14 @@ type batch struct {
 
 // Put implements the Database interface
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), copyBytes(value), false})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
 	b.size += len(value)
 	return nil
 }
 
 // Delete implements the Database interface
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), nil, true})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
 	b.size++
 	return nil
 }
@@ -413,10 +414,4 @@ func (it *iterator) Release() {
 	it.keys = nil
 	it.values = nil
 	it.Iterator.Release()
-}
-
-func copyBytes(bytes []byte) []byte {
-	copiedBytes := make([]byte, len(bytes))
-	copy(copiedBytes, bytes)
-	return copiedBytes
 }

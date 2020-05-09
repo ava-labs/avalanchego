@@ -221,6 +221,9 @@ type InternalHandler interface {
 	// able to run the engine.
 	Startup()
 
+	// Gossip to the network a container on the accepted frontier
+	Gossip()
+
 	// Shutdown this engine.
 	//
 	// This function will be called when the environment is exiting.

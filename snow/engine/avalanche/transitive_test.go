@@ -2553,6 +2553,57 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	te.insert(vtx)
 }
 
+func TestEngineGossip(t *testing.T) {
+	config := DefaultConfig()
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+
+	st := &stateTest{t: t}
+	config.State = st
+
+	gVtx := &Vtx{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}
+
+	te := &Transitive{}
+	te.Initialize(config)
+	te.finishBootstrapping()
+
+	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID()} }
+	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case vtxID.Equals(gVtx.ID()):
+			return gVtx, nil
+		}
+		t.Fatal(errUnknownVertex)
+		return nil, errUnknownVertex
+	}
+
+	called := new(bool)
+	sender.GossipF = func(vtxID ids.ID, vtxBytes []byte) {
+		*called = true
+		switch {
+		case !vtxID.Equals(gVtx.ID()):
+			t.Fatal(errUnknownVertex)
+		}
+		switch {
+		case !bytes.Equal(vtxBytes, gVtx.Bytes()):
+			t.Fatal(errUnknownVertex)
+		}
+	}
+
+	te.Gossip()
+
+	if !*called {
+		t.Fatalf("Should have gossiped the vertex")
+	}
+}
+
 func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	config := DefaultConfig()
 

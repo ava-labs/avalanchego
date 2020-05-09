@@ -91,6 +91,8 @@ func (h *Handler) dispatchMsg(msg message) bool {
 		h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
 	case notifyMsg:
 		h.engine.Notify(msg.notification)
+	case gossipMsg:
+		h.engine.Gossip()
 	case shutdownMsg:
 		h.engine.Shutdown()
 		return false
@@ -230,6 +232,9 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 		requestID:   requestID,
 	}
 }
+
+// Gossip passes a gossip request to the consensus engine
+func (h *Handler) Gossip() { h.msgs <- message{messageType: gossipMsg} }
 
 // Shutdown shuts down the dispatcher
 func (h *Handler) Shutdown() { h.msgs <- message{messageType: shutdownMsg}; h.wg.Wait() }
