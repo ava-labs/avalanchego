@@ -42,9 +42,6 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 
 // Remove ...
 func (r *Requests) Remove(vdr ids.ShortID, requestID uint32) (ids.ID, bool) {
-	if r.reqsToID == nil {
-		return ids.ID{}, false
-	}
 	vdrKey := vdr.Key()
 	vdrReqs, ok := r.reqsToID[vdrKey]
 	if !ok {
@@ -81,9 +78,6 @@ func (r *Requests) Len() int { return len(r.idToReq) }
 
 // Contains ...
 func (r *Requests) Contains(containerID ids.ID) bool {
-	if r.idToReq == nil {
-		return false
-	}
 	_, ok := r.idToReq[containerID.Key()]
 	return ok
 }
