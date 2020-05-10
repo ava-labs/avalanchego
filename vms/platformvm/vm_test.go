@@ -1291,6 +1291,8 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
 	firstMsgChan := make(chan common.Message, 1)
 	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1338,6 +1340,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}
 
 	firstVM.Shutdown()
+	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
@@ -1350,6 +1353,9 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer secondCtx.Lock.Unlock()
+
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1391,6 +1397,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
 	firstMsgChan := make(chan common.Message, 1)
 	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1438,6 +1446,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}
 
 	firstVM.Shutdown()
+	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
@@ -1450,6 +1459,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer secondCtx.Lock.Unlock()
+
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1491,7 +1503,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
 	}
-	defer vm.Shutdown()
 
 	defaultSubnet := validators.NewSet()
 	vm.validators = validators.NewManager()
@@ -1499,9 +1510,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
-	msgChan := make(chan common.Message, 1)
-
 	ctx.Lock.Lock()
+
+	msgChan := make(chan common.Message, 1)
 	if err := vm.Initialize(ctx, vmDB, genesisBytes, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
