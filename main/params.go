@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	dbVersion    = "v0.2.0"
+	dbVersion    = "v0.3.0"
 	defaultDbDir = "~/.gecko/db"
 )
 
