@@ -228,8 +228,10 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	txs := vm.PendingTxs()
 	if len(txs) != 1 {
@@ -264,11 +266,13 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	platformID := ids.Empty.Prefix(0)
 
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{platform: platformID}
-	defer vm.Shutdown()
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),

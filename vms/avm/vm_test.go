@@ -392,11 +392,13 @@ func TestTxSerialization(t *testing.T) {
 }
 
 func TestInvalidGenesis(t *testing.T) {
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
-	defer vm.Shutdown()
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -410,13 +412,14 @@ func TestInvalidGenesis(t *testing.T) {
 }
 
 func TestInvalidFx(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
-	defer vm.Shutdown()
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -432,13 +435,14 @@ func TestInvalidFx(t *testing.T) {
 }
 
 func TestFxInitializationFailure(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
-	defer vm.Shutdown()
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -489,6 +493,10 @@ func TestIssueTx(t *testing.T) {
 
 func TestGenesisGetUTXOs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	shortAddr := keys[0].PublicKey().Address()
 	addr := ids.NewID(hashing.ComputeHash256Array(shortAddr.Bytes()))
@@ -499,8 +507,6 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Shutdown()
-	ctx.Lock.Unlock()
 
 	if len(utxos) != 7 {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 7, len(utxos))
@@ -645,8 +651,8 @@ func TestIssueNFT(t *testing.T) {
 	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
-		ctx.Lock.Unlock()
 		vm.Shutdown()
+		ctx.Lock.Unlock()
 	}()
 
 	genesisBytes := BuildGenesisTest(t)
@@ -804,8 +810,8 @@ func TestIssueProperty(t *testing.T) {
 	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
-		ctx.Lock.Unlock()
 		vm.Shutdown()
+		ctx.Lock.Unlock()
 	}()
 
 	genesisBytes := BuildGenesisTest(t)
@@ -952,8 +958,8 @@ func TestIssueProperty(t *testing.T) {
 func TestVMFormat(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	defer func() {
-		ctx.Lock.Unlock()
 		vm.Shutdown()
+		ctx.Lock.Unlock()
 	}()
 
 	tests := []struct {
@@ -974,8 +980,8 @@ func TestVMFormat(t *testing.T) {
 func TestVMFormatAliased(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	defer func() {
-		ctx.Lock.Unlock()
 		vm.Shutdown()
+		ctx.Lock.Unlock()
 	}()
 
 	origAliases := ctx.BCLookup
