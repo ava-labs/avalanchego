@@ -21,8 +21,10 @@ func setup(t *testing.T) ([]byte, *VM, *Service) {
 
 func TestServiceIssueTx(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	txArgs := &IssueTxArgs{}
 	txReply := &IssueTxReply{}
@@ -44,8 +46,10 @@ func TestServiceIssueTx(t *testing.T) {
 
 func TestServiceGetTxStatus(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	statusArgs := &GetTxStatusArgs{}
 	statusReply := &GetTxStatusReply{}
@@ -85,8 +89,10 @@ func TestServiceGetTxStatus(t *testing.T) {
 
 func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	addr0 := keys[0].PublicKey().Address()
 	tests := []struct {
@@ -113,8 +119,10 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 
 func TestServiceGetUTXOs(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	addr0 := keys[0].PublicKey().Address()
 	tests := []struct {
@@ -163,8 +171,10 @@ func TestServiceGetUTXOs(t *testing.T) {
 
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -188,8 +198,10 @@ func TestGetAssetDescription(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -211,8 +223,10 @@ func TestGetBalance(t *testing.T) {
 
 func TestCreateFixedCapAsset(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	reply := CreateFixedCapAssetReply{}
 	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
@@ -235,8 +249,10 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 func TestCreateVariableCapAsset(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	reply := CreateVariableCapAssetReply{}
 	err := s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{

@@ -220,16 +220,17 @@ func TestIssueImportTx(t *testing.T) {
 	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
 		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
 	}
-
 	ctx.Lock.Unlock()
-	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 
 	msg := <-issuer
 	if msg != common.PendingTxs {
 		t.Fatalf("Wrong message")
 	}
 
-	// FIXME?: Is it safe to call vm.PendingTXs() called without the lock?
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
 	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)

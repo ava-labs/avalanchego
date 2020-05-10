@@ -12,7 +12,11 @@ import (
 
 func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: tx is nil
 	var tx *addDefaultSubnetValidatorTx
@@ -217,7 +221,11 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 // Test AddDefaultSubnetValidatorTx.SemanticVerify
 func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: Validator's start time too early
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
@@ -283,9 +291,9 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,           // nonce
-		defaultStakeAmount,       // stake amount
-		uint64(startTime.Unix()), // start time
+		defaultNonce+1,                                       // nonce
+		defaultStakeAmount,                                   // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
 		key.PublicKey().Address(),                            // node ID
 		defaultKey.PublicKey().Address(),                     // destination
