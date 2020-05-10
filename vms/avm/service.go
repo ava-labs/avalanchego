@@ -476,8 +476,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, 
 	}
 
 	for _, address := range addresses {
-		addressBytes := address.Key()
-		response.Addresses = append(response.Addresses, service.vm.Format(addressBytes[:]))
+		response.Addresses = append(response.Addresses, service.vm.Format(address.Bytes()))
 	}
 	return nil
 }
