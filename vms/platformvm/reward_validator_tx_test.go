@@ -18,6 +18,12 @@ func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7})
 
 	tests := []test{
@@ -54,6 +60,12 @@ func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
 
 func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	var nextToRemove *addDefaultSubnetValidatorTx
 	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
 	if err != nil {
@@ -130,6 +142,11 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 
 func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	keyIntf1, err := vm.factory.NewPrivateKey()
 	if err != nil {

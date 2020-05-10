@@ -24,6 +24,7 @@ var (
 		TestIteratorStart,
 		TestIteratorPrefix,
 		TestIteratorStartPrefix,
+		TestIteratorMemorySafety,
 		TestIteratorClosed,
 		TestStatNoPanic,
 		TestCompactNoPanic,
@@ -619,6 +620,63 @@ func TestIteratorStartPrefix(t *testing.T, db Database) {
 		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
 	} else if err := iterator.Error(); err != nil {
 		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
+	}
+}
+
+// TestIteratorMemorySafety ...
+func TestIteratorMemorySafety(t *testing.T, db Database) {
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("z")
+	value2 := []byte("world2")
+
+	key3 := []byte("hello3")
+	value3 := []byte("world3")
+
+	if err := db.Put(key1, value1); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	} else if err := db.Put(key2, value2); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	} else if err := db.Put(key3, value3); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	iterator := db.NewIterator()
+	if iterator == nil {
+		t.Fatalf("db.NewIterator returned nil")
+	}
+	defer iterator.Release()
+
+	keys := [][]byte{}
+	values := [][]byte{}
+	for iterator.Next() {
+		keys = append(keys, iterator.Key())
+		values = append(values, iterator.Value())
+	}
+
+	expectedKeys := [][]byte{
+		key1,
+		key3,
+		key2,
+	}
+	expectedValues := [][]byte{
+		value1,
+		value3,
+		value2,
+	}
+
+	for i, key := range keys {
+		value := values[i]
+		expectedKey := expectedKeys[i]
+		expectedValue := expectedValues[i]
+
+		if !bytes.Equal(key, expectedKey) {
+			t.Fatalf("Wrong key")
+		}
+		if !bytes.Equal(value, expectedValue) {
+			t.Fatalf("Wrong key")
+		}
 	}
 }
 
