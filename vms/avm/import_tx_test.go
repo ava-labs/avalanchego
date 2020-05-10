@@ -222,12 +222,14 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	ctx.Lock.Unlock()
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 
 	msg := <-issuer
 	if msg != common.PendingTxs {
 		t.Fatalf("Wrong message")
 	}
 
+	// FIXME?: Is it safe to call vm.PendingTXs() called without the lock?
 	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
@@ -265,6 +267,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	vm := &VM{platform: platformID}
+	defer vm.Shutdown()
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),

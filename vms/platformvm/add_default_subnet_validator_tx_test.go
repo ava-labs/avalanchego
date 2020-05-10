@@ -12,6 +12,7 @@ import (
 
 func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	// Case 1: tx is nil
 	var tx *addDefaultSubnetValidatorTx
@@ -216,6 +217,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 // Test AddDefaultSubnetValidatorTx.SemanticVerify
 func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
+	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
 
 	// Case 1: Validator's start time too early
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
