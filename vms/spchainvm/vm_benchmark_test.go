@@ -73,6 +73,7 @@ func BenchmarkParseBlock(b *testing.B) {
 		/*testing=*/ b,
 	)
 	vm := &VM{}
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(
 		/*ctx=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -106,6 +107,7 @@ func BenchmarkParseAndVerify(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		vm := &VM{}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		vm.Initialize(
 			/*ctx=*/ snow.DefaultContextTest(),
 			/*db=*/ memdb.New(),
@@ -141,6 +143,8 @@ func BenchmarkAccept(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		vm := &VM{}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
+
 		vm.Initialize(
 			/*ctx=*/ snow.DefaultContextTest(),
 			/*db=*/ memdb.New(),
@@ -178,6 +182,7 @@ func ParseAndVerifyAndAccept(numBlocks, numTxsPerBlock int, b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		vm := &VM{}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		vm.Initialize(
 			/*ctx=*/ snow.DefaultContextTest(),
 			/*db=*/ memdb.New(),
@@ -232,6 +237,7 @@ func ParseThenVerifyThenAccept(numBlocks, numTxsPerBlock int, b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		vm := &VM{}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		vm.Initialize(
 			/*ctx=*/ snow.DefaultContextTest(),
 			/*db=*/ memdb.New(),
@@ -292,6 +298,7 @@ func IssueAndVerifyAndAccept(numBlocks, numTxsPerBlock int, b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		vm := &VM{}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		vm.Initialize(
 			/*ctx=*/ snow.DefaultContextTest(),
 			/*db=*/ memdb.New(),
