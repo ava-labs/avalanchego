@@ -623,8 +623,10 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 
 func TestBaseTxSemanticVerify(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -688,8 +690,10 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 
 func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	vm.codec.RegisterType(&ava.TestVerifiable{})
 
@@ -738,8 +742,10 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	vm.codec.RegisterType(&ava.TestVerifiable{})
 
@@ -804,15 +810,15 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
-	defer vm.Shutdown()
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -897,8 +903,10 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -949,8 +957,10 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 
 func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1014,8 +1024,10 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 
 func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1147,8 +1159,10 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 	<-issuer
 
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	vm.PendingTxs()
 
@@ -1279,8 +1293,10 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 	<-issuer
 
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	vm.PendingTxs()
 
@@ -1445,8 +1461,10 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	<-issuer
 
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	vm.PendingTxs()
 
@@ -1595,8 +1613,10 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	<-issuer
 
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	vm.PendingTxs()
 

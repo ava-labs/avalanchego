@@ -17,7 +17,11 @@ func TestAdvanceTimeTxSyntacticVerify(t *testing.T) {
 
 	// Case 2: Timestamp is ahead of synchrony bound
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	tx = &advanceTimeTx{
 		Time: uint64(defaultGenesisTime.Add(Delta).Add(1 * time.Second).Unix()),
@@ -40,7 +44,11 @@ func TestAdvanceTimeTxSyntacticVerify(t *testing.T) {
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	tx := &advanceTimeTx{
 		Time: uint64(defaultGenesisTime.Unix()),
@@ -55,7 +63,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
 
 	// Case 1: Timestamp is after next validator start time
 	// Add a pending validator
@@ -98,9 +106,16 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	if err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
+	vm.Shutdown()
+	vm.Ctx.Lock.Unlock()
 
 	// Case 2: Timestamp is after next validator end time
 	vm = defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// fast forward clock to 10 seconds before genesis validators stop validating
 	vm.clock.Set(defaultValidateEndTime.Add(-10 * time.Second))
@@ -121,7 +136,11 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // Ensure semantic verification updates the current and pending validator sets correctly
 func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: Timestamp is after next validator start time
 	// Add a pending validator
@@ -201,7 +220,11 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Proposed advancing timestamp to 1 second after current timestamp
 	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime.Add(1 * time.Second))
@@ -223,7 +246,11 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	vm := defaultVM()
-	defer func() { vm.Ctx.Lock.Lock(); vm.Shutdown(); vm.Ctx.Lock.Unlock() }()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime)
 	if err != nil {
