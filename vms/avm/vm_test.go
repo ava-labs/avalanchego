@@ -396,6 +396,7 @@ func TestInvalidGenesis(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	vm := &VM{}
+	defer vm.Shutdown()
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -415,6 +416,7 @@ func TestInvalidFx(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	vm := &VM{}
+	defer vm.Shutdown()
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -436,6 +438,7 @@ func TestFxInitializationFailure(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	vm := &VM{}
+	defer vm.Shutdown()
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -457,6 +460,7 @@ func (tx *testTxBytes) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func TestIssueTx(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 
 	newTx := NewTx(t, genesisBytes, vm)
 
@@ -474,6 +478,7 @@ func TestIssueTx(t *testing.T) {
 		t.Fatalf("Wrong message")
 	}
 
+	// FIXME? vm.PendingTxs called after lock released.
 	if txs := vm.PendingTxs(); len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -503,6 +508,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -623,6 +629,7 @@ func TestIssueDependentTx(t *testing.T) {
 		t.Fatalf("Wrong message")
 	}
 
+	// FIXME? vm.PendingTxs called after lock released.
 	if txs := vm.PendingTxs(); len(txs) != 2 {
 		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
@@ -638,6 +645,7 @@ func TestIssueNFT(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	vm := &VM{}
+	defer vm.Shutdown()
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -796,6 +804,7 @@ func TestIssueProperty(t *testing.T) {
 	defer ctx.Lock.Unlock()
 
 	vm := &VM{}
+	defer vm.Shutdown()
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),

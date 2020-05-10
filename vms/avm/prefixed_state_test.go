@@ -18,8 +18,12 @@ import (
 func TestPrefixedSetsAndGets(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	ctx.Lock.Unlock()
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
+
+	// FIXME? is it safe to access vm.state.state without the lock?
 	state := vm.state
 
+	// FIXME? is it safe to call vm.codec.RegisterType() without the lock?
 	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	utxo := &ava.UTXO{
@@ -51,6 +55,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 		}},
 	}}
 
+	// FIXME? Is it safe to call vm.codec.Marshal() without the lock?
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
@@ -70,6 +75,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 		},
 	})
 
+	// FIXME? Is it safe to call vm.codec.Marshal() without the lock?
 	b, err := vm.codec.Marshal(tx)
 	if err != nil {
 		t.Fatal(err)
@@ -113,8 +119,12 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 func TestPrefixedFundingNoAddresses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	ctx.Lock.Unlock()
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
+
+	// FIXME? is it safe to access vm.state.state without the lock?
 	state := vm.state
 
+	// FIXME? is it safe to call vm.codec.RegisterType() without the lock?
 	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	utxo := &ava.UTXO{
@@ -137,8 +147,12 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 func TestPrefixedFundingAddresses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	ctx.Lock.Unlock()
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); ctx.Lock.Unlock() }()
+
+	// FIXME? is it safe to access vm.state.state without the lock?
 	state := vm.state
 
+	// FIXME? is it safe to call vm.codec.RegisterType() without the lock?
 	vm.codec.RegisterType(&testAddressable{})
 
 	utxo := &ava.UTXO{

@@ -9,36 +9,12 @@ import (
 
 	"github.com/ava-labs/gecko/snow/choices"
 
-	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func setup(t *testing.T) ([]byte, *VM, *Service) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
-
-	// This VM initilialzation is very similar to that done by GenesisVM().
-	// However replacing the body of this function, with a call to GenesisVM
-	// causes a timeout while executing the test suite.
-	// https://github.com/ava-labs/gecko/pull/59#pullrequestreview-392478636
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		make(chan common.Message, 1),
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	genesisBytes, _, vm := GenesisVM(t)
 	s := &Service{vm: vm}
 	return genesisBytes, vm, s
 }
