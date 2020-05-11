@@ -17,7 +17,8 @@ type ExternalSenderTest struct {
 	CantGetAcceptedFrontier, CantAcceptedFrontier,
 	CantGetAccepted, CantAccepted,
 	CantGet, CantPut,
-	CantPullQuery, CantPushQuery, CantChits bool
+	CantPullQuery, CantPushQuery, CantChits,
+	CantGossip bool
 
 	GetAcceptedFrontierF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32)
 	AcceptedFrontierF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
@@ -28,6 +29,7 @@ type ExternalSenderTest struct {
 	PushQueryF           func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 	PullQueryF           func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID)
 	ChitsF               func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
+	GossipF              func(chainID ids.ID, containerID ids.ID, container []byte)
 }
 
 // Default set the default callable value to [cant]
@@ -41,6 +43,7 @@ func (s *ExternalSenderTest) Default(cant bool) {
 	s.CantPullQuery = cant
 	s.CantPushQuery = cant
 	s.CantChits = cant
+	s.CantGossip = cant
 }
 
 // GetAcceptedFrontier calls GetAcceptedFrontierF if it was initialized. If it
@@ -157,5 +160,18 @@ func (s *ExternalSenderTest) Chits(vdr ids.ShortID, chainID ids.ID, requestID ui
 		s.T.Fatalf("Unexpectedly called Chits")
 	} else if s.CantChits && s.B != nil {
 		s.B.Fatalf("Unexpectedly called Chits")
+	}
+}
+
+// Gossip calls GossipF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *ExternalSenderTest) Gossip(chainID ids.ID, containerID ids.ID, container []byte) {
+	if s.GossipF != nil {
+		s.GossipF(chainID, containerID, container)
+	} else if s.CantGossip && s.T != nil {
+		s.T.Fatalf("Unexpectedly called Gossip")
+	} else if s.CantGossip && s.B != nil {
+		s.B.Fatalf("Unexpectedly called Gossip")
 	}
 }

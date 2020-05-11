@@ -16,7 +16,11 @@ import (
 
 func TestStateIDs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	ctx.Lock.Unlock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
 	id0 := ids.NewID([32]byte{0xff, 0})
@@ -126,7 +130,11 @@ func TestStateIDs(t *testing.T) {
 
 func TestStateStatuses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	ctx.Lock.Unlock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
 	if _, err := state.Status(ids.Empty); err == nil {
@@ -175,7 +183,11 @@ func TestStateStatuses(t *testing.T) {
 
 func TestStateUTXOs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	ctx.Lock.Unlock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
 	vm.codec.RegisterType(&ava.TestVerifiable{})
@@ -246,7 +258,11 @@ func TestStateUTXOs(t *testing.T) {
 
 func TestStateTXs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	ctx.Lock.Unlock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
 	vm.codec.RegisterType(&ava.TestTransferable{})

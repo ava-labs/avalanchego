@@ -62,6 +62,26 @@ func (t *Transitive) finishBootstrapping() {
 	t.bootstrapped = true
 }
 
+// Gossip implements the Engine interface
+func (t *Transitive) Gossip() {
+	edge := t.Config.State.Edge()
+	if len(edge) == 0 {
+		t.Config.Context.Log.Debug("Dropping gossip request as no vertices have been accepted")
+		return
+	}
+
+	sampler := random.Uniform{N: len(edge)}
+	vtxID := edge[sampler.Sample()]
+	vtx, err := t.Config.State.GetVertex(vtxID)
+	if err != nil {
+		t.Config.Context.Log.Warn("Dropping gossip request as %s couldn't be loaded due to %s", vtxID, err)
+		return
+	}
+
+	t.Config.Context.Log.Debug("Gossiping %s as accepted to the network", vtxID)
+	t.Config.Sender.Gossip(vtxID, vtx.Bytes())
+}
+
 // Shutdown implements the Engine interface
 func (t *Transitive) Shutdown() {
 	t.Config.Context.Log.Info("Shutting down Avalanche consensus")

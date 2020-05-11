@@ -7,6 +7,7 @@ import (
 	"bytes"
 
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -208,7 +209,14 @@ func (r *replayer) Delete(key []byte) {
 
 type iter struct{ iterator.Iterator }
 
-func (i *iter) Error() error { return updateError(i.Iterator.Error()) }
+// Error implements the Iterator interface
+func (it *iter) Error() error { return updateError(it.Iterator.Error()) }
+
+// Key implements the Iterator interface
+func (it *iter) Key() []byte { return utils.CopyBytes(it.Iterator.Key()) }
+
+// Value implements the Iterator interface
+func (it *iter) Value() []byte { return utils.CopyBytes(it.Iterator.Value()) }
 
 func updateError(err error) error {
 	switch err {

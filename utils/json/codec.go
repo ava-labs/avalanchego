@@ -50,3 +50,10 @@ func (r *request) Method() (string, error) {
 	uppercaseRune := string(unicode.ToUpper(firstRune))
 	return fmt.Sprintf("%s.%s%s", class, string(uppercaseRune), function[runeLen:]), nil
 }
+
+func (r *request) ReadRequest(args interface{}) error {
+	if err := r.CodecRequest.ReadRequest(args); err != nil {
+		return errors.New("couldn't unmarshal an argument. Ensure arguments are valid and properly formatted. See documentation for example calls")
+	}
+	return nil
+}

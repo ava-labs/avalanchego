@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/nodb"
+	"github.com/ava-labs/gecko/utils"
 )
 
 // DefaultSize is the default initial size of the memory database
@@ -62,7 +63,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, database.ErrClosed
 	}
 	if entry, ok := db.db[string(key)]; ok {
-		return copyBytes(entry), nil
+		return utils.CopyBytes(entry), nil
 	}
 	return nil, database.ErrNotFound
 }
@@ -75,7 +76,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	if db.db == nil {
 		return database.ErrClosed
 	}
-	db.db[string(key)] = copyBytes(value)
+	db.db[string(key)] = utils.CopyBytes(value)
 	return nil
 }
 
@@ -154,13 +155,13 @@ type batch struct {
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), copyBytes(value), false})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
 	b.size += len(value)
 	return nil
 }
 
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{copyBytes(key), nil, true})
+	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
 	b.size++
 	return nil
 }
@@ -253,9 +254,3 @@ func (it *iterator) Value() []byte {
 
 // Release implements the Iterator interface
 func (it *iterator) Release() { it.keys = nil; it.values = nil }
-
-func copyBytes(bytes []byte) []byte {
-	copiedBytes := make([]byte, len(bytes))
-	copy(copiedBytes, bytes)
-	return copiedBytes
-}

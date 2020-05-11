@@ -216,7 +216,10 @@ func TestIssueExportTx(t *testing.T) {
 	}
 
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	txs := vm.PendingTxs()
 	if len(txs) != 1 {
@@ -349,7 +352,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	txs := vm.PendingTxs()
 	if len(txs) != 1 {
