@@ -13,6 +13,11 @@ import (
 
 func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: tx is nil
 	var tx *addDefaultSubnetDelegatorTx
@@ -153,6 +158,11 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: Proposed validator currently validating default subnet
 	// but stops validating non-default subnet after stops validating default subnet

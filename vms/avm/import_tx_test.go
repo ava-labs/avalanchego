@@ -220,13 +220,18 @@ func TestIssueImportTx(t *testing.T) {
 	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
 		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
 	}
-
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
 	if msg != common.PendingTxs {
 		t.Fatalf("Wrong message")
 	}
+
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	txs := vm.PendingTxs()
 	if len(txs) != 1 {
@@ -261,10 +266,13 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	platformID := ids.Empty.Prefix(0)
 
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{platform: platformID}
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
