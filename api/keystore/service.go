@@ -332,6 +332,21 @@ func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *Del
 		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
+	userBatch := ks.userDB.NewBatch()
+	if err := userBatch.Delete([]byte(args.Username)); err != nil {
+		return err
+	}
+
+	userDataDB := prefixdb.New([]byte(args.Username), ks.bcDB)
+	dataBatch := userDataDB.NewBatch()
+	if err := dataBatch.Delete([]byte(args.Username)); err != nil {
+		return err
+	}
+
+	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
+		return err
+	}
+
 	// TODO: user is deleted from user db but returned an error due to some other problem.
 	// valid scenario ? discuss with team.
 

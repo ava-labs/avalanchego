@@ -311,7 +311,7 @@ func TestServiceDeleteUser(t *testing.T) {
 	ks := Keystore{}
 	ks.Initialize(logging.NoLog{}, memdb.New())
 
-	if err := ks.CreateUser(nil, &CreateUserArgs{Username: "testUser", Password: "passwTest@fake01ord"}, &CreateUserReply{}); err != nil {
+	if err := ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &CreateUserReply{}); err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
 
@@ -325,6 +325,13 @@ func TestServiceDeleteUser(t *testing.T) {
 
 			if !tt.wantError && !reflect.DeepEqual(tt.want, got) {
 				t.Fatalf("DeleteUser() failed: got %v, want %v", got, tt.want)
+			}
+
+			// deleted user details should be available to create user again.
+			if err == nil { // delete is successful
+				if err = ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &CreateUserReply{}); err != nil {
+					t.Fatalf("failed to create user: %v", err)
+				}
 			}
 		})
 	}
