@@ -8,5 +8,5 @@ source ${GECKO_PATH}/scripts/env.sh
 rm -r ${BUILD_DIR}/*
 
 # Remove salticidae
-rm $SALTICIDAE_PATH/build/lib/*
+rm $SALTICIDAE_GO_PATH/build/*
 
