@@ -406,7 +406,7 @@ func (nm *Handshake) SendPeerList(peers ...salticidae.PeerID) error {
 	build := Builder{}
 	pl, err := build.PeerList(ipsToSend)
 	if err != nil {
-		return fmt.Errorf("packing Peerlist failed due to: %w", err)
+		return fmt.Errorf("packing peer list failed due to: %w", err)
 	}
 	nm.send(pl, peers...)
 	nm.numPeerlistSent.Add(float64(len(peers)))
@@ -449,7 +449,7 @@ func connHandler(_conn *C.struct_msgnetwork_conn_t, connected C.bool, _ unsafe.P
 	HandshakeNet.requestedTimeout.Remove(ipID)
 
 	if _, exists := HandshakeNet.requested[ipStr]; !exists {
-		HandshakeNet.log.Debug("connHandler called with %s", ip)
+		HandshakeNet.log.Debug("connHandler called with ip %s", ip)
 		return true
 	}
 	delete(HandshakeNet.requested, ipStr)
@@ -568,7 +568,7 @@ func (nm *Handshake) checkCompatibility(peerVersion string) bool {
 		// peers major version is too low
 		return false
 	case major > MajorVersion:
-		nm.log.Debug("peer attempted to connect with a higher major version, this client may need to be updated")
+		nm.log.Warn("peer attempted to connect with a higher major version, this client may need to be updated")
 		return false
 	}
 
@@ -577,12 +577,12 @@ func (nm *Handshake) checkCompatibility(peerVersion string) bool {
 		// peers minor version is too low
 		return false
 	case minor > MinorVersion:
-		nm.log.Debug("peer attempted to connect with a higher minor version, this client may need to be updated")
+		nm.log.Warn("peer attempted to connect with a higher minor version, this client may need to be updated")
 		return false
 	}
 
 	if patch > PatchVersion {
-		nm.log.Debug("peer is connecting with a higher patch version, this client may need to be updated")
+		nm.log.Warn("peer is connecting with a higher patch version, this client may need to be updated")
 	}
 	return true
 }
@@ -612,7 +612,7 @@ func unknownPeerHandler(_addr *C.netaddr_t, _cert *C.x509_t, _ unsafe.Pointer) {
 	addr := salticidae.NetAddrFromC(salticidae.CNetAddr(_addr)).Copy(true)
 	ip := toIPDesc(addr)
 
-	HandshakeNet.log.Debug("adding peer %s", ip)
+	HandshakeNet.log.Debug("adding peer at %s", ip)
 
 	var peer salticidae.PeerID
 	var id ids.ShortID
