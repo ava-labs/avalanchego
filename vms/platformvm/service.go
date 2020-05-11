@@ -35,6 +35,8 @@ var (
 	errGetStakeSource        = errors.New("couldn't get account specified in 'stakeSource'")
 	errNoBlockchainWithAlias = errors.New("there is no blockchain with the specified alias")
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
+	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
+	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -690,9 +692,8 @@ type SignResponse struct {
 func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignResponse) error {
 	service.vm.Ctx.Log.Debug("sign called")
 
-	switch {
-	case args.Signer.Equals(ids.ShortEmpty):
-		return fmt.Errorf("signer not specified")
+	if args.Signer.IsZero() {
+		return errNilSigner
 	}
 
 	// Get the key of the Signer
@@ -904,6 +905,8 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	service.vm.Ctx.Log.Debug("platform.ImportAVA called")
 
 	switch {
+	case args.To.IsZero():
+		return errNilTo
 	case args.PayerNonce == 0:
 		return fmt.Errorf("sender's next nonce not specified")
 	}
