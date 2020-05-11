@@ -221,10 +221,8 @@ func init() {
 			if id != "" {
 				err = cb58.FromString(id)
 				if err != nil {
-					if err != nil {
-						errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err))
-						return
-					}
+					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err))
+					return
 				}
 				peerID, err := ids.ToShortID(cb58.Bytes)
 				if err != nil {
