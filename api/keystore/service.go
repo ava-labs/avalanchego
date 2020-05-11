@@ -339,9 +339,27 @@ func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *Del
 	}
 
 	userDataDB := prefixdb.New(userNameBytes, ks.bcDB)
-	dataBatch := userDataDB.NewBatch()
-	if err := dataBatch.Delete(userNameBytes); err != nil {
+
+	var data []KeyValuePair
+	it := userDataDB.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		data = append(data, KeyValuePair{
+			Key:   it.Key(),
+			Value: it.Value(),
+		})
+	}
+
+	if err = it.Error(); err != nil {
 		return err
+	}
+
+	dataBatch := userDataDB.NewBatch()
+	for _, kvp := range data {
+		if err = dataBatch.Delete(kvp.Key); err != nil {
+			return err
+		}
 	}
 
 	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
