@@ -17,7 +17,9 @@ ExecStart={{ ava_daemon_bin_dir }}/ava \
             --db-dir="{{ ava_daemon_db_dir }}" \
             --plugin-dir="{{ ava_daemon_plugin_dir }}" \
             --log-dir="{{ ava_daemon_log_dir }}" \
-            --log-level="{{ log_level }}"
+            --log-level="{{ log_level }}" \
+            --staking-tls-cert-file="{{ ava_daemon_staking_tls_cert }}" \
+            --staking-tls-key-file="{{ ava_daemon_staking_tls_key }}"
 
 [Install]
 WantedBy=multi-user.target

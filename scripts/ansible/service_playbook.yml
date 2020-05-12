@@ -4,7 +4,6 @@
     - name: ava-base
     - name: gopath
     - name: ava-build
-    - name: ava-certs
     - name: ava-user
     - name: ava-install
     - name: ava-service
