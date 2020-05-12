@@ -20,4 +20,6 @@ type ExternalSender interface {
 	PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 	PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID)
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
+
+	Gossip(chainID ids.ID, containerID ids.ID, container []byte)
 }

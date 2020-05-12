@@ -96,6 +96,36 @@ func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, repl
 	return nil
 }
 
+// GetTxArgs are arguments for passing into GetTx requests
+type GetTxArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxReply defines the GetTxStatus replies returned from the API
+type GetTxReply struct {
+	Tx formatting.CB58 `json:"tx"`
+}
+
+// GetTx returns the specified transaction
+func (service *Service) GetTx(r *http.Request, args *GetTxArgs, reply *GetTxReply) error {
+	service.vm.ctx.Log.Verbo("GetTx called with %s", args.TxID)
+
+	if args.TxID.IsZero() {
+		return errNilTxID
+	}
+
+	tx := UniqueTx{
+		vm:   service.vm,
+		txID: args.TxID,
+	}
+	if status := tx.Status(); !status.Fetched() {
+		return errUnknownTx
+	}
+
+	reply.Tx.Bytes = tx.Bytes()
+	return nil
+}
+
 // GetUTXOsArgs are arguments for passing into GetUTXOs requests
 type GetUTXOsArgs struct {
 	Addresses []string `json:"addresses"`
@@ -188,7 +218,8 @@ type GetBalanceArgs struct {
 
 // GetBalanceReply defines the GetBalance replies returned from the API
 type GetBalanceReply struct {
-	Balance json.Uint64 `json:"balance"`
+	Balance json.Uint64  `json:"balance"`
+	UTXOIDs []ava.UTXOID `json:"utxoIDs"`
 }
 
 // GetBalance returns the amount of an asset that an address at least partially owns
@@ -217,18 +248,21 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	}
 
 	for _, utxo := range utxos {
-		if utxo.AssetID().Equals(assetID) {
-			transferable, ok := utxo.Out.(ava.Transferable)
-			if !ok {
-				continue
-			}
-			amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
-			if err != nil {
-				return err
-			}
-			reply.Balance = json.Uint64(amt)
+		if !utxo.AssetID().Equals(assetID) {
+			continue
 		}
+		transferable, ok := utxo.Out.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
+		if err != nil {
+			return err
+		}
+		reply.Balance = json.Uint64(amt)
+		reply.UTXOIDs = append(reply.UTXOIDs, utxo.UTXOID)
 	}
+
 	return nil
 }
 

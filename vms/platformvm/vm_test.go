@@ -142,6 +142,8 @@ func defaultVM() *VM {
 	db := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
 	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
 		panic(err)
 	}
@@ -233,6 +235,11 @@ func GenesisCurrentValidators() *EventHeap {
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Ensure the genesis block has been accepted and stored
 	genesisBlockID := vm.LastAccepted() // lastAccepted should be ID of genesis block
@@ -302,6 +309,12 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
@@ -325,12 +338,10 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 	// trigger block creation
 	vm.unissuedEvents.Add(tx)
-	vm.Ctx.Lock.Lock()
 	blk, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
@@ -369,6 +380,12 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 // Reject proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
@@ -392,12 +409,10 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 
 	// trigger block creation
 	vm.unissuedEvents.Add(tx)
-	vm.Ctx.Lock.Lock()
 	blk, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
@@ -440,6 +455,12 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 // Accept proposal to add validator to non-default subnet
 func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 
@@ -463,12 +484,10 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 
 	// trigger block creation
 	vm.unissuedEvents.Add(tx)
-	vm.Ctx.Lock.Lock()
 	blk, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
@@ -511,6 +530,12 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to non-default subnet
 func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
@@ -536,12 +561,10 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 
 	// trigger block creation
 	vm.unissuedEvents.Add(tx)
-	vm.Ctx.Lock.Lock()
 	blk, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
@@ -584,16 +607,19 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 // Test case where default subnet validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	vm.Ctx.Lock.Lock()
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
@@ -630,12 +656,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal("expected timestamp to have advanced")
 	}
 
-	vm.Ctx.Lock.Lock()
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
@@ -676,16 +700,19 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where default subnet validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	vm.Ctx.Lock.Lock()
 	blk, err := vm.BuildBlock() // should contain proposal to advance time
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
@@ -722,12 +749,10 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal("expected timestamp to have advanced")
 	}
 
-	vm.Ctx.Lock.Lock()
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
@@ -768,6 +793,11 @@ func TestRewardValidatorReject(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	if _, err := vm.BuildBlock(); err == nil {
 		t.Fatalf("Should have errored on BuildBlock")
@@ -777,6 +807,11 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
@@ -793,13 +828,11 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.Ctx.Lock.Lock()
 	vm.unissuedDecisionTxs = append(vm.unissuedDecisionTxs, tx)
 	blk, err := vm.BuildBlock() // should contain proposal to create chain
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -839,6 +872,11 @@ func TestCreateChain(t *testing.T) {
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	createSubnetTx, err := vm.newCreateSubnetTx(
 		testNetworkID,
@@ -854,13 +892,11 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.Ctx.Lock.Lock()
 	vm.unissuedDecisionTxs = append(vm.unissuedDecisionTxs, createSubnetTx)
 	blk, err := vm.BuildBlock() // should contain proposal to create subnet
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -917,13 +953,11 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.Ctx.Lock.Lock()
 	vm.unissuedEvents.Push(addValidatorTx)
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
@@ -971,12 +1005,10 @@ func TestCreateSubnet(t *testing.T) {
 	// from pending to current validator set
 	vm.clock.Set(startTime)
 
-	vm.Ctx.Lock.Lock()
 	blk, err = vm.BuildBlock() // should be advance time tx
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
@@ -1031,12 +1063,10 @@ func TestCreateSubnet(t *testing.T) {
 
 	// fast forward clock to time validator should stop validating
 	vm.clock.Set(endTime)
-	vm.Ctx.Lock.Lock()
 	blk, err = vm.BuildBlock() // should be advance time tx
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.Lock.Unlock()
 
 	// Assert preferences are correct
 	// and accept the proposal/commit
@@ -1084,6 +1114,11 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	avmID := ids.Empty.Prefix(0)
 	utxoID := ava.UTXOID{
@@ -1116,9 +1151,6 @@ func TestAtomicImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	vm.Ctx.Lock.Lock()
-	defer vm.Ctx.Lock.Unlock()
 
 	vm.ava = assetID
 	vm.avm = avmID
@@ -1175,6 +1207,11 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	avmID := ids.Empty.Prefix(0)
 	utxoID := ava.UTXOID{
@@ -1207,9 +1244,6 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	vm.Ctx.Lock.Lock()
-	defer vm.Ctx.Lock.Unlock()
 
 	vm.ava = assetID
 	vm.avm = avmID
@@ -1271,6 +1305,8 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
 	firstMsgChan := make(chan common.Message, 1)
 	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1318,6 +1354,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}
 
 	firstVM.Shutdown()
+	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
@@ -1330,6 +1367,12 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer func() {
+		secondVM.Shutdown()
+		secondCtx.Lock.Unlock()
+	}()
+
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1371,6 +1414,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
 	firstMsgChan := make(chan common.Message, 1)
 	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1418,6 +1463,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}
 
 	firstVM.Shutdown()
+	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
@@ -1430,6 +1476,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer func() {
+		secondVM.Shutdown()
+		secondCtx.Lock.Unlock()
+	}()
+
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1471,7 +1523,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
 	}
-	defer vm.Shutdown()
 
 	defaultSubnet := validators.NewSet()
 	vm.validators = validators.NewManager()
@@ -1479,9 +1530,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
-	msgChan := make(chan common.Message, 1)
-
 	ctx.Lock.Lock()
+
+	msgChan := make(chan common.Message, 1)
 	if err := vm.Initialize(ctx, vmDB, genesisBytes, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -1510,7 +1561,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	router := &router.ChainRouter{}
-	router.Initialize(logging.NoLog{}, &timeoutManager)
+	router.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -1581,6 +1632,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.GetF = nil
 	externalSender.CantPushQuery = false
+	externalSender.CantPullQuery = false
 
 	engine.Put(ctx.NodeID, *reqID, advanceTimeBlkID, advanceTimeBlkBytes)
 
@@ -1627,6 +1679,12 @@ func TestUnverifiedParent(t *testing.T) {
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	msgChan := make(chan common.Message, 1)
 	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
 		t.Fatal(err)

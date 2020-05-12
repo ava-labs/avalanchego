@@ -392,10 +392,13 @@ func TestTxSerialization(t *testing.T) {
 }
 
 func TestInvalidGenesis(t *testing.T) {
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -409,12 +412,14 @@ func TestInvalidGenesis(t *testing.T) {
 }
 
 func TestInvalidFx(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -430,12 +435,14 @@ func TestInvalidFx(t *testing.T) {
 }
 
 func TestFxInitializationFailure(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
 		/*context=*/ ctx,
 		/*db=*/ memdb.New(),
@@ -457,6 +464,10 @@ func (tx *testTxBytes) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func TestIssueTx(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	newTx := NewTx(t, genesisBytes, vm)
 
@@ -473,6 +484,7 @@ func TestIssueTx(t *testing.T) {
 	if msg != common.PendingTxs {
 		t.Fatalf("Wrong message")
 	}
+	ctx.Lock.Lock()
 
 	if txs := vm.PendingTxs(); len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
@@ -481,6 +493,10 @@ func TestIssueTx(t *testing.T) {
 
 func TestGenesisGetUTXOs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	shortAddr := keys[0].PublicKey().Address()
 	addr := ids.NewID(hashing.ComputeHash256Array(shortAddr.Bytes()))
@@ -491,8 +507,6 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Shutdown()
-	ctx.Lock.Unlock()
 
 	if len(utxos) != 7 {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 7, len(utxos))
@@ -503,6 +517,10 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -615,13 +633,13 @@ func TestIssueDependentTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
 	if msg != common.PendingTxs {
 		t.Fatalf("Wrong message")
 	}
+	ctx.Lock.Lock()
 
 	if txs := vm.PendingTxs(); len(txs) != 2 {
 		t.Fatalf("Should have returned %d tx(s)", 2)
@@ -630,14 +648,15 @@ func TestIssueDependentTx(t *testing.T) {
 
 // Test issuing a transaction that creates an NFT family
 func TestIssueNFT(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -788,14 +807,15 @@ func TestIssueNFT(t *testing.T) {
 
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	vm := &VM{}
+	ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -937,8 +957,10 @@ func TestIssueProperty(t *testing.T) {
 
 func TestVMFormat(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	tests := []struct {
 		in       string
@@ -957,8 +979,10 @@ func TestVMFormat(t *testing.T) {
 
 func TestVMFormatAliased(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	origAliases := ctx.BCLookup
 	defer func() { ctx.BCLookup = origAliases }()
