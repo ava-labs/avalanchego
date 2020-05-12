@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
 	"path"
 	"sync"
 	"unsafe"
@@ -37,6 +36,7 @@ import (
 	"github.com/ava-labs/gecko/networking/xputtest"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -151,15 +151,9 @@ func (n *Node) initNetlib() error {
 	n.EC = salticidae.NewEventContext()
 	n.TCall = salticidae.NewThreadCall(n.EC)
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	signal.Notify(c, os.Kill)
-
-	go func() {
-		for range c {
-			n.TCall.AsyncCall(salticidae.ThreadCallCallback(C.onTerm), nil)
-		}
-	}()
+	utils.HandleSignals(func(os.Signal) {
+		n.TCall.AsyncCall(salticidae.ThreadCallCallback(C.onTerm), nil)
+	}, os.Interrupt, os.Kill)
 
 	// Create peer network config, may have tls enabled
 	peerConfig := salticidae.NewPeerNetworkConfig()
