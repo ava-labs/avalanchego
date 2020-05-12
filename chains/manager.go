@@ -40,6 +40,7 @@ import (
 const (
 	defaultChannelSize = 1000
 	requestTimeout     = 2 * time.Second
+	gossipFrequency    = 10 * time.Second
 )
 
 // Manager manages the chains running on this node.
@@ -146,7 +147,7 @@ func New(
 	timeoutManager.Initialize(requestTimeout)
 	go log.RecoverAndPanic(timeoutManager.Dispatch)
 
-	router.Initialize(log, &timeoutManager)
+	router.Initialize(log, &timeoutManager, gossipFrequency)
 
 	m := &manager{
 		stakingEnabled:  stakingEnabled,

@@ -112,6 +112,9 @@ type InternalHandler interface {
 	// Startup this engine.
 	Startup()
 
+	// Gossip to the network a container on the accepted frontier
+	Gossip()
+
 	// Shutdown this engine.
 	Shutdown()
 

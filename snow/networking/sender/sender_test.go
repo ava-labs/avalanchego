@@ -38,7 +38,7 @@ func TestTimeout(t *testing.T) {
 	go tm.Dispatch()
 
 	router := router.ChainRouter{}
-	router.Initialize(logging.NoLog{}, &tm)
+	router.Initialize(logging.NoLog{}, &tm, time.Hour)
 
 	sender := Sender{}
 	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &router, &tm)
