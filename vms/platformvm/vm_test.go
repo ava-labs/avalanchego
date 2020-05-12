@@ -1632,6 +1632,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	externalSender.GetF = nil
 	externalSender.CantPushQuery = false
+	externalSender.CantPullQuery = false
 
 	engine.Put(ctx.NodeID, *reqID, advanceTimeBlkID, advanceTimeBlkBytes)
 
