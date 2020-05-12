@@ -11,6 +11,12 @@ import (
 
 func TestTxHeapStart(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{SortByStartTime: true}
 
 	validator0, err := vm.newAddDefaultSubnetValidatorTx(
@@ -78,6 +84,12 @@ func TestTxHeapStart(t *testing.T) {
 
 func TestTxHeapStop(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{}
 
 	validator0, err := vm.newAddDefaultSubnetValidatorTx(
@@ -145,6 +157,12 @@ func TestTxHeapStop(t *testing.T) {
 
 func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{SortByStartTime: true}
 
 	validator, err := vm.newAddDefaultSubnetValidatorTx(
@@ -186,6 +204,12 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 
 func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{}
 
 	validator, err := vm.newAddDefaultSubnetValidatorTx(
