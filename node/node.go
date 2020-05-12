@@ -121,6 +121,9 @@ type Node struct {
 
 	// This node's configuration
 	Config *Config
+
+	// channel for closing the node
+	nodeCloser chan<- os.Signal
 }
 
 /*
@@ -151,7 +154,7 @@ func (n *Node) initNetlib() error {
 	n.EC = salticidae.NewEventContext()
 	n.TCall = salticidae.NewThreadCall(n.EC)
 
-	utils.HandleSignals(func(os.Signal) {
+	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		n.TCall.AsyncCall(salticidae.ThreadCallCallback(C.onTerm), nil)
 	}, os.Interrupt, os.Kill)
 
@@ -660,4 +663,5 @@ func (n *Node) Shutdown() {
 	n.ValidatorAPI.Shutdown()
 	n.ConsensusAPI.Shutdown()
 	n.chainManager.Shutdown()
+	utils.ClearSignals(n.nodeCloser)
 }
