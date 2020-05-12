@@ -6,4 +6,5 @@
     - name: ava-build
     - name: ava-user
     - name: ava-install
+    - name: ava-upgrade
     - name: ava-service
