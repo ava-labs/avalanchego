@@ -96,7 +96,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 
 	vtx, err := b.State.ParseVertex(vtxBytes)
 	if err != nil {
-		b.BootstrapConfig.Context.Log.Warn("ParseVertex failed due to %s for block:\n%s",
+		b.BootstrapConfig.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
 		b.GetFailed(vdr, requestID, vtxID)
