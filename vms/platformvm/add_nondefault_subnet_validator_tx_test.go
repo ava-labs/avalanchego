@@ -14,6 +14,11 @@ import (
 
 func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: tx is nil
 	var tx *addNonDefaultSubnetValidatorTx
@@ -202,6 +207,11 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: Proposed validator currently validating default subnet
 	// but stops validating non-default subnet after stops validating default subnet
@@ -590,12 +600,16 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	if err == nil {
 		t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
 	}
-
 }
 
 // Test that marshalling/unmarshalling works
 func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// valid tx
 	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
