@@ -104,7 +104,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 	}
 
 	if !b.pending.Contains(vtx.ID()) {
-		b.BootstrapConfig.Context.Log.Warn("Validator %s sent an unrequested vertex:\n%s",
+		b.BootstrapConfig.Context.Log.Debug("Validator %s sent an unrequested vertex:\n%s",
 			vdr,
 			formatting.DumpBytes{Bytes: vtxBytes})
 
@@ -119,7 +119,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
 	vtxID, ok := b.vtxReqs.Remove(vdr, requestID)
 	if !ok {
-		b.BootstrapConfig.Context.Log.Warn("GetFailed called without sending the corresponding Get message from %s",
+		b.BootstrapConfig.Context.Log.Debug("GetFailed called without sending the corresponding Get message from %s",
 			vdr)
 		return
 	}

@@ -98,7 +98,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 	}
 
 	if !b.pending.Contains(blk.ID()) {
-		b.BootstrapConfig.Context.Log.Warn("Validator %s sent an unrequested block:\n%s",
+		b.BootstrapConfig.Context.Log.Debug("Validator %s sent an unrequested block:\n%s",
 			vdr,
 			formatting.DumpBytes{Bytes: blkBytes})
 
@@ -113,7 +113,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
 	blkID, ok := b.blkReqs.Remove(vdr, requestID)
 	if !ok {
-		b.BootstrapConfig.Context.Log.Warn("GetFailed called without sending the corresponding Get message from %s",
+		b.BootstrapConfig.Context.Log.Debug("GetFailed called without sending the corresponding Get message from %s",
 			vdr)
 		return
 	}
