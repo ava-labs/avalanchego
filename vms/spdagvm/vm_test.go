@@ -91,6 +91,7 @@ func TestAva(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 	vm.batchTimeout = 0
 
@@ -172,6 +173,7 @@ func TestInvalidSpentTx(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 
 	ctx.Lock.Lock()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
@@ -258,6 +260,7 @@ func TestInvalidTxVerification(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 
 	ctx.Lock.Lock()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
@@ -319,6 +322,7 @@ func TestRPCAPI(t *testing.T) {
 	vmDB := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 	vm.batchTimeout = 0
 
@@ -526,6 +530,7 @@ func TestMultipleSend(t *testing.T) {
 	vmDB := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 
 	// Initialize these data structures
@@ -635,6 +640,7 @@ func TestIssuePendingDependency(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 	vm.batchTimeout = 0
 
