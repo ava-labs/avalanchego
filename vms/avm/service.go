@@ -96,6 +96,36 @@ func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, repl
 	return nil
 }
 
+// GetTxArgs are arguments for passing into GetTx requests
+type GetTxArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxReply defines the GetTxStatus replies returned from the API
+type GetTxReply struct {
+	Tx formatting.CB58 `json:"tx"`
+}
+
+// GetTx returns the specified transaction
+func (service *Service) GetTx(r *http.Request, args *GetTxArgs, reply *GetTxReply) error {
+	service.vm.ctx.Log.Verbo("GetTx called with %s", args.TxID)
+
+	if args.TxID.IsZero() {
+		return errNilTxID
+	}
+
+	tx := UniqueTx{
+		vm:   service.vm,
+		txID: args.TxID,
+	}
+	if status := tx.Status(); !status.Fetched() {
+		return errUnknownTx
+	}
+
+	reply.Tx.Bytes = tx.Bytes()
+	return nil
+}
+
 // GetUTXOsArgs are arguments for passing into GetUTXOs requests
 type GetUTXOsArgs struct {
 	Addresses []string `json:"addresses"`
