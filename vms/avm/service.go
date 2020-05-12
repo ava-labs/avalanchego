@@ -218,7 +218,8 @@ type GetBalanceArgs struct {
 
 // GetBalanceReply defines the GetBalance replies returned from the API
 type GetBalanceReply struct {
-	Balance json.Uint64 `json:"balance"`
+	Balance json.Uint64  `json:"balance"`
+	UTXOIDs []ava.UTXOID `json:"utxoIDs"`
 }
 
 // GetBalance returns the amount of an asset that an address at least partially owns
@@ -247,18 +248,21 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	}
 
 	for _, utxo := range utxos {
-		if utxo.AssetID().Equals(assetID) {
-			transferable, ok := utxo.Out.(ava.Transferable)
-			if !ok {
-				continue
-			}
-			amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
-			if err != nil {
-				return err
-			}
-			reply.Balance = json.Uint64(amt)
+		if !utxo.AssetID().Equals(assetID) {
+			continue
 		}
+		transferable, ok := utxo.Out.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
+		if err != nil {
+			return err
+		}
+		reply.Balance = json.Uint64(amt)
+		reply.UTXOIDs = append(reply.UTXOIDs, utxo.UTXOID)
 	}
+
 	return nil
 }
 

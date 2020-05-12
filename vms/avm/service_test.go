@@ -88,6 +88,27 @@ func TestServiceGetTxStatus(t *testing.T) {
 	}
 }
 
+func TestServiceGetBalance(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	assetID := genesisTx.ID()
+	addr := keys[0].PublicKey().Address()
+
+	balanceArgs := &GetBalanceArgs{
+		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+		AssetID: assetID.String(),
+	}
+	balanceReply := &GetBalanceReply{}
+	err := s.GetBalance(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(balanceReply.Balance), uint64(300000))
+
+	assert.Len(t, balanceReply.UTXOIDs, 4, "should have only returned four utxoIDs")
+}
+
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
 	defer func() {
