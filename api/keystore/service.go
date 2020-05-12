@@ -327,7 +327,7 @@ func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *Del
 	usr, err := ks.getUser(args.Username)
 	switch {
 	case err != nil || usr == nil:
-		return fmt.Errorf("user doesn't exists: %s", args.Username)
+		return fmt.Errorf("user doesn't exist: %s", args.Username)
 	case !usr.CheckPassword(args.Password):
 		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
