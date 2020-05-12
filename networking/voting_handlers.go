@@ -621,7 +621,7 @@ func chits(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Poi
 	for _, voteBytes := range msg.Get(ContainerIDs).([][]byte) {
 		vote, err := ids.ToID(voteBytes)
 		if err != nil {
-			VotingNet.log.Warn("error parsing chit %v: %s", voteBytes, err)
+			VotingNet.log.Debug("error parsing chit %v: %s", voteBytes, err)
 			return
 		}
 		votes.Add(vote)
