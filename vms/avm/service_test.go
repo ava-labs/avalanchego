@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/formatting"
 )
 
@@ -85,6 +86,70 @@ func TestServiceGetTxStatus(t *testing.T) {
 			expected.String(), statusReply.Status.String(),
 		)
 	}
+}
+
+func TestServiceGetBalance(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	assetID := genesisTx.ID()
+	addr := keys[0].PublicKey().Address()
+
+	balanceArgs := &GetBalanceArgs{
+		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+		AssetID: assetID.String(),
+	}
+	balanceReply := &GetBalanceReply{}
+	err := s.GetBalance(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(balanceReply.Balance), uint64(300000))
+
+	assert.Len(t, balanceReply.UTXOIDs, 4, "should have only returned four utxoIDs")
+}
+
+func TestServiceGetTx(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTxBytes := genesisTx.Bytes()
+	txID := genesisTx.ID()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{
+		TxID: txID,
+	}, &reply)
+	assert.NoError(t, err)
+	assert.Equal(t, genesisTxBytes, reply.Tx.Bytes, "Wrong tx returned from service.GetTx")
+}
+
+func TestServiceGetNilTx(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{}, &reply)
+	assert.Error(t, err, "Nil TxID should have returned an error")
+}
+
+func TestServiceGetUnknownTx(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{TxID: ids.Empty}, &reply)
+	assert.Error(t, err, "Unknown TxID should have returned an error")
 }
 
 func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
