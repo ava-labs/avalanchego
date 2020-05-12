@@ -234,7 +234,7 @@ func (s *Voting) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, 
 	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
 		s.log.Debug("attempted to send a Get message to a disconnected validator: %s", validatorID)
-		s.executor.Add(func() { s.router.GetFailed(validatorID, chainID, requestID, containerID) })
+		s.executor.Add(func() { s.router.GetFailed(validatorID, chainID, requestID) })
 		return // Validator is not connected
 	}
 

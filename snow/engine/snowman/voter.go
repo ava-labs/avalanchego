@@ -56,10 +56,7 @@ func (v *voter) Update() {
 	}
 
 	v.t.Config.Context.Log.Verbo("Snowman engine can't quiesce")
-
-	if len(v.t.polls.m) < v.t.Config.Params.ConcurrentRepolls {
-		v.t.repoll()
-	}
+	v.t.repoll()
 }
 
 func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
