@@ -5,8 +5,8 @@
   gather_facts: false
   hosts: all
   vars:
-    repo_name: ava-labs/gecko-internal
-    repo_branch: platformvm-proposal-accept
+    repo_name: ava-labs/gecko
+    repo_branch: master
   roles:
     - name: ava-stop
     - name: ava-build
