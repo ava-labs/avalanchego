@@ -1,7 +1,7 @@
 - name: Reload systemd
   become: true
   systemd:
-    daaemon_reload: true
+    daemon_reload: true
 
 - name: Restart AVA service
   become: true
