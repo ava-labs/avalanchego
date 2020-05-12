@@ -7,47 +7,25 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func setup(t *testing.T) ([]byte, *VM, *Service) {
-	genesisBytes := BuildGenesisTest(t)
-
-	ctx.Lock.Lock()
-
-	// This VM initilialzation is very similar to that done by GenesisVM().
-	// However replacing the body of this function, with a call to GenesisVM
-	// causes a timeout while executing the test suite.
-	// https://github.com/ava-labs/gecko/pull/59#pullrequestreview-392478636
-	vm := &VM{}
-	err := vm.Initialize(
-		ctx,
-		memdb.New(),
-		genesisBytes,
-		make(chan common.Message, 1),
-		[]*common.Fx{&common.Fx{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	genesisBytes, _, vm := GenesisVM(t)
 	s := &Service{vm: vm}
 	return genesisBytes, vm, s
 }
 
 func TestServiceIssueTx(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	txArgs := &IssueTxArgs{}
 	txReply := &IssueTxReply{}
@@ -69,8 +47,10 @@ func TestServiceIssueTx(t *testing.T) {
 
 func TestServiceGetTxStatus(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	statusArgs := &GetTxStatusArgs{}
 	statusReply := &GetTxStatusReply{}
@@ -129,10 +109,55 @@ func TestServiceGetBalance(t *testing.T) {
 	assert.Len(t, balanceReply.UTXOIDs, 4, "should have only returned four utxoIDs")
 }
 
+func TestServiceGetTx(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTxBytes := genesisTx.Bytes()
+	txID := genesisTx.ID()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{
+		TxID: txID,
+	}, &reply)
+	assert.NoError(t, err)
+	assert.Equal(t, genesisTxBytes, reply.Tx.Bytes, "Wrong tx returned from service.GetTx")
+}
+
+func TestServiceGetNilTx(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{}, &reply)
+	assert.Error(t, err, "Nil TxID should have returned an error")
+}
+
+func TestServiceGetUnknownTx(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	reply := GetTxReply{}
+	err := s.GetTx(nil, &GetTxArgs{TxID: ids.Empty}, &reply)
+	assert.Error(t, err, "Unknown TxID should have returned an error")
+}
+
 func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	addr0 := keys[0].PublicKey().Address()
 	tests := []struct {
@@ -159,8 +184,10 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 
 func TestServiceGetUTXOs(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	addr0 := keys[0].PublicKey().Address()
 	tests := []struct {
@@ -209,8 +236,10 @@ func TestServiceGetUTXOs(t *testing.T) {
 
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -234,8 +263,10 @@ func TestGetAssetDescription(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -257,8 +288,10 @@ func TestGetBalance(t *testing.T) {
 
 func TestCreateFixedCapAsset(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	reply := CreateFixedCapAssetReply{}
 	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
@@ -281,8 +314,10 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 func TestCreateVariableCapAsset(t *testing.T) {
 	_, vm, s := setup(t)
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
 
 	reply := CreateVariableCapAssetReply{}
 	err := s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{

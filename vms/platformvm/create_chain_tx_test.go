@@ -14,6 +14,11 @@ import (
 // test method SyntacticVerify
 func TestCreateChainTxSyntacticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: tx is nil
 	var tx *CreateChainTx
@@ -142,6 +147,11 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 // Ensure SemanticVerify fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: No control sigs (2 are needed)
 	tx, err := vm.newCreateChainTx(
@@ -189,6 +199,11 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure SemanticVerify fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Generate new, random key to sign tx with
 	factory := crypto.FactorySECP256K1R{}
@@ -222,6 +237,11 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	tx, err := vm.newCreateChainTx(
 		defaultNonce+1,
@@ -245,6 +265,11 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 func TestCreateChainTxAlreadyExists(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// create a tx
 	tx, err := vm.newCreateChainTx(
@@ -276,6 +301,11 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// create a valid tx
 	tx, err := vm.newCreateChainTx(
