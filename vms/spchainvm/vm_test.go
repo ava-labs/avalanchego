@@ -67,6 +67,7 @@ func TestPayments(t *testing.T) {
 	blocker, _ := queue.New(bootstrappingDB)
 
 	vm := &VM{}
+	defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, db, genesisData, msgChan, nil)
 
 	sender := &common.SenderTest{}

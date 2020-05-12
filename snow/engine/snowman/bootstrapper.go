@@ -89,7 +89,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 
 	blk, err := b.VM.ParseBlock(blkBytes)
 	if err != nil {
-		b.BootstrapConfig.Context.Log.Warn("ParseBlock failed due to %s for block:\n%s",
+		b.BootstrapConfig.Context.Log.Debug("ParseBlock failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: blkBytes})
 

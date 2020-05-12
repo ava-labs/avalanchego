@@ -88,6 +88,8 @@ func (t *Transitive) finishBootstrapping() {
 		// the preference to the last accepted block
 		t.Config.VM.SetPreference(tailID)
 	}
+
+	t.Config.Context.Log.Info("Bootstrapping finished with %s as the last accepted block", tailID)
 }
 
 // Gossip implements the Engine interface
@@ -142,7 +144,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 
 	blk, err := t.Config.VM.ParseBlock(blkBytes)
 	if err != nil {
-		t.Config.Context.Log.Warn("ParseBlock failed due to %s for block:\n%s",
+		t.Config.Context.Log.Debug("ParseBlock failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: blkBytes})
 
@@ -244,13 +246,13 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) {
 	// if the engine hasn't been bootstrapped, we shouldn't be receiving chits
 	if !t.bootstrapped {
-		t.Config.Context.Log.Warn("Dropping Chits due to bootstrapping")
+		t.Config.Context.Log.Debug("Dropping Chits due to bootstrapping")
 		return
 	}
 
 	// Since this is snowman, there should only be one ID in the vote set
 	if votes.Len() != 1 {
-		t.Config.Context.Log.Warn("Chits was called with the wrong number of votes %d. ValidatorID: %s, RequestID: %d",
+		t.Config.Context.Log.Debug("Chits was called with the wrong number of votes %d. ValidatorID: %s, RequestID: %d",
 			votes.Len(),
 			vdr,
 			requestID)

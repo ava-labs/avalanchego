@@ -50,7 +50,7 @@ func (sr *ChainRouter) AddChain(chain *handler.Handler) {
 	defer sr.lock.Unlock()
 
 	chainID := chain.Context().ChainID
-	sr.log.Debug("Adding %s to the routing table", chainID)
+	sr.log.Debug("registering chain %s with chain router", chainID)
 	sr.chains[chainID.Key()] = chain
 }
 
@@ -64,7 +64,7 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 		chain.Shutdown()
 		delete(sr.chains, chainID.Key())
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -78,7 +78,7 @@ func (sr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAcceptedFrontier(validatorID, requestID)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -93,7 +93,7 @@ func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.AcceptedFrontier(validatorID, requestID, containerIDs)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -108,7 +108,7 @@ func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -122,7 +122,7 @@ func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAccepted(validatorID, requestID, containerIDs)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -137,7 +137,7 @@ func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Accepted(validatorID, requestID, containerIDs)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -152,7 +152,7 @@ func (sr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAcceptedFailed(validatorID, requestID)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -165,7 +165,7 @@ func (sr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Get(validatorID, requestID, containerID)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -181,7 +181,7 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Put(validatorID, requestID, containerID, container)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -195,7 +195,7 @@ func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetFailed(validatorID, requestID)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -208,7 +208,7 @@ func (sr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.PushQuery(validatorID, requestID, containerID, container)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -221,7 +221,7 @@ func (sr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.PullQuery(validatorID, requestID, containerID)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -236,7 +236,7 @@ func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Chits(validatorID, requestID, votes)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 
@@ -250,7 +250,7 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.QueryFailed(validatorID, requestID)
 	} else {
-		sr.log.Warn("Message referenced a chain, %s, this validator is not validating", chainID)
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
 }
 

@@ -62,6 +62,8 @@ func (t *Transitive) finishBootstrapping() {
 	}
 	t.Consensus.Initialize(t.Config.Context, t.Params, frontier)
 	t.bootstrapped = true
+
+	t.Config.Context.Log.Info("Bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
 }
 
 // Gossip implements the Engine interface
@@ -112,7 +114,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 
 	vtx, err := t.Config.State.ParseVertex(vtxBytes)
 	if err != nil {
-		t.Config.Context.Log.Warn("ParseVertex failed due to %s for block:\n%s",
+		t.Config.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
 		t.GetFailed(vdr, requestID)
@@ -192,7 +194,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 // Chits implements the Engine interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) {
 	if !t.bootstrapped {
-		t.Config.Context.Log.Warn("Dropping Chits due to bootstrapping")
+		t.Config.Context.Log.Debug("Dropping Chits due to bootstrapping")
 		return
 	}
 
