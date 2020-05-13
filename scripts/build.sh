@@ -1,11 +1,11 @@
 #!/bin/bash -e
 
-GECKO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
-source ${GECKO_PATH}/scripts/env.sh 
-
 # Fetch Gecko dependencies, including salticidae-go and coreth
 echo "Fetching dependencies..."
 go mod download
+
+GECKO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
+source ${GECKO_PATH}/scripts/env.sh 
 
 # Make sure specified versions of salticidae and coreth exist
 if [ ! -d $CORETH_PATH ]; then
