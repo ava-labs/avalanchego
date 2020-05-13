@@ -24,7 +24,7 @@ type UTXOID struct {
 	OutputIndex uint32 `serialize:"true" json:"outputIndex"`
 
 	// Symbol is false if the UTXO should be part of the DB
-	Symbol bool
+	Symbol bool `json:"-"`
 	// id is the unique ID of a UTXO, it is calculated from TxID and OutputIndex
 	id ids.ID
 }

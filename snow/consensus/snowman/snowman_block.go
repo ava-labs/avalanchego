@@ -16,7 +16,7 @@ type snowmanBlock struct {
 	// block that this node contains. For the genesis, this value will be nil
 	blk Block
 
-	// shouldFalter is set to true if this node, and all its decendants received
+	// shouldFalter is set to true if this node, and all its descendants received
 	// less than Alpha votes
 	shouldFalter bool
 
