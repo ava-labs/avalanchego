@@ -477,7 +477,7 @@ func (n *Node) initChains() error {
 func (n *Node) initAPIServer() {
 	n.Log.Info("Initializing API server")
 
-	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPPort)
+	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
 
 	go n.Log.RecoverAndPanic(func() {
 		if n.Config.EnableHTTPS {
