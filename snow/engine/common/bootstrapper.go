@@ -122,9 +122,9 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		}
 
 		if size := accepted.Len(); size == 0 && b.Config.Beacons.Len() > 0 {
-			b.Context.Log.Warn("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this network yet")
+			b.Context.Log.Warn("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet")
 		} else {
-			b.Context.Log.Info("Bootstrapping finished with %d vertices in the accepted frontier", size)
+			b.Context.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
 		}
 
 		b.Bootstrapable.ForceAccepted(accepted)
