@@ -109,7 +109,7 @@ func (s *Voting) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, 
 			peers = append(peers, peer)
 			s.log.Verbo("Sending a GetAcceptedFrontier to %s", vID)
 		} else {
-			s.log.Debug("Attempted to send a GetAcceptedFrontier message to a disconnected validator: %s", vID)
+			s.log.Debug("attempted to send a GetAcceptedFrontier message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.GetAcceptedFrontierFailed(vID, chainID, requestID) })
 		}
 	}
@@ -134,14 +134,14 @@ func (s *Voting) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, 
 func (s *Voting) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
-		s.log.Debug("Attempted to send an AcceptedFrontier message to a disconnected validator: %s", validatorID)
+		s.log.Debug("attempted to send an AcceptedFrontier message to disconnected validator: %s", validatorID)
 		return // Validator is not connected
 	}
 
 	build := Builder{}
 	msg, err := build.AcceptedFrontier(chainID, requestID, containerIDs)
 	if err != nil {
-		s.log.Error("Attempted to pack too large of an AcceptedFrontier message.\nNumber of containerIDs: %d", containerIDs.Len())
+		s.log.Error("attempted to pack too large of an AcceptedFrontier message.\nNumber of containerIDs: %d", containerIDs.Len())
 		return // Packing message failed
 	}
 
@@ -167,9 +167,9 @@ func (s *Voting) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestI
 		vID := validatorID
 		if peer, exists := s.conns.GetPeerID(validatorID); exists {
 			peers = append(peers, peer)
-			s.log.Verbo("Sending a GetAccepted to %s", vID)
+			s.log.Verbo("sending a GetAccepted to %s", vID)
 		} else {
-			s.log.Debug("Attempted to send a GetAccepted message to a disconnected validator: %s", vID)
+			s.log.Debug("attempted to send a GetAccepted message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.GetAcceptedFailed(vID, chainID, requestID) })
 		}
 	}
@@ -182,7 +182,7 @@ func (s *Voting) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestI
 				s.executor.Add(func() { s.router.GetAcceptedFailed(validatorID, chainID, requestID) })
 			}
 		}
-		s.log.Debug("Attempted to pack too large of a GetAccepted message.\nNumber of containerIDs: %d", containerIDs.Len())
+		s.log.Debug("attempted to pack too large of a GetAccepted message.\nNumber of containerIDs: %d", containerIDs.Len())
 		return // Packing message failed
 	}
 
@@ -204,14 +204,14 @@ func (s *Voting) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestI
 func (s *Voting) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
-		s.log.Debug("Attempted to send an Accepted message to a disconnected validator: %s", validatorID)
+		s.log.Debug("attempted to send an Accepted message to a disconnected validator: %s", validatorID)
 		return // Validator is not connected
 	}
 
 	build := Builder{}
 	msg, err := build.Accepted(chainID, requestID, containerIDs)
 	if err != nil {
-		s.log.Error("Attempted to pack too large of an Accepted message.\nNumber of containerIDs: %d", containerIDs.Len())
+		s.log.Error("attempted to pack too large of an Accepted message.\nNumber of containerIDs: %d", containerIDs.Len())
 		return // Packing message failed
 	}
 
@@ -233,8 +233,8 @@ func (s *Voting) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uin
 func (s *Voting) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
 	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
-		s.log.Debug("Attempted to send a Get message to a disconnected validator: %s", validatorID)
-		s.executor.Add(func() { s.router.GetFailed(validatorID, chainID, requestID, containerID) })
+		s.log.Debug("attempted to send a Get message to a disconnected validator: %s", validatorID)
+		s.executor.Add(func() { s.router.GetFailed(validatorID, chainID, requestID) })
 		return // Validator is not connected
 	}
 
@@ -260,14 +260,14 @@ func (s *Voting) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, 
 func (s *Voting) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
-		s.log.Debug("Attempted to send a Container message to a disconnected validator: %s", validatorID)
+		s.log.Debug("attempted to send a Container message to a disconnected validator: %s", validatorID)
 		return // Validator is not connected
 	}
 
 	build := Builder{}
 	msg, err := build.Put(chainID, requestID, containerID, container)
 	if err != nil {
-		s.log.Error("Attempted to pack too large of a Put message.\nContainer length: %d", len(container))
+		s.log.Error("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 		return // Packing message failed
 	}
 
@@ -297,7 +297,7 @@ func (s *Voting) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 			peers = append(peers, peer)
 			s.log.Verbo("Sending a PushQuery to %s", vID)
 		} else {
-			s.log.Debug("Attempted to send a PushQuery message to a disconnected validator: %s", vID)
+			s.log.Debug("attempted to send a PushQuery message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.QueryFailed(vID, chainID, requestID) })
 		}
 	}
@@ -310,7 +310,7 @@ func (s *Voting) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 				s.executor.Add(func() { s.router.QueryFailed(validatorID, chainID, requestID) })
 			}
 		}
-		s.log.Error("Attempted to pack too large of a PushQuery message.\nContainer length: %d", len(container))
+		s.log.Error("attempted to pack too large of a PushQuery message.\nContainer length: %d", len(container))
 		return // Packing message failed
 	}
 
@@ -340,7 +340,7 @@ func (s *Voting) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 			peers = append(peers, peer)
 			s.log.Verbo("Sending a PullQuery to %s", vID)
 		} else {
-			s.log.Warn("Attempted to send a PullQuery message to a disconnected validator: %s", vID)
+			s.log.Debug("attempted to send a PullQuery message to a disconnected validator: %s", vID)
 			s.executor.Add(func() { s.router.QueryFailed(vID, chainID, requestID) })
 		}
 	}
@@ -367,14 +367,14 @@ func (s *Voting) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID 
 func (s *Voting) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
 	peer, exists := s.conns.GetPeerID(validatorID)
 	if !exists {
-		s.log.Debug("Attempted to send a Chits message to a disconnected validator: %s", validatorID)
+		s.log.Debug("attempted to send a Chits message to a disconnected validator: %s", validatorID)
 		return // Validator is not connected
 	}
 
 	build := Builder{}
 	msg, err := build.Chits(chainID, requestID, votes)
 	if err != nil {
-		s.log.Error("Attempted to pack too large of a Chits message.\nChits length: %d", votes.Len())
+		s.log.Error("attempted to pack too large of a Chits message.\nChits length: %d", votes.Len())
 		return // Packing message failed
 	}
 
@@ -395,7 +395,7 @@ func (s *Voting) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32
 // Gossip attempts to gossip the container to the network
 func (s *Voting) Gossip(chainID, containerID ids.ID, container []byte) {
 	if err := s.gossip(chainID, containerID, container); err != nil {
-		s.log.Error("Error gossiping container %s to %s\n%s", containerID, chainID, err)
+		s.log.Error("error gossiping container %s to %s: %s", containerID, chainID, err)
 	}
 }
 
@@ -433,7 +433,7 @@ func (s *Voting) gossip(chainID, containerID ids.ID, container []byte) error {
 	build := Builder{}
 	msg, err := build.Put(chainID, math.MaxUint32, containerID, container)
 	if err != nil {
-		return fmt.Errorf("Attempted to pack too large of a Put message.\nContainer length: %d: %w", len(container), err)
+		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
 	s.log.Verbo("Sending a Put message to peers."+
@@ -459,7 +459,7 @@ func getAcceptedFrontier(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t
 
 	validatorID, chainID, requestID, _, err := VotingNet.sanitize(_msg, _conn, GetAcceptedFrontier)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize getAcceptedFrontier message due to: %s", err)
 		return
 	}
 
@@ -473,7 +473,7 @@ func acceptedFrontier(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, AcceptedFrontier)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize acceptedFrontier message due to: %s", err)
 		return
 	}
 
@@ -481,7 +481,7 @@ func acceptedFrontier(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
-			VotingNet.log.Warn("Error parsing ContainerID: %v", containerIDBytes)
+			VotingNet.log.Debug("error parsing ContainerID %v: %s", containerIDBytes, err)
 			return
 		}
 		containerIDs.Add(containerID)
@@ -497,7 +497,7 @@ func getAccepted(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsa
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, GetAccepted)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize getAccepted message due to: %s", err)
 		return
 	}
 
@@ -505,7 +505,7 @@ func getAccepted(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsa
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
-			VotingNet.log.Warn("Error parsing ContainerID: %v", containerIDBytes)
+			VotingNet.log.Debug("error parsing ContainerID %v: %s", containerIDBytes, err)
 			return
 		}
 		containerIDs.Add(containerID)
@@ -521,7 +521,7 @@ func accepted(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, Accepted)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize accepted message due to: %s", err)
 		return
 	}
 
@@ -529,7 +529,7 @@ func accepted(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
-			VotingNet.log.Warn("Error parsing ContainerID: %v", containerIDBytes)
+			VotingNet.log.Debug("error parsing ContainerID %v: %s", containerIDBytes, err)
 			return
 		}
 		containerIDs.Add(containerID)
@@ -545,7 +545,7 @@ func get(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Point
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, Get)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize get message due to: %s", err)
 		return
 	}
 
@@ -561,7 +561,7 @@ func put(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Point
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, Put)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize put message due to: %s", err)
 		return
 	}
 
@@ -579,7 +579,7 @@ func pushQuery(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, PushQuery)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize pushQuery message due to: %s", err)
 		return
 	}
 
@@ -597,7 +597,7 @@ func pullQuery(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, PullQuery)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize pullQuery message due to: %s", err)
 		return
 	}
 
@@ -613,7 +613,7 @@ func chits(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Poi
 
 	validatorID, chainID, requestID, msg, err := VotingNet.sanitize(_msg, _conn, Chits)
 	if err != nil {
-		VotingNet.log.Error("Failed to sanitize message due to: %s", err)
+		VotingNet.log.Debug("failed to sanitize chits message due to: %s", err)
 		return
 	}
 
@@ -621,7 +621,7 @@ func chits(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Poi
 	for _, voteBytes := range msg.Get(ContainerIDs).([][]byte) {
 		vote, err := ids.ToID(voteBytes)
 		if err != nil {
-			VotingNet.log.Warn("Error parsing chit: %v", voteBytes)
+			VotingNet.log.Debug("error parsing chit %v: %s", voteBytes, err)
 			return
 		}
 		votes.Add(vote)
@@ -637,16 +637,16 @@ func (s *Voting) sanitize(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_
 
 	validatorID, exists := s.conns.GetID(peer)
 	if !exists {
-		return ids.ShortID{}, ids.ID{}, 0, nil, fmt.Errorf("message received from an un-registered peer")
+		return ids.ShortID{}, ids.ID{}, 0, nil, fmt.Errorf("received message from un-registered peer %s", validatorID)
 	}
 
-	s.log.Verbo("Receiving message from %s", validatorID)
+	s.log.Verbo("received message from %s", validatorID)
 
 	msg := salticidae.MsgFromC(salticidae.CMsg(_msg))
 	codec := Codec{}
 	pMsg, err := codec.Parse(op, msg.GetPayloadByMove())
 	if err != nil {
-		return ids.ShortID{}, ids.ID{}, 0, nil, err // The message couldn't be parsed
+		return ids.ShortID{}, ids.ID{}, 0, nil, fmt.Errorf("couldn't parse payload: %w", err) // The message couldn't be parsed
 	}
 
 	chainID, err := ids.ToID(pMsg.Get(ChainID).([]byte))
