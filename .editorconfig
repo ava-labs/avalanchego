@@ -1,0 +1,6 @@
+# https://editorconfig.org/
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_newspace = true

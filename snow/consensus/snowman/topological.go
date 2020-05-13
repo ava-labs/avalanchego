@@ -149,7 +149,7 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // During the sort, votes are pushed towards the genesis. To prevent interating
 // over all blocks that had unsuccessful polls, we set a flag on the block to
 // know that any future traversal through that block should register an
-// unsuccessful poll on that block and every decendant block.
+// unsuccessful poll on that block and every descendant block.
 //
 // The complexity of this function is:
 // - Runtime = 3 * |live set| + |votes|
@@ -408,7 +408,7 @@ func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
 
 // accept the preferred child of the provided snowman block. By accepting the
 // preferred child, all other children will be rejected. When these children are
-// rejected, all their decendants will be rejected.
+// rejected, all their descendants will be rejected.
 func (ts *Topological) accept(n *snowmanBlock) {
 	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
@@ -451,11 +451,11 @@ func (ts *Topological) accept(n *snowmanBlock) {
 		rejects = append(rejects, childID)
 	}
 
-	// reject all the decendants of the blocks we just rejected
+	// reject all the descendants of the blocks we just rejected
 	ts.rejectTransitively(rejects)
 }
 
-// Takes in a list of rejected ids and rejects all decendants of these IDs
+// Takes in a list of rejected ids and rejects all descendants of these IDs
 func (ts *Topological) rejectTransitively(rejected []ids.ID) {
 	// the rejected array is treated as a queue, with the next element at index
 	// 0 and the last element at the end of the slice.

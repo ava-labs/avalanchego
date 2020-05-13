@@ -23,8 +23,10 @@ type Transitive struct {
 	polls polls // track people I have asked for their preference
 
 	// vtxReqs prevents asking validators for the same vertex
+	vtxReqs common.Requests
+
 	// missingTxs tracks transaction that are missing
-	vtxReqs, missingTxs, pending ids.Set
+	missingTxs, pending ids.Set
 
 	// vtxBlocked tracks operations that are blocked on vertices
 	// txBlocked tracks operations that are blocked on transactions
@@ -115,22 +117,27 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 		t.Config.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
-		t.GetFailed(vdr, requestID, vtxID)
+		t.GetFailed(vdr, requestID)
 		return
 	}
 	t.insertFrom(vdr, vtx)
 }
 
 // GetFailed implements the Engine interface
-func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) {
 	if !t.bootstrapped {
-		t.bootstrapper.GetFailed(vdr, requestID, vtxID)
+		t.bootstrapper.GetFailed(vdr, requestID)
 		return
 	}
 
-	t.pending.Remove(vtxID)
+	vtxID, ok := t.vtxReqs.Remove(vdr, requestID)
+	if !ok {
+		t.Config.Context.Log.Warn("GetFailed called without sending the corresponding Get message from %s",
+			vdr)
+		return
+	}
+
 	t.vtxBlocked.Abandon(vtxID)
-	t.vtxReqs.Remove(vtxID)
 
 	if t.vtxReqs.Len() == 0 {
 		for _, txID := range t.missingTxs.List() {
@@ -142,7 +149,6 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len()))
 	t.numTxRequests.Set(float64(t.missingTxs.Len()))
-	t.numBlockedVtx.Set(float64(t.pending.Len()))
 }
 
 // PullQuery implements the Engine interface
@@ -167,14 +173,22 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 }
 
 // PushQuery implements the Engine interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []byte) {
+func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) {
 	if !t.bootstrapped {
 		t.Config.Context.Log.Debug("Dropping PushQuery for %s due to bootstrapping", vtxID)
 		return
 	}
 
-	t.Put(vdr, requestID, vtxID, vtx)
-	t.PullQuery(vdr, requestID, vtxID)
+	vtx, err := t.Config.State.ParseVertex(vtxBytes)
+	if err != nil {
+		t.Config.Context.Log.Warn("ParseVertex failed due to %s for block:\n%s",
+			err,
+			formatting.DumpBytes{Bytes: vtxBytes})
+		return
+	}
+	t.insertFrom(vdr, vtx)
+
+	t.PullQuery(vdr, requestID, vtx.ID())
 }
 
 // Chits implements the Engine interface
@@ -220,8 +234,16 @@ func (t *Transitive) Notify(msg common.Message) {
 }
 
 func (t *Transitive) repoll() {
+	if len(t.polls.m) >= t.Params.ConcurrentRepolls {
+		return
+	}
+
 	txs := t.Config.VM.PendingTxs()
 	t.batch(txs, false /*=force*/, true /*=empty*/)
+
+	for i := len(t.polls.m); i < t.Params.ConcurrentRepolls; i++ {
+		t.batch(nil, false /*=force*/, true /*=empty*/)
+	}
 }
 
 func (t *Transitive) reinsertFrom(vdr ids.ShortID, vtxID ids.ID) bool {
@@ -266,7 +288,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) {
 	vtxID := vtx.ID()
 
 	t.pending.Add(vtxID)
-	t.vtxReqs.Remove(vtxID)
+	t.vtxReqs.RemoveAny(vtxID)
 
 	i := &issuer{
 		t:   t,
@@ -395,10 +417,10 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 		return
 	}
 
-	t.vtxReqs.Add(vtxID)
+	t.RequestID++
+
+	t.vtxReqs.Add(vdr, t.RequestID, vtxID)
+	t.Config.Sender.Get(vdr, t.RequestID, vtxID)
 
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len())) // Tracks performance statistics
-
-	t.RequestID++
-	t.Config.Sender.Get(vdr, t.RequestID, vtxID)
 }
