@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+GECKO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
+
 export CORETH_VER="v0.1.0"     # Must match coreth version in go.mod
 export CORETH_PATH=$GOPATH/pkg/mod/github.com/ava-labs/coreth@$CORETH_VER
 
