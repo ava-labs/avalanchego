@@ -26,6 +26,8 @@ github.com/ava-labs/salticidae-go v0.1.0 h1:vAVxmVyRy5S9N5oPsorILAsJRjmsxAiN1f+d
 github.com/ava-labs/salticidae-go v0.1.0/go.mod h1:a70WWp46xvgc7wSCMEEFb2tv+btfOKD8jf+nrgY/q3U=
 github.com/ava-labs/salticidae-go v0.1.1 h1:6TYHzIJSAw9ZPQGlepEfk1U9GQFK6m78CB+Vj3mUK18=
 github.com/ava-labs/salticidae-go v0.1.1/go.mod h1:6+2wTzr6zDHRUpLT82bcee/nErQpfo7wyJgOYAF/XI8=
+github.com/ava-labs/salticidae-go v0.1.2 h1:JdQhAXMC2QILyHsDIRizPWqpHRCDpjty6a3x+MKtiT8=
+github.com/ava-labs/salticidae-go v0.1.2/go.mod h1:6+2wTzr6zDHRUpLT82bcee/nErQpfo7wyJgOYAF/XI8=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
