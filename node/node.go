@@ -479,18 +479,19 @@ func (n *Node) initAPIServer() {
 
 	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPPort)
 
-	if n.Config.EnableHTTPS {
-		n.Log.Debug("Initializing API server with TLS Enabled")
-		go n.Log.RecoverAndPanic(func() {
-			if err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile); err != nil {
-				n.Log.Warn("API server initialization failed with %s, attempting to create insecure API server", err)
-				n.APIServer.Dispatch()
-			}
-		})
-	} else {
-		n.Log.Debug("Initializing API server with TLS Disabled")
-		go n.Log.RecoverAndPanic(func() { n.APIServer.Dispatch() })
-	}
+	go n.Log.RecoverAndPanic(func() {
+		if n.Config.EnableHTTPS {
+			n.Log.Debug("Initializing API server with TLS Enabled")
+			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
+		}
+
+		n.Log.Debug("Initializing API server")
+		err := n.APIServer.Dispatch()
+
+		n.Log.Fatal("API server initialization failed with %s", err)
+		n.TCall.AsyncCall(salticidae.ThreadCallCallback(C.onTerm), nil)
+	})
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
@@ -623,15 +624,16 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	// initialize shared memory
 	n.initSharedMemory()
 
+	if err = n.initNetlib(); err != nil { // Set up all networking
+		return fmt.Errorf("problem initializing networking: %w", err)
+	}
+
 	// Start HTTP APIs
 	n.initAPIServer()   // Start the API Server
 	n.initKeystoreAPI() // Start the Keystore API
 	n.initMetricsAPI()  // Start the Metrics API
 
 	// Start node-to-node consensus server
-	if err = n.initNetlib(); err != nil { // Set up all networking
-		return fmt.Errorf("problem initializing networking: %w", err)
-	}
 	if err := n.initValidatorNet(); err != nil { // Set up the validator handshake + authentication
 		return fmt.Errorf("problem initializing validator network: %w", err)
 	}

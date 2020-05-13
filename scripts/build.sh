@@ -1,4 +1,8 @@
-#!/bin/bash -e
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
 
 # Fetch Gecko dependencies, including salticidae-go and coreth
 echo "Fetching dependencies..."

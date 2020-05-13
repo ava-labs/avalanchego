@@ -1,4 +1,9 @@
-#!/bin/bash -e
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 export GOPATH="$SRC_DIR/.build_image_gopath"
 WORKPREFIX="$GOPATH/src/github.com/ava-labs/"
