@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/salticidae-go"
 
+	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -22,6 +23,8 @@ var (
 type Codec struct{}
 
 // Pack attempts to pack a map of fields into a message.
+//
+// If a nil error is returned, the message's datastream must be freed manually
 func (Codec) Pack(op salticidae.Opcode, fields map[Field]interface{}) (Msg, error) {
 	message, ok := Messages[op]
 	if !ok {
@@ -49,20 +52,18 @@ func (Codec) Pack(op salticidae.Opcode, fields map[Field]interface{}) (Msg, erro
 }
 
 // Parse attempts to convert a byte stream into a message.
+//
+// The datastream is not freed.
 func (Codec) Parse(op salticidae.Opcode, ds salticidae.DataStream) (Msg, error) {
 	message, ok := Messages[op]
 	if !ok {
 		return nil, errBadOp
 	}
 
-	// TODO: make this work without copy
 	size := ds.Size()
-	p := wrappers.Packer{Bytes: make([]byte, size)}
-
 	byteHandle := ds.GetDataInPlace(size)
-	defer byteHandle.Release()
-
-	copy(p.Bytes, byteHandle.Get())
+	p := wrappers.Packer{Bytes: utils.CopyBytes(byteHandle.Get())}
+	byteHandle.Release()
 
 	fields := make(map[Field]interface{}, len(message))
 	for _, field := range message {

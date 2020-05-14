@@ -257,11 +257,12 @@ func toID(peer salticidae.PeerID) [32]byte {
 
 	size := ds.Size()
 	dsb := ds.GetDataInPlace(size)
-	idBytes := dsb.Get()
 
+	idBytes := dsb.Get()
 	id := [32]byte{}
 	copy(id[:], idBytes)
 
+	dsb.Release()
 	ds.Free()
 	return id
 }
