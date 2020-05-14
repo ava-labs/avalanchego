@@ -204,6 +204,8 @@ func (nm *Handshake) Initialize(
 }
 
 // ConnectTo add the peer as a connection and connects to them.
+//
+// assumes the peerID and addr are autofreed
 func (nm *Handshake) ConnectTo(peer salticidae.PeerID, stakerID ids.ShortID, addr salticidae.NetAddr) {
 	if nm.pending.ContainsPeerID(peer) || nm.connections.ContainsPeerID(peer) {
 		return
@@ -230,7 +232,9 @@ func (nm *Handshake) ConnectTo(peer salticidae.PeerID, stakerID ids.ShortID, add
 	})
 }
 
-// Connect ...
+// Connect attempts to start a connection with this provided address
+//
+// assumes addr is autofreed.
 func (nm *Handshake) Connect(addr salticidae.NetAddr) {
 	ip := toIPDesc(addr)
 	ipStr := ip.String()
@@ -441,7 +445,7 @@ func connHandler(_conn *C.struct_msgnetwork_conn_t, connected C.bool, _ unsafe.P
 	defer HandshakeNet.requestedLock.Unlock()
 
 	conn := salticidae.MsgNetworkConnFromC(salticidae.CMsgNetworkConn(_conn))
-	addr := conn.GetAddr()
+	addr := conn.GetAddr().Copy(true)
 	ip := toIPDesc(addr)
 	ipStr := ip.String()
 
@@ -461,6 +465,7 @@ func connHandler(_conn *C.struct_msgnetwork_conn_t, connected C.bool, _ unsafe.P
 	return true
 }
 
+// assumes peer is autofreed
 func (nm *Handshake) connectedToPeer(conn *C.struct_peernetwork_conn_t, peer salticidae.PeerID) {
 	peerBytes := toID(peer)
 	peerID := ids.NewID(peerBytes)
@@ -490,6 +495,7 @@ func (nm *Handshake) connectedToPeer(conn *C.struct_peernetwork_conn_t, peer sal
 	(*handler)()
 }
 
+// assumes peer is autofreed
 func (nm *Handshake) disconnectedFromPeer(peer salticidae.PeerID) {
 	cert := ids.ShortID{}
 	if pendingCert, exists := nm.pending.GetID(peer); exists {
