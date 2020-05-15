@@ -1,7 +1,9 @@
-os:
-  - linux
-  - osx
 language: go
+jobs:
+  include:
+    - os: linux
+      dist: bionic
+    - os: osx
 services:
 - docker
 env:
