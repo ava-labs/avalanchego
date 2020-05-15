@@ -1,9 +1,13 @@
 language: go
+go:
+  - 1.13.x
+
 jobs:
   include:
     #- os: linux
     #  dist: bionic
     - os: osx
+      osx_image: xcode11.4
 services:
 - docker
 env:
@@ -18,10 +22,13 @@ before_install:
  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then .ci/before_install_osx.sh; fi
  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/before_install_linux.sh; fi
 
-install: DOCKER_BUILDKIT=1 docker build --progress plain -t $DOCKERHUB_REPO:$COMMIT .
+install: 
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then DOCKER_BUILDKIT=1 docker build --progress plain -t $DOCKERHUB_REPO:$COMMIT; fi
+
 script: 
-  - docker run --rm -v "$PWD:$GECKO_HOME" $DOCKERHUB_REPO:$COMMIT bash "$GECKO_HOME/scripts/build_test.sh"
-  - docker run --rm -v "$PWD:$GECKO_HOME" $DOCKERHUB_REPO:$COMMIT bash "$GECKO_HOME/scripts/build.sh"
+ - if [ "$TRAVIS_OS_NAME" = "osx" ]; then .ci/runscript_osx.sh; fi
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/runscript_linux.sh; fi
+
 #Need to push to docker hub only from one build
 after_success: 
  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/after_success.sh; fi
