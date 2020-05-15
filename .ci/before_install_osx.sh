@@ -4,6 +4,10 @@ set -ev
 
 brew update
 brew install docker
+brew install docker-machine
+brew cask install virtualbox
+docker-machine create --driver virtualbox default
+docker-machine start default
 # hack to address problem with using DOCKER_BUILDKIT=1, inspired by:
 # * https://github.com/rootless-containers/usernetes/blob/master/.travis.yml
 #
