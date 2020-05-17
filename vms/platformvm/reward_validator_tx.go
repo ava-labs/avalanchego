@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/math"
 )
 
@@ -39,6 +40,8 @@ func (tx *rewardValidatorTx) initialize(vm *VM) error {
 	tx.vm = vm
 	return nil
 }
+
+func (tx *rewardValidatorTx) ID() ids.ID { return tx.TxID }
 
 // SyntacticVerify that this transaction is well formed
 func (tx *rewardValidatorTx) SyntacticVerify() error {
@@ -241,6 +244,22 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	}
 
 	return onCommitDB, onAbortDB, updateValidators, updateValidators, nil
+}
+
+func (tx *rewardValidatorTx) Accept() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+                return err
+        }
+        tx.vm.DB.Commit()
+        return nil
+}
+
+func (tx *rewardValidatorTx) Reject() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+                return err
+        }
+        tx.vm.DB.Commit()
+        return nil
 }
 
 // InitiallyPrefersCommit returns true.

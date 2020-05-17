@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
@@ -47,9 +48,12 @@ type ExportTx struct {
 func (tx *ExportTx) initialize(vm *VM) error {
 	tx.vm = vm
 	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
+	if err != nil {
+		return err
+	}
 	tx.bytes = txBytes
 	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
-	return err
+	return nil
 }
 
 // ID of this transaction
@@ -140,6 +144,11 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 func (tx *ExportTx) Accept(batch database.Batch) error {
 	txID := tx.ID()
 
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+		return err
+	}
+	tx.vm.DB.Commit()
+
 	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
 	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
 
@@ -166,6 +175,15 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 	}
 
 	return atomic.WriteAll(batch, sharedBatch)
+}
+
+func (tx *ExportTx) Reject() error {
+
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+		return err
+	}
+	tx.vm.DB.Commit()
+	return nil
 }
 
 func (vm *VM) newExportTx(nonce uint64, networkID uint32, outs []*ava.TransferableOutput, from *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {

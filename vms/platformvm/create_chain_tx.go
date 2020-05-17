@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -67,9 +68,12 @@ type CreateChainTx struct {
 func (tx *CreateChainTx) initialize(vm *VM) error {
 	tx.vm = vm
 	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
+	if err != nil {
+		return err
+	}
 	tx.bytes = txBytes
 	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
-	return err
+	return nil
 }
 
 // ID of this transaction
@@ -202,6 +206,22 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	}
 
 	return onAccept, nil
+}
+
+func (tx *CreateChainTx) Accept() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+                return err
+	}
+        tx.vm.DB.Commit()
+        return nil
+}
+
+func (tx *CreateChainTx) Reject() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+                return err
+        }
+        tx.vm.DB.Commit()
+        return nil
 }
 
 // We use this type so we can serialize a list of *CreateChainTx

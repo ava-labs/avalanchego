@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -164,6 +165,22 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 	tx.bytes = txBytes
 	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
 	return nil
+}
+
+func (tx *CreateSubnetTx) Accept() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+                return err
+        }
+        tx.vm.DB.Commit()
+        return nil
+}
+
+func (tx *CreateSubnetTx) Reject() error {
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+                return err
+	}
+        tx.vm.DB.Commit()
+        return nil
 }
 
 // [controlKeys] must be unique. They will be sorted by this method.

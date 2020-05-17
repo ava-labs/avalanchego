@@ -7,19 +7,26 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
 
 // DecisionTx is an operation that can be decided without being proposed
 type DecisionTx interface {
-	ID() ids.ID
-
 	initialize(vm *VM) error
+
+	ID() ids.ID
 
 	// Attempt to verify this transaction with the provided state. The provided
 	// database can be modified arbitrarily. If a nil error is returned, it is
-	// assumped onAccept is non-nil.
+	// assumed onAccept is non-nil.
 	SemanticVerify(database.Database) (onAccept func(), err error)
+
+	SyntacticVerify() error
+
+	Accept() error
+
+	Reject() error
 }
 
 // StandardBlock being accepted results in the transactions contained in the
@@ -38,6 +45,24 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 	for _, tx := range sb.Txs {
 		if err := tx.initialize(vm); err != nil {
 			return err
+		}
+
+		if err := tx.SyntacticVerify(); err != nil {
+			return err
+		}
+
+		status, err := vm.getTxStatus(vm.DB, tx.ID())
+		if err != nil {
+			return err
+		}
+
+		if status == choices.Unknown {
+			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+				return err
+			}
+			if err := vm.DB.Commit(); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -84,6 +109,30 @@ func (sb *StandardBlock) Verify() error {
 	sb.vm.currentBlocks[sb.ID().Key()] = sb
 	sb.parentBlock().addChild(sb)
 	return nil
+}
+
+func (sb *StandardBlock) Accept() {
+	sb.vm.Ctx.Log.Verbo("Accepting block with ID %s", sb.ID())
+
+	sb.CommonBlock.Accept()
+
+	for _, tx := range sb.Txs {
+		if err := tx.Accept(); err != nil {
+			sb.vm.Ctx.Log.Error("unable to accept tx")
+		}
+	}
+}
+
+func (sb *StandardBlock) Reject() {
+	sb.vm.Ctx.Log.Verbo("Rejecting block with ID %s", sb.ID())
+
+	sb.CommonBlock.Reject()
+
+	for _, tx := range sb.Txs {
+		if err := tx.Reject(); err != nil {
+			sb.vm.Ctx.Log.Error("unable to reject tx")
+		}
+	}
 }
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a

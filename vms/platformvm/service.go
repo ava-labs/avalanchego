@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -37,6 +38,7 @@ var (
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
 	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
 	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
+	errNilTxID               = errors.New("nil transaction ID")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -1393,5 +1395,33 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			VMID:     chain.VMID,
 		})
 	}
+	return nil
+}
+
+// GetTxStatusArgs are arguments for passing into GetTxStatus requests
+type GetTxStatusArgs struct {
+       TxID ids.ID `json:"txID"`
+}
+
+// GetTxStatusReply defines the GetTxStatus replies returned from the API
+type GetTxStatusReply struct {
+       Status choices.Status `json:"status"`
+}
+
+// GetTxStatus returns the status of the specified transaction
+func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, reply *GetTxStatusReply) error {
+	service.vm.Ctx.Log.Verbo("GetTxStatus called with %s", args.TxID)
+
+	if args.TxID.IsZero() {
+		return errNilTxID
+	}
+
+	status, err := service.vm.getTxStatus(service.vm.DB, args.TxID) 
+	if err != nil {
+		return err
+	}
+
+	reply.Status = status
+
 	return nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -293,6 +294,22 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	onAbortDB := versiondb.New(db)
 
 	return onCommitDB, onAbortDB, nil, nil, nil
+}
+
+func (tx *addNonDefaultSubnetValidatorTx) Accept() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+                return err
+       }
+        tx.vm.DB.Commit()
+        return nil
+}
+
+func (tx *addNonDefaultSubnetValidatorTx) Reject() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+               return err
+        }
+        tx.vm.DB.Commit()
+        return nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is

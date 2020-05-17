@@ -15,9 +15,19 @@ import (
 // ProposalTx is an operation that can be proposed
 type ProposalTx interface {
 	initialize(vm *VM) error
+
+	ID() ids.ID
+
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(database.Database) (onCommitDB *versiondb.Database, onAbortDB *versiondb.Database, onCommitFunc func(), onAbortFunc func(), err error)
+
+	SyntacticVerify() error
+
 	InitiallyPrefersCommit() bool
+
+	Accept() error
+
+	Reject() error
 }
 
 // ProposalBlock is a proposal to change the chain's state.
@@ -54,7 +64,29 @@ func (pb *ProposalBlock) Accept() {
 func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 	pb.vm = vm
 	pb.Block.Initialize(bytes, vm.SnowmanVM)
-	return pb.Tx.initialize(vm)
+
+	if err := pb.Tx.initialize(vm); err != nil {
+		return err
+	}
+
+        if err := pb.Tx.SyntacticVerify(); err != nil {
+                return err
+        }
+
+	status, err := vm.getTxStatus(vm.DB, pb.Tx.ID())
+	if err != nil {
+		return err
+	}
+	if status == choices.Unknown {
+		if err := vm.putTxStatus(vm.DB, pb.Tx.ID(), choices.Processing); err != nil {
+			return err
+		}
+		if err := vm.DB.Commit(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // setBaseDatabase sets this block's base database to [db]
@@ -133,6 +165,26 @@ func (pb *ProposalBlock) Options() [2]snowman.Block {
 		return [2]snowman.Block{commit, abort}
 	}
 	return [2]snowman.Block{abort, commit}
+}
+
+func (pb *ProposalBlock) Accept() {
+	pb.vm.Ctx.Log.Verbo("Accepting block with ID %s", pb.ID())
+
+        pb.CommonBlock.Accept()
+	
+	if err := pb.Tx.Accept(); err != nil {
+		pb.vm.Ctx.Log.Error("unable to accept tx")
+	}
+}
+
+func (pb *ProposalBlock) Reject() {
+        pb.vm.Ctx.Log.Verbo("Rejecting block with ID %s", pb.ID())
+
+        pb.CommonBlock.Reject()
+
+	if err := pb.Tx.Reject(); err != nil {
+		pb.vm.Ctx.Log.Error("unable to reject tx")
+	}
 }
 
 // newProposalBlock creates a new block that proposes to issue a transaction.

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 )
 
@@ -24,6 +25,7 @@ var (
 const (
 	currentValidatorsPrefix uint64 = iota
 	pendingValidatorsPrefix
+	txIDPrefix
 )
 
 // get the validators currently validating the specified subnet
@@ -301,6 +303,50 @@ func (vm *VM) registerDBTypes() {
 	if err := vm.State.RegisterType(subnetsTypeID, unmarshalSubnetsFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
+
+	unmarshalStatusFunc := func(bytes []byte) (interface{}, error) {
+		var status choices.Status
+		if err := Codec.Unmarshal(bytes, &status); err != nil {
+			return nil, err
+		}
+		return status, nil
+	}
+	if err := vm.State.RegisterType(statusTypeID, unmarshalStatusFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
+	}
+}
+
+func (vm *VM) getTxStatus(db database.Database, txID ids.ID) (choices.Status, error) {
+
+	key := txID.Prefix(txIDPrefix)
+	exists, err := vm.State.Has(db, statusTypeID, key)
+	if err != nil {
+		return choices.Unknown, err
+	}
+	if !exists { // tx doesn't exist so return choices.Unknown
+		return choices.Unknown, nil
+	}
+
+	statusInterface, err := vm.State.Get(db, statusTypeID, key)
+	if err != nil {
+		return choices.Unknown, err
+	}
+
+	status, ok := statusInterface.(choices.Status)
+	if !ok {
+		vm.Ctx.Log.Warn("expected to retrieve choices.status from database but got different type")
+		return choices.Unknown, errDBAccount
+	}
+
+	return status, nil
+}
+
+func (vm *VM) putTxStatus(db database.Database, txID ids.ID, status choices.Status) error {
+	err := vm.State.Put(db, statusTypeID, txID.Prefix(txIDPrefix), status)
+	if err != nil {
+		return errDBPutTxStatus
+	}
+	return nil
 }
 
 // Unmarshal a Block from bytes and initialize it

@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/hashing"
 )
 
 // advanceTimeTx is a transaction to increase the chain's timestamp.
@@ -24,12 +26,24 @@ type advanceTimeTx struct {
 	Time uint64 `serialize:"true"`
 
 	vm *VM
+	id ids.ID
+        bytes []byte
 }
 
 func (tx *advanceTimeTx) initialize(vm *VM) error {
 	tx.vm = vm
+
+        bytes, err := Codec.Marshal(tx) // byte representation of the signed transaction                                                                                                                           
+	if err != nil {
+                return err
+        }
+        tx.bytes = bytes
+        tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
+
 	return nil
 }
+
+func (tx *advanceTimeTx) ID() ids.ID { return tx.id }
 
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *advanceTimeTx) Timestamp() time.Time { return time.Unix(int64(tx.Time), 0) }
@@ -165,6 +179,22 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 	onAbortDB := versiondb.New(db) // state doesn't change
 
 	return onCommitDB, onAbortDB, onCommitFunc, nil, nil
+}
+
+func (tx *advanceTimeTx) Accept() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+                return err
+        }
+        tx.vm.DB.Commit()
+        return nil
+}
+
+func (tx *advanceTimeTx) Reject() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+                return err
+        }
+        tx.vm.DB.Commit()
+        return nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed time isn't after the

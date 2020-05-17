@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -47,9 +48,12 @@ type addDefaultSubnetDelegatorTx struct {
 func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 	tx.vm = vm
 	bytes, err := Codec.Marshal(tx) // byte representation of the signed transaction
+	if err != nil {
+		return err
+	}
 	tx.bytes = bytes
 	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
-	return err
+	return nil
 }
 
 func (tx *addDefaultSubnetDelegatorTx) ID() ids.ID { return tx.id }
@@ -178,6 +182,22 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	onAbortDB := versiondb.New(db)
 
 	return onCommitDB, onAbortDB, nil, nil, nil
+}
+
+func (tx *addDefaultSubnetDelegatorTx) Accept() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+                return err
+       }
+        tx.vm.DB.Commit()
+        return nil
+}
+
+func (tx *addDefaultSubnetDelegatorTx) Reject() error {
+        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+               return err
+        }
+        tx.vm.DB.Commit()
+        return nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is

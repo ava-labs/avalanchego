@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
@@ -38,6 +39,7 @@ const (
 	chainsTypeID
 	blockTypeID
 	subnetsTypeID
+	statusTypeID
 
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
@@ -95,6 +97,7 @@ var (
 	errDBChains                 = errors.New("couldn't retrieve chain list from database")
 	errDBPutChains              = errors.New("couldn't put chain list in database")
 	errDBPutBlock               = errors.New("couldn't put block in database")
+	errDBPutTxStatus            = errors.New("couldn't put tx status in database")
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -245,6 +248,12 @@ func (vm *VM) Initialize(
 			return errDBPutCurrentValidators
 		}
 
+		for _, tx := range genesis.Validators.Txs {
+			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Accepted); err != nil {
+				return err
+			}
+		}
+
 		// Persist the subnets that exist at genesis (none do)
 		if err := vm.putSubnets(vm.DB, []*CreateSubnetTx{}); err != nil {
 			return fmt.Errorf("error putting genesis subnets: %v", err)
@@ -259,6 +268,10 @@ func (vm *VM) Initialize(
 			} else {
 				vm.Ctx.Log.Warn("chain has networkID %d, expected %d", chain.NetworkID, vm.Ctx.NetworkID)
 			}
+		}
+
+		if err := vm.putTxStatus(vm.DB, chain.ID(), choices.Accepted); err != nil {
+			return err
 		}
 
 		// Persist the chains that exist at genesis
@@ -440,6 +453,11 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
+		for _, tx := range txs {
+			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+				return nil, err
+			}
+		}
 		return blk, vm.DB.Commit()
 	}
 
@@ -456,6 +474,9 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+			return nil, err
+		}
+		if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
 			return nil, err
 		}
 		return blk, vm.DB.Commit()
@@ -506,6 +527,9 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
+		if err := vm.putTxStatus(vm.DB, stakerTx.ID(), choices.Processing); err != nil {
+			return nil, err
+		}
 		return blk, vm.DB.Commit()
 	}
 
@@ -532,6 +556,9 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
+		if err := vm.putTxStatus(vm.DB, advanceTimeTx.id, choices.Processing); err != nil {
+			return nil, err
+		}
 		return blk, vm.DB.Commit()
 	}
 
@@ -546,6 +573,9 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 				return nil, err
 			}
 			if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+				return nil, err
+			}
+			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
 				return nil, err
 			}
 			return blk, vm.DB.Commit()

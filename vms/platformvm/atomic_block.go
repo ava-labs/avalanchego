@@ -30,7 +30,11 @@ type AtomicTx interface {
 	// database can be modified arbitrarily.
 	SemanticVerify(database.Database) error
 
+	SyntacticVerify() error
+
 	Accept(database.Batch) error
+
+	Reject() error
 }
 
 // AtomicBlock being accepted results in the transaction contained in the
@@ -48,7 +52,25 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 	if err := ab.SingleDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
-	return ab.Tx.initialize(vm)
+
+	if err := ab.Tx.initialize(vm); err != nil {
+		return err
+	}
+
+	if err := ab.Tx.SyntacticVerify(); err != nil {
+                return err
+        }
+
+        status, _ := vm.getTxStatus(vm.DB, ab.Tx.ID()) 
+        if status == choices.Unknown {
+               if err := vm.putTxStatus(vm.DB, ab.Tx.ID(), choices.Processing); err != nil {
+                        return err
+               }
+                if err := vm.DB.Commit(); err != nil {
+                        return err
+                }
+        }
+	return nil
 }
 
 // Reject implements the snowman.Block interface
@@ -127,6 +149,16 @@ func (ab *AtomicBlock) Accept() {
 	// remove this block and its parent from memory
 	parent.free()
 	ab.free()
+}
+
+func (ab *AtomicBlock) Reject() {
+	ab.vm.Ctx.Log.Verbo("Rejecting block with ID %s", ab.ID())
+
+	ab.CommonBlock.Reject()
+
+	if err := ab.Tx.Reject(); err != nil {
+		ab.vm.Ctx.Log.Error("unable to reject tx")
+	}
 }
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
