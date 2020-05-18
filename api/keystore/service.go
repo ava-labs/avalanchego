@@ -266,8 +266,12 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 
 	ks.log.Verbo("ImportUser called for %s", args.Username)
 
-	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
+	usr, err := ks.getUser(args.Username)
+	switch {
+	case err == nil || usr != nil:
 		return fmt.Errorf("user already exists: %s", args.Username)
+	case !usr.CheckPassword(args.Password):
+		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
 	userData := UserDB{}
