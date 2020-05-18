@@ -310,6 +310,8 @@ func (p *peer) version(msg Msg) {
 		}
 	}
 
+	p.SendPeerList()
+
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
@@ -320,7 +322,7 @@ func (p *peer) version(msg Msg) {
 	p.connected = true
 	p.net.connected(p)
 }
-func (p *peer) getPeerList(_ Msg) {
+func (p *peer) SendPeerList() {
 	ips := p.net.validatorIPs()
 	reply, err := p.b.PeerList(ips)
 	if err != nil {
@@ -329,6 +331,7 @@ func (p *peer) getPeerList(_ Msg) {
 	}
 	p.Send(reply)
 }
+func (p *peer) getPeerList(_ Msg) { p.SendPeerList() }
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
