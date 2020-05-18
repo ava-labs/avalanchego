@@ -266,17 +266,16 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 
 	ks.log.Verbo("ImportUser called for %s", args.Username)
 
-	usr, err := ks.getUser(args.Username)
-	switch {
-	case err == nil || usr != nil:
+	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
 		return fmt.Errorf("user already exists: %s", args.Username)
-	case !usr.CheckPassword(args.Password):
-		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
 	userData := UserDB{}
 	if err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
 		return err
+	}
+	if !userData.User.CheckPassword(args.Password) {
+		return fmt.Errorf("incorrect password for %s", args.Username)
 	}
 
 	usrBytes, err := ks.codec.Marshal(&userData.User)
