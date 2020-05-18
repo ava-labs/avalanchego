@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package networking
+package network
 
 import (
 	"github.com/ava-labs/gecko/ids"

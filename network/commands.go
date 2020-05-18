@@ -1,11 +1,9 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package networking
+package network
 
 import (
-	"github.com/ava-labs/salticidae-go"
-
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -138,7 +136,7 @@ func (f Field) String() string {
 // Public commands that may be sent between stakers
 const (
 	// Handshake:
-	GetVersion salticidae.Opcode = iota
+	GetVersion uint8 = iota
 	Version
 	GetPeerList
 	PeerList
@@ -165,7 +163,7 @@ const (
 
 // Defines the messages that can be sent/received with this network
 var (
-	Messages = map[salticidae.Opcode][]Field{
+	Messages = map[uint8][]Field{
 		// Handshake:
 		GetVersion:  []Field{},
 		Version:     []Field{NetworkID, MyTime, IP, VersionStr},

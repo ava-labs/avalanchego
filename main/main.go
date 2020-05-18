@@ -78,12 +78,6 @@ func main() {
 		return
 	}
 
-	log.Debug("Starting servers")
-	if err := node.MainNode.StartConsensusServer(); err != nil {
-		log.Fatal("problem starting servers: %s", err)
-		return
-	}
-
 	defer node.MainNode.Shutdown()
 
 	log.Debug("Dispatching node handlers")

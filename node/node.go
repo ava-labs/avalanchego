@@ -3,23 +3,16 @@
 
 package node
 
-// #include "salticidae/network.h"
-// void onTerm(threadcall_handle_t *, void *);
-// void errorHandler(SalticidaeCError *, bool, int32_t, void *);
-import "C"
-
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"sync"
-	"unsafe"
-
-	"github.com/ava-labs/salticidae-go"
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
@@ -32,14 +25,14 @@ import (
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/networking"
-	"github.com/ava-labs/gecko/networking/xputtest"
+	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/version"
 	"github.com/ava-labs/gecko/vms"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/nftfx"
@@ -52,12 +45,16 @@ import (
 	"github.com/ava-labs/gecko/vms/timestampvm"
 )
 
+// Networking constants
 const (
-	maxMessageSize = 1 << 25 // maximum size of a message sent with salticidae
+	TCP = "tcp"
 )
 
 var (
 	genesisHashKey = []byte("genesisID")
+
+	nodeVersion   = version.NewDefaultVersion("ava", 0, 1, 0)
+	versionParser = version.NewDefaultParser()
 )
 
 // MainNode is the reference for node callbacks
@@ -92,29 +89,11 @@ type Node struct {
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
 
-	// Event loop manager
-	EC salticidae.EventContext
-
-	// Caller to the event context
-	TCall salticidae.ThreadCall
-
-	// Network that manages validator peers
-	PeerNet salticidae.PeerNetwork
-	// Network that manages clients
-	ClientNet salticidae.MsgNetwork // TODO: Remove
-
-	// API that handles new connections
-	ValidatorAPI *networking.Handshake
-	// API that handles voting messages
-	ConsensusAPI *networking.Voting
+	// Net runs the networking stack
+	Net network.Network
 
 	// current validators of the network
 	vdrs validators.Manager
-
-	// APIs that handle client messages
-	// TODO: Remove
-	Issuer     *xputtest.Issuer
-	CClientAPI *xputtest.CClient
 
 	// Handles HTTP API calls
 	APIServer api.Server
@@ -132,71 +111,37 @@ type Node struct {
  ******************************************************************************
  */
 
-//export onTerm
-func onTerm(*C.threadcall_handle_t, unsafe.Pointer) {
-	MainNode.Log.Debug("Terminate signal received")
-	MainNode.EC.Stop()
-}
-
-//export errorHandler
-func errorHandler(_err *C.struct_SalticidaeCError, fatal C.bool, asyncID C.int32_t, _ unsafe.Pointer) {
-	err := (*salticidae.Error)(unsafe.Pointer(_err))
-	if fatal {
-		MainNode.Log.Fatal("Error during async call: %s", salticidae.StrError(err.GetCode()))
-		MainNode.EC.Stop()
-		return
+func (n *Node) initNetworking() error {
+	listener, err := net.Listen(TCP, n.Config.StakingIP.PortString())
+	if err != nil {
+		return err
 	}
-	MainNode.Log.Debug("Error during async with ID %d call: %s", asyncID, salticidae.StrError(err.GetCode()))
-}
+	dialer := network.NewDialer(TCP)
 
-func (n *Node) initNetlib() error {
-	// Create main event context
-	n.EC = salticidae.NewEventContext()
-	n.TCall = salticidae.NewThreadCall(n.EC)
-
-	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		n.TCall.AsyncCall(salticidae.ThreadCallCallback(C.onTerm), nil)
-	}, os.Interrupt, os.Kill)
-
-	// Create peer network config, may have tls enabled
-	peerConfig := salticidae.NewPeerNetworkConfig()
-	peerConfig.ConnTimeout(60)
-
-	msgConfig := peerConfig.AsMsgNetworkConfig()
-	msgConfig.MaxMsgSize(maxMessageSize)
-
+	var serverUpgrader, clientUpgrader network.Upgrader
 	if n.Config.EnableStaking {
-		msgConfig.EnableTLS(true)
-		msgConfig.TLSKeyFile(n.Config.StakingKeyFile)
-		msgConfig.TLSCertFile(n.Config.StakingCertFile)
-	}
-
-	// Create the peer network
-	err := salticidae.NewError()
-	n.PeerNet = salticidae.NewPeerNetwork(n.EC, peerConfig, &err)
-	if code := err.GetCode(); code != 0 {
-		return errors.New(salticidae.StrError(code))
-	}
-	// Add peer network error handling
-	net := n.PeerNet.AsMsgNetwork()
-	net.RegErrorHandler(salticidae.MsgNetworkErrorCallback(C.errorHandler), nil)
-
-	if n.Config.ThroughputServerEnabled {
-		// Create the client network
-		msgConfig := salticidae.NewMsgNetworkConfig()
-		msgConfig.MaxMsgSize(maxMessageSize)
-		n.ClientNet = salticidae.NewMsgNetwork(n.EC, msgConfig, &err)
-		if code := err.GetCode(); code != 0 {
-			return errors.New(salticidae.StrError(code))
+		// TODO: this TLS config will never accept a connection because the cert pool is empty.
+		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
+		if err != nil {
+			return err
 		}
-		// Add client network error handling
-		n.ClientNet.RegErrorHandler(salticidae.MsgNetworkErrorCallback(C.errorHandler), nil)
+
+		certPool := x509.NewCertPool()
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      certPool,
+			ServerName:   "ava",
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			ClientCAs:    certPool,
+		}
+
+		serverUpgrader = network.NewTLSServerUpgrader(tlsConfig)
+		clientUpgrader = network.NewTLSClientUpgrader(tlsConfig)
+	} else {
+		serverUpgrader = network.NewIPUpgrader()
+		clientUpgrader = network.NewIPUpgrader()
 	}
 
-	return nil
-}
-
-func (n *Node) initValidatorNet() error {
 	// Initialize validator manager and default subnet's validator set
 	defaultSubnetValidators := validators.NewSet()
 	if !n.Config.EnableStaking {
@@ -205,103 +150,62 @@ func (n *Node) initValidatorNet() error {
 	n.vdrs = validators.NewManager()
 	n.vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 
-	cErr := salticidae.NewError()
-	serverIP := salticidae.NewNetAddrFromIPPortString(n.Config.StakingIP.String(), true, &cErr)
-	if code := cErr.GetCode(); code != 0 {
-		return errors.New(salticidae.StrError(code))
+	n.Net = network.NewDefaultNetwork(
+		n.Log,
+		n.ID,
+		n.Config.StakingIP,
+		n.Config.NetworkID,
+		nodeVersion,
+		versionParser,
+		listener,
+		dialer,
+		serverUpgrader,
+		clientUpgrader,
+		defaultSubnetValidators,
+		n.Config.ConsensusRouter,
+	)
+
+	if !n.Config.EnableStaking {
+		n.Net.RegisterHandler(&insecureValidatorManager{
+			vdrs: defaultSubnetValidators,
+		})
 	}
 
-	n.ValidatorAPI = &networking.HandshakeNet
-	n.ValidatorAPI.Initialize(
-		/*log=*/ n.Log,
-		/*validators=*/ defaultSubnetValidators,
-		/*myIP=*/ serverIP,
-		/*myID=*/ n.ID,
-		/*network=*/ n.PeerNet,
-		/*metrics=*/ n.Config.ConsensusParams.Metrics,
-		/*enableStaking=*/ n.Config.EnableStaking,
-		/*networkID=*/ n.Config.NetworkID,
-	)
+	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
+		n.Net.Close()
+	}, os.Interrupt, os.Kill)
 
 	return nil
 }
 
-func (n *Node) initConsensusNet() {
-	vdrs, ok := n.vdrs.GetValidatorSet(platformvm.DefaultSubnetID)
-	n.Log.AssertTrue(ok, "should have initialize the validator set already")
-
-	n.ConsensusAPI = &networking.VotingNet
-	n.ConsensusAPI.Initialize(n.Log, vdrs, n.PeerNet, n.ValidatorAPI.Connections(), n.chainManager.Router(), n.Config.ConsensusParams.Metrics)
-
-	n.Log.AssertNoError(n.ConsensusDispatcher.Register("gossip", n.ConsensusAPI))
+type insecureValidatorManager struct {
+	vdrs validators.Set
 }
 
-func (n *Node) initClients() {
-	n.Issuer = &xputtest.Issuer{}
-	n.Issuer.Initialize(n.Log)
-
-	n.CClientAPI = &xputtest.CClientHandler
-	n.CClientAPI.Initialize(n.ClientNet, n.Issuer)
-
-	n.chainManager.AddRegistrant(n.Issuer)
+func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
+	i.vdrs.Add(validators.NewValidator(vdrID, 1))
+	return false
 }
 
-// StartConsensusServer starts the P2P server this node uses to communicate
-// with other nodes
-func (n *Node) StartConsensusServer() error {
-	n.Log.Verbo("starting the consensus server")
+func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
+	i.vdrs.Remove(vdrID)
+	return false
+}
 
-	n.PeerNet.AsMsgNetwork().Start()
-
-	err := salticidae.NewError()
-
-	// The IP this node listens on for P2P messaging
-	serverIP := salticidae.NewNetAddrFromIPPortString(n.Config.StakingIP.String(), true, &err)
-	if code := err.GetCode(); code != 0 {
-		return fmt.Errorf("failed to create ip addr: %s", salticidae.StrError(code))
-	}
-
-	// Listen for P2P messages
-	n.PeerNet.Listen(serverIP, &err)
-	if code := err.GetCode(); code != 0 {
-		return fmt.Errorf("failed to listen on consensus server at %s: %s", n.Config.StakingIP, salticidae.StrError(code))
-	}
-
-	// Start a server to handle throughput tests if configuration says to. Disabled by default.
-	if n.Config.ThroughputServerEnabled {
-		n.ClientNet.Start()
-
-		clientIP := salticidae.NewNetAddrFromIPPortString(fmt.Sprintf("127.0.0.1:%d", n.Config.ThroughputPort), true, &err)
-		if code := err.GetCode(); code != 0 {
-			return fmt.Errorf("failed to start xput server: %s", salticidae.StrError(code))
-		}
-
-		n.ClientNet.Listen(clientIP, &err)
-		if code := err.GetCode(); code != 0 {
-			return fmt.Errorf("failed to listen on xput server at 127.0.0.1:%d: %s", n.Config.ThroughputPort, salticidae.StrError(code))
-		}
-	}
-
+// Dispatch starts the node's servers.
+// Returns when the node exits.
+func (n *Node) Dispatch() {
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
-			bootstrapAddr := salticidae.NewNetAddrFromIPPortString(peer.IP.String(), true, &err)
-			if code := err.GetCode(); code != 0 {
-				return fmt.Errorf("failed to create bootstrap ip addr: %s", salticidae.StrError(code))
-			}
-
-			n.ValidatorAPI.Connect(bootstrapAddr)
+			n.Net.Track(peer.IP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
 		}
 	}
 
-	return nil
+	n.Net.Dispatch()
 }
-
-// Dispatch starts the node's servers.
-// Returns when the node exits.
-func (n *Node) Dispatch() { n.EC.Dispatch() }
 
 /*
  ******************************************************************************
@@ -490,7 +394,7 @@ func (n *Node) initAPIServer() {
 		err := n.APIServer.Dispatch()
 
 		n.Log.Fatal("API server initialization failed with %s", err)
-		n.TCall.AsyncCall(salticidae.ThreadCallCallback(C.onTerm), nil)
+		n.Net.Close()
 	})
 }
 
@@ -505,12 +409,11 @@ func (n *Node) initChainManager() {
 		n.ConsensusDispatcher,
 		n.DB,
 		n.Config.ConsensusRouter,
-		&networking.VotingNet,
+		n.Net,
 		n.Config.ConsensusParams,
 		n.vdrs,
 		n.ID,
 		n.Config.NetworkID,
-		n.ValidatorAPI,
 		&n.APIServer,
 		&n.keystoreServer,
 		&n.sharedMemory,
@@ -554,7 +457,7 @@ func (n *Node) initMetricsAPI() {
 func (n *Node) initAdminAPI() {
 	if n.Config.AdminAPIEnabled {
 		n.Log.Info("initializing Admin API")
-		service := admin.NewService(n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.ValidatorAPI.Connections(), &n.APIServer)
+		service := admin.NewService(n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
 		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 	}
 }
@@ -624,7 +527,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	// initialize shared memory
 	n.initSharedMemory()
 
-	if err = n.initNetlib(); err != nil { // Set up all networking
+	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
@@ -633,22 +536,12 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.initKeystoreAPI() // Start the Keystore API
 	n.initMetricsAPI()  // Start the Metrics API
 
-	// Start node-to-node consensus server
-	if err := n.initValidatorNet(); err != nil { // Set up the validator handshake + authentication
-		return fmt.Errorf("problem initializing validator network: %w", err)
-	}
 	if err := n.initVMManager(); err != nil { // Set up the vm manager
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
 	}
 
 	n.initEventDispatcher() // Set up the event dipatcher
 	n.initChainManager()    // Set up the chain manager
-	n.initConsensusNet()    // Set up the main consensus network
-
-	// TODO: Remove once API is fully featured for throughput tests
-	if n.Config.ThroughputServerEnabled {
-		n.initClients() // Set up the client servers
-	}
 
 	n.initAdminAPI() // Start the Admin API
 	n.initIPCAPI()   // Start the IPC API
@@ -662,8 +555,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 // Shutdown this node
 func (n *Node) Shutdown() {
 	n.Log.Info("shutting down the node")
-	n.ValidatorAPI.Shutdown()
-	n.ConsensusAPI.Shutdown()
+	n.Net.Close()
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
 }
