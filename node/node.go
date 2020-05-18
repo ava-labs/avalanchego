@@ -120,19 +120,20 @@ func (n *Node) initNetworking() error {
 
 	var serverUpgrader, clientUpgrader network.Upgrader
 	if n.Config.EnableStaking {
-		// TODO: this TLS config will never accept a connection because the cert pool is empty.
 		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
 		if err != nil {
 			return err
 		}
 
-		certPool := x509.NewCertPool()
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
-			RootCAs:      certPool,
-			ServerName:   "ava",
-			ClientAuth:   tls.RequireAndVerifyClientCert,
-			ClientCAs:    certPool,
+			ClientAuth:   tls.RequireAnyClientCert,
+			// We do not use TLS's CA functionality, we just require an
+			// authenticated channel. Therefore, we can safely skip verification
+			// here.
+			//
+			// TODO: Security audit required
+			InsecureSkipVerify: true,
 		}
 
 		serverUpgrader = network.NewTLSServerUpgrader(tlsConfig)
