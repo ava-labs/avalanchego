@@ -515,7 +515,7 @@ func (nm *Handshake) disconnectedFromPeer(peer salticidae.PeerID) {
 	nm.connections.Remove(peer, cert)
 	nm.numPeers.Set(float64(nm.connections.Len()))
 
-	if nm.vdrs.Contains(cert) {
+	if !nm.enableStaking || nm.vdrs.Contains(cert) {
 		nm.reconnectTimeout.Put(peerID, func() {
 			nm.pending.Remove(peer, cert)
 			nm.connections.Remove(peer, cert)
