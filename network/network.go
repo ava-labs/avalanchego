@@ -434,7 +434,9 @@ func (n *network) connected(p *peer) {
 
 	for i := 0; i < len(n.handlers); {
 		if n.handlers[i].Connected(p.id) {
-			n.handlers[i] = n.handlers[len(n.handlers)-1] // remove the current handler
+			newLen := len(n.handlers) - 1
+			n.handlers[i] = n.handlers[newLen] // remove the current handler
+			n.handlers = n.handlers[:newLen]
 		} else {
 			i++
 		}
@@ -459,7 +461,9 @@ func (n *network) disconnected(p *peer) {
 	if p.connected {
 		for i := 0; i < len(n.handlers); {
 			if n.handlers[i].Disconnected(p.id) {
-				n.handlers[i] = n.handlers[len(n.handlers)-1] // remove the current handler
+				newLen := len(n.handlers) - 1
+				n.handlers[i] = n.handlers[newLen] // remove the current handler
+				n.handlers = n.handlers[:newLen]
 			} else {
 				i++
 			}
