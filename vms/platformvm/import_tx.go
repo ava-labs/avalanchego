@@ -51,7 +51,7 @@ type UnsignedImportTx struct {
 	Ins []*ava.TransferableInput `serialize:"true"`
 
 	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`	
+	Outs []*ava.TransferableOutput `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx
@@ -62,7 +62,7 @@ func (tx *UnsignedImportTx) UnsignedBytes() []byte {
 // ImportTx imports funds from the AVM
 type ImportTx struct {
 	UnsignedImportTx `serialize:"true"`
-	
+
 	// Credentials that authorize the inputs to spend the corresponding outputs
 	Creds []verify.Verifiable `serialize:"true"`
 }
@@ -80,7 +80,6 @@ func (tx *ImportTx) initialize(vm *VM) error {
 	}
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
-}
 }
 
 // ID of this transaction
