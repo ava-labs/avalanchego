@@ -17,7 +17,8 @@ import (
 // defaultCheckOpts is a Check whose properties represent a default Check
 var defaultCheckOpts = Check{ExecutionPeriod: time.Minute}
 
-// Health observes a set of vital signs and makes them
+// Health observes a set of vital signs and makes them available through an HTTP
+// API.
 type Health struct {
 	log    logging.Logger
 	health health.Health
