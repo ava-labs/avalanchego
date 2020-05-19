@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -25,12 +27,14 @@ var (
 type UnsignedAddNonDefaultSubnetValidatorTx struct {
 	// The validator
 	SubnetValidator `serialize:"true"`
-
 	// ID of the network
 	NetworkID uint32 `serialize:"true"`
-
-	// Next unused nonce of the account paying the tx fee
-	Nonce uint64 `serialize:"true"`
+	// Input UTXOs
+	Ins []*ava.TransferableInput `serialize:"true"`
+	// Output UTXOs
+	Outs []*ava.TransferableOutput `serialize:"true"`
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // addNonDefaultSubnetValidatorTx is a transaction that, if it is in a ProposeAddValidator block that
@@ -326,7 +330,6 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 				Subnet: subnetID,
 			},
 			NetworkID: networkID,
-			Nonce:     nonce,
 		},
 	}
 

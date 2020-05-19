@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -27,10 +29,6 @@ type UnsignedCreateChainTx struct {
 	// ID of the Subnet that validates this blockchain
 	SubnetID ids.ID `serialize:"true"`
 
-	// Next unused nonce of account paying the transaction fee for this transaction.
-	// Currently unused, as there are no tx fees.
-	Nonce uint64 `serialize:"true"`
-
 	// A human readable name for the chain; need not be unique
 	ChainName string `serialize:"true"`
 
@@ -42,6 +40,15 @@ type UnsignedCreateChainTx struct {
 
 	// Byte representation of genesis state of the new chain
 	GenesisData []byte `serialize:"true"`
+
+	// Input UTXOs
+	Ins []*ava.TransferableInput `serialize:"true"`
+
+	// Output UTXOs
+	Outs []*ava.TransferableOutput `serialize:"true"`
+
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // CreateChainTx is a proposal to create a chain

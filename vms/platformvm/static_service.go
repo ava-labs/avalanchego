@@ -107,7 +107,7 @@ type BuildGenesisReply struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	Accounts   []Account        `serialize:"true"`
+	//Accounts   []Account        `serialize:"true"`
 	Validators *EventHeap       `serialize:"true"`
 	Chains     []*CreateChainTx `serialize:"true"`
 	Timestamp  uint64           `serialize:"true"`
@@ -137,8 +137,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return errAccountHasNoValue
 		}
 		accounts = append(accounts, newAccount(
-			account.Address, // ID
-			0,               // nonce
+			account.Address,         // ID
+			0,                       // nonce
 			uint64(account.Balance), // balance
 		))
 	}

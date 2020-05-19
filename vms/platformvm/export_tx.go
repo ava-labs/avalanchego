@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -26,10 +27,14 @@ type UnsignedExportTx struct {
 	// ID of the network this blockchain exists on
 	NetworkID uint32 `serialize:"true"`
 
-	// Next unused nonce of account paying for this transaction.
-	Nonce uint64 `serialize:"true"`
+	// Input UTXOs
+	Ins []*ava.TransferableInput `serialize:"true"`
 
-	Outs []*ava.TransferableOutput `serialize:"true"` // The outputs of this transaction
+	// Output UTXOs
+	Outs []*ava.TransferableOutput `serialize:"true"`
+
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // ExportTx exports funds to the AVM

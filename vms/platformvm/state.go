@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/gecko/vms/components/ava"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
@@ -104,47 +106,38 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 	return nil
 }
 
-// get the account with the specified Address
-// If account does not exist in database, return new account
-func (vm *VM) getAccount(db database.Database, address ids.ShortID) (Account, error) {
-	if address.IsZero() {
-		return Account{}, errEmptyAccountAddress
-	}
-
-	longID := address.LongID()
-
-	// see if account exists
-	exists, err := vm.State.Has(db, accountTypeID, longID)
-	if err != nil {
-		return Account{}, err
-	}
-	if !exists { // account doesn't exist so return new, empty account
-		return Account{
-			Address: address,
-			Nonce:   0,
-			Balance: 0,
-		}, nil
-	}
-
-	accountInterface, err := vm.State.Get(db, accountTypeID, longID)
-	if err != nil {
-		return Account{}, err
-	}
-	account, ok := accountInterface.(Account)
-	if !ok {
-		vm.Ctx.Log.Warn("expected to retrieve Account from database but got different type")
-		return Account{}, errDBAccount
-	}
-	return account, nil
+// getUTXO returns the UTXO with the specified ID
+func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
+	// TODO
+	return nil, errors.New("TODO")
 }
 
-// put an account in [db]
-func (vm *VM) putAccount(db database.Database, account Account) error {
-	err := vm.State.Put(db, accountTypeID, account.Address.LongID(), account)
-	if err != nil {
-		return errDBPutAccount
+// putUTXO persists the given UTXO
+func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
+	// TODO
+	// TODO: Map addr --> UTXOs that ref it
+	return errors.New("TODO")
+}
+
+// return the IDs of UTXOs that reference [addr]
+func (vm *VM) getRefedBy(db database.Database, addr ids.ShortID) ([]ids.ID, error) {
+	// TODO
+	return nil, errors.New("TODO")
+}
+
+// each element of [utxoIDs] is the ID of a UTXO that references [addr]
+func (vm *VM) putRefedBy(db database.Database, addr ids.ShortID, utxoIDs []ids.ID) error {
+	// TODO
+	return errors.New("TODO")
+}
+
+// getUTXOs returns UTXOs that reference at least one of the addresses in [addrs]
+func (vm *VM) getUTXOs(db database.Database, addrs ids.ShortSet) ([]*ava.UTXO, error) {
+	utxoIDs := ids.Set{}
+	for _, addr := range addrs.List() {
+		// TODO
 	}
-	return nil
+	return nil, errors.New("TODO")
 }
 
 // get all the blockchains that exist

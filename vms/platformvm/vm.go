@@ -98,6 +98,7 @@ var (
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
+	errInvalidID                = errors.New("invalid ID")
 )
 
 // Codec does serialization and deserialization

@@ -33,14 +33,17 @@ type UnsignedImportTx struct {
 	// ID of the network this blockchain exists on
 	NetworkID uint32 `serialize:"true"`
 
-	// Next unused nonce of account paying the transaction fee and receiving the
-	// inputs of this transaction.
-	Nonce uint64 `serialize:"true"`
-
 	// Account that this transaction is being sent by. This is needed to ensure the Credentials are replay safe.
 	Account ids.ShortID `serialize:"true"`
 
-	Ins []*ava.TransferableInput `serialize:"true"` // The inputs to this transaction
+	// Input UTXOs
+	Ins []*ava.TransferableInput `serialize:"true"`
+
+	// Output UTXOs
+	Outs []*ava.TransferableOutput `serialize:"true"`
+
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // ImportTx imports funds from the AVM

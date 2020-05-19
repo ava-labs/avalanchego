@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 const maxThreshold = 25
@@ -28,15 +30,22 @@ type UnsignedCreateSubnetTx struct {
 	// NetworkID is the ID of the network this tx was issued on
 	NetworkID uint32 `serialize:"true"`
 
-	// Next unused nonce of account paying the transaction fee for this transaction.
-	// Currently unused, as there are no tx fees.
-	Nonce uint64 `serialize:"true"`
-
 	// Each element in ControlKeys is the address of a public key
 	// In order to add a validator to this subnet, a tx must be signed
 	// with Threshold of these keys
 	ControlKeys []ids.ShortID `serialize:"true"`
-	Threshold   uint16        `serialize:"true"`
+
+	// See ControlKeys
+	Threshold uint16 `serialize:"true"`
+
+	// Input UTXOs
+	Ins []*ava.TransferableInput `serialize:"true"`
+
+	// Output UTXOs
+	Outs []*ava.TransferableOutput `serialize:"true"`
+
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // CreateSubnetTx is a proposal to create a new subnet

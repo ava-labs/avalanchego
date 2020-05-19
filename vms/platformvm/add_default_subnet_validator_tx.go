@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
@@ -28,9 +30,14 @@ var (
 type UnsignedAddDefaultSubnetValidatorTx struct {
 	DurationValidator `serialize:"true"`
 	NetworkID         uint32      `serialize:"true"`
-	Nonce             uint64      `serialize:"true"`
 	Destination       ids.ShortID `serialize:"true"`
 	Shares            uint32      `serialize:"true"`
+	// Input UTXOs
+	Ins []*ava.TransferableInput `serialize:"true"`
+	// Output UTXOs
+	Outs []*ava.TransferableOutput `serialize:"true"`
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // addDefaultSubnetValidatorTx is a transaction that, if it is in a ProposeAddValidator block that
@@ -207,7 +214,6 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(nonce, stakeAmt, startTime, endTime
 				Start: startTime,
 				End:   endTime,
 			},
-			Nonce:       nonce,
 			Destination: destination,
 			Shares:      shares,
 		},

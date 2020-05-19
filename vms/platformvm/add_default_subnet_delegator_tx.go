@@ -6,6 +6,9 @@ package platformvm
 import (
 	"fmt"
 
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
@@ -15,10 +18,17 @@ import (
 
 // UnsignedAddDefaultSubnetDelegatorTx is an unsigned addDefaultSubnetDelegatorTx
 type UnsignedAddDefaultSubnetDelegatorTx struct {
+	// Describes the delegatee
 	DurationValidator `serialize:"true"`
-	NetworkID         uint32      `serialize:"true"`
-	Nonce             uint64      `serialize:"true"`
-	Destination       ids.ShortID `serialize:"true"`
+	NetworkID         uint32 `serialize:"true"`
+	// Where to send staked AVA after done validating
+	Destination ids.ShortID `serialize:"true"`
+	// Input UTXOs
+	Ins []*ava.TransferableInput `serialize:"true"`
+	// Output UTXOs
+	Outs []*ava.TransferableOutput `serialize:"true"`
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // addDefaultSubnetDelegatorTx is a transaction that, if it is in a
@@ -118,18 +128,20 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	// Get the account that is paying the transaction fee and, if the proposal is to add a validator
 	// to the default subnet, providing the staked $AVA.
 	// The ID of this account is the address associated with the public key that signed this tx
-	accountID := tx.senderID
-	account, err := tx.vm.getAccount(db, accountID)
-	if err != nil {
-		return nil, nil, nil, nil, errDBAccount
-	}
+	/*
+		accountID := tx.senderID
+		account, err := tx.vm.getAccount(db, accountID)
+		if err != nil {
+			return nil, nil, nil, nil, errDBAccount
+		}
 
-	// The account if this block's proposal is committed and the validator is added
-	// to the pending validator set. (Increase the account's nonce; decrease its balance.)
-	newAccount, err := account.Remove(0, tx.Nonce) // Remove also removes the fee
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
+		// The account if this block's proposal is committed and the validator is added
+		// to the pending validator set. (Increase the account's nonce; decrease its balance.)
+		newAccount, err := account.Remove(0, tx.Nonce) // Remove also removes the fee
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+	*/
 
 	// Ensure that the period this validator validates the specified subnet is a subnet of the time they validate the default subnet
 	// First, see if they're currently validating the default subnet
@@ -196,6 +208,10 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	networkID uint32,
 	key *crypto.PrivateKeySECP256K1R,
 ) (*addDefaultSubnetDelegatorTx, error) {
+	// Get UTXOs of sender
+	addr := key.PublicKey().Address()
+	vm.getUt
+
 	tx := &addDefaultSubnetDelegatorTx{
 		UnsignedAddDefaultSubnetDelegatorTx: UnsignedAddDefaultSubnetDelegatorTx{
 			DurationValidator: DurationValidator{
@@ -207,7 +223,6 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 				End:   endTime,
 			},
 			NetworkID:   networkID,
-			Nonce:       nonce,
 			Destination: destination,
 		},
 	}
