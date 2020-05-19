@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -24,6 +25,17 @@ var (
 
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
+	vm *VM
+
+	// ID of this tx
+	id ids.ID
+
+	// Byte representation of the unsigned transaction
+	unsignedBytes []byte
+
+	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
+	bytes []byte
+
 	// ID of the network this blockchain exists on
 	NetworkID uint32 `serialize:"true"`
 
@@ -32,27 +44,32 @@ type UnsignedExportTx struct {
 
 	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
+}
 
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx *UnsignedExportTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
 }
 
 // ExportTx exports funds to the AVM
 type ExportTx struct {
 	UnsignedExportTx `serialize:"true"`
 
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	vm    *VM
-	id    ids.ID
-	key   crypto.PublicKey // public key of transaction signer
-	bytes []byte
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 func (tx *ExportTx) initialize(vm *VM) error {
 	tx.vm = vm
-	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
-	tx.bytes = txBytes
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedExportTx)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal UnsignedExportTx: %w", err)
+	}
+	tx.bytes, err = Codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal ExportTx: %w", err)
+	}
 	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
 	return err
 }

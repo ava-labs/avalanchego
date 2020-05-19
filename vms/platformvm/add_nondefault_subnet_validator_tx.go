@@ -25,16 +25,36 @@ var (
 
 // UnsignedAddNonDefaultSubnetValidatorTx is an unsigned addNonDefaultSubnetValidatorTx
 type UnsignedAddNonDefaultSubnetValidatorTx struct {
+	vm *VM
+
+	// ID of this tx
+	id ids.ID
+
+	// Byte representation of the unsigned transaction
+	unsignedBytes []byte
+
+	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
+	bytes []byte
+
+	// IDs of control keys
+	controlIDs []ids.ShortID
+
 	// The validator
 	SubnetValidator `serialize:"true"`
+
 	// ID of the network
 	NetworkID uint32 `serialize:"true"`
+
 	// Input UTXOs
 	Ins []*ava.TransferableInput `serialize:"true"`
+
 	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+}
+
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx *UnsignedAddNonDefaultSubnetValidatorTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
 }
 
 // addNonDefaultSubnetValidatorTx is a transaction that, if it is in a ProposeAddValidator block that
@@ -45,35 +65,29 @@ type UnsignedAddNonDefaultSubnetValidatorTx struct {
 type addNonDefaultSubnetValidatorTx struct {
 	UnsignedAddNonDefaultSubnetValidatorTx `serialize:"true"`
 
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
+
 	// When a subnet is created, it specifies a set of public keys ("control keys") such
 	// that in order to add a validator to the subnet, a tx must be signed with
 	// a certain threshold of those keys
 	// Each element of ControlSigs is the signature of one of those keys
 	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	// PayerSig is the signature of the public key whose corresponding account pays
-	// the tx fee for this tx
-	// ie the account with ID == [public key].Address() pays the tx fee
-	PayerSig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	vm         *VM
-	id         ids.ID
-	controlIDs []ids.ShortID
-	senderID   ids.ShortID
-
-	// Byte representation of the signed transaction
-	bytes []byte
 }
 
 // initialize [tx]
 func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
-	bytes, err := Codec.Marshal(tx) // byte representation of the signed transaction
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedAddNonDefaultSubnetValidatorTx)
 	if err != nil {
-		return err
+		fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
+	}
+	tx.bytes, err = Codec.Marshal(tx) // byte representation of the signed transaction
+	if err != nil {
+		fmt.Errorf("couldn't marshal addNonDefaultSubnetValidatorTx: %w", err)
 	}
 	tx.vm = vm
-	tx.bytes = bytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return nil
 }
 

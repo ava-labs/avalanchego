@@ -30,6 +30,17 @@ var (
 
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
+	vm *VM
+
+	// ID of this tx
+	id ids.ID
+
+	// Byte representation of the unsigned transaction
+	unsignedBytes []byte
+
+	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
+	bytes []byte
+
 	// ID of the network this blockchain exists on
 	NetworkID uint32 `serialize:"true"`
 
@@ -40,32 +51,36 @@ type UnsignedImportTx struct {
 	Ins []*ava.TransferableInput `serialize:"true"`
 
 	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
+	Outs []*ava.TransferableOutput `serialize:"true"`	
+}
 
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx *UnsignedImportTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
 }
 
 // ImportTx imports funds from the AVM
 type ImportTx struct {
 	UnsignedImportTx `serialize:"true"`
-
-	Sig   [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-	Creds []verify.Verifiable           `serialize:"true"` // The credentials of this transaction
-
-	vm            *VM
-	id            ids.ID
-	key           crypto.PublicKey // public key of transaction signer
-	unsignedBytes []byte
-	bytes         []byte
+	
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 func (tx *ImportTx) initialize(vm *VM) error {
 	tx.vm = vm
-	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
-	tx.bytes = txBytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedImportTx)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal UnsignedImportTx: %w", err)
+	}
+	tx.bytes, err = Codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal ImportTx: %w", err)
+	}
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
+}
 }
 
 // ID of this transaction

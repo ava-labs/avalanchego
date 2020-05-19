@@ -18,17 +18,36 @@ import (
 
 // UnsignedAddDefaultSubnetDelegatorTx is an unsigned addDefaultSubnetDelegatorTx
 type UnsignedAddDefaultSubnetDelegatorTx struct {
+	vm *VM
+
+	// ID of this tx
+	id ids.ID
+
+	// Byte representation of this unsigned tx
+	unsignedBytes []byte
+
+	// Byte representation of the signed transaction (ie with credentials)
+	bytes []byte
+
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
-	NetworkID         uint32 `serialize:"true"`
+
+	// ID of the network on which this tx was issued
+	NetworkID uint32 `serialize:"true"`
+
 	// Where to send staked AVA after done validating
 	Destination ids.ShortID `serialize:"true"`
+
 	// Input UTXOs
 	Ins []*ava.TransferableInput `serialize:"true"`
+
 	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+}
+
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx *UnsignedAddDefaultSubnetDelegatorTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
 }
 
 // addDefaultSubnetDelegatorTx is a transaction that, if it is in a
@@ -40,26 +59,24 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 type addDefaultSubnetDelegatorTx struct {
 	UnsignedAddDefaultSubnetDelegatorTx `serialize:"true"`
 
-	// Sig is the signature of the public key whose corresponding account pays
-	// the tx fee for this tx. ie the account with ID == [public key].Address()
-	// pays the tx fee
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	vm       *VM
-	id       ids.ID
-	senderID ids.ShortID
-
-	// Byte representation of the signed transaction
-	bytes []byte
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // initialize [tx]
 func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 	tx.vm = vm
-	bytes, err := Codec.Marshal(tx) // byte representation of the signed transaction
-	tx.bytes = bytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
-	return err
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedAddDefaultSubnetDelegatorTx)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal UnsignedAddDefaultSubnetDelegatorTx: %w", err)
+	}
+	tx.bytes, err = Codec.Marshal(tx) // byte representation of the signed transaction
+	if err != nil {
+		return fmt.Errorf("couldn't marshal addDefaultSubnetDelegatorTx: %w", err)
+	}
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
+	return nil
 }
 
 func (tx *addDefaultSubnetDelegatorTx) ID() ids.ID { return tx.id }

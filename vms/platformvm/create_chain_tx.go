@@ -23,6 +23,17 @@ var (
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx
 type UnsignedCreateChainTx struct {
+	vm *VM
+
+	// ID of this tx
+	id ids.ID
+
+	// Byte representation of the unsigned transaction
+	unsignedBytes []byte
+
+	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
+	bytes []byte
+
 	// ID of the network this blockchain exists on
 	NetworkID uint32 `serialize:"true"`
 
@@ -46,36 +57,37 @@ type UnsignedCreateChainTx struct {
 
 	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
+}
 
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx *UnsignedCreateChainTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
 }
 
 // CreateChainTx is a proposal to create a chain
 type CreateChainTx struct {
 	UnsignedCreateChainTx `serialize:"true"`
 
-	// Address of the account that provides the transaction fee
-	// Set in SemanticVerify
-	PayerAddress ids.ShortID
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 
 	// Signatures from Subnet's control keys
 	// Should not empty slice, not nil, if there are no control sigs
 	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	// Signature of key whose account provides the transaction fee
-	PayerSig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	vm    *VM
-	id    ids.ID
-	bytes []byte
 }
 
 func (tx *CreateChainTx) initialize(vm *VM) error {
 	tx.vm = vm
-	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
-	tx.bytes = txBytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedCreateChainTx)
+	if err != nil {
+		fmt.Errorf("couldn't marshal UnsignedCreateChainTx: %w", err)
+	}
+	tx.bytes, err = Codec.Marshal(tx) // byte representation of the signed transaction
+	if err != nil {
+		fmt.Errorf("couldn't marshal CreateChainTx: %w", err)
+	}
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
 

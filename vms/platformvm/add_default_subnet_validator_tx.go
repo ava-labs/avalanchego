@@ -28,16 +28,40 @@ var (
 
 // UnsignedAddDefaultSubnetValidatorTx is an unsigned addDefaultSubnetValidatorTx
 type UnsignedAddDefaultSubnetValidatorTx struct {
+	vm *VM
+
+	// ID of this tx
+	id ids.ID
+
+	// Byte representation of the unsigned tx
+	unsignedBytes []byte
+
+	// Byte representation of the signed transaction (ie with credentials)
+	bytes []byte
+
+	// Describes the validator
 	DurationValidator `serialize:"true"`
-	NetworkID         uint32      `serialize:"true"`
-	Destination       ids.ShortID `serialize:"true"`
-	Shares            uint32      `serialize:"true"`
+
+	// ID of network this tx was issued on
+	NetworkID uint32 `serialize:"true"`
+
+	// Address to send staked AVA (and possibly reward) to when staker is done staking
+	Destination ids.ShortID `serialize:"true"`
+
+	// Fee this validator charges delegators as a percentage, times 10,000
+	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
+	Shares uint32 `serialize:"true"`
+
 	// Input UTXOs
 	Ins []*ava.TransferableInput `serialize:"true"`
+
 	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+}
+
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx *UnsignedAddDefaultSubnetValidatorTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
 }
 
 // addDefaultSubnetValidatorTx is a transaction that, if it is in a ProposeAddValidator block that
@@ -46,23 +70,23 @@ type UnsignedAddDefaultSubnetValidatorTx struct {
 type addDefaultSubnetValidatorTx struct {
 	UnsignedAddDefaultSubnetValidatorTx `serialize:"true"`
 
-	// Signature on the byte repr. of UnsignedAddValidatorTx
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	vm       *VM
-	id       ids.ID
-	senderID ids.ShortID
-
-	// Byte representation of the signed transaction
-	bytes []byte
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // initialize [tx]
 func (tx *addDefaultSubnetValidatorTx) initialize(vm *VM) error {
 	tx.vm = vm
-	bytes, err := Codec.Marshal(tx) // byte representation of the signed transaction
-	tx.bytes = bytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedAddDefaultSubnetValidatorTx)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal UnsignedAddDefaultSubnetValidatorTx: %w", err)
+	}
+	tx.bytes, err = Codec.Marshal(tx) // byte representation of the signed transaction
+	if err != nil {
+		return fmt.Errorf("couldn't marshal addDefaultSubnetValidatorTx: %w", err)
+	}
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
 

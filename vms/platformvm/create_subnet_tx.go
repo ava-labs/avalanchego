@@ -27,6 +27,17 @@ var (
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
+	vm *VM
+
+	// ID of this tx
+	id ids.ID
+
+	// Byte representation of the unsigned transaction
+	unsignedBytes []byte
+
+	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
+	bytes []byte
+
 	// NetworkID is the ID of the network this tx was issued on
 	NetworkID uint32 `serialize:"true"`
 
@@ -43,32 +54,35 @@ type UnsignedCreateSubnetTx struct {
 
 	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
+}
 
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx *UnsignedCreateSubnetTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
 }
 
 // CreateSubnetTx is a proposal to create a new subnet
 type CreateSubnetTx struct {
 	UnsignedCreateSubnetTx `serialize:"true"`
 
-	// Signature on the UnsignedCreateSubnetTx's byte repr
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
+	// Credentials that authorize the inputs to spend the corresponding outputs
+	Creds []verify.Verifiable `serialize:"true"`
+}
 
-	// The public key that signed this transaction
-	// The transaction fee will be paid from the corresponding account
-	// (ie the account whose ID is [key].Address())
-	// [key] is non-nil iff this tx is valid
-	key crypto.PublicKey
-
-	// The VM this tx exists within
-	vm *VM
-
-	// ID is this transaction's ID
-	id ids.ID
-
-	// Byte representation of this transaction (including signature)
-	bytes []byte
+// initialize sets [tx.vm] to [vm]
+func (tx *CreateSubnetTx) initialize(vm *VM) error {
+	tx.vm = vm
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedCreateSubnetTx)
+	if err != nil {
+		fmt.Errorf("couldn't marshal UnsignedCreateSubnetTx: %w", err)
+	}
+	tx.bytes, err = Codec.Marshal(tx)
+	if err != nil {
+		fmt.Errorf("couldn't marshal CreateSubnetTx: %w", err)
+	}
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
+	return err
 }
 
 // ID returns the ID of this transaction
@@ -161,18 +175,6 @@ func (tx *CreateSubnetTx) Bytes() []byte {
 		tx.vm.Ctx.Log.Error("problem marshaling tx: %v", err)
 	}
 	return tx.bytes
-}
-
-// initialize sets [tx.vm] to [vm]
-func (tx *CreateSubnetTx) initialize(vm *VM) error {
-	tx.vm = vm
-	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
-	if err != nil {
-		return err
-	}
-	tx.bytes = txBytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
-	return nil
 }
 
 // [controlKeys] must be unique. They will be sorted by this method.
