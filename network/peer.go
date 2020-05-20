@@ -166,6 +166,9 @@ func (p *peer) handle(msg Msg) {
 	}
 	if !p.connected {
 		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
+
+		// send a get version message so that the peer's future messages are hopefully not dropped
+		p.GetVersion()
 		return
 	}
 	switch msg.Op() {
