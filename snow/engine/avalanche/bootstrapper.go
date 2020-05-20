@@ -43,14 +43,16 @@ func (b *bootstrapper) Initialize(config BootstrapConfig) {
 	b.BootstrapConfig = config
 
 	b.VtxBlocked.SetParser(&vtxParser{
-		numAccepted: b.numBootstrappedVtx,
-		numDropped:  b.numDroppedVtx,
+		log:         config.Context.Log,
+		numAccepted: b.numBSVtx,
+		numDropped:  b.numBSDroppedVtx,
 		state:       b.State,
 	})
 
 	b.TxBlocked.SetParser(&txParser{
-		numAccepted: b.numBootstrappedTx,
-		numDropped:  b.numDroppedTx,
+		log:         config.Context.Log,
+		numAccepted: b.numBSTx,
+		numDropped:  b.numBSDroppedTx,
 		vm:          b.VM,
 	})
 
@@ -155,7 +157,7 @@ func (b *bootstrapper) sendRequest(vtxID ids.ID) {
 	b.pending.Add(vtxID)
 	b.BootstrapConfig.Sender.Get(validatorID, b.RequestID, vtxID)
 
-	b.numPendingRequests.Set(float64(b.pending.Len()))
+	b.numBSPendingRequests.Set(float64(b.pending.Len()))
 }
 
 func (b *bootstrapper) addVertex(vtx avalanche.Vertex) {
@@ -182,19 +184,21 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 			b.pending.Remove(vtxID)
 
 			if err := b.VtxBlocked.Push(&vertexJob{
-				numAccepted: b.numBootstrappedVtx,
-				numDropped:  b.numDroppedVtx,
+				log:         b.BootstrapConfig.Context.Log,
+				numAccepted: b.numBSVtx,
+				numDropped:  b.numBSDroppedVtx,
 				vtx:         vtx,
 			}); err == nil {
-				b.numBlockedVtx.Inc()
+				b.numBSBlockedVtx.Inc()
 			}
 			for _, tx := range vtx.Txs() {
 				if err := b.TxBlocked.Push(&txJob{
-					numAccepted: b.numBootstrappedVtx,
-					numDropped:  b.numDroppedVtx,
+					log:         b.BootstrapConfig.Context.Log,
+					numAccepted: b.numBSTx,
+					numDropped:  b.numBSDroppedTx,
 					tx:          tx,
 				}); err == nil {
-					b.numBlockedTx.Inc()
+					b.numBSBlockedTx.Inc()
 				}
 			}
 
@@ -207,7 +211,7 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 	}
 
 	numPending := b.pending.Len()
-	b.numPendingRequests.Set(float64(numPending))
+	b.numBSPendingRequests.Set(float64(numPending))
 }
 
 func (b *bootstrapper) finish() {
@@ -215,8 +219,8 @@ func (b *bootstrapper) finish() {
 		return
 	}
 
-	b.executeAll(b.TxBlocked, b.numBlockedTx)
-	b.executeAll(b.VtxBlocked, b.numBlockedVtx)
+	b.executeAll(b.TxBlocked, b.numBSBlockedTx)
+	b.executeAll(b.VtxBlocked, b.numBSBlockedVtx)
 
 	// Start consensus
 	b.onFinished()

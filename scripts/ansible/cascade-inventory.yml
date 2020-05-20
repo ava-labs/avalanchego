@@ -43,8 +43,8 @@ borealis_bootstrap:
 
 borealis_node:
   hosts:
-      node1:
-        ansible_host: 34.207.133.167
+      # node1:
+      #   ansible_host: 34.207.133.167
       node2:
         ansible_host: 107.23.241.199
       node3:

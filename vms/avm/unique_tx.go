@@ -100,12 +100,12 @@ func (tx *UniqueTx) ID() ids.ID { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() {
-	defer tx.vm.db.Abort()
-
-	if err := tx.setStatus(choices.Accepted); err != nil {
-		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
+	if s := tx.Status(); s != choices.Processing {
+		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
 		return
 	}
+
+	defer tx.vm.db.Abort()
 
 	// Remove spent utxos
 	for _, utxo := range tx.InputUTXOs() {
@@ -123,20 +123,27 @@ func (tx *UniqueTx) Accept() {
 	// Add new utxos
 	for _, utxo := range tx.UTXOs() {
 		if err := tx.vm.state.FundUTXO(utxo); err != nil {
-			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxoID, err)
+			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
 			return
 		}
+	}
+
+	if err := tx.setStatus(choices.Accepted); err != nil {
+		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
+		return
 	}
 
 	txID := tx.ID()
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
+		tx.setStatus(choices.Processing)
 		return
 	}
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
+		tx.setStatus(choices.Processing)
 		return
 	}
 
