@@ -78,7 +78,7 @@ type addNonDefaultSubnetValidatorTx struct {
 // initialize [tx]
 func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
 	var err error
-	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedAddNonDefaultSubnetValidatorTx)
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddNonDefaultSubnetValidatorTx))
 	if err != nil {
 		fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
 	}
@@ -95,12 +95,11 @@ func (tx *addNonDefaultSubnetValidatorTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]
+// TODO: only verify once
 func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case !tx.senderID.IsZero():
-		return nil // Only verify the transaction once
 	case tx.id.IsZero():
 		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
@@ -141,12 +140,9 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 		tx.controlIDs[i] = key.Address()
 	}
 
-	// get account to pay tx fee from
-	key, err := tx.vm.factory.RecoverHashPublicKey(unsignedBytesHash, tx.PayerSig[:])
-	if err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
-	tx.senderID = key.Address()
 
 	return nil
 }

@@ -107,15 +107,21 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 }
 
 // getUTXO returns the UTXO with the specified ID
-func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
+func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.TransferableOutput, error) {
 	// TODO
 	return nil, errors.New("TODO")
 }
 
 // putUTXO persists the given UTXO
-func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
+func (vm *VM) putUTXO(db database.Database, utxo *ava.TransferableOutput) error {
 	// TODO
 	// TODO: Map addr --> UTXOs that ref it
+	return errors.New("TODO")
+}
+
+// removeUTXO removes the UTXO with the given ID
+func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
+	// TODO
 	return errors.New("TODO")
 }
 

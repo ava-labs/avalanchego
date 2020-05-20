@@ -91,7 +91,11 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 	ava.SortTransferableOutputs(outs, service.vm.codec)
 }
 
-func (vm *VM) syntacticVerifySpend(db database.Database, ins []*secp256k1fx.TransferInput, outs []*secp256k1fx.TransferOutput) {
+// Verify that:
+// * inputs and outputs are sorted
+// * value of outputs is no greater than that of inputs
+// TODO: Should we check that value of outputs is [txFee] less than inputs?
+func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.TransferableOutput) error {
 	fc := ava.NewFlowChecker()
 	for _, out := range outs {
 		if err := out.Verify(); err != nil {
@@ -99,7 +103,7 @@ func (vm *VM) syntacticVerifySpend(db database.Database, ins []*secp256k1fx.Tran
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !ava.IsSortedTransferableOutputs(outs, c) {
+	if !ava.IsSortedTransferableOutputs(outs, Codec) {
 		return errOutputsNotSorted
 	}
 
@@ -116,10 +120,11 @@ func (vm *VM) syntacticVerifySpend(db database.Database, ins []*secp256k1fx.Tran
 	if err := fc.Verify(); err != nil {
 		return err
 	}
+	return nil
 }
 
-func (vm *VM) semanticVerifySpend(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
-	for i, in := range t.Ins {
+func (vm *VM) semanticVerifySpend(db database.Database, tx interface{}, creds []verify.Verifiable) error {
+	for i, in := range ins {
 		cred := creds[i]
 
 		fxIndex, err := vm.getFx(cred)
@@ -128,7 +133,7 @@ func (vm *VM) semanticVerifySpend(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 		fx := vm.fxs[fxIndex].Fx
 
-		utxo, err := vm.getUTXO(&in.UTXOID)
+		utxo, err := vm.getUTXO(db, &in.UTXOID)
 		if err != nil {
 			return err
 		}
@@ -143,7 +148,7 @@ func (vm *VM) semanticVerifySpend(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 			return errIncompatibleFx
 		}
 
-		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
+		if err := fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
 			return err
 		}
 	}

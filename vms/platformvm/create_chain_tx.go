@@ -79,7 +79,7 @@ type CreateChainTx struct {
 func (tx *CreateChainTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
-	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedCreateChainTx)
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateChainTx))
 	if err != nil {
 		fmt.Errorf("couldn't marshal UnsignedCreateChainTx: %w", err)
 	}
@@ -99,12 +99,11 @@ func (tx *CreateChainTx) Bytes() []byte { return tx.bytes }
 
 // SyntacticVerify this transaction is well-formed
 // Also populates [tx.Key] with the public key that signed this transaction
+// TODO: Verify only once
 func (tx *CreateChainTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case !tx.PayerAddress.IsZero(): // Only verify the transaction once
-		return nil
 	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
 		return errWrongNetworkID
 	case tx.id.IsZero():
@@ -119,17 +118,9 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return errControlSigsNotSortedAndUnique
 	}
 
-	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr of unsigned tx
-	if err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
-
-	payerKey, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.PayerSig[:])
-	if err != nil {
-		return err
-	}
-	tx.PayerAddress = payerKey.Address()
 
 	return nil
 }

@@ -62,7 +62,7 @@ type ExportTx struct {
 func (tx *ExportTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
-	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedExportTx)
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedExportTx))
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedExportTx: %w", err)
 	}
@@ -88,13 +88,11 @@ func (tx *ExportTx) Bytes() []byte { return tx.bytes }
 func (tx *ExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 
 // SyntacticVerify this transaction is well-formed
-// Also populates [tx.Key] with the public key that signed this transaction
+// TODO only syntacticVerify once
 func (tx *ExportTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.key != nil:
-		return nil // Only verify the transaction once
 	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
 		return errWrongNetworkID
 	case tx.id.IsZero():

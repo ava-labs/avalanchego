@@ -67,7 +67,7 @@ type addDefaultSubnetDelegatorTx struct {
 func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
-	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedAddDefaultSubnetDelegatorTx)
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddDefaultSubnetDelegatorTx))
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedAddDefaultSubnetDelegatorTx: %w", err)
 	}
@@ -83,12 +83,11 @@ func (tx *addDefaultSubnetDelegatorTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]
+// TODO: Only do syntactic Verify once
 func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case !tx.senderID.IsZero():
-		return nil // Only verify the transaction once
 	case tx.id.IsZero():
 		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
@@ -107,19 +106,9 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 		return errStakeTooLong
 	}
 
-	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetDelegatorTx)
-	// Byte representation of the unsigned transaction
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
-	if err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
-
-	// get account to pay tx fee from
-	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
-	if err != nil {
-		return err
-	}
-	tx.senderID = key.Address()
 
 	return nil
 }
@@ -128,6 +117,19 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), error) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, err
+	}
+
+	// Update the UTXO set
+	for _, in := range tx.Ins {
+		utxoID := in.InputID() // ID of the UTXO that [in] spends
+		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)
+		}
+	}
+	for _, out := range tx.Outs {
+		if err := tx.vm.putUTXO(db, out); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("couldn't add UTXO %s to UTXO set: %w", err)
+		}
 	}
 
 	// Ensure the proposed validator starts after the current timestamp
@@ -141,24 +143,6 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 			currentTimestamp,
 			validatorStartTime)
 	}
-
-	// Get the account that is paying the transaction fee and, if the proposal is to add a validator
-	// to the default subnet, providing the staked $AVA.
-	// The ID of this account is the address associated with the public key that signed this tx
-	/*
-		accountID := tx.senderID
-		account, err := tx.vm.getAccount(db, accountID)
-		if err != nil {
-			return nil, nil, nil, nil, errDBAccount
-		}
-
-		// The account if this block's proposal is committed and the validator is added
-		// to the pending validator set. (Increase the account's nonce; decrease its balance.)
-		newAccount, err := account.Remove(0, tx.Nonce) // Remove also removes the fee
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-	*/
 
 	// Ensure that the period this validator validates the specified subnet is a subnet of the time they validate the default subnet
 	// First, see if they're currently validating the default subnet
@@ -215,6 +199,7 @@ func (tx *addDefaultSubnetDelegatorTx) InitiallyPrefersCommit() bool {
 	return tx.StartTime().After(tx.vm.clock.Time())
 }
 
+// TODO: Implement
 func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	nonce,
 	weight,
@@ -227,7 +212,6 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 ) (*addDefaultSubnetDelegatorTx, error) {
 	// Get UTXOs of sender
 	addr := key.PublicKey().Address()
-	vm.getUt
 
 	tx := &addDefaultSubnetDelegatorTx{
 		UnsignedAddDefaultSubnetDelegatorTx: UnsignedAddDefaultSubnetDelegatorTx{

@@ -73,7 +73,7 @@ type CreateSubnetTx struct {
 func (tx *CreateSubnetTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
-	tx.unsignedBytes, err = Codec.Marshal(tx.UnsignedCreateSubnetTx)
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateSubnetTx))
 	if err != nil {
 		fmt.Errorf("couldn't marshal UnsignedCreateSubnetTx: %w", err)
 	}
@@ -110,20 +110,9 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 		return errControlKeysNotSortedAndUnique
 	}
 
-	// Byte representation of the unsigned transaction
-	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
-	if err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
-
-	// Recover signature from byte repr. of unsigned tx
-	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:]) // the public key that signed [tx]
-	if err != nil {
-		return err
-	}
-
-	tx.key = key
 	return nil
 }
 
