@@ -30,7 +30,6 @@ type peer struct {
 	once sync.Once
 
 	b Builder
-	c Codec
 }
 
 func (p *peer) Start() {
@@ -110,7 +109,7 @@ func (p *peer) ReadMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msgBytes})
 
-		msg, err := p.c.Parse(msgBytes)
+		msg, err := p.b.Parse(msgBytes)
 		if err != nil {
 			p.net.log.Debug("failed to parse new message from %s:\n%s\n%s",
 				p.id,
