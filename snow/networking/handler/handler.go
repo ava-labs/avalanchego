@@ -78,7 +78,7 @@ func (h *Handler) dispatchMsg(msg message) bool {
 	case getMsg:
 		h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
 	case getFailedMsg:
-		h.engine.GetFailed(msg.validatorID, msg.requestID, msg.containerID)
+		h.engine.GetFailed(msg.validatorID, msg.requestID)
 	case putMsg:
 		h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case pushQueryMsg:
@@ -91,6 +91,8 @@ func (h *Handler) dispatchMsg(msg message) bool {
 		h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
 	case notifyMsg:
 		h.engine.Notify(msg.notification)
+	case gossipMsg:
+		h.engine.Gossip()
 	case shutdownMsg:
 		h.engine.Shutdown()
 		return false
@@ -183,12 +185,11 @@ func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids
 }
 
 // GetFailed passes a GetFailed message to the consensus engine.
-func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 	h.msgs <- message{
 		messageType: getFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-		containerID: containerID,
 	}
 }
 
@@ -231,6 +232,9 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 		requestID:   requestID,
 	}
 }
+
+// Gossip passes a gossip request to the consensus engine
+func (h *Handler) Gossip() { h.msgs <- message{messageType: gossipMsg} }
 
 // Shutdown shuts down the dispatcher
 func (h *Handler) Shutdown() { h.msgs <- message{messageType: shutdownMsg}; h.wg.Wait() }

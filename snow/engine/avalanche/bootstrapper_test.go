@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -60,7 +61,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 
 	handler.Initialize(engine, make(chan common.Message), 1)
 	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts)
+	router.Initialize(ctx.Log, timeouts, time.Hour)
 
 	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
 	txBlocker, _ := queue.New(prefixdb.New([]byte("tx"), db))
@@ -288,7 +289,6 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	bs.ForceAccepted(acceptedIDs)
 
 	state.getVertex = nil
-	sender.GetF = nil
 
 	state.parseVertex = func(vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
@@ -1005,5 +1005,113 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	if bs.pending.Len() != 1 {
 		t.Fatalf("wrong number pending")
+	}
+}
+
+func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
+	config, peerID, sender, state, _ := newConfig(t)
+
+	vtxID0 := ids.Empty.Prefix(0)
+	vtxID1 := ids.Empty.Prefix(1)
+
+	vtxBytes0 := []byte{0}
+	vtxBytes1 := []byte{1}
+
+	vtx0 := &Vtx{
+		id:     vtxID0,
+		height: 0,
+		status: choices.Processing,
+		bytes:  vtxBytes0,
+	}
+	vtx1 := &Vtx{
+		id:     vtxID1,
+		height: 0,
+		status: choices.Processing,
+		bytes:  vtxBytes1,
+	}
+
+	bs := bootstrapper{}
+	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
+	bs.Initialize(config)
+
+	acceptedIDs := ids.Set{}
+	acceptedIDs.Add(
+		vtxID0,
+	)
+
+	state.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case vtxID.Equals(vtxID0):
+			return nil, errUnknownVertex
+		default:
+			t.Fatal(errUnknownVertex)
+			panic(errUnknownVertex)
+		}
+	}
+
+	requestID := new(uint32)
+	sender.GetF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+		if !vdr.Equals(peerID) {
+			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
+		}
+		switch {
+		case vtxID.Equals(vtxID0):
+		default:
+			t.Fatalf("Requested unknown vertex")
+		}
+
+		*requestID = reqID
+	}
+
+	bs.ForceAccepted(acceptedIDs)
+
+	state.getVertex = nil
+	sender.GetF = nil
+
+	state.parseVertex = func(vtxBytes []byte) (avalanche.Vertex, error) {
+		switch {
+		case bytes.Equal(vtxBytes, vtxBytes0):
+			return vtx0, nil
+		case bytes.Equal(vtxBytes, vtxBytes1):
+			return vtx1, nil
+		}
+		t.Fatal(errParsedUnknownVertex)
+		return nil, errParsedUnknownVertex
+	}
+
+	state.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case vtxID.Equals(vtxID0):
+			return vtx0, nil
+		case vtxID.Equals(vtxID1):
+			return vtx1, nil
+		default:
+			t.Fatal(errUnknownVertex)
+			panic(errUnknownVertex)
+		}
+	}
+
+	finished := new(bool)
+	bs.onFinished = func() { *finished = true }
+	sender.CantGet = false
+
+	bs.Put(peerID, *requestID, vtxID0, vtxBytes1)
+
+	sender.CantGet = true
+
+	bs.Put(peerID, *requestID, vtxID0, vtxBytes0)
+
+	state.parseVertex = nil
+	state.edge = nil
+	bs.onFinished = nil
+
+	if !*finished {
+		t.Fatalf("Bootstrapping should have finished")
+	}
+	if vtx0.Status() != choices.Accepted {
+		t.Fatalf("Vertex should be accepted")
+	}
+	if vtx1.Status() != choices.Processing {
+		t.Fatalf("Vertex should be processing")
 	}
 }

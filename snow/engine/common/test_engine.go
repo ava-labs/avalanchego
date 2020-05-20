@@ -15,6 +15,7 @@ type EngineTest struct {
 	T *testing.T
 
 	CantStartup,
+	CantGossip,
 	CantShutdown,
 
 	CantContext,
@@ -38,10 +39,11 @@ type EngineTest struct {
 	CantQueryFailed,
 	CantChits bool
 
-	StartupF, ShutdownF                                                                func()
+	StartupF, GossipF, ShutdownF                                                       func()
 	ContextF                                                                           func() *snow.Context
 	NotifyF                                                                            func(Message)
-	GetF, GetFailedF, PullQueryF                                                       func(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
+	GetF, PullQueryF                                                                   func(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
+	GetFailedF                                                                         func(validatorID ids.ShortID, requestID uint32)
 	PutF, PushQueryF                                                                   func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte)
 	GetAcceptedFrontierF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, QueryFailedF func(validatorID ids.ShortID, requestID uint32)
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF                                 func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
@@ -50,6 +52,7 @@ type EngineTest struct {
 // Default ...
 func (e *EngineTest) Default(cant bool) {
 	e.CantStartup = cant
+	e.CantGossip = cant
 	e.CantShutdown = cant
 
 	e.CantContext = cant
@@ -80,6 +83,15 @@ func (e *EngineTest) Startup() {
 		e.StartupF()
 	} else if e.CantStartup && e.T != nil {
 		e.T.Fatalf("Unexpectedly called Startup")
+	}
+}
+
+// Gossip ...
+func (e *EngineTest) Gossip() {
+	if e.GossipF != nil {
+		e.GossipF()
+	} else if e.CantGossip && e.T != nil {
+		e.T.Fatalf("Unexpectedly called Gossip")
 	}
 }
 
@@ -176,9 +188,9 @@ func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID 
 }
 
 // GetFailed ...
-func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) {
 	if e.GetFailedF != nil {
-		e.GetFailedF(validatorID, requestID, containerID)
+		e.GetFailedF(validatorID, requestID)
 	} else if e.CantGetFailed && e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetFailed")
 	}

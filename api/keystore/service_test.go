@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
@@ -258,6 +259,17 @@ func TestServiceExportImport(t *testing.T) {
 		reply := ImportUserReply{}
 		if err := newKS.ImportUser(nil, &ImportUserArgs{
 			Username: "bob",
+			Password: "",
+			User:     exportReply.User,
+		}, &reply); err == nil {
+			t.Fatal("Should have errored due to incorrect password")
+		}
+	}
+
+	{
+		reply := ImportUserReply{}
+		if err := newKS.ImportUser(nil, &ImportUserArgs{
+			Username: "bob",
 			Password: strongPassword,
 			User:     exportReply.User,
 		}, &reply); err != nil {
@@ -278,5 +290,91 @@ func TestServiceExportImport(t *testing.T) {
 		} else if !bytes.Equal(val, []byte("world")) {
 			t.Fatalf("Should have read '%s' from the db", "world")
 		}
+	}
+}
+
+func TestServiceDeleteUser(t *testing.T) {
+	testUser := "testUser"
+	password := "passwTest@fake01ord"
+	tests := []struct {
+		desc      string
+		setup     func(ks *Keystore) error
+		request   *DeleteUserArgs
+		want      *DeleteUserReply
+		wantError bool
+	}{{
+		desc:      "empty user name case",
+		request:   &DeleteUserArgs{},
+		wantError: true,
+	}, {
+		desc:      "user not exists case",
+		request:   &DeleteUserArgs{Username: "dummy"},
+		wantError: true,
+	}, {
+		desc:      "user exists and invalid password case",
+		request:   &DeleteUserArgs{Username: testUser, Password: "password"},
+		wantError: true,
+	}, {
+		desc: "user exists and valid password case",
+		setup: func(ks *Keystore) error {
+			return ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &CreateUserReply{})
+		},
+		request: &DeleteUserArgs{Username: testUser, Password: password},
+		want:    &DeleteUserReply{Success: true},
+	}, {
+		desc: "delete a user, imported from import api case",
+		setup: func(ks *Keystore) error {
+
+			reply := CreateUserReply{}
+			if err := ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &reply); err != nil {
+				return err
+			}
+
+			// created data in bob db
+			db, err := ks.GetDatabase(ids.Empty, testUser, password)
+			if err != nil {
+				return err
+			}
+			if err := db.Put([]byte("hello"), []byte("world")); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		request: &DeleteUserArgs{Username: testUser, Password: password},
+		want:    &DeleteUserReply{Success: true},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ks := Keystore{}
+			ks.Initialize(logging.NoLog{}, memdb.New())
+
+			if tt.setup != nil {
+				if err := tt.setup(&ks); err != nil {
+					t.Fatalf("failed to create user setup in keystore: %v", err)
+				}
+			}
+			got := &DeleteUserReply{}
+			err := ks.DeleteUser(nil, tt.request, got)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
+			}
+
+			if !tt.wantError && !reflect.DeepEqual(tt.want, got) {
+				t.Fatalf("DeleteUser() failed: got %v, want %v", got, tt.want)
+			}
+
+			if err == nil && got.Success { // delete is successful
+				if _, ok := ks.users[testUser]; ok {
+					t.Fatalf("DeleteUser() failed: expected the user %s should be delete from users map", testUser)
+				}
+
+				// deleted user details should be available to create user again.
+				if err = ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &CreateUserReply{}); err != nil {
+					t.Fatalf("failed to create user: %v", err)
+				}
+			}
+		})
 	}
 }

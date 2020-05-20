@@ -124,10 +124,6 @@ type CommonBlock struct {
 	*core.Block `serialize:"true"`
 	vm          *VM
 
-	// This block's parent.
-	// nil before parentBlock() is called on this block
-	parent Block
-
 	// This block's children
 	children []Block
 }
@@ -142,7 +138,6 @@ func (cb *CommonBlock) Reject() {
 // free removes this block from memory
 func (cb *CommonBlock) free() {
 	delete(cb.vm.currentBlocks, cb.ID().Key())
-	cb.parent = nil
 	cb.children = nil
 }
 
@@ -165,19 +160,12 @@ func (cb *CommonBlock) Parent() snowman.Block {
 
 // parentBlock returns this block's parent
 func (cb *CommonBlock) parentBlock() Block {
-	// Check if the block already has a reference to its parent
-	if cb.parent != nil {
-		return cb.parent
-	}
-
 	// Get the parent from database
 	parentID := cb.ParentID()
 	parent, err := cb.vm.getBlock(parentID)
 	if err != nil {
-		cb.vm.Ctx.Log.Debug("could not get parent (ID %s) of block %s", parentID, cb.ID())
 		return nil
 	}
-	cb.parent = parent
 	return parent.(Block)
 }
 

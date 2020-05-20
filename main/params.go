@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/ava-labs/gecko/database/leveldb"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/snow/networking/router"
+	"github.com/ava-labs/gecko/staking"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -32,8 +34,15 @@ const (
 
 // Results of parsing the CLI
 var (
-	Config = node.Config{}
-	Err    error
+	Config                 = node.Config{}
+	Err                    error
+	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
+	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
+	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+)
+
+var (
+	errBootstrapMismatch = errors.New("more bootstrap IDs provided than bootstrap IPs")
 )
 
 // GetIPs returns the default IPs for each network
@@ -52,17 +61,15 @@ func GetIPs(networkID uint32) []string {
 	}
 }
 
-var (
-	errBootstrapMismatch = errors.New("more bootstrap IDs provided than bootstrap IPs")
-)
-
 // Parse the CLI arguments
 func init() {
 	errs := &wrappers.Errs{}
 	defer func() { Err = errs.Err }()
 
 	loggingConfig, err := logging.DefaultConfig()
-	errs.Add(err)
+	if errs.Add(err); errs.Errored() {
+		return
+	}
 
 	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
 
@@ -80,7 +87,7 @@ func init() {
 
 	// Database:
 	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := fs.String("db-dir", "db", "Database directory for Ava state")
+	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Ava state")
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
@@ -98,8 +105,8 @@ func init() {
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
 	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
-	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", "keys/staker.key", "TLS private key file for staking connections")
-	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", "keys/staker.crt", "TLS certificate file for staking connections")
+	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
+	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", "./build/plugins", "Plugin directory for Ava VMs")
@@ -140,17 +147,22 @@ func init() {
 	}
 
 	networkID, err := genesis.NetworkID(*networkName)
-	errs.Add(err)
+	if errs.Add(err); err != nil {
+		return
+	}
 
 	Config.NetworkID = networkID
 
 	// DB:
-	if *db && err == nil {
-		// TODO: Add better params here
+	if *db {
+		*dbDir = os.ExpandEnv(*dbDir) // parse any env variables
 		dbPath := path.Join(*dbDir, genesis.NetworkName(Config.NetworkID), dbVersion)
 		db, err := leveldb.New(dbPath, 0, 0, 0)
+		if err != nil {
+			errs.Add(fmt.Errorf("couldn't create db at %s: %w", dbPath, err))
+			return
+		}
 		Config.DB = db
-		errs.Add(err)
 	} else {
 		Config.DB = memdb.New()
 	}
@@ -162,7 +174,7 @@ func init() {
 	if *consensusIP == "" {
 		ip, err = Config.Nat.IP()
 		if err != nil {
-			ip = net.IPv4zero
+			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
 	} else {
 		ip = net.ParseIP(*consensusIP)
@@ -170,7 +182,9 @@ func init() {
 
 	if ip == nil {
 		errs.Add(fmt.Errorf("Invalid IP Address %s", *consensusIP))
+		return
 	}
+
 	Config.StakingIP = utils.IPDesc{
 		IP:   ip,
 		Port: uint16(*consensusPort),
@@ -183,7 +197,10 @@ func init() {
 	for _, ip := range strings.Split(*bootstrapIPs, ",") {
 		if ip != "" {
 			addr, err := utils.ToIPDesc(ip)
-			errs.Add(err)
+			if err != nil {
+				errs.Add(fmt.Errorf("couldn't parse ip: %w", err))
+				return
+			}
 			Config.BootstrapPeers = append(Config.BootstrapPeers, &node.Peer{
 				IP: addr,
 			})
@@ -202,24 +219,52 @@ func init() {
 		cb58 := formatting.CB58{}
 		for _, id := range strings.Split(*bootstrapIDs, ",") {
 			if id != "" {
-				errs.Add(cb58.FromString(id))
-				cert, err := ids.ToShortID(cb58.Bytes)
-				errs.Add(err)
-
+				err = cb58.FromString(id)
+				if err != nil {
+					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err))
+					return
+				}
+				peerID, err := ids.ToShortID(cb58.Bytes)
+				if err != nil {
+					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id: %w", err))
+					return
+				}
 				if len(Config.BootstrapPeers) <= i {
 					errs.Add(errBootstrapMismatch)
-					continue
+					return
 				}
-				Config.BootstrapPeers[i].ID = cert
+				Config.BootstrapPeers[i].ID = peerID
 				i++
 			}
 		}
 		if len(Config.BootstrapPeers) != i {
 			errs.Add(fmt.Errorf("More bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i))
+			return
 		}
 	} else {
 		for _, peer := range Config.BootstrapPeers {
 			peer.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+		}
+	}
+
+	// Staking
+	Config.StakingCertFile = os.ExpandEnv(Config.StakingCertFile) // parse any env variable
+	Config.StakingKeyFile = os.ExpandEnv(Config.StakingKeyFile)
+	switch {
+	// If staking key/cert locations are specified but not found, error
+	case Config.StakingKeyFile != defaultStakingKeyPath || Config.StakingCertFile != defaultStakingCertPath:
+		if _, err := os.Stat(Config.StakingKeyFile); os.IsNotExist(err) {
+			errs.Add(fmt.Errorf("couldn't find staking key at %s", Config.StakingKeyFile))
+			return
+		} else if _, err := os.Stat(Config.StakingCertFile); os.IsNotExist(err) {
+			errs.Add(fmt.Errorf("couldn't find staking certificate at %s", Config.StakingCertFile))
+			return
+		}
+	default:
+		// Only creates staking key/cert if [stakingKeyPath] doesn't exist
+		if err := staking.GenerateStakingKeyCert(Config.StakingKeyFile, Config.StakingCertFile); err != nil {
+			errs.Add(fmt.Errorf("couldn't generate staking key/cert: %w", err))
+			return
 		}
 	}
 
@@ -231,14 +276,18 @@ func init() {
 		loggingConfig.Directory = *logsDir
 	}
 	logFileLevel, err := logging.ToLevel(*logLevel)
-	errs.Add(err)
+	if errs.Add(err); err != nil {
+		return
+	}
 	loggingConfig.LogLevel = logFileLevel
 
 	if *logDisplayLevel == "" {
 		*logDisplayLevel = *logLevel
 	}
 	displayLevel, err := logging.ToLevel(*logDisplayLevel)
-	errs.Add(err)
+	if errs.Add(err); err != nil {
+		return
+	}
 	loggingConfig.DisplayLevel = displayLevel
 
 	Config.LoggingConfig = loggingConfig

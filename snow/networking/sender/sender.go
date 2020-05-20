@@ -88,7 +88,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 	// Add a timeout -- if we don't get a response before the timeout expires,
 	// send this consensus engine a GetFailed message
 	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
-		s.router.GetFailed(validatorID, s.ctx.ChainID, requestID, containerID)
+		s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 	})
 	s.sender.Get(validatorID, s.ctx.ChainID, requestID, containerID)
 }
@@ -162,4 +162,10 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set)
 		return
 	}
 	s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
+}
+
+// Gossip the provided container
+func (s *Sender) Gossip(containerID ids.ID, container []byte) {
+	s.ctx.Log.Verbo("Gossiping %s", containerID)
+	s.sender.Gossip(s.ctx.ChainID, containerID, container)
 }

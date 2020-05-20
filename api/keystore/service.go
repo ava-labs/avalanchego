@@ -218,7 +218,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 		return err
 	}
 	if !usr.CheckPassword(args.Password) {
-		return fmt.Errorf("incorrect password for %s", args.Username)
+		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
 	userDB := prefixdb.New([]byte(args.Username), ks.bcDB)
@@ -274,6 +274,9 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	if err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
 		return err
 	}
+	if !userData.User.CheckPassword(args.Password) {
+		return fmt.Errorf("incorrect password for user %q", args.Username)
+	}
 
 	usrBytes, err := ks.codec.Marshal(&userData.User)
 	if err != nil {
@@ -301,6 +304,70 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	return nil
 }
 
+// DeleteUserArgs are arguments for passing into DeleteUser requests
+type DeleteUserArgs struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// DeleteUserReply is the response from calling DeleteUser
+type DeleteUserReply struct {
+	Success bool `json:"success"`
+}
+
+// DeleteUser deletes user with the provided username and password.
+func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *DeleteUserReply) error {
+	ks.lock.Lock()
+	defer ks.lock.Unlock()
+
+	ks.log.Verbo("DeleteUser called with %s", args.Username)
+
+	if args.Username == "" {
+		return errEmptyUsername
+	}
+
+	// check if user exists and valid user.
+	usr, err := ks.getUser(args.Username)
+	switch {
+	case err != nil || usr == nil:
+		return fmt.Errorf("user doesn't exist: %s", args.Username)
+	case !usr.CheckPassword(args.Password):
+		return fmt.Errorf("incorrect password for user %q", args.Username)
+	}
+
+	userNameBytes := []byte(args.Username)
+	userBatch := ks.userDB.NewBatch()
+	if err := userBatch.Delete(userNameBytes); err != nil {
+		return err
+	}
+
+	userDataDB := prefixdb.New(userNameBytes, ks.bcDB)
+	dataBatch := userDataDB.NewBatch()
+
+	it := userDataDB.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		if err = dataBatch.Delete(it.Key()); err != nil {
+			return err
+		}
+	}
+
+	if err = it.Error(); err != nil {
+		return err
+	}
+
+	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
+		return err
+	}
+
+	// delete from users map.
+	delete(ks.users, args.Username)
+
+	reply.Success = true
+	return nil
+}
+
 // NewBlockchainKeyStore ...
 func (ks *Keystore) NewBlockchainKeyStore(blockchainID ids.ID) *BlockchainKeystore {
 	return &BlockchainKeystore{
@@ -319,7 +386,7 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 		return nil, err
 	}
 	if !usr.CheckPassword(password) {
-		return nil, fmt.Errorf("incorrect password for user '%s'", username)
+		return nil, fmt.Errorf("incorrect password for user %q", username)
 	}
 
 	userDB := prefixdb.New([]byte(username), ks.bcDB)

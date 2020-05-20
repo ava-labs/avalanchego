@@ -4,6 +4,8 @@
 package router
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -19,7 +21,7 @@ type Router interface {
 	AddChain(chain *handler.Handler)
 	RemoveChain(chainID ids.ID)
 	Shutdown()
-	Initialize(log logging.Logger, timeouts *timeout.Manager)
+	Initialize(log logging.Logger, timeouts *timeout.Manager, gossipFrequency time.Duration)
 }
 
 // ExternalRouter routes messages from the network to the
@@ -40,6 +42,6 @@ type ExternalRouter interface {
 type InternalRouter interface {
 	GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
+	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -54,7 +55,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 
 	handler.Initialize(engine, make(chan common.Message), 1)
 	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts)
+	router.Initialize(ctx.Log, timeouts, time.Hour)
 
 	blocker, _ := queue.New(db)
 
@@ -222,12 +223,13 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	bs.ForceAccepted(acceptedIDs)
 
 	vm.GetBlockF = nil
-	sender.GetF = nil
 
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(blkBytes, blkBytes1):
 			return blk1, nil
+		case bytes.Equal(blkBytes, blkBytes2):
+			return blk2, nil
 		}
 		t.Fatal(errUnknownBlock)
 		return nil, errUnknownBlock
@@ -474,5 +476,115 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	if bs.pending.Len() != 1 {
 		t.Fatalf("wrong number pending")
+	}
+}
+
+func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
+	config, peerID, sender, vm := newConfig(t)
+
+	blkID0 := ids.Empty.Prefix(0)
+	blkID1 := ids.Empty.Prefix(1)
+	blkID2 := ids.Empty.Prefix(2)
+
+	blkBytes0 := []byte{0}
+	blkBytes1 := []byte{1}
+	blkBytes2 := []byte{2}
+
+	blk0 := &Blk{
+		id:     blkID0,
+		height: 0,
+		status: choices.Accepted,
+		bytes:  blkBytes0,
+	}
+	blk1 := &Blk{
+		parent: blk0,
+		id:     blkID1,
+		height: 1,
+		status: choices.Processing,
+		bytes:  blkBytes1,
+	}
+	blk2 := &Blk{
+		parent: blk1,
+		id:     blkID2,
+		height: 2,
+		status: choices.Processing,
+		bytes:  blkBytes2,
+	}
+
+	bs := bootstrapper{}
+	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
+	bs.Initialize(config)
+
+	acceptedIDs := ids.Set{}
+	acceptedIDs.Add(blkID1)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID.Equals(blkID1):
+			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock)
+			panic(errUnknownBlock)
+		}
+	}
+
+	requestID := new(uint32)
+	sender.GetF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+		if !vdr.Equals(peerID) {
+			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
+		}
+		switch {
+		case vtxID.Equals(blkID1):
+		default:
+			t.Fatalf("Requested unknown block")
+		}
+
+		*requestID = reqID
+	}
+
+	bs.ForceAccepted(acceptedIDs)
+
+	vm.GetBlockF = nil
+	sender.GetF = nil
+
+	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blkBytes, blkBytes2):
+			return blk2, nil
+		}
+		t.Fatal(errUnknownBlock)
+		return nil, errUnknownBlock
+	}
+
+	sender.CantGet = false
+
+	bs.Put(peerID, *requestID, blkID1, blkBytes2)
+
+	sender.CantGet = true
+
+	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(blkBytes, blkBytes1):
+			return blk1, nil
+		}
+		t.Fatal(errUnknownBlock)
+		return nil, errUnknownBlock
+	}
+
+	finished := new(bool)
+	bs.onFinished = func() { *finished = true }
+
+	bs.Put(peerID, *requestID, blkID1, blkBytes1)
+
+	vm.ParseBlockF = nil
+
+	if !*finished {
+		t.Fatalf("Bootstrapping should have finished")
+	}
+	if blk1.Status() != choices.Accepted {
+		t.Fatalf("Block should be accepted")
+	}
+	if blk2.Status() != choices.Processing {
+		t.Fatalf("Block should be processing")
 	}
 }
