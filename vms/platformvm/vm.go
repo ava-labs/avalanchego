@@ -454,8 +454,14 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		for _, tx := range txs {
-			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+			status, err := vm.getTxStatus()
+			if err != nil {
 				return nil, err
+			}
+			if status == choices.Unknown {
+				if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+					return nil, err
+				}
 			}
 		}
 		return blk, vm.DB.Commit()
@@ -476,8 +482,14 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
-		if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+		status, err := vm.getTxStatus()
+		if err != nil {
 			return nil, err
+		}
+		if status == choices.Unknown {
+			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+				return nil, err
+			}
 		}
 		return blk, vm.DB.Commit()
 	}
@@ -527,8 +539,14 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
-		if err := vm.putTxStatus(vm.DB, stakerTx.ID(), choices.Processing); err != nil {
+		status, err := vm.getTxStatus()
+		if err != nil {
 			return nil, err
+		}
+		if status == choices.Unknown {
+			if err := vm.putTxStatus(vm.DB, stakerTx.ID(), choices.Processing); err != nil {
+				return nil, err
+			}
 		}
 		return blk, vm.DB.Commit()
 	}
@@ -556,8 +574,14 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
-		if err := vm.putTxStatus(vm.DB, advanceTimeTx.id, choices.Processing); err != nil {
+		status, err := vm.getTxStatus()
+		if err != nil {
 			return nil, err
+		}
+		if status == choices.Unknown {
+			if err := vm.putTxStatus(vm.DB, advanceTimeTx.id, choices.Processing); err != nil {
+				return nil, err
+			}
 		}
 		return blk, vm.DB.Commit()
 	}
@@ -575,8 +599,14 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 				return nil, err
 			}
-			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+			status, err := vm.getTxStatus()
+			if err != nil {
 				return nil, err
+			}
+			if status == choices.Unknown {
+				if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+					return nil, err
+				}
 			}
 			return blk, vm.DB.Commit()
 		}

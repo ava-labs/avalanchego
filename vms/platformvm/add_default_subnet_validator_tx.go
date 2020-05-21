@@ -192,19 +192,19 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 }
 
 func (tx *addDefaultSubnetValidatorTx) Accept() error {
-        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
-                return err
-       }
-        tx.vm.DB.Commit()
-        return nil
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+		return err
+	}
+	tx.vm.DB.Commit()
+	return nil
 }
 
 func (tx *addDefaultSubnetValidatorTx) Reject() error {
-        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
-               return err
-        }
-        tx.vm.DB.Commit()
-        return nil
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+		return err
+	}
+	tx.vm.DB.Commit()
+	return nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is

@@ -209,19 +209,19 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 }
 
 func (tx *CreateChainTx) Accept() error {
-        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
-                return err
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+		return err
 	}
-        tx.vm.DB.Commit()
-        return nil
+	tx.vm.DB.Commit()
+	return nil
 }
 
 func (tx *CreateChainTx) Reject() error {
-        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
-                return err
-        }
-        tx.vm.DB.Commit()
-        return nil
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+		return err
+	}
+	tx.vm.DB.Commit()
+	return nil
 }
 
 // We use this type so we can serialize a list of *CreateChainTx

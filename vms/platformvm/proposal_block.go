@@ -69,9 +69,9 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 		return err
 	}
 
-        if err := pb.Tx.SyntacticVerify(); err != nil {
-                return err
-        }
+	if err := pb.Tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	status, err := vm.getTxStatus(vm.DB, pb.Tx.ID())
 	if err != nil {
@@ -170,17 +170,17 @@ func (pb *ProposalBlock) Options() [2]snowman.Block {
 func (pb *ProposalBlock) Accept() {
 	pb.vm.Ctx.Log.Verbo("Accepting block with ID %s", pb.ID())
 
-        pb.CommonBlock.Accept()
-	
+	pb.CommonBlock.Accept()
+
 	if err := pb.Tx.Accept(); err != nil {
 		pb.vm.Ctx.Log.Error("unable to accept tx")
 	}
 }
 
 func (pb *ProposalBlock) Reject() {
-        pb.vm.Ctx.Log.Verbo("Rejecting block with ID %s", pb.ID())
+	pb.vm.Ctx.Log.Verbo("Rejecting block with ID %s", pb.ID())
 
-        pb.CommonBlock.Reject()
+	pb.CommonBlock.Reject()
 
 	if err := pb.Tx.Reject(); err != nil {
 		pb.vm.Ctx.Log.Error("unable to reject tx")

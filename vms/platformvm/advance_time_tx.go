@@ -25,20 +25,20 @@ type advanceTimeTx struct {
 	// Unix time this block proposes increasing the timestamp to
 	Time uint64 `serialize:"true"`
 
-	vm *VM
-	id ids.ID
-        bytes []byte
+	vm    *VM
+	id    ids.ID
+	bytes []byte
 }
 
 func (tx *advanceTimeTx) initialize(vm *VM) error {
 	tx.vm = vm
 
-        bytes, err := Codec.Marshal(tx) // byte representation of the signed transaction                                                                                                                           
+	bytes, err := Codec.Marshal(tx) // byte representation of the signed transaction
 	if err != nil {
-                return err
-        }
-        tx.bytes = bytes
-        tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
+		return err
+	}
+	tx.bytes = bytes
+	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
 
 	return nil
 }
@@ -182,19 +182,19 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 }
 
 func (tx *advanceTimeTx) Accept() error {
-        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
-                return err
-        }
-        tx.vm.DB.Commit()
-        return nil
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+		return err
+	}
+	tx.vm.DB.Commit()
+	return nil
 }
 
 func (tx *advanceTimeTx) Reject() error {
-        if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
-                return err
-        }
-        tx.vm.DB.Commit()
-        return nil
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+		return err
+	}
+	tx.vm.DB.Commit()
+	return nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed time isn't after the

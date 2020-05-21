@@ -58,18 +58,18 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 	}
 
 	if err := ab.Tx.SyntacticVerify(); err != nil {
-                return err
-        }
+		return err
+	}
 
-        status, _ := vm.getTxStatus(vm.DB, ab.Tx.ID()) 
-        if status == choices.Unknown {
-               if err := vm.putTxStatus(vm.DB, ab.Tx.ID(), choices.Processing); err != nil {
-                        return err
-               }
-                if err := vm.DB.Commit(); err != nil {
-                        return err
-                }
-        }
+	status, _ := vm.getTxStatus(vm.DB, ab.Tx.ID())
+	if status == choices.Unknown {
+		if err := vm.putTxStatus(vm.DB, ab.Tx.ID(), choices.Processing); err != nil {
+			return err
+		}
+		if err := vm.DB.Commit(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
