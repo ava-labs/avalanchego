@@ -22,10 +22,6 @@ const (
 	ContainerID                 // Used for querying
 	ContainerBytes              // Used for gossiping
 	ContainerIDs                // Used for querying
-	Bytes                       // Used as arbitrary data
-	TxID                        // Used for throughput tests
-	Tx                          // Used for throughput tests
-	Status                      // Used for throughput tests
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -51,14 +47,6 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackBytes
 	case ContainerIDs:
 		return wrappers.TryPackHashes
-	case Bytes:
-		return wrappers.TryPackBytes
-	case TxID:
-		return wrappers.TryPackHash
-	case Tx:
-		return wrappers.TryPackBytes
-	case Status:
-		return wrappers.TryPackInt
 	default:
 		return nil
 	}
@@ -87,14 +75,6 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackBytes
 	case ContainerIDs:
 		return wrappers.TryUnpackHashes
-	case Bytes:
-		return wrappers.TryUnpackBytes
-	case TxID:
-		return wrappers.TryUnpackHash
-	case Tx:
-		return wrappers.TryUnpackBytes
-	case Status:
-		return wrappers.TryUnpackInt
 	default:
 		return nil
 	}
@@ -120,14 +100,6 @@ func (f Field) String() string {
 		return "Container Bytes"
 	case ContainerIDs:
 		return "Container IDs"
-	case Bytes:
-		return "Bytes"
-	case TxID:
-		return "TxID"
-	case Tx:
-		return "Tx"
-	case Status:
-		return "Status"
 	default:
 		return "Unknown Field"
 	}
