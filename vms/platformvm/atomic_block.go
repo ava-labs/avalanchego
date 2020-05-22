@@ -69,7 +69,7 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 			Tx: &ab.Tx,
 		}
 		if err := vm.putTx(vm.DB, ab.Tx.ID(), genTx); err != nil {
-			return nil, err
+			return err
 		}
 		if err := vm.putTxStatus(vm.DB, ab.Tx.ID(), choices.Processing); err != nil {
 			return err

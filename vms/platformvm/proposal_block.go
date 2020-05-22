@@ -101,7 +101,7 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 			Tx: &pb.Tx,
 		}
 		if err := vm.putTx(vm.DB, pb.Tx.ID(), genTx); err != nil {
-			return nil, err
+			return err
 		}
 		if err := vm.putTxStatus(vm.DB, pb.Tx.ID(), choices.Processing); err != nil {
 			return err

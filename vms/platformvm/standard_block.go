@@ -61,7 +61,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 				Tx: &tx,
 			}
 			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
-				return nil, err
+				return err
 			}
 			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
 				return err

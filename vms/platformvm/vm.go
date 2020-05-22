@@ -257,7 +257,7 @@ func (vm *VM) Initialize(
 				Tx: &tx,
 			}
 			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
-				return nil, err
+				return err
 			}
 			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Accepted); err != nil {
 				return err
@@ -280,10 +280,10 @@ func (vm *VM) Initialize(
 			}
 		}
 		genTx := &GenericTx{
-			Tx: &tx,
+			Tx: &chain,
 		}
-		if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
-			return nil, err
+		if err := vm.putTx(vm.DB, chain.ID(), genTx); err != nil {
+			return err
 		}
 		if err := vm.putTxStatus(vm.DB, chain.ID(), choices.Accepted); err != nil {
 			return err
@@ -572,9 +572,9 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		}
 		if status == choices.Unknown {
 			genTx := &GenericTx{
-				Tx: &tx,
+				Tx: &stakerTx,
 			}
-			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+			if err := vm.putTx(vm.DB, stakerTx.ID(), genTx); err != nil {
 				return nil, err
 			}
 			if err := vm.putTxStatus(vm.DB, stakerTx.ID(), choices.Processing); err != nil {
@@ -613,12 +613,12 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		}
 		if status == choices.Unknown {
 			genTx := &GenericTx{
-				Tx: &tx,
+				Tx: &advanceTimeTx,
 			}
-			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+			if err := vm.putTx(vm.DB, advanceTimeTx.ID(), genTx); err != nil {
 				return nil, err
 			}
-			if err := vm.putTxStatus(vm.DB, advanceTimeTx.id, choices.Processing); err != nil {
+			if err := vm.putTxStatus(vm.DB, advanceTimeTx.ID(), choices.Processing); err != nil {
 				return nil, err
 			}
 		}
