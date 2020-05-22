@@ -151,14 +151,6 @@ const (
 	PushQuery
 	PullQuery
 	Chits
-	// Pinging:
-	Ping
-	Pong
-	// Arbitrary data message:
-	Data
-	// Throughput test:
-	IssueTx
-	DecidedTx
 )
 
 // Defines the messages that can be sent/received with this network
@@ -180,13 +172,5 @@ var (
 		PushQuery: []Field{ChainID, RequestID, ContainerID, ContainerBytes},
 		PullQuery: []Field{ChainID, RequestID, ContainerID},
 		Chits:     []Field{ChainID, RequestID, ContainerIDs},
-		// Pinging:
-		Ping: []Field{},
-		Pong: []Field{},
-		// Arbitrary data message:
-		Data: []Field{Bytes},
-		// Throughput test:
-		IssueTx:   []Field{ChainID, Tx},
-		DecidedTx: []Field{TxID, Status},
 	}
 )

@@ -21,6 +21,4 @@ type dialer struct {
 // NewDialer ...
 func NewDialer(network string) Dialer { return &dialer{network: network} }
 
-func (d *dialer) Dial(ip utils.IPDesc) (net.Conn, error) {
-	return net.Dial(d.network, ip.String())
-}
+func (d *dialer) Dial(ip utils.IPDesc) (net.Conn, error) { return net.Dial(d.network, ip.String()) }

@@ -17,19 +17,32 @@ import (
 )
 
 type peer struct {
-	net *network
+	net *network // network this peer is part of
 
+	// if the version message has been received and is valid. is only modified
+	// on the connection's reader routine with the network state lock held.
 	connected bool
-	closed    bool
-	sender    chan []byte
 
-	ip   utils.IPDesc
-	id   ids.ShortID
-	conn net.Conn
-
+	// only close the peer once
 	once sync.Once
 
-	b Builder
+	// if the close function has been called, is only modifed when the network
+	// state lock held.
+	closed bool
+
+	// queue of messages this connection is attempting to send the peer. Is
+	// closed when the connection is closed.
+	sender chan []byte
+
+	// ip may or may not be set when the peer is first started. is only modified
+	// on the connection's reader routine with the network state lock held.
+	ip utils.IPDesc
+
+	// id should be set when the peer is first started.
+	id ids.ShortID
+
+	// the connection object that is used to read/write messages from
+	conn net.Conn
 }
 
 func (p *peer) Start() {
@@ -109,7 +122,7 @@ func (p *peer) ReadMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msgBytes})
 
-		msg, err := p.b.Parse(msgBytes)
+		msg, err := p.net.b.Parse(msgBytes)
 		if err != nil {
 			p.net.log.Debug("failed to parse new message from %s:\n%s\n%s",
 				p.id,
@@ -212,12 +225,12 @@ func (p *peer) close() {
 }
 
 func (p *peer) GetVersion() {
-	msg, err := p.b.GetVersion()
+	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
 func (p *peer) Version() {
-	msg, err := p.b.Version(
+	msg, err := p.net.b.Version(
 		p.net.networkID,
 		p.net.clock.Unix(),
 		p.net.ip,
@@ -227,12 +240,12 @@ func (p *peer) Version() {
 	p.Send(msg)
 }
 func (p *peer) GetPeerList() {
-	msg, err := p.b.GetPeerList()
+	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
 func (p *peer) PeerList(peers []utils.IPDesc) {
-	msg, err := p.b.PeerList(peers)
+	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return
@@ -254,7 +267,9 @@ func (p *peer) version(msg Msg) {
 			p.net.networkID)
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
+		p.net.stateLock.Lock()
 		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
 		p.Close()
 		return
 	}
@@ -266,7 +281,9 @@ func (p *peer) version(msg Msg) {
 			uint64(myTime))
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
+		p.net.stateLock.Lock()
 		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
 		p.Close()
 		return
 	}
@@ -277,7 +294,9 @@ func (p *peer) version(msg Msg) {
 		p.net.log.Debug("peer version could not be parsed due to %s", err)
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
+		p.net.stateLock.Lock()
 		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
 		p.Close()
 		return
 	}
@@ -291,7 +310,9 @@ func (p *peer) version(msg Msg) {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
+		p.net.stateLock.Lock()
 		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
 		p.Close()
 		return
 	}
@@ -307,7 +328,9 @@ func (p *peer) version(msg Msg) {
 			// verification
 			if bytes.Equal(peerIP.IP, localPeerIP.IP) {
 				// if the IPs match, add this ip:port pair to be tracked
+				p.net.stateLock.Lock()
 				p.ip = peerIP
+				p.net.stateLock.Unlock()
 			}
 		}
 	}
@@ -326,7 +349,7 @@ func (p *peer) version(msg Msg) {
 }
 func (p *peer) SendPeerList() {
 	ips := p.net.validatorIPs()
-	reply, err := p.b.PeerList(ips)
+	reply, err := p.net.b.PeerList(ips)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return

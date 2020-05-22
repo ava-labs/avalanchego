@@ -5,7 +5,6 @@ package network
 
 import (
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils"
 )
 
@@ -128,30 +127,5 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs ids.Set) (
 		ChainID:      chainID.Bytes(),
 		RequestID:    requestID,
 		ContainerIDs: containerIDBytes,
-	})
-}
-
-// Ping message
-func (m Builder) Ping() (Msg, error) { return m.Pack(Ping, nil) }
-
-// Pong message
-func (m Builder) Pong() (Msg, error) { return m.Pack(Pong, nil) }
-
-// Data message
-func (m Builder) Data(b []byte) (Msg, error) { return m.Pack(Data, map[Field]interface{}{Bytes: b}) }
-
-// IssueTx message
-func (m Builder) IssueTx(chainID ids.ID, tx []byte) (Msg, error) {
-	return m.Pack(IssueTx, map[Field]interface{}{
-		ChainID: chainID.Bytes(),
-		Tx:      tx,
-	})
-}
-
-// DecidedTx message
-func (m Builder) DecidedTx(txID ids.ID, status choices.Status) (Msg, error) {
-	return m.Pack(DecidedTx, map[Field]interface{}{
-		TxID:   txID.Bytes(),
-		Status: uint32(status),
 	})
 }
