@@ -364,7 +364,7 @@ func (p *peer) peerList(msg Msg) {
 		if !ip.Equal(p.net.ip) &&
 			!ip.IsZero() &&
 			(p.net.allowPrivateIPs || !ip.IsPrivate()) {
-			// TODO: this is a vulnerability, perhaps only try to connect once?
+			// TODO: only try to connect once
 			p.net.Track(ip)
 		}
 	}
