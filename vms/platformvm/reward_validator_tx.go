@@ -53,6 +53,8 @@ func (tx *rewardValidatorTx) initialize(vm *VM) error {
 
 func (tx *rewardValidatorTx) ID() ids.ID { return tx.TxID }
 
+func (tx *rewardValidatorTx) Bytes() []byte { return tx.bytes }
+
 // SyntacticVerify that this transaction is well formed
 func (tx *rewardValidatorTx) SyntacticVerify() error {
 	switch {

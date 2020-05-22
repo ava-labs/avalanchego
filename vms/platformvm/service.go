@@ -419,24 +419,28 @@ type GenericTx struct {
 }
 
 func (genTx GenericTx) Bytes() []byte {
-        switch tx := genTx.Tx.(type) {
-        case *addDefaultSubnetValidatorTx:
-               return tx.Bytes()
-       case *addDefaultSubnetDelegatorTx:
-                return tx.Bytes()
-        case *addNonDefaultSubnetValidatorTx:
-               return tx.Bytes()
-       case *CreateSubnetTx:
-               return tx.Bytes()
-       case *CreateChainTx:
-               return tx.Bytes()
-        case *ExportTx:
-               return tx.Bytes()
-        case *ImportTx:
-               return tx.Bytes()
-       default:
-               return nil
-        }
+	switch tx := genTx.Tx.(type) {
+	case *addDefaultSubnetValidatorTx:
+		return tx.Bytes()
+	case *addDefaultSubnetDelegatorTx:
+		return tx.Bytes()
+	case *addNonDefaultSubnetValidatorTx:
+		return tx.Bytes()
+	case *advanceTimeTx:
+		return tx.Bytes()
+	case *CreateSubnetTx:
+		return tx.Bytes()
+	case *CreateChainTx:
+		return tx.Bytes()
+	case *ExportTx:
+		return tx.Bytes()
+	case *ImportTx:
+		return tx.Bytes()
+	case *rewardValidatorTx:
+		return tx.Bytes()
+	default:
+		return nil
+	}
 }
 
 /*
