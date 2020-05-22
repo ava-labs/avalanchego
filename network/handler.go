@@ -6,7 +6,7 @@ package network
 import "github.com/ava-labs/gecko/ids"
 
 // Handler represents a handler that is called when a connection is marked as
-// connected and disconnected
+// connected or disconnected
 type Handler interface {
 	// returns true if the handler should be removed
 	Connected(id ids.ShortID) bool

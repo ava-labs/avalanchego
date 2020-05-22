@@ -45,14 +45,17 @@ type peer struct {
 	conn net.Conn
 }
 
+// assume the stateLock is held
 func (p *peer) Start() {
 	go p.ReadMessages()
 	go p.WriteMessages()
 
 	// Initially send the version to the peer
-	p.Version()
+	go p.Version()
+	go p.requestVersion()
 }
 
+// request the version from the peer until we get the version from them
 func (p *peer) requestVersion() {
 	t := time.NewTicker(p.net.getVersionTimeout)
 	defer t.Stop()
@@ -70,6 +73,7 @@ func (p *peer) requestVersion() {
 	}
 }
 
+// attempt to read messages from the peer
 func (p *peer) ReadMessages() {
 	defer p.Close()
 
@@ -135,6 +139,7 @@ func (p *peer) ReadMessages() {
 	}
 }
 
+// attempt to write messages to the peer
 func (p *peer) WriteMessages() {
 	defer p.Close()
 
@@ -149,7 +154,7 @@ func (p *peer) WriteMessages() {
 		for len(msg) > 0 {
 			written, err := p.conn.Write(msg)
 			if err != nil {
-				// TODO: log error
+				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
 				return
 			}
 			msg = msg[written:]
@@ -157,7 +162,21 @@ func (p *peer) WriteMessages() {
 	}
 }
 
+// send assumes that close has not been called on this peer yet
 func (p *peer) Send(msg Msg) bool {
+	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
+
+	return p.send(msg)
+}
+
+// send assumes that close has not been called on this peer yet and that the
+// stateLock is held.
+func (p *peer) send(msg Msg) bool {
+	if p.closed {
+		p.net.log.Debug("dropping message to %s due to a closed connection", p.id)
+		return false
+	}
 	select {
 	case p.sender <- msg.Bytes():
 		return true
@@ -167,6 +186,7 @@ func (p *peer) Send(msg Msg) bool {
 	}
 }
 
+// assumes the stateLock is not held
 func (p *peer) handle(msg Msg) {
 	op := msg.Op()
 	switch op {
@@ -184,7 +204,7 @@ func (p *peer) handle(msg Msg) {
 		p.GetVersion()
 		return
 	}
-	switch msg.Op() {
+	switch op {
 	case GetPeerList:
 		p.getPeerList(msg)
 	case PeerList:
@@ -212,8 +232,10 @@ func (p *peer) handle(msg Msg) {
 	}
 }
 
+// assumes the stateLock is not held
 func (p *peer) Close() { p.once.Do(p.close) }
 
+// assumes only `peer.Close` calls this
 func (p *peer) close() {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
@@ -224,11 +246,14 @@ func (p *peer) close() {
 	p.net.disconnected(p)
 }
 
+// assumes the stateLock is not held
 func (p *peer) GetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
+
+// assumes the stateLock is not held
 func (p *peer) Version() {
 	msg, err := p.net.b.Version(
 		p.net.networkID,
@@ -239,11 +264,15 @@ func (p *peer) Version() {
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
+
+// assumes the stateLock is not held
 func (p *peer) GetPeerList() {
 	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
+
+// assumes the stateLock is not held
 func (p *peer) PeerList(peers []utils.IPDesc) {
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
@@ -254,7 +283,10 @@ func (p *peer) PeerList(peers []utils.IPDesc) {
 	return
 }
 
+// assumes the stateLock is not held
 func (p *peer) getVersion(_ Msg) { p.Version() }
+
+// assumes the stateLock is not held
 func (p *peer) version(msg Msg) {
 	if p.connected {
 		p.net.log.Verbo("dropping duplicated version message from %s", p.id)
@@ -340,6 +372,8 @@ func (p *peer) version(msg Msg) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
+	// the network connected function can only be called if disconnected wasn't
+	// already called
 	if p.closed {
 		return
 	}
@@ -347,6 +381,8 @@ func (p *peer) version(msg Msg) {
 	p.connected = true
 	p.net.connected(p)
 }
+
+// assumes the stateLock is not held
 func (p *peer) SendPeerList() {
 	ips := p.net.validatorIPs()
 	reply, err := p.net.b.PeerList(ips)
@@ -356,7 +392,11 @@ func (p *peer) SendPeerList() {
 	}
 	p.Send(reply)
 }
+
+// assumes the stateLock is not held
 func (p *peer) getPeerList(_ Msg) { p.SendPeerList() }
+
+// assumes the stateLock is not held
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
@@ -369,6 +409,8 @@ func (p *peer) peerList(msg Msg) {
 		}
 	}
 }
+
+// assumes the stateLock is not held
 func (p *peer) getAcceptedFrontier(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -376,6 +418,8 @@ func (p *peer) getAcceptedFrontier(msg Msg) {
 
 	p.net.router.GetAcceptedFrontier(p.id, chainID, requestID)
 }
+
+// assumes the stateLock is not held
 func (p *peer) acceptedFrontier(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -393,6 +437,8 @@ func (p *peer) acceptedFrontier(msg Msg) {
 
 	p.net.router.AcceptedFrontier(p.id, chainID, requestID, containerIDs)
 }
+
+// assumes the stateLock is not held
 func (p *peer) getAccepted(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -410,6 +456,8 @@ func (p *peer) getAccepted(msg Msg) {
 
 	p.net.router.GetAccepted(p.id, chainID, requestID, containerIDs)
 }
+
+// assumes the stateLock is not held
 func (p *peer) accepted(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -427,6 +475,8 @@ func (p *peer) accepted(msg Msg) {
 
 	p.net.router.Accepted(p.id, chainID, requestID, containerIDs)
 }
+
+// assumes the stateLock is not held
 func (p *peer) get(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -436,6 +486,8 @@ func (p *peer) get(msg Msg) {
 
 	p.net.router.Get(p.id, chainID, requestID, containerID)
 }
+
+// assumes the stateLock is not held
 func (p *peer) put(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -446,6 +498,8 @@ func (p *peer) put(msg Msg) {
 
 	p.net.router.Put(p.id, chainID, requestID, containerID, container)
 }
+
+// assumes the stateLock is not held
 func (p *peer) pushQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -456,6 +510,8 @@ func (p *peer) pushQuery(msg Msg) {
 
 	p.net.router.PushQuery(p.id, chainID, requestID, containerID, container)
 }
+
+// assumes the stateLock is not held
 func (p *peer) pullQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
@@ -465,6 +521,8 @@ func (p *peer) pullQuery(msg Msg) {
 
 	p.net.router.PullQuery(p.id, chainID, requestID, containerID)
 }
+
+// assumes the stateLock is not held
 func (p *peer) chits(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)

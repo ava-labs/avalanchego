@@ -313,6 +313,8 @@ func (n *Node) initEventDispatcher() {
 
 	n.ConsensusDispatcher = &triggers.EventDispatcher{}
 	n.ConsensusDispatcher.Initialize(n.Log)
+
+	n.Log.AssertNoError(n.ConsensusDispatcher.Register("gossip", n.Net))
 }
 
 // Initializes the Platform chain.
