@@ -462,6 +462,7 @@ func getAcceptedFrontier(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t
 		VotingNet.log.Debug("failed to sanitize getAcceptedFrontier message due to: %s", err)
 		return
 	}
+	VotingNet.log.Verbo("received getAcceptedFrontier from %v\nchainID: %v\nrequestID: %v", validatorID, chainID, requestID)
 
 	VotingNet.router.GetAcceptedFrontier(validatorID, chainID, requestID)
 }
@@ -481,11 +482,13 @@ func acceptedFrontier(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
+			VotingNet.log.Verbo("received acceptedFrontier from %v\nchainID: %v\nrequestID: %v", validatorID, chainID, requestID)
 			VotingNet.log.Debug("error parsing ContainerID %v: %s", containerIDBytes, err)
 			return
 		}
 		containerIDs.Add(containerID)
 	}
+	VotingNet.log.Verbo("received acceptedFrontier from %v\nchainID: %v\nrequestID: %v\ncontainerIDs: %v", validatorID, chainID, requestID, containerIDs)
 
 	VotingNet.router.AcceptedFrontier(validatorID, chainID, requestID, containerIDs)
 }
@@ -505,11 +508,13 @@ func getAccepted(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsa
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
+			VotingNet.log.Verbo("received getAccepted from %v\nchainID: %v\nrequestID: %v", validatorID, chainID, requestID)
 			VotingNet.log.Debug("error parsing ContainerID %v: %s", containerIDBytes, err)
 			return
 		}
 		containerIDs.Add(containerID)
 	}
+	VotingNet.log.Verbo("received getAccepted from %v\nchainID: %v\nrequestID: %v\ncontainerIDs: %v", validatorID, chainID, requestID, containerIDs)
 
 	VotingNet.router.GetAccepted(validatorID, chainID, requestID, containerIDs)
 }
@@ -529,11 +534,13 @@ func accepted(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
+			VotingNet.log.Verbo("received accepted from %v\nchainID: %v\nrequestID: %v", validatorID, chainID, requestID)
 			VotingNet.log.Debug("error parsing ContainerID %v: %s", containerIDBytes, err)
 			return
 		}
 		containerIDs.Add(containerID)
 	}
+	VotingNet.log.Verbo("received accepted from %v\nchainID: %v\nrequestID: %v\ncontainerIDs: %v", validatorID, chainID, requestID, containerIDs)
 
 	VotingNet.router.Accepted(validatorID, chainID, requestID, containerIDs)
 }
@@ -549,7 +556,12 @@ func get(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Point
 		return
 	}
 
-	containerID, _ := ids.ToID(msg.Get(ContainerID).([]byte))
+	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
+	VotingNet.log.Verbo("received get from %v\nchainID: %v\nrequestID: %v\ncontainerID: %v", validatorID, chainID, requestID, ContainerID)
+	if err != nil {
+		VotingNet.log.Debug("error parsing ContainerID: %s", err)
+		return
+	}
 
 	VotingNet.router.Get(validatorID, chainID, requestID, containerID)
 }
@@ -565,7 +577,11 @@ func put(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Point
 		return
 	}
 
-	containerID, _ := ids.ToID(msg.Get(ContainerID).([]byte))
+	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
+	VotingNet.log.Verbo("received put from %v\nchainID: %v\nrequestID: %v\ncontainerID: %v", validatorID, chainID, requestID, containerID)
+	if err != nil {
+		VotingNet.log.Debug("couldn't parse containerID")
+	}
 
 	containerBytes := msg.Get(ContainerBytes).([]byte)
 
@@ -583,7 +599,11 @@ func pushQuery(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe
 		return
 	}
 
-	containerID, _ := ids.ToID(msg.Get(ContainerID).([]byte))
+	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
+	VotingNet.log.Verbo("received pushQuery from %v\nchainID: %v\nrequestID: %v\ncontainerID: %v", validatorID, chainID, requestID, containerID)
+	if err != nil {
+		VotingNet.log.Debug("couldn't parse containerID")
+	}
 
 	containerBytes := msg.Get(ContainerBytes).([]byte)
 
@@ -601,7 +621,11 @@ func pullQuery(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe
 		return
 	}
 
-	containerID, _ := ids.ToID(msg.Get(ContainerID).([]byte))
+	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
+	VotingNet.log.Verbo("received pullQuery from %v\nchainID: %v\nrequestID: %v\ncontainerID: %v", validatorID, chainID, requestID, containerID)
+	if err != nil {
+		VotingNet.log.Verbo("couldn't parse containerID")
+	}
 
 	VotingNet.router.PullQuery(validatorID, chainID, requestID, containerID)
 }
@@ -621,11 +645,13 @@ func chits(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Poi
 	for _, voteBytes := range msg.Get(ContainerIDs).([][]byte) {
 		vote, err := ids.ToID(voteBytes)
 		if err != nil {
+			VotingNet.log.Verbo("received chits from %v\nchainID: %v\nrequestID: %v", validatorID, chainID, requestID)
 			VotingNet.log.Debug("error parsing chit %v: %s", voteBytes, err)
 			return
 		}
 		votes.Add(vote)
 	}
+	VotingNet.log.Verbo("received chits from %v\nchainID: %v\nrequestID: %v\nvotes: %v", validatorID, chainID, requestID, votes)
 
 	VotingNet.router.Chits(validatorID, chainID, requestID, votes)
 }
