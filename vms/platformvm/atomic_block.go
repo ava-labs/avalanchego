@@ -23,6 +23,8 @@ type AtomicTx interface {
 
 	ID() ids.ID
 
+	Bytes() []byte
+
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 
@@ -63,6 +65,12 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 
 	status, _ := vm.getTxStatus(vm.DB, ab.Tx.ID())
 	if status == choices.Unknown {
+		genTx := &GenericTx{
+			Tx: &ab.Tx,
+		}
+		if err := vm.putTx(vm.DB, ab.Tx.ID(), genTx); err != nil {
+			return nil, err
+		}
 		if err := vm.putTxStatus(vm.DB, ab.Tx.ID(), choices.Processing); err != nil {
 			return err
 		}

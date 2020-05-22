@@ -58,6 +58,8 @@ func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 
 func (tx *addDefaultSubnetDelegatorTx) ID() ids.ID { return tx.id }
 
+func (tx *addDefaultSubnetDelegatorTx) Bytes() []byte { return tx.bytes }
+
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]
 func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {

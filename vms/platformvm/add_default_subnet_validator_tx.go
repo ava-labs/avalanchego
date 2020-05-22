@@ -65,6 +65,8 @@ func (tx *addDefaultSubnetValidatorTx) initialize(vm *VM) error {
 
 func (tx *addDefaultSubnetValidatorTx) ID() ids.ID { return tx.id }
 
+func (tx *addDefaultSubnetValidatorTx) Bytes() []byte { return tx.bytes }
+
 // SyntacticVerify that this transaction is well formed
 // If [tx] is valid, this method also populates [tx.accountID]
 func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {

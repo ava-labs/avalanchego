@@ -18,6 +18,7 @@ type ProposalTx interface {
 
 	ID() ids.ID
 
+	Bytes() []byte
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(database.Database) (onCommitDB *versiondb.Database, onAbortDB *versiondb.Database, onCommitFunc func(), onAbortFunc func(), err error)
 
@@ -56,7 +57,25 @@ type ProposalBlock struct {
 func (pb *ProposalBlock) Accept() {
 	pb.SetStatus(choices.Accepted)
 	pb.VM.LastAcceptedID = pb.ID()
+
+	//	pb.CommonBlock.Accept()
+	if err := pb.Tx.Accept(); err != nil {
+		pb.vm.Ctx.Log.Error("unable to accept tx")
+	}
 }
+
+func (pb *ProposalBlock) Reject() {
+	pb.vm.Ctx.Log.Verbo("Rejecting block with ID %s", pb.ID())
+
+	pb.CommonBlock.Reject()
+
+	if err := pb.Tx.Reject(); err != nil {
+		pb.vm.Ctx.Log.Error("unable to reject tx")
+	}
+}
+
+
+
 
 // Initialize this block.
 // Sets [pb.vm] to [vm] and populates non-serialized fields
@@ -78,6 +97,12 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 		return err
 	}
 	if status == choices.Unknown {
+		genTx := &GenericTx{
+			Tx: &pb.Tx,
+		}
+		if err := vm.putTx(vm.DB, pb.Tx.ID(), genTx); err != nil {
+			return nil, err
+		}
 		if err := vm.putTxStatus(vm.DB, pb.Tx.ID(), choices.Processing); err != nil {
 			return err
 		}
@@ -165,26 +190,6 @@ func (pb *ProposalBlock) Options() [2]snowman.Block {
 		return [2]snowman.Block{commit, abort}
 	}
 	return [2]snowman.Block{abort, commit}
-}
-
-func (pb *ProposalBlock) Accept() {
-	pb.vm.Ctx.Log.Verbo("Accepting block with ID %s", pb.ID())
-
-	pb.CommonBlock.Accept()
-
-	if err := pb.Tx.Accept(); err != nil {
-		pb.vm.Ctx.Log.Error("unable to accept tx")
-	}
-}
-
-func (pb *ProposalBlock) Reject() {
-	pb.vm.Ctx.Log.Verbo("Rejecting block with ID %s", pb.ID())
-
-	pb.CommonBlock.Reject()
-
-	if err := pb.Tx.Reject(); err != nil {
-		pb.vm.Ctx.Log.Error("unable to reject tx")
-	}
 }
 
 // newProposalBlock creates a new block that proposes to issue a transaction.

@@ -25,6 +25,7 @@ var (
 const (
 	currentValidatorsPrefix uint64 = iota
 	pendingValidatorsPrefix
+	statusIDPrefix
 	txIDPrefix
 )
 
@@ -242,6 +243,73 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error
 	return nil, fmt.Errorf("couldn't find subnet with ID %s", id)
 }
 
+func (vm *VM) getTxStatus(db database.Database, txID ids.ID) (choices.Status, error) {
+
+	key := txID.Prefix(txIDPrefix)
+	exists, err := vm.State.Has(db, statusTypeID, key)
+	if err != nil {
+		return choices.Unknown, err
+	}
+	if !exists { // tx doesn't exist so return choices.Unknown
+		return choices.Unknown, nil
+	}
+
+	statusInterface, err := vm.State.Get(db, statusTypeID, key)
+	if err != nil {
+		return choices.Unknown, err
+	}
+
+	status, ok := statusInterface.(choices.Status)
+	if !ok {
+		vm.Ctx.Log.Warn("expected to retrieve choices.status from database but got different type")
+		return choices.Unknown, errDBStatus
+	}
+
+	return status, nil
+}
+
+func (vm *VM) putTxStatus(db database.Database, txID ids.ID, status choices.Status) error {
+	err := vm.State.Put(db, statusTypeID, txID.Prefix(txIDPrefix), status)
+	if err != nil {
+		return errDBPutTxStatus
+	}
+	return nil
+}
+
+func (vm *VM) getTx(db database.Database, txID ids.ID) (*GenericTx, error) {
+
+	key := txID.Prefix(txIDPrefix)
+	exists, err := vm.State.Has(db, txTypeID, key)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return &GenericTx{}, nil
+	}
+
+	txInterface, err := vm.State.Get(db, txTypeID, key)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, ok := txInterface.(*GenericTx)
+	if !ok {
+		vm.Ctx.Log.Warn("expected to retrieve tx from database but got different type")
+		return nil, errDBTx
+	}
+
+	return tx, nil
+
+}
+
+func (vm *VM) putTx(db database.Database, txID ids.ID, tx *GenericTx) error {
+	err := vm.State.Put(db, txTypeID, txID.Prefix(txIDPrefix), tx)
+	if err != nil {
+		return errDBPutTx
+	}
+	return nil
+}
+
 // register each type that we'll be storing in the database
 // so that [vm.State] knows how to unmarshal these types from bytes
 func (vm *VM) registerDBTypes() {
@@ -314,39 +382,17 @@ func (vm *VM) registerDBTypes() {
 	if err := vm.State.RegisterType(statusTypeID, unmarshalStatusFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
-}
 
-func (vm *VM) getTxStatus(db database.Database, txID ids.ID) (choices.Status, error) {
-
-	key := txID.Prefix(txIDPrefix)
-	exists, err := vm.State.Has(db, statusTypeID, key)
-	if err != nil {
-		return choices.Unknown, err
+	unmarshalTxFunc := func(bytes []byte) (interface{}, error) {
+		genTx := GenericTx{}
+		if err := Codec.Unmarshal(bytes, &genTx); err != nil {
+			return nil, err
+		}
+		return &genTx, nil
 	}
-	if !exists { // tx doesn't exist so return choices.Unknown
-		return choices.Unknown, nil
+	if err := vm.State.RegisterType(txTypeID, unmarshalTxFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
-
-	statusInterface, err := vm.State.Get(db, statusTypeID, key)
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	status, ok := statusInterface.(choices.Status)
-	if !ok {
-		vm.Ctx.Log.Warn("expected to retrieve choices.status from database but got different type")
-		return choices.Unknown, errDBAccount
-	}
-
-	return status, nil
-}
-
-func (vm *VM) putTxStatus(db database.Database, txID ids.ID, status choices.Status) error {
-	err := vm.State.Put(db, statusTypeID, txID.Prefix(txIDPrefix), status)
-	if err != nil {
-		return errDBPutTxStatus
-	}
-	return nil
 }
 
 // Unmarshal a Block from bytes and initialize it

@@ -414,8 +414,29 @@ func (service *Service) CreateAccount(_ *http.Request, args *CreateAccountArgs, 
 	return nil
 }
 
-type genericTx struct {
+type GenericTx struct {
 	Tx interface{} `serialize:"true"`
+}
+
+func (genTx GenericTx) Bytes() []byte {
+        switch tx := genTx.Tx.(type) {
+        case *addDefaultSubnetValidatorTx:
+               return tx.Bytes()
+       case *addDefaultSubnetDelegatorTx:
+                return tx.Bytes()
+        case *addNonDefaultSubnetValidatorTx:
+               return tx.Bytes()
+       case *CreateSubnetTx:
+               return tx.Bytes()
+       case *CreateChainTx:
+               return tx.Bytes()
+        case *ExportTx:
+               return tx.Bytes()
+        case *ImportTx:
+               return tx.Bytes()
+       default:
+               return nil
+        }
 }
 
 /*
@@ -467,7 +488,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		Shares:      uint32(args.DelegationFeeRate),
 	}}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	txBytes, err := Codec.Marshal(GenericTx{Tx: &tx})
 	if err != nil {
 		return fmt.Errorf("problem while creating transaction: %w", err)
 	}
@@ -516,7 +537,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		Destination: args.Destination,
 	}}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	txBytes, err := Codec.Marshal(GenericTx{Tx: &tx})
 	if err != nil {
 		return fmt.Errorf("problem while creating transaction: %w", err)
 	}
@@ -563,7 +584,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 		bytes:       nil,
 	}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	txBytes, err := Codec.Marshal(GenericTx{Tx: &tx})
 	if err != nil {
 		return errCreatingTransaction
 	}
@@ -604,7 +625,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 		bytes: nil,
 	}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	txBytes, err := Codec.Marshal(GenericTx{Tx: &tx})
 	if err != nil {
 		return errCreatingTransaction
 	}
@@ -655,7 +676,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 		}},
 	}}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	txBytes, err := Codec.Marshal(GenericTx{Tx: &tx})
 	if err != nil {
 		return errCreatingTransaction
 	}
@@ -713,7 +734,7 @@ func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignRespons
 		return errors.New("got unexpected key from database")
 	}
 
-	genTx := genericTx{}
+	genTx := GenericTx{}
 	if err := Codec.Unmarshal(args.Tx.Bytes, &genTx); err != nil {
 		return err
 	}
@@ -1007,7 +1028,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		tx.Creds = append(tx.Creds, cred)
 	}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	txBytes, err := Codec.Marshal(GenericTx{Tx: &tx})
 	if err != nil {
 		return errCreatingTransaction
 	}
@@ -1085,7 +1106,7 @@ type IssueTxResponse struct {
 func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *IssueTxResponse) error {
 	service.vm.Ctx.Log.Debug("issueTx called")
 
-	genTx := genericTx{}
+	genTx := GenericTx{}
 	if err := Codec.Unmarshal(args.Tx.Bytes, &genTx); err != nil {
 		return err
 	}
@@ -1201,7 +1222,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		bytes:        nil,
 	}
 
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
+	txBytes, err := Codec.Marshal(GenericTx{Tx: &tx})
 	if err != nil {
 		service.vm.Ctx.Log.Error("problem marshaling createChainTx: %w", err)
 		return errCreatingTransaction

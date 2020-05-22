@@ -76,6 +76,8 @@ func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
 
 func (tx *addNonDefaultSubnetValidatorTx) ID() ids.ID { return tx.id }
 
+func (tx *addNonDefaultSubnetValidatorTx) Bytes() []byte { return tx.bytes }
+
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]
 func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {

@@ -40,6 +40,7 @@ const (
 	blockTypeID
 	subnetsTypeID
 	statusTypeID
+	txTypeID
 
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
@@ -95,8 +96,11 @@ var (
 	errDBAccount                = errors.New("couldn't retrieve account from database")
 	errDBPutAccount             = errors.New("couldn't put account in database")
 	errDBChains                 = errors.New("couldn't retrieve chain list from database")
+	errDBStatus                 = errors.New("couldn't retrieve status from database")
+	errDBTx                     = errors.New("couldn't retrieve tx from database")
 	errDBPutChains              = errors.New("couldn't put chain list in database")
 	errDBPutBlock               = errors.New("couldn't put block in database")
+	errDBPutTx                  = errors.New("couldn't put tx in database")
 	errDBPutTxStatus            = errors.New("couldn't put tx status in database")
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
@@ -249,6 +253,12 @@ func (vm *VM) Initialize(
 		}
 
 		for _, tx := range genesis.Validators.Txs {
+			genTx := &GenericTx{
+				Tx: &tx,
+			}
+			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+				return nil, err
+			}
 			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Accepted); err != nil {
 				return err
 			}
@@ -269,7 +279,12 @@ func (vm *VM) Initialize(
 				vm.Ctx.Log.Warn("chain has networkID %d, expected %d", chain.NetworkID, vm.Ctx.NetworkID)
 			}
 		}
-
+		genTx := &GenericTx{
+			Tx: &tx,
+		}
+		if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+			return nil, err
+		}
 		if err := vm.putTxStatus(vm.DB, chain.ID(), choices.Accepted); err != nil {
 			return err
 		}
@@ -459,6 +474,12 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 				return nil, err
 			}
 			if status == choices.Unknown {
+				genTx := &GenericTx{
+					Tx: &tx,
+				}
+				if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+					return nil, err
+				}
 				if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
 					return nil, err
 				}
@@ -487,6 +508,12 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		if status == choices.Unknown {
+			genTx := &GenericTx{
+				Tx: &tx,
+			}
+			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+				return nil, err
+			}
 			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
 				return nil, err
 			}
@@ -544,6 +571,12 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		if status == choices.Unknown {
+			genTx := &GenericTx{
+				Tx: &tx,
+			}
+			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+				return nil, err
+			}
 			if err := vm.putTxStatus(vm.DB, stakerTx.ID(), choices.Processing); err != nil {
 				return nil, err
 			}
@@ -579,6 +612,12 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		if status == choices.Unknown {
+			genTx := &GenericTx{
+				Tx: &tx,
+			}
+			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+				return nil, err
+			}
 			if err := vm.putTxStatus(vm.DB, advanceTimeTx.id, choices.Processing); err != nil {
 				return nil, err
 			}
@@ -604,6 +643,12 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 				return nil, err
 			}
 			if status == choices.Unknown {
+				genTx := &GenericTx{
+					Tx: &tx,
+				}
+				if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+					return nil, err
+				}
 				if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
 					return nil, err
 				}

@@ -45,6 +45,8 @@ func (tx *advanceTimeTx) initialize(vm *VM) error {
 
 func (tx *advanceTimeTx) ID() ids.ID { return tx.id }
 
+func (tx *advanceTimeTx) Bytes() []byte { return tx.bytes }
+
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *advanceTimeTx) Timestamp() time.Time { return time.Unix(int64(tx.Time), 0) }
 
