@@ -30,9 +30,16 @@ type bootstrapper struct {
 	metrics
 	common.Bootstrapper
 
+	// IDs of vertices that we're already in the process of getting
+	// TODO: Find a better way to track; this keeps every single vertex's ID in memory when bootstrapping from nothing
+	seen ids.Set
+
+	numFetched uint64 // number of vertices that have been fetched from validators
+
 	// vtxReqs prevents asking validators for the same vertex
 	vtxReqs common.Requests
 
+	// IDs of vertices that we have requested from other validators but haven't received
 	pending    ids.Set
 	finished   bool
 	onFinished func()
@@ -91,8 +98,6 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
 
 // Put ...
 func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) {
-	b.BootstrapConfig.Context.Log.Verbo("Put called for vertexID %s", vtxID)
-
 	vtx, err := b.State.ParseVertex(vtxBytes)
 	if err != nil {
 		b.BootstrapConfig.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
@@ -168,6 +173,10 @@ func (b *bootstrapper) addVertex(vtx avalanche.Vertex) {
 
 func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 	vts := []avalanche.Vertex{vtx}
+	b.numFetched++
+	if b.numFetched%2500 == 0 { // perioidcally inform user of progress
+		b.BootstrapConfig.Context.Log.Info("bootstrapping has fetched %d vertices", b.numFetched)
+	}
 
 	for len(vts) > 0 {
 		newLen := len(vts) - 1
@@ -187,6 +196,8 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 				vtx:         vtx,
 			}); err == nil {
 				b.numBlockedVtx.Inc()
+			} else {
+				b.BootstrapConfig.Context.Log.Verbo("couldn't push to vtxBlocked")
 			}
 			for _, tx := range vtx.Txs() {
 				if err := b.TxBlocked.Push(&txJob{
@@ -195,10 +206,20 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 					tx:          tx,
 				}); err == nil {
 					b.numBlockedTx.Inc()
+				} else {
+					b.BootstrapConfig.Context.Log.Verbo("couldn't push to txBlocked")
 				}
 			}
-
-			vts = append(vts, vtx.Parents()...)
+			parentsToAdd := []avalanche.Vertex{}
+			parentsToAddIDs := ids.Set{} // ToDO remove...only here for debug
+			for _, parent := range vtx.Parents() {
+				if !b.seen.Contains(parent.ID()) {
+					parentsToAdd = append(parentsToAdd, parent)
+					parentsToAddIDs.Add(parent.ID())
+				}
+			}
+			vts = append(vts, parentsToAdd...)
+			b.seen.Add(parentsToAddIDs.List()...)
 		case choices.Accepted:
 			b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", vtxID)
 		case choices.Rejected:
@@ -214,12 +235,15 @@ func (b *bootstrapper) finish() {
 	if b.finished {
 		return
 	}
+	b.BootstrapConfig.Context.Log.Info("bootstrapping finished fetching vertices. executing state transitions...")
 
 	b.executeAll(b.TxBlocked, b.numBlockedTx)
 	b.executeAll(b.VtxBlocked, b.numBlockedVtx)
 
 	// Start consensus
+	b.BootstrapConfig.Context.Log.Info("done bootstrapping")
 	b.onFinished()
+	b.seen = ids.Set{}
 	b.finished = true
 }
 
