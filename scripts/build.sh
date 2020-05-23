@@ -10,7 +10,6 @@ PREFIX="${PREFIX:-$(pwd)/build}"
 PLUGIN_PREFIX="$PREFIX/plugins"
 
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SRC_DIR/env.sh"
 
 CORETH_PKG=github.com/ava-labs/coreth
 CORETH_PATH="$GOPATH/src/$CORETH_PKG"
