@@ -218,7 +218,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 		return err
 	}
 	if !usr.CheckPassword(args.Password) {
-		return fmt.Errorf("incorrect password for %s", args.Username)
+		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
 	userDB := prefixdb.New([]byte(args.Username), ks.bcDB)
@@ -273,6 +273,9 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	userData := UserDB{}
 	if err := ks.codec.Unmarshal(args.User.Bytes, &userData); err != nil {
 		return err
+	}
+	if !userData.User.CheckPassword(args.Password) {
+		return fmt.Errorf("incorrect password for user %q", args.Username)
 	}
 
 	usrBytes, err := ks.codec.Marshal(&userData.User)
@@ -383,7 +386,7 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 		return nil, err
 	}
 	if !usr.CheckPassword(password) {
-		return nil, fmt.Errorf("incorrect password for user '%s'", username)
+		return nil, fmt.Errorf("incorrect password for user %q", username)
 	}
 
 	userDB := prefixdb.New([]byte(username), ks.bcDB)
