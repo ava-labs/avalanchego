@@ -52,6 +52,7 @@ type Config struct {
 	AdminAPIEnabled    bool
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
+	HealthAPIEnabled   bool
 
 	// Logging configuration
 	LoggingConfig logging.Config

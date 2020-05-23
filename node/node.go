@@ -17,12 +17,14 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/ava-labs/salticidae-go"
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
+	"github.com/ava-labs/gecko/api/health"
 	"github.com/ava-labs/gecko/api/ipcs"
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
@@ -559,6 +561,19 @@ func (n *Node) initAdminAPI() {
 	}
 }
 
+// initHealthAPI initializes the Health API service
+// Assumes n.Log, n.ConsensusAPI, and n.ValidatorAPI already initialized
+func (n *Node) initHealthAPI() {
+	if !n.Config.HealthAPIEnabled {
+		return
+	}
+
+	n.Log.Info("initializing Health API")
+	service := health.NewService(n.Log)
+	service.RegisterHeartbeat("network.validators.heartbeat", n.ValidatorAPI, 5*time.Minute)
+	n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
+}
+
 // initIPCAPI initializes the IPC API service
 // Assumes n.log and n.chainManager already initialized
 func (n *Node) initIPCAPI() {
@@ -650,8 +665,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		n.initClients() // Set up the client servers
 	}
 
-	n.initAdminAPI() // Start the Admin API
-	n.initIPCAPI()   // Start the IPC API
+	n.initAdminAPI()  // Start the Admin API
+	n.initHealthAPI() // Start the Health API
+	n.initIPCAPI()    // Start the IPC API
 
 	if err := n.initAliases(); err != nil { // Set up aliases
 		return err

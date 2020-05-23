@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -147,6 +148,8 @@ type Handshake struct {
 	// If any chain is blocked on connecting to peers, track these blockers here
 	awaitingLock sync.Mutex
 	awaiting     []*networking.AwaitingConnections
+
+	lastHeartbeat int64
 }
 
 // Initialize to the c networking library. This should only be done once during
@@ -201,6 +204,8 @@ func (nm *Handshake) Initialize(
 	net.RegHandler(Version, salticidae.MsgNetworkMsgCallback(C.version), nil)
 	net.RegHandler(GetPeerList, salticidae.MsgNetworkMsgCallback(C.getPeerList), nil)
 	net.RegHandler(PeerList, salticidae.MsgNetworkMsgCallback(C.peerList), nil)
+
+	nm.heartbeat()
 }
 
 // ConnectTo add the peer as a connection and connects to them.
@@ -593,6 +598,16 @@ func (nm *Handshake) checkCompatibility(peerVersion string) bool {
 	return true
 }
 
+// heartbeat registers a new heartbeat to signal liveness
+func (nm *Handshake) heartbeat() {
+	atomic.StoreInt64(&nm.lastHeartbeat, nm.clock.Time().Unix())
+}
+
+// GetHeartbeat returns the most recent heartbeat time
+func (nm *Handshake) GetHeartbeat() int64 {
+	return atomic.LoadInt64(&nm.lastHeartbeat)
+}
+
 // peerHandler notifies a change to the set of connected peers
 // connected is true if a new peer is connected
 // connected is false if a formerly connected peer has disconnected
@@ -667,6 +682,7 @@ func pong(*C.struct_msg_t, *C.struct_msgnetwork_conn_t, unsafe.Pointer) {}
 //export getVersion
 func getVersion(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Pointer) {
 	HandshakeNet.numGetVersionReceived.Inc()
+	HandshakeNet.heartbeat()
 
 	conn := salticidae.PeerNetworkConnFromC(salticidae.CPeerNetworkConn(_conn))
 	peer := conn.GetPeerID(false)
@@ -679,6 +695,7 @@ func getVersion(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsaf
 //export version
 func version(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Pointer) {
 	HandshakeNet.numVersionReceived.Inc()
+	HandshakeNet.heartbeat()
 
 	msg := salticidae.MsgFromC(salticidae.CMsg(_msg))
 	conn := salticidae.PeerNetworkConnFromC(salticidae.CPeerNetworkConn(_conn))
@@ -763,6 +780,7 @@ func version(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.P
 //export getPeerList
 func getPeerList(_ *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Pointer) {
 	HandshakeNet.numGetPeerlistReceived.Inc()
+	HandshakeNet.heartbeat()
 
 	conn := salticidae.PeerNetworkConnFromC(salticidae.CPeerNetworkConn(_conn))
 	peer := conn.GetPeerID(false)
@@ -775,6 +793,7 @@ func getPeerList(_ *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.
 //export peerList
 func peerList(_msg *C.struct_msg_t, _conn *C.struct_msgnetwork_conn_t, _ unsafe.Pointer) {
 	HandshakeNet.numPeerlistReceived.Inc()
+	HandshakeNet.heartbeat()
 
 	msg := salticidae.MsgFromC(salticidae.CMsg(_msg))
 	build := Builder{}
