@@ -1732,3 +1732,530 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGenesisTxStatus(t *testing.T) {
+	vm := defaultVM()
+
+	currentValidators, _ := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+
+	for _, tx := range currentValidators.Txs {
+		status, _ := vm.getTxStatus(vm.DB, tx.ID())
+		if status != choices.Accepted {
+			t.Fatal("expected genesis validator txs to be Accepted")
+		}
+	}
+
+	genesisChains, _ := vm.getChains(vm.DB)
+	for _, tx := range genesisChains {
+		status, _ := vm.getTxStatus(vm.DB, tx.ID())
+		if status != choices.Accepted {
+			t.Fatal("expected genesis chain txs to be Accepted")
+		}
+	}
+
+}
+
+func TestAddDefaultSubnetValidatorTxStatus(t *testing.T) {
+	vm := defaultVM()
+	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+	key, _ := vm.factory.NewPrivateKey()
+	ID := key.PublicKey().Address()
+
+	// create valid tx
+	tx, err := vm.newAddDefaultSubnetValidatorTx(
+		defaultNonce+1,
+		defaultStakeAmount,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		ID,
+		ID,
+		NumberOfShares,
+		testNetworkID,
+		defaultKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Unknown")
+	}
+
+	// trigger block creation
+	vm.unissuedEvents.Add(tx)
+	vm.Ctx.Lock.Lock()
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Processing")
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if err := block.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block.Accept()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Accepted")
+	}
+}
+
+func TestAddNonDefaultSubnetValidatorTxStatus(t *testing.T) {
+	vm := defaultVM()
+	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+
+	// create valid tx
+	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+		defaultNonce+1,
+		defaultWeight,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		keys[0].PublicKey().Address(),
+		testSubnet1.id,
+		testNetworkID,
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		keys[0],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+		t.Fatal("expected addNonDefaultSubnetValidatorTx to be Unknown")
+	}
+
+	// trigger block creation
+	vm.unissuedEvents.Add(tx)
+	vm.Ctx.Lock.Lock()
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Processing")
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if err := block.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block.Accept()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Accepted")
+	}
+}
+
+func TestAddDefaultSubnetDelegatorTxStatus(t *testing.T) {
+	vm := defaultVM()
+	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+
+	tx, err := vm.newAddDefaultSubnetDelegatorTx(
+		defaultNonce+1,
+		defaultStakeAmount,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		defaultKey.PublicKey().Address(),
+		defaultKey.PublicKey().Address(),
+		testNetworkID,
+		defaultKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+		t.Fatal("expected addDefaultSubnetDelegatorTx to be Unknown")
+	}
+
+	// trigger block creation
+	vm.unissuedEvents.Add(tx)
+	vm.Ctx.Lock.Lock()
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+		t.Fatal("expected addDefaultSubnetDelegatorTx to be Processing")
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if err := block.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block.Accept()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+		t.Fatal("expected addDefaultSubnetDelegatorTx to be Accepted")
+	}
+}
+
+func TestRewardValidatorTxStatus(t *testing.T) {
+	vm := defaultVM()
+
+	vm.clock.Set(defaultValidateEndTime)
+
+	vm.Ctx.Lock.Lock()
+	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if status, _ := vm.getTxStatus(vm.DB, block.Tx.ID()); status != choices.Processing {
+		t.Fatal("expected rewardValidatorTx to be Processing")
+	}
+
+	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	}
+	if err := block.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block.Accept()
+	if status, _ := vm.getTxStatus(vm.DB, block.Tx.ID()); status != choices.Accepted {
+		t.Fatal("expected rewardValidatorTx to be Accepted")
+	}
+
+	if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	commit.Accept() // advance the timestamp
+	// Verify that chain's timestamp has advanced
+	timestamp, err := vm.getTimestamp(vm.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+
+	vm.Ctx.Lock.Lock()
+	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+
+	pBlock := blk.(*ProposalBlock)
+	/*	if status, _ := vm.getTxStatus(vm.DB, pBlock.Tx.ID()); status != choices.Processing {
+	        t.Fatal("expected rewardValidatorTx to be Processing")
+	}*/
+
+	if err := pBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	pBlock.Accept()
+	/*if status, _ := vm.getTxStatus(vm.DB, pBlock.Tx.ID()); status != choices.Accepted {
+	        t.Fatal("expected rewardValidatorTx to be Accepted")
+	}*/
+
+}
+
+func TestCreateChainTxStatus(t *testing.T) {
+	vm := defaultVM()
+
+	tx, err := vm.newCreateChainTx(
+		defaultNonce+1,
+		testSubnet1.id,
+		nil,
+		timestampvm.ID,
+		nil,
+		"name",
+		testNetworkID,
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		keys[0],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+		t.Fatal("expected createChainTx to be Unknown")
+	}
+
+	vm.Ctx.Lock.Lock()
+	vm.unissuedDecisionTxs = append(vm.unissuedDecisionTxs, tx)
+	blk, err := vm.BuildBlock() // should contain proposal to create chain
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+		t.Fatal("expected createChainTx to be Processing")
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	blk.Accept()
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+		t.Fatal("expected createChainTx to be Accepted")
+	}
+}
+
+func TestCreateSubnetTxStatus(t *testing.T) {
+	vm := defaultVM()
+
+	createSubnetTx, err := vm.newCreateSubnetTx(
+		testNetworkID,
+		defaultNonce+1,
+		[]ids.ShortID{
+			keys[0].PublicKey().Address(),
+			keys[1].PublicKey().Address(),
+		},
+		1,       // threshold
+		keys[0], // payer
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID()); status != choices.Unknown {
+		t.Fatal("expected createSubnetTx to be Unknown")
+	}
+
+	vm.Ctx.Lock.Lock()
+	vm.unissuedDecisionTxs = append(vm.unissuedDecisionTxs, createSubnetTx)
+	blk, err := vm.BuildBlock() // should contain proposal to create subnet
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID()); status != choices.Processing {
+		t.Fatal("expected createSubnetTx to be Processing")
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	blk.Accept()
+	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID()); status != choices.Accepted {
+		t.Fatal("expected createSubnetTx to be Accepted")
+	}
+}
+
+func TestAtomicImportTxStatus(t *testing.T) {
+	vm := defaultVM()
+
+	avmID := ids.Empty.Prefix(0)
+	utxoID := ava.UTXOID{
+		TxID:        ids.Empty.Prefix(1),
+		OutputIndex: 1,
+	}
+	assetID := ids.Empty.Prefix(2)
+	amount := uint64(50000)
+	key := keys[0]
+
+	sm := &atomic.SharedMemory{}
+	sm.Initialize(logging.NoLog{}, memdb.New())
+
+	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+
+	tx, err := vm.newImportTx(
+		defaultNonce+1,
+		testNetworkID,
+		[]*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: utxoID,
+			Asset:  ava.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   amount,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+		[][]*crypto.PrivateKeySECP256K1R{[]*crypto.PrivateKeySECP256K1R{key}},
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.Lock.Lock()
+	defer vm.Ctx.Lock.Unlock()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+		t.Fatal("expected atomic importTx to be Unknown")
+	}
+
+	vm.ava = assetID
+	vm.avm = avmID
+
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+
+	if _, err := vm.BuildBlock(); err == nil {
+		t.Fatalf("should have errored due to missing utxos")
+	}
+
+	// Provide the avm UTXO:
+	smDB := vm.Ctx.SharedMemory.GetDatabase(avmID)
+
+	utxo := &ava.UTXO{
+		UTXOID: utxoID,
+		Asset:  ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{key.PublicKey().Address()},
+			},
+		},
+	}
+
+	state := ava.NewPrefixedState(smDB, Codec)
+	if err := state.FundAVMUTXO(utxo); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
+
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+		t.Fatal("expected atomic importTx to be Processing")
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	blk.Accept()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+		t.Fatal("expected atomic importTx to be Accepted")
+	}
+
+}
+
+func TestAtomicExportTxStatus(t *testing.T) {
+	vm := defaultVM()
+
+	avmID := ids.Empty.Prefix(0)
+	assetID := ids.Empty.Prefix(2)
+	amount := uint64(50000)
+	key := keys[0]
+
+	sm := &atomic.SharedMemory{}
+	sm.Initialize(logging.NoLog{}, memdb.New())
+
+	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+
+	tx, err := vm.newExportTx(
+		defaultNonce+1,
+		testNetworkID,
+		[]*ava.TransferableOutput{&ava.TransferableOutput{
+			Asset: ava.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amount,
+			},
+		}},
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Ctx.Lock.Lock()
+	defer vm.Ctx.Lock.Unlock()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+		t.Fatal("expected atomic exportTx to be Unknown")
+	}
+
+	vm.ava = assetID
+	vm.avm = avmID
+
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+		t.Fatal("expected atomic exportTx to be Processing")
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	blk.Accept()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+		t.Fatal("expected atomic exportTx to be Accepted")
+	}
+
+}
+
+func TestAddDefaultSubnetValidatorRejectTxStatus(t *testing.T) {
+	vm := defaultVM()
+	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+	key, _ := vm.factory.NewPrivateKey()
+	ID := key.PublicKey().Address()
+
+	// create valid tx
+	tx, err := vm.newAddDefaultSubnetValidatorTx(
+		defaultNonce+1,
+		defaultStakeAmount,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		ID,
+		ID,
+		NumberOfShares,
+		testNetworkID,
+		defaultKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Unknown")
+	}
+	// trigger block creation
+	vm.unissuedEvents.Add(tx)
+	vm.Ctx.Lock.Lock()
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Ctx.Lock.Unlock()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Processing")
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if err := block.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block.Reject()
+
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Rejected {
+		t.Fatal("expected addDefaultSubnetValidatorTx to be Rejected")
+	}
+}
