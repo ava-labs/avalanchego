@@ -4,23 +4,22 @@
 package platformvm
 
 import (
-	"fmt"
 	"encoding/json"
 	"testing"
 
-        "github.com/ava-labs/gecko/chains/atomic"
-        "github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/chains/atomic"
+	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-        "github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func setup() (*VM, *Service) {
-        vm := defaultVM()
-        s := &Service{vm: vm}
-        return vm, s
+	vm := defaultVM()
+	s := &Service{vm: vm}
+	return vm, s
 }
 
 func TestAddDefaultSubnetValidator(t *testing.T) {
@@ -56,73 +55,72 @@ func TestServiceGetTxStatus(t *testing.T) {
 	assetID := ids.Empty.Prefix(2)
 	key := keys[0]
 	sm := &atomic.SharedMemory{}
-        sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, memdb.New())
 
-        vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
 	statusArgs := &GetTxStatusArgs{}
-        statusReply := &GetTxStatusReply{}
-        if err := s.GetTxStatus(nil, statusArgs, statusReply); err == nil {
-                t.Fatal("Expected empty transaction to return an error")
-        }
+	statusReply := &GetTxStatusReply{}
+	if err := s.GetTxStatus(nil, statusArgs, statusReply); err == nil {
+		t.Fatal("Expected empty transaction to return an error")
+	}
 
-        tx, err := vm.newExportTx(
-                defaultNonce+1,
+	tx, err := vm.newExportTx(
+		defaultNonce+1,
 		testNetworkID,
-                []*ava.TransferableOutput{&ava.TransferableOutput{
-                        Asset:  ava.Asset{ID: assetID},
+		[]*ava.TransferableOutput{&ava.TransferableOutput{
+			Asset: ava.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-                                Amt:   amount,
-                        },
+				Amt: amount,
+			},
 		}},
-                key,
-        )
-        if err != nil {
-                t.Fatal(err)
-        }
+		key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-        vm.Ctx.Lock.Lock()
+	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 
 	statusArgs.TxID = tx.ID()
-	fmt.Printf("ID: %v\n", tx.ID())
-        if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
-                t.Fatal(err)
-        }
-        if expected := choices.Unknown; expected != statusReply.Status {
-                t.Fatalf(
-                        "Expected an unsubmitted tx to have status %q, got %q",
-                        expected.String(), statusReply.Status.String(),
-                )
-        }
+	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
+		t.Fatal(err)
+	}
+	if expected := choices.Unknown; expected != statusReply.Status {
+		t.Fatalf(
+			"Expected an unsubmitted tx to have status %q, got %q",
+			expected.String(), statusReply.Status.String(),
+		)
+	}
 
 	vm.ava = assetID
 	vm.avm = avmID
 
-        vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+	vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
 
-        blk, _ := vm.BuildBlock()
+	blk, _ := vm.BuildBlock()
 
-        if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
-                t.Fatal(err)
-        }
-        if expected := choices.Processing; expected != statusReply.Status {
-                t.Fatalf(
-                        "Expected an unsubmitted tx to have status %q, got %q",
-                        expected.String(), statusReply.Status.String(),
-                )
-        }
-        if err := blk.Verify(); err != nil {
-                t.Fatal(err)
-        }
+	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
+		t.Fatal(err)
+	}
+	if expected := choices.Processing; expected != statusReply.Status {
+		t.Fatalf(
+			"Expected an unsubmitted tx to have status %q, got %q",
+			expected.String(), statusReply.Status.String(),
+		)
+	}
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
 	blk.Accept()
-        if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
-                t.Fatal(err)
-        }
-        if expected := choices.Accepted; expected != statusReply.Status {
-                t.Fatalf(
-                        "Expected an unsubmitted tx to have status %q, got %q",
-                        expected.String(), statusReply.Status.String(),
-                )
-        }
+	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
+		t.Fatal(err)
+	}
+	if expected := choices.Accepted; expected != statusReply.Status {
+		t.Fatalf(
+			"Expected an unsubmitted tx to have status %q, got %q",
+			expected.String(), statusReply.Status.String(),
+		)
+	}
 }

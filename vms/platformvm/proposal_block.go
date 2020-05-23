@@ -74,9 +74,6 @@ func (pb *ProposalBlock) Reject() {
 	}
 }
 
-
-
-
 // Initialize this block.
 // Sets [pb.vm] to [vm] and populates non-serialized fields
 // This method should be called when a block is unmarshaled from bytes

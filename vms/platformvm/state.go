@@ -264,7 +264,6 @@ func (vm *VM) getTxStatus(db database.Database, txID ids.ID) (choices.Status, er
 		vm.Ctx.Log.Warn("expected to retrieve choices.status from database but got different type")
 		return choices.Unknown, errDBStatus
 	}
-
 	return status, nil
 }
 
@@ -297,9 +296,7 @@ func (vm *VM) getTx(db database.Database, txID ids.ID) (*GenericTx, error) {
 		vm.Ctx.Log.Warn("expected to retrieve tx from database but got different type")
 		return nil, errDBTx
 	}
-
 	return tx, nil
-
 }
 
 func (vm *VM) putTx(db database.Database, txID ids.ID, tx *GenericTx) error {

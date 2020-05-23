@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
 )
 
@@ -47,7 +46,7 @@ func (tx *rewardValidatorTx) initialize(vm *VM) error {
 		return err
 	}
 	tx.bytes = txBytes
-	tx.TxID = ids.NewID(hashing.ComputeHash256Array(txBytes))
+	//tx.TxID = ids.NewID(hashing.ComputeHash256Array(txBytes))
 	return nil
 }
 
