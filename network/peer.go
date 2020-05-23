@@ -188,6 +188,8 @@ func (p *peer) send(msg Msg) bool {
 
 // assumes the stateLock is not held
 func (p *peer) handle(msg Msg) {
+	p.net.heartbeat()
+
 	op := msg.Op()
 	switch op {
 	case Version:

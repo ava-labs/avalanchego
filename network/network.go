@@ -8,8 +8,10 @@ import (
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/gecko/api/health"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
@@ -45,6 +47,10 @@ type Network interface {
 	// The network must be able to broadcast accepted decisions to random peers.
 	// Thread safety must be managed internally in the network.
 	triggers.Acceptor
+
+	// The network should be able to report the last time the network interacted
+	// with a peer
+	health.Heartbeater
 
 	// Should only be called once, will run until either a fatal error occurs,
 	// or the network is closed. Returns a non-nil error.
@@ -85,7 +91,8 @@ type network struct {
 	vdrs           validators.Set // set of current validators in the AVAnet
 	router         router.Router  // router must be thread safe
 
-	clock timer.Clock
+	clock         timer.Clock
+	lastHeartbeat int64
 
 	initialReconnectDelay        time.Duration
 	maxReconnectDelay            time.Duration
@@ -210,6 +217,7 @@ func NewNetwork(
 		peers:           make(map[[20]byte]*peer),
 	}
 	net.executor.Initialize()
+	net.heartbeat()
 	return net
 }
 
@@ -418,6 +426,12 @@ func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 func (n *network) Accept(chainID, containerID ids.ID, container []byte) error {
 	return n.gossipContainer(chainID, containerID, container)
 }
+
+// heartbeat registers a new heartbeat to signal liveness
+func (n *network) heartbeat() { atomic.StoreInt64(&n.lastHeartbeat, n.clock.Time().Unix()) }
+
+// GetHeartbeat returns the most recent heartbeat time
+func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbeat) }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.

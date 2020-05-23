@@ -30,7 +30,7 @@ func (s *Service) Call(_ *http.Request, args *Args, reply *Reply) error {
 
 func TestCall(t *testing.T) {
 	s := Server{}
-	s.Initialize(logging.NoLog{}, logging.NoFactory{}, 8080)
+	s.Initialize(logging.NoLog{}, logging.NoFactory{}, "localhost", 8080)
 
 	serv := &Service{}
 	newServer := rpc.NewServer()

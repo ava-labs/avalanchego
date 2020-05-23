@@ -16,10 +16,11 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -37,6 +38,7 @@ var (
 	errUnknownOutputType         = errors.New("unknown output type")
 	errUnneededAddress           = errors.New("address not required to sign")
 	errUnknownCredentialType     = errors.New("unknown credential type")
+	errNilTxID                   = errors.New("nil transaction ID")
 )
 
 // Service defines the base service for the asset vm
@@ -74,10 +76,6 @@ type GetTxStatusArgs struct {
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
-
-var (
-	errNilTxID = errors.New("nil transaction ID")
-)
 
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, reply *GetTxStatusReply) error {
@@ -247,6 +245,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		return err
 	}
 
+	reply.UTXOIDs = make([]ava.UTXOID, 0, len(utxos))
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(assetID) {
 			continue
