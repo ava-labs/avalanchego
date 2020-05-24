@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"reflect"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -63,15 +64,19 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 		return err
 	}
 
-	status, _ := vm.getTxStatus(vm.DB, ab.Tx.ID())
+	txType := reflect.TypeOf(ab.Tx)
+	status, err := vm.getTxStatus(vm.DB, ab.Tx.ID(), txType.String())
+	if err != nil {
+		return err
+	}
 	if status == choices.Unknown {
 		genTx := &GenericTx{
 			Tx: &ab.Tx,
 		}
-		if err := vm.putTx(vm.DB, ab.Tx.ID(), genTx); err != nil {
+		if err := vm.putTx(vm.DB, ab.Tx.ID(), txType.String(), genTx); err != nil {
 			return err
 		}
-		if err := vm.putTxStatus(vm.DB, ab.Tx.ID(), choices.Processing); err != nil {
+		if err := vm.putTxStatus(vm.DB, ab.Tx.ID(), txType.String(), choices.Processing); err != nil {
 			return err
 		}
 		if err := vm.DB.Commit(); err != nil {

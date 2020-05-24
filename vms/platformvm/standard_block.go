@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"reflect"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
@@ -52,7 +54,8 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 			return err
 		}
 
-		status, err := vm.getTxStatus(vm.DB, tx.ID())
+		txType := reflect.TypeOf(tx)
+		status, err := vm.getTxStatus(vm.DB, tx.ID(), txType.String())
 		if err != nil {
 			return err
 		}
@@ -60,10 +63,10 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 			genTx := &GenericTx{
 				Tx: &tx,
 			}
-			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+			if err := vm.putTx(vm.DB, tx.ID(), txType.String(), genTx); err != nil {
 				return err
 			}
-			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+			if err := vm.putTxStatus(vm.DB, tx.ID(), txType.String(), choices.Processing); err != nil {
 				return err
 			}
 			if err := vm.DB.Commit(); err != nil {

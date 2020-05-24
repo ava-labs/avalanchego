@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -209,7 +210,8 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 }
 
 func (tx *CreateChainTx) Accept() error {
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Accepted); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()
@@ -217,7 +219,8 @@ func (tx *CreateChainTx) Accept() error {
 }
 
 func (tx *CreateChainTx) Reject() error {
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Rejected); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()

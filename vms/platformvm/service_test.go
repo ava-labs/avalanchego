@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/ava-labs/gecko/chains/atomic"
@@ -83,7 +84,9 @@ func TestServiceGetTxStatus(t *testing.T) {
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 
+	txType := reflect.TypeOf(tx)
 	statusArgs.TxID = tx.ID()
+	statusArgs.TxType = txType.String()
 	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
 		t.Fatal(err)
 	}

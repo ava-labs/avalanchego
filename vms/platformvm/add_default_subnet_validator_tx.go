@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -194,7 +195,8 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 }
 
 func (tx *addDefaultSubnetValidatorTx) Accept() error {
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Accepted); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()
@@ -202,7 +204,8 @@ func (tx *addDefaultSubnetValidatorTx) Accept() error {
 }
 
 func (tx *addDefaultSubnetValidatorTx) Reject() error {
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Rejected); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()

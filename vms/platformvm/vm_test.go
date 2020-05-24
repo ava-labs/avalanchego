@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"container/heap"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -1739,7 +1740,8 @@ func TestGenesisTxStatus(t *testing.T) {
 	currentValidators, _ := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
 
 	for _, tx := range currentValidators.Txs {
-		status, _ := vm.getTxStatus(vm.DB, tx.ID())
+		txType := reflect.TypeOf(tx)
+		status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String())
 		if status != choices.Accepted {
 			t.Fatal("expected genesis validator txs to be Accepted")
 		}
@@ -1747,7 +1749,8 @@ func TestGenesisTxStatus(t *testing.T) {
 
 	genesisChains, _ := vm.getChains(vm.DB)
 	for _, tx := range genesisChains {
-		status, _ := vm.getTxStatus(vm.DB, tx.ID())
+		txType := reflect.TypeOf(tx)
+		status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String())
 		if status != choices.Accepted {
 			t.Fatal("expected genesis chain txs to be Accepted")
 		}
@@ -1778,7 +1781,8 @@ func TestAddDefaultSubnetValidatorTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Unknown")
 	}
 
@@ -1791,7 +1795,7 @@ func TestAddDefaultSubnetValidatorTxStatus(t *testing.T) {
 	}
 	vm.Ctx.Lock.Unlock()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Processing")
 	}
 
@@ -1802,7 +1806,7 @@ func TestAddDefaultSubnetValidatorTxStatus(t *testing.T) {
 	}
 	block.Accept()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Accepted")
 	}
 }
@@ -1828,7 +1832,8 @@ func TestAddNonDefaultSubnetValidatorTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected addNonDefaultSubnetValidatorTx to be Unknown")
 	}
 
@@ -1841,7 +1846,7 @@ func TestAddNonDefaultSubnetValidatorTxStatus(t *testing.T) {
 	}
 	vm.Ctx.Lock.Unlock()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Processing")
 	}
 
@@ -1852,7 +1857,7 @@ func TestAddNonDefaultSubnetValidatorTxStatus(t *testing.T) {
 	}
 	block.Accept()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Accepted")
 	}
 }
@@ -1876,7 +1881,8 @@ func TestAddDefaultSubnetDelegatorTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected addDefaultSubnetDelegatorTx to be Unknown")
 	}
 
@@ -1889,7 +1895,7 @@ func TestAddDefaultSubnetDelegatorTxStatus(t *testing.T) {
 	}
 	vm.Ctx.Lock.Unlock()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected addDefaultSubnetDelegatorTx to be Processing")
 	}
 
@@ -1900,7 +1906,7 @@ func TestAddDefaultSubnetDelegatorTxStatus(t *testing.T) {
 	}
 	block.Accept()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected addDefaultSubnetDelegatorTx to be Accepted")
 	}
 }
@@ -1919,7 +1925,8 @@ func TestRewardValidatorTxStatus(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	if status, _ := vm.getTxStatus(vm.DB, block.Tx.ID()); status != choices.Processing {
+	txType := reflect.TypeOf(block.Tx)
+	if status, _ := vm.getTxStatus(vm.DB, block.Tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected rewardValidatorTx to be Processing")
 	}
 
@@ -1931,7 +1938,7 @@ func TestRewardValidatorTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	block.Accept()
-	if status, _ := vm.getTxStatus(vm.DB, block.Tx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, block.Tx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected rewardValidatorTx to be Accepted")
 	}
 
@@ -1988,7 +1995,8 @@ func TestCreateChainTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected createChainTx to be Unknown")
 	}
 
@@ -2000,7 +2008,8 @@ func TestCreateChainTxStatus(t *testing.T) {
 	}
 	vm.Ctx.Lock.Unlock()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected createChainTx to be Processing")
 	}
 
@@ -2009,7 +2018,7 @@ func TestCreateChainTxStatus(t *testing.T) {
 	}
 
 	blk.Accept()
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected createChainTx to be Accepted")
 	}
 }
@@ -2031,7 +2040,8 @@ func TestCreateSubnetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID()); status != choices.Unknown {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected createSubnetTx to be Unknown")
 	}
 
@@ -2042,7 +2052,7 @@ func TestCreateSubnetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.Ctx.Lock.Unlock()
-	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID()); status != choices.Processing {
+	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected createSubnetTx to be Processing")
 	}
 
@@ -2051,7 +2061,7 @@ func TestCreateSubnetTxStatus(t *testing.T) {
 	}
 
 	blk.Accept()
-	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected createSubnetTx to be Accepted")
 	}
 }
@@ -2094,7 +2104,8 @@ func TestAtomicImportTxStatus(t *testing.T) {
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected atomic importTx to be Unknown")
 	}
 
@@ -2134,7 +2145,7 @@ func TestAtomicImportTxStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected atomic importTx to be Processing")
 	}
 
@@ -2144,7 +2155,7 @@ func TestAtomicImportTxStatus(t *testing.T) {
 
 	blk.Accept()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected atomic importTx to be Accepted")
 	}
 
@@ -2181,7 +2192,8 @@ func TestAtomicExportTxStatus(t *testing.T) {
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected atomic exportTx to be Unknown")
 	}
 
@@ -2195,7 +2207,7 @@ func TestAtomicExportTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected atomic exportTx to be Processing")
 	}
 
@@ -2204,7 +2216,7 @@ func TestAtomicExportTxStatus(t *testing.T) {
 	}
 	blk.Accept()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Accepted {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Accepted {
 		t.Fatal("expected atomic exportTx to be Accepted")
 	}
 
@@ -2232,7 +2244,9 @@ func TestAddDefaultSubnetValidatorRejectTxStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Unknown {
+
+	txType := reflect.TypeOf(tx)
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Unknown")
 	}
 	// trigger block creation
@@ -2244,7 +2258,7 @@ func TestAddDefaultSubnetValidatorRejectTxStatus(t *testing.T) {
 	}
 	vm.Ctx.Lock.Unlock()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Processing {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Processing")
 	}
 
@@ -2255,7 +2269,7 @@ func TestAddDefaultSubnetValidatorRejectTxStatus(t *testing.T) {
 	}
 	block.Reject()
 
-	if status, _ := vm.getTxStatus(vm.DB, tx.ID()); status != choices.Rejected {
+	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Rejected {
 		t.Fatal("expected addDefaultSubnetValidatorTx to be Rejected")
 	}
 }

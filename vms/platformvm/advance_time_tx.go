@@ -5,12 +5,12 @@ package platformvm
 
 import (
 	"fmt"
+	"reflect"
 	"time"
-
-	"github.com/ava-labs/gecko/ids"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -184,7 +184,8 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 }
 
 func (tx *advanceTimeTx) Accept() error {
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Accepted); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()
@@ -192,7 +193,8 @@ func (tx *advanceTimeTx) Accept() error {
 }
 
 func (tx *advanceTimeTx) Reject() error {
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Rejected); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()

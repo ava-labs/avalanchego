@@ -7,6 +7,7 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	stdmath "math"
@@ -256,10 +257,11 @@ func (vm *VM) Initialize(
 			genTx := &GenericTx{
 				Tx: &tx,
 			}
-			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+			txType := reflect.TypeOf(tx)
+			if err := vm.putTx(vm.DB, tx.ID(), txType.String(), genTx); err != nil {
 				return err
 			}
-			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Accepted); err != nil {
+			if err := vm.putTxStatus(vm.DB, tx.ID(), txType.String(), choices.Accepted); err != nil {
 				return err
 			}
 		}
@@ -282,10 +284,11 @@ func (vm *VM) Initialize(
 		genTx := &GenericTx{
 			Tx: &chain,
 		}
-		if err := vm.putTx(vm.DB, chain.ID(), genTx); err != nil {
+		txType := reflect.TypeOf(chain)
+		if err := vm.putTx(vm.DB, chain.ID(), txType.String(), genTx); err != nil {
 			return err
 		}
-		if err := vm.putTxStatus(vm.DB, chain.ID(), choices.Accepted); err != nil {
+		if err := vm.putTxStatus(vm.DB, chain.ID(), txType.String(), choices.Accepted); err != nil {
 			return err
 		}
 
@@ -469,7 +472,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		for _, tx := range txs {
-			status, err := vm.getTxStatus()
+			txType := reflect.TypeOf(tx)
+			status, err := vm.getTxStatus(vm.DB, tx.ID(), txType.String())
 			if err != nil {
 				return nil, err
 			}
@@ -477,10 +481,10 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 				genTx := &GenericTx{
 					Tx: &tx,
 				}
-				if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+				if err := vm.putTx(vm.DB, tx.ID(), txType.String(), genTx); err != nil {
 					return nil, err
 				}
-				if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+				if err := vm.putTxStatus(vm.DB, tx.ID(), txType.String(), choices.Processing); err != nil {
 					return nil, err
 				}
 			}
@@ -503,7 +507,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
-		status, err := vm.getTxStatus()
+		txType := reflect.TypeOf(tx)
+		status, err := vm.getTxStatus(vm.DB, tx.ID(), txType.String())
 		if err != nil {
 			return nil, err
 		}
@@ -511,10 +516,10 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			genTx := &GenericTx{
 				Tx: &tx,
 			}
-			if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+			if err := vm.putTx(vm.DB, tx.ID(), txType.String(), genTx); err != nil {
 				return nil, err
 			}
-			if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+			if err := vm.putTxStatus(vm.DB, tx.ID(), txType.String(), choices.Processing); err != nil {
 				return nil, err
 			}
 		}
@@ -566,7 +571,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
-		status, err := vm.getTxStatus()
+		txType := reflect.TypeOf(stakerTx)
+		status, err := vm.getTxStatus(vm.DB, stakerTx.ID(), txType.String())
 		if err != nil {
 			return nil, err
 		}
@@ -574,10 +580,10 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			genTx := &GenericTx{
 				Tx: &stakerTx,
 			}
-			if err := vm.putTx(vm.DB, stakerTx.ID(), genTx); err != nil {
+			if err := vm.putTx(vm.DB, stakerTx.ID(), txType.String(), genTx); err != nil {
 				return nil, err
 			}
-			if err := vm.putTxStatus(vm.DB, stakerTx.ID(), choices.Processing); err != nil {
+			if err := vm.putTxStatus(vm.DB, stakerTx.ID(), txType.String(), choices.Processing); err != nil {
 				return nil, err
 			}
 		}
@@ -607,7 +613,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 			return nil, err
 		}
-		status, err := vm.getTxStatus()
+		txType := reflect.TypeOf(advanceTimeTx)
+		status, err := vm.getTxStatus(vm.DB, advanceTimeTx.ID(), txType.String())
 		if err != nil {
 			return nil, err
 		}
@@ -615,10 +622,10 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			genTx := &GenericTx{
 				Tx: &advanceTimeTx,
 			}
-			if err := vm.putTx(vm.DB, advanceTimeTx.ID(), genTx); err != nil {
+			if err := vm.putTx(vm.DB, advanceTimeTx.ID(), txType.String(), genTx); err != nil {
 				return nil, err
 			}
-			if err := vm.putTxStatus(vm.DB, advanceTimeTx.ID(), choices.Processing); err != nil {
+			if err := vm.putTxStatus(vm.DB, advanceTimeTx.ID(), txType.String(), choices.Processing); err != nil {
 				return nil, err
 			}
 		}
@@ -638,7 +645,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 				return nil, err
 			}
-			status, err := vm.getTxStatus()
+			txType := reflect.TypeOf(tx)
+			status, err := vm.getTxStatus(vm.DB, tx.ID(), txType.String())
 			if err != nil {
 				return nil, err
 			}
@@ -646,10 +654,10 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 				genTx := &GenericTx{
 					Tx: &tx,
 				}
-				if err := vm.putTx(vm.DB, tx.ID(), genTx); err != nil {
+				if err := vm.putTx(vm.DB, tx.ID(), txType.String(), genTx); err != nil {
 					return nil, err
 				}
-				if err := vm.putTxStatus(vm.DB, tx.ID(), choices.Processing); err != nil {
+				if err := vm.putTxStatus(vm.DB, tx.ID(), txType.String(), choices.Processing); err != nil {
 					return nil, err
 				}
 			}

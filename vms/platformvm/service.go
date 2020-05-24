@@ -1425,7 +1425,8 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 
 // GetTxStatusArgs are arguments for passing into GetTxStatus requests
 type GetTxStatusArgs struct {
-	TxID ids.ID `json:"txID"`
+	TxID   ids.ID `json:"txID"`
+	TxType string `json:"txType"`
 }
 
 // GetTxStatusReply defines the GetTxStatus replies returned from the API
@@ -1441,7 +1442,7 @@ func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, repl
 		return errNilTxID
 	}
 
-	status, err := service.vm.getTxStatus(service.vm.DB, args.TxID)
+	status, err := service.vm.getTxStatus(service.vm.DB, args.TxID, args.TxType)
 	if err != nil {
 		return err
 	}

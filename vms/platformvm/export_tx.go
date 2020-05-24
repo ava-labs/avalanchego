@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"reflect"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -143,8 +144,8 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 // Accept this transaction.
 func (tx *ExportTx) Accept(batch database.Batch) error {
 	txID := tx.ID()
-
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Accepted); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Accepted); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()
@@ -178,8 +179,8 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 }
 
 func (tx *ExportTx) Reject() error {
-
-	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), choices.Rejected); err != nil {
+	txType := reflect.TypeOf(tx)
+	if err := tx.vm.putTxStatus(tx.vm.DB, tx.ID(), txType.String(), choices.Rejected); err != nil {
 		return err
 	}
 	tx.vm.DB.Commit()
