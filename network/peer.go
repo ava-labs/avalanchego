@@ -257,6 +257,7 @@ func (p *peer) GetVersion() {
 
 // assumes the stateLock is not held
 func (p *peer) Version() {
+	p.net.stateLock.Lock()
 	msg, err := p.net.b.Version(
 		p.net.networkID,
 		p.net.nodeID,
@@ -264,6 +265,7 @@ func (p *peer) Version() {
 		p.net.ip,
 		p.net.version.String(),
 	)
+	p.net.stateLock.Unlock()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
@@ -431,14 +433,16 @@ func (p *peer) getPeerList(_ Msg) { p.SendPeerList() }
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
+	p.net.stateLock.Lock()
 	for _, ip := range ips {
 		if !ip.Equal(p.net.ip) &&
 			!ip.IsZero() &&
 			(p.net.allowPrivateIPs || !ip.IsPrivate()) {
 			// TODO: only try to connect once
-			p.net.Track(ip)
+			p.net.track(ip)
 		}
 	}
+	p.net.stateLock.Unlock()
 }
 
 // assumes the stateLock is not held

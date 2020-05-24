@@ -699,8 +699,12 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	// mark the IP as one of mine.
 	if id.Equals(n.id) {
 		if !p.ip.IsZero() {
-			// TODO: if n.ip is less useful than p.ip (either it is private, or
-			// it is zero), should we set it to this IP?
+			// if n.ip is less useful than p.ip set it to this IP
+			if n.ip.IsZero() {
+				n.log.Info("setting my ip to %s because I was able to connect to myself through this channel",
+					p.ip)
+				n.ip = p.ip
+			}
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
 			n.myIPs[str] = struct{}{}
