@@ -1,4 +1,5 @@
 
+#!/usr/bin/env ansible-playbook
 ---
 - name: Update the network
   connection: ssh
