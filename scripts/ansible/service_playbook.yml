@@ -3,8 +3,9 @@
 - name: Configure AVA service
   hosts: ava_nodes
   roles:
-    - name: ava-base
+    - name: golang-base
     - name: gopath
+    - name: ava-base
     - name: ava-build
     - name: ava-user
     - name: ava-install
