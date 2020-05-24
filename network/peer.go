@@ -259,6 +259,7 @@ func (p *peer) GetVersion() {
 func (p *peer) Version() {
 	msg, err := p.net.b.Version(
 		p.net.networkID,
+		p.net.nodeID,
 		p.net.clock.Unix(),
 		p.net.ip,
 		p.net.version.String(),
@@ -301,9 +302,28 @@ func (p *peer) version(msg Msg) {
 			p.net.networkID)
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
-		p.net.stateLock.Lock()
-		p.ip = utils.IPDesc{}
-		p.net.stateLock.Unlock()
+		if !p.ip.IsZero() {
+			p.net.stateLock.Lock()
+			delete(p.net.disconnectedIPs, p.ip.String())
+			p.ip = utils.IPDesc{}
+			p.net.stateLock.Unlock()
+		}
+		p.Close()
+		return
+	}
+
+	if nodeID := msg.Get(NodeID).(uint32); nodeID == p.net.nodeID {
+		p.net.log.Debug("peer's node ID matches our nodeID")
+
+		// By clearing the IP, we will not attempt to reconnect to this peer
+		if !p.ip.IsZero() {
+			p.net.stateLock.Lock()
+			str := p.ip.String()
+			p.net.myIPs[str] = struct{}{}
+			delete(p.net.disconnectedIPs, str)
+			p.ip = utils.IPDesc{}
+			p.net.stateLock.Unlock()
+		}
 		p.Close()
 		return
 	}
@@ -315,9 +335,12 @@ func (p *peer) version(msg Msg) {
 			uint64(myTime))
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
-		p.net.stateLock.Lock()
-		p.ip = utils.IPDesc{}
-		p.net.stateLock.Unlock()
+		if !p.ip.IsZero() {
+			p.net.stateLock.Lock()
+			delete(p.net.disconnectedIPs, p.ip.String())
+			p.ip = utils.IPDesc{}
+			p.net.stateLock.Unlock()
+		}
 		p.Close()
 		return
 	}
@@ -328,9 +351,12 @@ func (p *peer) version(msg Msg) {
 		p.net.log.Debug("peer version could not be parsed due to %s", err)
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
-		p.net.stateLock.Lock()
-		p.ip = utils.IPDesc{}
-		p.net.stateLock.Unlock()
+		if !p.ip.IsZero() {
+			p.net.stateLock.Lock()
+			delete(p.net.disconnectedIPs, p.ip.String())
+			p.ip = utils.IPDesc{}
+			p.net.stateLock.Unlock()
+		}
 		p.Close()
 		return
 	}
@@ -344,9 +370,12 @@ func (p *peer) version(msg Msg) {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
-		p.net.stateLock.Lock()
-		p.ip = utils.IPDesc{}
-		p.net.stateLock.Unlock()
+		if !p.ip.IsZero() {
+			p.net.stateLock.Lock()
+			delete(p.net.disconnectedIPs, p.ip.String())
+			p.ip = utils.IPDesc{}
+			p.net.stateLock.Unlock()
+		}
 		p.Close()
 		return
 	}

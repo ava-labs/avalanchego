@@ -30,6 +30,7 @@ func TestBuildGetVersion(t *testing.T) {
 
 func TestBuildVersion(t *testing.T) {
 	networkID := uint32(1)
+	nodeID := uint32(3)
 	myTime := uint64(2)
 	ip := utils.IPDesc{
 		IP:   net.IPv6loopback,
@@ -39,6 +40,7 @@ func TestBuildVersion(t *testing.T) {
 
 	msg, err := TestBuilder.Version(
 		networkID,
+		nodeID,
 		myTime,
 		ip,
 		myVersion,
@@ -47,6 +49,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, Version, msg.Op())
 	assert.Equal(t, networkID, msg.Get(NetworkID))
+	assert.Equal(t, nodeID, msg.Get(NodeID))
 	assert.Equal(t, myTime, msg.Get(MyTime))
 	assert.Equal(t, ip, msg.Get(IP))
 	assert.Equal(t, myVersion, msg.Get(VersionStr))
@@ -56,6 +59,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Version, parsedMsg.Op())
 	assert.Equal(t, networkID, parsedMsg.Get(NetworkID))
+	assert.Equal(t, nodeID, parsedMsg.Get(NodeID))
 	assert.Equal(t, myTime, parsedMsg.Get(MyTime))
 	assert.Equal(t, ip, parsedMsg.Get(IP))
 	assert.Equal(t, myVersion, parsedMsg.Get(VersionStr))

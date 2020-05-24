@@ -15,9 +15,10 @@ type Builder struct{ Codec }
 func (m Builder) GetVersion() (Msg, error) { return m.Pack(GetVersion, nil) }
 
 // Version message
-func (m Builder) Version(networkID uint32, myTime uint64, ip utils.IPDesc, myVersion string) (Msg, error) {
+func (m Builder) Version(networkID, nodeID uint32, myTime uint64, ip utils.IPDesc, myVersion string) (Msg, error) {
 	return m.Pack(Version, map[Field]interface{}{
 		NetworkID:  networkID,
+		NodeID:     nodeID,
 		MyTime:     myTime,
 		IP:         ip,
 		VersionStr: myVersion,

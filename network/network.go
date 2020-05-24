@@ -6,6 +6,7 @@ package network
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -91,6 +92,8 @@ type network struct {
 	vdrs           validators.Set // set of current validators in the AVAnet
 	router         router.Router  // router must be thread safe
 
+	nodeID uint32
+
 	clock         timer.Clock
 	lastHeartbeat int64
 
@@ -114,8 +117,10 @@ type network struct {
 	closed          bool
 	disconnectedIPs map[string]struct{}
 	connectedIPs    map[string]struct{}
-	peers           map[[20]byte]*peer
-	handlers        []Handler
+	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
+	myIPs    map[string]struct{} // set of IPs that resulted in my ID.
+	peers    map[[20]byte]*peer
+	handlers []Handler
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -200,6 +205,7 @@ func NewNetwork(
 		clientUpgrader:               clientUpgrader,
 		vdrs:                         vdrs,
 		router:                       router,
+		nodeID:                       rand.Uint32(),
 		initialReconnectDelay:        initialReconnectDelay,
 		maxReconnectDelay:            maxReconnectDelay,
 		maxMessageSize:               maxMessageSize,
@@ -214,6 +220,7 @@ func NewNetwork(
 
 		disconnectedIPs: make(map[string]struct{}),
 		connectedIPs:    make(map[string]struct{}),
+		myIPs:           map[string]struct{}{ip.String(): struct{}{}},
 		peers:           make(map[[20]byte]*peer),
 	}
 	net.executor.Initialize()
@@ -547,6 +554,9 @@ func (n *network) track(ip utils.IPDesc) {
 	if _, ok := n.connectedIPs[str]; ok {
 		return
 	}
+	if _, ok := n.myIPs[str]; ok {
+		return
+	}
 	n.disconnectedIPs[str] = struct{}{}
 
 	go n.connectTo(ip)
@@ -560,7 +570,7 @@ func (n *network) gossip() {
 	for range t.C {
 		ips := n.validatorIPs()
 		if len(ips) == 0 {
-			n.log.Debug("skipping validator gossiping as no validators are connected")
+			n.log.Debug("skipping validator gossiping as no public validators are connected")
 			continue
 		}
 		msg, err := n.b.PeerList(ips)
@@ -616,12 +626,17 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		n.stateLock.Lock()
 		_, isDisconnected := n.disconnectedIPs[str]
 		_, isConnected := n.connectedIPs[str]
+		_, isMyself := n.myIPs[str]
 		closed := n.closed
+
 		n.stateLock.Unlock()
 
-		if !isDisconnected || isConnected || closed {
-			// If the IP was discovered by that peer connecting to us, we don't
+		if !isDisconnected || isConnected || isMyself || closed {
+			// If the IP was discovered by the peer connecting to us, we don't
 			// need to attempt to connect anymore
+
+			// If the IP was discovered to be our IP address, we don't need to
+			// attempt to connect anymore
 
 			// If the network was closed, we should stop attempting to connect
 			// to the peer
@@ -680,7 +695,24 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 		return nil
 	}
 
+	// if this connection is myself, then I should delete the connection and
+	// mark the IP as one of mine.
+	if id.Equals(n.id) {
+		if !p.ip.IsZero() {
+			// TODO: if n.ip is less useful than p.ip (either it is private, or
+			// it is zero), should we set it to this IP?
+			str := p.ip.String()
+			delete(n.disconnectedIPs, str)
+			n.myIPs[str] = struct{}{}
+		}
+		p.conn.Close()
+		return nil
+	}
+
 	if _, ok := n.peers[key]; ok {
+		if !p.ip.IsZero() {
+			delete(n.disconnectedIPs, p.ip.String())
+		}
 		p.conn.Close()
 		return nil
 	}

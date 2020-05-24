@@ -14,6 +14,7 @@ type Field uint32
 const (
 	VersionStr     Field = iota // Used in handshake
 	NetworkID                   // Used in handshake
+	NodeID                      // Used in handshake
 	MyTime                      // Used in handshake
 	IP                          // Used in handshake
 	Peers                       // Used in handshake
@@ -30,6 +31,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case VersionStr:
 		return wrappers.TryPackStr
 	case NetworkID:
+		return wrappers.TryPackInt
+	case NodeID:
 		return wrappers.TryPackInt
 	case MyTime:
 		return wrappers.TryPackLong
@@ -59,6 +62,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackStr
 	case NetworkID:
 		return wrappers.TryUnpackInt
+	case NodeID:
+		return wrappers.TryUnpackInt
 	case MyTime:
 		return wrappers.TryUnpackLong
 	case IP:
@@ -86,6 +91,8 @@ func (f Field) String() string {
 		return "VersionStr"
 	case NetworkID:
 		return "NetworkID"
+	case NodeID:
+		return "NodeID"
 	case MyTime:
 		return "MyTime"
 	case IP:
@@ -130,7 +137,7 @@ var (
 	Messages = map[uint8][]Field{
 		// Handshake:
 		GetVersion:  []Field{},
-		Version:     []Field{NetworkID, MyTime, IP, VersionStr},
+		Version:     []Field{NetworkID, NodeID, MyTime, IP, VersionStr},
 		GetPeerList: []Field{},
 		PeerList:    []Field{Peers},
 		// Bootstrapping:
