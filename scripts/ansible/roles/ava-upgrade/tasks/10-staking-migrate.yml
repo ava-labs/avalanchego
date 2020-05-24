@@ -1,7 +1,7 @@
 - name: Migrate staking key
   vars:
-    old_key: "{{ ava_daemon_data_dir }}/keys/staker.key"
-    new_key: "{{ ava_daemon_data_dir }}/staking/staker.key"
+    old_key: "{{ ava_daemon_home_dir }}/keys/staker.key"
+    new_key: "{{ ava_daemon_home_dir }}/staking/staker.key"
   block:
     - name: Check for Gecko 0.2.0 staking key
       stat:
@@ -25,8 +25,8 @@
 
 - name: Migrate staking certificate
   vars:
-    old_cert: "{{ ava_daemon_data_dir }}/keys/staker.crt"
-    new_cert: "{{ ava_daemon_data_dir }}/staking/staker.crt"
+    old_cert: "{{ ava_daemon_home_dir }}/keys/staker.crt"
+    new_cert: "{{ ava_daemon_home_dir }}/staking/staker.crt"
   block:
     - name: Check for Gecko 0.2.0 staking certificate
       stat:

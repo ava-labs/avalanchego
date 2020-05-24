@@ -8,11 +8,11 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-WorkingDirectory={{ ava_daemon_data_dir }}
+WorkingDirectory={{ ava_daemon_home_dir }}
 Restart=always
 RestartSec=1
 User={{ ava_daemon_user }}
-ExecStart={{ ava_daemon_bin_dir }}/ava \
+ExecStart={{ bindir }}/ava \
             --public-ip="{{ ansible_facts.default_ipv4.address }}" \
             --db-dir="{{ ava_daemon_db_dir }}" \
             --plugin-dir="{{ ava_daemon_plugin_dir }}" \

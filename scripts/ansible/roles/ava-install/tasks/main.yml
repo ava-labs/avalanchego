@@ -1,4 +1,14 @@
-- name: Create directories
+- name: Create shared directories
+  file:
+    # Don't specify owner, mode etc for directories not specific to AVA.
+    # OS defaults, or local defaults are better than any guess we could make.
+    path: "{{ item.path }}"
+    state: directory
+  loop:
+    - path: "{{ sharedstatedir }}"
+    - path: "{{ logdir }}"
+
+- name: Create AVA directories
   become: true
   file:
     path: "{{ item.path }}"
@@ -8,7 +18,9 @@
     recurse: "{{ item.recurse | default(omit) }}"
     state: directory
   loop:
-    - path: "{{ ava_daemon_data_dir }}"
+    - path: "{{ ava_daemon_home_dir }}"
+      mode: u=rwX,go=rX
+    - path: "{{ ava_daemon_db_dir }}"
       mode: u=rwX,go=rX
     - path: "{{ ava_daemon_staking_dir }}"
       mode: u=rX,go=
@@ -24,11 +36,11 @@
   notify:
     - Restart AVA service
 
-- name: Install binary
+- name: Install AVA binary
   become: true
   copy:
     src: "{{ ava_binary }}"
-    dest: "{{ ava_daemon_bin_dir }}/ava"
+    dest: "{{ bindir }}/ava"
     remote_src: true
     owner: root
     group: root
@@ -36,7 +48,7 @@
   notify:
     - Restart AVA service
 
-- name: Install plugins
+- name: Install AVA plugins
   become: true
   copy:
     src: "{{ item.path }}"

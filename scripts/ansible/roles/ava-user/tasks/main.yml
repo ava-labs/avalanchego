@@ -9,7 +9,7 @@
   user:
     name: "{{ ava_daemon_user }}"
     group: "{{ ava_daemon_group }}"
-    home: "{{ ava_daemon_data_dir }}"
+    home: "{{ ava_daemon_home_dir }}"
     shell: /bin/false
     skeleton: false
     system: true
