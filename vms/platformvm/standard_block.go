@@ -123,7 +123,7 @@ func (sb *StandardBlock) Verify() error {
 func (sb *StandardBlock) Accept() {
 	sb.vm.Ctx.Log.Verbo("Accepting block with ID %s", sb.ID())
 
-	sb.CommonBlock.Accept()
+	sb.SingleDecisionBlock.Accept()
 
 	for _, tx := range sb.Txs {
 		if err := tx.Accept(); err != nil {
@@ -135,7 +135,7 @@ func (sb *StandardBlock) Accept() {
 func (sb *StandardBlock) Reject() {
 	sb.vm.Ctx.Log.Verbo("Rejecting block with ID %s", sb.ID())
 
-	sb.CommonBlock.Reject()
+	sb.SingleDecisionBlock.Reject()
 
 	for _, tx := range sb.Txs {
 		if err := tx.Reject(); err != nil {

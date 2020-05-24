@@ -134,7 +134,7 @@ func (ab *AtomicBlock) Verify() error {
 func (ab *AtomicBlock) Accept() {
 	ab.vm.Ctx.Log.Verbo("Accepting block with ID %s", ab.ID())
 
-	ab.CommonBlock.Accept()
+	ab.SingleDecisionBlock.Accept()
 
 	// Update the state of the chain in the database
 	if err := ab.onAcceptDB.Commit(); err != nil {
@@ -167,7 +167,7 @@ func (ab *AtomicBlock) Accept() {
 func (ab *AtomicBlock) Reject() {
 	ab.vm.Ctx.Log.Verbo("Rejecting block with ID %s", ab.ID())
 
-	ab.CommonBlock.Reject()
+	ab.SingleDecisionBlock.Reject()
 
 	if err := ab.Tx.Reject(); err != nil {
 		ab.vm.Ctx.Log.Error("unable to reject tx")
