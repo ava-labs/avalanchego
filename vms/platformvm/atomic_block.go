@@ -43,7 +43,7 @@ type AtomicTx interface {
 // AtomicBlock being accepted results in the transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
-	SingleDecisionBlock `serialize:"true"`
+	CommonDecisionBlock `serialize:"true"`
 
 	Tx AtomicTx `serialize:"true"`
 
@@ -52,7 +52,7 @@ type AtomicBlock struct {
 
 // initialize this block
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
-	if err := ab.SingleDecisionBlock.initialize(vm, bytes); err != nil {
+	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
 
@@ -134,7 +134,7 @@ func (ab *AtomicBlock) Verify() error {
 func (ab *AtomicBlock) Accept() {
 	ab.vm.Ctx.Log.Verbo("Accepting block with ID %s", ab.ID())
 
-	ab.SingleDecisionBlock.Accept()
+	ab.CommonBlock.Accept()
 
 	// Update the state of the chain in the database
 	if err := ab.onAcceptDB.Commit(); err != nil {

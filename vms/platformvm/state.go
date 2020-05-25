@@ -251,29 +251,11 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error
 	return nil, fmt.Errorf("couldn't find subnet with ID %s", id)
 }
 
-func (vm *VM) getTxStatus(db database.Database, txID ids.ID) (choices.Status, error) {
+func (vm *VM) getTxStatus(db database.Database, txID ids.ID, txType string) (choices.Status, error) {
 
-	switch txType {
-	case "*platformvm.addDefaultSubnetValidatorTx":
-		key = txID.Prefix(addDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.addDefaultSubnetDelegatorTx":
-		key = txID.Prefix(addDefaultSubnetDelegatorTxIDPrefix)
-	case "*platformvm.addNonDefaultSubnetValidatorTx":
-		key = txID.Prefix(addNonDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.advanceTimeTx":
-		key = txID.Prefix(advanceTimeTxIDPrefix)
-	case "*platformvm.CreateSubnetTx":
-		key = txID.Prefix(createSubnetTxIDPrefix)
-	case "*platformvm.CreateChainTx":
-		key = txID.Prefix(createChainTxIDPrefix)
-	case "*platformvm.ExportTx":
-		key = txID.Prefix(exportTxIDPrefix)
-	case "*platformvm.ImportTx":
-		key = txID.Prefix(importTxIDPrefix)
-	case "*platformvm.rewardValidatorTx":
-		key = txID.Prefix(rewardValidatorTxIDPrefix)
-	default:
-		return choices.Unknown, fmt.Errorf("Unrecognized tx type %s", txType)
+	key, err := txKey(txID, txType)
+	if err != nil {
+		return choices.Unknown, err
 	}
 
 	exists, err := vm.State.Has(db, statusTypeID, key)
@@ -299,65 +281,24 @@ func (vm *VM) getTxStatus(db database.Database, txID ids.ID) (choices.Status, er
 
 }
 
-func (vm *VM) putTxStatus(db database.Database, txID ids.ID, status choices.Status) error {
-	var key ids.ID
+func (vm *VM) putTxStatus(db database.Database, txID ids.ID, txType string, status choices.Status) error {
 
-	switch txType {
-	case "*platformvm.addDefaultSubnetValidatorTx":
-		key = txID.Prefix(addDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.addDefaultSubnetDelegatorTx":
-		key = txID.Prefix(addDefaultSubnetDelegatorTxIDPrefix)
-	case "*platformvm.addNonDefaultSubnetValidatorTx":
-		key = txID.Prefix(addNonDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.advanceTimeTx":
-		key = txID.Prefix(advanceTimeTxIDPrefix)
-	case "*platformvm.CreateSubnetTx":
-		key = txID.Prefix(createSubnetTxIDPrefix)
-	case "*platformvm.CreateChainTx":
-		key = txID.Prefix(createChainTxIDPrefix)
-	case "*platformvm.ExportTx":
-		key = txID.Prefix(exportTxIDPrefix)
-	case "*platformvm.ImportTx":
-		key = txID.Prefix(importTxIDPrefix)
-	case "*platformvm.rewardValidatorTx":
-		key = txID.Prefix(rewardValidatorTxIDPrefix)
-	default:
-		return fmt.Errorf("Unrecognized tx type %s", txType)
+	key, err := txKey(txID, txType)
+	if err != nil {
+		return err
 	}
 
-	err := vm.State.Put(db, statusTypeID, key, status)
-
-	if err != nil {
+	if err := vm.State.Put(db, statusTypeID, key, status); err != nil {
 		return errDBPutTxStatus
 	}
 	return nil
 }
 
-func (vm *VM) getTx(db database.Database, txID ids.ID) (*GenericTx, error) {
+func (vm *VM) getTx(db database.Database, txID ids.ID, txType string) (*GenericTx, error) {
 
-	var key ids.ID
-
-	switch txType {
-	case "*platformvm.addDefaultSubnetValidatorTx":
-		key = txID.Prefix(addDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.addDefaultSubnetDelegatorTx":
-		key = txID.Prefix(addDefaultSubnetDelegatorTxIDPrefix)
-	case "*platformvm.addNonDefaultSubnetValidatorTx":
-		key = txID.Prefix(addNonDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.advanceTimeTx":
-		key = txID.Prefix(advanceTimeTxIDPrefix)
-	case "*platformvm.CreateSubnetTx":
-		key = txID.Prefix(createSubnetTxIDPrefix)
-	case "*platformvm.CreateChainTx":
-		key = txID.Prefix(createChainTxIDPrefix)
-	case "*platformvm.ExportTx":
-		key = txID.Prefix(exportTxIDPrefix)
-	case "*platformvm.ImportTx":
-		key = txID.Prefix(importTxIDPrefix)
-	case "rewardValidatorTx":
-		key = txID.Prefix(rewardValidatorTxIDPrefix)
-	default:
-		return nil, fmt.Errorf("Unrecognized tx type %s", txType)
+	key, err := txKey(txID, txType)
+	if err != nil {
+		return nil, err
 	}
 
 	exists, err := vm.State.Has(db, txTypeID, key)
@@ -382,34 +323,14 @@ func (vm *VM) getTx(db database.Database, txID ids.ID) (*GenericTx, error) {
 	return tx, nil
 }
 
-func (vm *VM) putTx(db database.Database, txID ids.ID, tx *GenericTx) error {
-	var key ids.ID
+func (vm *VM) putTx(db database.Database, txID ids.ID, txType string, tx *GenericTx) error {
 
-	switch txType {
-	case "*platformvm.addDefaultSubnetValidatorTx":
-		key = txID.Prefix(addDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.addDefaultSubnetDelegatorTx":
-		key = txID.Prefix(addDefaultSubnetDelegatorTxIDPrefix)
-	case "*platformvm.addNonDefaultSubnetValidatorTx":
-		key = txID.Prefix(addNonDefaultSubnetValidatorTxIDPrefix)
-	case "*platformvm.advanceTimeTx":
-		key = txID.Prefix(advanceTimeTxIDPrefix)
-	case "*platformvm.CreateSubnetTx":
-		key = txID.Prefix(createSubnetTxIDPrefix)
-	case "*platformvm.CreateChainTx":
-		key = txID.Prefix(createChainTxIDPrefix)
-	case "*platformvm.ExportTx":
-		key = txID.Prefix(exportTxIDPrefix)
-	case "*platformvm.ImportTx":
-		key = txID.Prefix(importTxIDPrefix)
-	case "*platformvm.rewardValidatorTx":
-		key = txID.Prefix(rewardValidatorTxIDPrefix)
-	default:
-		return fmt.Errorf("Unrecognized tx type %s", txType)
+	key, err := txKey(txID, txType)
+	if err != nil {
+		return err
 	}
 
-	err := vm.State.Put(db, txTypeID, key, tx)
-	if err != nil {
+	if err := vm.State.Put(db, txTypeID, key, tx); err != nil {
 		return errDBPutTx
 	}
 	return nil
@@ -498,6 +419,35 @@ func (vm *VM) registerDBTypes() {
 	if err := vm.State.RegisterType(txTypeID, unmarshalTxFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
+}
+
+func txKey(txID ids.ID, txType string) (ids.ID, error) {
+
+	var key ids.ID
+
+	switch txType {
+	case "*platformvm.addDefaultSubnetValidatorTx":
+		key = txID.Prefix(addDefaultSubnetValidatorTxIDPrefix)
+	case "*platformvm.addDefaultSubnetDelegatorTx":
+		key = txID.Prefix(addDefaultSubnetDelegatorTxIDPrefix)
+	case "*platformvm.addNonDefaultSubnetValidatorTx":
+		key = txID.Prefix(addNonDefaultSubnetValidatorTxIDPrefix)
+	case "*platformvm.advanceTimeTx":
+		key = txID.Prefix(advanceTimeTxIDPrefix)
+	case "*platformvm.CreateSubnetTx":
+		key = txID.Prefix(createSubnetTxIDPrefix)
+	case "*platformvm.CreateChainTx":
+		key = txID.Prefix(createChainTxIDPrefix)
+	case "*platformvm.ExportTx":
+		key = txID.Prefix(exportTxIDPrefix)
+	case "*platformvm.ImportTx":
+		key = txID.Prefix(importTxIDPrefix)
+	case "*platformvm.rewardValidatorTx":
+		key = txID.Prefix(rewardValidatorTxIDPrefix)
+	default:
+		return ids.ID{}, fmt.Errorf("Unrecognized tx type %s", txType)
+	}
+	return key, nil
 }
 
 // Unmarshal a Block from bytes and initialize it
