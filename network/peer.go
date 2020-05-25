@@ -190,6 +190,13 @@ func (p *peer) handle(msg Msg) {
 	p.net.heartbeat()
 
 	op := msg.Op()
+	msgMetrics := p.net.message(op)
+	if msgMetrics == nil {
+		p.net.log.Debug("dropping an unknown message from %s with op %d", p.id, op)
+		return
+	}
+	msgMetrics.numReceived.Inc()
+
 	switch op {
 	case Version:
 		p.version(msg)
@@ -228,8 +235,6 @@ func (p *peer) handle(msg Msg) {
 		p.pullQuery(msg)
 	case Chits:
 		p.chits(msg)
-	default:
-		p.net.log.Debug("dropping an unknown message from %s with op %d", p.id, op)
 	}
 }
 

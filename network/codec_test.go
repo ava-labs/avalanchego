@@ -30,6 +30,6 @@ func TestCodecParseInvalidOp(t *testing.T) {
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
-	_, err := TestCodec.Parse([]byte{GetVersion, 0x00})
+	_, err := TestCodec.Parse([]byte{byte(GetVersion), 0x00})
 	assert.Error(t, err)
 }

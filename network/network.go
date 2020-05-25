@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/api/health"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/networking/router"
@@ -79,6 +81,9 @@ type Network interface {
 }
 
 type network struct {
+	// The metrics that this network tracks
+	metrics
+
 	log            logging.Logger
 	id             ids.ShortID
 	ip             utils.IPDesc
@@ -126,6 +131,7 @@ type network struct {
 // NewDefaultNetwork returns a new Network implementation with the provided
 // parameters and some reasonable default values.
 func NewDefaultNetwork(
+	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
 	ip utils.IPDesc,
@@ -140,6 +146,7 @@ func NewDefaultNetwork(
 	router router.Router,
 ) Network {
 	return NewNetwork(
+		registerer,
 		log,
 		id,
 		ip,
@@ -168,6 +175,7 @@ func NewDefaultNetwork(
 
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
+	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
 	ip utils.IPDesc,
@@ -223,6 +231,7 @@ func NewNetwork(
 		myIPs:           map[string]struct{}{ip.String(): struct{}{}},
 		peers:           make(map[[20]byte]*peer),
 	}
+	net.initialize(registerer)
 	net.executor.Initialize()
 	net.heartbeat()
 	return net
@@ -244,6 +253,9 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 		}
 		if !sent {
 			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(vID, chainID, requestID) })
+			n.getAcceptedFrontier.numFailed.Inc()
+		} else {
+			n.getAcceptedFrontier.numSent.Inc()
 		}
 	}
 }
@@ -266,6 +278,9 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 	if !sent {
 		n.log.Debug("failed to send an AcceptedFrontier message to: %s", validatorID)
+		n.acceptedFrontier.numFailed.Inc()
+	} else {
+		n.acceptedFrontier.numSent.Inc()
 	}
 }
 
@@ -291,6 +306,9 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		}
 		if !sent {
 			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
+			n.getAccepted.numFailed.Inc()
+		} else {
+			n.getAccepted.numSent.Inc()
 		}
 	}
 }
@@ -313,6 +331,9 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 	if !sent {
 		n.log.Debug("failed to send an Accepted message to: %s", validatorID)
+		n.accepted.numFailed.Inc()
+	} else {
+		n.accepted.numSent.Inc()
 	}
 }
 
@@ -330,6 +351,9 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 	if !sent {
 		n.log.Debug("failed to send a Get message to: %s", validatorID)
+		n.get.numFailed.Inc()
+	} else {
+		n.get.numSent.Inc()
 	}
 }
 
@@ -350,6 +374,9 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 	if !sent {
 		n.log.Debug("failed to send a Put message to: %s", validatorID)
+		n.put.numFailed.Inc()
+	} else {
+		n.put.numSent.Inc()
 	}
 }
 
@@ -377,6 +404,9 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		if !sent {
 			n.log.Debug("failed sending a PushQuery message to: %s", vID)
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
+			n.pushQuery.numFailed.Inc()
+		} else {
+			n.pushQuery.numSent.Inc()
 		}
 	}
 }
@@ -398,6 +428,9 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		if !sent {
 			n.log.Debug("failed sending a PullQuery message to: %s", vID)
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
+			n.pullQuery.numFailed.Inc()
+		} else {
+			n.pullQuery.numSent.Inc()
 		}
 	}
 }
@@ -419,6 +452,9 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 	if !sent {
 		n.log.Debug("failed to send a Chits message to: %s", validatorID)
+		n.chits.numFailed.Inc()
+	} else {
+		n.chits.numSent.Inc()
 	}
 }
 
@@ -536,7 +572,11 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 
 	sampler := random.Uniform{N: len(allPeers)}
 	for i := 0; i < numToGossip; i++ {
-		allPeers[sampler.Sample()].send(msg)
+		if allPeers[sampler.Sample()].send(msg) {
+			n.put.numSent.Inc()
+		} else {
+			n.put.numFailed.Inc()
+		}
 	}
 	return nil
 }

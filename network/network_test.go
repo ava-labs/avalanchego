@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/gecko/ids"
@@ -183,6 +185,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 	handler := router.Router(nil)
 
 	net := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id,
 		ip,
@@ -265,6 +268,7 @@ func TestEstablishConnection(t *testing.T) {
 	handler := router.Router(nil)
 
 	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
@@ -281,6 +285,7 @@ func TestEstablishConnection(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id1,
 		ip1,
@@ -402,6 +407,7 @@ func TestDoubleTrack(t *testing.T) {
 	handler := router.Router(nil)
 
 	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
@@ -418,6 +424,7 @@ func TestDoubleTrack(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id1,
 		ip1,
@@ -540,6 +547,7 @@ func TestDoubleClose(t *testing.T) {
 	handler := router.Router(nil)
 
 	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
@@ -556,6 +564,7 @@ func TestDoubleClose(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id1,
 		ip1,
@@ -683,6 +692,7 @@ func TestRemoveHandlers(t *testing.T) {
 	handler := router.Router(nil)
 
 	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
@@ -699,6 +709,7 @@ func TestRemoveHandlers(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id1,
 		ip1,
@@ -835,6 +846,7 @@ func TestTrackConnected(t *testing.T) {
 	handler := router.Router(nil)
 
 	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
@@ -851,6 +863,7 @@ func TestTrackConnected(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id1,
 		ip1,
@@ -974,6 +987,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	handler := router.Router(nil)
 
 	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id0,
 		ip0,
@@ -990,6 +1004,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
 		log,
 		id1,
 		ip1,

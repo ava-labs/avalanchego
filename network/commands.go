@@ -112,10 +112,46 @@ func (f Field) String() string {
 	}
 }
 
+// Op is an opcode
+type Op byte
+
+func (op Op) String() string {
+	switch op {
+	case GetVersion:
+		return "get_version"
+	case Version:
+		return "version"
+	case GetPeerList:
+		return "get_peerlist"
+	case PeerList:
+		return "peerlist"
+	case GetAcceptedFrontier:
+		return "get_accepted_frontier"
+	case AcceptedFrontier:
+		return "accepted_frontier"
+	case GetAccepted:
+		return "get_accepted"
+	case Accepted:
+		return "accepted"
+	case Get:
+		return "get"
+	case Put:
+		return "put"
+	case PushQuery:
+		return "push_query"
+	case PullQuery:
+		return "pull_query"
+	case Chits:
+		return "chits"
+	default:
+		return "Unknown Op"
+	}
+}
+
 // Public commands that may be sent between stakers
 const (
 	// Handshake:
-	GetVersion uint8 = iota
+	GetVersion Op = iota
 	Version
 	GetPeerList
 	PeerList
@@ -134,7 +170,7 @@ const (
 
 // Defines the messages that can be sent/received with this network
 var (
-	Messages = map[uint8][]Field{
+	Messages = map[Op][]Field{
 		// Handshake:
 		GetVersion:  []Field{},
 		Version:     []Field{NetworkID, NodeID, MyTime, IP, VersionStr},

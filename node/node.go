@@ -154,6 +154,7 @@ func (n *Node) initNetworking() error {
 	n.vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 
 	n.Net = network.NewDefaultNetwork(
+		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
 		n.Config.StakingIP,
@@ -542,17 +543,17 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
 
+	// Start HTTP APIs
+	n.initAPIServer()   // Start the API Server
+	n.initKeystoreAPI() // Start the Keystore API
+	n.initMetricsAPI()  // Start the Metrics API
+
 	// initialize shared memory
 	n.initSharedMemory()
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
-
-	// Start HTTP APIs
-	n.initAPIServer()   // Start the API Server
-	n.initKeystoreAPI() // Start the Keystore API
-	n.initMetricsAPI()  // Start the Metrics API
 
 	if err := n.initVMManager(); err != nil { // Set up the vm manager
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
