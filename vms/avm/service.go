@@ -722,7 +722,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 				break
 			}
 		}
-		if len(fromkc.Keys) != 1 {
+		if len(fromkc.Keys) == 0 {
 			return fmt.Errorf("problem retrieving the address: %w", errNoMatchingAddress)
 		}
 		kc = fromkc
