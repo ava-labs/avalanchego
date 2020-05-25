@@ -60,7 +60,6 @@ func (pb *ProposalBlock) Accept() {
 	pb.SetStatus(choices.Accepted)
 	pb.VM.LastAcceptedID = pb.ID()
 
-	//	pb.CommonBlock.Accept()
 	if err := pb.Tx.Accept(); err != nil {
 		pb.vm.Ctx.Log.Error("unable to accept tx")
 	}
@@ -91,7 +90,7 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 		return err
 	}
 
-	txType := reflect.TypeOf(tx)
+	txType := reflect.TypeOf(pb.Tx)
 	status, err := vm.getTxStatus(vm.DB, pb.Tx.ID(), txType.String())
 	if err != nil {
 		return err

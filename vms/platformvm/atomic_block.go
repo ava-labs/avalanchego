@@ -167,7 +167,7 @@ func (ab *AtomicBlock) Accept() {
 func (ab *AtomicBlock) Reject() {
 	ab.vm.Ctx.Log.Verbo("Rejecting block with ID %s", ab.ID())
 
-	ab.SingleDecisionBlock.Reject()
+	ab.CommonBlock.Reject()
 
 	if err := ab.Tx.Reject(); err != nil {
 		ab.vm.Ctx.Log.Error("unable to reject tx")
@@ -178,11 +178,9 @@ func (ab *AtomicBlock) Reject() {
 // decision block, has ID [parentID].
 func (vm *VM) newAtomicBlock(parentID ids.ID, tx AtomicTx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
-		SingleDecisionBlock: SingleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{
-			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID),
-				vm:    vm,
-			},
+		CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
+			Block: core.NewBlock(parentID),
+			vm:    vm,
 		}},
 		Tx: tx,
 	}

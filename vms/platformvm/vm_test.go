@@ -2008,7 +2008,6 @@ func TestCreateChainTxStatus(t *testing.T) {
 	}
 	vm.Ctx.Lock.Unlock()
 
-	txType := reflect.TypeOf(tx)
 	if status, _ := vm.getTxStatus(vm.DB, tx.ID(), txType.String()); status != choices.Processing {
 		t.Fatal("expected createChainTx to be Processing")
 	}
@@ -2040,7 +2039,7 @@ func TestCreateSubnetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txType := reflect.TypeOf(tx)
+	txType := reflect.TypeOf(createSubnetTx)
 	if status, _ := vm.getTxStatus(vm.DB, createSubnetTx.ID(), txType.String()); status != choices.Unknown {
 		t.Fatal("expected createSubnetTx to be Unknown")
 	}

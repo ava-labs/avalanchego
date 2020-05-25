@@ -280,16 +280,16 @@ func (vm *VM) Initialize(
 			} else {
 				vm.Ctx.Log.Warn("chain has networkID %d, expected %d", chain.NetworkID, vm.Ctx.NetworkID)
 			}
-		}
-		genTx := &GenericTx{
-			Tx: &chain,
-		}
-		txType := reflect.TypeOf(chain)
-		if err := vm.putTx(vm.DB, chain.ID(), txType.String(), genTx); err != nil {
-			return err
-		}
-		if err := vm.putTxStatus(vm.DB, chain.ID(), txType.String(), choices.Accepted); err != nil {
-			return err
+			genTx := &GenericTx{
+				Tx: &chain,
+			}
+			txType := reflect.TypeOf(chain)
+			if err := vm.putTx(vm.DB, chain.ID(), txType.String(), genTx); err != nil {
+				return err
+			}
+			if err := vm.putTxStatus(vm.DB, chain.ID(), txType.String(), choices.Accepted); err != nil {
+				return err
+			}
 		}
 
 		// Persist the chains that exist at genesis

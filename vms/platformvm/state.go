@@ -6,7 +6,6 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/ava-labs/gecko/database"
