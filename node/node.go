@@ -59,9 +59,6 @@ var (
 	versionParser = version.NewDefaultParser()
 )
 
-// MainNode is the reference for node callbacks
-var MainNode = Node{}
-
 // Node is an instance of an Ava node.
 type Node struct {
 	Log        logging.Logger

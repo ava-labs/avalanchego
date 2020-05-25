@@ -71,15 +71,16 @@ func main() {
 	mapper.MapPort(Config.StakingIP.Port, Config.StakingIP.Port)
 	mapper.MapPort(Config.HTTPPort, Config.HTTPPort)
 
+	node := node.Node{}
+
 	log.Debug("initializing node state")
-	// MainNode is a global variable in the node.go file
-	if err := node.MainNode.Initialize(&Config, log, factory); err != nil {
+	if err := node.Initialize(&Config, log, factory); err != nil {
 		log.Fatal("error initializing node state: %s", err)
 		return
 	}
 
-	defer node.MainNode.Shutdown()
+	defer node.Shutdown()
 
 	log.Debug("Dispatching node handlers")
-	node.MainNode.Dispatch()
+	node.Dispatch()
 }
