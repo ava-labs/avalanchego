@@ -534,9 +534,14 @@ func (n *network) Close() error {
 
 	n.closed = true
 	err := n.listener.Close()
+
+	peersToClose := []*peer(nil)
+	for _, peer := range n.peers {
+		peersToClose = append(peersToClose, peer)
+	}
 	n.stateLock.Unlock()
 
-	for _, peer := range n.peers {
+	for _, peer := range peersToClose {
 		peer.Close() // Grabs the stateLock
 	}
 	return err
@@ -762,6 +767,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	}
 
 	n.peers[key] = p
+	n.numPeers.Set(float64(len(n.peers)))
 	p.Start()
 	return nil
 }
@@ -812,6 +818,7 @@ func (n *network) disconnected(p *peer) {
 	n.log.Debug("disconnected from %s at %s", p.id, p.ip)
 	key := p.id.Key()
 	delete(n.peers, key)
+	n.numPeers.Set(float64(len(n.peers)))
 
 	if !p.ip.IsZero() {
 		str := p.ip.String()
