@@ -37,6 +37,7 @@ var (
 	errUnknownOutputType         = errors.New("unknown output type")
 	errUnneededAddress           = errors.New("address not required to sign")
 	errUnknownCredentialType     = errors.New("unknown credential type")
+	errNoMatchingAddress         = errors.New("the user has no from address")
 )
 
 // Service defines the base service for the asset vm
@@ -93,36 +94,6 @@ func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, repl
 	}
 
 	reply.Status = tx.Status()
-	return nil
-}
-
-// GetTxArgs are arguments for passing into GetTx requests
-type GetTxArgs struct {
-	TxID ids.ID `json:"txID"`
-}
-
-// GetTxReply defines the GetTxStatus replies returned from the API
-type GetTxReply struct {
-	Tx formatting.CB58 `json:"tx"`
-}
-
-// GetTx returns the specified transaction
-func (service *Service) GetTx(r *http.Request, args *GetTxArgs, reply *GetTxReply) error {
-	service.vm.ctx.Log.Verbo("GetTx called with %s", args.TxID)
-
-	if args.TxID.IsZero() {
-		return errNilTxID
-	}
-
-	tx := UniqueTx{
-		vm:   service.vm,
-		txID: args.TxID,
-	}
-	if status := tx.Status(); !status.Fetched() {
-		return errUnknownTx
-	}
-
-	reply.Tx.Bytes = tx.Bytes()
 	return nil
 }
 
@@ -218,8 +189,7 @@ type GetBalanceArgs struct {
 
 // GetBalanceReply defines the GetBalance replies returned from the API
 type GetBalanceReply struct {
-	Balance json.Uint64  `json:"balance"`
-	UTXOIDs []ava.UTXOID `json:"utxoIDs"`
+	Balance json.Uint64 `json:"balance"`
 }
 
 // GetBalance returns the amount of an asset that an address at least partially owns
@@ -248,21 +218,18 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	}
 
 	for _, utxo := range utxos {
-		if !utxo.AssetID().Equals(assetID) {
-			continue
+		if utxo.AssetID().Equals(assetID) {
+			transferable, ok := utxo.Out.(ava.Transferable)
+			if !ok {
+				continue
+			}
+			amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
+			if err != nil {
+				return err
+			}
+			reply.Balance = json.Uint64(amt)
 		}
-		transferable, ok := utxo.Out.(ava.Transferable)
-		if !ok {
-			continue
-		}
-		amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
-		if err != nil {
-			return err
-		}
-		reply.Balance = json.Uint64(amt)
-		reply.UTXOIDs = append(reply.UTXOIDs, utxo.UTXOID)
 	}
-
 	return nil
 }
 
@@ -646,6 +613,7 @@ type SendArgs struct {
 	Amount   json.Uint64 `json:"amount"`
 	AssetID  string      `json:"assetID"`
 	To       string      `json:"to"`
+	From     string      `json:"from"`
 }
 
 // SendReply defines the Send replies returned from the API
@@ -701,6 +669,25 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 			return fmt.Errorf("problem retrieving private key: %w", err)
 		}
 		kc.Add(sk)
+	}
+
+	if args.From != "" {
+		fromBytes, err := service.vm.Parse(args.From)
+		if err != nil {
+			return fmt.Errorf("problem parsing to address: %w", err)
+		}
+		from, err := ids.ToShortID(fromBytes)
+		if err != nil {
+			return fmt.Errorf("problem parsing to address: %w", err)
+		}
+
+		for _, sk := range kc.Keys {
+			if sk.PublicKey().Address().String() == from.String() {
+				kc = secp256k1fx.NewKeychain()
+				kc.Add(sk)
+				break
+			}
+		}
 	}
 
 	amountSpent := uint64(0)
