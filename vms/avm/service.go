@@ -37,7 +37,7 @@ var (
 	errUnknownOutputType         = errors.New("unknown output type")
 	errUnneededAddress           = errors.New("address not required to sign")
 	errUnknownCredentialType     = errors.New("unknown credential type")
-	errNoMatchingAddress         = errors.New("the user has no from address")
+	errNoMatchingAddress         = errors.New("the user has no matching address with From")
 )
 
 // Service defines the base service for the asset vm
@@ -715,13 +715,17 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 			return fmt.Errorf("problem parsing to address: %w", err)
 		}
 
+		fromkc := secp256k1fx.NewKeychain()
 		for _, sk := range kc.Keys {
 			if sk.PublicKey().Address().String() == from.String() {
-				kc = secp256k1fx.NewKeychain()
-				kc.Add(sk)
+				fromkc.Add(sk)
 				break
 			}
 		}
+		if len(fromkc.Keys) != 1 {
+			return fmt.Errorf("problem retrieving the address: %w", errNoMatchingAddress)
+		}
+		kc = fromkc
 	}
 
 	amountSpent := uint64(0)
