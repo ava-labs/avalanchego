@@ -257,7 +257,7 @@ func (vm *VM) getTxStatus(db database.Database, txID ids.ID, txType string) (cho
 		return choices.Unknown, err
 	}
 
-	exists, err := vm.State.Has(db, statusTypeID, key)
+	exists, err := vm.State.Has(db, txStatusTypeID, key)
 	if err != nil {
 		return choices.Unknown, err
 	}
@@ -265,7 +265,7 @@ func (vm *VM) getTxStatus(db database.Database, txID ids.ID, txType string) (cho
 		return choices.Unknown, nil
 	}
 
-	statusInterface, err := vm.State.Get(db, statusTypeID, key)
+	statusInterface, err := vm.State.Get(db, txStatusTypeID, key)
 	if err != nil {
 		return choices.Unknown, err
 	}
@@ -287,7 +287,7 @@ func (vm *VM) putTxStatus(db database.Database, txID ids.ID, txType string, stat
 		return err
 	}
 
-	if err := vm.State.Put(db, statusTypeID, key, status); err != nil {
+	if err := vm.State.Put(db, txStatusTypeID, key, status); err != nil {
 		return errDBPutTxStatus
 	}
 	return nil
@@ -404,7 +404,7 @@ func (vm *VM) registerDBTypes() {
 		}
 		return status, nil
 	}
-	if err := vm.State.RegisterType(statusTypeID, unmarshalStatusFunc); err != nil {
+	if err := vm.State.RegisterType(txStatusTypeID, unmarshalStatusFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 

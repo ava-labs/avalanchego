@@ -40,7 +40,7 @@ const (
 	chainsTypeID
 	blockTypeID
 	subnetsTypeID
-	statusTypeID
+	txStatusTypeID
 	txTypeID
 
 	// Delta is the synchrony bound used for safe decision making
