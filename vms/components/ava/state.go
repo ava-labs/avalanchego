@@ -5,6 +5,7 @@ package ava
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/database"
@@ -146,7 +147,7 @@ func (s *State) SetIDs(id ids.ID, idSlice []ids.ID) error {
 
 	bytes, err := s.Codec.Marshal(idSlice)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal an ID array due to %w", err)
 	}
 
 	s.Cache.Put(id, idSlice)

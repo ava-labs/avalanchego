@@ -333,7 +333,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) {
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len()))
 	t.numTxRequests.Set(float64(t.missingTxs.Len()))
-	t.numBlockedVtx.Set(float64(t.pending.Len()))
+	t.numPendingVtx.Set(float64(t.pending.Len()))
 }
 
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) {

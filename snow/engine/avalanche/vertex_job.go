@@ -4,15 +4,20 @@
 package avalanche
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/utils/logging"
 )
 
 type vtxParser struct {
+	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	state                   State
 }
@@ -23,6 +28,7 @@ func (p *vtxParser) Parse(vtxBytes []byte) (queue.Job, error) {
 		return nil, err
 	}
 	return &vertexJob{
+		log:         p.log,
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
 		vtx:         vtx,
@@ -30,6 +36,7 @@ func (p *vtxParser) Parse(vtxBytes []byte) (queue.Job, error) {
 }
 
 type vertexJob struct {
+	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	vtx                     avalanche.Vertex
 }
@@ -44,23 +51,28 @@ func (v *vertexJob) MissingDependencies() ids.Set {
 	}
 	return missing
 }
-func (v *vertexJob) Execute() {
+func (v *vertexJob) Execute() error {
 	if v.MissingDependencies().Len() != 0 {
 		v.numDropped.Inc()
-		return
+		return errors.New("attempting to execute blocked vertex")
 	}
 	for _, tx := range v.vtx.Txs() {
 		if tx.Status() != choices.Accepted {
 			v.numDropped.Inc()
-			return
+			return errors.New("attempting to execute vertex with non-accepted transactions")
 		}
 	}
-	switch v.vtx.Status() {
+	status := v.vtx.Status()
+	switch status {
 	case choices.Unknown, choices.Rejected:
 		v.numDropped.Inc()
+		return fmt.Errorf("attempting to execute vertex with status %s", status)
 	case choices.Processing:
-		v.vtx.Accept()
 		v.numAccepted.Inc()
+		if err := v.vtx.Accept(); err != nil {
+			return fmt.Errorf("failed to accept vertex in bootstrapping: %w", err)
+		}
 	}
+	return nil
 }
 func (v *vertexJob) Bytes() []byte { return v.vtx.Bytes() }
