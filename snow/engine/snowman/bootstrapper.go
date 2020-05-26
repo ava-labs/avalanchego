@@ -43,6 +43,7 @@ func (b *bootstrapper) Initialize(config BootstrapConfig) {
 	b.BootstrapConfig = config
 
 	b.Blocked.SetParser(&parser{
+		log:         config.Context.Log,
 		numAccepted: b.numBootstrapped,
 		numDropped:  b.numDropped,
 		vm:          b.VM,

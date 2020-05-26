@@ -4,15 +4,20 @@
 package snowman
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/utils/logging"
 )
 
 type parser struct {
+	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	vm                      ChainVM
 }
@@ -23,6 +28,7 @@ func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
 		return nil, err
 	}
 	return &blockJob{
+		log:         p.log,
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
 		blk:         blk,
@@ -30,6 +36,7 @@ func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
 }
 
 type blockJob struct {
+	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	blk                     snowman.Block
 }
@@ -42,18 +49,27 @@ func (b *blockJob) MissingDependencies() ids.Set {
 	}
 	return missing
 }
-func (b *blockJob) Execute() {
+func (b *blockJob) Execute() error {
 	if b.MissingDependencies().Len() != 0 {
 		b.numDropped.Inc()
-		return
+		return errors.New("attempting to accept a block with missing dependencies")
 	}
-	switch b.blk.Status() {
+	status := b.blk.Status()
+	switch status {
 	case choices.Unknown, choices.Rejected:
 		b.numDropped.Inc()
+		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
-		b.blk.Verify()
-		b.blk.Accept()
+		if err := b.blk.Verify(); err != nil {
+			b.log.Warn("block %s failed verification during bootstrapping due to %s",
+				b.blk.ID(), err)
+		}
+
 		b.numAccepted.Inc()
+		if err := b.blk.Accept(); err != nil {
+			return fmt.Errorf("failed to accept block in bootstrapping: %w", err)
+		}
 	}
+	return nil
 }
 func (b *blockJob) Bytes() []byte { return b.blk.Bytes() }
