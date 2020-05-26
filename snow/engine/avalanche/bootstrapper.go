@@ -210,16 +210,12 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 					b.BootstrapConfig.Context.Log.Verbo("couldn't push to txBlocked")
 				}
 			}
-			parentsToAdd := []avalanche.Vertex{}
-			parentsToAddIDs := ids.Set{} // ToDO remove...only here for debug
 			for _, parent := range vtx.Parents() {
-				if !b.seen.Contains(parent.ID()) {
-					parentsToAdd = append(parentsToAdd, parent)
-					parentsToAddIDs.Add(parent.ID())
+				if parentID := parent.ID(); !b.seen.Contains(parentID) {
+					b.seen.Add(parentID)
+					vts = append(vts, parent)
 				}
 			}
-			vts = append(vts, parentsToAdd...)
-			b.seen.Add(parentsToAddIDs.List()...)
 		case choices.Accepted:
 			b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", vtxID)
 		case choices.Rejected:
@@ -241,7 +237,6 @@ func (b *bootstrapper) finish() {
 	b.executeAll(b.VtxBlocked, b.numBlockedVtx)
 
 	// Start consensus
-	b.BootstrapConfig.Context.Log.Info("done bootstrapping")
 	b.onFinished()
 	b.seen = ids.Set{}
 	b.finished = true
