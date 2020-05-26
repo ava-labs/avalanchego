@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Parser ...
+// Parser defines the interface of a version parser
 type Parser interface {
 	Parse(string) (Version, error)
 }
@@ -19,10 +19,10 @@ type parser struct {
 	versionSeparator string
 }
 
-// NewDefaultParser ...
+// NewDefaultParser returns a new parser with the default separators
 func NewDefaultParser() Parser { return NewParser(defaultAppSeparator, defaultVersionSeparator) }
 
-// NewParser ...
+// NewParser returns a new parser
 func NewParser(appSeparator string, versionSeparator string) Parser {
 	return &parser{
 		appSeparator:     appSeparator,

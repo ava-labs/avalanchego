@@ -19,7 +19,7 @@ var (
 	errDifferentMinor = errors.New("different minor version")
 )
 
-// Version ...
+// Version defines what is needed to describe a version
 type Version interface {
 	fmt.Stringer
 
@@ -40,7 +40,7 @@ type version struct {
 	str   string
 }
 
-// NewDefaultVersion ...
+// NewDefaultVersion returns a new version with default separators
 func NewDefaultVersion(
 	app string,
 	major int,
@@ -57,7 +57,7 @@ func NewDefaultVersion(
 	)
 }
 
-// NewVersion ...
+// NewVersion returns a new version
 func NewVersion(
 	app string,
 	appSeparator string,
