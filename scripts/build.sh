@@ -10,7 +10,7 @@ PREFIX="${PREFIX:-$(pwd)/build}"
 PLUGIN_PREFIX="$PREFIX/plugins"
 
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SRC_DIR/env.sh"
+GOPATH="$(go env GOPATH)"
 
 CORETH_PKG=github.com/ava-labs/coreth
 CORETH_PATH="$GOPATH/src/$CORETH_PKG"
@@ -36,9 +36,8 @@ else
 fi
 
 go build -o "$PREFIX/ava" "$GECKO_PATH/main/"*.go
-go build -o "$PREFIX/xputtest" "$GECKO_PATH/xputtest/"*.go
 go build -o "$PLUGIN_PREFIX/evm" "$CORETH_PATH/plugin/"*.go
-if [[ -f "$PREFIX/ava" && -f "$PREFIX/xputtest" && -f "$PLUGIN_PREFIX/evm" ]]; then
+if [[ -f "$PREFIX/ava" && -f "$PLUGIN_PREFIX/evm" ]]; then
         echo "Build Successful" 
 else
         echo "Build failure" 

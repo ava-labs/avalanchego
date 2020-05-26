@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	dbVersion = "v0.2.0"
+	dbVersion = "v0.3.0"
 )
 
 // Results of parsing the CLI
@@ -52,7 +52,7 @@ func GetIPs(networkID uint32) []string {
 		return []string{
 			"3.227.207.132:21001",
 			"34.207.133.167:21001",
-			"107.23.241.199:21001",
+			"54.162.71.9:21001",
 			"54.197.215.186:21001",
 			"18.234.153.22:21001",
 		}

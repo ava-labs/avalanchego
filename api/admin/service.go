@@ -226,3 +226,17 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *A
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
 }
+
+// StacktraceArgs are the arguments for calling Stacktrace
+type StacktraceArgs struct{}
+
+// StacktraceReply are the results from calling Stacktrace
+type StacktraceReply struct {
+	Stacktrace string `json:"stacktrace"`
+}
+
+// Stacktrace returns the current global stacktrace
+func (service *Admin) Stacktrace(_ *http.Request, _ *StacktraceArgs, reply *StacktraceReply) error {
+	reply.Stacktrace = logging.Stacktrace{Global: true}.String()
+	return nil
+}
