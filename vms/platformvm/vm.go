@@ -694,7 +694,7 @@ func (vm *VM) resetTimer() {
 	}
 
 	waitTime := nextValidatorSetChangeTime.Sub(localTime)
-	vm.Ctx.Log.Info("next scheduled event is at %s (%s in the future)", nextValidatorSetChangeTime, waitTime)
+	vm.Ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextValidatorSetChangeTime, waitTime)
 
 	// Wake up when it's time to add/remove the next validator
 	vm.timer.SetTimeoutIn(waitTime)
