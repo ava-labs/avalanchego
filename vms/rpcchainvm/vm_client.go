@@ -289,23 +289,23 @@ type BlockClient struct {
 func (b *BlockClient) ID() ids.ID { return b.id }
 
 // Accept ...
-func (b *BlockClient) Accept() {
+func (b *BlockClient) Accept() error {
 	delete(b.vm.blks, b.id.Key())
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
 		Id: b.id.Bytes(),
 	})
-	b.vm.ctx.Log.AssertNoError(err)
+	return err
 }
 
 // Reject ...
-func (b *BlockClient) Reject() {
+func (b *BlockClient) Reject() error {
 	delete(b.vm.blks, b.id.Key())
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id.Bytes(),
 	})
-	b.vm.ctx.Log.AssertNoError(err)
+	return err
 }
 
 // Status ...

@@ -76,7 +76,7 @@ func (vtx *uniqueVertex) setStatus(status choices.Status) {
 
 func (vtx *uniqueVertex) ID() ids.ID { return vtx.vtxID }
 
-func (vtx *uniqueVertex) Accept() {
+func (vtx *uniqueVertex) Accept() error {
 	vtx.setStatus(choices.Accepted)
 
 	vtx.serializer.edge.Add(vtx.vtxID)
@@ -90,17 +90,17 @@ func (vtx *uniqueVertex) Accept() {
 	// parents to be garbage collected
 	vtx.v.parents = nil
 
-	vtx.serializer.db.Commit()
+	return vtx.serializer.db.Commit()
 }
 
-func (vtx *uniqueVertex) Reject() {
+func (vtx *uniqueVertex) Reject() error {
 	vtx.setStatus(choices.Rejected)
 
 	// Should never traverse into parents of a decided vertex. Allows for the
 	// parents to be garbage collected
 	vtx.v.parents = nil
 
-	vtx.serializer.db.Commit()
+	return vtx.serializer.db.Commit()
 }
 
 func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
