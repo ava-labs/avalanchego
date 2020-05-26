@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	dbVersion = "v0.2.0"
+	dbVersion = "v0.3.0"
 )
 
 // Results of parsing the CLI
