@@ -61,12 +61,14 @@ func (b *blockJob) Execute() error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		if err := b.blk.Verify(); err != nil {
-			b.log.Warn("block %s failed verification during bootstrapping due to %s",
+			b.log.Debug("block %s failed verification during bootstrapping due to %s",
 				b.blk.ID(), err)
 		}
 
 		b.numAccepted.Inc()
 		if err := b.blk.Accept(); err != nil {
+			b.log.Debug("block %s failed to accept during bootstrapping due to %s",
+				b.blk.ID(), err)
 			return fmt.Errorf("failed to accept block in bootstrapping: %w", err)
 		}
 	}

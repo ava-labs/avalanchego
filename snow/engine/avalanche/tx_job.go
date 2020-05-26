@@ -65,12 +65,14 @@ func (t *txJob) Execute() error {
 		return fmt.Errorf("attempting to execute transaction with status %s", status)
 	case choices.Processing:
 		if err := t.tx.Verify(); err != nil {
-			t.log.Warn("transaction %s failed verification during bootstrapping due to %s",
+			t.log.Debug("transaction %s failed verification during bootstrapping due to %s",
 				t.tx.ID(), err)
 		}
 
 		t.numAccepted.Inc()
 		if err := t.tx.Accept(); err != nil {
+			t.log.Error("transaction %s failed to accept during bootstrapping due to %s",
+				t.tx.ID(), err)
 			return fmt.Errorf("failed to accept transaction in bootstrapping: %w", err)
 		}
 	}
