@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   pull_request:
-    - master
+     branches: [ master ]
 
 jobs:
   build:
