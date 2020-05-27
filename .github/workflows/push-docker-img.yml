@@ -1,12 +1,8 @@
 name: Docker Image CI
 
 on:
-  #pull_request:
-  #
-  push:
-    branches:
+  pull_request:
     - master
-    - fix_docker-travis
 
 jobs:
   build:
