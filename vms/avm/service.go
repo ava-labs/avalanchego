@@ -16,11 +16,12 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -38,6 +39,7 @@ var (
 	errUnknownOutputType         = errors.New("unknown output type")
 	errUnneededAddress           = errors.New("address not required to sign")
 	errUnknownCredentialType     = errors.New("unknown credential type")
+	errNilTxID                   = errors.New("nil transaction ID")
 )
 
 // Service defines the base service for the asset vm
@@ -75,10 +77,6 @@ type GetTxStatusArgs struct {
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
-
-var (
-	errNilTxID = errors.New("nil transaction ID")
-)
 
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, reply *GetTxStatusReply) error {
@@ -248,6 +246,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		return err
 	}
 
+	reply.UTXOIDs = make([]ava.UTXOID, 0, len(utxos))
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(assetID) {
 			continue
@@ -629,13 +628,47 @@ func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, 
 	}
 
 	addresses, _ := user.Addresses(db)
-	addresses = append(addresses, ids.NewID(hashing.ComputeHash256Array(sk.PublicKey().Address().Bytes())))
+	addresses = append(addresses, sk.PublicKey().Address())
 
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving address: %w", err)
 	}
 
 	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
+	return nil
+}
+
+// ListAddressesArgs ...
+type ListAddressesArgs struct {
+	// User that we're listing the addresses of
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// ListAddressesResponse ...
+type ListAddressesResponse struct {
+	// Each element is an address controlled by specified account
+	Addresses []string `json:"addresses"`
+}
+
+// ListAddresses returns all of the addresses controlled by user [args.Username]
+func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, response *ListAddressesResponse) error {
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	response.Addresses = []string{}
+
+	user := userState{vm: service.vm}
+	addresses, err := user.Addresses(db)
+	if err != nil {
+		return nil
+	}
+
+	for _, address := range addresses {
+		response.Addresses = append(response.Addresses, service.vm.Format(address.Bytes()))
+	}
 	return nil
 }
 
@@ -660,6 +693,10 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem parsing address: %w", err)
 	}
+	addr, err := ids.ToShortID(address)
+	if err != nil {
+		return fmt.Errorf("problem parsing address: %w", err)
+	}
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -668,7 +705,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	user := userState{vm: service.vm}
 
-	sk, err := user.Key(db, ids.NewID(hashing.ComputeHash256Array(address)))
+	sk, err := user.Key(db, addr)
 	if err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
@@ -713,7 +750,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	}
 
 	addresses, _ := user.Addresses(db)
-	addresses = append(addresses, ids.NewID(hashing.ComputeHash256Array(sk.PublicKey().Address().Bytes())))
+	addresses = append(addresses, sk.PublicKey().Address())
 
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving addresses: %w", err)
@@ -772,7 +809,9 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.Set{}
-	addrs.Add(addresses...)
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
 	utxos, err := service.vm.GetUTXOs(addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
@@ -1041,6 +1080,10 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Minter, err)
 	}
+	addr, err := ids.ToShortID(minter)
+	if err != nil {
+		return fmt.Errorf("problem parsing address '%s': %w", args.Minter, err)
+	}
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -1049,7 +1092,6 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 
 	user := userState{vm: service.vm}
 
-	addr := ids.NewID(hashing.ComputeHash256Array(minter))
 	sk, err := user.Key(db, addr)
 	if err != nil {
 		return fmt.Errorf("problem retriving private key: %w", err)
@@ -1560,7 +1602,10 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.Set{}
-	addrs.Add(addresses...)
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
+
 	utxos, err := service.vm.GetAtomicUTXOs(addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
@@ -1704,7 +1749,10 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.Set{}
-	addrs.Add(addresses...)
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
+
 	utxos, err := service.vm.GetUTXOs(addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)

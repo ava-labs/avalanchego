@@ -42,6 +42,7 @@ type Config struct {
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
+	HTTPHost      string
 	HTTPPort      uint16
 	EnableHTTPS   bool
 	HTTPSKeyFile  string
@@ -51,6 +52,7 @@ type Config struct {
 	AdminAPIEnabled    bool
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
+	HealthAPIEnabled   bool
 
 	// Logging configuration
 	LoggingConfig logging.Config

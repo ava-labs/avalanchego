@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v3"
 	"github.com/stretchr/testify/assert"
 )
 
