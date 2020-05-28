@@ -80,11 +80,6 @@ func (s *prefixedState) Funds(id ids.ID) ([]ids.ID, error) {
 	return s.state.IDs(uniqueID(id, fundsID, s.funds))
 }
 
-// SetFunds saves the mapping from address to utxo IDs to storage.
-func (s *prefixedState) SetFunds(id ids.ID, idSlice []ids.ID) error {
-	return s.state.SetIDs(uniqueID(id, fundsID, s.funds), idSlice)
-}
-
 // SpendUTXO consumes the provided utxo.
 func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 	utxo, err := s.UTXO(utxoID)
@@ -106,11 +101,7 @@ func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 func (s *prefixedState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Remove(utxoID)
-		if err := s.SetFunds(addrID, utxos.List()); err != nil {
+		if err := s.state.RemoveID(addrID, utxoID); err != nil {
 			return err
 		}
 	}
@@ -135,11 +126,7 @@ func (s *prefixedState) FundUTXO(utxo *ava.UTXO) error {
 func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Add(utxoID)
-		if err := s.SetFunds(addrID, utxos.List()); err != nil {
+		if err := s.state.AddID(addrID, utxoID); err != nil {
 			return err
 		}
 	}

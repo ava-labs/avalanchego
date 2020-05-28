@@ -97,11 +97,7 @@ func (s *chainState) setStatus(id ids.ID, status choices.Status) error {
 func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Remove(utxoID)
-		if err := s.setFunds(addrID, utxos.List()); err != nil {
+		if err := s.RemoveID(addrID, utxoID); err != nil {
 			return err
 		}
 	}
@@ -111,19 +107,11 @@ func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Add(utxoID)
-		if err := s.setFunds(addrID, utxos.List()); err != nil {
+		if err := s.AddID(addrID, utxoID); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func (s *chainState) setFunds(id ids.ID, idSlice []ids.ID) error {
-	return s.SetIDs(UniqueID(id, s.fundsIDPrefix, s.fundsID), idSlice)
 }
 
 // PrefixedState wraps a state object. By prefixing the state, there will
