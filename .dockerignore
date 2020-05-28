@@ -1,0 +1,11 @@
+*.md
+*.yml
+.ci
+.git
+.github
+.idea
+.travis
+build
+db
+Dockerfile*
+keys
