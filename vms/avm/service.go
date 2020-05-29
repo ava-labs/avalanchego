@@ -708,11 +708,11 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 	if args.From != "" {
 		fromBytes, err := service.vm.Parse(args.From)
 		if err != nil {
-			return fmt.Errorf("problem parsing to address: %w", err)
+			return fmt.Errorf("problem parsing argument 'from' to address: %w", err)
 		}
 		from, err := ids.ToShortID(fromBytes)
 		if err != nil {
-			return fmt.Errorf("problem parsing to address: %w", err)
+			return fmt.Errorf("problem parsing argument 'from' to address: %w", err)
 		}
 
 		fromkc := secp256k1fx.NewKeychain()
