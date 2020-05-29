@@ -51,7 +51,7 @@ func (h *Handler) Dispatch() {
 				log.Debug("dropping message due to closing:\n%s", msg)
 				continue
 			}
-			if !h.dispatchMsg(msg) {
+			if h.dispatchMsg(msg) {
 				closing = true
 			}
 		case msg := <-h.msgChan:
@@ -59,7 +59,7 @@ func (h *Handler) Dispatch() {
 				log.Debug("dropping internal message due to closing:\n%s", msg)
 				continue
 			}
-			if !h.dispatchMsg(message{messageType: notifyMsg, notification: msg}) {
+			if h.dispatchMsg(message{messageType: notifyMsg, notification: msg}) {
 				closing = true
 			}
 		}

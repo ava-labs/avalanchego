@@ -263,11 +263,12 @@ func (sr *ChainRouter) Shutdown() {
 		chain.Shutdown()
 		close(chain.msgs)
 	}
-	for _, chain := range sr.chains {
+	sr.chains = map[[32]byte]*Handler{}
+	prevChains := sr.chains
+	sr.lock.Unlock()
+	for _, chain := range prevChains {
 		chain.wg.Wait()
 	}
-	sr.chains = map[[32]byte]*Handler{}
-	sr.lock.Unlock()
 	sr.gossiper.Stop()
 }
 
