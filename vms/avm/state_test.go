@@ -177,13 +177,6 @@ func TestStateStatuses(t *testing.T) {
 	if err := state.AddID(ids.Empty, ids.Empty); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := state.Status(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
-	}
-
-	if err := state.SetStatus(ids.Empty, choices.Accepted); err != nil {
-		t.Fatal(err)
-	}
 
 	status, err = state.Status(ids.Empty)
 	if err != nil {
