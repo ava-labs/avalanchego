@@ -120,7 +120,7 @@ func (h *Handler) dispatchMsg(msg message) bool {
 	}
 
 	if err != nil {
-		ctx.Log.Error("fatal error occurred on chain %s, forcing a shutdown due to %s", err)
+		ctx.Log.Fatal("forcing chain to shutdown due to %s", err)
 	}
 	return done || err != nil
 }

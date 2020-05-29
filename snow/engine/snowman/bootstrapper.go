@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
@@ -75,7 +77,9 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 // ForceAccepted ...
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	for _, blkID := range acceptedContainerIDs.List() {
-		b.fetch(blkID)
+		if err := b.fetch(blkID); err != nil {
+			return err
+		}
 	}
 
 	if numPending := b.pending.Len(); numPending == 0 {
@@ -124,17 +128,17 @@ func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	return nil
 }
 
-func (b *bootstrapper) fetch(blkID ids.ID) {
+func (b *bootstrapper) fetch(blkID ids.ID) error {
 	if b.pending.Contains(blkID) {
-		return
+		return nil
 	}
 
 	blk, err := b.VM.GetBlock(blkID)
 	if err != nil {
 		b.sendRequest(blkID)
-		return
+		return nil
 	}
-	b.storeBlock(blk)
+	return b.storeBlock(blk)
 }
 
 func (b *bootstrapper) sendRequest(blkID ids.ID) {
@@ -156,7 +160,9 @@ func (b *bootstrapper) sendRequest(blkID ids.ID) {
 }
 
 func (b *bootstrapper) addBlock(blk snowman.Block) error {
-	b.storeBlock(blk)
+	if err := b.storeBlock(blk); err != nil {
+		return err
+	}
 
 	if numPending := b.pending.Len(); numPending == 0 {
 		return b.finish()
@@ -164,7 +170,7 @@ func (b *bootstrapper) addBlock(blk snowman.Block) error {
 	return nil
 }
 
-func (b *bootstrapper) storeBlock(blk snowman.Block) {
+func (b *bootstrapper) storeBlock(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
@@ -178,6 +184,10 @@ func (b *bootstrapper) storeBlock(blk snowman.Block) {
 			b.numBlocked.Inc()
 		}
 
+		if err := b.Blocked.Commit(); err != nil {
+			return err
+		}
+
 		blk = blk.Parent()
 		status = blk.Status()
 		blkID = blk.ID()
@@ -189,11 +199,12 @@ func (b *bootstrapper) storeBlock(blk snowman.Block) {
 	case choices.Accepted:
 		b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", blkID)
 	case choices.Rejected:
-		b.BootstrapConfig.Context.Log.Error("Bootstrapping wants to accept %s, however it was previously rejected", blkID)
+		return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", blkID)
 	}
 
 	numPending := b.pending.Len()
 	b.numPendingRequests.Set(float64(numPending))
+	return nil
 }
 
 func (b *bootstrapper) finish() error {
@@ -221,6 +232,9 @@ func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge)
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		if err := jobs.Execute(job); err != nil {
+			return err
+		}
+		if err := jobs.Commit(); err != nil {
 			return err
 		}
 	}
