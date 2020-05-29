@@ -38,7 +38,10 @@ func (h *Handler) Context() *snow.Context { return h.engine.Context() }
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
 	log := h.Context().Log
-	defer h.wg.Done()
+	defer func() {
+		log.Info("finished shutting down chain")
+		h.wg.Done()
+	}()
 
 	closing := false
 	for {

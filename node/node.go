@@ -575,4 +575,5 @@ func (n *Node) Shutdown() {
 	n.Net.Close()
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
+	n.Log.Info("node shut down successfully")
 }
