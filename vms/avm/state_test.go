@@ -23,9 +23,9 @@ func TestStateIDs(t *testing.T) {
 
 	state := vm.state.state
 
-	id0 := ids.NewID([32]byte{0xff, 0})
-	id1 := ids.NewID([32]byte{0xff, 0})
-	id2 := ids.NewID([32]byte{0xff, 0})
+	id0 := ids.NewID([32]byte{0x00, 0})
+	id1 := ids.NewID([32]byte{0x01, 0})
+	id2 := ids.NewID([32]byte{0x02, 0})
 
 	if _, err := state.IDs(ids.Empty); err != nil {
 		t.Fatal(err)
@@ -47,11 +47,27 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
 			t.Fatalf("Wrong ID returned")
 		}
+	}
+
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result, err = state.IDs(ids.Empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
 	}
 
 	expected = []ids.ID{id1, id2}
@@ -70,6 +86,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -88,6 +105,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -99,18 +117,6 @@ func TestStateIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during cache lookup")
-	}
-
-	state.Cache.Flush()
-
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during parsing")
-	}
-
 	statusResult, err := state.Status(ids.Empty)
 	if err != nil {
 		t.Fatal(err)
@@ -119,12 +125,27 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result, err = state.IDs(ids.Empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
+	}
+
 	if err := state.AddID(ids.Empty, ids.ID{}); err == nil {
 		t.Fatalf("Should have errored during serialization")
 	}
 
-	if _, err := state.IDs(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
+	if err := state.RemoveID(ids.Empty, ids.ID{}); err == nil {
+		t.Fatalf("Should have errored during serialization")
 	}
 }
 

@@ -77,7 +77,7 @@ func (s *prefixedState) SetDBInitialized(status choices.Status) error {
 // Funds returns the mapping from the 32 byte representation of an address to a
 // list of utxo IDs that reference the address.
 func (s *prefixedState) Funds(id ids.ID) ([]ids.ID, error) {
-	return s.state.IDs(uniqueID(id, fundsID, s.funds))
+	return s.state.IDs(id)
 }
 
 // SpendUTXO consumes the provided utxo.

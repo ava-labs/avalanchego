@@ -16,6 +16,7 @@ import (
 
 var (
 	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
+	errZeroID = errors.New("database key ID value not initialized")
 )
 
 // UniqueID returns a unique identifier
@@ -134,12 +135,18 @@ func (s *State) IDs(id ids.ID) ([]ids.ID, error) {
 
 // AddID saves an ID to the prefixed database
 func (s *State) AddID(id ids.ID, key ids.ID) error {
+	if key.IsZero() {
+		return errZeroID
+	}
 	db := prefixdb.New(id.Bytes(), s.DB)
 	return db.Put(key.Bytes(), nil)
 }
 
 // RemoveID removes an ID from the prefixed database
 func (s *State) RemoveID(id ids.ID, key ids.ID) error {
+	if key.IsZero() {
+		return errZeroID
+	}
 	db := prefixdb.New(id.Bytes(), s.DB)
 	return db.Delete(key.Bytes())
 }

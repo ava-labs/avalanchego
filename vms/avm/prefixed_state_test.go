@@ -182,8 +182,11 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	_, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
-	if err == nil {
-		t.Fatalf("Should have returned no utxoIDs")
+	funds, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(funds) != 0 {
+		t.Fatalf("Should have returned 0 utxoIDs")
 	}
 }

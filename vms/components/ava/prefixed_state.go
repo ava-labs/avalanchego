@@ -47,7 +47,7 @@ func (s *chainState) UTXO(id ids.ID) (*UTXO, error) {
 // Funds returns the mapping from the 32 byte representation of an
 // address to a list of utxo IDs that reference the address.
 func (s *chainState) Funds(id ids.ID) ([]ids.ID, error) {
-	return s.IDs(UniqueID(id, s.fundsIDPrefix, s.fundsID))
+	return s.IDs(id)
 }
 
 // SpendUTXO consumes the provided platform utxo.
