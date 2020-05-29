@@ -684,7 +684,7 @@ type SendArgs struct {
 	Amount   json.Uint64 `json:"amount"`
 	AssetID  string      `json:"assetID"`
 	To       string      `json:"to"`
-	From     string      `json:"from"`
+	Froms     []string	`json:"froms"`
 }
 
 // SendReply defines the Send replies returned from the API
@@ -744,21 +744,23 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		kc.Add(sk)
 	}
 
-	if args.From != "" {
-		fromBytes, err := service.vm.Parse(args.From)
-		if err != nil {
-			return fmt.Errorf("problem parsing argument 'from' to address: %w", err)
-		}
-		from, err := ids.ToShortID(fromBytes)
-		if err != nil {
-			return fmt.Errorf("problem parsing argument 'from' to address: %w", err)
-		}
-
+	if len(args.Froms) != 0 {
 		fromkc := secp256k1fx.NewKeychain()
-		for _, sk := range kc.Keys {
-			if sk.PublicKey().Address().String() == from.String() {
-				fromkc.Add(sk)
-				break
+		for _, fromArg := range args.Froms {
+			fromBytes, err := service.vm.Parse(fromArg)
+			if err != nil {
+				return fmt.Errorf("problem parsing argument 'from' to address: %w", err)
+			}
+			from, err := ids.ToShortID(fromBytes)
+			if err != nil {
+				return fmt.Errorf("problem parsing argument 'from' to address: %w", err)
+			}
+
+			for _, sk := range kc.Keys {
+				if sk.PublicKey().Address().String() == from.String() {
+					fromkc.Add(sk)
+					break
+				}
 			}
 		}
 		if len(fromkc.Keys) == 0 {
