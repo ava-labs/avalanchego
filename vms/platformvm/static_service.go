@@ -40,13 +40,14 @@ type APIAccount struct {
 // [Amount] is the amount of $AVA being staked.
 // [Endtime] is the Unix time repr. of when they are done staking
 // [ID] is the node ID of the staker
-// [Destination] is the address where the staked $AVA (and, if applicable, reward)
+// [Address] is the address where the staked AVA (and, if applicable, reward)
 // is sent when this staker is done staking.
 type APIValidator struct {
 	StartTime   json.Uint64  `json:"startTime"`
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
+	Address     *ids.ShortID `json:"address,omitempty"`
 	ID          ids.ShortID  `json:"id"`
 }
 
@@ -137,8 +138,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return errAccountHasNoValue
 		}
 		accounts = append(accounts, newAccount(
-			account.Address, // ID
-			0,               // nonce
+			account.Address,         // ID
+			0,                       // nonce
 			uint64(account.Balance), // balance
 		))
 	}
