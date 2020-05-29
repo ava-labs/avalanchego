@@ -1560,7 +1560,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
+	chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)

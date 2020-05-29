@@ -20,7 +20,12 @@ type Router interface {
 	AddChain(chain *Handler)
 	RemoveChain(chainID ids.ID)
 	Shutdown()
-	Initialize(log logging.Logger, timeouts *timeout.Manager, gossipFrequency time.Duration)
+	Initialize(
+		log logging.Logger,
+		timeouts *timeout.Manager,
+		gossipFrequency,
+		shutdownTimeout time.Duration,
+	)
 }
 
 // ExternalRouter routes messages from the network to the

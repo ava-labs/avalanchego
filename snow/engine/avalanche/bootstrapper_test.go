@@ -60,7 +60,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 
 	handler.Initialize(engine, make(chan common.Message), 1)
 	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts, time.Hour)
+	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
 	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
 	txBlocker, _ := queue.New(prefixdb.New([]byte("tx"), db))

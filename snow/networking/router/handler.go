@@ -4,8 +4,6 @@
 package router
 
 import (
-	"sync"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -15,7 +13,7 @@ import (
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference)
 type Handler struct {
 	msgs    chan message
-	wg      sync.WaitGroup
+	closed  chan struct{}
 	engine  common.Engine
 	msgChan <-chan common.Message
 
@@ -25,10 +23,9 @@ type Handler struct {
 // Initialize this consensus handler
 func (h *Handler) Initialize(engine common.Engine, msgChan <-chan common.Message, bufferSize int) {
 	h.msgs = make(chan message, bufferSize)
+	h.closed = make(chan struct{})
 	h.engine = engine
 	h.msgChan = msgChan
-
-	h.wg.Add(1)
 }
 
 // Context of this Handler
@@ -40,7 +37,7 @@ func (h *Handler) Dispatch() {
 	log := h.Context().Log
 	defer func() {
 		log.Info("finished shutting down chain")
-		h.wg.Done()
+		close(h.closed)
 	}()
 
 	closing := false

@@ -18,11 +18,12 @@ import (
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	log      logging.Logger
-	lock     sync.RWMutex
-	chains   map[[32]byte]*Handler
-	timeouts *timeout.Manager
-	gossiper *timer.Repeater
+	log          logging.Logger
+	lock         sync.RWMutex
+	chains       map[[32]byte]*Handler
+	timeouts     *timeout.Manager
+	gossiper     *timer.Repeater
+	closeTimeout time.Duration
 }
 
 // Initialize the router.
@@ -33,11 +34,17 @@ type ChainRouter struct {
 //
 // This router also fires a gossip event every [gossipFrequency] to the engine,
 // notifying the engine it should gossip it's accepted set.
-func (sr *ChainRouter) Initialize(log logging.Logger, timeouts *timeout.Manager, gossipFrequency time.Duration) {
+func (sr *ChainRouter) Initialize(
+	log logging.Logger,
+	timeouts *timeout.Manager,
+	gossipFrequency time.Duration,
+	closeTimeout time.Duration,
+) {
 	sr.log = log
 	sr.chains = make(map[[32]byte]*Handler)
 	sr.timeouts = timeouts
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
+	sr.closeTimeout = closeTimeout
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
 }
@@ -63,7 +70,15 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Shutdown()
 		close(chain.msgs)
-		chain.wg.Wait()
+
+		ticker := time.NewTicker(sr.closeTimeout)
+		select {
+		case _, _ = <-chain.closed:
+		case <-ticker.C:
+			chain.Context().Log.Warn("timed out while shutting down")
+		}
+		ticker.Stop()
+
 		delete(sr.chains, chainID.Key())
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
@@ -266,9 +281,20 @@ func (sr *ChainRouter) Shutdown() {
 	prevChains := sr.chains
 	sr.chains = map[[32]byte]*Handler{}
 	sr.lock.Unlock()
+
+	ticker := time.NewTicker(sr.closeTimeout)
+	timedout := false
 	for _, chain := range prevChains {
-		chain.wg.Wait()
+		select {
+		case _, _ = <-chain.closed:
+		case <-ticker.C:
+			timedout = true
+		}
 	}
+	if timedout {
+		sr.log.Warn("timed out while shutting down the chains")
+	}
+	ticker.Stop()
 	sr.gossiper.Stop()
 }
 
