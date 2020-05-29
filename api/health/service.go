@@ -41,7 +41,7 @@ func (h *Health) Handler() *common.HTTPHandler {
 
 // RegisterHeartbeat adds a check with default options and a CheckFn that checks
 // the given heartbeater for a recent heartbeat
-func (h *Health) RegisterHeartbeat(name string, hb heartbeater, max time.Duration) error {
+func (h *Health) RegisterHeartbeat(name string, hb Heartbeater, max time.Duration) error {
 	return h.RegisterCheckFunc(name, HeartbeatCheckFn(hb, max))
 }
 
@@ -73,8 +73,8 @@ type GetLivenessReply struct {
 }
 
 // GetLiveness returns a summation of the health of the node
-func (service *Health) GetLiveness(_ *http.Request, _ *GetLivenessArgs, reply *GetLivenessReply) error {
-	service.log.Debug("Health: GetLiveness called")
-	reply.Checks, reply.Healthy = service.health.Results()
+func (h *Health) GetLiveness(_ *http.Request, _ *GetLivenessArgs, reply *GetLivenessReply) error {
+	h.log.Debug("Health: GetLiveness called")
+	reply.Checks, reply.Healthy = h.health.Results()
 	return nil
 }
