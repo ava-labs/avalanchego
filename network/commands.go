@@ -1,11 +1,9 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package networking
+package network
 
 import (
-	"github.com/ava-labs/salticidae-go"
-
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -16,6 +14,7 @@ type Field uint32
 const (
 	VersionStr     Field = iota // Used in handshake
 	NetworkID                   // Used in handshake
+	NodeID                      // Used in handshake
 	MyTime                      // Used in handshake
 	IP                          // Used in handshake
 	Peers                       // Used in handshake
@@ -24,10 +23,6 @@ const (
 	ContainerID                 // Used for querying
 	ContainerBytes              // Used for gossiping
 	ContainerIDs                // Used for querying
-	Bytes                       // Used as arbitrary data
-	TxID                        // Used for throughput tests
-	Tx                          // Used for throughput tests
-	Status                      // Used for throughput tests
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -36,6 +31,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case VersionStr:
 		return wrappers.TryPackStr
 	case NetworkID:
+		return wrappers.TryPackInt
+	case NodeID:
 		return wrappers.TryPackInt
 	case MyTime:
 		return wrappers.TryPackLong
@@ -53,14 +50,6 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackBytes
 	case ContainerIDs:
 		return wrappers.TryPackHashes
-	case Bytes:
-		return wrappers.TryPackBytes
-	case TxID:
-		return wrappers.TryPackHash
-	case Tx:
-		return wrappers.TryPackBytes
-	case Status:
-		return wrappers.TryPackInt
 	default:
 		return nil
 	}
@@ -72,6 +61,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 	case VersionStr:
 		return wrappers.TryUnpackStr
 	case NetworkID:
+		return wrappers.TryUnpackInt
+	case NodeID:
 		return wrappers.TryUnpackInt
 	case MyTime:
 		return wrappers.TryUnpackLong
@@ -89,14 +80,6 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackBytes
 	case ContainerIDs:
 		return wrappers.TryUnpackHashes
-	case Bytes:
-		return wrappers.TryUnpackBytes
-	case TxID:
-		return wrappers.TryUnpackHash
-	case Tx:
-		return wrappers.TryUnpackBytes
-	case Status:
-		return wrappers.TryUnpackInt
 	default:
 		return nil
 	}
@@ -108,6 +91,8 @@ func (f Field) String() string {
 		return "VersionStr"
 	case NetworkID:
 		return "NetworkID"
+	case NodeID:
+		return "NodeID"
 	case MyTime:
 		return "MyTime"
 	case IP:
@@ -122,23 +107,51 @@ func (f Field) String() string {
 		return "Container Bytes"
 	case ContainerIDs:
 		return "Container IDs"
-	case Bytes:
-		return "Bytes"
-	case TxID:
-		return "TxID"
-	case Tx:
-		return "Tx"
-	case Status:
-		return "Status"
 	default:
 		return "Unknown Field"
+	}
+}
+
+// Op is an opcode
+type Op byte
+
+func (op Op) String() string {
+	switch op {
+	case GetVersion:
+		return "get_version"
+	case Version:
+		return "version"
+	case GetPeerList:
+		return "get_peerlist"
+	case PeerList:
+		return "peerlist"
+	case GetAcceptedFrontier:
+		return "get_accepted_frontier"
+	case AcceptedFrontier:
+		return "accepted_frontier"
+	case GetAccepted:
+		return "get_accepted"
+	case Accepted:
+		return "accepted"
+	case Get:
+		return "get"
+	case Put:
+		return "put"
+	case PushQuery:
+		return "push_query"
+	case PullQuery:
+		return "pull_query"
+	case Chits:
+		return "chits"
+	default:
+		return "Unknown Op"
 	}
 }
 
 // Public commands that may be sent between stakers
 const (
 	// Handshake:
-	GetVersion salticidae.Opcode = iota
+	GetVersion Op = iota
 	Version
 	GetPeerList
 	PeerList
@@ -153,22 +166,14 @@ const (
 	PushQuery
 	PullQuery
 	Chits
-	// Pinging:
-	Ping
-	Pong
-	// Arbitrary data message:
-	Data
-	// Throughput test:
-	IssueTx
-	DecidedTx
 )
 
 // Defines the messages that can be sent/received with this network
 var (
-	Messages = map[salticidae.Opcode][]Field{
+	Messages = map[Op][]Field{
 		// Handshake:
 		GetVersion:  []Field{},
-		Version:     []Field{NetworkID, MyTime, IP, VersionStr},
+		Version:     []Field{NetworkID, NodeID, MyTime, IP, VersionStr},
 		GetPeerList: []Field{},
 		PeerList:    []Field{Peers},
 		// Bootstrapping:
@@ -182,13 +187,5 @@ var (
 		PushQuery: []Field{ChainID, RequestID, ContainerID, ContainerBytes},
 		PullQuery: []Field{ChainID, RequestID, ContainerID},
 		Chits:     []Field{ChainID, RequestID, ContainerIDs},
-		// Pinging:
-		Ping: []Field{},
-		Pong: []Field{},
-		// Arbitrary data message:
-		Data: []Field{Bytes},
-		// Throughput test:
-		IssueTx:   []Field{ChainID, Tx},
-		DecidedTx: []Field{TxID, Status},
 	}
 )

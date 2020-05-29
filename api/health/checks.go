@@ -51,14 +51,14 @@ func (c gosundheitCheck) Name() string { return c.name }
 // returning the results
 func (c gosundheitCheck) Execute() (interface{}, error) { return c.checkFn() }
 
-// heartbeater provides a getter to the most recently observed heartbeat
-type heartbeater interface {
+// Heartbeater provides a getter to the most recently observed heartbeat
+type Heartbeater interface {
 	GetHeartbeat() int64
 }
 
 // HeartbeatCheckFn returns a CheckFn that checks the given heartbeater has
 // pulsed within the given duration
-func HeartbeatCheckFn(hb heartbeater, max time.Duration) CheckFn {
+func HeartbeatCheckFn(hb Heartbeater, max time.Duration) CheckFn {
 	return func() (data interface{}, err error) {
 		// Get the heartbeat and create a data set to return to the caller
 		hb := hb.GetHeartbeat()
