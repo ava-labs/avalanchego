@@ -35,11 +35,11 @@ type bootstrapper struct {
 
 	pending    ids.Set
 	finished   bool
-	onFinished func()
+	onFinished func() error
 }
 
 // Initialize this engine.
-func (b *bootstrapper) Initialize(config BootstrapConfig) {
+func (b *bootstrapper) Initialize(config BootstrapConfig) error {
 	b.BootstrapConfig = config
 
 	b.Blocked.SetParser(&parser{
@@ -51,6 +51,7 @@ func (b *bootstrapper) Initialize(config BootstrapConfig) {
 
 	config.Bootstrapable = b
 	b.Bootstrapper.Initialize(config.Config)
+	return nil
 }
 
 // CurrentAcceptedFrontier ...
@@ -72,7 +73,7 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 }
 
 // ForceAccepted ...
-func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
+func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	for _, blkID := range acceptedContainerIDs.List() {
 		b.fetch(blkID)
 	}
@@ -80,12 +81,13 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
 	if numPending := b.pending.Len(); numPending == 0 {
 		// TODO: This typically indicates bootstrapping has failed, so this
 		// should be handled appropriately
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
 // Put ...
-func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) {
+func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	b.BootstrapConfig.Context.Log.Verbo("Put called for blkID %s", blkID)
 
 	blk, err := b.VM.ParseBlock(blkBytes)
@@ -95,7 +97,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 			formatting.DumpBytes{Bytes: blkBytes})
 
 		b.GetFailed(vdr, requestID)
-		return
+		return nil
 	}
 
 	if !b.pending.Contains(blk.ID()) {
@@ -104,21 +106,22 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 			formatting.DumpBytes{Bytes: blkBytes})
 
 		b.GetFailed(vdr, requestID)
-		return
+		return nil
 	}
 
-	b.addBlock(blk)
+	return b.addBlock(blk)
 }
 
 // GetFailed ...
-func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
+func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	blkID, ok := b.blkReqs.Remove(vdr, requestID)
 	if !ok {
 		b.BootstrapConfig.Context.Log.Debug("GetFailed called without sending the corresponding Get message from %s",
 			vdr)
-		return
+		return nil
 	}
 	b.sendRequest(blkID)
+	return nil
 }
 
 func (b *bootstrapper) fetch(blkID ids.ID) {
@@ -152,12 +155,13 @@ func (b *bootstrapper) sendRequest(blkID ids.ID) {
 	b.numPendingRequests.Set(float64(b.pending.Len()))
 }
 
-func (b *bootstrapper) addBlock(blk snowman.Block) {
+func (b *bootstrapper) addBlock(blk snowman.Block) error {
 	b.storeBlock(blk)
 
 	if numPending := b.pending.Len(); numPending == 0 {
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
 func (b *bootstrapper) storeBlock(blk snowman.Block) {
@@ -192,27 +196,33 @@ func (b *bootstrapper) storeBlock(blk snowman.Block) {
 	b.numPendingRequests.Set(float64(numPending))
 }
 
-func (b *bootstrapper) finish() {
+func (b *bootstrapper) finish() error {
 	if b.finished {
-		return
+		return nil
 	}
 
-	b.executeAll(b.Blocked, b.numBlocked)
+	if err := b.executeAll(b.Blocked, b.numBlocked); err != nil {
+		return err
+	}
 
 	// Start consensus
-	b.onFinished()
+	if err := b.onFinished(); err != nil {
+		return err
+	}
 	b.finished = true
 
 	if b.Bootstrapped != nil {
 		b.Bootstrapped()
 	}
+	return nil
 }
 
-func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) {
+func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		if err := jobs.Execute(job); err != nil {
-			b.BootstrapConfig.Context.Log.Warn("Error executing: %s", err)
+			return err
 		}
 	}
+	return nil
 }

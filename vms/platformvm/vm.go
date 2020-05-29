@@ -400,9 +400,9 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 }
 
 // Shutdown this blockchain
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
-		return
+		return nil
 	}
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
@@ -411,9 +411,7 @@ func (vm *VM) Shutdown() {
 	vm.timer.Stop()
 	vm.Ctx.Lock.Lock()
 
-	if err := vm.DB.Close(); err != nil {
-		vm.Ctx.Log.Error("Closing the database failed with %s", err)
-	}
+	return vm.DB.Close()
 }
 
 // BuildBlock builds a block to be added to consensus

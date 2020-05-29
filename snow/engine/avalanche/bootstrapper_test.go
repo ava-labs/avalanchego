@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
@@ -41,7 +40,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	state := &stateTest{}
 	vm := &VMTest{}
 	engine := &Transitive{}
-	handler := &handler.Handler{}
+	handler := &router.Handler{}
 	router := &router.ChainRouter{}
 	timeouts := &timeout.Manager{}
 
@@ -196,7 +195,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	for vtxKey, reqID := range vtxIDToReqID {
 		vtxID := ids.NewID(vtxKey)
@@ -314,7 +313,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *requestID, vtxID1, vtxBytes1)
 	bs.Put(peerID, *requestID, vtxID0, vtxBytes0)
@@ -461,7 +460,7 @@ func TestBootstrapperVertexDependencies(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *reqIDPtr, vtxID0, vtxBytes0)
 
@@ -653,7 +652,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *reqIDPtr, vtxID0, vtxBytes0)
 
@@ -845,7 +844,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *reqIDPtr, vtxID0, vtxBytes0)
 
@@ -1092,7 +1091,7 @@ func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 	sender.CantGet = false
 
 	bs.Put(peerID, *requestID, vtxID0, vtxBytes1)

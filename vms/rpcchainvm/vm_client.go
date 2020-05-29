@@ -130,26 +130,31 @@ func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server 
 }
 
 // Shutdown ...
-func (vm *VMClient) Shutdown() {
+func (vm *VMClient) Shutdown() error {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 
 	if vm.closed {
-		return
+		return nil
 	}
 
 	vm.closed = true
 
-	vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{})
+	if _, err := vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{}); err != nil {
+		return err
+	}
 
 	for _, server := range vm.servers {
 		server.Stop()
 	}
 	for _, conn := range vm.conns {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			return err
+		}
 	}
 
 	vm.proc.Kill()
+	return nil
 }
 
 // CreateHandlers ...

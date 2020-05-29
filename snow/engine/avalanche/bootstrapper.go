@@ -42,11 +42,11 @@ type bootstrapper struct {
 	// IDs of vertices that we have requested from other validators but haven't received
 	pending    ids.Set
 	finished   bool
-	onFinished func()
+	onFinished func() error
 }
 
 // Initialize this engine.
-func (b *bootstrapper) Initialize(config BootstrapConfig) {
+func (b *bootstrapper) Initialize(config BootstrapConfig) error {
 	b.BootstrapConfig = config
 
 	b.VtxBlocked.SetParser(&vtxParser{
@@ -65,6 +65,7 @@ func (b *bootstrapper) Initialize(config BootstrapConfig) {
 
 	config.Bootstrapable = b
 	b.Bootstrapper.Initialize(config.Config)
+	return nil
 }
 
 // CurrentAcceptedFrontier ...
@@ -86,7 +87,7 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 }
 
 // ForceAccepted ...
-func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
+func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	for _, vtxID := range acceptedContainerIDs.List() {
 		b.fetch(vtxID)
 	}
@@ -94,20 +95,20 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
 	if numPending := b.pending.Len(); numPending == 0 {
 		// TODO: This typically indicates bootstrapping has failed, so this
 		// should be handled appropriately
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
 // Put ...
-func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) {
+func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	vtx, err := b.State.ParseVertex(vtxBytes)
 	if err != nil {
 		b.BootstrapConfig.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
 
-		b.GetFailed(vdr, requestID)
-		return
+		return b.GetFailed(vdr, requestID)
 	}
 
 	if !b.pending.Contains(vtx.ID()) {
@@ -115,23 +116,23 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 			vdr,
 			formatting.DumpBytes{Bytes: vtxBytes})
 
-		b.GetFailed(vdr, requestID)
-		return
+		return b.GetFailed(vdr, requestID)
 	}
 
-	b.addVertex(vtx)
+	return b.addVertex(vtx)
 }
 
 // GetFailed ...
-func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
+func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	vtxID, ok := b.vtxReqs.Remove(vdr, requestID)
 	if !ok {
 		b.BootstrapConfig.Context.Log.Debug("GetFailed called without sending the corresponding Get message from %s",
 			vdr)
-		return
+		return nil
 	}
 
 	b.sendRequest(vtxID)
+	return nil
 }
 
 func (b *bootstrapper) fetch(vtxID ids.ID) {
@@ -165,12 +166,13 @@ func (b *bootstrapper) sendRequest(vtxID ids.ID) {
 	b.numBSPendingRequests.Set(float64(b.pending.Len()))
 }
 
-func (b *bootstrapper) addVertex(vtx avalanche.Vertex) {
+func (b *bootstrapper) addVertex(vtx avalanche.Vertex) error {
 	b.storeVertex(vtx)
 
 	if numPending := b.pending.Len(); numPending == 0 {
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
 func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
@@ -231,27 +233,36 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 	b.numBSPendingRequests.Set(float64(numPending))
 }
 
-func (b *bootstrapper) finish() {
+func (b *bootstrapper) finish() error {
 	if b.finished {
-		return
+		return nil
 	}
 	b.BootstrapConfig.Context.Log.Info("bootstrapping finished fetching vertices. executing state transitions...")
 
-	b.executeAll(b.TxBlocked, b.numBSBlockedTx)
-	b.executeAll(b.VtxBlocked, b.numBSBlockedVtx)
+	if err := b.executeAll(b.TxBlocked, b.numBSBlockedTx); err != nil {
+		return err
+	}
+	if err := b.executeAll(b.VtxBlocked, b.numBSBlockedVtx); err != nil {
+		return err
+	}
 
 	// Start consensus
-	b.onFinished()
+	if err := b.onFinished(); err != nil {
+		return err
+	}
 	b.seen = ids.Set{}
 	b.finished = true
+	return nil
 }
 
-func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) {
+func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		b.BootstrapConfig.Context.Log.Debug("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
-			b.BootstrapConfig.Context.Log.Warn("Error executing: %s", err)
+			b.BootstrapConfig.Context.Log.Error("Error executing: %s", err)
+			return err
 		}
 	}
+	return nil
 }

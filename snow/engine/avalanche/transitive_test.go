@@ -28,7 +28,7 @@ func TestEngineShutdown(t *testing.T) {
 	config := DefaultConfig()
 	vmShutdownCalled := false
 	vm := &VMTest{}
-	vm.ShutdownF = func() { vmShutdownCalled = true }
+	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	config.VM = vm
 
 	transitive := &Transitive{}

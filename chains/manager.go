@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -428,7 +427,7 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
+	handler := &router.Handler{}
 	handler.Initialize(&engine, msgChan, defaultChannelSize)
 
 	// Allows messages to be routed to the new chain
@@ -514,7 +513,7 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
+	handler := &router.Handler{}
 	handler.Initialize(&engine, msgChan, defaultChannelSize)
 
 	// Allow incoming messages to be routed to the new chain

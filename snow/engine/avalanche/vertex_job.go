@@ -59,7 +59,8 @@ func (v *vertexJob) Execute() error {
 	for _, tx := range v.vtx.Txs() {
 		if tx.Status() != choices.Accepted {
 			v.numDropped.Inc()
-			return errors.New("attempting to execute vertex with non-accepted transactions")
+			v.log.Warn("attempting to execute vertex with non-accepted transactions")
+			return nil
 		}
 	}
 	status := v.vtx.Status()

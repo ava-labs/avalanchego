@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -37,11 +36,11 @@ func TestTimeout(t *testing.T) {
 	tm.Initialize(time.Millisecond)
 	go tm.Dispatch()
 
-	router := router.ChainRouter{}
-	router.Initialize(logging.NoLog{}, &tm, time.Hour)
+	chainRouter := router.ChainRouter{}
+	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &router, &tm)
+	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -52,16 +51,17 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 
 	failedVDRs := ids.ShortSet{}
-	engine.QueryFailedF = func(validatorID ids.ShortID, _ uint32) {
+	engine.QueryFailedF = func(validatorID ids.ShortID, _ uint32) error {
 		failedVDRs.Add(validatorID)
 		wg.Done()
+		return nil
 	}
 
-	handler := handler.Handler{}
+	handler := router.Handler{}
 	handler.Initialize(&engine, nil, 1)
 	go handler.Dispatch()
 
-	router.AddChain(&handler)
+	chainRouter.AddChain(&handler)
 
 	vdrIDs := ids.ShortSet{}
 	vdrIDs.Add(ids.NewShortID([20]byte{255}))

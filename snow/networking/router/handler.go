@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handler
+package router
 
 import (
 	"sync"
@@ -18,6 +18,8 @@ type Handler struct {
 	wg      sync.WaitGroup
 	engine  common.Engine
 	msgChan <-chan common.Message
+
+	toClose func()
 }
 
 // Initialize this consensus handler
@@ -35,24 +37,40 @@ func (h *Handler) Context() *snow.Context { return h.engine.Context() }
 // Dispatch waits for incoming messages from the network
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
+	log := h.Context().Log
 	defer h.wg.Done()
 
+	closing := false
 	for {
 		select {
-		case msg := <-h.msgs:
-			if !h.dispatchMsg(msg) {
+		case msg, ok := <-h.msgs:
+			if !ok {
 				return
+			}
+			if closing {
+				log.Debug("dropping message due to closing:\n%s", msg)
+				continue
+			}
+			if !h.dispatchMsg(msg) {
+				closing = true
 			}
 		case msg := <-h.msgChan:
-			if !h.dispatchMsg(message{messageType: notifyMsg, notification: msg}) {
-				return
+			if closing {
+				log.Debug("dropping internal message due to closing:\n%s", msg)
+				continue
 			}
+			if !h.dispatchMsg(message{messageType: notifyMsg, notification: msg}) {
+				closing = true
+			}
+		}
+		if closing && h.toClose != nil {
+			go h.toClose()
 		}
 	}
 }
 
 // Dispatch a message to the consensus engine.
-// Returns false iff this consensus handler (and its associated engine) should shutdown
+// Returns true iff this consensus handler (and its associated engine) should shutdown
 // (due to receipt of a shutdown message)
 func (h *Handler) dispatchMsg(msg message) bool {
 	ctx := h.engine.Context()
@@ -61,43 +79,50 @@ func (h *Handler) dispatchMsg(msg message) bool {
 	defer ctx.Lock.Unlock()
 
 	ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
-
+	var (
+		err  error
+		done bool
+	)
 	switch msg.messageType {
 	case getAcceptedFrontierMsg:
-		h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
+		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
 	case acceptedFrontierMsg:
-		h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
 	case getAcceptedFrontierFailedMsg:
-		h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
+		err = h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
 	case getAcceptedMsg:
-		h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
 	case acceptedMsg:
-		h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
 	case getAcceptedFailedMsg:
-		h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
+		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
 	case getMsg:
-		h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
+		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
 	case getFailedMsg:
-		h.engine.GetFailed(msg.validatorID, msg.requestID)
+		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
 	case putMsg:
-		h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case pushQueryMsg:
-		h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case pullQueryMsg:
-		h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
+		err = h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
 	case queryFailedMsg:
-		h.engine.QueryFailed(msg.validatorID, msg.requestID)
+		err = h.engine.QueryFailed(msg.validatorID, msg.requestID)
 	case chitsMsg:
-		h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
 	case notifyMsg:
-		h.engine.Notify(msg.notification)
+		err = h.engine.Notify(msg.notification)
 	case gossipMsg:
-		h.engine.Gossip()
+		err = h.engine.Gossip()
 	case shutdownMsg:
-		h.engine.Shutdown()
-		return false
+		err = h.engine.Shutdown()
+		done = true
 	}
-	return true
+
+	if err != nil {
+		ctx.Log.Error("fatal error occurred on chain %s, forcing a shutdown due to %s", err)
+	}
+	return done || err != nil
 }
 
 // GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
@@ -237,7 +262,7 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 func (h *Handler) Gossip() { h.msgs <- message{messageType: gossipMsg} }
 
 // Shutdown shuts down the dispatcher
-func (h *Handler) Shutdown() { h.msgs <- message{messageType: shutdownMsg}; h.wg.Wait() }
+func (h *Handler) Shutdown() { h.msgs <- message{messageType: shutdownMsg} }
 
 // Notify ...
 func (h *Handler) Notify(msg common.Message) {
