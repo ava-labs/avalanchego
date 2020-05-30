@@ -155,7 +155,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			case *addDefaultSubnetDelegatorTx:
 				address = tx.Destination
 			default: // Shouldn't happen
-				service.vm.Ctx.Log.Debug("unexpected type in currentValidators list")
+				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
 			}
 
 			reply.Validators[i] = APIValidator{
@@ -215,7 +215,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			case *addDefaultSubnetDelegatorTx:
 				address = tx.Destination
 			default: // Shouldn't happen
-				service.vm.Ctx.Log.Debug("unexpected type in currentValidators list")
+				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
 			}
 			reply.Validators[i] = APIValidator{
 				ID:          vdr.ID(),
