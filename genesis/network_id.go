@@ -14,24 +14,32 @@ import (
 // Hardcoded network IDs
 var (
 	MainnetID uint32 = 1
-	TestnetID uint32 = 2
 	CascadeID uint32 = 2
+	DenaliID  uint32 = 3
+
+	TestnetID uint32 = 3
 	LocalID   uint32 = 12345
 
 	MainnetName = "mainnet"
-	TestnetName = "testnet"
 	CascadeName = "cascade"
+	DenaliName  = "denali"
+
+	TestnetName = "testnet"
 	LocalName   = "local"
 
 	NetworkIDToNetworkName = map[uint32]string{
 		MainnetID: MainnetName,
-		TestnetID: CascadeName,
-		LocalID:   LocalName,
+		CascadeID: CascadeName,
+		DenaliID:  DenaliName,
+
+		LocalID: LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
 		MainnetName: MainnetID,
-		TestnetName: TestnetID,
 		CascadeName: CascadeID,
+		DenaliName:  DenaliID,
+
+		TestnetName: TestnetID,
 		LocalName:   LocalID,
 	}
 
