@@ -67,11 +67,11 @@ var (
 			"6cesTteH62Y5mLoDBUASaBvCXuL2AthL",
 		},
 		StakerIDs: []string{
-			"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
-			"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
-			"DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
-			"N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
-			"EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
+			"C8TBZhhPTr53AKcwkwzfa7cromxL7ndNw",
+			"ATr9svGb2ameq1S3xjHfUYAheVF9a6RCL",
+			"LcWZdhnqfdUfhP9txf4eynNDdoosPnSFo",
+			"MLGUdJKazgcCbzRjM192Eggw2fyHMdq8d",
+			"EKGHUF3N8VTYBT3tDrUf9DjoTbMeGjkbZ",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
