@@ -158,9 +158,6 @@ func (ab *AtomicBlock) Accept() {
 		ab.onAcceptFunc()
 	}
 
-	parent := ab.parentBlock()
-	// remove this block and its parent from memory
-	parent.free()
 	ab.free()
 }
 

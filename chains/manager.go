@@ -13,13 +13,13 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/avalanche"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking"
 	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
@@ -102,16 +102,15 @@ type manager struct {
 	decisionEvents  *triggers.EventDispatcher
 	consensusEvents *triggers.EventDispatcher
 	db              database.Database
-	chainRouter     router.Router         // Routes incoming messages to the appropriate chain
-	sender          sender.ExternalSender // Sends consensus messages to other validators
-	timeoutManager  *timeout.Manager      // Manages request timeouts when sending messages to other validators
-	consensusParams avacon.Parameters     // The consensus parameters (alpha, beta, etc.) for new chains
-	validators      validators.Manager    // Validators validating on this chain
-	registrants     []Registrant          // Those notified when a chain is created
-	nodeID          ids.ShortID           // The ID of this node
-	networkID       uint32                // ID of the network this node is connected to
-	awaiter         Awaiter               // Waits for required connections before running bootstrapping
-	server          *api.Server           // Handles HTTP API calls
+	chainRouter     router.Router      // Routes incoming messages to the appropriate chain
+	net             network.Network    // Sends consensus messages to other validators
+	timeoutManager  *timeout.Manager   // Manages request timeouts when sending messages to other validators
+	consensusParams avacon.Parameters  // The consensus parameters (alpha, beta, etc.) for new chains
+	validators      validators.Manager // Validators validating on this chain
+	registrants     []Registrant       // Those notified when a chain is created
+	nodeID          ids.ShortID        // The ID of this node
+	networkID       uint32             // ID of the network this node is connected to
+	server          *api.Server        // Handles HTTP API calls
 	keystore        *keystore.Keystore
 	sharedMemory    *atomic.SharedMemory
 
@@ -133,12 +132,11 @@ func New(
 	consensusEvents *triggers.EventDispatcher,
 	db database.Database,
 	router router.Router,
-	sender sender.ExternalSender,
+	net network.Network,
 	consensusParams avacon.Parameters,
 	validators validators.Manager,
 	nodeID ids.ShortID,
 	networkID uint32,
-	awaiter Awaiter,
 	server *api.Server,
 	keystore *keystore.Keystore,
 	sharedMemory *atomic.SharedMemory,
@@ -158,13 +156,12 @@ func New(
 		consensusEvents: consensusEvents,
 		db:              db,
 		chainRouter:     router,
-		sender:          sender,
+		net:             net,
 		timeoutManager:  &timeoutManager,
 		consensusParams: consensusParams,
 		validators:      validators,
 		nodeID:          nodeID,
 		networkID:       networkID,
-		awaiter:         awaiter,
 		server:          server,
 		keystore:        keystore,
 		sharedMemory:    sharedMemory,
@@ -390,7 +387,7 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.sender, m.chainRouter, m.timeoutManager)
+	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
 
 	// The engine handles consensus
 	engine := avaeng.Transitive{
@@ -438,17 +435,17 @@ func (m *manager) createAvalancheChain(
 	m.chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
-	awaiting := &networking.AwaitingConnections{
-		Requested:      beacons,
-		WeightRequired: (3*bootstrapWeight + 3) / 4, // 75% must be connected to
-		Finish: func() {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-
-			engine.Startup()
-		},
+	reqWeight := (3*bootstrapWeight + 3) / 4
+	if reqWeight == 0 {
+		engine.Startup()
+	} else {
+		go m.net.RegisterHandler(&awaiter{
+			vdrs:      beacons,
+			reqWeight: reqWeight, // 75% must be connected to
+			ctx:       ctx,
+			eng:       &engine,
+		})
 	}
-	m.awaiter.AwaitConnections(awaiting)
 
 	return nil
 }
@@ -486,7 +483,7 @@ func (m *manager) createSnowmanChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.sender, m.chainRouter, m.timeoutManager)
+	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
 
 	bootstrapWeight := uint64(0)
 	for _, beacon := range beacons.List() {
@@ -524,17 +521,17 @@ func (m *manager) createSnowmanChain(
 	m.chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
-	awaiting := &networking.AwaitingConnections{
-		Requested:      beacons,
-		WeightRequired: (3*bootstrapWeight + 3) / 4, // 75% must be connected to
-		Finish: func() {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-
-			engine.Startup()
-		},
+	reqWeight := (3*bootstrapWeight + 3) / 4
+	if reqWeight == 0 {
+		engine.Startup()
+	} else {
+		go m.net.RegisterHandler(&awaiter{
+			vdrs:      beacons,
+			reqWeight: reqWeight, // 75% must be connected to
+			ctx:       ctx,
+			eng:       &engine,
+		})
 	}
-	m.awaiter.AwaitConnections(awaiting)
 	return nil
 }
 
