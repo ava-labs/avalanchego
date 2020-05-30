@@ -148,11 +148,22 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		vdr := tx.Vdr()
 		weight := json.Uint64(vdr.Weight())
 		if args.SubnetID.Equals(DefaultSubnetID) {
+			var address ids.ShortID
+			switch tx := tx.(type) {
+			case *addDefaultSubnetValidatorTx:
+				address = tx.Destination
+			case *addDefaultSubnetDelegatorTx:
+				address = tx.Destination
+			default: // Shouldn't happen
+				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
+			}
+
 			reply.Validators[i] = APIValidator{
 				ID:          vdr.ID(),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
+				Address:     &address,
 			}
 		} else {
 			reply.Validators[i] = APIValidator{
@@ -197,11 +208,21 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		vdr := tx.Vdr()
 		weight := json.Uint64(vdr.Weight())
 		if args.SubnetID.Equals(DefaultSubnetID) {
+			var address ids.ShortID
+			switch tx := tx.(type) {
+			case *addDefaultSubnetValidatorTx:
+				address = tx.Destination
+			case *addDefaultSubnetDelegatorTx:
+				address = tx.Destination
+			default: // Shouldn't happen
+				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
+			}
 			reply.Validators[i] = APIValidator{
 				ID:          vdr.ID(),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
+				Address:     &address,
 			}
 		} else {
 			reply.Validators[i] = APIValidator{
