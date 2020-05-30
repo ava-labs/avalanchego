@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -43,6 +44,12 @@ type peer struct {
 
 	// the connection object that is used to read/write messages from
 	conn net.Conn
+
+	// version that the peer reported during the handshake
+	versionStr string
+
+	// unix time of the last message sent and received respectively
+	lastSent, lastReceived int64
 }
 
 // assume the stateLock is held
@@ -159,6 +166,7 @@ func (p *peer) WriteMessages() {
 			}
 			msg = msg[written:]
 		}
+		atomic.StoreInt64(&p.lastSent, p.net.clock.Time().Unix())
 	}
 }
 
@@ -188,6 +196,7 @@ func (p *peer) send(msg Msg) bool {
 // assumes the stateLock is not held
 func (p *peer) handle(msg Msg) {
 	p.net.heartbeat()
+	atomic.StoreInt64(&p.lastReceived, p.net.clock.Time().Unix())
 
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
@@ -414,6 +423,8 @@ func (p *peer) version(msg Msg) {
 	if p.closed {
 		return
 	}
+
+	p.versionStr = peerVersion.String()
 
 	p.connected = true
 	p.net.connected(p)

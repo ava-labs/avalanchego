@@ -70,9 +70,9 @@ type Network interface {
 	// The handler will initially be called with this local node's ID.
 	RegisterHandler(h Handler)
 
-	// Returns the IPs of nodes this network is currently connected to
-	// externally. Thread safety must be managed internally to the network.
-	IPs() []utils.IPDesc
+	// Returns the description of the nodes this network is currently connected
+	// to externally. Thread safety must be managed internally to the network.
+	Peers() []PeerID
 
 	// Close this network and all existing connections it has. Thread safety
 	// must be managed internally to the network. Calling close multiple times
@@ -511,17 +511,24 @@ func (n *network) RegisterHandler(h Handler) {
 }
 
 // IPs implements the Network interface
-func (n *network) IPs() []utils.IPDesc {
+func (n *network) Peers() []PeerID {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	ips := []utils.IPDesc(nil)
+	peers := []PeerID{}
 	for _, peer := range n.peers {
 		if peer.connected {
-			ips = append(ips, peer.ip)
+			peers = append(peers, PeerID{
+				IP:           peer.conn.RemoteAddr().String(),
+				PublicIP:     peer.ip.String(),
+				ID:           peer.id,
+				Version:      peer.versionStr,
+				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+			})
 		}
 	}
-	return ips
+	return peers
 }
 
 // Close implements the Network interface
