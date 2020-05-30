@@ -696,8 +696,6 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		_, isConnected := n.connectedIPs[str]
 		_, isMyself := n.myIPs[str]
 		closed := n.closed
-		n.retryDelay[str] = delay
-		n.stateLock.Unlock()
 
 		if !isDisconnected || isConnected || isMyself || closed {
 			// If the IP was discovered by the peer connecting to us, we don't
@@ -708,8 +706,12 @@ func (n *network) connectTo(ip utils.IPDesc) {
 
 			// If the network was closed, we should stop attempting to connect
 			// to the peer
+
+			n.stateLock.Unlock()
 			return
 		}
+		n.retryDelay[str] = delay
+		n.stateLock.Unlock()
 
 		err := n.attemptConnect(ip)
 		if err == nil {
