@@ -25,15 +25,17 @@ type Block struct {
 func (b *Block) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
-func (b *Block) Accept() {
+func (b *Block) Accept() error {
 	b.vm.ctx.Log.Verbo("Block %s is accepted", b.ID())
 	b.vm.updateStatus(b.ID(), choices.Accepted)
+	return nil
 }
 
 // Reject implements the snowman.Block interface
-func (b *Block) Reject() {
+func (b *Block) Reject() error {
 	b.vm.ctx.Log.Verbo("Block %s is rejected", b.ID())
 	b.vm.updateStatus(b.ID(), choices.Rejected)
+	return nil
 }
 
 // Status implements the snowman.Block interface
