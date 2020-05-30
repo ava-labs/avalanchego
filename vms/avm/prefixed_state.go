@@ -15,7 +15,6 @@ const (
 	txID uint64 = iota
 	utxoID
 	txStatusID
-	fundsID
 	dbInitializedID
 )
 
@@ -28,8 +27,8 @@ var (
 type prefixedState struct {
 	state *state
 
-	tx, utxo, txStatus, funds cache.Cacher
-	uniqueTx                  cache.Deduplicator
+	tx, utxo, txStatus cache.Cacher
+	uniqueTx           cache.Deduplicator
 }
 
 // UniqueTx de-duplicates the transaction.
@@ -76,9 +75,7 @@ func (s *prefixedState) SetDBInitialized(status choices.Status) error {
 
 // Funds returns the mapping from the 32 byte representation of an address to a
 // list of utxo IDs that reference the address.
-func (s *prefixedState) Funds(id ids.ID) ([]ids.ID, error) {
-	return s.state.IDs(id)
-}
+func (s *prefixedState) Funds(id ids.ID) ([]ids.ID, error) { return s.state.IDs(id) }
 
 // SpendUTXO consumes the provided utxo.
 func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {

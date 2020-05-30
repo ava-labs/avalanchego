@@ -151,7 +151,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 
 	state := vm.state
 
-	vm.codec.RegisterType(&testAddressable{})
+	vm.codec.RegisterType(&ava.TestAddressable{})
 
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{
@@ -159,7 +159,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: ava.Asset{ID: ids.Empty},
-		Out: &testAddressable{
+		Out: &ava.TestAddressable{
 			Addrs: [][]byte{
 				[]byte{0},
 			},

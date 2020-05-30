@@ -47,7 +47,7 @@ func (s *chainState) UTXO(id ids.ID) (*UTXO, error) {
 // Funds returns the mapping from the 32 byte representation of an
 // address to a list of utxo IDs that reference the address.
 func (s *chainState) Funds(id ids.ID) ([]ids.ID, error) {
-	return s.IDs(id)
+	return s.IDs(UniqueID(id, s.fundsIDPrefix, s.fundsID))
 }
 
 // SpendUTXO consumes the provided platform utxo.
@@ -97,6 +97,7 @@ func (s *chainState) setStatus(id ids.ID, status choices.Status) error {
 func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
+		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
 		if err := s.RemoveID(addrID, utxoID); err != nil {
 			return err
 		}
@@ -107,6 +108,7 @@ func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
+		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
 		if err := s.AddID(addrID, utxoID); err != nil {
 			return err
 		}
