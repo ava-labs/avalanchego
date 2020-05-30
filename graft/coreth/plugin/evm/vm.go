@@ -252,13 +252,14 @@ func (vm *VM) Initialize(
 }
 
 // Shutdown implements the snowman.ChainVM interface
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.ctx == nil {
-		return
+		return nil
 	}
 
 	vm.writeBackMetadata()
 	vm.chain.Stop()
+	return nil
 }
 
 // BuildBlock implements the snowman.ChainVM interface
