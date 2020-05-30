@@ -5,10 +5,10 @@ package ava
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/vms/components/codec"
@@ -16,6 +16,7 @@ import (
 
 var (
 	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
+	errZeroID            = errors.New("database key ID value not initialized")
 )
 
 // UniqueID returns a unique identifier
@@ -117,39 +118,35 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 
 // IDs returns a slice of IDs from storage
 func (s *State) IDs(id ids.ID) ([]ids.ID, error) {
-	if idsIntf, found := s.Cache.Get(id); found {
-		if idSlice, ok := idsIntf.([]ids.ID); ok {
-			return idSlice, nil
-		}
-		return nil, errCacheTypeMismatch
-	}
-
-	bytes, err := s.DB.Get(id.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
 	idSlice := []ids.ID(nil)
-	if err := s.Codec.Unmarshal(bytes, &idSlice); err != nil {
-		return nil, err
-	}
+	iter := prefixdb.New(id.Bytes(), s.DB).NewIterator()
+	defer iter.Release()
 
-	s.Cache.Put(id, idSlice)
+	for iter.Next() {
+		keyID, err := ids.ToID(iter.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		idSlice = append(idSlice, keyID)
+	}
 	return idSlice, nil
 }
 
-// SetIDs saves a slice of IDs to the database.
-func (s *State) SetIDs(id ids.ID, idSlice []ids.ID) error {
-	if len(idSlice) == 0 {
-		s.Cache.Evict(id)
-		return s.DB.Delete(id.Bytes())
+// AddID saves an ID to the prefixed database
+func (s *State) AddID(id ids.ID, key ids.ID) error {
+	if key.IsZero() {
+		return errZeroID
 	}
+	db := prefixdb.New(id.Bytes(), s.DB)
+	return db.Put(key.Bytes(), nil)
+}
 
-	bytes, err := s.Codec.Marshal(idSlice)
-	if err != nil {
-		return fmt.Errorf("failed to marshal an ID array due to %w", err)
+// RemoveID removes an ID from the prefixed database
+func (s *State) RemoveID(id ids.ID, key ids.ID) error {
+	if key.IsZero() {
+		return errZeroID
 	}
-
-	s.Cache.Put(id, idSlice)
-	return s.DB.Put(id.Bytes(), bytes)
+	db := prefixdb.New(id.Bytes(), s.DB)
+	return db.Delete(key.Bytes())
 }
