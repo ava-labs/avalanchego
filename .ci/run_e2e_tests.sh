@@ -2,10 +2,19 @@ set -x
 
 LATEST_KURTOSIS_TAG="kurtosistech/kurtosis:latest"
 LATEST_CONTROLLER_TAG="kurtosistech/ava-test-controller:latest"
-GECKO_IMAGE="${DOCKERHUB_REPO}":"$COMMIT"
+#GECKO_IMAGE="${DOCKERHUB_REPO}":"$COMMIT"
 
 docker pull ${LATEST_CONTROLLER_TAG}
 docker pull ${LATEST_KURTOSIS_TAG}
+
+SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
+SRC_PATH=$(dirname "${SCRIPTS_PATH}")
+
+# build docker image we need
+echo $(pwd)
+bash ${SRC_PATH}/scripts/build_image.sh
+# get docker image label
+GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
 docker image ls
 echo "MY GECKO IMAGE: ${GECKO_IMAGE}"
