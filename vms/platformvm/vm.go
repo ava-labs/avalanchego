@@ -837,7 +837,10 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
-		utxos, _ := state.AVMFunds(addr)
+		utxos, err := state.AVMFunds(addr)
+		if err != nil {
+			return nil, err
+		}
 		utxoIDs.Add(utxos...)
 	}
 

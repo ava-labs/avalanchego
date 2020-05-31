@@ -119,7 +119,7 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 // IDs returns a slice of IDs from storage
 func (s *State) IDs(id ids.ID) ([]ids.ID, error) {
 	idSlice := []ids.ID(nil)
-	iter := prefixdb.New(id.Bytes(), s.DB).NewIterator()
+	iter := prefixdb.NewNested(id.Bytes(), s.DB).NewIterator()
 	defer iter.Release()
 
 	for iter.Next() {
@@ -138,7 +138,7 @@ func (s *State) AddID(id ids.ID, key ids.ID) error {
 	if key.IsZero() {
 		return errZeroID
 	}
-	db := prefixdb.New(id.Bytes(), s.DB)
+	db := prefixdb.NewNested(id.Bytes(), s.DB)
 	return db.Put(key.Bytes(), nil)
 }
 
@@ -147,6 +147,6 @@ func (s *State) RemoveID(id ids.ID, key ids.ID) error {
 	if key.IsZero() {
 		return errZeroID
 	}
-	db := prefixdb.New(id.Bytes(), s.DB)
+	db := prefixdb.NewNested(id.Bytes(), s.DB)
 	return db.Delete(key.Bytes())
 }

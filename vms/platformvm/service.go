@@ -37,6 +37,7 @@ var (
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
 	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
 	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
+	errNoFunds               = errors.New("no spendable funds were found")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -985,6 +986,10 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 
 		ins = append(ins, in)
 		keys = append(keys, signers)
+	}
+
+	if amount == 0 {
+		return errNoFunds
 	}
 
 	ava.SortTransferableInputsWithSigners(ins, keys)
