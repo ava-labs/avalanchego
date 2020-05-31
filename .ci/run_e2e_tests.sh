@@ -12,7 +12,7 @@ ${LATEST_KURTOSIS_TAG}) &
 
 kurtosis_pid=$!
 
-sleep 15
+sleep 90
 kill ${kurtosis_pid}
 
 ACTUAL_EXIT_STATUS=$(docker ps -a --latest --filter ancestor=${LATEST_CONTROLLER_TAG} --format="{{.Status}}")
