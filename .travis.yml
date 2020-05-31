@@ -26,7 +26,7 @@ install:
 
 script: 
  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then .ci/runscript_osx.sh; fi
- - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/runscript_linux.sh; fi
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/runscript_linux.sh; .ci/run_e2e_tests.sh; fi
 
 #Need to push to docker hub only from one build
 after_success: 
