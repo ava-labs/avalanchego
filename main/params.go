@@ -39,6 +39,12 @@ var (
 	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
 	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
 	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+
+	defaultPluginDirs = []string{
+		"./build/plugins",
+		"./plugins",
+		os.ExpandEnv(filepath.Join("$HOME", ".gecko", "plugins")),
+	}
 )
 
 var (
@@ -118,7 +124,7 @@ func init() {
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
 	// Plugins:
-	fs.StringVar(&Config.PluginDir, "plugin-dir", "./build/plugins", "Plugin directory for Ava VMs")
+	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Ava VMs")
 
 	// Logging:
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
@@ -254,6 +260,16 @@ func init() {
 	} else {
 		for _, peer := range Config.BootstrapPeers {
 			peer.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+		}
+	}
+
+	// Plugins
+	if _, err := os.Stat(Config.PluginDir); os.IsNotExist(err) {
+		for _, dir := range defaultPluginDirs {
+			if _, err := os.Stat(dir); !os.IsNotExist(err) {
+				Config.PluginDir = dir
+				break
+			}
 		}
 	}
 
