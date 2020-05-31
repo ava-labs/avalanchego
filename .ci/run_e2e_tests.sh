@@ -2,8 +2,8 @@ LATEST_KURTOSIS_TAG="kurtosistech/kurtosis:latest"
 LATEST_CONTROLLER_TAG="kurtosistech/ava-test-controller:latest"
 GECKO_IMAGE="${DOCKERHUB_REPO}":"$COMMIT"
 
-#bash "${KURTOSIS_PATH}"/scripts/build_image.sh ${LATEST_KURTOSIS_TAG}
-#docker pull ${LATEST_CONTROLLER_TAG}
+docker pull ${LATEST_CONTROLLER_TAG}
+docker pull ${LATEST_KURTOSIS_TAG}
 
 (docker run -v /var/run/docker.sock:/var/run/docker.sock \
 --env DEFAULT_GECKO_IMAGE="${DEFAULT_GECKO_IMAGE}" \
