@@ -1,3 +1,5 @@
+set -x
+
 LATEST_KURTOSIS_TAG="kurtosistech/kurtosis:latest"
 LATEST_CONTROLLER_TAG="kurtosistech/ava-test-controller:latest"
 GECKO_IMAGE="${DOCKERHUB_REPO}":"$COMMIT"
@@ -5,8 +7,11 @@ GECKO_IMAGE="${DOCKERHUB_REPO}":"$COMMIT"
 docker pull ${LATEST_CONTROLLER_TAG}
 docker pull ${LATEST_KURTOSIS_TAG}
 
+docker image ls
+echo "MY GECKO IMAGE: ${GECKO_IMAGE}"
+
 (docker run -v /var/run/docker.sock:/var/run/docker.sock \
---env DEFAULT_GECKO_IMAGE="${DEFAULT_GECKO_IMAGE}" \
+--env DEFAULT_GECKO_IMAGE="${GECKO_IMAGE}" \
 --env TEST_CONTROLLER_IMAGE="${LATEST_CONTROLLER_TAG}" \
 ${LATEST_KURTOSIS_TAG}) &
 
