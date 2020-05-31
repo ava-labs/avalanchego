@@ -1,8 +1,5 @@
-set -x
-
 LATEST_KURTOSIS_TAG="kurtosistech/kurtosis:latest"
 LATEST_CONTROLLER_TAG="kurtosistech/ava-test-controller:latest"
-#GECKO_IMAGE="${DOCKERHUB_REPO}":"$COMMIT"
 
 docker pull ${LATEST_CONTROLLER_TAG}
 docker pull ${LATEST_KURTOSIS_TAG}
@@ -11,13 +8,9 @@ SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 
 # build docker image we need
-echo $(pwd)
 bash ${SRC_PATH}/scripts/build_image.sh
 # get docker image label
 GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
-
-docker image ls
-echo "MY GECKO IMAGE: ${GECKO_IMAGE}"
 
 (docker run -v /var/run/docker.sock:/var/run/docker.sock \
 --env DEFAULT_GECKO_IMAGE="${GECKO_IMAGE}" \
@@ -31,8 +24,6 @@ kill ${kurtosis_pid}
 
 ACTUAL_EXIT_STATUS=$(docker ps -a --latest --filter ancestor=${LATEST_CONTROLLER_TAG} --format="{{.Status}}")
 EXPECTED_EXIT_STATUS="Exited \(0\).*"
-
-echo "${ACTUAL_EXIT_STATUS}"
 
 # Clear containers.
 echo "Clearing kurtosis testnet containers."
