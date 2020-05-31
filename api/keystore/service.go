@@ -27,7 +27,7 @@ import (
 
 const (
 	// maxUserPassLen is the maximum length of the username or password allowed
-	maxUserPassLen = 1024
+	maxUserPassLen = 25
 
 	// requiredPassScore defines the score a password must achieve to be accepted
 	// as a password with strong characteristics by the zxcvbn package
