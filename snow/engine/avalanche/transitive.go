@@ -369,6 +369,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
+	orphans := t.Consensus.Orphans()
 	for _, tx := range txs {
 		inputs := tx.InputIDs()
 		overlaps := consumed.Overlaps(inputs)
@@ -380,8 +381,10 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 			overlaps = false
 		}
 
-		// Force allows for a conflict to be issued
-		if txID := tx.ID(); !overlaps && !issuedTxs.Contains(txID) && (force || t.Consensus.IsVirtuous(tx)) && !tx.Status().Decided() {
+		if txID := tx.ID(); !overlaps && // should never allow conflicting txs in the same vertex
+			!issuedTxs.Contains(txID) && // shouldn't issue duplicated transactions to the same vertex
+			(force || t.Consensus.IsVirtuous(tx)) && // force allows for a conflict to be issued
+			(!t.Consensus.TxIssued(tx) || orphans.Contains(txID)) { // should only reissued orphaned txs
 			batch = append(batch, tx)
 			issuedTxs.Add(txID)
 			consumed.Union(inputs)
