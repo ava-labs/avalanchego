@@ -37,11 +37,10 @@ func (b *Bootstrapper) Initialize(config Config) {
 }
 
 // Startup implements the Engine interface.
-func (b *Bootstrapper) Startup() {
+func (b *Bootstrapper) Startup() error {
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		b.Context.Log.Info("Bootstrapping skipped due to no provided bootstraps")
-		b.Bootstrapable.ForceAccepted(ids.Set{})
-		return
+		return b.Bootstrapable.ForceAccepted(ids.Set{})
 	}
 
 	vdrs := ids.ShortSet{}
@@ -49,23 +48,26 @@ func (b *Bootstrapper) Startup() {
 
 	b.RequestID++
 	b.Sender.GetAcceptedFrontier(vdrs, b.RequestID)
+	return nil
 }
 
 // GetAcceptedFrontier implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) {
+func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
 	b.Sender.AcceptedFrontier(validatorID, requestID, b.Bootstrapable.CurrentAcceptedFrontier())
+	return nil
 }
 
 // GetAcceptedFrontierFailed implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) {
+func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	b.AcceptedFrontier(validatorID, requestID, ids.Set{})
+	return nil
 }
 
 // AcceptedFrontier implements the Engine interface.
-func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
+func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
 	if !b.pendingAcceptedFrontier.Contains(validatorID) {
 		b.Context.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
-		return
+		return nil
 	}
 	b.pendingAcceptedFrontier.Remove(validatorID)
 
@@ -78,23 +80,25 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 		b.RequestID++
 		b.Sender.GetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
 	}
+	return nil
 }
 
 // GetAccepted implements the Engine interface.
-func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
+func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
 	b.Sender.Accepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
+	return nil
 }
 
 // GetAcceptedFailed implements the Engine interface.
-func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) {
-	b.Accepted(validatorID, requestID, ids.Set{})
+func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+	return b.Accepted(validatorID, requestID, ids.Set{})
 }
 
 // Accepted implements the Engine interface.
-func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
+func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
 	if !b.pendingAccepted.Contains(validatorID) {
 		b.Context.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
-		return
+		return nil
 	}
 	b.pendingAccepted.Remove(validatorID)
 
@@ -113,20 +117,22 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		b.acceptedVotes[key] = newWeight
 	}
 
-	if b.pendingAccepted.Len() == 0 {
-		accepted := ids.Set{}
-		for key, weight := range b.acceptedVotes {
-			if weight >= b.Config.Alpha {
-				accepted.Add(ids.NewID(key))
-			}
-		}
-
-		if size := accepted.Len(); size == 0 && b.Config.Beacons.Len() > 0 {
-			b.Context.Log.Warn("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet")
-		} else {
-			b.Context.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
-		}
-
-		b.Bootstrapable.ForceAccepted(accepted)
+	if b.pendingAccepted.Len() != 0 {
+		return nil
 	}
+
+	accepted := ids.Set{}
+	for key, weight := range b.acceptedVotes {
+		if weight >= b.Config.Alpha {
+			accepted.Add(ids.NewID(key))
+		}
+	}
+
+	if size := accepted.Len(); size == 0 && b.Config.Beacons.Len() > 0 {
+		b.Context.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet")
+	} else {
+		b.Context.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+	}
+
+	return b.Bootstrapable.ForceAccepted(accepted)
 }

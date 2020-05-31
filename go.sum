@@ -17,8 +17,8 @@ github.com/aristanetworks/glog v0.0.0-20191112221043-67e8567f59f3/go.mod h1:KASm
 github.com/aristanetworks/goarista v0.0.0-20200520141224-0f14e646773f h1:uM6lu1fpmCwf54zb6Ckkvphioq8MLlyFb/TlTgPpCKc=
 github.com/aristanetworks/goarista v0.0.0-20200520141224-0f14e646773f/go.mod h1:QZe5Yh80Hp1b6JxQdpfSEEe8X7hTyTEZSosSrFf/oJE=
 github.com/aristanetworks/splunk-hec-go v0.3.3/go.mod h1:1VHO9r17b0K7WmOlLb9nTk/2YanvOEnLMUgsFrxBROc=
-github.com/ava-labs/coreth v0.1.0 h1:Cx9dkhkQ7Bc7jD07OTbFJRlNTeHbSSLUwsCQlduTupg=
-github.com/ava-labs/coreth v0.1.0/go.mod h1:pGolKipwq5vGIY2IBBcBkMYrqniXMsS5SBn+BBi4+Js=
+github.com/ava-labs/coreth v0.2.0 h1:HjR4RMTnWvXhXlnEbFNGF5pbcxfemVxZeEzC4BTIrIw=
+github.com/ava-labs/coreth v0.2.0/go.mod h1:pGolKipwq5vGIY2IBBcBkMYrqniXMsS5SBn+BBi4+Js=
 github.com/ava-labs/go-ethereum v1.9.3 h1:GmnMZ/dlvVAPFmWBzEpRJX49pUAymPfoASLNRJqR0AY=
 github.com/ava-labs/go-ethereum v1.9.3/go.mod h1:a+agc6fXfZFsPZCylA3ry4Y8CLCqLKg3Rc23NXZ9aw8=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=

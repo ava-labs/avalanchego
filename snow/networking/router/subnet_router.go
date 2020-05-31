@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -19,11 +18,12 @@ import (
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	log      logging.Logger
-	lock     sync.RWMutex
-	chains   map[[32]byte]*handler.Handler
-	timeouts *timeout.Manager
-	gossiper *timer.Repeater
+	log          logging.Logger
+	lock         sync.RWMutex
+	chains       map[[32]byte]*Handler
+	timeouts     *timeout.Manager
+	gossiper     *timer.Repeater
+	closeTimeout time.Duration
 }
 
 // Initialize the router.
@@ -34,23 +34,30 @@ type ChainRouter struct {
 //
 // This router also fires a gossip event every [gossipFrequency] to the engine,
 // notifying the engine it should gossip it's accepted set.
-func (sr *ChainRouter) Initialize(log logging.Logger, timeouts *timeout.Manager, gossipFrequency time.Duration) {
+func (sr *ChainRouter) Initialize(
+	log logging.Logger,
+	timeouts *timeout.Manager,
+	gossipFrequency time.Duration,
+	closeTimeout time.Duration,
+) {
 	sr.log = log
-	sr.chains = make(map[[32]byte]*handler.Handler)
+	sr.chains = make(map[[32]byte]*Handler)
 	sr.timeouts = timeouts
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
+	sr.closeTimeout = closeTimeout
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
 }
 
 // AddChain registers the specified chain so that incoming
 // messages can be routed to it
-func (sr *ChainRouter) AddChain(chain *handler.Handler) {
+func (sr *ChainRouter) AddChain(chain *Handler) {
 	sr.lock.Lock()
 	defer sr.lock.Unlock()
 
 	chainID := chain.Context().ChainID
 	sr.log.Debug("registering chain %s with chain router", chainID)
+	chain.toClose = func() { sr.RemoveChain(chainID) }
 	sr.chains[chainID.Key()] = chain
 }
 
@@ -62,6 +69,16 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Shutdown()
+		close(chain.msgs)
+
+		ticker := time.NewTicker(sr.closeTimeout)
+		select {
+		case _, _ = <-chain.closed:
+		case <-ticker.C:
+			chain.Context().Log.Warn("timed out while shutting down")
+		}
+		ticker.Stop()
+
 		delete(sr.chains, chainID.Key())
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
@@ -256,16 +273,28 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 
 // Shutdown shuts down this router
 func (sr *ChainRouter) Shutdown() {
-	sr.lock.RLock()
-	defer sr.lock.RUnlock()
-
-	sr.shutdown()
-}
-
-func (sr *ChainRouter) shutdown() {
+	sr.lock.Lock()
 	for _, chain := range sr.chains {
 		chain.Shutdown()
+		close(chain.msgs)
 	}
+	prevChains := sr.chains
+	sr.chains = map[[32]byte]*Handler{}
+	sr.lock.Unlock()
+
+	ticker := time.NewTicker(sr.closeTimeout)
+	timedout := false
+	for _, chain := range prevChains {
+		select {
+		case _, _ = <-chain.closed:
+		case <-ticker.C:
+			timedout = true
+		}
+	}
+	if timedout {
+		sr.log.Warn("timed out while shutting down the chains")
+	}
+	ticker.Stop()
 	sr.gossiper.Stop()
 }
 
@@ -274,10 +303,6 @@ func (sr *ChainRouter) Gossip() {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	sr.gossip()
-}
-
-func (sr *ChainRouter) gossip() {
 	for _, chain := range sr.chains {
 		chain.Gossip()
 	}

@@ -32,7 +32,7 @@ type ExternalHandler interface {
 }
 
 // FrontierHandler defines how a consensus engine reacts to frontier messages
-// from other validators
+// from other validators. Functions only return fatal errors if they occur.
 type FrontierHandler interface {
 	// Notify this engine of a request for the accepted frontier of vertices.
 	//
@@ -45,19 +45,19 @@ type FrontierHandler interface {
 	//
 	// This engine should respond with an AcceptedFrontier message with the same
 	// requestID, and the engine's current accepted frontier.
-	GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32)
+	GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error
 
 	// Notify this engine of an accepted frontier.
 	//
 	// This function can be called by any validator. It is not safe to assume
-	// this message is in response to a GetAcceptedFrontier message, is utilizing a
-	// unique requestID, or that the containerIDs from a valid frontier.
-	// However, the validatorID is  assumed to be authenticated.
+	// this message is in response to a GetAcceptedFrontier message, is
+	// utilizing a unique requestID, or that the containerIDs from a valid
+	// frontier. However, the validatorID is  assumed to be authenticated.
 	AcceptedFrontier(
 		validatorID ids.ShortID,
 		requestID uint32,
 		containerIDs ids.Set,
-	)
+	) error
 
 	// Notify this engine that a get accepted frontier request it issued has
 	// failed.
@@ -69,11 +69,12 @@ type FrontierHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAcceptedFrontier message.
-	GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32)
+	GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // AcceptedHandler defines how a consensus engine reacts to messages pertaining
-// to accepted containers from other validators
+// to accepted containers from other validators. Functions only return fatal
+// errors if they occur.
 type AcceptedHandler interface {
 	// Notify this engine of a request to filter non-accepted vertices.
 	//
@@ -84,7 +85,11 @@ type AcceptedHandler interface {
 	// This engine should respond with an Accepted message with the same
 	// requestID, and the subset of the containerIDs that this node has decided
 	// are accepted.
-	GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
+	GetAccepted(
+		validatorID ids.ShortID,
+		requestID uint32,
+		containerIDs ids.Set,
+	) error
 
 	// Notify this engine of a set of accepted vertices.
 	//
@@ -93,7 +98,11 @@ type AcceptedHandler interface {
 	// unique requestID, or that the containerIDs are a subset of the
 	// containerIDs from a GetAccepted message. However, the validatorID is
 	// assumed to be authenticated.
-	Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
+	Accepted(
+		validatorID ids.ShortID,
+		requestID uint32,
+		containerIDs ids.Set,
+	) error
 
 	// Notify this engine that a get accepted request it issued has failed.
 	//
@@ -104,11 +113,11 @@ type AcceptedHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAccepted message.
-	GetAcceptedFailed(validatorID ids.ShortID, requestID uint32)
+	GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // FetchHandler defines how a consensus engine reacts to retrieval messages from
-// other validators
+// other validators. Functions only return fatal errors if they occur.
 type FetchHandler interface {
 	// Notify this engine of a request for a container.
 	//
@@ -124,7 +133,7 @@ type FetchHandler interface {
 	// This engine should respond with a Put message with the same requestID if
 	// the container was locally avaliable. Otherwise, the message can be safely
 	// dropped.
-	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
+	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
 
 	// Notify this engine of a container.
 	//
@@ -141,7 +150,7 @@ type FetchHandler interface {
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
-	)
+	) error
 
 	// Notify this engine that a get request it issued has failed.
 	//
@@ -151,11 +160,11 @@ type FetchHandler interface {
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the Get message.
-	GetFailed(validatorID ids.ShortID, requestID uint32)
+	GetFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // QueryHandler defines how a consensus engine reacts to query messages from
-// other validators
+// other validators. Functions only return fatal errors if they occur.
 type QueryHandler interface {
 	// Notify this engine of a request for our preferences.
 	//
@@ -168,7 +177,11 @@ type QueryHandler interface {
 	// is complete, this engine should send this validator the current
 	// preferences in a Chits message. The Chits message should have the same
 	// requestID that was passed in here.
-	PullQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
+	PullQuery(
+		validatorID ids.ShortID,
+		requestID uint32,
+		containerID ids.ID,
+	) error
 
 	// Notify this engine of a request for our preferences.
 	//
@@ -191,14 +204,14 @@ type QueryHandler interface {
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
-	)
+	) error
 
 	// Notify this engine of the specified validators preferences.
 	//
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a PullQuery or a PushQuery message.
 	// However, the validatorID is assumed to be authenticated.
-	Chits(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
+	Chits(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
 
 	// Notify this engine that a query it issued has failed.
 	//
@@ -209,26 +222,27 @@ type QueryHandler interface {
 	//
 	// The validatorID and the requestID are assumed to be the same as those
 	// sent in the Query message.
-	QueryFailed(validatorID ids.ShortID, requestID uint32)
+	QueryFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // InternalHandler defines how this consensus engine reacts to messages from
-// other components of this validator
+// other components of this validator. Functions only return fatal errors if
+// they occur.
 type InternalHandler interface {
 	// Startup this engine.
 	//
 	// This function will be called once the environment is configured to be
 	// able to run the engine.
-	Startup()
+	Startup() error
 
 	// Gossip to the network a container on the accepted frontier
-	Gossip()
+	Gossip() error
 
 	// Shutdown this engine.
 	//
 	// This function will be called when the environment is exiting.
-	Shutdown()
+	Shutdown() error
 
 	// Notify this engine of a message from the virtual machine.
-	Notify(Message)
+	Notify(Message) error
 }

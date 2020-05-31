@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	dbVersion = "v0.3.0"
+	dbVersion = "v0.5.0"
 )
 
 // Results of parsing the CLI
@@ -39,6 +39,12 @@ var (
 	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
 	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
 	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+
+	defaultPluginDirs = []string{
+		"./build/plugins",
+		"./plugins",
+		os.ExpandEnv(filepath.Join("$HOME", ".gecko", "plugins")),
+	}
 )
 
 var (
@@ -48,6 +54,14 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
+	case genesis.DenaliID:
+		return []string{
+			"3.20.56.211:21001",
+			"18.224.140.156:21001",
+			"3.133.83.66:21001",
+			"3.133.131.39:21001",
+			"18.188.121.35:21001",
+		}
 	case genesis.CascadeID:
 		return []string{
 			"3.227.207.132:21001",
@@ -74,7 +88,7 @@ func init() {
 	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.CascadeName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", genesis.TestnetName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
@@ -110,7 +124,7 @@ func init() {
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
 	// Plugins:
-	fs.StringVar(&Config.PluginDir, "plugin-dir", "./build/plugins", "Plugin directory for Ava VMs")
+	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Ava VMs")
 
 	// Logging:
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
@@ -246,6 +260,16 @@ func init() {
 	} else {
 		for _, peer := range Config.BootstrapPeers {
 			peer.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+		}
+	}
+
+	// Plugins
+	if _, err := os.Stat(Config.PluginDir); os.IsNotExist(err) {
+		for _, dir := range defaultPluginDirs {
+			if _, err := os.Stat(dir); !os.IsNotExist(err) {
+				Config.PluginDir = dir
+				break
+			}
 		}
 	}
 

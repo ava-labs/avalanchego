@@ -37,6 +37,7 @@ var (
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
 	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
 	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
+	errNoFunds               = errors.New("no spendable funds were found")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -148,11 +149,22 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		vdr := tx.Vdr()
 		weight := json.Uint64(vdr.Weight())
 		if args.SubnetID.Equals(DefaultSubnetID) {
+			var address ids.ShortID
+			switch tx := tx.(type) {
+			case *addDefaultSubnetValidatorTx:
+				address = tx.Destination
+			case *addDefaultSubnetDelegatorTx:
+				address = tx.Destination
+			default: // Shouldn't happen
+				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
+			}
+
 			reply.Validators[i] = APIValidator{
 				ID:          vdr.ID(),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
+				Address:     &address,
 			}
 		} else {
 			reply.Validators[i] = APIValidator{
@@ -197,11 +209,21 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		vdr := tx.Vdr()
 		weight := json.Uint64(vdr.Weight())
 		if args.SubnetID.Equals(DefaultSubnetID) {
+			var address ids.ShortID
+			switch tx := tx.(type) {
+			case *addDefaultSubnetValidatorTx:
+				address = tx.Destination
+			case *addDefaultSubnetDelegatorTx:
+				address = tx.Destination
+			default: // Shouldn't happen
+				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
+			}
 			reply.Validators[i] = APIValidator{
 				ID:          vdr.ID(),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
+				Address:     &address,
 			}
 		} else {
 			reply.Validators[i] = APIValidator{
@@ -964,6 +986,10 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 
 		ins = append(ins, in)
 		keys = append(keys, signers)
+	}
+
+	if amount == 0 {
+		return errNoFunds
 	}
 
 	ava.SortTransferableInputsWithSigners(ins, keys)

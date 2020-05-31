@@ -79,7 +79,9 @@ func (j *Jobs) HasNext() (bool, error) {
 
 // Execute ...
 func (j *Jobs) Execute(job Job) error {
-	job.Execute()
+	if err := job.Execute(); err != nil {
+		return err
+	}
 
 	jobID := job.ID()
 
@@ -128,6 +130,12 @@ func (j *Jobs) push(job Job) error {
 }
 
 func (j *Jobs) block(job Job, deps ids.Set) error {
+	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
+		return err
+	} else if has {
+		return errDuplicate
+	}
+
 	if err := j.state.SetJob(j.db, job); err != nil {
 		return err
 	}
