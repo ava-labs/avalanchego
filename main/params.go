@@ -56,7 +56,7 @@ func GetIPs(networkID uint32) []string {
 	switch networkID {
 	case genesis.DenaliID:
 		return []string{
-			"3.133.117.223:21001",
+			"3.20.56.211:21001",
 			"18.224.140.156:21001",
 			"3.133.83.66:21001",
 			"3.133.131.39:21001",
