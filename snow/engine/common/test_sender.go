@@ -15,7 +15,7 @@ type SenderTest struct {
 
 	CantGetAcceptedFrontier, CantAcceptedFrontier,
 	CantGetAccepted, CantAccepted,
-	CantGet, CantPut,
+	CantGet, CantGetAncestors, CantPut, CantPutAncestor,
 	CantPullQuery, CantPushQuery, CantChits,
 	CantGossip bool
 
@@ -24,7 +24,9 @@ type SenderTest struct {
 	GetAcceptedF         func(ids.ShortSet, uint32, ids.Set)
 	AcceptedF            func(ids.ShortID, uint32, ids.Set)
 	GetF                 func(ids.ShortID, uint32, ids.ID)
+	GetAncestorsF        func(ids.ShortID, uint32, ids.ID)
 	PutF                 func(ids.ShortID, uint32, ids.ID, []byte)
+	PutAncestorF         func(ids.ShortID, uint32, ids.ID, []byte)
 	PushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
 	PullQueryF           func(ids.ShortSet, uint32, ids.ID)
 	ChitsF               func(ids.ShortID, uint32, ids.Set)
@@ -38,7 +40,9 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantGetAccepted = cant
 	s.CantAccepted = cant
 	s.CantGet = cant
+	s.CantGetAccepted = cant
 	s.CantPut = cant
+	s.CantPutAncestor = cant
 	s.CantPullQuery = cant
 	s.CantPushQuery = cant
 	s.CantChits = cant
@@ -100,6 +104,17 @@ func (s *SenderTest) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 	}
 }
 
+// GetAncestors calls GetAncestorsF if it was initialized. If it
+// wasn't initialized and this function shouldn't be called and testing was
+// initialized, then testing will fail.
+func (s *SenderTest) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) {
+	if s.GetAncestorsF != nil {
+		s.GetAncestorsF(validatorID, requestID, vtxID)
+	} else if s.CantGetAncestors && s.T != nil {
+		s.T.Fatalf("Unexpectedly called CantGetAncestors")
+	}
+}
+
 // Put calls PutF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
@@ -108,6 +123,17 @@ func (s *SenderTest) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []
 		s.PutF(vdr, requestID, vtxID, vtx)
 	} else if s.CantPut && s.T != nil {
 		s.T.Fatalf("Unexpectedly called Put")
+	}
+}
+
+// PutAncestor calls PutAncestorF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *SenderTest) PutAncestor(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []byte) {
+	if s.PutAncestorF != nil {
+		s.PutAncestorF(vdr, requestID, vtxID, vtx)
+	} else if s.CantPutAncestor && s.T != nil {
+		s.T.Fatalf("Unexpectedly called PutAncestor")
 	}
 }
 

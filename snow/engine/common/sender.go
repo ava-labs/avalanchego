@@ -50,9 +50,17 @@ type FetchSender interface {
 	// to this validator
 	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
 
+	// GetAncestors requests that the validator with ID [validatorID] send container [containerID] and its
+	// ancestors. The maximum number of ancestors to send in response is defined in snow/engine/common/bootstrapper.go
+	GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
+
 	// Tell the specified validator that the container whose ID is <containerID>
 	// has body <container>
 	Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte)
+
+	// Tell the specified validator that the container whose ID is <containerID>
+	// has body <container>
+	PutAncestor(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte)
 }
 
 // QuerySender defines how a consensus engine sends query messages to other

@@ -359,6 +359,26 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 }
 
+// GetAncestors implements the Sender interface.
+func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
+	msg, err := n.b.GetAncestors(chainID, requestID, containerID)
+	if err != nil {
+		n.log.Error("failed to build GetAncestors message: %w", err)
+		return
+	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		sent = peer.send(msg)
+	}
+	if !sent {
+		n.log.Debug("failed to send a GetAncestors message to: %s", validatorID)
+	}
+}
+
 // Put implements the Sender interface.
 func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	msg, err := n.b.Put(chainID, requestID, containerID, container)
@@ -379,6 +399,29 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 		n.put.numFailed.Inc()
 	} else {
 		n.put.numSent.Inc()
+	}
+}
+
+// PutAncestor implements the Sender interface.
+func (n *network) PutAncestor(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+	msg, err := n.b.PutAncestor(chainID, requestID, containerID, container)
+	if err != nil {
+		n.log.Error("failed to build PutAncestor message because of container of size %d", len(container))
+		return
+	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		sent = peer.send(msg)
+	}
+	if !sent {
+		n.log.Debug("failed to send a PutAncestor message to: %s", validatorID)
+		n.putAncestor.numFailed.Inc()
+	} else {
+		n.putAncestor.numSent.Inc()
 	}
 }
 

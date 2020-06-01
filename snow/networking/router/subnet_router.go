@@ -186,6 +186,20 @@ func (sr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 }
 
+// GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
+// to the consensus engine working on the chain with ID [chainID]
+// The maximum number of ancestors to respond with is define in snow/engine/commong/bootstrapper.go
+func (sr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.GetAncestors(validatorID, requestID, containerID)
+	} else {
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+	}
+}
+
 // Put routes an incoming Put request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
@@ -197,6 +211,19 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Put(validatorID, requestID, containerID, container)
+	} else {
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+	}
+}
+
+// PutAncestor routes an incoming PutAncestor message from the validator with ID [validatorID]
+// to the consensus engine working on the chain with ID [chainID]
+func (sr *ChainRouter) PutAncestor(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.PutAncestor(validatorID, requestID, containerID, container)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}

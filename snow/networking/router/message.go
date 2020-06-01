@@ -31,6 +31,8 @@ const (
 	notifyMsg
 	gossipMsg
 	shutdownMsg
+	getAncestorsMsg
+	putAncestorMsg
 )
 
 type message struct {
@@ -74,8 +76,12 @@ func (t msgType) String() string {
 		return "Get Accepted Failed Message"
 	case getMsg:
 		return "Get Message"
+	case getAncestorsMsg:
+		return "Get Ancestors Message"
 	case putMsg:
 		return "Put Message"
+	case putAncestorMsg:
+		return "Put Ancestor Message"
 	case getFailedMsg:
 		return "Get Failed Message"
 	case pushQueryMsg:

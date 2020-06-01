@@ -98,10 +98,14 @@ func (h *Handler) dispatchMsg(msg message) bool {
 		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
 	case getMsg:
 		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
+	case getAncestorsMsg:
+		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
 	case getFailedMsg:
 		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
 	case putMsg:
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+	case putAncestorMsg:
+		err = h.engine.PutAncestor(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case pushQueryMsg:
 		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case pullQueryMsg:
@@ -198,10 +202,31 @@ func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids
 	}
 }
 
+// GetAncestors passes a GetAncestors message received from the network to the consensus engine.
+func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+	h.msgs <- message{
+		messageType: getAncestorsMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+		containerID: containerID,
+	}
+}
+
 // Put passes a Put message received from the network to the consensus engine.
 func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
 	h.msgs <- message{
 		messageType: putMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+		containerID: containerID,
+		container:   container,
+	}
+}
+
+// PutAncestor passes a PutAncestor message received from the network to the consensus engine.
+func (h *Handler) PutAncestor(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
+	h.msgs <- message{
+		messageType: putAncestorMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,

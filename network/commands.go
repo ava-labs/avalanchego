@@ -135,8 +135,12 @@ func (op Op) String() string {
 		return "accepted"
 	case Get:
 		return "get"
+	case GetAncestors:
+		return "get_ancestors"
 	case Put:
 		return "put"
+	case PutAncestor:
+		return "put_ancestor"
 	case PushQuery:
 		return "push_query"
 	case PullQuery:
@@ -166,6 +170,9 @@ const (
 	PushQuery
 	PullQuery
 	Chits
+	// Bootstrapping
+	GetAncestors
+	PutAncestor
 )
 
 // Defines the messages that can be sent/received with this network
@@ -181,6 +188,8 @@ var (
 		AcceptedFrontier:    []Field{ChainID, RequestID, ContainerIDs},
 		GetAccepted:         []Field{ChainID, RequestID, ContainerIDs},
 		Accepted:            []Field{ChainID, RequestID, ContainerIDs},
+		GetAncestors:        []Field{ChainID, RequestID, ContainerID},
+		PutAncestor:         []Field{ChainID, RequestID, ContainerID, ContainerBytes},
 		// Consensus:
 		Get:       []Field{ChainID, RequestID, ContainerID},
 		Put:       []Field{ChainID, RequestID, ContainerID, ContainerBytes},

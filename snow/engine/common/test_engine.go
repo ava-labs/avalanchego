@@ -32,8 +32,10 @@ type EngineTest struct {
 	CantAccepted,
 
 	CantGet,
+	CantGetAncestors,
 	CantGetFailed,
 	CantPut,
+	CantPutAncestor,
 
 	CantPushQuery,
 	CantPullQuery,
@@ -43,8 +45,8 @@ type EngineTest struct {
 	ContextF                                                                                       func() *snow.Context
 	StartupF, GossipF, ShutdownF                                                                   func() error
 	NotifyF                                                                                        func(Message) error
-	GetF, PullQueryF                                                                               func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
-	PutF, PushQueryF                                                                               func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
+	GetF, GetAncestorsF, PullQueryF                                                                func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
+	PutF, PutAncestorF, PushQueryF                                                                 func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF                                             func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
 	GetAcceptedFrontierF, GetFailedF, QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 }
@@ -70,8 +72,10 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantAccepted = cant
 
 	e.CantGet = cant
+	e.CantGetAncestors = cant
 	e.CantGetFailed = cant
 	e.CantPut = cant
+	e.CantPutAncestor = cant
 
 	e.CantPushQuery = cant
 	e.CantPullQuery = cant
@@ -233,6 +237,16 @@ func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID 
 	return nil
 }
 
+// GetAncestors ...
+func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+	if e.GetAncestorsF != nil {
+		e.GetAncestorsF(validatorID, requestID, containerID)
+	} else if e.CantGetAncestors && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetAncestors")
+	}
+	return nil
+}
+
 // GetFailed ...
 func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error {
 	if e.GetFailedF != nil {
@@ -255,6 +269,16 @@ func (e *EngineTest) Put(validatorID ids.ShortID, requestID uint32, containerID 
 			e.T.Fatalf("Unexpectedly called Put")
 		}
 		return errors.New("Unexpectedly called Put")
+	}
+	return nil
+}
+
+// PutAncestor ...
+func (e *EngineTest) PutAncestor(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
+	if e.PutAncestorF != nil {
+		e.PutAncestorF(validatorID, requestID, containerID, container)
+	} else if e.CantPutAncestor && e.T != nil {
+		e.T.Fatalf("Unexpectedly called PutAncestor")
 	}
 	return nil
 }

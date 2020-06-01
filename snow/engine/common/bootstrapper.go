@@ -10,10 +10,17 @@ import (
 	"github.com/ava-labs/gecko/utils/math"
 )
 
+const (
+	// AncestorsToFetch is the maximum number of ancestors that should be returned in response to a GetAncestors call
+	AncestorsToFetch = 200
+)
+
 // Bootstrapper implements the Engine interface.
 type Bootstrapper struct {
 	Config
 
+	// IDs of validators we have requested the accepted frontier from but haven't
+	// received a reply from
 	pendingAcceptedFrontier ids.ShortSet
 	acceptedFrontier        ids.Set
 
@@ -43,6 +50,7 @@ func (b *Bootstrapper) Startup() error {
 		return b.Bootstrapable.ForceAccepted(ids.Set{})
 	}
 
+	// Ask each of the bootstrap validators to send their accepted frontier
 	vdrs := ids.ShortSet{}
 	vdrs.Union(b.pendingAcceptedFrontier)
 
@@ -59,6 +67,7 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 
 // GetAcceptedFrontierFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
 	b.AcceptedFrontier(validatorID, requestID, ids.Set{})
 	return nil
 }
@@ -69,10 +78,16 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 		b.Context.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
 		return nil
 	}
+	// Mark that we received a response from [validatorID]
 	b.pendingAcceptedFrontier.Remove(validatorID)
 
+	// Union the reported accepted frontier from [validatorID] with the accepted frontier we got from others
 	b.acceptedFrontier.Union(containerIDs)
 
+	// We've received the accepted frontier from every bootstrap validator
+	// Ask each bootstrap validator to filter the list of containers that we were
+	// told are on the accepted frontier such that the list only contains containers
+	// they think are accepted
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		vdrs := ids.ShortSet{}
 		vdrs.Union(b.pendingAccepted)
@@ -91,6 +106,8 @@ func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, co
 
 // GetAcceptedFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+	// If we can't get a response from [validatorID], act as though they said
+	// that they think none of the containers we sent them in GetAccepted are accepted
 	return b.Accepted(validatorID, requestID, ids.Set{})
 }
 
@@ -100,6 +117,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		b.Context.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
 		return nil
 	}
+	// Mark that we received a response from [validatorID]
 	b.pendingAccepted.Remove(validatorID)
 
 	weight := uint64(0)
@@ -121,6 +139,8 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		return nil
 	}
 
+	// We've received the filtered accepted frontier from every bootstrap validator
+	// Accept all containers that have a sufficient weight behind them
 	accepted := ids.Set{}
 	for key, weight := range b.acceptedVotes {
 		if weight >= b.Config.Alpha {
