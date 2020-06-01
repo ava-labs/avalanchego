@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/gecko/ids"
@@ -114,6 +115,11 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 	}
 
 	return b.addBlock(blk)
+}
+
+// PutAncestor ...
+func (b *bootstrapper) PutAncestor(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
+	return errors.New("TODO")
 }
 
 // GetFailed ...

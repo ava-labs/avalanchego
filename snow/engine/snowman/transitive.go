@@ -141,6 +141,34 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 	return nil
 }
 
+// GetAncestors implements the Engine interface
+func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+	blk, err := t.Config.VM.GetBlock(blkID)
+	if err != nil { // Don't have the block. Drop this request.
+		t.Config.Context.Log.Verbo("couldn't get block %s. dropping GetAncestors from %s. Request ID: %s", blkID, vdr, requestID)
+		return nil
+	}
+
+	// ancestors[0] is [blk]. ancestors[1] is its parent, ancestors[2] is its grandparent, etc.
+	ancestors := []snowman.Block{blk}
+	for i := 1; i <= int(common.AncestorsToFetch); i++ {
+		ancestor := ancestors[i-1].Parent()
+		if ancestor.Status() == choices.Unknown {
+			// Probably failed to fetch because the block we tried to fetch is the genesis block's parent (non-existent)
+			t.Config.Context.Log.Verbo("couldn't get block %s. dropping GetAncestors from %s. Request ID: %s", ancestor, vdr, requestID)
+			break
+		}
+		ancestors = append(ancestors, ancestor)
+	}
+
+	// Send ancestors from oldest --> most recent
+	for i := len(ancestors) - 1; i > 0; i-- {
+		t.Config.Sender.PutAncestor(vdr, requestID, ancestors[i].ID(), ancestors[i].Bytes())
+	}
+	t.Config.Sender.Put(vdr, requestID, ancestors[0].ID(), ancestors[0].Bytes())
+	return nil
+}
+
 // Put implements the Engine interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	t.Config.Context.Log.Verbo("Put called for blockID %s", blkID)

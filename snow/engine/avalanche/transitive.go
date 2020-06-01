@@ -6,6 +6,7 @@ package avalanche
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -107,6 +108,45 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 	if vtx, err := t.Config.State.GetVertex(vtxID); err == nil {
 		t.Config.Sender.Put(vdr, requestID, vtxID, vtx.Bytes())
 	}
+	return nil
+}
+
+// GetAncestors implements the Engine interface
+func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
+	t.Config.Context.Log.Info("In GetAncestors. Validator: %s, request ID: %d, vtxID: %s", vdr, requestID, vtxID)
+	vertex, err := t.Config.State.GetVertex(vtxID)
+	if err != nil || vertex.Status() == choices.Unknown {
+		t.Config.Context.Log.Info("dropping getAncestors")
+		return nil // Don't have the requested vertex. Drop message.
+	}
+
+	// vertex and its ancestors. First element is vertex.
+	// Further back elements are further back ancestors
+	ancestors := []avalanche.Vertex{}
+	queue := []avalanche.Vertex{vertex} // for BFS
+	beenInQueue := ids.Set{}            // IDs of vertices that have been in queue before
+	beenInQueue.Add(vertex.ID())
+	for len(ancestors) < common.AncestorsToFetch && len(queue) > 0 {
+		var vtx avalanche.Vertex
+		vtx, queue = queue[0], queue[1:] // pop
+		ancestors = append(ancestors, vtx)
+		for _, parent := range vtx.Parents() {
+			if parent.Status() == choices.Unknown { // Don't have this vertex...ignore
+				continue
+			}
+			parentID := parent.ID()
+			if !beenInQueue.Contains(parentID) { // Don't add same vertex twice
+				queue = append(queue, parent)
+				beenInQueue.Add(parentID)
+			}
+		}
+	}
+
+	// Send ancestors from oldest --> most recent (approximately)
+	for i := len(ancestors) - 1; i > 0; i-- {
+		t.Config.Sender.PutAncestor(vdr, requestID, ancestors[i].ID(), ancestors[i].Bytes())
+	}
+	t.Config.Sender.Put(vdr, requestID, vertex.ID(), vertex.Bytes())
 	return nil
 }
 
