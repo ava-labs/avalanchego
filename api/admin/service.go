@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -75,6 +76,20 @@ func (service *Admin) GetNetworkID(r *http.Request, args *GetNetworkIDArgs, repl
 	service.log.Debug("Admin: GetNetworkID called")
 
 	reply.NetworkID = cjson.Uint32(service.networkID)
+	return nil
+}
+
+type GetNetworkNameArgs struct{}
+
+type GetNetworkNameReply struct {
+	NetworkName string `json:"networkName"`
+}
+
+// GetNetworkID returns the network ID this node is running on
+func (service *Admin) GetNetworkName(r *http.Request, args *GetNetworkNameArgs, reply *GetNetworkNameReply) error {
+	service.log.Debug("Admin: GetNetworkName called")
+
+	reply.NetworkName = genesis.NetworkName(service.networkID)
 	return nil
 }
 
