@@ -216,11 +216,9 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 	b.BootstrapConfig.Context.Log.Verbo("in Put(%s, %d, %s)", vdr, requestID, vtxID) // TODO remove
 	vtx, err := b.State.ParseVertex(vtxBytes)                                        // Persists the vtx. vtx.Status() not Unknown.
 	if err != nil {
-		b.BootstrapConfig.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
-			err,
-			formatting.DumpBytes{Bytes: vtxBytes})
-
-		return b.GetFailed(vdr, requestID) // TODO is this right?
+		b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
+		b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
+		return b.GetFailed(vdr, requestID)
 	}
 	parsedVtxID := vtx.ID() // Actual ID of the vertex we just got
 
@@ -234,7 +232,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 	expectedVtxID, ok := b.outstandingRequests.Remove(vdr, requestID)
 	b.outstandingRequestsLock.Unlock()
 
-	if !ok {
+	if !ok { // there was no outstanding request from this validator for a request with this ID
 		if requestID != math.MaxUint32 { // request ID of math.MaxUint32 means the put was a gossip message. In that case, just return.
 			b.BootstrapConfig.Context.Log.Debug("Unexpected Put. There is no outstanding request to %s with request ID %d", vdr, requestID)
 		}
@@ -255,7 +253,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 	case choices.Accepted, choices.Rejected:
 		return nil
 	case choices.Unknown:
-		return fmt.Errorf("status of vtx %s is after it was parsed", vtxID)
+		return fmt.Errorf("status of vtx %s is Unknown after it was parsed", vtxID)
 	}
 
 	b.wg.Add(1) // Incremented before an element is put into toProcess
@@ -270,9 +268,8 @@ func (b *bootstrapper) PutAncestor(vdr ids.ShortID, requestID uint32, vtxID ids.
 	b.BootstrapConfig.Context.Log.Debug("in PutAncestor(%s, %d, %s)", vdr, requestID, vtxID) // TODO remove
 	_, err := b.State.ParseVertex(vtxBytes)                                                  // Persists the vtx
 	if err != nil {
-		b.BootstrapConfig.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
-			err,
-			formatting.DumpBytes{Bytes: vtxBytes})
+		b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
+		b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
 	}
 	return nil
 }
