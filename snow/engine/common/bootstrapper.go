@@ -12,7 +12,7 @@ import (
 
 const (
 	// AncestorsToFetch is the maximum number of ancestors that should be returned in response to a GetAncestors call
-	AncestorsToFetch = 200
+	AncestorsToFetch = 1000
 )
 
 // Bootstrapper implements the Engine interface.
