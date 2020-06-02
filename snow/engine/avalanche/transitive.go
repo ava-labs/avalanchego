@@ -122,8 +122,8 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	startTime := time.Now()                                                                                       // TODO remove
-	t.Config.Context.Log.Info("In GetAncestors. Validator: %s, request ID: %d, vtxID: %s", vdr, requestID, vtxID) // TODO remove
+	startTime := time.Now()                                                                                        // TODO remove
+	t.Config.Context.Log.Verbo("In GetAncestors. Validator: %s, request ID: %d, vtxID: %s", vdr, requestID, vtxID) // TODO remove
 	vertex, err := t.Config.State.GetVertex(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		t.Config.Context.Log.Info("dropping getAncestors")
@@ -136,7 +136,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 	queue := []avalanche.Vertex{vertex} // for BFS
 	beenInQueue := ids.Set{}            // IDs of vertices that have been in queue before
 	beenInQueue.Add(vertex.ID())
-	for len(ancestors) < common.MaxContainersPerMultiPut && len(queue) > 0 {
+	for len(ancestors) < common.MaxContainersPerMultiPut && len(queue) > 0 && time.Since(startTime) < common.MaxTimeFetchingAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		ancestors = append(ancestors, vtx)

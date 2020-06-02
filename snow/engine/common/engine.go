@@ -144,11 +144,8 @@ type FetchHandler interface {
 	// assume the requested containerID exists. However, the validatorID is
 	// assumed to be authenticated.
 	//
-	// This engine should respond with putAncestor messages with the same requestID, where each message
-	// contains an ancestor of [containerID]. These messages should be sent in topological order.
-	// That is, the first PutAncestor sent should have furthest back ancestors, and later PutAncestor
-	// messages should have ancestors closer to [containerID].
-	// After sending all the ancestors, the engine should issue a Put (not PutAncestor) with [containerID].
+	// This engine should respond with a MultiPut message with the same requestID, which contains [containerID]
+	// as well as its ancestors.
 	//
 	// If this engine doesn't have some ancestors, it should reply with its best effort attempt at getting them.
 	// If this engine doesn't have [containerID] it can ignore this message.
@@ -165,22 +162,6 @@ type FetchHandler interface {
 	// container before adding the container to consensus. Once all ancestor
 	// containers are added, pushes the container into the consensus.
 	Put(
-		validatorID ids.ShortID,
-		requestID uint32,
-		containerID ids.ID,
-		container []byte,
-	) error
-
-	// Notify this engine of container [containerID], whose byte representation is [container].
-	//
-	// This should only be called during bootstrapping, and only in response to a GetAncestors
-	// call to validator [validatorID] with request ID [requestID]. This call should contain
-	// an ancestor of the container specified in that call.
-	//
-	// It is not safe to assume this message is in response to a GetAncestor messge, that this
-	// message has a unique requestID or even that the containerID matches the ID of the
-	// container bytes. However, the validatorID is assumed to be authenticated.
-	PutAncestor(
 		validatorID ids.ShortID,
 		requestID uint32,
 		containerID ids.ID,

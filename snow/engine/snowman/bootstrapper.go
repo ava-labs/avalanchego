@@ -4,12 +4,10 @@
 package snowman
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -18,11 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const (
-	// TODO define this constant in one place rather than here and in snowman
-	// Max containers size in a MultiPut message
-	maxContainersLen = int(4 / 5 * network.DefaultMaxMessageSize)
-)
+const ()
 
 // BootstrapConfig ...
 type BootstrapConfig struct {
@@ -140,7 +134,6 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 	}
 
 	expectedBlkID, ok := b.outstandingRequests.Remove(vdr, requestID)
-
 	if !ok { // there was no outstanding request from this validator for a request with this ID
 		if requestID != math.MaxUint32 { // request ID of math.MaxUint32 means the put was a gossip message. In that case, just return.
 			b.BootstrapConfig.Context.Log.Debug("Unexpected Put. There is no outstanding request to %s with request ID %d", vdr, requestID)
@@ -157,14 +150,9 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 	return b.process(vtx)
 }
 
-// PutAncestor ...
-func (b *bootstrapper) PutAncestor(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	return errors.New("TODO")
-}
-
 // MultiPut ...
 func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
-	b.BootstrapConfig.Context.Log.Debug("in MultiPut(%s, %d). len(blks): %d", vdr, requestID, len(blks)) // TODO remove
+	b.BootstrapConfig.Context.Log.Verbo("in MultiPut(%s, %d). len(blks): %d", vdr, requestID, len(blks)) // TODO remove
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.outstandingRequests.Remove(vdr, requestID)
 	if !ok {
@@ -173,7 +161,11 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 	}
 
 	var wantedBlk snowman.Block = nil // the block that this MultiPut is in response to
-	for _, blkBytes := range blks {
+	for i, blkBytes := range blks {
+		if i > common.MaxContainersPerMultiPut {
+			b.BootstrapConfig.Context.Log.Debug("MultiPut from %s contains more than maximum number of vertices. Request ID: %d", vdr, requestID)
+			break
+		}
 		blk, err := b.VM.ParseBlock(blkBytes) // Persists the blk
 		if err != nil {
 			b.BootstrapConfig.Context.Log.Debug("Failed to parse block: %w", err)
@@ -206,14 +198,14 @@ func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 // process a block
 func (b *bootstrapper) process(blk snowman.Block) error {
-	b.numProcessed++              // Progress tracker
-	if b.numProcessed%2500 == 0 { // Periodicall print progress
-		b.BootstrapConfig.Context.Log.Debug("processed %d blocks", b.numProcessed)
-	}
 
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
+		b.numProcessed++                                      // Progress tracker
+		if b.numProcessed%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			b.BootstrapConfig.Context.Log.Debug("processed %d blocks", b.numProcessed)
+		}
 		if err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numBootstrapped,
 			numDropped:  b.numDropped,

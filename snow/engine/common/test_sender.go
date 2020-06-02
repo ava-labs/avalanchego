@@ -15,7 +15,7 @@ type SenderTest struct {
 
 	CantGetAcceptedFrontier, CantAcceptedFrontier,
 	CantGetAccepted, CantAccepted,
-	CantGet, CantGetAncestors, CantPut, CantPutAncestor, CantMultiPut,
+	CantGet, CantGetAncestors, CantPut, CantMultiPut,
 	CantPullQuery, CantPushQuery, CantChits,
 	CantGossip bool
 
@@ -26,7 +26,6 @@ type SenderTest struct {
 	GetF                 func(ids.ShortID, uint32, ids.ID)
 	GetAncestorsF        func(ids.ShortID, uint32, ids.ID)
 	PutF                 func(ids.ShortID, uint32, ids.ID, []byte)
-	PutAncestorF         func(ids.ShortID, uint32, ids.ID, []byte)
 	MultiPutF            func(ids.ShortID, uint32, [][]byte)
 	PushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
 	PullQueryF           func(ids.ShortSet, uint32, ids.ID)
@@ -43,7 +42,6 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantGet = cant
 	s.CantGetAccepted = cant
 	s.CantPut = cant
-	s.CantPutAncestor = cant
 	s.CantMultiPut = cant
 	s.CantPullQuery = cant
 	s.CantPushQuery = cant
@@ -125,17 +123,6 @@ func (s *SenderTest) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []
 		s.PutF(vdr, requestID, vtxID, vtx)
 	} else if s.CantPut && s.T != nil {
 		s.T.Fatalf("Unexpectedly called Put")
-	}
-}
-
-// PutAncestor calls PutAncestorF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
-func (s *SenderTest) PutAncestor(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []byte) {
-	if s.PutAncestorF != nil {
-		s.PutAncestorF(vdr, requestID, vtxID, vtx)
-	} else if s.CantPutAncestor && s.T != nil {
-		s.T.Fatalf("Unexpectedly called PutAncestor")
 	}
 }
 

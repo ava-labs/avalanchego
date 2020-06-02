@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
@@ -14,6 +15,12 @@ import (
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/wrappers"
+)
+
+const (
+	// TODO define this constant in one place rather than here and in snowman
+	// Max containers size in a MultiPut message
+	maxContainersLen = int(4 / 5 * network.DefaultMaxMessageSize)
 )
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -155,6 +162,9 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	// ancestors[0] is [blk]. ancestors[1] is its parent, ancestors[2] is its grandparent, etc.
 	ancestors := []snowman.Block{blk}
 	for i := 1; i <= int(common.MaxContainersPerMultiPut); i++ {
+		if time.Since(startTime) > common.MaxTimeFetchingAncestors {
+			break
+		}
 		ancestor := ancestors[i-1].Parent()
 		if ancestor.Status() == choices.Unknown {
 			// Probably failed to fetch because the block we tried to fetch is the genesis block's parent (non-existent)
@@ -163,6 +173,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 		}
 		ancestors = append(ancestors, ancestor)
 	}
+
 	containersBytesLen := 0
 	containersBytes := [][]byte{}
 	for i := 0; i < len(ancestors); i++ {

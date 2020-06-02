@@ -216,19 +216,6 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 }
 
-// PutAncestor routes an incoming PutAncestor message from the validator with ID [validatorID]
-// to the consensus engine working on the chain with ID [chainID]
-func (sr *ChainRouter) PutAncestor(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	sr.lock.RLock()
-	defer sr.lock.RUnlock()
-
-	if chain, exists := sr.chains[chainID.Key()]; exists {
-		chain.PutAncestor(validatorID, requestID, containerID, container)
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
-}
-
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {

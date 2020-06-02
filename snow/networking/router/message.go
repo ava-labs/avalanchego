@@ -32,7 +32,6 @@ const (
 	gossipMsg
 	shutdownMsg
 	getAncestorsMsg
-	putAncestorMsg
 	multiPutMsg
 )
 
@@ -82,8 +81,6 @@ func (t msgType) String() string {
 		return "Get Ancestors Message"
 	case putMsg:
 		return "Put Message"
-	case putAncestorMsg:
-		return "Put Ancestor Message"
 	case multiPutMsg:
 		return "MultiPut Message"
 	case getFailedMsg:

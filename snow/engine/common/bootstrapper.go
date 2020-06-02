@@ -5,6 +5,7 @@ package common
 
 import (
 	stdmath "math"
+	"time"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/math"
@@ -13,6 +14,14 @@ import (
 const (
 	// MaxContainersPerMultiPut is the maximum number of containers that can be sent in a MultiPut
 	MaxContainersPerMultiPut = 2000
+
+	// StatusUpdateFrequency ... bootstrapper logs "processed X blocks/vertices" every [statusUpdateFrequency] blocks/vertices
+	StatusUpdateFrequency = 2500
+)
+
+var (
+	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching vertices during a call to GetAncestors
+	MaxTimeFetchingAncestors = 100 * time.Millisecond
 )
 
 // Bootstrapper implements the Engine interface.

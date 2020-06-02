@@ -146,8 +146,6 @@ func (op Op) String() string {
 		return "get_ancestors"
 	case Put:
 		return "put"
-	case PutAncestor:
-		return "put_ancestor"
 	case MultiPut:
 		return "multi_put"
 	case PushQuery:
@@ -181,7 +179,6 @@ const (
 	Chits
 	// Bootstrapping
 	GetAncestors
-	PutAncestor
 	MultiPut
 )
 
@@ -199,7 +196,6 @@ var (
 		GetAccepted:         []Field{ChainID, RequestID, ContainerIDs},
 		Accepted:            []Field{ChainID, RequestID, ContainerIDs},
 		GetAncestors:        []Field{ChainID, RequestID, ContainerID},
-		PutAncestor:         []Field{ChainID, RequestID, ContainerID, ContainerBytes},
 		MultiPut:            []Field{ChainID, RequestID, MultiContainerBytes},
 		// Consensus:
 		Get:       []Field{ChainID, RequestID, ContainerID},
