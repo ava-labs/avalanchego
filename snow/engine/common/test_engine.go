@@ -36,6 +36,7 @@ type EngineTest struct {
 	CantGetFailed,
 	CantPut,
 	CantPutAncestor,
+	CantMultiPut,
 
 	CantPushQuery,
 	CantPullQuery,
@@ -47,6 +48,7 @@ type EngineTest struct {
 	NotifyF                                                                                        func(Message) error
 	GetF, GetAncestorsF, PullQueryF                                                                func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
 	PutF, PutAncestorF, PushQueryF                                                                 func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
+	MultiPutF                                                                                      func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF                                             func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
 	GetAcceptedFrontierF, GetFailedF, QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 }
@@ -76,6 +78,7 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantGetFailed = cant
 	e.CantPut = cant
 	e.CantPutAncestor = cant
+	e.CantMultiPut = cant
 
 	e.CantPushQuery = cant
 	e.CantPullQuery = cant
@@ -269,6 +272,19 @@ func (e *EngineTest) Put(validatorID ids.ShortID, requestID uint32, containerID 
 			e.T.Fatalf("Unexpectedly called Put")
 		}
 		return errors.New("Unexpectedly called Put")
+	}
+	return nil
+}
+
+// MultiPut ...
+func (e *EngineTest) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+	if e.MultiPutF != nil {
+		return e.MultiPutF(validatorID, requestID, containers)
+	} else if e.CantMultiPut {
+		if e.T != nil {
+			e.T.Fatalf("Unexpectedly called MultiPut")
+		}
+		return errors.New("Unexpectedly called MultiPut")
 	}
 	return nil
 }

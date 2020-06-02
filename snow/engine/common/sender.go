@@ -61,6 +61,10 @@ type FetchSender interface {
 	// Tell the specified validator that the container whose ID is <containerID>
 	// has body <container>
 	PutAncestor(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte)
+
+	// Give the specified validator several containers at once
+	// Should be in response to a GetAncestors message with request ID [requestID] from the validator
+	MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte)
 }
 
 // QuerySender defines how a consensus engine sends query messages to other

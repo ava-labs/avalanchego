@@ -30,7 +30,7 @@ import (
 const (
 	defaultInitialReconnectDelay               = time.Second
 	defaultMaxReconnectDelay                   = time.Hour
-	defaultMaxMessageSize               uint32 = 1 << 21
+	DefaultMaxMessageSize               uint32 = 1 << 21
 	defaultSendQueueSize                       = 1 << 10
 	defaultMaxClockDifference                  = time.Minute
 	defaultPeerListGossipSpacing               = time.Minute
@@ -162,7 +162,7 @@ func NewDefaultNetwork(
 		router,
 		defaultInitialReconnectDelay,
 		defaultMaxReconnectDelay,
-		defaultMaxMessageSize,
+		DefaultMaxMessageSize,
 		defaultSendQueueSize,
 		defaultMaxClockDifference,
 		defaultPeerListGossipSpacing,
@@ -422,6 +422,29 @@ func (n *network) PutAncestor(validatorID ids.ShortID, chainID ids.ID, requestID
 		n.putAncestor.numFailed.Inc()
 	} else {
 		n.putAncestor.numSent.Inc()
+	}
+}
+
+// MultiPut implements the Sender interface.
+func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+	msg, err := n.b.MultiPut(chainID, requestID, containers)
+	if err != nil {
+		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
+		return
+	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		sent = peer.send(msg)
+	}
+	if !sent {
+		n.log.Debug("failed to send a MultiPut message to: %s", validatorID)
+		n.multiPut.numFailed.Inc()
+	} else {
+		n.multiPut.numSent.Inc()
 	}
 }
 

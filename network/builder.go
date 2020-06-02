@@ -108,6 +108,15 @@ func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, conta
 	})
 }
 
+// MultiPut message
+func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte) (Msg, error) {
+	return m.Pack(MultiPut, map[Field]interface{}{
+		ChainID:             chainID.Bytes(),
+		RequestID:           requestID,
+		MultiContainerBytes: containers,
+	})
+}
+
 // PutAncestor message
 func (m Builder) PutAncestor(chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) (Msg, error) {
 	return m.Pack(PutAncestor, map[Field]interface{}{

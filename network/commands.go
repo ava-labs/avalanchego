@@ -12,17 +12,18 @@ type Field uint32
 
 // Fields that may be packed. These values are not sent over the wire.
 const (
-	VersionStr     Field = iota // Used in handshake
-	NetworkID                   // Used in handshake
-	NodeID                      // Used in handshake
-	MyTime                      // Used in handshake
-	IP                          // Used in handshake
-	Peers                       // Used in handshake
-	ChainID                     // Used for dispatching
-	RequestID                   // Used for all messages
-	ContainerID                 // Used for querying
-	ContainerBytes              // Used for gossiping
-	ContainerIDs                // Used for querying
+	VersionStr          Field = iota // Used in handshake
+	NetworkID                        // Used in handshake
+	NodeID                           // Used in handshake
+	MyTime                           // Used in handshake
+	IP                               // Used in handshake
+	Peers                            // Used in handshake
+	ChainID                          // Used for dispatching
+	RequestID                        // Used for all messages
+	ContainerID                      // Used for querying
+	ContainerBytes                   // Used for gossiping
+	ContainerIDs                     // Used for querying
+	MultiContainerBytes              // Used in MultiPut
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -50,6 +51,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackBytes
 	case ContainerIDs:
 		return wrappers.TryPackHashes
+	case MultiContainerBytes:
+		return wrappers.TryPack2DBytes
 	default:
 		return nil
 	}
@@ -80,6 +83,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackBytes
 	case ContainerIDs:
 		return wrappers.TryUnpackHashes
+	case MultiContainerBytes:
+		return wrappers.TryUnpack2DBytes
 	default:
 		return nil
 	}
@@ -107,6 +112,8 @@ func (f Field) String() string {
 		return "Container Bytes"
 	case ContainerIDs:
 		return "Container IDs"
+	case MultiContainerBytes:
+		return "MultiContainerBytes"
 	default:
 		return "Unknown Field"
 	}
@@ -141,6 +148,8 @@ func (op Op) String() string {
 		return "put"
 	case PutAncestor:
 		return "put_ancestor"
+	case MultiPut:
+		return "multi_put"
 	case PushQuery:
 		return "push_query"
 	case PullQuery:
@@ -173,6 +182,7 @@ const (
 	// Bootstrapping
 	GetAncestors
 	PutAncestor
+	MultiPut
 )
 
 // Defines the messages that can be sent/received with this network
@@ -190,6 +200,7 @@ var (
 		Accepted:            []Field{ChainID, RequestID, ContainerIDs},
 		GetAncestors:        []Field{ChainID, RequestID, ContainerID},
 		PutAncestor:         []Field{ChainID, RequestID, ContainerID, ContainerBytes},
+		MultiPut:            []Field{ChainID, RequestID, MultiContainerBytes},
 		// Consensus:
 		Get:       []Field{ChainID, RequestID, ContainerID},
 		Put:       []Field{ChainID, RequestID, ContainerID, ContainerBytes},

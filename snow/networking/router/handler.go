@@ -106,6 +106,8 @@ func (h *Handler) dispatchMsg(msg message) bool {
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case putAncestorMsg:
 		err = h.engine.PutAncestor(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+	case multiPutMsg:
+		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
 	case pushQueryMsg:
 		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case pullQueryMsg:
@@ -231,6 +233,16 @@ func (h *Handler) PutAncestor(validatorID ids.ShortID, requestID uint32, contain
 		requestID:   requestID,
 		containerID: containerID,
 		container:   container,
+	}
+}
+
+// MultiPut passes a MultiPut message received from the network to the consensus engine.
+func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
+	h.msgs <- message{
+		messageType: multiPutMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+		containers:  containers,
 	}
 }
 

@@ -4,7 +4,10 @@
 package avalanche
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
@@ -14,6 +17,12 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/random"
 	"github.com/ava-labs/gecko/utils/wrappers"
+)
+
+const (
+	// TODO define this constant in one place rather than here and in snowman
+	// Max containers size in a MultiPut message
+	maxContainersLen = int(4 / 5 * network.DefaultMaxMessageSize)
 )
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -113,7 +122,8 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	t.Config.Context.Log.Info("In GetAncestors. Validator: %s, request ID: %d, vtxID: %s", vdr, requestID, vtxID)
+	startTime := time.Now()                                                                                       // TODO remove
+	t.Config.Context.Log.Info("In GetAncestors. Validator: %s, request ID: %d, vtxID: %s", vdr, requestID, vtxID) // TODO remove
 	vertex, err := t.Config.State.GetVertex(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		t.Config.Context.Log.Info("dropping getAncestors")
@@ -126,7 +136,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 	queue := []avalanche.Vertex{vertex} // for BFS
 	beenInQueue := ids.Set{}            // IDs of vertices that have been in queue before
 	beenInQueue.Add(vertex.ID())
-	for len(ancestors) < common.AncestorsToFetch && len(queue) > 0 {
+	for len(ancestors) < common.MaxContainersPerMultiPut && len(queue) > 0 {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		ancestors = append(ancestors, vtx)
@@ -142,11 +152,19 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		}
 	}
 
-	// Send ancestors from oldest --> most recent (approximately)
-	for i := len(ancestors) - 1; i > 0; i-- {
-		t.Config.Sender.PutAncestor(vdr, requestID, ancestors[i].ID(), ancestors[i].Bytes())
+	containersBytesLen := 0
+	containersBytes := [][]byte{}
+	for i := len(ancestors) - 1; i >= 0; i-- {
+		bytes := ancestors[i].Bytes()
+		if newLen := containersBytesLen + len(bytes); newLen > maxContainersLen {
+			containersBytes = append(containersBytes, bytes)
+			containersBytesLen = newLen
+		} else {
+			break
+		}
 	}
-	t.Config.Sender.Put(vdr, requestID, vertex.ID(), vertex.Bytes())
+	t.Config.Context.Log.Info("GetAncestors call took %v", time.Since(startTime)) // TODO remove
+	t.Config.Sender.MultiPut(vdr, requestID, containersBytes)
 	return nil
 }
 

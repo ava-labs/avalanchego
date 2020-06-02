@@ -39,6 +39,7 @@ type ExternalRouter interface {
 	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
 	Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 	PutAncestor(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
 	PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 	PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)

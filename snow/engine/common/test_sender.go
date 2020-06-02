@@ -15,7 +15,7 @@ type SenderTest struct {
 
 	CantGetAcceptedFrontier, CantAcceptedFrontier,
 	CantGetAccepted, CantAccepted,
-	CantGet, CantGetAncestors, CantPut, CantPutAncestor,
+	CantGet, CantGetAncestors, CantPut, CantPutAncestor, CantMultiPut,
 	CantPullQuery, CantPushQuery, CantChits,
 	CantGossip bool
 
@@ -27,6 +27,7 @@ type SenderTest struct {
 	GetAncestorsF        func(ids.ShortID, uint32, ids.ID)
 	PutF                 func(ids.ShortID, uint32, ids.ID, []byte)
 	PutAncestorF         func(ids.ShortID, uint32, ids.ID, []byte)
+	MultiPutF            func(ids.ShortID, uint32, [][]byte)
 	PushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
 	PullQueryF           func(ids.ShortSet, uint32, ids.ID)
 	ChitsF               func(ids.ShortID, uint32, ids.Set)
@@ -43,6 +44,7 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantGetAccepted = cant
 	s.CantPut = cant
 	s.CantPutAncestor = cant
+	s.CantMultiPut = cant
 	s.CantPullQuery = cant
 	s.CantPushQuery = cant
 	s.CantChits = cant
@@ -134,6 +136,17 @@ func (s *SenderTest) PutAncestor(vdr ids.ShortID, requestID uint32, vtxID ids.ID
 		s.PutAncestorF(vdr, requestID, vtxID, vtx)
 	} else if s.CantPutAncestor && s.T != nil {
 		s.T.Fatalf("Unexpectedly called PutAncestor")
+	}
+}
+
+// MultiPut calls MultiPutF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *SenderTest) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) {
+	if s.MultiPutF != nil {
+		s.MultiPutF(vdr, requestID, vtxs)
+	} else if s.CantMultiPut && s.T != nil {
+		s.T.Fatalf("Unexpectedly called MultiPut")
 	}
 }
 

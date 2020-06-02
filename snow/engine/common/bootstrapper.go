@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	// AncestorsToFetch is the maximum number of ancestors that should be returned in response to a GetAncestors call
-	AncestorsToFetch = 1000
+	// MaxContainersPerMultiPut is the maximum number of containers that can be sent in a MultiPut
+	MaxContainersPerMultiPut = 2000
 )
 
 // Bootstrapper implements the Engine interface.

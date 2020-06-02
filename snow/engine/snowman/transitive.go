@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -143,6 +145,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
+	startTime := time.Now()
 	blk, err := t.Config.VM.GetBlock(blkID)
 	if err != nil { // Don't have the block. Drop this request.
 		t.Config.Context.Log.Verbo("couldn't get block %s. dropping GetAncestors from %s. Request ID: %s", blkID, vdr, requestID)
@@ -151,7 +154,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 
 	// ancestors[0] is [blk]. ancestors[1] is its parent, ancestors[2] is its grandparent, etc.
 	ancestors := []snowman.Block{blk}
-	for i := 1; i <= int(common.AncestorsToFetch); i++ {
+	for i := 1; i <= int(common.MaxContainersPerMultiPut); i++ {
 		ancestor := ancestors[i-1].Parent()
 		if ancestor.Status() == choices.Unknown {
 			// Probably failed to fetch because the block we tried to fetch is the genesis block's parent (non-existent)
@@ -160,12 +163,19 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 		}
 		ancestors = append(ancestors, ancestor)
 	}
-
-	// Send ancestors from oldest --> most recent
-	for i := len(ancestors) - 1; i > 0; i-- {
-		t.Config.Sender.PutAncestor(vdr, requestID, ancestors[i].ID(), ancestors[i].Bytes())
+	containersBytesLen := 0
+	containersBytes := [][]byte{}
+	for i := 0; i < len(ancestors); i++ {
+		bytes := ancestors[i].Bytes()
+		if newLen := containersBytesLen + len(bytes); newLen > maxContainersLen {
+			containersBytes = append(containersBytes, bytes)
+			containersBytesLen = newLen
+		} else {
+			break
+		}
 	}
-	t.Config.Sender.Put(vdr, requestID, ancestors[0].ID(), ancestors[0].Bytes())
+	t.Config.Context.Log.Info("GetAncestors call took %v", time.Since(startTime)) // TODO remove
+	t.Config.Sender.MultiPut(vdr, requestID, containersBytes)
 	return nil
 }
 

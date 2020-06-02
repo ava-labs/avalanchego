@@ -125,6 +125,14 @@ func (s *Sender) PutAncestor(validatorID ids.ShortID, requestID uint32, containe
 	s.sender.PutAncestor(validatorID, s.ctx.ChainID, requestID, containerID, container)
 }
 
+// MultiPut sends a MultiPut message to the consensus engine running on the specified chain
+// on the specified validator.
+// The MultiPut message gives the recipient the contents of several containers.
+func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
+	s.ctx.Log.Verbo("Sending MultiPut to validator %s. RequestID: %d. NumContainers: %d", validatorID, requestID, len(containers))
+	s.sender.MultiPut(validatorID, s.ctx.ChainID, requestID, containers)
+}
+
 // PushQuery sends a PushQuery message to the consensus engines running on the specified chains
 // on the specified validators.
 // The PushQuery message signifies that this consensus engine would like each validator to send

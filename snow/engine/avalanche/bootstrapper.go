@@ -43,6 +43,8 @@ type bootstrapper struct {
 	// outstandingRequests tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
 
+	greedyRequests common.Requests
+
 	processedCache *cache.LRU
 
 	// IDs of vertices that we have requested from other validators but haven't received
@@ -94,7 +96,10 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 }
 
 // Get a vertex and its ancestors
-func (b *bootstrapper) fetch(vtxID ids.ID) error {
+// [needed] is true if [vtxID] is needed to finish bootstrapping
+// [needed] is false if [vtxID] is not needed.
+// (We greedily request vertices we don't know we need)
+func (b *bootstrapper) fetch(vtxID ids.ID, needed bool) error {
 	// Make sure we don't already have this vertex
 	if _, err := b.State.GetVertex(vtxID); err == nil {
 		return nil
@@ -107,7 +112,11 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 	validatorID := validators[0].ID()
 	b.RequestID++
 
-	b.outstandingRequests.Add(validatorID, b.RequestID, vtxID)
+	if needed {
+		b.outstandingRequests.Add(validatorID, b.RequestID, vtxID)
+	} else {
+		b.greedyRequests.Add(validatorID, b.RequestID, vtxID)
+	}
 	b.BootstrapConfig.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
 	return nil
 }
@@ -130,11 +139,12 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 
 		switch vtx.Status() {
 		case choices.Unknown:
-			b.fetch(vtx.ID())
+			if err := b.fetch(vtx.ID(), true); err != nil {
+				return err
+			}
 		case choices.Rejected:
 			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtx.ID())
 		case choices.Processing:
-
 			if err := b.VtxBlocked.Push(&vertexJob{
 				log:         b.BootstrapConfig.Context.Log,
 				numAccepted: b.numBSVtx,
@@ -206,13 +216,6 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 		return b.GetFailed(vdr, requestID)
 	}
 
-	switch vtx.Status() {
-	case choices.Accepted, choices.Rejected:
-		return nil
-	case choices.Unknown:
-		return fmt.Errorf("status of vtx %s is Unknown after it was parsed", vtxID)
-	}
-
 	return b.process(vtx)
 }
 
@@ -226,6 +229,47 @@ func (b *bootstrapper) PutAncestor(vdr ids.ShortID, requestID uint32, vtxID ids.
 	return nil
 }
 
+// MultiPut ...
+func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
+	b.BootstrapConfig.Context.Log.Debug("in MultiPut(%s, %d). len(vtxs): %d", vdr, requestID, len(vtxs)) // TODO remove
+	// Make sure this is in response to a request we made
+	neededVtxID, needed := b.outstandingRequests.Remove(vdr, requestID)
+	if !needed { // this message isn't in response to a request for a vertex we need
+		if _, requested := b.outstandingRequests.Remove(vdr, requestID); !requested { // this message isn't in response to a request for a vertex we greedily requested
+			b.BootstrapConfig.Context.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
+			return nil
+		}
+	}
+
+	var neededVtx avalanche.Vertex = nil // the vertex that this MultiPut is in response to
+	for _, vtxBytes := range vtxs {
+		vtx, err := b.State.ParseVertex(vtxBytes) // Persists the vtx
+		if err != nil {
+			b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
+			b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
+		}
+		// if i == 0 {
+		// 	b.BootstrapConfig.Context.Log.Debug("greedily requesting %s", vtx.ID()) // TODO remove
+		// 	b.fetch(vtx.ID(), false)
+		// }
+		if vtx.ID().Equals(neededVtxID) {
+			neededVtx = vtx // found the vtx we wanted
+		}
+	}
+
+	if !needed {
+		return nil
+	}
+
+	// This MultiPut was supposed to include [neededVtxID] but it didn't
+	if neededVtx == nil {
+		b.outstandingRequests.Add(vdr, requestID, neededVtxID) // immediately removed by getFailed
+		return b.GetFailed(vdr, requestID)
+	}
+
+	return b.process(neededVtx)
+}
+
 // GetFailed is called when a Get message we sent fails
 func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	vtxID, ok := b.outstandingRequests.Remove(vdr, requestID)
@@ -234,7 +278,7 @@ func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 		return nil
 	}
 	// Send another request for this
-	return b.fetch(vtxID)
+	return b.fetch(vtxID, true)
 }
 
 // ForceAccepted ...
@@ -242,7 +286,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	for _, vtxID := range acceptedContainerIDs.List() {
 		if vtx, err := b.State.GetVertex(vtxID); err == nil {
 			b.process(vtx)
-		} else if err := b.fetch(vtxID); err != nil {
+		} else if err := b.fetch(vtxID, true); err != nil {
 			return err
 		}
 	}

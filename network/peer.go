@@ -242,6 +242,8 @@ func (p *peer) handle(msg Msg) {
 		p.put(msg)
 	case PutAncestor:
 		p.putAncestor(msg)
+	case MultiPut:
+		p.multiPut(msg)
 	case PushQuery:
 		p.pushQuery(msg)
 	case PullQuery:
@@ -575,6 +577,16 @@ func (p *peer) putAncestor(msg Msg) {
 	container := msg.Get(ContainerBytes).([]byte)
 
 	p.net.router.PutAncestor(p.id, chainID, requestID, containerID, container)
+}
+
+// assumes the stateLock is not held
+func (p *peer) multiPut(msg Msg) {
+	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(RequestID).(uint32)
+	containers := msg.Get(MultiContainerBytes).([][]byte)
+
+	p.net.router.MultiPut(p.id, chainID, requestID, containers)
 }
 
 // assumes the stateLock is not held

@@ -138,8 +138,6 @@ type FetchHandler interface {
 	// Notify this engine of a request for a container and its ancestors.
 	//
 	// The request is from validator [validatorID]. The requested container is [containerID].
-	// The maximum number of ancestors that will be sent in response is define by constant
-	// AncestorsToFetch in snow/engine/common/bootstrapper.go
 	//
 	// This function can be called by any validator. It is not safe to assume
 	// this message is utilizing a unique requestID. It is also not safe to
@@ -187,6 +185,22 @@ type FetchHandler interface {
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
+	) error
+
+	// Notify this engine of multiple containers.
+	// Each element of [containers] is the byte representation of a container.
+	//
+	// This should only be called during bootstrapping, and only in response to a GetAncestors
+	// call to validator [validatorID] with request ID [requestID]. This call should contain
+	// the container requested in that message, along with ancestors.
+	//
+	// It is not safe to assume this message is in response to a GetAncestor message, that this
+	// message has a unique requestID or that any of the containers in [containers] are valid.
+	// However, the validatorID is assumed to be authenticated.
+	MultiPut(
+		validatorID ids.ShortID,
+		requestID uint32,
+		containers [][]byte,
 	) error
 
 	// Notify this engine that a get request it issued has failed.
