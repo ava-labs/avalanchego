@@ -55,7 +55,7 @@ const (
 var (
 	genesisHashKey = []byte("genesisID")
 
-	nodeVersion   = version.NewDefaultVersion("avalanche", 0, 5, 0)
+	nodeVersion   = version.NewDefaultVersion("avalanche", 0, 5, 1)
 	versionParser = version.NewDefaultParser()
 )
 
