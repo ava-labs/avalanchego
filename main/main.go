@@ -81,6 +81,7 @@ func main() {
 
 	defer node.Shutdown()
 
-	log.Debug("Dispatching node handlers")
-	node.Dispatch()
+	log.Debug("dispatching node handlers")
+	err = node.Dispatch()
+	log.Debug("node dispatching returned with %s", err)
 }

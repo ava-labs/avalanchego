@@ -195,7 +195,7 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 
 // Dispatch starts the node's servers.
 // Returns when the node exits.
-func (n *Node) Dispatch() {
+func (n *Node) Dispatch() error {
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
@@ -205,7 +205,7 @@ func (n *Node) Dispatch() {
 		}
 	}
 
-	n.Net.Dispatch()
+	return n.Net.Dispatch()
 }
 
 /*
