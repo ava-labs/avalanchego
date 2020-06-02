@@ -148,9 +148,17 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 		return fmt.Errorf("user already exists: %s", args.Username)
 	}
 
-	if zxcvbn.PasswordStrength(args.Password, nil).Score < requiredPassScore {
-		return errWeakPassword
-	}
+	if len(args.Password) < 50 {
+		if zxcvbn.PasswordStrength(args.Password, nil).Score < requiredPassScore {
+			return errWeakPassword
+		}
+	} 
+
+	if len(args.Password) >= 50 {
+		if zxcvbn.PasswordStrength(args.Password[:50], nil).Score < requiredPassScore {
+			return errWeakPassword
+			}
+		}
 
 	usr := &User{}
 	if err := usr.Initialize(args.Password); err != nil {
