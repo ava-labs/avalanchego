@@ -45,6 +45,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
+	errBootstrapping             = errors.New("chain is currently bootstrapping")
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -66,6 +67,8 @@ type VM struct {
 
 	// State management
 	state *prefixedState
+
+	bootstrapped bool
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -198,10 +201,25 @@ func (vm *VM) Initialize(
 }
 
 // Bootstrapping marks this VM as bootstrapping
-func (vm *VM) Bootstrapping() error { return nil }
+func (vm *VM) Bootstrapping() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapping(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // Bootstrapped marks this VM as bootstrapped
-func (vm *VM) Bootstrapped() error { return nil }
+func (vm *VM) Bootstrapped() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapped(); err != nil {
+			return err
+		}
+	}
+	vm.bootstrapped = true
+	return nil
+}
 
 // Shutdown implements the avalanche.DAGVM interface
 func (vm *VM) Shutdown() error {
@@ -278,6 +296,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
 func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
+	if !vm.bootstrapped {
+		return ids.ID{}, errBootstrapping
+	}
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err

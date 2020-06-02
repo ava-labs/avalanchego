@@ -840,6 +840,16 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	cr := codecRegistry{
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
@@ -1386,6 +1396,16 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	cr := codecRegistry{
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
@@ -1537,6 +1557,16 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cr := codecRegistry{
 		index:         1,
