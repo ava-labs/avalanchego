@@ -125,11 +125,13 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 		*reqID = innerReqID
 	}
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
 	vm.GetBlockF = nil
 	sender.GetF = nil
+	vm.CantBootstrapping = true
 
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
 		switch {
@@ -142,11 +144,13 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *reqID, blkID1, blkBytes1)
 
 	vm.ParseBlockF = nil
 	bs.onFinished = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Bootstrapping should have finished")
@@ -218,10 +222,12 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 		*requestID = reqID
 	}
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
 	vm.GetBlockF = nil
+	vm.CantBootstrapping = true
 
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
 		switch {
@@ -236,11 +242,13 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *requestID, blkID2, blkBytes2)
 	bs.Put(peerID, *requestID, blkID1, blkBytes1)
 
 	vm.ParseBlockF = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Bootstrapping should have finished")
@@ -315,11 +323,13 @@ func TestBootstrapperDependency(t *testing.T) {
 
 		*requestID = reqID
 	}
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
 	vm.GetBlockF = nil
 	sender.GetF = nil
+	vm.CantBootstrapping = true
 
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
 		switch {
@@ -336,6 +346,7 @@ func TestBootstrapperDependency(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *requestID, blkID1, blkBytes1)
 
@@ -410,6 +421,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		t.Fatal(errUnknownBlock)
 		return nil, errUnknownBlock
 	}
+	vm.CantBootstrapping = false
 
 	accepted := bs.FilterAccepted(blkIDs)
 
@@ -466,6 +478,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	sender.CantGet = false
 	bs.onFinished = func() error { return nil }
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
@@ -540,11 +553,13 @@ func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
 
 		*requestID = reqID
 	}
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
 	vm.GetBlockF = nil
 	sender.GetF = nil
+	vm.CantBootstrapping = true
 
 	vm.ParseBlockF = func(blkBytes []byte) (snowman.Block, error) {
 		switch {
@@ -572,10 +587,12 @@ func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *requestID, blkID1, blkBytes1)
 
 	vm.ParseBlockF = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Bootstrapping should have finished")

@@ -81,6 +81,12 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 	return nil, errBadData // Should never happen
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (svm *SnowmanVM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (svm *SnowmanVM) Bootstrapped() error { return nil }
+
 // Shutdown this vm
 func (svm *SnowmanVM) Shutdown() error {
 	if svm.DB == nil {

@@ -12,8 +12,7 @@ import (
 type VM interface {
 	// Initialize this VM.
 	// [ctx]: Metadata about this VM.
-	//     [ctx.networkID]: The ID of the network this VM's chain is running
-	//                      on.
+	//     [ctx.networkID]: The ID of the network this VM's chain is running on.
 	//     [ctx.chainID]: The unique ID of the chain this VM is running on.
 	//     [ctx.Log]: Used to log messages
 	//     [ctx.NodeID]: The unique staker ID of this node.
@@ -36,6 +35,12 @@ type VM interface {
 		toEngine chan<- Message,
 		fxs []*Fx,
 	) error
+
+	// Bootstrapping is called when the node is starting to bootstrap.
+	Bootstrapping() error
+
+	// Bootstrapped is called when the node is exiting bootstrapping.
+	Bootstrapped() error
 
 	// Shutdown is called when the node is shutting down.
 	Shutdown() error

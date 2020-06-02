@@ -116,6 +116,12 @@ func (vm *VM) Initialize(
 	return nil
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown implements the snowman.ChainVM interface
 func (vm *VM) Shutdown() error {
 	if vm.timer == nil {

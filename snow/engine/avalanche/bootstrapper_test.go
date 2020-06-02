@@ -82,7 +82,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 }
 
 func TestBootstrapperSingleFrontier(t *testing.T) {
-	config, peerID, sender, state, _ := newConfig(t)
+	config, peerID, sender, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -150,7 +150,11 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		vtxIDToReqID[vtxKey] = reqID
 	}
 
+	vm.CantBootstrapping = false
+
 	bs.ForceAccepted(acceptedIDs)
+
+	vm.CantBootstrapping = true
 
 	state.getVertex = nil
 	sender.GetF = nil
@@ -196,6 +200,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	for vtxKey, reqID := range vtxIDToReqID {
 		vtxID := ids.NewID(vtxKey)
@@ -215,6 +220,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	state.parseVertex = nil
 	state.edge = nil
 	bs.onFinished = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Bootstrapping should have finished")
@@ -231,7 +237,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 }
 
 func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
-	config, peerID, sender, state, _ := newConfig(t)
+	config, peerID, sender, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -285,7 +291,11 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		*requestID = reqID
 	}
 
+	vm.CantBootstrapping = false
+
 	bs.ForceAccepted(acceptedIDs)
+
+	vm.CantBootstrapping = true
 
 	state.getVertex = nil
 
@@ -314,9 +324,12 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *requestID, vtxID1, vtxBytes1)
 	bs.Put(peerID, *requestID, vtxID0, vtxBytes0)
+
+	vm.CantBootstrapped = true
 
 	state.parseVertex = nil
 	state.edge = nil
@@ -334,7 +347,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 }
 
 func TestBootstrapperVertexDependencies(t *testing.T) {
-	config, peerID, sender, state, _ := newConfig(t)
+	config, peerID, sender, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -389,7 +402,11 @@ func TestBootstrapperVertexDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
+	vm.CantBootstrapping = false
+
 	bs.ForceAccepted(acceptedIDs)
+
+	vm.CantBootstrapping = true
 
 	state.getVertex = nil
 	sender.GetF = nil
@@ -461,11 +478,13 @@ func TestBootstrapperVertexDependencies(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *reqIDPtr, vtxID0, vtxBytes0)
 
 	state.parseVertex = nil
 	bs.onFinished = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Bootstrapping should have finished")
@@ -563,7 +582,11 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
+	vm.CantBootstrapping = false
+
 	bs.ForceAccepted(acceptedIDs)
+
+	vm.CantBootstrapping = true
 
 	state.getVertex = nil
 	sender.GetF = nil
@@ -653,11 +676,13 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *reqIDPtr, vtxID0, vtxBytes0)
 
 	state.parseVertex = nil
 	bs.onFinished = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Should have finished bootstrapping")
@@ -758,11 +783,13 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 
 		*reqIDPtr = reqID
 	}
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
 	state.getVertex = nil
 	sender.GetF = nil
+	vm.CantBootstrapping = true
 
 	state.parseVertex = func(vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
@@ -845,11 +872,13 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *reqIDPtr, vtxID0, vtxBytes0)
 
 	state.parseVertex = nil
 	bs.onFinished = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Bootstrapping should have finished")
@@ -958,7 +987,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 }
 
 func TestBootstrapperPartialFetch(t *testing.T) {
-	config, _, sender, state, _ := newConfig(t)
+	config, _, sender, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -995,6 +1024,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	sender.CantGet = false
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
@@ -1008,7 +1038,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 }
 
 func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
-	config, peerID, sender, state, _ := newConfig(t)
+	config, peerID, sender, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -1061,11 +1091,13 @@ func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
 
 		*requestID = reqID
 	}
+	vm.CantBootstrapping = false
 
 	bs.ForceAccepted(acceptedIDs)
 
 	state.getVertex = nil
 	sender.GetF = nil
+	vm.CantBootstrapping = true
 
 	state.parseVertex = func(vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
@@ -1093,6 +1125,7 @@ func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
 	finished := new(bool)
 	bs.onFinished = func() error { *finished = true; return nil }
 	sender.CantGet = false
+	vm.CantBootstrapped = false
 
 	bs.Put(peerID, *requestID, vtxID0, vtxBytes1)
 
@@ -1103,6 +1136,7 @@ func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
 	state.parseVertex = nil
 	state.edge = nil
 	bs.onFinished = nil
+	vm.CantBootstrapped = true
 
 	if !*finished {
 		t.Fatalf("Bootstrapping should have finished")
