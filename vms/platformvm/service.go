@@ -35,6 +35,7 @@ var (
 	errGetStakeSource        = errors.New("couldn't get account specified in 'stakeSource'")
 	errNoBlockchainWithAlias = errors.New("there is no blockchain with the specified alias")
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
+	errNonDSUsesDS           = errors.New("add non default subnet validator attempts to use default Subnet ID")
 	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
 	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
 	errNoFunds               = errors.New("no spendable funds were found")
@@ -550,7 +551,7 @@ type AddNonDefaultSubnetValidatorArgs struct {
 	APIValidator
 
 	// ID of subnet to validate
-	SubnetID ids.ID `json:"subnetID"`
+	SubnetID string `json:"subnetID"`
 
 	// Next unused nonce of the account the tx fee is paid from
 	PayerNonce json.Uint64 `json:"payerNonce"`
@@ -559,6 +560,20 @@ type AddNonDefaultSubnetValidatorArgs struct {
 // AddNonDefaultSubnetValidator adds a validator to a subnet other than the default subnet
 // Returns the unsigned transaction, which must be signed using Sign
 func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *CreateTxResponse) error {
+	switch {
+	case args.SubnetID == "":
+		return errors.New("'subnetID' not given")
+	}
+
+	subnetID, err := ids.FromString(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
+	}
+
+	if subnetID.Equals(DefaultSubnetID) {
+		return errNonDSUsesDS
+	}
+
 	tx := addNonDefaultSubnetValidatorTx{
 		UnsignedAddNonDefaultSubnetValidatorTx: UnsignedAddNonDefaultSubnetValidatorTx{
 			SubnetValidator: SubnetValidator{
@@ -570,7 +585,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 					Start: uint64(args.StartTime),
 					End:   uint64(args.EndTime),
 				},
-				Subnet: args.SubnetID,
+				Subnet: subnetID,
 			},
 			NetworkID: service.vm.Ctx.NetworkID,
 			Nonce:     uint64(args.PayerNonce),
@@ -1150,7 +1165,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
 	// ID of Subnet that validates the new blockchain
-	SubnetID ids.ID `json:"subnetID"`
+	SubnetID string `json:"subnetID"`
 
 	// ID of the VM the new blockchain is running
 	VMID string `json:"vmID"`
@@ -1178,8 +1193,13 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return errors.New("sender's next nonce not specified")
 	case args.VMID == "":
 		return errors.New("VM not specified")
-	case args.SubnetID.Equals(ids.Empty):
+	case args.SubnetID == "":
 		return errors.New("subnet not specified")
+	}
+
+	subnetID, err := ids.FromString(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("problem parsing subnetID %s, %w", args.SubnetID, err)
 	}
 
 	vmID, err := service.vm.chainManager.LookupVM(args.VMID)
@@ -1203,14 +1223,14 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
-	if args.SubnetID.Equals(DefaultSubnetID) {
+	if subnetID.Equals(DefaultSubnetID) {
 		return errDSCantValidate
 	}
 
 	tx := CreateChainTx{
 		UnsignedCreateChainTx: UnsignedCreateChainTx{
 			NetworkID:   service.vm.Ctx.NetworkID,
-			SubnetID:    args.SubnetID,
+			SubnetID:    subnetID,
 			Nonce:       uint64(args.PayerNonce),
 			ChainName:   args.Name,
 			VMID:        vmID,
@@ -1318,7 +1338,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 // ValidatedByArgs is the arguments for calling ValidatedBy
 type ValidatedByArgs struct {
 	// ValidatedBy returns the ID of the Subnet validating the blockchain with this ID
-	BlockchainID ids.ID `json:"blockchainID"`
+	BlockchainID string `json:"blockchainID"`
 }
 
 // ValidatedByResponse is the reply from calling ValidatedBy
@@ -1332,11 +1352,16 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	service.vm.Ctx.Log.Debug("validatedBy called")
 
 	switch {
-	case args.BlockchainID.Equals(ids.Empty):
-		return errors.New("'blockchainID' not specified")
+	case args.BlockchainID == "":
+		return errors.New("'blockchainID' not given")
 	}
 
-	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
+	blockchainID, err := ids.FromString(args.BlockchainID)
+	if err != nil {
+		return fmt.Errorf("problem parsing blockchainID '%s': %w", args.BlockchainID, err)
+	}
+
+	chain, err := service.vm.getChain(service.vm.DB, blockchainID)
 	if err != nil {
 		return err
 	}
@@ -1346,7 +1371,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 
 // ValidatesArgs are the arguments to Validates
 type ValidatesArgs struct {
-	SubnetID ids.ID `json:"subnetID"`
+	SubnetID string `json:"subnetID"`
 }
 
 // ValidatesResponse is the response from calling Validates
@@ -1359,12 +1384,17 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	service.vm.Ctx.Log.Debug("validates called")
 
 	switch {
-	case args.SubnetID.Equals(ids.Empty):
-		return errors.New("'subnetID' not specified")
+	case args.SubnetID == "":
+		return errors.New("'subnetID' not given")
+	}
+
+	subnetID, err := ids.FromString(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
 	}
 
 	// Verify that the Subnet exists
-	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil {
+	if _, err := service.vm.getSubnet(service.vm.DB, subnetID); err != nil {
 		return err
 	}
 	// Get the chains that exist
@@ -1374,7 +1404,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
-		if chain.SubnetID.Equals(args.SubnetID) {
+		if chain.SubnetID.Equals(subnetID) {
 			response.BlockchainIDs = append(response.BlockchainIDs, chain.ID())
 		}
 	}
