@@ -148,17 +148,17 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 		return fmt.Errorf("user already exists: %s", args.Username)
 	}
 
-	if len(args.Password) < 50 {
-		if zxcvbn.PasswordStrength(args.Password, nil).Score < requiredPassScore {
-			return errWeakPassword
-		}
-	} 
+// As per issue https://github.com/ava-labs/gecko/issues/195 it was found the longer the length of password the slower zxcvbn.PasswordStrength() performs.  
+// To avoid performance issues and DOS vector we only check the first 50 characters of the password.
+	checkPass := args.Password
 
-	if len(args.Password) >= 50 {
-		if zxcvbn.PasswordStrength(args.Password[:50], nil).Score < requiredPassScore {
-			return errWeakPassword
-			}
-		}
+	if len(args.Password) > 50 {
+	    checkPass = args.Password[:50]
+	}
+
+	if zxcvbn.PasswordStrength(checkPass, nil).Score < requiredPassScore {
+	    return errWeakPassword
+	}
 
 	usr := &User{}
 	if err := usr.Initialize(args.Password); err != nil {
