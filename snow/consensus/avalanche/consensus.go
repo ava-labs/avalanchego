@@ -77,6 +77,9 @@ type Vertex interface {
 	// Returns the vertices this vertex depends on
 	Parents() []Vertex
 
+	// Returns the height of this vertex
+	Height() uint64
+
 	// Returns a series of state transitions to be performed on acceptance
 	Txs() []snowstorm.Tx
 
