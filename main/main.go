@@ -41,7 +41,7 @@ func main() {
 	defer Config.DB.Close()
 
 	if Config.StakingIP.IsZero() {
-		log.Warn("NAT traversal has failed. If this node becomes a staker, it may lose its reward due to being unreachable.")
+		log.Warn("NAT traversal has failed. It will be able to connect to less nodes.")
 	}
 
 	// Track if sybil control is enforced
@@ -62,7 +62,7 @@ func main() {
 
 	// Track if assertions should be executed
 	if Config.LoggingConfig.Assertions {
-		log.Warn("assertions are enabled. This may slow down execution")
+		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
 	mapper := nat.NewDefaultMapper(log, Config.Nat, nat.TCP, "gecko")
