@@ -20,7 +20,7 @@ import (
 const (
 	// TODO define this constant in one place rather than here and in snowman
 	// Max containers size in a MultiPut message
-	maxContainersLen = int(4 / 5 * network.DefaultMaxMessageSize)
+	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -159,45 +159,35 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 		return nil
 	}
 
-	// ancestors[0] is [blk]. ancestors[1] is its parent, ancestors[2] is its grandparent, etc.
-	ancestors := []snowman.Block{blk}
-	for i := 1; i <= int(common.MaxContainersPerMultiPut); i++ {
-		if time.Since(startTime) > common.MaxTimeFetchingAncestors {
+	ancestorsBytes := make([][]byte, 1, common.MaxContainersPerMultiPut) // First elt is byte repr. of blk, then its parents, then grandparent, etc.
+	ancestorsBytes[0] = blk.Bytes()
+	ancestorsBytesLen := len(blk.Bytes()) // length, in bytes, of all elements of ancestors
+
+	for i := 1; i < common.MaxContainersPerMultiPut && time.Since(startTime) > common.MaxTimeFetchingAncestors; i++ {
+		blk = blk.Parent()
+		if blk.Status() == choices.Unknown {
+			t.Config.Context.Log.Debug("couldn't get block %s. dropping GetAncestors from %s. Request ID: %s", blk, vdr, requestID)
 			break
 		}
-		ancestor := ancestors[i-1].Parent()
-		if ancestor.Status() == choices.Unknown {
-			// Probably failed to fetch because the block we tried to fetch is the genesis block's parent (non-existent)
-			t.Config.Context.Log.Verbo("couldn't get block %s. dropping GetAncestors from %s. Request ID: %s", ancestor, vdr, requestID)
+		blkBytes := blk.Bytes()
+		if newLen := ancestorsBytesLen + len(blkBytes); newLen < maxContainersLen {
+			ancestorsBytes = append(ancestorsBytes, blkBytes)
+			ancestorsBytesLen = newLen
+		} else { // reached maximum response size
 			break
 		}
-		ancestors = append(ancestors, ancestor)
 	}
 
-	containersBytesLen := 0
-	containersBytes := [][]byte{}
-	for i := 0; i < len(ancestors); i++ {
-		bytes := ancestors[i].Bytes()
-		if newLen := containersBytesLen + len(bytes); newLen > maxContainersLen {
-			containersBytes = append(containersBytes, bytes)
-			containersBytesLen = newLen
-		} else {
-			break
-		}
-	}
-	t.Config.Context.Log.Info("GetAncestors call took %v", time.Since(startTime)) // TODO remove
-	t.Config.Sender.MultiPut(vdr, requestID, containersBytes)
+	t.Config.Sender.MultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
 // Put implements the Engine interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	t.Config.Context.Log.Verbo("Put called for blockID %s", blkID)
-
-	// if the engine hasn't been bootstrapped, forward the request to the
-	// bootstrapper
+	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
 	if !t.bootstrapped {
-		return t.bootstrapper.Put(vdr, requestID, blkID, blkBytes)
+		t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+		return nil
 	}
 
 	blk, err := t.Config.VM.ParseBlock(blkBytes)
@@ -223,10 +213,10 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	// if the engine hasn't been bootstrapped, forward the request to the
-	// bootstrapper
+	// not done bootstrapping --> didn't send a get --> this message is invalid
 	if !t.bootstrapped {
-		return t.bootstrapper.GetFailed(vdr, requestID)
+		t.Config.Context.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping")
+		return nil
 	}
 
 	// we don't use the assumption that this function is called after a failed

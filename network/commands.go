@@ -171,15 +171,14 @@ const (
 	AcceptedFrontier
 	GetAccepted
 	Accepted
+	GetAncestors
+	MultiPut
 	// Consensus:
 	Get
 	Put
 	PushQuery
 	PullQuery
 	Chits
-	// Bootstrapping
-	GetAncestors
-	MultiPut
 )
 
 // Defines the messages that can be sent/received with this network

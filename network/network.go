@@ -375,7 +375,10 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 		sent = peer.send(msg)
 	}
 	if !sent {
+		n.getAncestors.numFailed.Inc()
 		n.log.Debug("failed to send a GetAncestors message to: %s", validatorID)
+	} else {
+		n.getAncestors.numSent.Inc()
 	}
 }
 

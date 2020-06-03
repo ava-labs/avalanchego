@@ -22,7 +22,7 @@ import (
 const (
 	// TODO define this constant in one place rather than here and in snowman
 	// Max containers size in a MultiPut message
-	maxContainersLen = int(4 / 5 * network.DefaultMaxMessageSize)
+	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -122,49 +122,43 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	startTime := time.Now()                                                                                        // TODO remove
-	t.Config.Context.Log.Verbo("In GetAncestors. Validator: %s, request ID: %d, vtxID: %s", vdr, requestID, vtxID) // TODO remove
+	startTime := time.Now()
+	t.Config.Context.Log.Verbo("In GetAncestors. Validator: %s, request ID: %d, vtxID: %s", vdr, requestID, vtxID)
 	vertex, err := t.Config.State.GetVertex(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
-		t.Config.Context.Log.Info("dropping getAncestors")
+		t.Config.Context.Log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
-	// vertex and its ancestors. First element is vertex.
-	// Further back elements are further back ancestors
-	ancestors := []avalanche.Vertex{}
-	queue := []avalanche.Vertex{vertex} // for BFS
-	beenInQueue := ids.Set{}            // IDs of vertices that have been in queue before
-	beenInQueue.Add(vertex.ID())
-	for len(ancestors) < common.MaxContainersPerMultiPut && len(queue) > 0 && time.Since(startTime) < common.MaxTimeFetchingAncestors {
+	queue := make([]avalanche.Vertex, 1, common.MaxContainersPerMultiPut) // for BFS
+	queue[0] = vertex
+	ancestorsBytesLen := len(vertex.Bytes())                             // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, common.MaxContainersPerMultiPut) // vertex and its ancestors in BFS order
+	visited := ids.Set{}                                                 // IDs of vertices that have been in queue before
+	visited.Add(vertex.ID())
+
+	for len(ancestorsBytes) < common.MaxContainersPerMultiPut && len(queue) > 0 && time.Since(startTime) < common.MaxTimeFetchingAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
-		ancestors = append(ancestors, vtx)
+		vtxBytes := vtx.Bytes()
+		if newLen := ancestorsBytesLen + len(vtxBytes); newLen < maxContainersLen {
+			ancestorsBytes = append(ancestorsBytes, vtxBytes)
+			ancestorsBytesLen = newLen
+		} else { // reached maximum response size
+			break
+		}
 		for _, parent := range vtx.Parents() {
-			if parent.Status() == choices.Unknown { // Don't have this vertex...ignore
+			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
 				continue
 			}
-			parentID := parent.ID()
-			if !beenInQueue.Contains(parentID) { // Don't add same vertex twice
+			if parentID := parent.ID(); !visited.Contains(parentID) { // Already visited; ignore
 				queue = append(queue, parent)
-				beenInQueue.Add(parentID)
+				visited.Add(parentID)
 			}
 		}
 	}
 
-	containersBytesLen := 0
-	containersBytes := [][]byte{}
-	for i := len(ancestors) - 1; i >= 0; i-- {
-		bytes := ancestors[i].Bytes()
-		if newLen := containersBytesLen + len(bytes); newLen > maxContainersLen {
-			containersBytes = append(containersBytes, bytes)
-			containersBytesLen = newLen
-		} else {
-			break
-		}
-	}
-	t.Config.Context.Log.Info("GetAncestors call took %v", time.Since(startTime)) // TODO remove
-	t.Config.Sender.MultiPut(vdr, requestID, containersBytes)
+	t.Config.Sender.MultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -172,8 +166,9 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	t.Config.Context.Log.Verbo("Put called for vertexID %s", vtxID)
 
-	if !t.bootstrapped {
-		return t.bootstrapper.Put(vdr, requestID, vtxID, vtxBytes)
+	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
+		t.Config.Context.Log.Debug("Dropping Put for %s due to bootstrapping", vtxID)
+		return nil
 	}
 
 	vtx, err := t.Config.State.ParseVertex(vtxBytes)
@@ -189,8 +184,9 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	if !t.bootstrapped {
-		return t.bootstrapper.GetFailed(vdr, requestID)
+	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
+		t.Config.Context.Log.Debug("Dropping GetFailed($s, %d) due to bootstrapping", vdr, requestID)
+		return nil
 	}
 
 	vtxID, ok := t.vtxReqs.Remove(vdr, requestID)
