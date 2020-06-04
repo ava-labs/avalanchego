@@ -34,6 +34,7 @@ type EngineTest struct {
 	CantGet,
 	CantGetAncestors,
 	CantGetFailed,
+	CantGetAncestorsFailed,
 	CantPut,
 	CantMultiPut,
 
@@ -42,14 +43,15 @@ type EngineTest struct {
 	CantQueryFailed,
 	CantChits bool
 
-	ContextF                                                                                       func() *snow.Context
-	StartupF, GossipF, ShutdownF                                                                   func() error
-	NotifyF                                                                                        func(Message) error
-	GetF, GetAncestorsF, PullQueryF                                                                func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
-	PutF, PushQueryF                                                                               func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
-	MultiPutF                                                                                      func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error
-	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF                                             func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
-	GetAcceptedFrontierF, GetFailedF, QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
+	ContextF                                           func() *snow.Context
+	StartupF, GossipF, ShutdownF                       func() error
+	NotifyF                                            func(Message) error
+	GetF, GetAncestorsF, PullQueryF                    func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
+	PutF, PushQueryF                                   func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
+	MultiPutF                                          func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error
+	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
+	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
+	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 }
 
 var _ Engine = &EngineTest{}
@@ -257,6 +259,19 @@ func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error 
 			e.T.Fatalf("Unexpectedly called GetFailed")
 		}
 		return errors.New("Unexpectedly called GetFailed")
+	}
+	return nil
+}
+
+// GetAncestorsFailed ...
+func (e *EngineTest) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
+	if e.GetAncestorsFailedF != nil {
+		return e.GetAncestorsFailedF(validatorID, requestID)
+	} else if e.CantGetAncestorsFailed {
+		if e.T != nil {
+			e.T.Fatalf("Unexpectedly called GetAncestorsFailed")
+		}
+		return errors.New("Unexpectedly called GetAncestorsFailed")
 	}
 	return nil
 }

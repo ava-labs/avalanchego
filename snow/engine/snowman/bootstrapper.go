@@ -32,12 +32,16 @@ type bootstrapper struct {
 	metrics
 	common.Bootstrapper
 
+	// Number of blocks processed
 	numProcessed uint32
 
-	// outstandingRequests tracks which validators were asked for which containers in which requests
+	// tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
 
-	finished   bool
+	// true if bootstrapping is done
+	finished bool
+
+	// Called when bootstrapping is done
 	onFinished func() error
 }
 

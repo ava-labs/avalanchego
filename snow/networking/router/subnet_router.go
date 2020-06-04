@@ -222,7 +222,7 @@ func (sr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	// This message came in response to a Get message from this node, and when we sent that Get
+	// This message came in response to a GetAncestors message from this node, and when we sent that
 	// message we set a timeout. Since we got a response, cancel the timeout.
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
@@ -241,6 +241,20 @@ func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetFailed(validatorID, requestID)
+	} else {
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+	}
+}
+
+// GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
+// to the consensus engine working on the chain with ID [chainID]
+func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.GetAncestorsFailed(validatorID, requestID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}

@@ -98,7 +98,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 	s.ctx.Log.Verbo("Sending GetAncestors to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
 	// Sending a GetAncestors to myself will always fail
 	if validatorID.Equals(s.ctx.NodeID) {
-		go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
+		go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 		return
 	}
 	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {

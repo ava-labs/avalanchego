@@ -33,6 +33,7 @@ const (
 	shutdownMsg
 	getAncestorsMsg
 	multiPutMsg
+	getAncestorsFailedMsg
 )
 
 type message struct {

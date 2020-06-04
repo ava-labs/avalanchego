@@ -40,7 +40,7 @@ type bootstrapper struct {
 	// number of vertices processed so far
 	numProcessed uint32
 
-	// outstandingRequests tracks which validators were asked for which containers in which requests
+	// tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
 
 	// Contains IDs of vertices that have recently been processed

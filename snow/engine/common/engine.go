@@ -194,6 +194,16 @@ type FetchHandler interface {
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the Get message.
 	GetFailed(validatorID ids.ShortID, requestID uint32) error
+
+	// Notify this engine that a GetAncestors request it issued has failed.
+	//
+	// This function will be called if the engine sent a GetAncestors message that is not
+	// anticipated to be responded to. This could be because the recipient of
+	// the message is unknown or if the message request has timed out.
+	//
+	// The validatorID and requestID are assumed to be the same as those sent in
+	// the Get message.
+	GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
 // QueryHandler defines how a consensus engine reacts to query messages from

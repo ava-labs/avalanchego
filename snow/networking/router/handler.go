@@ -102,6 +102,8 @@ func (h *Handler) dispatchMsg(msg message) bool {
 		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
 	case getFailedMsg:
 		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
+	case getAncestorsFailedMsg:
+		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
 	case putMsg:
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 	case multiPutMsg:
@@ -237,6 +239,15 @@ func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers
 func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 	h.msgs <- message{
 		messageType: getFailedMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+	}
+}
+
+// GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
+func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
+	h.msgs <- message{
+		messageType: getAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 	}

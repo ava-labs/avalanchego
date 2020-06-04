@@ -49,5 +49,6 @@ type InternalRouter interface {
 	GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
+	GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 }
