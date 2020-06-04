@@ -118,7 +118,7 @@ func (t *Transitive) Gossip() error {
 		return nil
 	}
 
-	t.Config.Context.Log.Debug("gossiping %s as accepted to the network", blkID)
+	t.Config.Context.Log.Verbo("gossiping %s as accepted to the network", blkID)
 	t.Config.Sender.Gossip(blkID, blk.Bytes())
 	return nil
 }
