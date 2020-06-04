@@ -102,7 +102,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 		return
 	}
 	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
-		s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
+		s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 	})
 	s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, containerID)
 }

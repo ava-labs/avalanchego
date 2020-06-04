@@ -202,7 +202,7 @@ type FetchHandler interface {
 	// the message is unknown or if the message request has timed out.
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
-	// the Get message.
+	// the GetAncestors message.
 	GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error
 }
 

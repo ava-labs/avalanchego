@@ -159,7 +159,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 
 	ancestorsBytes := make([][]byte, 1, common.MaxContainersPerMultiPut) // First elt is byte repr. of blk, then its parents, then grandparent, etc.
 	ancestorsBytes[0] = blk.Bytes()
-	ancestorsBytesLen := len(blk.Bytes()) // length, in bytes, of all elements of ancestors
+	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < common.MaxContainersPerMultiPut && time.Since(startTime) < common.MaxTimeFetchingAncestors; numFetched++ {
 		blk = blk.Parent()
@@ -167,7 +167,9 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 			break
 		}
 		blkBytes := blk.Bytes()
-		if newLen := ancestorsBytesLen + len(blkBytes); newLen < maxContainersLen {
+		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
+		// is included with each container, and the size is repr. by an int.
+		if newLen := wrappers.IntLen + ancestorsBytesLen + len(blkBytes); newLen < maxContainersLen {
 			ancestorsBytes = append(ancestorsBytes, blkBytes)
 			ancestorsBytesLen = newLen
 		} else { // reached maximum response size

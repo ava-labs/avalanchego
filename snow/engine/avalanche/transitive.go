@@ -141,7 +141,9 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()
-		if newLen := ancestorsBytesLen + len(vtxBytes); newLen < maxContainersLen {
+		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
+		// is included with each container, and the size is repr. by an int.
+		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < maxContainersLen {
 			ancestorsBytes = append(ancestorsBytes, vtxBytes)
 			ancestorsBytesLen = newLen
 		} else { // reached maximum response size

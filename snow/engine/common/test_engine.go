@@ -76,6 +76,7 @@ func (e *EngineTest) Default(cant bool) {
 
 	e.CantGet = cant
 	e.CantGetAncestors = cant
+	e.CantGetAncestorsFailed = cant
 	e.CantGetFailed = cant
 	e.CantPut = cant
 	e.CantMultiPut = cant
