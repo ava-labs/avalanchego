@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -853,4 +854,15 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 		utxos = append(utxos, utxo)
 	}
 	return utxos, nil
+}
+
+func (vm *VM) ParseAddress(addrStr string) ([]byte, error) {
+	cb58 := formatting.CB58{}
+	err := cb58.FromString(addrStr)
+	return cb58.Bytes, err
+}
+
+// Format ...
+func (vm *VM) Format(b []byte) string {
+	return formatting.CB58{Bytes: b}.String()
 }

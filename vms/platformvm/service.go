@@ -43,6 +43,87 @@ var (
 // Service defines the API calls that can be made to the platform chain
 type Service struct{ vm *VM }
 
+// ExportKeyArgs are arguments for ExportKey
+type ExportKeyArgs struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Address  string `json:"address"`
+}
+
+// ExportKeyReply is the response for ExportKey
+type ExportKeyReply struct {
+	// The decrypted PrivateKey for the Address provided in the arguments
+	PrivateKey formatting.CB58 `json:"privateKey"`
+}
+
+// ExportKey returns a private key from the provided user
+func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
+	service.vm.SnowmanVM.Ctx.Log.Verbo("ExportKey called for user '%s'", args.Username)
+
+	address, err := service.vm.ParseAddress(args.Address)
+	if err != nil {
+		return fmt.Errorf("problem parsing address: %w", err)
+	}
+	addr, err := ids.ToShortID(address)
+	if err != nil {
+		return fmt.Errorf("problem parsing address: %w", err)
+	}
+
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := user{db: db}
+
+	sk, err := user.getKey(addr)
+	if err != nil {
+		return fmt.Errorf("problem retrieving private key: %w", err)
+	}
+
+	reply.PrivateKey.Bytes = sk.Bytes()
+	return nil
+}
+
+// ImportKeyArgs are arguments for ImportKey
+type ImportKeyArgs struct {
+	Username   string          `json:"username"`
+	Password   string          `json:"password"`
+	PrivateKey formatting.CB58 `json:"privateKey"`
+}
+
+// ImportKeyReply is the response for ImportKey
+type ImportKeyReply struct {
+	// The address controlled by the PrivateKey provided in the arguments
+	Address string `json:"address"`
+}
+
+// ImportKey adds a private key to the provided user
+func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ImportKeyReply) error {
+	service.vm.SnowmanVM.Ctx.Log.Verbo("ImportKey called for user '%s'", args.Username)
+
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving data: %w", err)
+	}
+
+	user := user{db: db}
+
+	factory := crypto.FactorySECP256K1R{}
+	skIntf, err := factory.ToPrivateKey(args.PrivateKey.Bytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing private key %s: %w", args.PrivateKey, err)
+	}
+	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+
+	if err := user.putAccount(sk); err != nil {
+		return fmt.Errorf("problem saving key %w", err)
+	}
+
+	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
+	return nil
+}
+
 /*
  ******************************************************
  ******************* Get Subnets **********************

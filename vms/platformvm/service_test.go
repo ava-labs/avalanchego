@@ -32,3 +32,21 @@ func TestCreateBlockchainArgsParsing(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestExportKey(t *testing.T) {
+	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1","address":"6Y3kysjF9jnHnYkdS9yGAuoHyae2eNmeV"}`
+	args := ExportKeyArgs{}
+	err := json.Unmarshal([]byte(jsonString), &args)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestImportKey(t *testing.T) {
+	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1","privateKey":"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
+	args := ImportKeyArgs{}
+	err := json.Unmarshal([]byte(jsonString), &args)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
