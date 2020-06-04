@@ -163,7 +163,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	ancestorsBytes[0] = blk.Bytes()
 	ancestorsBytesLen := len(blk.Bytes()) // length, in bytes, of all elements of ancestors
 
-	for i := 1; i < common.MaxContainersPerMultiPut && time.Since(startTime) > common.MaxTimeFetchingAncestors; i++ {
+	for i := 1; i < common.MaxContainersPerMultiPut && time.Since(startTime) < common.MaxTimeFetchingAncestors; i++ {
 		blk = blk.Parent()
 		if blk.Status() == choices.Unknown {
 			t.Config.Context.Log.Debug("couldn't get block %s. dropping GetAncestors from %s. Request ID: %s", blk, vdr, requestID)
