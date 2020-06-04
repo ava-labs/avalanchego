@@ -33,6 +33,12 @@ func (m Builder) PeerList(ipDescs []utils.IPDesc) (Msg, error) {
 	return m.Pack(PeerList, map[Field]interface{}{Peers: ipDescs})
 }
 
+// Ping message
+func (m Builder) Ping() (Msg, error) { return m.Pack(Ping, nil) }
+
+// Pong message
+func (m Builder) Pong() (Msg, error) { return m.Pack(Pong, nil) }
+
 // GetAcceptedFrontier message
 func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32) (Msg, error) {
 	return m.Pack(GetAcceptedFrontier, map[Field]interface{}{

@@ -125,6 +125,10 @@ func (op Op) String() string {
 		return "get_peerlist"
 	case PeerList:
 		return "peerlist"
+	case Ping:
+		return "ping"
+	case Pong:
+		return "pong"
 	case GetAcceptedFrontier:
 		return "get_accepted_frontier"
 	case AcceptedFrontier:
@@ -166,6 +170,9 @@ const (
 	PushQuery
 	PullQuery
 	Chits
+	// Handshake:
+	Ping
+	Pong
 )
 
 // Defines the messages that can be sent/received with this network
@@ -176,6 +183,8 @@ var (
 		Version:     []Field{NetworkID, NodeID, MyTime, IP, VersionStr},
 		GetPeerList: []Field{},
 		PeerList:    []Field{Peers},
+		Ping:        []Field{},
+		Pong:        []Field{},
 		// Bootstrapping:
 		GetAcceptedFrontier: []Field{ChainID, RequestID},
 		AcceptedFrontier:    []Field{ChainID, RequestID, ContainerIDs},

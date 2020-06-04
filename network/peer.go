@@ -60,6 +60,24 @@ func (p *peer) Start() {
 	// Initially send the version to the peer
 	go p.Version()
 	go p.requestVersion()
+	go p.sendPings()
+}
+
+func (p *peer) sendPings() {
+	t := time.NewTicker(p.net.pingFrequency)
+	defer t.Stop()
+
+	for range t.C {
+		p.net.stateLock.Lock()
+		closed := p.closed
+		p.net.stateLock.Unlock()
+
+		if closed {
+			return
+		}
+
+		p.Ping()
+	}
 }
 
 // request the version from the peer until we get the version from them
@@ -76,6 +94,7 @@ func (p *peer) requestVersion() {
 		if connected || closed {
 			return
 		}
+
 		p.GetVersion()
 	}
 }
@@ -83,6 +102,11 @@ func (p *peer) requestVersion() {
 // attempt to read messages from the peer
 func (p *peer) ReadMessages() {
 	defer p.Close()
+
+	if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
+		p.net.log.Verbo("error on setting the connection read timeout %s", err)
+		return
+	}
 
 	pendingBuffer := wrappers.Packer{}
 	readBuffer := make([]byte, 1<<10)
@@ -196,7 +220,15 @@ func (p *peer) send(msg Msg) bool {
 // assumes the stateLock is not held
 func (p *peer) handle(msg Msg) {
 	p.net.heartbeat()
-	atomic.StoreInt64(&p.lastReceived, p.net.clock.Time().Unix())
+
+	currentTime := p.net.clock.Time()
+	atomic.StoreInt64(&p.lastReceived, currentTime.Unix())
+
+	if err := p.conn.SetReadDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
+		p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
+		p.Close()
+		return
+	}
 
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
@@ -212,6 +244,12 @@ func (p *peer) handle(msg Msg) {
 		return
 	case GetVersion:
 		p.getVersion(msg)
+		return
+	case Ping:
+		p.ping(msg)
+		return
+	case Pong:
+		p.pong(msg)
 		return
 	}
 	if !p.connected {
@@ -291,6 +329,12 @@ func (p *peer) GetPeerList() {
 }
 
 // assumes the stateLock is not held
+func (p *peer) SendPeerList() {
+	ips := p.net.validatorIPs()
+	p.PeerList(ips)
+}
+
+// assumes the stateLock is not held
 func (p *peer) PeerList(peers []utils.IPDesc) {
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
@@ -298,7 +342,28 @@ func (p *peer) PeerList(peers []utils.IPDesc) {
 		return
 	}
 	p.Send(msg)
-	return
+}
+
+// assumes the stateLock is not held
+func (p *peer) Ping() {
+	msg, err := p.net.b.Ping()
+	p.net.log.AssertNoError(err)
+	if p.Send(msg) {
+		p.net.ping.numSent.Inc()
+	} else {
+		p.net.ping.numFailed.Inc()
+	}
+}
+
+// assumes the stateLock is not held
+func (p *peer) Pong() {
+	msg, err := p.net.b.Pong()
+	p.net.log.AssertNoError(err)
+	if p.Send(msg) {
+		p.net.pong.numSent.Inc()
+	} else {
+		p.net.pong.numFailed.Inc()
+	}
 }
 
 // assumes the stateLock is not held
@@ -431,17 +496,6 @@ func (p *peer) version(msg Msg) {
 }
 
 // assumes the stateLock is not held
-func (p *peer) SendPeerList() {
-	ips := p.net.validatorIPs()
-	reply, err := p.net.b.PeerList(ips)
-	if err != nil {
-		p.net.log.Warn("failed to send PeerList message due to %s", err)
-		return
-	}
-	p.Send(reply)
-}
-
-// assumes the stateLock is not held
 func (p *peer) getPeerList(_ Msg) { p.SendPeerList() }
 
 // assumes the stateLock is not held
@@ -459,6 +513,12 @@ func (p *peer) peerList(msg Msg) {
 	}
 	p.net.stateLock.Unlock()
 }
+
+// assumes the stateLock is not held
+func (p *peer) ping(_ Msg) { p.Pong() }
+
+// assumes the stateLock is not held
+func (p *peer) pong(_ Msg) {}
 
 // assumes the stateLock is not held
 func (p *peer) getAcceptedFrontier(msg Msg) {
