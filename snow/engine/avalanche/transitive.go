@@ -151,7 +151,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
 				continue
 			}
-			if parentID := parent.ID(); !visited.Contains(parentID) { // Already visited; ignore
+			if parentID := parent.ID(); !visited.Contains(parentID) { // If already visited, ignore
 				queue = append(queue, parent)
 				visited.Add(parentID)
 			}
