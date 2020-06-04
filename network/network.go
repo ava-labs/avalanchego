@@ -531,7 +531,15 @@ func (n *network) Dispatch() error {
 	for {
 		conn, err := n.listener.Accept()
 		if err != nil {
-			return err
+			n.stateLock.Lock()
+			closed := n.closed
+			n.stateLock.Unlock()
+
+			if closed {
+				return err
+			}
+			n.log.Debug("error during server accept: %s", err)
+			continue
 		}
 		go n.upgrade(&peer{
 			net:  n,
