@@ -37,6 +37,9 @@ type bootstrapper struct {
 	metrics
 	common.Bootstrapper
 
+	// true if all of the vertices in the original accepted frontier have been processed
+	processedStartingAcceptedFrontier bool
+
 	// number of vertices processed so far
 	numProcessed uint32
 
@@ -176,7 +179,7 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 			b.processedCache.Put(vtx.ID(), nil)
 		}
 	}
-	if numPending := b.outstandingRequests.Len(); numPending == 0 {
+	if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
 		return b.finish()
 	}
 	return nil
@@ -242,6 +245,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 			return err
 		}
 	}
+	b.processedStartingAcceptedFrontier = true
 
 	if numPending := b.outstandingRequests.Len(); numPending == 0 {
 		return b.finish()
