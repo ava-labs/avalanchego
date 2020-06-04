@@ -228,7 +228,7 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
-	net := &network{
+	netw := &network{
 		log:                                log,
 		id:                                 id,
 		ip:                                 ip,
@@ -258,17 +258,16 @@ func NewNetwork(
 		gossipSize:                         gossipSize,
 		pingPongTimeout:                    pingPongTimeout,
 		pingFrequency:                      pingFrequency,
-
-		disconnectedIPs: make(map[string]struct{}),
-		connectedIPs:    make(map[string]struct{}),
-		retryDelay:      make(map[string]time.Duration),
-		myIPs:           map[string]struct{}{ip.String(): {}},
-		peers:           make(map[[20]byte]*peer),
+		disconnectedIPs:                    make(map[string]struct{}),
+		connectedIPs:                       make(map[string]struct{}),
+		retryDelay:                         make(map[string]time.Duration),
+		myIPs:                              map[string]struct{}{ip.String(): {}},
+		peers:                              make(map[[20]byte]*peer),
 	}
-	net.initialize(registerer)
-	net.executor.Initialize()
-	net.heartbeat()
-	return net
+	_ = netw.initialize(registerer)
+	netw.executor.Initialize()
+	netw.heartbeat()
+	return netw
 }
 
 // GetAcceptedFrontier implements the Sender interface.
@@ -917,7 +916,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	defer n.stateLock.Unlock()
 
 	if n.closed {
-		p.conn.Close()
+		_ = p.conn.Close()
 		return nil
 	}
 
@@ -936,7 +935,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
-		p.conn.Close()
+		_ = p.conn.Close()
 		return nil
 	}
 
@@ -946,7 +945,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		p.conn.Close()
+		_ = p.conn.Close()
 		return nil
 	}
 
