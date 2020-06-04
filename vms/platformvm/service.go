@@ -35,8 +35,8 @@ var (
 	errGetStakeSource        = errors.New("couldn't get account specified in 'stakeSource'")
 	errNoBlockchainWithAlias = errors.New("there is no blockchain with the specified alias")
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
-	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
-	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
+	errNilSigner             = errors.New("signer is not valid")
+	errNilTo                 = errors.New("empty 'to' field is not valid")
 	errNoFunds               = errors.New("no spendable funds were found")
 )
 
@@ -60,11 +60,7 @@ type ExportKeyReply struct {
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.SnowmanVM.Ctx.Log.Verbo("ExportKey called for user '%s'", args.Username)
 
-	address, err := service.vm.ParseAddress(args.Address)
-	if err != nil {
-		return fmt.Errorf("problem parsing address: %w", err)
-	}
-	addr, err := ids.ToShortID(address)
+	addr, err := service.vm.ParseAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address: %w", err)
 	}
@@ -120,7 +116,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
-	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
+	reply.Address = service.vm.FormatAddress(sk.PublicKey().Address())
 	return nil
 }
 
@@ -138,8 +134,8 @@ type APISubnet struct {
 	// Each element of [ControlKeys] the address of a public key.
 	// A transaction to add a validator to this subnet requires
 	// signatures from [Threshold] of these keys to be valid.
-	ControlKeys []ids.ShortID `json:"controlKeys"`
-	Threshold   json.Uint16   `json:"threshold"`
+	ControlKeys []string    `json:"controlKeys"`
+	Threshold   json.Uint16 `json:"threshold"`
 }
 
 // GetSubnetsArgs are the arguments to GetSubnet
@@ -169,9 +165,13 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	if getAll {
 		response.Subnets = make([]APISubnet, len(subnets))
 		for i, subnet := range subnets {
+			controlAddrs := []string{}
+			for _, controlKeyID := range subnet.ControlKeys {
+				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+			}
 			response.Subnets[i] = APISubnet{
 				ID:          subnet.id,
-				ControlKeys: subnet.ControlKeys,
+				ControlKeys: controlAddrs,
 				Threshold:   json.Uint16(subnet.Threshold),
 			}
 		}
@@ -182,10 +182,14 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	idsSet.Add(args.IDs...)
 	for _, subnet := range subnets {
 		if idsSet.Contains(subnet.id) {
+			controlAddrs := []string{}
+			for _, controlKeyID := range subnet.ControlKeys {
+				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+			}
 			response.Subnets = append(response.Subnets,
 				APISubnet{
 					ID:          subnet.id,
-					ControlKeys: subnet.ControlKeys,
+					ControlKeys: controlAddrs,
 					Threshold:   json.Uint16(subnet.Threshold),
 				},
 			)
@@ -209,7 +213,7 @@ type GetCurrentValidatorsArgs struct {
 
 // GetCurrentValidatorsReply are the results from calling GetCurrentValidators
 type GetCurrentValidatorsReply struct {
-	Validators []APIValidator `json:"validators"`
+	Validators []FormattedAPIValidator `json:"validators"`
 }
 
 // GetCurrentValidators returns the list of current validators
@@ -225,11 +229,11 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}
 
-	reply.Validators = make([]APIValidator, validators.Len())
-	for i, tx := range validators.Txs {
-		vdr := tx.Vdr()
-		weight := json.Uint64(vdr.Weight())
-		if args.SubnetID.Equals(DefaultSubnetID) {
+	reply.Validators = make([]FormattedAPIValidator, validators.Len())
+	if args.SubnetID.Equals(DefaultSubnetID) {
+		for i, tx := range validators.Txs {
+			vdr := tx.Vdr()
+			weight := json.Uint64(vdr.Weight())
 			var address ids.ShortID
 			switch tx := tx.(type) {
 			case *addDefaultSubnetValidatorTx:
@@ -240,15 +244,19 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
 			}
 
-			reply.Validators[i] = APIValidator{
+			reply.Validators[i] = FormattedAPIValidator{
 				ID:          vdr.ID(),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
-				Address:     &address,
+				Address:     service.vm.FormatAddress(address),
 			}
-		} else {
-			reply.Validators[i] = APIValidator{
+		}
+	} else {
+		for i, tx := range validators.Txs {
+			vdr := tx.Vdr()
+			weight := json.Uint64(vdr.Weight())
+			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID(),
 				StartTime: json.Uint64(tx.StartTime().Unix()),
 				EndTime:   json.Uint64(tx.EndTime().Unix()),
@@ -269,7 +277,7 @@ type GetPendingValidatorsArgs struct {
 
 // GetPendingValidatorsReply are the results from calling GetPendingValidators
 type GetPendingValidatorsReply struct {
-	Validators []APIValidator `json:"validators"`
+	Validators []FormattedAPIValidator `json:"validators"`
 }
 
 // GetPendingValidators returns the list of current validators
@@ -285,7 +293,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}
 
-	reply.Validators = make([]APIValidator, validators.Len())
+	reply.Validators = make([]FormattedAPIValidator, validators.Len())
 	for i, tx := range validators.Txs {
 		vdr := tx.Vdr()
 		weight := json.Uint64(vdr.Weight())
@@ -299,15 +307,15 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			default: // Shouldn't happen
 				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
 			}
-			reply.Validators[i] = APIValidator{
+			reply.Validators[i] = FormattedAPIValidator{
 				ID:          vdr.ID(),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
-				Address:     &address,
+				Address:     service.vm.FormatAddress(address),
 			}
 		} else {
-			reply.Validators[i] = APIValidator{
+			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID(),
 				StartTime: json.Uint64(tx.StartTime().Unix()),
 				EndTime:   json.Uint64(tx.EndTime().Unix()),
@@ -356,8 +364,8 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 	for i, vdr := range sample {
 		reply.Validators[i] = vdr.ID()
 	}
-
 	ids.SortShortIDs(reply.Validators)
+
 	return nil
 }
 
@@ -366,30 +374,33 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
  *************** Get/Create Accounts ******************
  ******************************************************
  */
-
 // GetAccountArgs are the arguments for calling GetAccount
 type GetAccountArgs struct {
 	// Address of the account we want the information about
-	Address ids.ShortID `json:"address"`
+	Address string `json:"address"`
 }
 
 // GetAccountReply is the response from calling GetAccount
 type GetAccountReply struct {
-	Address ids.ShortID `json:"address"`
+	Address string      `json:"address"`
 	Nonce   json.Uint64 `json:"nonce"`
 	Balance json.Uint64 `json:"balance"`
 }
 
 // GetAccount details given account ID
 func (service *Service) GetAccount(_ *http.Request, args *GetAccountArgs, reply *GetAccountReply) error {
-	account, err := service.vm.getAccount(service.vm.DB, args.Address)
+	address, err := service.vm.ParseAddress(args.Address)
+	if err != nil {
+		return fmt.Errorf("problem parsing address: %w", err)
+	}
+	account, err := service.vm.getAccount(service.vm.DB, address)
 	if err != nil && err != database.ErrNotFound {
 		return fmt.Errorf("couldn't get account: %w", err)
 	} else if err == database.ErrNotFound {
-		account = newAccount(args.Address, 0, 0)
+		account = newAccount(address, 0, 0)
 	}
 
-	reply.Address = account.Address
+	reply.Address = service.vm.FormatAddress(account.Address)
 	reply.Balance = json.Uint64(account.Balance)
 	reply.Nonce = json.Uint64(account.Nonce)
 	return nil
@@ -404,7 +415,7 @@ type ListAccountsArgs struct {
 
 // ListAccountsReply is the reply from ListAccounts
 type ListAccountsReply struct {
-	Accounts []APIAccount `json:"accounts"`
+	Accounts []FormattedAPIAccount `json:"accounts"`
 }
 
 // ListAccounts lists all of the accounts controlled by [args.Username]
@@ -428,7 +439,7 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 		return fmt.Errorf("couldn't get accounts held by user: %w", err)
 	}
 
-	reply.Accounts = []APIAccount{}
+	reply.Accounts = []FormattedAPIAccount{}
 	for _, accountID := range accountIDs {
 		account, err := service.vm.getAccount(service.vm.DB, accountID) // Get account whose ID is [accountID]
 		if err != nil && err != database.ErrNotFound {
@@ -437,8 +448,8 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 		} else if err == database.ErrNotFound {
 			account = newAccount(accountID, 0, 0)
 		}
-		reply.Accounts = append(reply.Accounts, APIAccount{
-			Address: accountID,
+		reply.Accounts = append(reply.Accounts, FormattedAPIAccount{
+			Address: service.vm.FormatAddress(accountID),
 			Nonce:   json.Uint64(account.Nonce),
 			Balance: json.Uint64(account.Balance),
 		})
@@ -463,7 +474,7 @@ type CreateAccountArgs struct {
 // CreateAccountReply are the response from calling CreateAccount
 type CreateAccountReply struct {
 	// Address of the newly created account
-	Address ids.ShortID `json:"address"`
+	Address string `json:"address"`
 }
 
 // CreateAccount creates a new account on the Platform Chain
@@ -510,7 +521,7 @@ func (service *Service) CreateAccount(_ *http.Request, args *CreateAccountArgs, 
 		return errors.New("problem saving account")
 	}
 
-	reply.Address = privKey.PublicKey().Address()
+	reply.Address = service.vm.FormatAddress(privKey.PublicKey().Address())
 
 	return nil
 }
@@ -532,7 +543,7 @@ type CreateTxResponse struct {
 
 // AddDefaultSubnetValidatorArgs are the arguments to AddDefaultSubnetValidator
 type AddDefaultSubnetValidatorArgs struct {
-	APIDefaultSubnetValidator
+	FormattedAPIDefaultSubnetValidator
 
 	// Next nonce of the sender
 	PayerNonce json.Uint64 `json:"payerNonce"`
@@ -550,6 +561,13 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		return fmt.Errorf("sender's next nonce not specified")
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
+	case args.Destination == "":
+		return fmt.Errorf("destination not specified")
+	}
+
+	destination, err := service.vm.ParseAddress(args.Destination)
+	if err != nil {
+		return fmt.Errorf("problem while parsing destination: %w", err)
 	}
 
 	// Create the transaction
@@ -563,7 +581,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 			End:   uint64(args.EndTime),
 		},
 		Nonce:       uint64(args.PayerNonce),
-		Destination: args.Destination,
+		Destination: destination,
 		NetworkID:   service.vm.Ctx.NetworkID,
 		Shares:      uint32(args.DelegationFeeRate),
 	}}
@@ -581,7 +599,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 type AddDefaultSubnetDelegatorArgs struct {
 	APIValidator
 
-	Destination ids.ShortID `json:"destination"`
+	Destination string `json:"destination"`
 
 	// Next unused nonce of the account the staked $AVA and tx fee are paid from
 	PayerNonce json.Uint64 `json:"payerNonce"`
@@ -600,6 +618,13 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		return fmt.Errorf("sender's next unused nonce not specified")
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
+	case args.Destination == "":
+		return fmt.Errorf("destination must be non-empty string")
+	}
+
+	destination, err := service.vm.ParseAddress(args.Destination)
+	if err != nil {
+		return fmt.Errorf("problem parsing destination address: %w", err)
 	}
 
 	// Create the transaction
@@ -614,7 +639,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		},
 		NetworkID:   service.vm.Ctx.NetworkID,
 		Nonce:       uint64(args.PayerNonce),
-		Destination: args.Destination,
+		Destination: destination,
 	}}
 
 	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
@@ -692,12 +717,21 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 		return fmt.Errorf("sender's next nonce not specified")
 	}
 
+	controlKeys := []ids.ShortID{}
+	for _, controlKey := range args.ControlKeys {
+		controlKeyID, err := service.vm.ParseAddress(controlKey)
+		if err != nil {
+			return fmt.Errorf("problem parsing control key: %w", err)
+		}
+		controlKeys = append(controlKeys, controlKeyID)
+	}
+
 	// Create the transaction
 	tx := CreateSubnetTx{
 		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
 			NetworkID:   service.vm.Ctx.NetworkID,
 			Nonce:       uint64(args.PayerNonce),
-			ControlKeys: args.ControlKeys,
+			ControlKeys: controlKeys,
 			Threshold:   uint16(args.Threshold),
 		},
 		key:   nil,
@@ -778,7 +812,7 @@ type SignArgs struct {
 	Tx formatting.CB58 `json:"tx"`
 
 	// The address of the key signing the bytes
-	Signer ids.ShortID `json:"signer"`
+	Signer string `json:"signer"`
 
 	// User that controls Signer
 	Username string `json:"username"`
@@ -795,8 +829,13 @@ type SignResponse struct {
 func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignResponse) error {
 	service.vm.Ctx.Log.Debug("sign called")
 
-	if args.Signer.IsZero() {
+	if args.Signer == "" {
 		return errNilSigner
+	}
+
+	signer, err := service.vm.ParseAddress(args.Signer)
+	if err != nil {
+		return fmt.Errorf("problem parsing address %w", err)
 	}
 
 	// Get the key of the Signer
@@ -806,11 +845,11 @@ func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignRespons
 	}
 	user := user{db: db}
 
-	key, err := user.getKey(args.Signer) // Key of [args.Signer]
+	key, err := user.getKey(signer) // Key of [args.Signer]
 	if err != nil {
 		return errDB
 	}
-	if !bytes.Equal(key.PublicKey().Address().Bytes(), args.Signer.Bytes()) { // sanity check
+	if !bytes.Equal(key.PublicKey().Address().Bytes(), signer.Bytes()) { // sanity check
 		return errors.New("got unexpected key from database")
 	}
 
@@ -991,7 +1030,7 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 // ImportAVAArgs are the arguments to ImportAVA
 type ImportAVAArgs struct {
 	// ID of the account that will receive the imported funds, and pay the transaction fee
-	To ids.ShortID `json:"to"`
+	To string `json:"to"`
 
 	// Next nonce of the sender
 	PayerNonce json.Uint64 `json:"payerNonce"`
@@ -1008,10 +1047,15 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	service.vm.Ctx.Log.Debug("platform.ImportAVA called")
 
 	switch {
-	case args.To.IsZero():
+	case args.To == "":
 		return errNilTo
 	case args.PayerNonce == 0:
 		return fmt.Errorf("sender's next nonce not specified")
+	}
+
+	toID, err := service.vm.ParseAddress(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing address in 'to' field %w", err)
 	}
 
 	// Get the key of the Signer
@@ -1022,14 +1066,14 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	user := user{db: db}
 
 	kc := secp256k1fx.NewKeychain()
-	key, err := user.getKey(args.To)
+	key, err := user.getKey(toID)
 	if err != nil {
 		return errDB
 	}
 	kc.Add(key)
 
 	addrSet := ids.Set{}
-	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(args.To.Bytes())))
+	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(toID.Bytes())))
 
 	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
 	if err != nil {
@@ -1079,7 +1123,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	tx := ImportTx{UnsignedImportTx: UnsignedImportTx{
 		NetworkID: service.vm.Ctx.NetworkID,
 		Nonce:     uint64(args.PayerNonce),
-		Account:   args.To,
+		Account:   toID,
 		Ins:       ins,
 	}}
 

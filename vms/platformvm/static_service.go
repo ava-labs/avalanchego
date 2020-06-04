@@ -36,6 +36,12 @@ type APIAccount struct {
 	Balance json.Uint64 `json:"balance"`
 }
 
+type FormattedAPIAccount struct {
+	Address string      `json:"address"`
+	Nonce   json.Uint64 `json:"nonce"`
+	Balance json.Uint64 `json:"balance"`
+}
+
 // APIValidator is a validator.
 // [Amount] is the amount of $AVA being staked.
 // [Endtime] is the Unix time repr. of when they are done staking
@@ -67,6 +73,34 @@ type APIDefaultSubnetValidator struct {
 	APIValidator
 
 	Destination       ids.ShortID `json:"destination"`
+	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
+}
+
+type FormattedAPIValidator struct {
+	StartTime   json.Uint64  `json:"startTime"`
+	EndTime     json.Uint64  `json:"endTime"`
+	Weight      *json.Uint64 `json:"weight,omitempty"`
+	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
+	Address     string       `json:"address,omitempty"`
+	ID          ids.ShortID  `json:"id"`
+}
+
+func (v *FormattedAPIValidator) weight() uint64 {
+	switch {
+	case v.Weight != nil:
+		return uint64(*v.Weight)
+	case v.StakeAmount != nil:
+		return uint64(*v.StakeAmount)
+	default:
+		return 0
+	}
+}
+
+// FormattedAPIDefaultSubnetValidator is a formatted validator of the default subnet
+type FormattedAPIDefaultSubnetValidator struct {
+	FormattedAPIValidator
+
+	Destination       string      `json:"destination"`
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 

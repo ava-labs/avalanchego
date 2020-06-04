@@ -7,6 +7,7 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	stdmath "math"
@@ -39,6 +40,9 @@ const (
 	chainsTypeID
 	blockTypeID
 	subnetsTypeID
+
+	platformAlias = "P"
+	addressSep    = "-"
 
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
@@ -99,6 +103,9 @@ var (
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
+	errInvalidAddress           = errors.New("invalid address")
+	errEmptyAddress             = errors.New("empty address")
+	errInvalidPAddressPrefix    = errors.New("invalid platform address prefix")
 )
 
 // Codec does serialization and deserialization
@@ -856,13 +863,28 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	return utxos, nil
 }
 
-func (vm *VM) ParseAddress(addrStr string) ([]byte, error) {
+// ParseAddr ...
+func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
+	if count := strings.Count(addrStr, addressSep); count != 1 {
+		return ids.ShortID{}, errInvalidAddress
+	}
+	addressParts := strings.SplitN(addrStr, addressSep, 2)
+	bcAlias := addressParts[0]
+	rawAddr := addressParts[1]
+	if bcAlias != platformAlias {
+		return ids.ShortID{}, errInvalidPAddressPrefix
+	}
+
 	cb58 := formatting.CB58{}
-	err := cb58.FromString(addrStr)
-	return cb58.Bytes, err
+	err := cb58.FromString(rawAddr)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return ids.ToShortID(cb58.Bytes)
 }
 
-// Format ...
-func (vm *VM) Format(b []byte) string {
-	return formatting.CB58{Bytes: b}.String()
+// Assumes addrID is not empty
+// FormatAddress ...
+func (vm *VM) FormatAddress(addrID ids.ShortID) string {
+	return fmt.Sprintf("%s%s%s", platformAlias, addressSep, addrID.String())
 }
