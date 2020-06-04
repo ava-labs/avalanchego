@@ -185,14 +185,13 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
-		t.Config.Context.Log.Debug("Dropping GetFailed($s, %d) due to bootstrapping", vdr, requestID)
+		t.Config.Context.Log.Debug("Dropping GetFailed(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
 
 	vtxID, ok := t.vtxReqs.Remove(vdr, requestID)
 	if !ok {
-		t.Config.Context.Log.Warn("GetFailed called without sending the corresponding Get message from %s",
-			vdr)
+		t.Config.Context.Log.Debug("GetFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
 		return nil
 	}
 
