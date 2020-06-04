@@ -525,6 +525,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = Config
+	n.Log.Info("Gecko version is: %s", nodeVersion)
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {
