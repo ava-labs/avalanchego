@@ -132,7 +132,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 
 	queue := make([]avalanche.Vertex, 1, common.MaxContainersPerMultiPut) // for BFS
 	queue[0] = vertex
-	ancestorsBytesLen := len(vertex.Bytes())                             // length, in bytes, of vertex and its ancestors
+	ancestorsBytesLen := 0                                               // length, in bytes, of vertex and its ancestors
 	ancestorsBytes := make([][]byte, 0, common.MaxContainersPerMultiPut) // vertex and its ancestors in BFS order
 	visited := ids.Set{}                                                 // IDs of vertices that have been in queue before
 	visited.Add(vertex.ID())

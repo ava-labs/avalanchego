@@ -183,7 +183,7 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 }
 
 // MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
-// with request ID [requestID]
+// with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
 	if lenVtxs := len(vtxs); lenVtxs > common.MaxContainersPerMultiPut {
 		b.BootstrapConfig.Context.Log.Debug("MultiPut(%s, %d) contains more than maximum number of vertices", vdr, requestID)
@@ -210,7 +210,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		return b.fetch(neededVtxID)
 	}
 
-	for _, vtxBytes := range vtxs {
+	for _, vtxBytes := range vtxs { // Parse/persist all the vertices
 		if _, err := b.State.ParseVertex(vtxBytes); err != nil { // Persists the vtx
 			b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
 			b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
@@ -244,8 +244,6 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	}
 
 	if numPending := b.outstandingRequests.Len(); numPending == 0 {
-		// TODO: This typically indicates bootstrapping has failed, so this
-		// should be handled appropriately
 		return b.finish()
 	}
 	return nil

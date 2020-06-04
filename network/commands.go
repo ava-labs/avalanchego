@@ -171,14 +171,17 @@ const (
 	AcceptedFrontier
 	GetAccepted
 	Accepted
-	GetAncestors
-	MultiPut
 	// Consensus:
 	Get
 	Put
 	PushQuery
 	PullQuery
 	Chits
+	// Bootstrapping:
+	// TODO: Move GetAncestors and MultiPut with the rest of the bootstrapping
+	// commands when we do non-backwards compatible upgrade
+	GetAncestors
+	MultiPut
 )
 
 // Defines the messages that can be sent/received with this network
