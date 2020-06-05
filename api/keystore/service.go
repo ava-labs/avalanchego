@@ -104,10 +104,28 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 	ks.bcDB = prefixdb.New([]byte("bcs"), db)
 }
 
+var mapping jsoncodec.RPCRestMap = jsoncodec.RPCRestMap{
+	"/api/keystore/user/create": map[string]string{
+		"post": "keystore.CreateUser",
+	},
+	"/api/keystore/user/delete": map[string]string{
+		"post": "keystore.DeleteUser",
+	},
+	"/api/keystore/user/list": map[string]string{
+		"post": "keystore.ListUsers",
+	},
+	"/api/keystore/user/import": map[string]string{
+		"post": "keystore.ImportUser",
+	},
+	"/api/keystore/user/export": map[string]string{
+		"post": "keystore.ExportUser",
+	},
+}
+
 // CreateHandler returns a new service object that can send requests to thisAPI.
 func (ks *Keystore) CreateHandler() *common.HTTPHandler {
 	newServer := rpc.NewServer()
-	codec := jsoncodec.NewCodec()
+	codec := jsoncodec.RestCodec{Mapping: mapping}
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(ks, "keystore")
