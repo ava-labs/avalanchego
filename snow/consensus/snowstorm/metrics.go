@@ -37,14 +37,14 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 			Namespace: namespace,
 			Name:      "tx_accepted",
 			Help:      "Latency of accepting from the time the transaction was issued in milliseconds",
-			Buckets:   timer.Buckets,
+			Buckets:   timer.MillisecondsBuckets,
 		})
 	m.latRejected = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "tx_rejected",
 			Help:      "Latency of rejecting from the time the transaction was issued in milliseconds",
-			Buckets:   timer.Buckets,
+			Buckets:   timer.MillisecondsBuckets,
 		})
 
 	if err := registerer.Register(m.numProcessing); err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Handler passes incoming messages from the network to the consensus engine
@@ -21,7 +22,12 @@ type Handler struct {
 }
 
 // Initialize this consensus handler
-func (h *Handler) Initialize(engine common.Engine, msgChan <-chan common.Message, bufferSize int) {
+func (h *Handler) Initialize(
+	engine common.Engine,
+	msgChan <-chan common.Message,
+	bufferSize int,
+	metrics prometheus.Registerer,
+) {
 	h.msgs = make(chan message, bufferSize)
 	h.closed = make(chan struct{})
 	h.engine = engine
