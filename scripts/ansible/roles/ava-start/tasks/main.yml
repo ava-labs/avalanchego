@@ -33,6 +33,6 @@
       --api-ipcs-enabled="{{ api_ipcs_enabled }}"
       --xput-server-enabled="{{ xput_server_enabled }}"
       --xput-server-port="{{ xput_server_port }}"
-      >/dev/null 2>&1 &
+      > ava.log 2>&1 &
   environment:
     PATH: /sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin:/snap/bin

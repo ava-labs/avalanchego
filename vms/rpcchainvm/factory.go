@@ -8,6 +8,8 @@ import (
 	"os/exec"
 
 	"github.com/hashicorp/go-plugin"
+
+	"github.com/ava-labs/gecko/utils/logging"
 )
 
 var (
@@ -16,6 +18,7 @@ var (
 
 // Factory ...
 type Factory struct {
+	Log  logging.Logger
 	Path string
 }
 
@@ -25,6 +28,9 @@ func (f *Factory) New() (interface{}, error) {
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
 		Cmd:             exec.Command("sh", "-c", f.Path),
+		Stderr:          f.Log,
+		SyncStdout:      f.Log,
+		SyncStderr:      f.Log,
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
