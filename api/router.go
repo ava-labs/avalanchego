@@ -88,6 +88,8 @@ func (r *router) forceAddRouter(base, endpoint string, handler http.Handler) err
 	endpoints[endpoint] = handler
 	r.routes[base] = endpoints
 	r.router.Handle(url, handler)
+	url = "/api" + endpoint
+	r.router.PathPrefix(url).Handler(handler)
 
 	var err error
 	if aliases, exists := r.aliases[base]; exists {
