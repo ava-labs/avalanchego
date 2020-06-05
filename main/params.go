@@ -87,6 +87,9 @@ func init() {
 
 	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
 
+	// If this is true, print the version and quit.
+	version := fs.Bool("version", false, "If true, print version and quit")
+
 	// NetworkID:
 	networkName := fs.String("network-id", genesis.TestnetName, "Network ID this node will connect to")
 
@@ -151,6 +154,11 @@ func init() {
 	fs.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
 
 	ferr := fs.Parse(os.Args[1:])
+
+	if *version { // If --version used, print version and exit
+		fmt.Println(node.Version.String())
+		os.Exit(0)
+	}
 
 	if ferr == flag.ErrHelp {
 		// display usage/help text and exit successfully
