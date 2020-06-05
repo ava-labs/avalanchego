@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sync"
 
+	jsoncodec "github.com/ava-labs/gecko/utils/json"
 	"github.com/gorilla/mux"
 )
 
@@ -75,6 +77,8 @@ func (r *router) addRouter(base, endpoint string, handler http.Handler) error {
 	return r.forceAddRouter(base, endpoint, handler)
 }
 
+//  Endpoint and its aliases will call the same handler as
+//  forceAddRouter iterates over aliases of enpoint and adds the same handler
 func (r *router) forceAddRouter(base, endpoint string, handler http.Handler) error {
 	endpoints := r.routes[base]
 	if endpoints == nil {
@@ -88,8 +92,12 @@ func (r *router) forceAddRouter(base, endpoint string, handler http.Handler) err
 	endpoints[endpoint] = handler
 	r.routes[base] = endpoints
 	r.router.Handle(url, handler)
-	url = "/api" + endpoint
-	r.router.PathPrefix(url).Handler(handler)
+
+	re := regexp.MustCompile(fmt.Sprintf("^%s", baseURL))
+	restBase := re.ReplaceAllString(base, jsoncodec.RestBaseURL)
+	restUrl := restBase + endpoint
+
+	r.router.PathPrefix(restUrl).Handler(handler)
 
 	var err error
 	if aliases, exists := r.aliases[base]; exists {

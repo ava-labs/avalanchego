@@ -13,30 +13,40 @@ import (
 	"github.com/gorilla/rpc/v2"
 )
 
-type RPCRestMap map[string]map[string]string
+type URIMethodMap map[string]string
 type RestCodec struct {
-	Mapping RPCRestMap
+	Mapping URIMethodMap
 }
 
 type RestCodecRequest struct {
 	*http.Request
-	Mapping RPCRestMap
+	Mapping URIMethodMap
 }
 
+var (
+	RestBaseURL = "/rest"
+)
+
+//  Checks if the uri is in the mapping of RestCodecRequest
 func (r *RestCodecRequest) Method() (string, error) {
+	//
 	req := r.Request
 	uri := strings.ToLower(req.RequestURI)
-	if r.Mapping[uri] == nil {
-		return "", errors.New("Path not found")
+	for k, v := range r.Mapping {
+		if strings.HasSuffix(uri, k) {
+			return v, nil
+		}
 	}
-	method := strings.ToLower(req.Method)
-	if r.Mapping[uri][method] == "" {
-		return "", errors.New("Method not allowed")
+	return "", errors.New("Path not found")
+}
+
+// generates mapping of uri to base.method
+func MappingGenerator(m map[string]string, base string) URIMethodMap {
+	r := URIMethodMap{}
+	for k, v := range m {
+		r[k] = fmt.Sprintf("%s.%s", base, v)
 	}
-	return r.Mapping[uri][method], nil
-	// uriSections := strings.SplitN(strings.ToLower(req.RequestURI), "/", 5)
-	// method := fmt.Sprintf("%s.%s%s", uriSections[2], strings.Title(uriSections[4]), strings.Title(uriSections[3]))
-	// return method, nil
+	return r
 }
 func (r *RestCodecRequest) ReadRequest(args interface{}) error {
 	buf := new(bytes.Buffer)
@@ -63,9 +73,9 @@ func (c *RestCodecRequest) WriteResponse(w http.ResponseWriter, reply interface{
 	}
 }
 func (codec RestCodec) NewRequest(req *http.Request) rpc.CodecRequest {
-	restBase := "/api"
-	if strings.HasPrefix(req.RequestURI, restBase) {
-		re := regexp.MustCompile(`^/api`)
+
+	if strings.HasPrefix(req.RequestURI, RestBaseURL) {
+		re := regexp.MustCompile(fmt.Sprintf("^%s", RestBaseURL))
 		req.RequestURI = re.ReplaceAllString(req.RequestURI, "")
 		r := RestCodecRequest{Request: req, Mapping: codec.Mapping}
 		return &r

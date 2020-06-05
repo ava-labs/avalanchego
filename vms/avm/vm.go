@@ -239,10 +239,31 @@ func (vm *VM) Shutdown() error {
 	return vm.baseDB.Close()
 }
 
+var mapping map[string]string = map[string]string{
+	"/tx":                        "GetTx",
+	"/tx/issue":                  "IssueTx",
+	"/tx/status":                 "GetTxStatus",
+	"/tx/send":                   "Send",
+	"/tx/mint":                   "CreateMintTx",
+	"/tx/mint/sign":              "SignMintTx",
+	"/utxo":                      "GetUTXOs",
+	"/balance":                   "GetBalance",
+	"/balance/all":               "GetAllBalances",
+	"/asset/description":         "GetAssetDescription",
+	"/asset/cap/fixed/create":    "CreateFixedCapAsset",
+	"/asset/cap/variable/create": "CreateVariableCapAsset",
+	"/address/create":            "CreateAddress",
+	"/address/list":              "ListAddresses",
+	"/key/import":                "ImportKey",
+	"/key/export":                "ExportKey",
+	"/ava/import":                "ImportAVA",
+	"/ava/export":                "ExportAVA",
+}
+
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	rpcServer := rpc.NewServer()
-	codec := cjson.NewCodec()
+	codec := cjson.RestCodec{Mapping: cjson.MappingGenerator(mapping, "avm")}
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	rpcServer.RegisterService(&Service{vm: vm}, "avm") // name this service "avm"
@@ -253,10 +274,14 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	}
 }
 
+var staticMapping map[string]string = map[string]string{
+	"/genesis/build": "vm.BuildGenesis",
+}
+
 // CreateStaticHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer := rpc.NewServer()
-	codec := cjson.NewCodec()
+	codec := cjson.RestCodec{Mapping: cjson.MappingGenerator(staticMapping, "avm")}
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&StaticService{}, "avm") // name this service "avm"

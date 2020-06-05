@@ -32,10 +32,23 @@ type Admin struct {
 	httpServer   *api.Server
 }
 
+var mapping map[string]string = map[string]string{
+	"/node/id":        "GetNodeID",
+	"/blockchain/id":  "GetBlockchainID",
+	"/network/id":     "GetNetworkID",
+	"/peers":          "Peers",
+	"/profile/start":  "StartCPUProfiler",
+	"/profile/stop":   "StopCPUProfiler",
+	"/profile/memory": "MemoryProfile",
+	"/profile/lock":   "LockProfile",
+	"/stack/trace":    "Stacktrace",
+	"/chain/alias":    "AliasChain",
+}
+
 // NewService returns a new admin API service
 func NewService(version version.Version, nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
 	newServer := rpc.NewServer()
-	codec := cjson.NewCodec()
+	codec := cjson.RestCodec{Mapping: cjson.MappingGenerator(mapping, "admin")}
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&Admin{
