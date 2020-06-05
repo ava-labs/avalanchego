@@ -4,6 +4,7 @@
 package common
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
@@ -19,7 +20,7 @@ type BootstrapableTest struct {
 
 	CurrentAcceptedFrontierF func() (acceptedContainerIDs ids.Set)
 	FilterAcceptedF          func(containerIDs ids.Set) (acceptedContainerIDs ids.Set)
-	ForceAcceptedF           func(acceptedContainerIDs ids.Set)
+	ForceAcceptedF           func(acceptedContainerIDs ids.Set) error
 }
 
 // Default sets the default on call handling
@@ -52,10 +53,14 @@ func (b *BootstrapableTest) FilterAccepted(containerIDs ids.Set) ids.Set {
 }
 
 // ForceAccepted implements the Bootstrapable interface
-func (b *BootstrapableTest) ForceAccepted(containerIDs ids.Set) {
+func (b *BootstrapableTest) ForceAccepted(containerIDs ids.Set) error {
 	if b.ForceAcceptedF != nil {
-		b.ForceAcceptedF(containerIDs)
-	} else if b.CantForceAccepted && b.T != nil {
-		b.T.Fatalf("Unexpectedly called ForceAccepted")
+		return b.ForceAcceptedF(containerIDs)
+	} else if b.CantForceAccepted {
+		if b.T != nil {
+			b.T.Fatalf("Unexpectedly called ForceAccepted")
+		}
+		return errors.New("Unexpectedly called ForceAccepted")
 	}
+	return nil
 }

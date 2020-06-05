@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
@@ -35,14 +37,15 @@ type bootstrapper struct {
 
 	pending    ids.Set
 	finished   bool
-	onFinished func()
+	onFinished func() error
 }
 
 // Initialize this engine.
-func (b *bootstrapper) Initialize(config BootstrapConfig) {
+func (b *bootstrapper) Initialize(config BootstrapConfig) error {
 	b.BootstrapConfig = config
 
 	b.Blocked.SetParser(&parser{
+		log:         config.Context.Log,
 		numAccepted: b.numBootstrapped,
 		numDropped:  b.numDropped,
 		vm:          b.VM,
@@ -50,6 +53,7 @@ func (b *bootstrapper) Initialize(config BootstrapConfig) {
 
 	config.Bootstrapable = b
 	b.Bootstrapper.Initialize(config.Config)
+	return nil
 }
 
 // CurrentAcceptedFrontier ...
@@ -71,20 +75,23 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 }
 
 // ForceAccepted ...
-func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
+func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	for _, blkID := range acceptedContainerIDs.List() {
-		b.fetch(blkID)
+		if err := b.fetch(blkID); err != nil {
+			return err
+		}
 	}
 
 	if numPending := b.pending.Len(); numPending == 0 {
 		// TODO: This typically indicates bootstrapping has failed, so this
 		// should be handled appropriately
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
 // Put ...
-func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) {
+func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	b.BootstrapConfig.Context.Log.Verbo("Put called for blkID %s", blkID)
 
 	blk, err := b.VM.ParseBlock(blkBytes)
@@ -94,7 +101,7 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 			formatting.DumpBytes{Bytes: blkBytes})
 
 		b.GetFailed(vdr, requestID)
-		return
+		return nil
 	}
 
 	if !b.pending.Contains(blk.ID()) {
@@ -103,34 +110,35 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkB
 			formatting.DumpBytes{Bytes: blkBytes})
 
 		b.GetFailed(vdr, requestID)
-		return
+		return nil
 	}
 
-	b.addBlock(blk)
+	return b.addBlock(blk)
 }
 
 // GetFailed ...
-func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
+func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	blkID, ok := b.blkReqs.Remove(vdr, requestID)
 	if !ok {
 		b.BootstrapConfig.Context.Log.Debug("GetFailed called without sending the corresponding Get message from %s",
 			vdr)
-		return
+		return nil
 	}
 	b.sendRequest(blkID)
+	return nil
 }
 
-func (b *bootstrapper) fetch(blkID ids.ID) {
+func (b *bootstrapper) fetch(blkID ids.ID) error {
 	if b.pending.Contains(blkID) {
-		return
+		return nil
 	}
 
 	blk, err := b.VM.GetBlock(blkID)
 	if err != nil {
 		b.sendRequest(blkID)
-		return
+		return nil
 	}
-	b.storeBlock(blk)
+	return b.storeBlock(blk)
 }
 
 func (b *bootstrapper) sendRequest(blkID ids.ID) {
@@ -151,15 +159,18 @@ func (b *bootstrapper) sendRequest(blkID ids.ID) {
 	b.numPendingRequests.Set(float64(b.pending.Len()))
 }
 
-func (b *bootstrapper) addBlock(blk snowman.Block) {
-	b.storeBlock(blk)
+func (b *bootstrapper) addBlock(blk snowman.Block) error {
+	if err := b.storeBlock(blk); err != nil {
+		return err
+	}
 
 	if numPending := b.pending.Len(); numPending == 0 {
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
-func (b *bootstrapper) storeBlock(blk snowman.Block) {
+func (b *bootstrapper) storeBlock(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
@@ -173,6 +184,10 @@ func (b *bootstrapper) storeBlock(blk snowman.Block) {
 			b.numBlocked.Inc()
 		}
 
+		if err := b.Blocked.Commit(); err != nil {
+			return err
+		}
+
 		blk = blk.Parent()
 		status = blk.Status()
 		blkID = blk.ID()
@@ -184,34 +199,44 @@ func (b *bootstrapper) storeBlock(blk snowman.Block) {
 	case choices.Accepted:
 		b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", blkID)
 	case choices.Rejected:
-		b.BootstrapConfig.Context.Log.Error("Bootstrapping wants to accept %s, however it was previously rejected", blkID)
+		return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", blkID)
 	}
 
 	numPending := b.pending.Len()
 	b.numPendingRequests.Set(float64(numPending))
+	return nil
 }
 
-func (b *bootstrapper) finish() {
+func (b *bootstrapper) finish() error {
 	if b.finished {
-		return
+		return nil
 	}
 
-	b.executeAll(b.Blocked, b.numBlocked)
+	if err := b.executeAll(b.Blocked, b.numBlocked); err != nil {
+		return err
+	}
 
 	// Start consensus
-	b.onFinished()
+	if err := b.onFinished(); err != nil {
+		return err
+	}
 	b.finished = true
 
 	if b.Bootstrapped != nil {
 		b.Bootstrapped()
 	}
+	return nil
 }
 
-func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) {
+func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		if err := jobs.Execute(job); err != nil {
-			b.BootstrapConfig.Context.Log.Warn("Error executing: %s", err)
+			return err
+		}
+		if err := jobs.Commit(); err != nil {
+			return err
 		}
 	}
+	return nil
 }

@@ -129,9 +129,9 @@ func (vm *VM) Initialize(
 }
 
 // Shutdown implements the avalanche.DAGVM interface
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
-		return
+		return nil
 	}
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
@@ -139,9 +139,8 @@ func (vm *VM) Shutdown() {
 	vm.ctx.Lock.Unlock()
 	vm.timer.Stop()
 	vm.ctx.Lock.Lock()
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
-	}
+
+	return vm.baseDB.Close()
 }
 
 // CreateHandlers makes new service objects with references to the vm

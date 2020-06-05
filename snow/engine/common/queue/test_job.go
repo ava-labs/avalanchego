@@ -4,6 +4,7 @@
 package queue
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
@@ -20,7 +21,7 @@ type TestJob struct {
 
 	IDF                  func() ids.ID
 	MissingDependenciesF func() ids.Set
-	ExecuteF             func()
+	ExecuteF             func() error
 	BytesF               func() []byte
 }
 
@@ -55,12 +56,13 @@ func (j *TestJob) MissingDependencies() ids.Set {
 }
 
 // Execute ...
-func (j *TestJob) Execute() {
+func (j *TestJob) Execute() error {
 	if j.ExecuteF != nil {
-		j.ExecuteF()
+		return j.ExecuteF()
 	} else if j.CantExecute && j.T != nil {
 		j.T.Fatalf("Unexpectedly called Execute")
 	}
+	return errors.New("Unexpectedly called Execute")
 }
 
 // Bytes ...

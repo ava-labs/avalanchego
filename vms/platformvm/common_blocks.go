@@ -129,10 +129,10 @@ type CommonBlock struct {
 }
 
 // Reject implements the snowman.Block interface
-func (cb *CommonBlock) Reject() {
+func (cb *CommonBlock) Reject() error {
 	defer cb.free() // remove this block from memory
 
-	cb.Block.Reject()
+	return cb.Block.Reject()
 }
 
 // free removes this block from memory
@@ -213,17 +213,21 @@ type SingleDecisionBlock struct {
 }
 
 // Accept implements the snowman.Block interface
-func (sdb *SingleDecisionBlock) Accept() {
+func (sdb *SingleDecisionBlock) Accept() error {
 	sdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", sdb.ID())
 
-	sdb.CommonBlock.Accept()
+	if err := sdb.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
 	if err := sdb.onAcceptDB.Commit(); err != nil {
 		sdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+		return err
 	}
 	if err := sdb.vm.DB.Commit(); err != nil {
 		sdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+		return err
 	}
 
 	for _, child := range sdb.children {
@@ -234,6 +238,7 @@ func (sdb *SingleDecisionBlock) Accept() {
 	}
 
 	sdb.free()
+	return nil
 }
 
 // DoubleDecisionBlock contains the accept for a pair of blocks
@@ -242,25 +247,31 @@ type DoubleDecisionBlock struct {
 }
 
 // Accept implements the snowman.Block interface
-func (ddb *DoubleDecisionBlock) Accept() {
+func (ddb *DoubleDecisionBlock) Accept() error {
 	ddb.VM.Ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
 
 	parent, ok := ddb.parentBlock().(*ProposalBlock)
 	if !ok {
 		ddb.vm.Ctx.Log.Error("double decision block should only follow a proposal block")
-		return
+		return errInvalidBlockType
 	}
 
-	parent.CommonBlock.Accept()
+	if err := parent.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
-	ddb.CommonBlock.Accept()
+	if err := ddb.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
 	if err := ddb.onAcceptDB.Commit(); err != nil {
 		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+		return err
 	}
 	if err := ddb.vm.DB.Commit(); err != nil {
 		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+		return err
 	}
 
 	for _, child := range ddb.children {
@@ -273,4 +284,5 @@ func (ddb *DoubleDecisionBlock) Accept() {
 	// remove this block and its parent from memory
 	parent.free()
 	ddb.free()
+	return nil
 }

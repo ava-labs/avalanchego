@@ -70,9 +70,9 @@ type Network interface {
 	// The handler will initially be called with this local node's ID.
 	RegisterHandler(h Handler)
 
-	// Returns the IPs of nodes this network is currently connected to
-	// externally. Thread safety must be managed internally to the network.
-	IPs() []utils.IPDesc
+	// Returns the description of the nodes this network is currently connected
+	// to externally. Thread safety must be managed internally to the network.
+	Peers() []PeerID
 
 	// Close this network and all existing connections it has. Thread safety
 	// must be managed internally to the network. Calling close multiple times
@@ -122,6 +122,7 @@ type network struct {
 	closed          bool
 	disconnectedIPs map[string]struct{}
 	connectedIPs    map[string]struct{}
+	retryDelay      map[string]time.Duration
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs    map[string]struct{} // set of IPs that resulted in my ID.
 	peers    map[[20]byte]*peer
@@ -228,6 +229,7 @@ func NewNetwork(
 
 		disconnectedIPs: make(map[string]struct{}),
 		connectedIPs:    make(map[string]struct{}),
+		retryDelay:      make(map[string]time.Duration),
 		myIPs:           map[string]struct{}{ip.String(): struct{}{}},
 		peers:           make(map[[20]byte]*peer),
 	}
@@ -483,7 +485,15 @@ func (n *network) Dispatch() error {
 	for {
 		conn, err := n.listener.Accept()
 		if err != nil {
-			return err
+			n.stateLock.Lock()
+			closed := n.closed
+			n.stateLock.Unlock()
+
+			if closed {
+				return err
+			}
+			n.log.Debug("error during server accept: %s", err)
+			continue
 		}
 		go n.upgrade(&peer{
 			net:  n,
@@ -511,17 +521,24 @@ func (n *network) RegisterHandler(h Handler) {
 }
 
 // IPs implements the Network interface
-func (n *network) IPs() []utils.IPDesc {
+func (n *network) Peers() []PeerID {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	ips := []utils.IPDesc(nil)
+	peers := []PeerID{}
 	for _, peer := range n.peers {
 		if peer.connected {
-			ips = append(ips, peer.ip)
+			peers = append(peers, PeerID{
+				IP:           peer.conn.RemoteAddr().String(),
+				PublicIP:     peer.ip.String(),
+				ID:           peer.id,
+				Version:      peer.versionStr,
+				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+			})
 		}
 	}
-	return ips
+	return peers
 }
 
 // Close implements the Network interface
@@ -666,15 +683,27 @@ func (n *network) gossip() {
 // the network is closed
 func (n *network) connectTo(ip utils.IPDesc) {
 	str := ip.String()
-	delay := n.initialReconnectDelay
+	n.stateLock.Lock()
+	delay := n.retryDelay[str]
+	n.stateLock.Unlock()
+
 	for {
+		time.Sleep(delay)
+
+		if delay == 0 {
+			delay = n.initialReconnectDelay
+		} else {
+			delay *= 2
+		}
+		if delay > n.maxReconnectDelay {
+			delay = n.maxReconnectDelay
+		}
+
 		n.stateLock.Lock()
 		_, isDisconnected := n.disconnectedIPs[str]
 		_, isConnected := n.connectedIPs[str]
 		_, isMyself := n.myIPs[str]
 		closed := n.closed
-
-		n.stateLock.Unlock()
 
 		if !isDisconnected || isConnected || isMyself || closed {
 			// If the IP was discovered by the peer connecting to us, we don't
@@ -685,8 +714,12 @@ func (n *network) connectTo(ip utils.IPDesc) {
 
 			// If the network was closed, we should stop attempting to connect
 			// to the peer
+
+			n.stateLock.Unlock()
 			return
 		}
+		n.retryDelay[str] = delay
+		n.stateLock.Unlock()
 
 		err := n.attemptConnect(ip)
 		if err == nil {
@@ -694,12 +727,6 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		}
 		n.log.Verbo("error attempting to connect to %s: %s. Reattempting in %s",
 			ip, err, delay)
-
-		time.Sleep(delay)
-		delay *= 2
-		if delay > n.maxReconnectDelay {
-			delay = n.maxReconnectDelay
-		}
 	}
 }
 
@@ -737,6 +764,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	defer n.stateLock.Unlock()
 
 	if n.closed {
+		p.conn.Close()
 		return nil
 	}
 
@@ -752,6 +780,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			}
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
+			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
 		p.conn.Close()
@@ -760,7 +789,9 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 
 	if _, ok := n.peers[key]; ok {
 		if !p.ip.IsZero() {
-			delete(n.disconnectedIPs, p.ip.String())
+			str := p.ip.String()
+			delete(n.disconnectedIPs, str)
+			delete(n.retryDelay, str)
 		}
 		p.conn.Close()
 		return nil
@@ -798,6 +829,7 @@ func (n *network) connected(p *peer) {
 		str := p.ip.String()
 
 		delete(n.disconnectedIPs, str)
+		delete(n.retryDelay, str)
 		n.connectedIPs[str] = struct{}{}
 	}
 

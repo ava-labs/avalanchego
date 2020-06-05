@@ -38,7 +38,7 @@ type VM interface {
 	) error
 
 	// Shutdown is called when the node is shutting down.
-	Shutdown()
+	Shutdown() error
 
 	// Creates the HTTP handlers for custom chain network calls.
 	//

@@ -18,3 +18,13 @@ type TestTransferable struct {
 
 // Amount ...
 func (t *TestTransferable) Amount() uint64 { return t.Val }
+
+// TestAddressable ...
+type TestAddressable struct {
+	TestTransferable `serialize:"true"`
+
+	Addrs [][]byte `serialize:"true"`
+}
+
+// Addresses ...
+func (a *TestAddressable) Addresses() [][]byte { return a.Addrs }

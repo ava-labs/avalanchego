@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
@@ -37,7 +36,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	sender := &common.SenderTest{}
 	vm := &VMTest{}
 	engine := &Transitive{}
-	handler := &handler.Handler{}
+	handler := &router.Handler{}
 	router := &router.ChainRouter{}
 	timeouts := &timeout.Manager{}
 
@@ -55,7 +54,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 
 	handler.Initialize(engine, make(chan common.Message), 1)
 	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts, time.Hour)
+	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
 	blocker, _ := queue.New(db)
 
@@ -142,7 +141,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *reqID, blkID1, blkBytes1)
 
@@ -236,7 +235,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *requestID, blkID2, blkBytes2)
 	bs.Put(peerID, *requestID, blkID1, blkBytes1)
@@ -336,7 +335,7 @@ func TestBootstrapperDependency(t *testing.T) {
 	blk1.status = choices.Processing
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *requestID, blkID1, blkBytes1)
 
@@ -466,7 +465,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	sender.CantGet = false
-	bs.onFinished = func() {}
+	bs.onFinished = func() error { return nil }
 
 	bs.ForceAccepted(acceptedIDs)
 
@@ -572,7 +571,7 @@ func TestBootstrapperWrongIDByzantineResponse(t *testing.T) {
 	}
 
 	finished := new(bool)
-	bs.onFinished = func() { *finished = true }
+	bs.onFinished = func() error { *finished = true; return nil }
 
 	bs.Put(peerID, *requestID, blkID1, blkBytes1)
 

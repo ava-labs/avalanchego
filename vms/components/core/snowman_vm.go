@@ -82,14 +82,21 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 }
 
 // Shutdown this vm
-func (svm *SnowmanVM) Shutdown() {
+func (svm *SnowmanVM) Shutdown() error {
 	if svm.DB == nil {
-		return
+		return nil
 	}
 
-	svm.DB.Commit()              // Flush DB
-	svm.DB.GetDatabase().Close() // close underlying database
-	svm.DB.Close()               // close versionDB
+	// flush DB
+	if err := svm.DB.Commit(); err != nil {
+		return err
+	}
+
+	// close underlying database
+	if err := svm.DB.GetDatabase().Close(); err != nil {
+		return err
+	}
+	return svm.DB.Close() // close versionDB
 }
 
 // DBInitialized returns true iff [svm]'s database has values in it already

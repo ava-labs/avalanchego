@@ -34,8 +34,9 @@ type Consensus interface {
 	IsVirtuous(snowstorm.Tx) bool
 
 	// Adds a new decision. Assumes the dependencies have already been added.
-	// Assumes that mutations don't conflict with themselves.
-	Add(Vertex)
+	// Assumes that mutations don't conflict with themselves. Returns if a
+	// critical error has occurred.
+	Add(Vertex) error
 
 	// VertexIssued returns true iff Vertex has been added
 	VertexIssued(Vertex) bool
@@ -54,8 +55,9 @@ type Consensus interface {
 	Preferences() ids.Set
 
 	// RecordPoll collects the results of a network poll. If a result has not
-	// been added, the result is dropped.
-	RecordPoll(ids.UniqueBag)
+	// been added, the result is dropped. Returns if a critical error has
+	// occurred.
+	RecordPoll(ids.UniqueBag) error
 
 	// Quiesce returns true iff all vertices that have been added but not been accepted or rejected are rogue.
 	// Note, it is possible that after returning quiesce, a new decision may be added such

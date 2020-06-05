@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -41,6 +40,7 @@ const (
 	defaultChannelSize = 1000
 	requestTimeout     = 2 * time.Second
 	gossipFrequency    = 10 * time.Second
+	shutdownTimeout    = 1 * time.Second
 )
 
 // Manager manages the chains running on this node.
@@ -145,7 +145,7 @@ func New(
 	timeoutManager.Initialize(requestTimeout)
 	go log.RecoverAndPanic(timeoutManager.Dispatch)
 
-	router.Initialize(log, &timeoutManager, gossipFrequency)
+	router.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
 
 	m := &manager{
 		stakingEnabled:  stakingEnabled,
@@ -428,7 +428,7 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
+	handler := &router.Handler{}
 	handler.Initialize(&engine, msgChan, defaultChannelSize)
 
 	// Allows messages to be routed to the new chain
@@ -514,7 +514,7 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
+	handler := &router.Handler{}
 	handler.Initialize(&engine, msgChan, defaultChannelSize)
 
 	// Allow incoming messages to be routed to the new chain
