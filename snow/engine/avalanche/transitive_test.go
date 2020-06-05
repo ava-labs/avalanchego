@@ -2272,7 +2272,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown vertex requested")
 	}
 
-	sender.GetF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.GetAncestorsF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if !vdrID.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
@@ -2315,7 +2315,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	te.Put(vdrID, *requestID, vtxID0, vtxBytes0)
+	te.MultiPut(vdrID, *requestID, [][]byte{vtxBytes0})
 
 	vm.ParseTxF = nil
 	st.parseVertex = nil
