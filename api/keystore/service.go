@@ -105,19 +105,19 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 }
 
 var mapping jsoncodec.RPCRestMap = jsoncodec.RPCRestMap{
-	"/api/keystore/user/create": map[string]string{
+	"/keystore/user/create": map[string]string{
 		"post": "keystore.CreateUser",
 	},
-	"/api/keystore/user/delete": map[string]string{
+	"/keystore/user/delete": map[string]string{
 		"post": "keystore.DeleteUser",
 	},
-	"/api/keystore/user/list": map[string]string{
+	"/keystore/user/list": map[string]string{
 		"post": "keystore.ListUsers",
 	},
-	"/api/keystore/user/import": map[string]string{
+	"/keystore/user/import": map[string]string{
 		"post": "keystore.ImportUser",
 	},
-	"/api/keystore/user/export": map[string]string{
+	"/keystore/user/export": map[string]string{
 		"post": "keystore.ExportUser",
 	},
 }

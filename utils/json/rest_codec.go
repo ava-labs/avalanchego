@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/gorilla/rpc/v2"
@@ -40,6 +41,9 @@ func (r *RestCodecRequest) Method() (string, error) {
 func (r *RestCodecRequest) ReadRequest(args interface{}) error {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(r.Request.Body)
+	if len(buf.Bytes()) == 0 {
+		return nil
+	}
 	if err := json.Unmarshal(buf.Bytes(), args); err != nil {
 		return err
 	}
@@ -59,8 +63,10 @@ func (c *RestCodecRequest) WriteResponse(w http.ResponseWriter, reply interface{
 	}
 }
 func (codec RestCodec) NewRequest(req *http.Request) rpc.CodecRequest {
-	fmt.Println(strings.HasPrefix(req.RequestURI, "/api"))
-	if strings.HasPrefix(req.RequestURI, "/api") {
+	restBase := "/api"
+	if strings.HasPrefix(req.RequestURI, restBase) {
+		re := regexp.MustCompile(`^/api`)
+		req.RequestURI = re.ReplaceAllString(req.RequestURI, "")
 		r := RestCodecRequest{Request: req, Mapping: codec.Mapping}
 		return &r
 	}
