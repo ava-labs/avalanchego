@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
@@ -30,32 +32,42 @@ type bootstrapper struct {
 	metrics
 	common.Bootstrapper
 
+	// IDs of vertices that we're already in the process of getting
+	// TODO: Find a better way to track; this keeps every single vertex's ID in memory when bootstrapping from nothing
+	seen ids.Set
+
+	numFetched uint64 // number of vertices that have been fetched from validators
+
 	// vtxReqs prevents asking validators for the same vertex
 	vtxReqs common.Requests
 
+	// IDs of vertices that we have requested from other validators but haven't received
 	pending    ids.Set
 	finished   bool
-	onFinished func()
+	onFinished func() error
 }
 
 // Initialize this engine.
-func (b *bootstrapper) Initialize(config BootstrapConfig) {
+func (b *bootstrapper) Initialize(config BootstrapConfig) error {
 	b.BootstrapConfig = config
 
 	b.VtxBlocked.SetParser(&vtxParser{
-		numAccepted: b.numBootstrappedVtx,
-		numDropped:  b.numDroppedVtx,
+		log:         config.Context.Log,
+		numAccepted: b.numBSVtx,
+		numDropped:  b.numBSDroppedVtx,
 		state:       b.State,
 	})
 
 	b.TxBlocked.SetParser(&txParser{
-		numAccepted: b.numBootstrappedTx,
-		numDropped:  b.numDroppedTx,
+		log:         config.Context.Log,
+		numAccepted: b.numBSTx,
+		numDropped:  b.numBSDroppedTx,
 		vm:          b.VM,
 	})
 
 	config.Bootstrapable = b
 	b.Bootstrapper.Initialize(config.Config)
+	return nil
 }
 
 // CurrentAcceptedFrontier ...
@@ -77,30 +89,30 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 }
 
 // ForceAccepted ...
-func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) {
+func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	for _, vtxID := range acceptedContainerIDs.List() {
-		b.fetch(vtxID)
+		if err := b.fetch(vtxID); err != nil {
+			return err
+		}
 	}
 
 	if numPending := b.pending.Len(); numPending == 0 {
 		// TODO: This typically indicates bootstrapping has failed, so this
 		// should be handled appropriately
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
 // Put ...
-func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) {
-	b.BootstrapConfig.Context.Log.Verbo("Put called for vertexID %s", vtxID)
-
+func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	vtx, err := b.State.ParseVertex(vtxBytes)
 	if err != nil {
 		b.BootstrapConfig.Context.Log.Debug("ParseVertex failed due to %s for block:\n%s",
 			err,
 			formatting.DumpBytes{Bytes: vtxBytes})
 
-		b.GetFailed(vdr, requestID)
-		return
+		return b.GetFailed(vdr, requestID)
 	}
 
 	if !b.pending.Contains(vtx.ID()) {
@@ -108,36 +120,36 @@ func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxB
 			vdr,
 			formatting.DumpBytes{Bytes: vtxBytes})
 
-		b.GetFailed(vdr, requestID)
-		return
+		return b.GetFailed(vdr, requestID)
 	}
 
-	b.addVertex(vtx)
+	return b.addVertex(vtx)
 }
 
 // GetFailed ...
-func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) {
+func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	vtxID, ok := b.vtxReqs.Remove(vdr, requestID)
 	if !ok {
 		b.BootstrapConfig.Context.Log.Debug("GetFailed called without sending the corresponding Get message from %s",
 			vdr)
-		return
+		return nil
 	}
 
 	b.sendRequest(vtxID)
+	return nil
 }
 
-func (b *bootstrapper) fetch(vtxID ids.ID) {
+func (b *bootstrapper) fetch(vtxID ids.ID) error {
 	if b.pending.Contains(vtxID) {
-		return
+		return nil
 	}
 
 	vtx, err := b.State.GetVertex(vtxID)
 	if err != nil {
 		b.sendRequest(vtxID)
-		return
+		return nil
 	}
-	b.storeVertex(vtx)
+	return b.storeVertex(vtx)
 }
 
 func (b *bootstrapper) sendRequest(vtxID ids.ID) {
@@ -155,19 +167,26 @@ func (b *bootstrapper) sendRequest(vtxID ids.ID) {
 	b.pending.Add(vtxID)
 	b.BootstrapConfig.Sender.Get(validatorID, b.RequestID, vtxID)
 
-	b.numPendingRequests.Set(float64(b.pending.Len()))
+	b.numBSPendingRequests.Set(float64(b.pending.Len()))
 }
 
-func (b *bootstrapper) addVertex(vtx avalanche.Vertex) {
-	b.storeVertex(vtx)
+func (b *bootstrapper) addVertex(vtx avalanche.Vertex) error {
+	if err := b.storeVertex(vtx); err != nil {
+		return err
+	}
 
 	if numPending := b.pending.Len(); numPending == 0 {
-		b.finish()
+		return b.finish()
 	}
+	return nil
 }
 
-func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
+func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) error {
 	vts := []avalanche.Vertex{vtx}
+	b.numFetched++
+	if b.numFetched%2500 == 0 { // perioidcally inform user of progress
+		b.BootstrapConfig.Context.Log.Info("bootstrapping has fetched %d vertices", b.numFetched)
+	}
 
 	for len(vts) > 0 {
 		newLen := len(vts) - 1
@@ -182,53 +201,84 @@ func (b *bootstrapper) storeVertex(vtx avalanche.Vertex) {
 			b.pending.Remove(vtxID)
 
 			if err := b.VtxBlocked.Push(&vertexJob{
-				numAccepted: b.numBootstrappedVtx,
-				numDropped:  b.numDroppedVtx,
+				log:         b.BootstrapConfig.Context.Log,
+				numAccepted: b.numBSVtx,
+				numDropped:  b.numBSDroppedVtx,
 				vtx:         vtx,
 			}); err == nil {
-				b.numBlockedVtx.Inc()
+				b.numBSBlockedVtx.Inc()
+			} else {
+				b.BootstrapConfig.Context.Log.Verbo("couldn't push to vtxBlocked")
+			}
+			if err := b.VtxBlocked.Commit(); err != nil {
+				return err
 			}
 			for _, tx := range vtx.Txs() {
 				if err := b.TxBlocked.Push(&txJob{
-					numAccepted: b.numBootstrappedVtx,
-					numDropped:  b.numDroppedVtx,
+					log:         b.BootstrapConfig.Context.Log,
+					numAccepted: b.numBSTx,
+					numDropped:  b.numBSDroppedTx,
 					tx:          tx,
 				}); err == nil {
-					b.numBlockedTx.Inc()
+					b.numBSBlockedTx.Inc()
+				} else {
+					b.BootstrapConfig.Context.Log.Verbo("couldn't push to txBlocked")
 				}
 			}
-
-			vts = append(vts, vtx.Parents()...)
+			if err := b.TxBlocked.Commit(); err != nil {
+				return err
+			}
+			for _, parent := range vtx.Parents() {
+				if parentID := parent.ID(); !b.seen.Contains(parentID) {
+					b.seen.Add(parentID)
+					vts = append(vts, parent)
+				}
+			}
 		case choices.Accepted:
-			b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", vtxID)
+			b.BootstrapConfig.Context.Log.Verbo("bootstrapping confirmed %s", vtxID)
 		case choices.Rejected:
-			b.BootstrapConfig.Context.Log.Error("Bootstrapping wants to accept %s, however it was previously rejected", vtxID)
+			return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", vtxID)
 		}
 	}
 
 	numPending := b.pending.Len()
-	b.numPendingRequests.Set(float64(numPending))
+	b.numBSPendingRequests.Set(float64(numPending))
+	return nil
 }
 
-func (b *bootstrapper) finish() {
+func (b *bootstrapper) finish() error {
 	if b.finished {
-		return
+		return nil
+	}
+	b.BootstrapConfig.Context.Log.Info("bootstrapping finished fetching vertices. executing state transitions...")
+
+	if err := b.executeAll(b.TxBlocked, b.numBSBlockedTx); err != nil {
+		return err
+	}
+	if err := b.executeAll(b.VtxBlocked, b.numBSBlockedVtx); err != nil {
+		return err
 	}
 
-	b.executeAll(b.TxBlocked, b.numBlockedTx)
-	b.executeAll(b.VtxBlocked, b.numBlockedVtx)
-
 	// Start consensus
-	b.onFinished()
+	if err := b.onFinished(); err != nil {
+		return err
+	}
+	b.seen = ids.Set{}
 	b.finished = true
+	return nil
 }
 
-func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) {
+func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		b.BootstrapConfig.Context.Log.Debug("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
-			b.BootstrapConfig.Context.Log.Warn("Error executing: %s", err)
+			b.BootstrapConfig.Context.Log.Error("Error executing: %s", err)
+			return err
+		}
+		if err := jobs.Commit(); err != nil {
+			return err
 		}
 	}
+	return nil
 }

@@ -25,7 +25,7 @@ func (v *voter) Fulfill(id ids.ID) {
 func (v *voter) Abandon(id ids.ID) { v.Fulfill(id) }
 
 func (v *voter) Update() {
-	if v.deps.Len() != 0 {
+	if v.deps.Len() != 0 || v.t.errs.Errored() {
 		return
 	}
 
@@ -46,7 +46,10 @@ func (v *voter) Update() {
 	results = v.bubbleVotes(results)
 
 	v.t.Config.Context.Log.Verbo("Finishing poll [%d] with:\n%s", v.requestID, &results)
-	v.t.Consensus.RecordPoll(results)
+	if err := v.t.Consensus.RecordPoll(results); err != nil {
+		v.t.errs.Add(err)
+		return
+	}
 
 	v.t.Config.VM.SetPreference(v.t.Consensus.Preference())
 

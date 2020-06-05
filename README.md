@@ -1,4 +1,4 @@
-# gecko
+# Gecko
 
 ## Installation
 
@@ -10,23 +10,6 @@ AVA is an incredibly lightweight protocol, so the minimum computer requirements 
 - Network: IPv4 or IPv6 network connection, with an open public port.
 
 ### Native Install
-
-Ubuntu users need the following libraries:
-
-* libssl-dev
-* libuv1-dev
-* cmake
-* make
-* curl
-* g++
-  
-Install the libraries:
-
-```sh
-sudo apt-get install libssl-dev libuv1-dev cmake make curl g++
-```
-
-#### Downloading Gecko Source Code
 
 Clone the Gecko repository:
 
@@ -43,7 +26,7 @@ Build Gecko using the build script:
 ./scripts/build.sh
 ```
 
-The Gecko binary, named `ava`, is in the `build` directory. 
+The Gecko binary, named `ava`, is in the `build` directory.
 
 ### Docker Install
 
@@ -72,10 +55,11 @@ You may see a few warnings. These are OK.
 You can use `Ctrl + C` to kill the node.
 
 If you want to specify your log level. You should set `--log-level` to one of the following values, in decreasing order of logging.
-* `--log-level=verbo`
-* `--log-level=debug`
-* `--log-level=info`
-* `--log-level=warn`
-* `--log-level=error`
-* `--log-level=fatal`
-* `--log-level=off`
+
+- `--log-level=verbo`
+- `--log-level=debug`
+- `--log-level=info`
+- `--log-level=warn`
+- `--log-level=error`
+- `--log-level=fatal`
+- `--log-level=off`

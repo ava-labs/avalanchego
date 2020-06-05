@@ -259,6 +259,17 @@ func TestServiceExportImport(t *testing.T) {
 		reply := ImportUserReply{}
 		if err := newKS.ImportUser(nil, &ImportUserArgs{
 			Username: "bob",
+			Password: "",
+			User:     exportReply.User,
+		}, &reply); err == nil {
+			t.Fatal("Should have errored due to incorrect password")
+		}
+	}
+
+	{
+		reply := ImportUserReply{}
+		if err := newKS.ImportUser(nil, &ImportUserArgs{
+			Username: "bob",
 			Password: strongPassword,
 			User:     exportReply.User,
 		}, &reply); err != nil {

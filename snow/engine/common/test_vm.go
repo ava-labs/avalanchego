@@ -22,7 +22,7 @@ type VMTest struct {
 	CantInitialize, CantShutdown, CantCreateHandlers, CantCreateStaticHandlers bool
 
 	InitializeF           func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
-	ShutdownF             func()
+	ShutdownF             func() error
 	CreateHandlersF       func() map[string]*HTTPHandler
 	CreateStaticHandlersF func() map[string]*HTTPHandler
 }
@@ -46,12 +46,16 @@ func (vm *VMTest) Initialize(ctx *snow.Context, db database.Database, initState 
 }
 
 // Shutdown ...
-func (vm *VMTest) Shutdown() {
+func (vm *VMTest) Shutdown() error {
 	if vm.ShutdownF != nil {
-		vm.ShutdownF()
-	} else if vm.CantShutdown && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called Shutdown")
+		return vm.ShutdownF()
+	} else if vm.CantShutdown {
+		if vm.T != nil {
+			vm.T.Fatalf("Unexpectedly called Shutdown")
+		}
+		return errors.New("Unexpectedly called Shutdown")
 	}
+	return nil
 }
 
 // CreateHandlers ...

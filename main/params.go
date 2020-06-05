@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	dbVersion = "v0.2.0"
+	dbVersion = "v0.5.0"
 )
 
 // Results of parsing the CLI
@@ -39,6 +39,12 @@ var (
 	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
 	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
 	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+
+	defaultPluginDirs = []string{
+		"./build/plugins",
+		"./plugins",
+		os.ExpandEnv(filepath.Join("$HOME", ".gecko", "plugins")),
+	}
 )
 
 var (
@@ -48,11 +54,19 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
+	case genesis.DenaliID:
+		return []string{
+			"3.20.56.211:21001",
+			"18.224.140.156:21001",
+			"3.133.83.66:21001",
+			"3.133.131.39:21001",
+			"18.188.121.35:21001",
+		}
 	case genesis.CascadeID:
 		return []string{
 			"3.227.207.132:21001",
 			"34.207.133.167:21001",
-			"107.23.241.199:21001",
+			"54.162.71.9:21001",
 			"54.197.215.186:21001",
 			"18.234.153.22:21001",
 		}
@@ -74,7 +88,7 @@ func init() {
 	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.CascadeName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", genesis.TestnetName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
@@ -93,6 +107,7 @@ func init() {
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 
 	// HTTP Server:
+	httpHost := fs.String("http-host", "", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
 	fs.BoolVar(&Config.EnableHTTPS, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
@@ -109,7 +124,7 @@ func init() {
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
 	// Plugins:
-	fs.StringVar(&Config.PluginDir, "plugin-dir", "./build/plugins", "Plugin directory for Ava VMs")
+	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Ava VMs")
 
 	// Logging:
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
@@ -128,6 +143,7 @@ func init() {
 	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", true, "If true, this node exposes the Admin API")
 	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
+	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
 	fs.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
 
 	// Throughput Server
@@ -247,6 +263,16 @@ func init() {
 		}
 	}
 
+	// Plugins
+	if _, err := os.Stat(Config.PluginDir); os.IsNotExist(err) {
+		for _, dir := range defaultPluginDirs {
+			if _, err := os.Stat(dir); !os.IsNotExist(err) {
+				Config.PluginDir = dir
+				break
+			}
+		}
+	}
+
 	// Staking
 	Config.StakingCertFile = os.ExpandEnv(Config.StakingCertFile) // parse any env variable
 	Config.StakingKeyFile = os.ExpandEnv(Config.StakingKeyFile)
@@ -269,6 +295,7 @@ func init() {
 	}
 
 	// HTTP:
+	Config.HTTPHost = *httpHost
 	Config.HTTPPort = uint16(*httpPort)
 
 	// Logging:

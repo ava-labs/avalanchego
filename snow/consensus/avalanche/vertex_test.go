@@ -28,8 +28,8 @@ func (v *Vtx) Parents() []Vertex      { return v.dependencies }
 func (v *Vtx) Txs() []snowstorm.Tx    { return v.txs }
 func (v *Vtx) Status() choices.Status { return v.status }
 func (v *Vtx) Live()                  {}
-func (v *Vtx) Accept()                { v.status = choices.Accepted }
-func (v *Vtx) Reject()                { v.status = choices.Rejected }
+func (v *Vtx) Accept() error          { v.status = choices.Accepted; return nil }
+func (v *Vtx) Reject() error          { v.status = choices.Rejected; return nil }
 func (v *Vtx) Bytes() []byte          { return v.bytes }
 
 type sortVts []*Vtx

@@ -76,7 +76,7 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 func TestEngineShutdown(t *testing.T) {
 	_, _, _, vm, transitive, _ := setup(t)
 	vmShutdownCalled := false
-	vm.ShutdownF = func() { vmShutdownCalled = true }
+	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	vm.CantShutdown = false
 	transitive.Shutdown()
 	if !vmShutdownCalled {

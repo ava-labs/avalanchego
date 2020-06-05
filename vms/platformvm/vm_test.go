@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -1560,8 +1559,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	timeoutManager.Initialize(2 * time.Second)
 	go timeoutManager.Dispatch()
 
-	router := &router.ChainRouter{}
-	router.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
+	chainRouter := &router.ChainRouter{}
+	chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -1569,7 +1568,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
 
-	sender.Initialize(ctx, externalSender, router, &timeoutManager)
+	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
 	// The engine handles consensus
 	engine := smeng.Transitive{}
@@ -1597,11 +1596,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
+	handler := &router.Handler{}
 	handler.Initialize(&engine, msgChan, 1000)
 
 	// Allow incoming messages to be routed to the new chain
-	router.AddChain(handler)
+	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	reqID := new(uint32)
@@ -1646,7 +1645,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	ctx.Lock.Unlock()
 
-	router.Shutdown()
+	chainRouter.Shutdown()
 }
 
 func TestUnverifiedParent(t *testing.T) {

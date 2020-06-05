@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/logging"
 
@@ -22,14 +23,14 @@ type Admin struct {
 	nodeID       ids.ShortID
 	networkID    uint32
 	log          logging.Logger
-	networking   Networking
+	networking   network.Network
 	performance  Performance
 	chainManager chains.Manager
 	httpServer   *api.Server
 }
 
 // NewService returns a new admin API service
-func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers Peerable, httpServer *api.Server) *common.HTTPHandler {
+func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -39,10 +40,8 @@ func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainM
 		networkID:    networkID,
 		log:          log,
 		chainManager: chainManager,
-		networking: Networking{
-			peers: peers,
-		},
-		httpServer: httpServer,
+		networking:   peers,
+		httpServer:   httpServer,
 	}, "admin")
 	return &common.HTTPHandler{Handler: newServer}
 }
@@ -103,16 +102,14 @@ type PeersArgs struct{}
 
 // PeersReply are the results from calling Peers
 type PeersReply struct {
-	Peers []string `json:"peers"`
+	Peers []network.PeerID `json:"peers"`
 }
 
 // Peers returns the list of current validators
 func (service *Admin) Peers(r *http.Request, args *PeersArgs, reply *PeersReply) error {
 	service.log.Debug("Admin: Peers called")
-
-	peers, err := service.networking.Peers()
-	reply.Peers = peers
-	return err
+	reply.Peers = service.networking.Peers()
+	return nil
 }
 
 // StartCPUProfilerArgs are the arguments for calling StartCPUProfiler
@@ -225,4 +222,18 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *A
 
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
+}
+
+// StacktraceArgs are the arguments for calling Stacktrace
+type StacktraceArgs struct{}
+
+// StacktraceReply are the results from calling Stacktrace
+type StacktraceReply struct {
+	Stacktrace string `json:"stacktrace"`
+}
+
+// Stacktrace returns the current global stacktrace
+func (service *Admin) Stacktrace(_ *http.Request, _ *StacktraceArgs, reply *StacktraceReply) error {
+	reply.Stacktrace = logging.Stacktrace{Global: true}.String()
+	return nil
 }

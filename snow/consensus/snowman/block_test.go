@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"errors"
 	"sort"
 
 	"github.com/ava-labs/gecko/ids"
@@ -21,17 +22,19 @@ type TestBlock struct {
 func (b *TestBlock) Parent() Block          { return b.parent }
 func (b *TestBlock) ID() ids.ID             { return b.id }
 func (b *TestBlock) Status() choices.Status { return b.status }
-func (b *TestBlock) Accept() {
+func (b *TestBlock) Accept() error {
 	if b.status.Decided() && b.status != choices.Accepted {
-		panic("Dis-agreement")
+		return errors.New("Dis-agreement")
 	}
 	b.status = choices.Accepted
+	return nil
 }
-func (b *TestBlock) Reject() {
+func (b *TestBlock) Reject() error {
 	if b.status.Decided() && b.status != choices.Rejected {
-		panic("Dis-agreement")
+		return errors.New("Dis-agreement")
 	}
 	b.status = choices.Rejected
+	return nil
 }
 func (b *TestBlock) Verify() error { return nil }
 func (b *TestBlock) Bytes() []byte { return b.bytes }

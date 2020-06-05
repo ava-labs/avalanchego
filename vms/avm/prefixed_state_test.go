@@ -151,7 +151,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 
 	state := vm.state
 
-	vm.codec.RegisterType(&testAddressable{})
+	vm.codec.RegisterType(&ava.TestAddressable{})
 
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{
@@ -159,7 +159,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: ava.Asset{ID: ids.Empty},
-		Out: &testAddressable{
+		Out: &ava.TestAddressable{
 			Addrs: [][]byte{
 				[]byte{0},
 			},
@@ -182,8 +182,11 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	_, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
-	if err == nil {
-		t.Fatalf("Should have returned no utxoIDs")
+	funds, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(funds) != 0 {
+		t.Fatalf("Should have returned 0 utxoIDs")
 	}
 }
