@@ -247,8 +247,13 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		}
 	}
 
+	primaryAlias, err := m.PrimaryAlias(chain.ID)
+	if err != nil {
+		primaryAlias = chain.ID.String()
+	}
+
 	// Create the log and context of the chain
-	chainLog, err := m.logFactory.MakeChain(chain.ID, "")
+	chainLog, err := m.logFactory.MakeChain(primaryAlias, "")
 	if err != nil {
 		m.log.Error("error while creating chain's log %s", err)
 		return
@@ -266,12 +271,9 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chain.ID),
 		BCLookup:            m,
 	}
+
 	consensusParams := m.consensusParams
-	if alias, err := m.PrimaryAlias(ctx.ChainID); err == nil {
-		consensusParams.Namespace = fmt.Sprintf("gecko_%s", alias)
-	} else {
-		consensusParams.Namespace = fmt.Sprintf("gecko_%s", ctx.ChainID)
-	}
+	consensusParams.Namespace = fmt.Sprintf("gecko_%s", primaryAlias)
 
 	// The validators of this blockchain
 	var validators validators.Set // Validators validating this blockchain
