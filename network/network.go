@@ -526,7 +526,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 // Gossip attempts to gossip the container to the network
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 	if err := n.gossipContainer(chainID, containerID, container); err != nil {
-		n.log.Error("failed to Gossip(%s, %s): %s", chainID, containerID, err)
+		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
 }
@@ -701,7 +701,9 @@ func (n *network) gossip() {
 		}
 		msg, err := n.b.PeerList(ips)
 		if err != nil {
-			n.log.Warn("failed to gossip PeerList message due to %s", err)
+			n.log.Error("failed to build peer list to gossip: %s. len(ips): %d",
+				err,
+				len(ips))
 			continue
 		}
 
