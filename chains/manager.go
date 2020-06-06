@@ -429,7 +429,13 @@ func (m *manager) createAvalancheChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(&engine, msgChan, defaultChannelSize)
+	handler.Initialize(
+		&engine,
+		msgChan,
+		defaultChannelSize,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
 
 	// Allows messages to be routed to the new chain
 	m.chainRouter.AddChain(handler)
@@ -515,7 +521,13 @@ func (m *manager) createSnowmanChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(&engine, msgChan, defaultChannelSize)
+	handler.Initialize(
+		&engine,
+		msgChan,
+		defaultChannelSize,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
 
 	// Allow incoming messages to be routed to the new chain
 	m.chainRouter.AddChain(handler)

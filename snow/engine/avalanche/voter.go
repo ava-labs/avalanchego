@@ -59,11 +59,11 @@ func (v *voter) Update() {
 	}
 
 	if v.t.Consensus.Quiesce() {
-		v.t.Config.Context.Log.Verbo("Avalanche engine can quiesce")
+		v.t.Config.Context.Log.Debug("Avalanche engine can quiesce")
 		return
 	}
 
-	v.t.Config.Context.Log.Verbo("Avalanche engine can't quiesce")
+	v.t.Config.Context.Log.Debug("Avalanche engine can't quiesce")
 	v.t.errs.Add(v.t.repoll())
 }
 
