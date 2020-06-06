@@ -115,11 +115,12 @@ var mapping map[string]string = map[string]string{
 // CreateHandler returns a new service object that can send requests to thisAPI.
 func (ks *Keystore) CreateHandler() *common.HTTPHandler {
 	newServer := rpc.NewServer()
-	codec := jsoncodec.RestCodec{Mapping: jsoncodec.MappingGenerator(mapping, "keystore")}
+	restMap := jsoncodec.MappingGenerator(mapping, "keystore")
+	codec := jsoncodec.RestCodec{Mapping: restMap}
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(ks, "keystore")
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer, RestEndpoints: restMap.GetKeys()}
 }
 
 // Get the user whose name is [username]

@@ -163,7 +163,8 @@ var mapping map[string]string = map[string]string{
 
 func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ...common.LockOption) *common.HTTPHandler {
 	server := rpc.NewServer()
-	codec := json.RestCodec{Mapping: json.MappingGenerator(mapping, "platform")}
+	restMap := json.MappingGenerator(mapping, "platform")
+	codec := json.RestCodec{Mapping: restMap}
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	server.RegisterService(service, name)
@@ -172,7 +173,7 @@ func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ..
 	if len(lockOption) != 0 {
 		lock = lockOption[0]
 	}
-	return &common.HTTPHandler{LockOptions: lock, Handler: server}
+	return &common.HTTPHandler{LockOptions: lock, Handler: server, RestEndpoints: restMap.GetKeys()}
 }
 
 // Initialize this vm.

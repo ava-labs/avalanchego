@@ -7,10 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"sync"
 
-	jsoncodec "github.com/ava-labs/gecko/utils/json"
 	"github.com/gorilla/mux"
 )
 
@@ -92,12 +90,6 @@ func (r *router) forceAddRouter(base, endpoint string, handler http.Handler) err
 	endpoints[endpoint] = handler
 	r.routes[base] = endpoints
 	r.router.Handle(url, handler)
-
-	re := regexp.MustCompile(fmt.Sprintf("^%s", baseURL))
-	restBase := re.ReplaceAllString(base, jsoncodec.RestBaseURL)
-	restUrl := restBase + endpoint
-
-	r.router.PathPrefix(restUrl).Handler(handler)
 
 	var err error
 	if aliases, exists := r.aliases[base]; exists {

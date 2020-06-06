@@ -48,7 +48,8 @@ var mapping map[string]string = map[string]string{
 // NewService returns a new admin API service
 func NewService(version version.Version, nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
 	newServer := rpc.NewServer()
-	codec := cjson.RestCodec{Mapping: cjson.MappingGenerator(mapping, "admin")}
+	restMap := cjson.MappingGenerator(mapping, "admin")
+	codec := cjson.RestCodec{Mapping: restMap}
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&Admin{
@@ -60,7 +61,7 @@ func NewService(version version.Version, nodeID ids.ShortID, networkID uint32, l
 		networking:   peers,
 		httpServer:   httpServer,
 	}, "admin")
-	return &common.HTTPHandler{Handler: newServer}
+	return &common.HTTPHandler{Handler: newServer, RestEndpoints: restMap.GetKeys()}
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion

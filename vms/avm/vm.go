@@ -263,13 +263,14 @@ var mapping map[string]string = map[string]string{
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	rpcServer := rpc.NewServer()
-	codec := cjson.RestCodec{Mapping: cjson.MappingGenerator(mapping, "avm")}
+	restMap := cjson.MappingGenerator(mapping, "avm")
+	codec := cjson.RestCodec{Mapping: restMap}
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	rpcServer.RegisterService(&Service{vm: vm}, "avm") // name this service "avm"
 
 	return map[string]*common.HTTPHandler{
-		"":        {Handler: rpcServer},
+		"":        {Handler: rpcServer, RestEndpoints: restMap.GetKeys()},
 		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}
 }
@@ -281,12 +282,13 @@ var staticMapping map[string]string = map[string]string{
 // CreateStaticHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer := rpc.NewServer()
-	codec := cjson.RestCodec{Mapping: cjson.MappingGenerator(staticMapping, "avm")}
+	restMap := cjson.MappingGenerator(staticMapping, "avm")
+	codec := cjson.RestCodec{Mapping: restMap}
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&StaticService{}, "avm") // name this service "avm"
 	return map[string]*common.HTTPHandler{
-		"": {LockOptions: common.WriteLock, Handler: newServer},
+		"": {LockOptions: common.WriteLock, Handler: newServer, RestEndpoints: restMap.GetKeys()},
 	}
 }
 
