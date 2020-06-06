@@ -10,7 +10,7 @@ import (
 // This example inserts several ints into an IntHeap, checks the minimum,
 // and removes them in order of priority.
 func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
-	h := NewMaxVertexHeap()
+	h := newMaxVertexHeap()
 
 	vtx0 := &Vtx{
 		id:     GenerateID(),
@@ -90,7 +90,7 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 }
 
 func TestUniqueVertexHeapRemainsUnique(t *testing.T) {
-	h := NewMaxVertexHeap()
+	h := newMaxVertexHeap()
 
 	vtx0 := &Vtx{
 		height: 0,

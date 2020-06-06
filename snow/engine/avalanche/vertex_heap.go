@@ -72,7 +72,7 @@ type maxHeightVertexHeap struct {
 	elementIDs ids.Set
 }
 
-func NewMaxVertexHeap() *maxHeightVertexHeap {
+func newMaxVertexHeap() *maxHeightVertexHeap {
 	return &maxHeightVertexHeap{
 		heap:       &priorityQueue{},
 		elementIDs: ids.Set{},
