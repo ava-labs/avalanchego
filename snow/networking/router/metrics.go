@@ -28,6 +28,8 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 }
 
 type metrics struct {
+	pending prometheus.Gauge
+
 	getAcceptedFrontier, acceptedFrontier, getAcceptedFrontierFailed,
 	getAccepted, accepted, getAcceptedFailed,
 	get, put, getFailed,
@@ -40,81 +42,34 @@ type metrics struct {
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer) error {
 	errs := wrappers.Errs{}
-	m.getAcceptedFrontier = initHistogram()
-	return errs.Err
-	m.getAcceptedFrontier = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
+
+	m.pending = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "get_accepted_frontier",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.acceptedFrontier = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "accepted_frontier",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.getAcceptedFrontierFailed = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "get_accepted_frontier_failed",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.getAccepted = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "get_accepted",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.accepted = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "accepted",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.getAcceptedFailed = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "get_accepted_failed",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.get = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "get",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.put = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "put",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.getFailed = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "getFailed",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
-		})
-	m.getFailed = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "getFailed",
-			Help:      "Time spent processing this request in nanoseconds",
-			Buckets:   timer.NanosecondsBuckets,
+			Name:      "pending",
+			Help:      "Number of pending events",
 		})
 
-	if err := registerer.Register(m.getAcceptedFrontier); err != nil {
-		return fmt.Errorf("failed to register get_accepted_frontier statistics due to %s", err)
+	if err := registerer.Register(m.pending); err != nil {
+		errs.Add(fmt.Errorf("failed to register pending statistics due to %s", err))
 	}
-	return nil
+
+	m.getAcceptedFrontier = initHistogram(namespace, "get_accepted_frontier", registerer, &errs)
+	m.acceptedFrontier = initHistogram(namespace, "accepted_frontier", registerer, &errs)
+	m.getAcceptedFrontierFailed = initHistogram(namespace, "get_accepted_frontier_failed", registerer, &errs)
+	m.getAccepted = initHistogram(namespace, "get_accepted", registerer, &errs)
+	m.accepted = initHistogram(namespace, "accepted", registerer, &errs)
+	m.getAcceptedFailed = initHistogram(namespace, "get_accepted_failed", registerer, &errs)
+	m.get = initHistogram(namespace, "get", registerer, &errs)
+	m.put = initHistogram(namespace, "put", registerer, &errs)
+	m.getFailed = initHistogram(namespace, "get_failed", registerer, &errs)
+	m.pushQuery = initHistogram(namespace, "push_query", registerer, &errs)
+	m.pullQuery = initHistogram(namespace, "pull_query", registerer, &errs)
+	m.chits = initHistogram(namespace, "chits", registerer, &errs)
+	m.queryFailed = initHistogram(namespace, "query_failed", registerer, &errs)
+	m.notify = initHistogram(namespace, "notify", registerer, &errs)
+	m.gossip = initHistogram(namespace, "gossip", registerer, &errs)
+	m.shutdown = initHistogram(namespace, "shutdown", registerer, &errs)
+
+	return errs.Err
 }
