@@ -339,7 +339,7 @@ func (ipf ipFilter) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 	writer.WriteHeader(404)
-	writer.Write([]byte("404 page not found"))
+	writer.Write([]byte("404 page not found\r\n"))
 }
 
 func newIPFilter(handler http.Handler) http.Handler {
