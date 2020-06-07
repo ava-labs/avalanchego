@@ -116,6 +116,15 @@ func (h *Handler) dispatchMsg(msg message) bool {
 	case getAcceptedFailedMsg:
 		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
 		h.getAcceptedFailed.Observe(float64(time.Now().Sub(startTime)))
+	case getAncestorsMsg:
+		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
+		h.getAncestors.Observe(float64(time.Now().Sub(startTime)))
+	case getAncestorsFailedMsg:
+		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
+		h.getAncestorsFailed.Observe(float64(time.Now().Sub(startTime)))
+	case multiPutMsg:
+		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
+		h.multiPut.Observe(float64(time.Now().Sub(startTime)))
 	case getMsg:
 		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
 		h.get.Observe(float64(time.Now().Sub(startTime)))
@@ -235,6 +244,16 @@ func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids
 	}
 }
 
+// GetAncestors passes a GetAncestors message received from the network to the consensus engine.
+func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+	h.msgs <- message{
+		messageType: getAncestorsMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+		containerID: containerID,
+	}
+}
+
 // Put passes a Put message received from the network to the consensus engine.
 func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
 	h.metrics.pending.Inc()
@@ -247,11 +266,30 @@ func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids
 	}
 }
 
+// MultiPut passes a MultiPut message received from the network to the consensus engine.
+func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
+	h.msgs <- message{
+		messageType: multiPutMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+		containers:  containers,
+	}
+}
+
 // GetFailed passes a GetFailed message to the consensus engine.
 func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 	h.metrics.pending.Inc()
 	h.msgs <- message{
 		messageType: getFailedMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+	}
+}
+
+// GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
+func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
+	h.msgs <- message{
+		messageType: getAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 	}

@@ -89,6 +89,15 @@ func (m Builder) Get(chainID ids.ID, requestID uint32, containerID ids.ID) (Msg,
 	})
 }
 
+// GetAncestors message
+func (m Builder) GetAncestors(chainID ids.ID, requestID uint32, containerID ids.ID) (Msg, error) {
+	return m.Pack(GetAncestors, map[Field]interface{}{
+		ChainID:     chainID.Bytes(),
+		RequestID:   requestID,
+		ContainerID: containerID.Bytes(),
+	})
+}
+
 // Put message
 func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) (Msg, error) {
 	return m.Pack(Put, map[Field]interface{}{
@@ -96,6 +105,15 @@ func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, conta
 		RequestID:      requestID,
 		ContainerID:    containerID.Bytes(),
 		ContainerBytes: container,
+	})
+}
+
+// MultiPut message
+func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte) (Msg, error) {
+	return m.Pack(MultiPut, map[Field]interface{}{
+		ChainID:             chainID.Bytes(),
+		RequestID:           requestID,
+		MultiContainerBytes: containers,
 	})
 }
 

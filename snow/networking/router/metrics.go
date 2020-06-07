@@ -32,6 +32,7 @@ type metrics struct {
 
 	getAcceptedFrontier, acceptedFrontier, getAcceptedFrontierFailed,
 	getAccepted, accepted, getAcceptedFailed,
+	getAncestors, multiPut, getAncestorsFailed,
 	get, put, getFailed,
 	pushQuery, pullQuery, chits, queryFailed,
 	notify,
@@ -60,6 +61,9 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	m.getAccepted = initHistogram(namespace, "get_accepted", registerer, &errs)
 	m.accepted = initHistogram(namespace, "accepted", registerer, &errs)
 	m.getAcceptedFailed = initHistogram(namespace, "get_accepted_failed", registerer, &errs)
+	m.getAncestors = initHistogram(namespace, "get_ancestors", registerer, &errs)
+	m.multiPut = initHistogram(namespace, "multi_put", registerer, &errs)
+	m.getAncestorsFailed = initHistogram(namespace, "get_ancestors_failed", registerer, &errs)
 	m.get = initHistogram(namespace, "get", registerer, &errs)
 	m.put = initHistogram(namespace, "put", registerer, &errs)
 	m.getFailed = initHistogram(namespace, "get_failed", registerer, &errs)

@@ -1551,8 +1551,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	advanceTimePreference := advanceTimeBlk.Options()[0]
 
+	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	vdrs := validators.NewSet()
-	vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+	vdrs.Add(validators.NewValidator(peerID, 1))
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
@@ -1623,23 +1624,23 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	frontier := ids.Set{}
 	frontier.Add(advanceTimeBlkID)
-	engine.AcceptedFrontier(ctx.NodeID, *reqID, frontier)
+	engine.AcceptedFrontier(peerID, *reqID, frontier)
 
 	externalSender.GetAcceptedF = nil
-	externalSender.GetF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
 		*reqID = requestID
 		if !containerID.Equals(advanceTimeBlkID) {
 			t.Fatalf("wrong block requested")
 		}
 	}
 
-	engine.Accepted(ctx.NodeID, *reqID, frontier)
+	engine.Accepted(peerID, *reqID, frontier)
 
 	externalSender.GetF = nil
 	externalSender.CantPushQuery = false
 	externalSender.CantPullQuery = false
 
-	engine.Put(ctx.NodeID, *reqID, advanceTimeBlkID, advanceTimeBlkBytes)
+	engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes})
 
 	externalSender.CantPushQuery = true
 

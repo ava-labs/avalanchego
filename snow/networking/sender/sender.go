@@ -93,6 +93,20 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 	s.sender.Get(validatorID, s.ctx.ChainID, requestID, containerID)
 }
 
+// GetAncestors sends a GetAncestors message
+func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+	s.ctx.Log.Verbo("Sending GetAncestors to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
+	// Sending a GetAncestors to myself will always fail
+	if validatorID.Equals(s.ctx.NodeID) {
+		go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
+		return
+	}
+	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+		s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
+	})
+	s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, containerID)
+}
+
 // Put sends a Put message to the consensus engine running on the specified chain
 // on the specified validator.
 // The Put message signifies that this consensus engine is giving to the recipient
@@ -100,6 +114,14 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 func (s *Sender) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending Put to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
 	s.sender.Put(validatorID, s.ctx.ChainID, requestID, containerID, container)
+}
+
+// MultiPut sends a MultiPut message to the consensus engine running on the specified chain
+// on the specified validator.
+// The MultiPut message gives the recipient the contents of several containers.
+func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
+	s.ctx.Log.Verbo("Sending MultiPut to validator %s. RequestID: %d. NumContainers: %d", validatorID, requestID, len(containers))
+	s.sender.MultiPut(validatorID, s.ctx.ChainID, requestID, containers)
 }
 
 // PushQuery sends a PushQuery message to the consensus engines running on the specified chains
