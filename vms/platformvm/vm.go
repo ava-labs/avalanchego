@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -38,6 +39,9 @@ const (
 	chainsTypeID
 	blockTypeID
 	subnetsTypeID
+
+	platformAlias = "P"
+	addressSep    = "-"
 
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
@@ -98,6 +102,8 @@ var (
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
+	errInvalidAddress           = errors.New("invalid address")
+	errEmptyAddress             = errors.New("empty address")
 )
 
 // Codec does serialization and deserialization
@@ -859,4 +865,20 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 		utxos = append(utxos, utxo)
 	}
 	return utxos, nil
+}
+
+// ParseAddr ...
+func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
+	cb58 := formatting.CB58{}
+	err := cb58.FromString(addrStr)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return ids.ToShortID(cb58.Bytes)
+}
+
+// Assumes addrID is not empty
+// FormatAddress ...
+func (vm *VM) FormatAddress(addrID ids.ShortID) string {
+	return addrID.String()
 }
