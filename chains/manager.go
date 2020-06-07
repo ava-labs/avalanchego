@@ -38,7 +38,7 @@ import (
 
 const (
 	defaultChannelSize = 1000
-	requestTimeout     = 2 * time.Second
+	requestTimeout     = 4 * time.Second
 	gossipFrequency    = 10 * time.Second
 	shutdownTimeout    = 1 * time.Second
 )
