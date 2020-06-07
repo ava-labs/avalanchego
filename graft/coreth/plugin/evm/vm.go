@@ -338,11 +338,11 @@ func (ipf ipFilter) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		ipf.handler.ServeHTTP(writer, request)
 		return
 	}
-	writer.WriterHeader(404)
+	writer.WriteHeader(404)
 }
 
-func NewIPFilter(handler http.Handler) {
-	ipFilter{handler}
+func newIPFilter(handler http.Handler) http.Handler {
+	return ipFilter{handler}
 }
 
 // CreateHandlers makes new http handlers that can handle API calls
@@ -355,8 +355,8 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler.RegisterName("debug", &DebugAPI{vm})
 
 	return map[string]*commonEng.HTTPHandler{
-		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: NewIPFilter(handler)},
-		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: NewIPFilter(handler.WebsocketHandler([]string{"*"}))},
+		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler)},
+		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler.WebsocketHandler([]string{"*"}))},
 	}
 }
 
