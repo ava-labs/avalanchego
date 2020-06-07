@@ -23,6 +23,11 @@ func (a *Abort) Verify() error {
 	parent, ok := a.parentBlock().(*ProposalBlock)
 	// Abort is a decision, so its parent must be a proposal
 	if !ok {
+		if err := a.Reject(); err == nil {
+			a.vm.DB.Commit()
+		} else {
+			a.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
 

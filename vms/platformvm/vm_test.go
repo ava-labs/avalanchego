@@ -376,6 +376,65 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	}
 }
 
+// verify invalid proposal to add validator to default subnet
+func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
+	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+	key, _ := vm.factory.NewPrivateKey()
+	ID := key.PublicKey().Address()
+
+	// create invalid tx
+	tx, err := vm.newAddDefaultSubnetValidatorTx(
+		defaultNonce+1,
+		defaultStakeAmount,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		ID,
+		ID,
+		NumberOfShares,
+		testNetworkID,
+		defaultKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blk, err := vm.newProposalBlock(vm.LastAccepted(), tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.DB.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err == nil {
+		t.Fatalf("Should have errored during verification")
+	}
+
+	if status := blk.Status(); status != choices.Rejected {
+		t.Fatalf("Should have marked the block as rejected")
+	}
+
+	parsedBlk, err := vm.GetBlock(blk.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := parsedBlk.Status(); status != choices.Rejected {
+		t.Fatalf("Should have marked the block as rejected")
+	}
+}
+
 // Reject proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	vm := defaultVM()

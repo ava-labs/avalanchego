@@ -98,6 +98,11 @@ func (pb *ProposalBlock) Verify() error {
 	// The parent of a proposal block (ie this block) must be a decision block
 	parent, ok := parentIntf.(decision)
 	if !ok {
+		if err := pb.Reject(); err == nil {
+			pb.vm.DB.Commit()
+		} else {
+			pb.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
 
@@ -107,6 +112,11 @@ func (pb *ProposalBlock) Verify() error {
 	var err error
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
 	if err != nil {
+		if err := pb.Reject(); err == nil {
+			pb.vm.DB.Commit()
+		} else {
+			pb.vm.DB.Abort()
+		}
 		return err
 	}
 
