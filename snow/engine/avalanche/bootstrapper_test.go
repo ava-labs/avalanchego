@@ -58,7 +58,13 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	peerID := peer.ID()
 	peers.Add(peer)
 
-	handler.Initialize(engine, make(chan common.Message), 1)
+	handler.Initialize(
+		engine,
+		make(chan common.Message),
+		1,
+		"",
+		prometheus.NewRegistry(),
+	)
 	timeouts.Initialize(0)
 	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
@@ -83,7 +89,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 
 // Three vertices in the accepted frontier. None have parents. No need to fetch anything
 func TestBootstrapperSingleFrontier(t *testing.T) {
-	config, _, _, state, _ := newConfig(t)
+	config, _, _, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -148,6 +154,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	bs.ForceAccepted(acceptedIDs)
 
 	if !*finished {
@@ -170,7 +179,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 // Requests again and gets an unexpected vertex.
 // Requests again and gets the expected vertex.
 func TestBootstrapperByzantineResponses(t *testing.T) {
-	config, peerID, sender, state, _ := newConfig(t)
+	config, peerID, sender, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -251,6 +260,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		t.Fatal(errParsedUnknownVertex)
 		return nil, errParsedUnknownVertex
 	}
+	vm.CantBootstrapping = false
 
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
@@ -298,6 +308,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
+
+	vm.CantBootstrapped = false
+
 	if err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes0}); err != nil { // send expected vertex
 		t.Fatal(err)
 	}
@@ -422,6 +435,8 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
+	vm.CantBootstrapping = false
+
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	}
@@ -437,6 +452,9 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(errParsedUnknownVertex)
 		return nil, errParsedUnknownVertex
 	}
+
+	vm.CantBootstrapped = false
+
 	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
@@ -459,9 +477,9 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 }
 
-// Unfilfilled tx dependency
+// Unfulfilled tx dependency
 func TestBootstrapperMissingTxDependency(t *testing.T) {
-	config, peerID, sender, state, _ := newConfig(t)
+	config, peerID, sender, state, vm := newConfig(t)
 
 	utxos := []ids.ID{GenerateID(), GenerateID()}
 
@@ -554,9 +572,13 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
+	vm.CantBootstrapping = false
+
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	}
+
+	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
@@ -670,7 +692,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 
 // MultiPut only contains 1 of the two needed vertices; have to issue another GetAncestors
 func TestBootstrapperIncompleteMultiPut(t *testing.T) {
-	config, peerID, sender, state, _ := newConfig(t)
+	config, peerID, sender, state, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
 	vtxID1 := ids.Empty.Prefix(1)
@@ -753,6 +775,8 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		requested = vtxID
 	}
 
+	vm.CantBootstrapping = false
+
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	} else if !requested.Equals(vtxID1) {
@@ -767,6 +791,8 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		t.Fatal("should hae requested vtx0")
 	}
 
+	vm.CantBootstrapped = false
+
 	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil { // Provide vtx0; can finish now
 		t.Fatal(err)
 	} else if !bs.finished {
@@ -778,5 +804,4 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 	} else if vtx2.Status() != choices.Accepted {
 		t.Fatal("should be accepted")
 	}
-
 }

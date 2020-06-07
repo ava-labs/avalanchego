@@ -52,7 +52,13 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	peerID := peer.ID()
 	peers.Add(peer)
 
-	handler.Initialize(engine, make(chan common.Message), 1)
+	handler.Initialize(
+		engine,
+		make(chan common.Message),
+		1,
+		"",
+		prometheus.NewRegistry(),
+	)
 	timeouts.Initialize(0)
 	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
@@ -126,6 +132,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		t.Fatal(errUnknownBlock)
 		return nil, errUnknownBlock
 	}
+
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
 
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should finish
 		t.Fatal(err)
@@ -225,6 +234,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		}
 		*requestID = reqID
 	}
+	vm.CantBootstrapping = false
 
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk1
 		t.Fatal(err)
@@ -248,6 +258,8 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	} else if oldReqID == *requestID {
 		t.Fatal("should have sent new request")
 	}
+
+	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with right block
 		t.Fatal(err)
@@ -370,6 +382,8 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		requested = vtxID
 	}
 
+	vm.CantBootstrapping = false
+
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
@@ -379,6 +393,8 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	} else if !requested.Equals(blkID1) {
 		t.Fatal("should have requested blk1")
 	}
+
+	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
 		t.Fatal(err)
@@ -438,6 +454,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		status: choices.Processing,
 		bytes:  blkBytes3,
 	}
+	vm.CantBootstrapping = false
 
 	bs := bootstrapper{}
 	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
@@ -508,6 +525,8 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
+
+	vm.CantBootstrapped = false
 
 	if err := bs.MultiPut(peerID, *requestID, [][]byte{blkBytes2, blkBytes1}); err != nil { // respond with blk2 and blk1
 		t.Fatal(err)
@@ -586,6 +605,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		t.Fatal(errUnknownBlock)
 		return nil, errUnknownBlock
 	}
+	vm.CantBootstrapping = false
 
 	accepted := bs.FilterAccepted(blkIDs)
 

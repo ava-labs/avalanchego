@@ -76,6 +76,12 @@ func TestFxVerifyTransfer(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
+	if err := fx.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
 	tx := &testTx{
 		bytes: txBytes,
 	}
@@ -470,6 +476,9 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
+	if err := fx.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
 	tx := &testTx{
 		bytes: txBytes,
 	}
@@ -495,6 +504,14 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 		},
 	}
 
+	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fx.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
 		t.Fatalf("Should have errored due to an invalid signature")
 	}
@@ -506,6 +523,9 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 	vm.clock.Set(date)
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.Bootstrapping(); err != nil {
 		t.Fatal(err)
 	}
 	tx := &testTx{
@@ -531,6 +551,14 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
 			sigBytes,
 		},
+	}
+
+	if err := fx.VerifyTransfer(tx, in, cred, out); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fx.Bootstrapped(); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := fx.VerifyTransfer(tx, in, cred, out); err == nil {
