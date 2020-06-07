@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -335,6 +337,23 @@ func (vm *VM) LastAccepted() ids.ID {
 	return vm.lastAccepted.ID()
 }
 
+type ipFilter struct {
+	handler http.Handler
+}
+
+func (ipf ipFilter) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if ips, _, err := net.SplitHostPort(request.RemoteAddr); err == nil && ips == "127.0.0.1" {
+		ipf.handler.ServeHTTP(writer, request)
+		return
+	}
+	writer.WriteHeader(404)
+	writer.Write([]byte("404 page not found\r\n"))
+}
+
+func newIPFilter(handler http.Handler) http.Handler {
+	return ipFilter{handler}
+}
+
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler := vm.chain.NewRPCHandler()
@@ -345,8 +364,8 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler.RegisterName("debug", &DebugAPI{vm})
 
 	return map[string]*commonEng.HTTPHandler{
-		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
-		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
+		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler)},
+		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler.WebsocketHandler([]string{"*"}))},
 	}
 }
 
@@ -355,8 +374,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*commonEng.HTTPHandler {
 	handler := rpc.NewServer()
 	handler.RegisterName("static", &StaticService{})
 	return map[string]*commonEng.HTTPHandler{
-		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
-		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
+		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler)},
+		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler.WebsocketHandler([]string{"*"}))},
 	}
 }
 
