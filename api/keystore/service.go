@@ -266,6 +266,10 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 
 	ks.log.Verbo("ImportUser called for %s", args.Username)
 
+	if args.Username == "" {
+		return errEmptyUsername
+	}
+
 	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
 		return fmt.Errorf("user already exists: %s", args.Username)
 	}
