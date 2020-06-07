@@ -90,7 +90,7 @@ func (self *ETHChain) PendingSize() (int, error) {
 }
 
 func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
-	return self.backend.TxPool().AddRemotesSync(txs)
+	return self.backend.TxPool().AddRemotes(txs)
 }
 
 func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
