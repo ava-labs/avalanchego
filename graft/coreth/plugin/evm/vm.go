@@ -251,6 +251,14 @@ func (vm *VM) Initialize(
 	return nil
 }
 
+// Bootstrapping notifies this VM that the consensus engine is performing
+// bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped notifies this VM that the consensus engine has finished
+// bootstrapping
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown implements the snowman.ChainVM interface
 func (vm *VM) Shutdown() error {
 	if vm.ctx == nil {
