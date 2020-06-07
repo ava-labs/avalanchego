@@ -5,7 +5,6 @@ package avalanche
 
 import (
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
@@ -60,47 +59,56 @@ func (v *voter) Update() {
 	}
 
 	if v.t.Consensus.Quiesce() {
-		v.t.Config.Context.Log.Verbo("Avalanche engine can quiesce")
+		v.t.Config.Context.Log.Debug("Avalanche engine can quiesce")
 		return
 	}
 
-	v.t.Config.Context.Log.Verbo("Avalanche engine can't quiesce")
+	v.t.Config.Context.Log.Debug("Avalanche engine can't quiesce")
 	v.t.errs.Add(v.t.repoll())
 }
 
 func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 	bubbledVotes := ids.UniqueBag{}
+	vertexHeap := newMaxVertexHeap()
 	for _, vote := range votes.List() {
-		set := votes.GetSet(vote)
 		vtx, err := v.t.Config.State.GetVertex(vote)
 		if err != nil {
 			continue
 		}
 
-		vts := []avalanche.Vertex{vtx}
-		for len(vts) > 0 {
-			vtx := vts[0]
-			vts = vts[1:]
+		vertexHeap.Push(vtx)
+	}
 
-			status := vtx.Status()
-			if !status.Fetched() {
-				v.t.Config.Context.Log.Verbo("Dropping %d vote(s) for %s because the vertex is unknown", set.Len(), vtx.ID())
-				continue
-			}
+	for vertexHeap.Len() > 0 {
+		vtx := vertexHeap.Pop()
+		vtxID := vtx.ID()
+		set := votes.GetSet(vtxID)
+		status := vtx.Status()
 
-			if status.Decided() {
-				v.t.Config.Context.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided", set.Len(), vtx.ID())
-				continue
-			}
+		if !status.Fetched() {
+			v.t.Config.Context.Log.Verbo("Dropping %d vote(s) for %s because the vertex is unknown", set.Len(), vtxID)
+			bubbledVotes.RemoveSet(vtx.ID())
+			continue
+		}
 
-			if v.t.Consensus.VertexIssued(vtx) {
-				v.t.Config.Context.Log.Verbo("Applying %d vote(s) for %s", set.Len(), vtx.ID())
-				bubbledVotes.UnionSet(vtx.ID(), set)
-			} else {
-				v.t.Config.Context.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued", set.Len(), vtx.ID())
-				vts = append(vts, vtx.Parents()...)
+		if status.Decided() {
+			v.t.Config.Context.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided", set.Len(), vtxID)
+			bubbledVotes.RemoveSet(vtx.ID())
+			continue
+		}
+
+		if v.t.Consensus.VertexIssued(vtx) {
+			v.t.Config.Context.Log.Verbo("Applying %d vote(s) for %s", set.Len(), vtx.ID())
+			bubbledVotes.UnionSet(vtx.ID(), set)
+		} else {
+			v.t.Config.Context.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued", set.Len(), vtx.ID())
+			bubbledVotes.RemoveSet(vtx.ID()) // Remove votes for this vertex because it hasn't been issued
+			for _, parentVtx := range vtx.Parents() {
+				bubbledVotes.UnionSet(parentVtx.ID(), set)
+				vertexHeap.Push(parentVtx)
 			}
 		}
 	}
+
 	return bubbledVotes
 }

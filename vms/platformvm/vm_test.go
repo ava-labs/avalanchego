@@ -1598,7 +1598,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(&engine, msgChan, 1000)
+	handler.Initialize(
+		&engine,
+		msgChan,
+		1000,
+		"",
+		prometheus.NewRegistry(),
+	)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)

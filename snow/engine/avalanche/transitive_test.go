@@ -2167,6 +2167,9 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 
 	vm.Default(true)
 
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
 	utxos := []ids.ID{GenerateID(), GenerateID()}
 
 	txID0 := GenerateID()

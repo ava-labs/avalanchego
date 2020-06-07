@@ -84,6 +84,11 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 
 // ForceAccepted ...
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
+	if err := b.VM.Bootstrapping(); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
+			err)
+	}
+
 	for _, blkID := range acceptedContainerIDs.List() {
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if err := b.process(blk); err != nil {
@@ -219,9 +224,15 @@ func (b *bootstrapper) finish() error {
 	if b.finished {
 		return nil
 	}
+	b.BootstrapConfig.Context.Log.Info("bootstrapping finished fetching blocks. executing state transitions...")
 
 	if err := b.executeAll(b.Blocked, b.numBlocked); err != nil {
 		return err
+	}
+
+	if err := b.VM.Bootstrapped(); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
+			err)
 	}
 
 	// Start consensus
