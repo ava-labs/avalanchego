@@ -399,6 +399,12 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 	vm.chainManager.CreateChain(chainParams)
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
 	if vm.timer == nil {

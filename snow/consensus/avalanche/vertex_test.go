@@ -16,7 +16,7 @@ type Vtx struct {
 	id           ids.ID
 	txs          []snowstorm.Tx
 
-	height int
+	height uint64
 	status choices.Status
 
 	bytes []byte
@@ -25,6 +25,7 @@ type Vtx struct {
 func (v *Vtx) ID() ids.ID             { return v.id }
 func (v *Vtx) ParentIDs() []ids.ID    { return nil }
 func (v *Vtx) Parents() []Vertex      { return v.dependencies }
+func (v *Vtx) Height() uint64         { return v.height }
 func (v *Vtx) Txs() []snowstorm.Tx    { return v.txs }
 func (v *Vtx) Status() choices.Status { return v.status }
 func (v *Vtx) Live()                  {}

@@ -9,6 +9,14 @@ message InitializeRequest {
 
 message InitializeResponse {}
 
+message BootstrappingRequest {}
+
+message BootstrappingResponse {}
+
+message BootstrappedRequest {}
+
+message BootstrappedResponse {}
+
 message ShutdownRequest {}
 
 message ShutdownResponse {}
@@ -86,6 +94,8 @@ message BlockRejectResponse {}
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
+    rpc Bootstrapping(BootstrappingRequest) returns (BootstrappingResponse);
+    rpc Bootstrapped(BootstrappedRequest) returns (BootstrappedResponse);
     rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
     rpc CreateHandlers(CreateHandlersRequest) returns (CreateHandlersResponse);
     rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);

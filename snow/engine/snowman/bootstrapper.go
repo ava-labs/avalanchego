@@ -22,9 +22,6 @@ type BootstrapConfig struct {
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.Jobs
 
-	// blocks that have outstanding get requests
-	blkReqs common.Requests
-
 	VM ChainVM
 
 	Bootstrapped func()
@@ -35,8 +32,19 @@ type bootstrapper struct {
 	metrics
 	common.Bootstrapper
 
-	pending    ids.Set
-	finished   bool
+	// true if all of the vertices in the original accepted frontier have been processed
+	processedStartingAcceptedFrontier bool
+
+	// Number of blocks processed
+	numProcessed uint32
+
+	// tracks which validators were asked for which containers in which requests
+	outstandingRequests common.Requests
+
+	// true if bootstrapping is done
+	finished bool
+
+	// Called when bootstrapping is done
 	onFinished func() error
 }
 
@@ -56,14 +64,14 @@ func (b *bootstrapper) Initialize(config BootstrapConfig) error {
 	return nil
 }
 
-// CurrentAcceptedFrontier ...
+// CurrentAcceptedFrontier returns the last accepted block
 func (b *bootstrapper) CurrentAcceptedFrontier() ids.Set {
 	acceptedFrontier := ids.Set{}
 	acceptedFrontier.Add(b.VM.LastAccepted())
 	return acceptedFrontier
 }
 
-// FilterAccepted ...
+// FilterAccepted returns the blocks in [containerIDs] that we have accepted
 func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 	acceptedIDs := ids.Set{}
 	for _, blkID := range containerIDs.List() {
@@ -76,106 +84,109 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 
 // ForceAccepted ...
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
+	if err := b.VM.Bootstrapping(); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
+			err)
+	}
+
 	for _, blkID := range acceptedContainerIDs.List() {
-		if err := b.fetch(blkID); err != nil {
+		if blk, err := b.VM.GetBlock(blkID); err == nil {
+			if err := b.process(blk); err != nil {
+				return err
+			}
+		} else if err := b.fetch(blkID); err != nil {
 			return err
 		}
 	}
 
-	if numPending := b.pending.Len(); numPending == 0 {
-		// TODO: This typically indicates bootstrapping has failed, so this
-		// should be handled appropriately
+	b.processedStartingAcceptedFrontier = true
+	if numPending := b.outstandingRequests.Len(); numPending == 0 {
 		return b.finish()
 	}
 	return nil
 }
 
-// Put ...
-func (b *bootstrapper) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	b.BootstrapConfig.Context.Log.Verbo("Put called for blkID %s", blkID)
-
-	blk, err := b.VM.ParseBlock(blkBytes)
-	if err != nil {
-		b.BootstrapConfig.Context.Log.Debug("ParseBlock failed due to %s for block:\n%s",
-			err,
-			formatting.DumpBytes{Bytes: blkBytes})
-
-		b.GetFailed(vdr, requestID)
-		return nil
-	}
-
-	if !b.pending.Contains(blk.ID()) {
-		b.BootstrapConfig.Context.Log.Debug("Validator %s sent an unrequested block:\n%s",
-			vdr,
-			formatting.DumpBytes{Bytes: blkBytes})
-
-		b.GetFailed(vdr, requestID)
-		return nil
-	}
-
-	return b.addBlock(blk)
-}
-
-// GetFailed ...
-func (b *bootstrapper) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	blkID, ok := b.blkReqs.Remove(vdr, requestID)
-	if !ok {
-		b.BootstrapConfig.Context.Log.Debug("GetFailed called without sending the corresponding Get message from %s",
-			vdr)
-		return nil
-	}
-	b.sendRequest(blkID)
-	return nil
-}
-
+// Get block [blkID] and its ancestors from a validator
 func (b *bootstrapper) fetch(blkID ids.ID) error {
-	if b.pending.Contains(blkID) {
+	// Make sure we haven't already requested this block
+	if b.outstandingRequests.Contains(blkID) {
 		return nil
 	}
 
-	blk, err := b.VM.GetBlock(blkID)
-	if err != nil {
-		b.sendRequest(blkID)
+	// Make sure we don't already have this block
+	if _, err := b.VM.GetBlock(blkID); err == nil {
 		return nil
 	}
-	return b.storeBlock(blk)
-}
 
-func (b *bootstrapper) sendRequest(blkID ids.ID) {
-	validators := b.BootstrapConfig.Validators.Sample(1)
+	validators := b.BootstrapConfig.Validators.Sample(1) // validator to send request to
 	if len(validators) == 0 {
-		b.BootstrapConfig.Context.Log.Error("Dropping request for %s as there are no validators", blkID)
-		return
+		return fmt.Errorf("Dropping request for %s as there are no validators", blkID)
 	}
 	validatorID := validators[0].ID()
 	b.RequestID++
 
-	b.blkReqs.RemoveAny(blkID)
-	b.blkReqs.Add(validatorID, b.RequestID, blkID)
-
-	b.pending.Add(blkID)
-	b.BootstrapConfig.Sender.Get(validatorID, b.RequestID, blkID)
-
-	b.numPendingRequests.Set(float64(b.pending.Len()))
-}
-
-func (b *bootstrapper) addBlock(blk snowman.Block) error {
-	if err := b.storeBlock(blk); err != nil {
-		return err
-	}
-
-	if numPending := b.pending.Len(); numPending == 0 {
-		return b.finish()
-	}
+	b.outstandingRequests.Add(validatorID, b.RequestID, blkID)
+	b.BootstrapConfig.Sender.GetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
 	return nil
 }
 
-func (b *bootstrapper) storeBlock(blk snowman.Block) error {
+// MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
+// with request ID [requestID]
+func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
+	if lenBlks := len(blks); lenBlks > common.MaxContainersPerMultiPut {
+		b.BootstrapConfig.Context.Log.Debug("MultiPut(%s, %d) contains more than maximum number of blocks", vdr, requestID)
+		return b.GetAncestorsFailed(vdr, requestID)
+	} else if lenBlks == 0 {
+		b.BootstrapConfig.Context.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
+		return b.GetAncestorsFailed(vdr, requestID)
+	}
+
+	// Make sure this is in response to a request we made
+	wantedBlkID, ok := b.outstandingRequests.Remove(vdr, requestID)
+	if !ok { // this message isn't in response to a request we made
+		b.BootstrapConfig.Context.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
+		return nil
+	}
+
+	wantedBlk, err := b.VM.ParseBlock(blks[0]) // the block we requested
+	if err != nil {
+		b.BootstrapConfig.Context.Log.Debug("Failed to parse requested block %s: %w", wantedBlkID, err)
+		return b.fetch(wantedBlkID)
+	} else if actualID := wantedBlk.ID(); !actualID.Equals(wantedBlkID) {
+		b.BootstrapConfig.Context.Log.Debug("expected the first block to be the requested block, %s, but is %s", wantedBlk, actualID)
+		return b.fetch(wantedBlkID)
+	}
+
+	for _, blkBytes := range blks {
+		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
+			b.BootstrapConfig.Context.Log.Debug("Failed to parse block: %w", err)
+			b.BootstrapConfig.Context.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
+		}
+	}
+
+	return b.process(wantedBlk)
+}
+
+// GetAncestorsFailed is called when a GetAncestors message we sent fails
+func (b *bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
+	blkID, ok := b.outstandingRequests.Remove(vdr, requestID)
+	if !ok {
+		b.BootstrapConfig.Context.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
+		return nil
+	}
+	// Send another request for this
+	return b.fetch(blkID)
+}
+
+// process a block
+func (b *bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
-		b.pending.Remove(blkID)
-
+		b.numProcessed++                                      // Progress tracker
+		if b.numProcessed%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			b.BootstrapConfig.Context.Log.Info("processed %d blocks", b.numProcessed)
+		}
 		if err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numBootstrapped,
 			numDropped:  b.numDropped,
@@ -188,6 +199,7 @@ func (b *bootstrapper) storeBlock(blk snowman.Block) error {
 			return err
 		}
 
+		// Process this block's parent
 		blk = blk.Parent()
 		status = blk.Status()
 		blkID = blk.ID()
@@ -195,15 +207,16 @@ func (b *bootstrapper) storeBlock(blk snowman.Block) error {
 
 	switch status := blk.Status(); status {
 	case choices.Unknown:
-		b.sendRequest(blkID)
-	case choices.Accepted:
-		b.BootstrapConfig.Context.Log.Verbo("Bootstrapping confirmed %s", blkID)
-	case choices.Rejected:
+		if err := b.fetch(blkID); err != nil {
+			return err
+		}
+	case choices.Rejected: // Should never happen
 		return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", blkID)
 	}
 
-	numPending := b.pending.Len()
-	b.numPendingRequests.Set(float64(numPending))
+	if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+		return b.finish()
+	}
 	return nil
 }
 
@@ -211,9 +224,15 @@ func (b *bootstrapper) finish() error {
 	if b.finished {
 		return nil
 	}
+	b.BootstrapConfig.Context.Log.Info("bootstrapping finished fetching blocks. executing state transitions...")
 
 	if err := b.executeAll(b.Blocked, b.numBlocked); err != nil {
 		return err
+	}
+
+	if err := b.VM.Bootstrapped(); err != nil {
+		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
+			err)
 	}
 
 	// Start consensus

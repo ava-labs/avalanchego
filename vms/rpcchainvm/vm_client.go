@@ -129,6 +129,18 @@ func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server 
 	return server
 }
 
+// Bootstrapping ...
+func (vm *VMClient) Bootstrapping() error {
+	_, err := vm.client.Bootstrapping(context.Background(), &vmproto.BootstrappingRequest{})
+	return err
+}
+
+// Bootstrapped ...
+func (vm *VMClient) Bootstrapped() error {
+	_, err := vm.client.Bootstrapped(context.Background(), &vmproto.BootstrappedRequest{})
+	return err
+}
+
 // Shutdown ...
 func (vm *VMClient) Shutdown() error {
 	vm.lock.Lock()

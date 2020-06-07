@@ -84,8 +84,18 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	return &vmproto.InitializeResponse{}, nil
 }
 
+// Bootstrapping ...
+func (vm *VMServer) Bootstrapping(context.Context, *vmproto.BootstrappingRequest) (*vmproto.BootstrappingResponse, error) {
+	return &vmproto.BootstrappingResponse{}, vm.vm.Bootstrapping()
+}
+
+// Bootstrapped ...
+func (vm *VMServer) Bootstrapped(context.Context, *vmproto.BootstrappedRequest) (*vmproto.BootstrappedResponse, error) {
+	return &vmproto.BootstrappedResponse{}, vm.vm.Bootstrapped()
+}
+
 // Shutdown ...
-func (vm *VMServer) Shutdown(_ context.Context, _ *vmproto.ShutdownRequest) (*vmproto.ShutdownResponse, error) {
+func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmproto.ShutdownResponse, error) {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 
