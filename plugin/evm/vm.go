@@ -334,11 +334,12 @@ type ipFilter struct {
 }
 
 func (ipf ipFilter) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	if ips, _, err := net.SplitHostPort(request.RemoteAddr); err != nil && ips == "127.0.0.1" {
+	if ips, _, err := net.SplitHostPort(request.RemoteAddr); err == nil && ips == "127.0.0.1" {
 		ipf.handler.ServeHTTP(writer, request)
 		return
 	}
 	writer.WriteHeader(404)
+	writer.Write([]byte("404 page not found"))
 }
 
 func newIPFilter(handler http.Handler) http.Handler {
