@@ -68,6 +68,7 @@ type VM struct {
 	// State management
 	state *prefixedState
 
+	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
 	// Transaction issuing
@@ -200,7 +201,8 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
-// Bootstrapping marks this VM as bootstrapping
+// Bootstrapping is called by the consensus engine when it starts bootstrapping
+// this chain
 func (vm *VM) Bootstrapping() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
@@ -210,7 +212,8 @@ func (vm *VM) Bootstrapping() error {
 	return nil
 }
 
-// Bootstrapped marks this VM as bootstrapped
+// Bootstrapped is called by the consensus engine when it is done bootstrapping
+// this chain
 func (vm *VM) Bootstrapped() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {

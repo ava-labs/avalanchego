@@ -36,10 +36,10 @@ type VM interface {
 		fxs []*Fx,
 	) error
 
-	// Bootstrapping is called when the node is starting to bootstrap.
+	// Bootstrapping is called when the node is starting to bootstrap this chain.
 	Bootstrapping() error
 
-	// Bootstrapped is called when the node is exiting bootstrapping.
+	// Bootstrapped is called when the node is done bootstrapping this chain.
 	Bootstrapped() error
 
 	// Shutdown is called when the node is shutting down.

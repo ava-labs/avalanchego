@@ -49,7 +49,7 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 
 	vtxZ := h.Pop()
 	if !vtxZ.ID().Equals(vtx4.ID()) {
-		t.Fatalf("Heap did not pop unknonw element first")
+		t.Fatalf("Heap did not pop unknown element first")
 	}
 
 	vtxA := h.Pop()

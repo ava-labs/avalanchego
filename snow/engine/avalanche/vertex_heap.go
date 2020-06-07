@@ -18,13 +18,14 @@ type priorityQueue []*vertexItem
 
 func (pq priorityQueue) Len() int { return len(pq) }
 
+// Returns true if the vertex at index i has greater height than the vertex at
+// index j.
 func (pq priorityQueue) Less(i, j int) bool {
 	statusI := pq[i].vertex.Status()
 	statusJ := pq[j].vertex.Status()
 
-	// Put unknown vertices at the front of the heap to ensure
-	// once we have made it below a certain height in DAG traversal
-	// we do not need to reset
+	// Put unknown vertices at the front of the heap to ensure once we have made
+	// it below a certain height in DAG traversal we do not need to reset
 	if !statusI.Fetched() {
 		return true
 	}
@@ -40,6 +41,7 @@ func (pq priorityQueue) Swap(i, j int) {
 	pq[j].index = j
 }
 
+// Push adds an item to this priority queue. x must have type *vertexItem
 func (pq *priorityQueue) Push(x interface{}) {
 	n := len(*pq)
 	item := x.(*vertexItem)
@@ -47,6 +49,7 @@ func (pq *priorityQueue) Push(x interface{}) {
 	*pq = append(*pq, item)
 }
 
+// Pop returns the last item in this priorityQueue
 func (pq *priorityQueue) Pop() interface{} {
 	old := *pq
 	n := len(old)
@@ -84,6 +87,8 @@ func (vh *maxHeightVertexHeap) Clear() {
 	vh.elementIDs.Clear()
 }
 
+// Push adds an element to this heap. Returns true if the element was added.
+// Returns false if it was already in the heap.
 func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 	vtxID := vtx.ID()
 	if vh.elementIDs.Contains(vtxID) {
@@ -98,6 +103,9 @@ func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 	return true
 }
 
+// If there are any vertices in this heap with status Unknown, removes one such
+// vertex and returns it. Otherwise, removes and returns the vertex in this heap
+// with the greatest height.
 func (vh *maxHeightVertexHeap) Pop() avalanche.Vertex {
 	vtx := heap.Pop(vh.heap).(*vertexItem).vertex
 	vh.elementIDs.Remove(vtx.ID())
