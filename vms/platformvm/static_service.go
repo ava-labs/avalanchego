@@ -172,8 +172,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return errAccountHasNoValue
 		}
 		accounts = append(accounts, newAccount(
-			account.Address,         // ID
-			0,                       // nonce
+			account.Address, // ID
+			0,               // nonce
 			uint64(account.Balance), // balance
 		))
 	}

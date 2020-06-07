@@ -9,7 +9,7 @@ import (
 )
 
 func TestAddDefaultSubnetValidator(t *testing.T) {
-	expectedJSONString := `{"startTime":"0","endTime":"0","id":null,"destination":null,"delegationFeeRate":"0","payerNonce":"0"}`
+	expectedJSONString := `{"startTime":"0","endTime":"0","id":null,"destination":"","delegationFeeRate":"0","payerNonce":"0"}`
 	args := AddDefaultSubnetValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
