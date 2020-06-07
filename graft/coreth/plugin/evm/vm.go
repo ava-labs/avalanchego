@@ -366,8 +366,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*commonEng.HTTPHandler {
 	handler := rpc.NewServer()
 	handler.RegisterName("static", &StaticService{})
 	return map[string]*commonEng.HTTPHandler{
-		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
-		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
+		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler)},
+		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler.WebsocketHandler([]string{"*"}))},
 	}
 }
 
