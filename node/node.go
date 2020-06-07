@@ -55,7 +55,8 @@ const (
 var (
 	genesisHashKey = []byte("genesisID")
 
-	nodeVersion   = version.NewDefaultVersion("avalanche", 0, 5, 2)
+	// Version is the version of this code
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 2)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -156,7 +157,7 @@ func (n *Node) initNetworking() error {
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		nodeVersion,
+		Version,
 		versionParser,
 		listener,
 		dialer,
@@ -528,6 +529,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = Config
+	n.Log.Info("Gecko version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {
