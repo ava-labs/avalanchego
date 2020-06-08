@@ -246,6 +246,7 @@ func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids
 
 // GetAncestors passes a GetAncestors message received from the network to the consensus engine.
 func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+	h.metrics.pending.Inc()
 	h.msgs <- message{
 		messageType: getAncestorsMsg,
 		validatorID: validatorID,
@@ -268,6 +269,7 @@ func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids
 
 // MultiPut passes a MultiPut message received from the network to the consensus engine.
 func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
+	h.metrics.pending.Inc()
 	h.msgs <- message{
 		messageType: multiPutMsg,
 		validatorID: validatorID,
@@ -288,6 +290,7 @@ func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 
 // GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
 func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
+	h.metrics.pending.Inc()
 	h.msgs <- message{
 		messageType: getAncestorsFailedMsg,
 		validatorID: validatorID,
