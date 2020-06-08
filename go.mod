@@ -28,7 +28,7 @@ require (
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/mr-tron/base58 v1.1.3
+	github.com/mr-tron/base58 v1.2.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pborman/uuid v1.2.0 // indirect

@@ -281,12 +281,12 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.NewRouter()
+	Config.Nat = nat.GetNATRouter()
 
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		ip, err = Config.Nat.IP()
+		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}

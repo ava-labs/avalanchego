@@ -1,10 +1,6 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
 package nat
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -14,13 +10,7 @@ import (
 	"github.com/huin/goupnp/dcps/internetgateway2"
 )
 
-const (
-	soapTimeout = time.Second
-)
-
-var (
-	errNoGateway = errors.New("Failed to connect to any avaliable gateways")
-)
+const soapRequestTimeout = 3 * time.Second
 
 // upnpClient is the interface used by goupnp for their client implementations
 type upnpClient interface {
@@ -50,66 +40,13 @@ type upnpClient interface {
 }
 
 type upnpRouter struct {
-	root   *goupnp.RootDevice
+	dev    *goupnp.RootDevice
 	client upnpClient
 }
 
-func (n *upnpRouter) MapPort(
-	networkProtocol NetworkProtocol,
-	newInternalPort uint16,
-	newExternalPort uint16,
-	mappingName string,
-	mappingDuration time.Duration,
-) error {
-	ip, err := n.localAddress()
-	if err != nil {
-		return err
-	}
-
-	protocol := string(networkProtocol)
-	// goupnp uses seconds to denote their lifetime
-	lifetime := uint32(mappingDuration / time.Second)
-
-	// UnmapPort's error is intentionally dropped, because the mapping may not
-	// exist.
-	n.UnmapPort(networkProtocol, newInternalPort, newExternalPort)
-
-	return n.client.AddPortMapping(
-		"", // newRemoteHost isn't used to limit the mapping to a host
-		newExternalPort,
-		protocol,
-		newInternalPort,
-		ip.String(), // newInternalClient is the client traffic should be sent to
-		true,        // newEnabled enables port mappings
-		mappingName,
-		lifetime,
-	)
-}
-
-func (n *upnpRouter) UnmapPort(networkProtocol NetworkProtocol, _, externalPort uint16) error {
-	protocol := string(networkProtocol)
-	return n.client.DeletePortMapping(
-		"", // newRemoteHost isn't used to limit the mapping to a host
-		externalPort,
-		protocol)
-}
-
-func (n *upnpRouter) IP() (net.IP, error) {
-	ipStr, err := n.client.GetExternalIPAddress()
-	if err != nil {
-		return nil, err
-	}
-
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP %s", ipStr)
-	}
-	return ip, nil
-}
-
-func (n *upnpRouter) localAddress() (net.IP, error) {
+func (r *upnpRouter) localIP() (net.IP, error) {
 	// attempt to get an address on the router
-	deviceAddr, err := net.ResolveUDPAddr("udp4", n.root.URLBase.Host)
+	deviceAddr, err := net.ResolveUDPAddr("udp4", r.dev.URLBase.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -142,27 +79,34 @@ func (n *upnpRouter) localAddress() (net.IP, error) {
 		}
 	}
 	return nil, fmt.Errorf("couldn't find the local address in the same network as %s", deviceIP)
+
 }
 
-// getUPnPRouter searches for all Gateway Devices that have avaliable
-// connections in the goupnp library and returns the first connection it can
-// find.
-func getUPnPRouter() Router {
-	routers := make(chan *upnpRouter)
-	// Because DiscoverDevices takes a noticeable amount of time to error, we
-	// run these requests in parallel
-	go func() {
-		routers <- connectToGateway(internetgateway1.URN_WANConnectionDevice_1, gateway1)
-	}()
-	go func() {
-		routers <- connectToGateway(internetgateway2.URN_WANConnectionDevice_2, gateway2)
-	}()
-	for i := 0; i < 2; i++ {
-		if router := <-routers; router != nil {
-			return router
-		}
+func (r *upnpRouter) ExternalIP() (net.IP, error) {
+	str, err := r.client.GetExternalIPAddress()
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	ip := net.ParseIP(str)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP %s", str)
+	}
+	return ip, nil
+}
+
+func (r *upnpRouter) MapPort(protocol string, intport, extport uint16, desc string, duration time.Duration) error {
+	ip, err := r.localIP()
+	if err != nil {
+		return nil
+	}
+	lifetime := uint32(duration / time.Second)
+	r.UnmapPort(protocol, extport)
+	return r.client.AddPortMapping("", extport, protocol, intport, ip.String(), true, desc, lifetime)
+}
+
+func (r *upnpRouter) UnmapPort(protocol string, extport uint16) error {
+	return r.client.DeletePortMapping("", extport, protocol)
 }
 
 func gateway1(client goupnp.ServiceClient) upnpClient {
@@ -175,7 +119,6 @@ func gateway1(client goupnp.ServiceClient) upnpClient {
 		return nil
 	}
 }
-
 func gateway2(client goupnp.ServiceClient) upnpClient {
 	switch client.Service.ServiceType {
 	case internetgateway2.URN_WANIPConnection_1:
@@ -189,65 +132,69 @@ func gateway2(client goupnp.ServiceClient) upnpClient {
 	}
 }
 
-func connectToGateway(deviceType string, toClient func(goupnp.ServiceClient) upnpClient) *upnpRouter {
-	devs, err := goupnp.DiscoverDevices(deviceType)
+func getUpnpClient(client goupnp.ServiceClient) upnpClient {
+	c := gateway1(client)
+	if c != nil {
+		return c
+	}
+	return gateway2(client)
+}
+
+func getRootDevice(dev *goupnp.MaybeRootDevice) *upnpRouter {
+	var router *upnpRouter
+	dev.Root.Device.VisitServices(func(service *goupnp.Service) {
+		c := goupnp.ServiceClient{
+			SOAPClient: service.NewSOAPClient(),
+			RootDevice: dev.Root,
+			Location:   dev.Location,
+			Service:    service,
+		}
+		c.SOAPClient.HTTPClient.Timeout = soapRequestTimeout
+		client := getUpnpClient(c)
+		if client == nil {
+			return
+		}
+		router = &upnpRouter{dev.Root, client}
+		if router == nil {
+			return
+		}
+		if _, nat, err := router.client.GetNATRSIPStatus(); err != nil || !nat {
+			router = nil
+			return
+		}
+	})
+	return router
+}
+
+func discover(target string) *upnpRouter {
+	devs, err := goupnp.DiscoverDevices(target)
 	if err != nil {
 		return nil
 	}
-	// we are iterating over all the network devices, acting a possible roots
-	for i := range devs {
-		dev := &devs[i]
-		if dev.Root == nil {
+	for i := 0; i < len(devs); i++ {
+		if devs[i].Root == nil {
 			continue
 		}
-
-		// the root device may be a router, so attempt to connect to that
-		rootDevice := &dev.Root.Device
-		if upnp := getRouter(dev, rootDevice, toClient); upnp != nil {
-			return upnp
-		}
-
-		// attempt to connect to any sub devices
-		devices := rootDevice.Devices
-		for i := range devices {
-			if upnp := getRouter(dev, &devices[i], toClient); upnp != nil {
-				return upnp
-			}
+		u := getRootDevice(&devs[i])
+		if u != nil {
+			return u
 		}
 	}
 	return nil
 }
 
-func getRouter(rootDevice *goupnp.MaybeRootDevice, device *goupnp.Device, toClient func(goupnp.ServiceClient) upnpClient) *upnpRouter {
-	for i := range device.Services {
-		service := &device.Services[i]
-
-		soapClient := service.NewSOAPClient()
-		// make sure the client times out if needed
-		soapClient.HTTPClient.Timeout = soapTimeout
-
-		// attempt to create a client connection
-		serviceClient := goupnp.ServiceClient{
-			SOAPClient: soapClient,
-			RootDevice: rootDevice.Root,
-			Location:   rootDevice.Location,
-			Service:    service,
-		}
-		client := toClient(serviceClient)
-		if client == nil {
-			continue
-		}
-
-		// check whether port mapping is enabled
-		if _, nat, err := client.GetNATRSIPStatus(); err != nil || !nat {
-			continue
-		}
-
-		// we found a router!
-		return &upnpRouter{
-			root:   rootDevice.Root,
-			client: client,
-		}
+func getUPnPRouter() *upnpRouter {
+	r := discover(internetgateway1.URN_WANConnectionDevice_1)
+	if r != nil {
+		return r
 	}
-	return nil
+	return discover(internetgateway2.URN_WANConnectionDevice_2)
+}
+
+func GetUPnP() *upnpRouter {
+	r := discover(internetgateway1.URN_WANConnectionDevice_1)
+	if r != nil {
+		return r
+	}
+	return discover(internetgateway2.URN_WANConnectionDevice_2)
 }
