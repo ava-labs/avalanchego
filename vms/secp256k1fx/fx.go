@@ -34,8 +34,9 @@ var (
 
 // Fx describes the secp256k1 feature extension
 type Fx struct {
-	VM          VM
-	SECPFactory crypto.FactorySECP256K1R
+	VM           VM
+	SECPFactory  crypto.FactorySECP256K1R
+	bootstrapped bool
 }
 
 // Initialize ...
@@ -68,6 +69,12 @@ func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	fx.VM = vm
 	return nil
 }
+
+// Bootstrapping ...
+func (fx *Fx) Bootstrapping() error { return nil }
+
+// Bootstrapped ...
+func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
 // VerifyOperation ...
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
@@ -154,6 +161,11 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 		return errTooFewSigners
 	case numSigs != len(cred.Sigs):
 		return errInputCredentialSignersMismatch
+	}
+
+	// disable signature verification during bootstrapping
+	if !fx.bootstrapped {
+		return nil
 	}
 
 	txBytes := tx.UnsignedBytes()

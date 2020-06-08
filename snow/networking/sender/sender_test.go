@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestSenderContext(t *testing.T) {
@@ -58,7 +59,13 @@ func TestTimeout(t *testing.T) {
 	}
 
 	handler := router.Handler{}
-	handler.Initialize(&engine, nil, 1)
+	handler.Initialize(
+		&engine,
+		nil,
+		1,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go handler.Dispatch()
 
 	chainRouter.AddChain(&handler)

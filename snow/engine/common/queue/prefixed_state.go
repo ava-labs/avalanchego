@@ -95,25 +95,31 @@ func (ps *prefixedState) Job(db database.Database, id ids.ID) (Job, error) {
 	return ps.state.Job(db, p.Bytes)
 }
 
-func (ps *prefixedState) SetBlocking(db database.Database, id ids.ID, blocking ids.Set) error {
+func (ps *prefixedState) AddBlocking(db database.Database, id ids.ID, blocking ids.ID) error {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
 	p.PackByte(blockingID)
 	p.PackFixedBytes(id.Bytes())
 
-	return ps.state.SetIDs(db, p.Bytes, blocking)
+	return ps.state.AddID(db, p.Bytes, blocking)
 }
 
-func (ps *prefixedState) DeleteBlocking(db database.Database, id ids.ID) error {
+func (ps *prefixedState) DeleteBlocking(db database.Database, id ids.ID, blocking []ids.ID) error {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
 	p.PackByte(blockingID)
 	p.PackFixedBytes(id.Bytes())
 
-	return db.Delete(p.Bytes)
+	for _, blocked := range blocking {
+		if err := ps.state.RemoveID(db, p.Bytes, blocked); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (ps *prefixedState) Blocking(db database.Database, id ids.ID) (ids.Set, error) {
+func (ps *prefixedState) Blocking(db database.Database, id ids.ID) ([]ids.ID, error) {
 	p := wrappers.Packer{Bytes: make([]byte, 1+hashing.HashLen)}
 
 	p.PackByte(blockingID)

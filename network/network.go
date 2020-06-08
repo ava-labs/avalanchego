@@ -30,7 +30,7 @@ import (
 const (
 	defaultInitialReconnectDelay               = time.Second
 	defaultMaxReconnectDelay                   = time.Hour
-	defaultMaxMessageSize               uint32 = 1 << 21
+	DefaultMaxMessageSize               uint32 = 1 << 21
 	defaultSendQueueSize                       = 1 << 10
 	defaultMaxClockDifference                  = time.Minute
 	defaultPeerListGossipSpacing               = time.Minute
@@ -162,7 +162,7 @@ func NewDefaultNetwork(
 		router,
 		defaultInitialReconnectDelay,
 		defaultMaxReconnectDelay,
-		defaultMaxMessageSize,
+		DefaultMaxMessageSize,
 		defaultSendQueueSize,
 		defaultMaxClockDifference,
 		defaultPeerListGossipSpacing,
@@ -359,6 +359,29 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 }
 
+// GetAncestors implements the Sender interface.
+func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
+	msg, err := n.b.GetAncestors(chainID, requestID, containerID)
+	if err != nil {
+		n.log.Error("failed to build GetAncestors message: %w", err)
+		return
+	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		sent = peer.send(msg)
+	}
+	if !sent {
+		n.getAncestors.numFailed.Inc()
+		n.log.Debug("failed to send a GetAncestors message to: %s", validatorID)
+	} else {
+		n.getAncestors.numSent.Inc()
+	}
+}
+
 // Put implements the Sender interface.
 func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	msg, err := n.b.Put(chainID, requestID, containerID, container)
@@ -379,6 +402,29 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 		n.put.numFailed.Inc()
 	} else {
 		n.put.numSent.Inc()
+	}
+}
+
+// MultiPut implements the Sender interface.
+func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+	msg, err := n.b.MultiPut(chainID, requestID, containers)
+	if err != nil {
+		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
+		return
+	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		sent = peer.send(msg)
+	}
+	if !sent {
+		n.log.Debug("failed to send a MultiPut message to: %s", validatorID)
+		n.multiPut.numFailed.Inc()
+	} else {
+		n.multiPut.numSent.Inc()
 	}
 }
 

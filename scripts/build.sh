@@ -15,7 +15,7 @@ GECKO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory 
 BUILD_DIR=$GECKO_PATH/build # Where binaries go
 PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 
-CORETH_VER="0.2.0" # Should match coreth version in go.mod
+CORETH_VER="0.2.4" # Should match coreth version in go.mod
 CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@v$CORETH_VER"
 
 # Build Gecko

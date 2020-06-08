@@ -4,10 +4,16 @@
 package queue
 
 import (
+	"errors"
+
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/wrappers"
+)
+
+var (
+	errZeroID = errors.New("zero id")
 )
 
 type state struct{ jobs *Jobs }
@@ -42,30 +48,37 @@ func (s *state) Job(db database.Database, key []byte) (Job, error) {
 	return s.jobs.parser.Parse(value)
 }
 
-func (s *state) SetIDs(db database.Database, key []byte, blocking ids.Set) error {
-	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen+hashing.HashLen*blocking.Len())}
+// IDs returns a slice of IDs from storage
+func (s *state) IDs(db database.Database, prefix []byte) ([]ids.ID, error) {
+	idSlice := []ids.ID(nil)
+	iter := prefixdb.NewNested(prefix, db).NewIterator()
+	defer iter.Release()
 
-	p.PackInt(uint32(blocking.Len()))
-	for _, id := range blocking.List() {
-		p.PackFixedBytes(id.Bytes())
+	for iter.Next() {
+		keyID, err := ids.ToID(iter.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		idSlice = append(idSlice, keyID)
 	}
-
-	return db.Put(key, p.Bytes)
+	return idSlice, nil
 }
 
-func (s *state) IDs(db database.Database, key []byte) (ids.Set, error) {
-	bytes, err := db.Get(key)
-	if err != nil {
-		return nil, err
+// AddID saves an ID to the prefixed database
+func (s *state) AddID(db database.Database, prefix []byte, key ids.ID) error {
+	if key.IsZero() {
+		return errZeroID
 	}
+	pdb := prefixdb.NewNested(prefix, db)
+	return pdb.Put(key.Bytes(), nil)
+}
 
-	p := wrappers.Packer{Bytes: bytes}
-
-	blocking := ids.Set{}
-	for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
-		id, _ := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
-		blocking.Add(id)
+// RemoveID removes an ID from the prefixed database
+func (s *state) RemoveID(db database.Database, prefix []byte, key ids.ID) error {
+	if key.IsZero() {
+		return errZeroID
 	}
-
-	return blocking, p.Err
+	pdb := prefixdb.NewNested(prefix, db)
+	return pdb.Delete(key.Bytes())
 }

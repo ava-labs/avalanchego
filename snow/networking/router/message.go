@@ -31,6 +31,9 @@ const (
 	notifyMsg
 	gossipMsg
 	shutdownMsg
+	getAncestorsMsg
+	multiPutMsg
+	getAncestorsFailedMsg
 )
 
 type message struct {
@@ -39,6 +42,7 @@ type message struct {
 	requestID    uint32
 	containerID  ids.ID
 	container    []byte
+	containers   [][]byte
 	containerIDs ids.Set
 	notification common.Message
 }
@@ -74,8 +78,12 @@ func (t msgType) String() string {
 		return "Get Accepted Failed Message"
 	case getMsg:
 		return "Get Message"
+	case getAncestorsMsg:
+		return "Get Ancestors Message"
 	case putMsg:
 		return "Put Message"
+	case multiPutMsg:
+		return "MultiPut Message"
 	case getFailedMsg:
 		return "Get Failed Message"
 	case pushQueryMsg:
