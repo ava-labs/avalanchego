@@ -248,6 +248,7 @@ func (b *bootstrapper) finish() error {
 }
 
 func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
+	numExecuted := 0
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		if err := jobs.Execute(job); err != nil {
@@ -255,6 +256,10 @@ func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge)
 		}
 		if err := jobs.Commit(); err != nil {
 			return err
+		}
+		numExecuted++
+		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			b.BootstrapConfig.Context.Log.Info("executed %d blocks", numExecuted)
 		}
 	}
 	return nil

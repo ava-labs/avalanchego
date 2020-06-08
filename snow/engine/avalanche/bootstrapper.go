@@ -155,9 +155,6 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 			} else {
 				b.BootstrapConfig.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
 			}
-			if err := b.VtxBlocked.Commit(); err != nil {
-				return err
-			}
 			for _, tx := range vtx.Txs() {
 				if err := b.TxBlocked.Push(&txJob{
 					log:         b.BootstrapConfig.Context.Log,
@@ -170,15 +167,20 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 					b.BootstrapConfig.Context.Log.Verbo("couldn't push to txBlocked: %s", err)
 				}
 			}
-			if err := b.TxBlocked.Commit(); err != nil {
-				return err
-			}
 			for _, parent := range vtx.Parents() {
 				toProcess = append(toProcess, parent)
 			}
 			b.processedCache.Put(vtx.ID(), nil)
 		}
 	}
+
+	if err := b.VtxBlocked.Commit(); err != nil {
+		return err
+	}
+	if err := b.TxBlocked.Commit(); err != nil {
+		return err
+	}
+
 	if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
 		return b.finish()
 	}
@@ -263,11 +265,14 @@ func (b *bootstrapper) finish() error {
 	if b.finished {
 		return nil
 	}
-	b.BootstrapConfig.Context.Log.Info("finished fetching vertices. executing state transitions...")
+	b.BootstrapConfig.Context.Log.Info("finished fetching vertices. executing transaction state transitions...")
 
 	if err := b.executeAll(b.TxBlocked, b.numBSBlockedTx); err != nil {
 		return err
 	}
+
+	b.BootstrapConfig.Context.Log.Info("executing vertex state transitions...")
+
 	if err := b.executeAll(b.VtxBlocked, b.numBSBlockedVtx); err != nil {
 		return err
 	}
@@ -286,6 +291,7 @@ func (b *bootstrapper) finish() error {
 }
 
 func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
+	numExecuted := 0
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		b.BootstrapConfig.Context.Log.Debug("Executing: %s", job.ID())
@@ -295,6 +301,10 @@ func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge)
 		}
 		if err := jobs.Commit(); err != nil {
 			return err
+		}
+		numExecuted++
+		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			b.BootstrapConfig.Context.Log.Info("executed %d operations", numExecuted)
 		}
 	}
 	return nil
