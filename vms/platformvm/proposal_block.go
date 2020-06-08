@@ -109,13 +109,22 @@ func (pb *ProposalBlock) Verify() error {
 	// pdb is the database if this block's parent is accepted
 	pdb := parent.onAccept()
 
+	isAdvanceTimeProposal := false
+	switch pb.Tx.(type) {
+	case *advanceTimeTx:
+		isAdvanceTimeProposal = true
+	}
 	var err error
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
 	if err != nil {
-		if err := pb.Reject(); err == nil {
-			pb.vm.DB.Commit()
-		} else {
-			pb.vm.DB.Abort()
+		// If this block's transaction proposes to advance the timestamp, the transaction may fail
+		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
+		if !isAdvanceTimeProposal {
+			if err := pb.Reject(); err == nil {
+				pb.vm.DB.Commit()
+			} else {
+				pb.vm.DB.Abort()
+			}
 		}
 		return err
 	}
