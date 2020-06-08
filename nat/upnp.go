@@ -82,6 +82,7 @@ func (r *upnpRouter) localIP() (net.IP, error) {
 		}
 	}
 	return nil, fmt.Errorf("couldn't find the local address in the same network as %s", deviceIP)
+
 }
 
 func (r *upnpRouter) ExternalIP() (net.IP, error) {
@@ -194,7 +195,7 @@ func discover(target string) *upnpRouter {
 			return u
 		}
 	}
-	return nil
+	return gateway2(client)
 }
 
 func getUPnPRouter() *upnpRouter {
@@ -218,4 +219,20 @@ func getUPnPRouter() *upnpRouter {
 	}
 
 	return nil
+}
+
+func getUPnPRouter() *upnpRouter {
+	r := discover(internetgateway1.URN_WANConnectionDevice_1)
+	if r != nil {
+		return r
+	}
+	return discover(internetgateway2.URN_WANConnectionDevice_2)
+}
+
+func GetUPnP() *upnpRouter {
+	r := discover(internetgateway1.URN_WANConnectionDevice_1)
+	if r != nil {
+		return r
+	}
+	return discover(internetgateway2.URN_WANConnectionDevice_2)
 }
