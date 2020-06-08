@@ -40,8 +40,8 @@ type bootstrapper struct {
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
 
-	// number of vertices processed so far
-	numProcessed uint32
+	// number of vertices fetched so far
+	numFetched uint32
 
 	// tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
@@ -170,8 +170,8 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 			b.processedCache.Put(vtx.ID(), nil)
 		}
 
-		if b.numProcessed%common.StatusUpdateFrequency == 0 {
-			b.BootstrapConfig.Context.Log.Info("processed %d vertices", b.numProcessed)
+		if b.numFetched%common.StatusUpdateFrequency == 0 {
+			b.BootstrapConfig.Context.Log.Info("fetched %d vertices", b.numFetched)
 		}
 	}
 
