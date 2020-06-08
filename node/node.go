@@ -55,7 +55,8 @@ const (
 var (
 	genesisHashKey = []byte("genesisID")
 
-	nodeVersion   = version.NewDefaultVersion("avalanche", 0, 5, 1)
+	// Version is the version of this code
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 3)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -156,7 +157,7 @@ func (n *Node) initNetworking() error {
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		nodeVersion,
+		Version,
 		versionParser,
 		listener,
 		dialer,
@@ -294,7 +295,10 @@ func (n *Node) initVMManager() error {
 			AVA:      avaAssetID,
 			Platform: ids.Empty,
 		}),
-		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
+			Log:  n.Log,
+			Path: path.Join(n.Config.PluginDir, "evm"),
+		}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
@@ -525,6 +529,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = Config
+	n.Log.Info("Gecko version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {

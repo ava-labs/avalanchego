@@ -3,9 +3,13 @@
 
 package timer
 
+import (
+	"time"
+)
+
 // Useful latency buckets
 var (
-	Buckets = []float64{
+	MillisecondsBuckets = []float64{
 		10,    // 10 ms is ~ instant
 		100,   // 100 ms
 		250,   // 250 ms
@@ -17,5 +21,16 @@ var (
 		5000,  // 5 seconds
 		10000, // 10 seconds
 		// anything larger than 10 seconds will be bucketed together
+	}
+	NanosecondsBuckets = []float64{
+		float64(100 * time.Nanosecond),
+		float64(time.Microsecond),
+		float64(10 * time.Microsecond),
+		float64(100 * time.Microsecond),
+		float64(time.Millisecond),
+		float64(10 * time.Millisecond),
+		float64(100 * time.Millisecond),
+		float64(time.Second),
+		// anything larger than a second will be bucketed together
 	}
 )

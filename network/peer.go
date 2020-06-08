@@ -201,7 +201,7 @@ func (p *peer) handle(msg Msg) {
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
-		p.net.log.Debug("dropping an unknown message from %s with op %d", p.id, op)
+		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op.String())
 		return
 	}
 	msgMetrics.numReceived.Inc()
@@ -236,14 +236,20 @@ func (p *peer) handle(msg Msg) {
 		p.accepted(msg)
 	case Get:
 		p.get(msg)
+	case GetAncestors:
+		p.getAncestors(msg)
 	case Put:
 		p.put(msg)
+	case MultiPut:
+		p.multiPut(msg)
 	case PushQuery:
 		p.pushQuery(msg)
 	case PullQuery:
 		p.pullQuery(msg)
 	case Chits:
 		p.chits(msg)
+	default:
+		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op.String())
 	}
 }
 
@@ -537,6 +543,16 @@ func (p *peer) get(msg Msg) {
 	p.net.router.Get(p.id, chainID, requestID, containerID)
 }
 
+func (p *peer) getAncestors(msg Msg) {
+	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(RequestID).(uint32)
+	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
+	p.net.log.AssertNoError(err)
+
+	p.net.router.GetAncestors(p.id, chainID, requestID, containerID)
+}
+
 // assumes the stateLock is not held
 func (p *peer) put(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
@@ -547,6 +563,16 @@ func (p *peer) put(msg Msg) {
 	container := msg.Get(ContainerBytes).([]byte)
 
 	p.net.router.Put(p.id, chainID, requestID, containerID, container)
+}
+
+// assumes the stateLock is not held
+func (p *peer) multiPut(msg Msg) {
+	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(RequestID).(uint32)
+	containers := msg.Get(MultiContainerBytes).([][]byte)
+
+	p.net.router.MultiPut(p.id, chainID, requestID, containers)
 }
 
 // assumes the stateLock is not held

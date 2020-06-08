@@ -36,7 +36,9 @@ type ExternalRouter interface {
 	GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
 	Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
 	Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
+	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
 	Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
 	PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 	PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
@@ -47,5 +49,6 @@ type InternalRouter interface {
 	GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
+	GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 }

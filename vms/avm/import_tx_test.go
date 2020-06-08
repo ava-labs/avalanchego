@@ -140,6 +140,16 @@ func TestIssueImportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	key := keys[0]
 
 	utxoID := ava.UTXOID{
@@ -287,6 +297,16 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	key := keys[0]
 

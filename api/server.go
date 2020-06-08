@@ -75,8 +75,9 @@ func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 	}
 
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := "bc/" + ctx.ChainID.String()
-	httpLogger, err := s.factory.MakeChain(ctx.ChainID, "http")
+	chainID := ctx.ChainID.String()
+	defaultEndpoint := "bc/" + chainID
+	httpLogger, err := s.factory.MakeChain(chainID, "http")
 	if err != nil {
 		s.log.Error("Failed to create new http logger: %s", err)
 		return

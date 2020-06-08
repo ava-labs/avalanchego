@@ -85,10 +85,13 @@ func (j *Jobs) Execute(job Job) error {
 
 	jobID := job.ID()
 
-	blocking, _ := j.state.Blocking(j.db, jobID)
-	j.state.DeleteBlocking(j.db, jobID)
+	blocking, err := j.state.Blocking(j.db, jobID)
+	if err != nil {
+		return err
+	}
+	j.state.DeleteBlocking(j.db, jobID, blocking)
 
-	for _, blockedID := range blocking.List() {
+	for _, blockedID := range blocking {
 		job, err := j.state.Job(j.db, blockedID)
 		if err != nil {
 			return err
@@ -142,9 +145,7 @@ func (j *Jobs) block(job Job, deps ids.Set) error {
 
 	jobID := job.ID()
 	for _, depID := range deps.List() {
-		blocking, _ := j.state.Blocking(j.db, depID)
-		blocking.Add(jobID)
-		if err := j.state.SetBlocking(j.db, depID, blocking); err != nil {
+		if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
 			return err
 		}
 	}
