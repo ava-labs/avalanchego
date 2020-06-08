@@ -147,7 +147,7 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				numDropped:  b.numBSDroppedVtx,
 				vtx:         vtx,
 			}); err == nil {
-				b.numProcessed++ // Progress tracker
+				b.numFetched++ // Progress tracker
 				b.numBSBlockedVtx.Inc()
 			} else {
 				b.BootstrapConfig.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
