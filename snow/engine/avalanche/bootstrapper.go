@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	cacheSize = 3000
+	cacheSize = 100000
 )
 
 // BootstrapConfig ...
@@ -132,10 +132,6 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 		if _, ok := b.processedCache.Get(vtx.ID()); ok { // already processed this
 			continue
 		}
-		b.numProcessed++ // Progress tracker
-		if b.numProcessed%common.StatusUpdateFrequency == 0 {
-			b.BootstrapConfig.Context.Log.Info("processed %d vertices", b.numProcessed)
-		}
 
 		switch vtx.Status() {
 		case choices.Unknown:
@@ -151,6 +147,7 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				numDropped:  b.numBSDroppedVtx,
 				vtx:         vtx,
 			}); err == nil {
+				b.numProcessed++ // Progress tracker
 				b.numBSBlockedVtx.Inc()
 			} else {
 				b.BootstrapConfig.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
@@ -171,6 +168,10 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				toProcess = append(toProcess, parent)
 			}
 			b.processedCache.Put(vtx.ID(), nil)
+		}
+
+		if b.numProcessed%common.StatusUpdateFrequency == 0 {
+			b.BootstrapConfig.Context.Log.Info("processed %d vertices", b.numProcessed)
 		}
 	}
 
