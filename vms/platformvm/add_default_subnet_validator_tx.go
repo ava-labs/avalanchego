@@ -63,44 +63,44 @@ func (tx *addDefaultSubnetValidatorTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify that this transaction is well formed
 // If [tx] is valid, this method also populates [tx.accountID]
-func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
+func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() TxError {
 	switch {
 	case tx == nil:
-		return errNilTx
+		return tempError{errNilTx}
 	case !tx.senderID.IsZero():
 		return nil // Only verify the transaction once
 	case tx.id.IsZero():
-		return errInvalidID
+		return tempError{errInvalidID}
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
-		return errWrongNetworkID
+		return permError{errWrongNetworkID}
 	case tx.NodeID.IsZero():
-		return errInvalidID
+		return tempError{errInvalidID}
 	case tx.Destination.IsZero():
-		return errInvalidID
+		return tempError{errInvalidID}
 	case tx.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
+		return permError{errWeightTooSmall}
 	case tx.Shares > NumberOfShares: // Ensure delegators shares are in the allowed amount
-		return errTooManyShares
+		return permError{errTooManyShares}
 	}
 
 	// Ensure staking length is not too short or long
 	stakingDuration := tx.Duration()
 	if stakingDuration < MinimumStakingDuration {
-		return errStakeTooShort
+		return permError{errStakeTooShort}
 	} else if stakingDuration > MaximumStakingDuration {
-		return errStakeTooLong
+		return permError{errStakeTooLong}
 	}
 
 	// Byte representation of the unsigned transaction
 	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetValidatorTx)
 	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return err
+		return permError{err}
 	}
 
 	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:]) // the public key that signed [tx]
 	if err != nil {
-		return err
+		return permError{err}
 	}
 	tx.senderID = key.Address()
 
@@ -108,7 +108,7 @@ func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), error) {
+func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -116,13 +116,13 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// Ensure the proposed validator starts after the current time
 	currentTime, err := tx.vm.getTimestamp(db)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	startTime := tx.StartTime()
 	if !currentTime.Before(startTime) {
-		return nil, nil, nil, nil, fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
+		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTime,
-			startTime)
+			startTime)}
 	}
 
 	// Get the account that is paying the transaction fee and, if the proposal is to add a validator
@@ -131,7 +131,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	accountID := tx.senderID
 	account, err := tx.vm.getAccount(db, accountID)
 	if err != nil {
-		return nil, nil, nil, nil, errDBAccount
+		return nil, nil, nil, nil, permError{errDBAccount}
 	}
 
 	// If the transaction adds a validator to the default subnet, also deduct
@@ -142,31 +142,31 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// to the pending validator set. (Increase the account's nonce; decrease its balance.)
 	newAccount, err := account.Remove(amount, tx.Nonce)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
 	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	currentValidators := validators.NewSet()
 	currentValidators.Set(tx.vm.getValidators(currentEvents))
 	if currentValidators.Contains(tx.NodeID) {
-		return nil, nil, nil, nil, fmt.Errorf("validator with ID %s already in the current default validator set",
-			tx.NodeID)
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the current default validator set",
+			tx.NodeID)}
 	}
 
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
 	pendingEvents, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	pendingValidators := validators.NewSet()
 	pendingValidators.Set(tx.vm.getValidators(pendingEvents))
 	if pendingValidators.Contains(tx.NodeID) {
-		return nil, nil, nil, nil, fmt.Errorf("validator with ID %s already in the pending default validator set",
-			tx.NodeID)
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the pending default validator set",
+			tx.NodeID)}
 	}
 
 	pendingEvents.Add(tx) // add validator to set of pending validators
@@ -175,10 +175,10 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// update the validator's account by removing the staked $AVA
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 
 	// If this proposal is aborted, chain state doesn't change

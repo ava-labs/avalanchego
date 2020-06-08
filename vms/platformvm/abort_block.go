@@ -24,7 +24,9 @@ func (a *Abort) Verify() error {
 	// Abort is a decision, so its parent must be a proposal
 	if !ok {
 		if err := a.Reject(); err == nil {
-			a.vm.DB.Commit()
+			if err := a.vm.DB.Commit(); err != nil {
+				a.vm.Ctx.Log.Error("error committing Abort block as rejected: %s", err)
+			}
 		} else {
 			a.vm.DB.Abort()
 		}

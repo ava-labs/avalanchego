@@ -36,6 +36,7 @@ type APIAccount struct {
 	Balance json.Uint64 `json:"balance"`
 }
 
+// FormattedAPIAccount is an APIAccount but allows for a formatted Address
 type FormattedAPIAccount struct {
 	Address string      `json:"address"`
 	Nonce   json.Uint64 `json:"nonce"`
@@ -76,6 +77,7 @@ type APIDefaultSubnetValidator struct {
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
+// FormattedAPIValidator allows for a formatted address
 type FormattedAPIValidator struct {
 	StartTime   json.Uint64  `json:"startTime"`
 	EndTime     json.Uint64  `json:"endTime"`
