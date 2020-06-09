@@ -111,3 +111,72 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		t.Fatalf("Should have errored due to an invalid end time")
 	}
 }
+
+func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
+	id := ids.NewShortID([20]byte{1})
+	account := APIAccount{
+		Address: id,
+		Balance: 123456789,
+	}
+
+	weight := json.Uint64(987654321)
+	validator1 := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 0,
+			EndTime:   20,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
+
+	validator2 := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 3,
+			EndTime:   15,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
+
+	validator3 := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 1,
+			EndTime:   10,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
+
+	args := BuildGenesisArgs{
+		Accounts: []APIAccount{
+			account,
+		},
+		Validators: []APIDefaultSubnetValidator{
+			validator1,
+			validator2,
+			validator3,
+		},
+		Time: 5,
+	}
+	reply := BuildGenesisReply{}
+
+	ss := StaticService{}
+	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
+		t.Fatalf("BuildGenesis should not have errored")
+	}
+
+	genesis := &Genesis{}
+	Codec.Unmarshal(reply.Bytes.Bytes, genesis)
+	validators := genesis.Validators
+	currentValidator := validators.Remove()
+	for validators.Len() > 0 {
+		nextValidator := validators.Remove()
+		if currentValidator.EndTime().Unix() > nextValidator.EndTime().Unix() {
+			t.Fatalf("Validators returned by genesis should be a min heap sorted by end time")
+		}
+		currentValidator = nextValidator
+	}
+}

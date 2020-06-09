@@ -1275,7 +1275,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		if err := tx.initialize(service.vm); err != nil {
 			return fmt.Errorf("error initializing tx: %s", err)
 		}
-		service.vm.unissuedEvents.Push(tx)
+		service.vm.unissuedEvents.Add(tx)
 		response.TxID = tx.ID()
 	case DecisionTx:
 		if err := tx.initialize(service.vm); err != nil {
