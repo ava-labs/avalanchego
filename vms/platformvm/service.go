@@ -390,6 +390,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
  *************** Get/Create Accounts ******************
  ******************************************************
  */
+
 // GetAccountArgs are the arguments for calling GetAccount
 type GetAccountArgs struct {
 	// Address of the account we want the information about

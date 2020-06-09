@@ -204,49 +204,6 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		return
 	}
 
-	// Get a factory for the vm we want to use on our chain
-	vmFactory, err := m.vmManager.GetVMFactory(vmID)
-	if err != nil {
-		m.log.Error("error while getting vmFactory: %s", err)
-		return
-	}
-
-	// Create the chain
-	vm, err := vmFactory.New()
-	if err != nil {
-		m.log.Error("error while creating vm: %s", err)
-		return
-	}
-	// TODO: Shutdown VM if an error occurs
-
-	fxs := make([]*common.Fx, len(chain.FxAliases))
-	for i, fxAlias := range chain.FxAliases {
-		fxID, err := m.vmManager.Lookup(fxAlias)
-		if err != nil {
-			m.log.Error("error while looking up Fx: %s", err)
-			return
-		}
-
-		// Get a factory for the fx we want to use on our chain
-		fxFactory, err := m.vmManager.GetVMFactory(fxID)
-		if err != nil {
-			m.log.Error("error while getting fxFactory: %s", err)
-			return
-		}
-
-		fx, err := fxFactory.New()
-		if err != nil {
-			m.log.Error("error while creating fx: %s", err)
-			return
-		}
-
-		// Create the fx
-		fxs[i] = &common.Fx{
-			ID: fxID,
-			Fx: fx,
-		}
-	}
-
 	primaryAlias, err := m.PrimaryAlias(chain.ID)
 	if err != nil {
 		primaryAlias = chain.ID.String()
@@ -270,6 +227,49 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		Keystore:            m.keystore.NewBlockchainKeyStore(chain.ID),
 		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chain.ID),
 		BCLookup:            m,
+	}
+
+	// Get a factory for the vm we want to use on our chain
+	vmFactory, err := m.vmManager.GetVMFactory(vmID)
+	if err != nil {
+		m.log.Error("error while getting vmFactory: %s", err)
+		return
+	}
+
+	// Create the chain
+	vm, err := vmFactory.New(ctx)
+	if err != nil {
+		m.log.Error("error while creating vm: %s", err)
+		return
+	}
+	// TODO: Shutdown VM if an error occurs
+
+	fxs := make([]*common.Fx, len(chain.FxAliases))
+	for i, fxAlias := range chain.FxAliases {
+		fxID, err := m.vmManager.Lookup(fxAlias)
+		if err != nil {
+			m.log.Error("error while looking up Fx: %s", err)
+			return
+		}
+
+		// Get a factory for the fx we want to use on our chain
+		fxFactory, err := m.vmManager.GetVMFactory(fxID)
+		if err != nil {
+			m.log.Error("error while getting fxFactory: %s", err)
+			return
+		}
+
+		fx, err := fxFactory.New(ctx)
+		if err != nil {
+			m.log.Error("error while creating fx: %s", err)
+			return
+		}
+
+		// Create the fx
+		fxs[i] = &common.Fx{
+			ID: fxID,
+			Fx: fx,
+		}
 	}
 
 	consensusParams := m.consensusParams

@@ -5,6 +5,7 @@ package spchainvm
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
 )
 
 // ID this VM should be referenced by
@@ -16,4 +17,4 @@ var (
 type Factory struct{}
 
 // New ...
-func (f *Factory) New() (interface{}, error) { return &VM{}, nil }
+func (f *Factory) New(*snow.Context) (interface{}, error) { return &VM{}, nil }

@@ -867,7 +867,7 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	return utxos, nil
 }
 
-// ParseAddr ...
+// ParseAddress ...
 func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
 	cb58 := formatting.CB58{}
 	err := cb58.FromString(addrStr)
@@ -877,8 +877,8 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
 	return ids.ToShortID(cb58.Bytes)
 }
 
-// Assumes addrID is not empty
 // FormatAddress ...
+// Assumes addrID is not empty
 func (vm *VM) FormatAddress(addrID ids.ShortID) string {
 	return addrID.String()
 }
