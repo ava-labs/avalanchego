@@ -188,22 +188,22 @@ const (
 var (
 	Messages = map[Op][]Field{
 		// Handshake:
-		GetVersion:  []Field{},
-		Version:     []Field{NetworkID, NodeID, MyTime, IP, VersionStr},
-		GetPeerList: []Field{},
-		PeerList:    []Field{Peers},
+		GetVersion:  {},
+		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr},
+		GetPeerList: {},
+		PeerList:    {Peers},
 		// Bootstrapping:
-		GetAcceptedFrontier: []Field{ChainID, RequestID},
-		AcceptedFrontier:    []Field{ChainID, RequestID, ContainerIDs},
-		GetAccepted:         []Field{ChainID, RequestID, ContainerIDs},
-		Accepted:            []Field{ChainID, RequestID, ContainerIDs},
-		GetAncestors:        []Field{ChainID, RequestID, ContainerID},
-		MultiPut:            []Field{ChainID, RequestID, MultiContainerBytes},
+		GetAcceptedFrontier: {ChainID, RequestID},
+		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
+		GetAccepted:         {ChainID, RequestID, ContainerIDs},
+		Accepted:            {ChainID, RequestID, ContainerIDs},
+		GetAncestors:        {ChainID, RequestID, ContainerID},
+		MultiPut:            {ChainID, RequestID, MultiContainerBytes},
 		// Consensus:
-		Get:       []Field{ChainID, RequestID, ContainerID},
-		Put:       []Field{ChainID, RequestID, ContainerID, ContainerBytes},
-		PushQuery: []Field{ChainID, RequestID, ContainerID, ContainerBytes},
-		PullQuery: []Field{ChainID, RequestID, ContainerID},
-		Chits:     []Field{ChainID, RequestID, ContainerIDs},
+		Get:       {ChainID, RequestID, ContainerID},
+		Put:       {ChainID, RequestID, ContainerID, ContainerBytes},
+		PushQuery: {ChainID, RequestID, ContainerID, ContainerBytes},
+		PullQuery: {ChainID, RequestID, ContainerID},
+		Chits:     {ChainID, RequestID, ContainerIDs},
 	}
 )

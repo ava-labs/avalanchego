@@ -127,7 +127,7 @@ func (svm *SnowmanVM) NotifyBlockReady() {
 	select {
 	case svm.ToEngine <- common.PendingTxs:
 	default:
-		svm.Ctx.Log.Warn("dropping message to consensus engine")
+		svm.Ctx.Log.Debug("dropping message to consensus engine")
 	}
 }
 

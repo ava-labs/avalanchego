@@ -35,7 +35,7 @@ const (
 	batchSize      = 30
 	stateCacheSize = 10000
 	idCacheSize    = 10000
-	txCacheSize    = 1000000
+	txCacheSize    = 100000
 	addressSep     = "-"
 )
 

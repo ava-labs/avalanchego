@@ -35,8 +35,8 @@ type bootstrapper struct {
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
 
-	// Number of blocks processed
-	numProcessed uint32
+	// Number of blocks fetched
+	numFetched uint32
 
 	// tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
@@ -183,16 +183,16 @@ func (b *bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
-		b.numProcessed++                                      // Progress tracker
-		if b.numProcessed%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.BootstrapConfig.Context.Log.Info("processed %d blocks", b.numProcessed)
-		}
 		if err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numBootstrapped,
 			numDropped:  b.numDropped,
 			blk:         blk,
 		}); err == nil {
 			b.numBlocked.Inc()
+			b.numFetched++                                      // Progress tracker
+			if b.numFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+				b.BootstrapConfig.Context.Log.Info("fetched %d blocks", b.numFetched)
+			}
 		}
 
 		if err := b.Blocked.Commit(); err != nil {
