@@ -124,6 +124,7 @@ type network struct {
 	b Builder
 
 	stateLock       sync.Mutex
+	pendingBytes    int
 	closed          bool
 	disconnectedIPs map[string]struct{}
 	connectedIPs    map[string]struct{}
