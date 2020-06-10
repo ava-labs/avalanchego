@@ -27,18 +27,21 @@ import (
 	"github.com/ava-labs/gecko/version"
 )
 
+// reasonable default values
 const (
-	defaultInitialReconnectDelay               = time.Second
-	defaultMaxReconnectDelay                   = time.Hour
-	DefaultMaxMessageSize               uint32 = 1 << 21
-	defaultSendQueueSize                       = 1 << 10
-	defaultMaxClockDifference                  = time.Minute
-	defaultPeerListGossipSpacing               = time.Minute
-	defaultPeerListGossipSize                  = 100
-	defaultPeerListStakerGossipFraction        = 2
-	defaultGetVersionTimeout                   = 2 * time.Second
-	defaultAllowPrivateIPs                     = true
-	defaultGossipSize                          = 50
+	defaultInitialReconnectDelay                     = time.Second
+	defaultMaxReconnectDelay                         = time.Hour
+	DefaultMaxMessageSize                     uint32 = 1 << 21
+	defaultSendQueueSize                             = 1 << 10
+	defaultMaxNetworkPendingSendBytes                = 1 << 28 // 256MB
+	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
+	defaultMaxClockDifference                        = time.Minute
+	defaultPeerListGossipSpacing                     = time.Minute
+	defaultPeerListGossipSize                        = 100
+	defaultPeerListStakerGossipFraction              = 2
+	defaultGetVersionTimeout                         = 2 * time.Second
+	defaultAllowPrivateIPs                           = true
+	defaultGossipSize                                = 50
 )
 
 // Network defines the functionality of the networking library.
@@ -102,17 +105,19 @@ type network struct {
 	clock         timer.Clock
 	lastHeartbeat int64
 
-	initialReconnectDelay        time.Duration
-	maxReconnectDelay            time.Duration
-	maxMessageSize               uint32
-	sendQueueSize                int
-	maxClockDifference           time.Duration
-	peerListGossipSpacing        time.Duration
-	peerListGossipSize           int
-	peerListStakerGossipFraction int
-	getVersionTimeout            time.Duration
-	allowPrivateIPs              bool
-	gossipSize                   int
+	initialReconnectDelay              time.Duration
+	maxReconnectDelay                  time.Duration
+	maxMessageSize                     uint32
+	sendQueueSize                      int
+	maxNetworkPendingSendBytes         int
+	networkPendingSendBytesToRateLimit int
+	maxClockDifference                 time.Duration
+	peerListGossipSpacing              time.Duration
+	peerListGossipSize                 int
+	peerListStakerGossipFraction       int
+	getVersionTimeout                  time.Duration
+	allowPrivateIPs                    bool
+	gossipSize                         int
 
 	executor timer.Executor
 
@@ -164,6 +169,8 @@ func NewDefaultNetwork(
 		defaultMaxReconnectDelay,
 		DefaultMaxMessageSize,
 		defaultSendQueueSize,
+		defaultMaxNetworkPendingSendBytes,
+		defaultNetworkPendingSendBytesToRateLimit,
 		defaultMaxClockDifference,
 		defaultPeerListGossipSpacing,
 		defaultPeerListGossipSize,
@@ -193,6 +200,8 @@ func NewNetwork(
 	maxReconnectDelay time.Duration,
 	maxMessageSize uint32,
 	sendQueueSize int,
+	maxNetworkPendingSendBytes int,
+	networkPendingSendBytesToRateLimit int,
 	maxClockDifference time.Duration,
 	peerListGossipSpacing time.Duration,
 	peerListGossipSize int,
@@ -202,35 +211,37 @@ func NewNetwork(
 	gossipSize int,
 ) Network {
 	net := &network{
-		log:                          log,
-		id:                           id,
-		ip:                           ip,
-		networkID:                    networkID,
-		version:                      version,
-		parser:                       parser,
-		listener:                     listener,
-		dialer:                       dialer,
-		serverUpgrader:               serverUpgrader,
-		clientUpgrader:               clientUpgrader,
-		vdrs:                         vdrs,
-		router:                       router,
-		nodeID:                       rand.Uint32(),
-		initialReconnectDelay:        initialReconnectDelay,
-		maxReconnectDelay:            maxReconnectDelay,
-		maxMessageSize:               maxMessageSize,
-		sendQueueSize:                sendQueueSize,
-		maxClockDifference:           maxClockDifference,
-		peerListGossipSpacing:        peerListGossipSpacing,
-		peerListGossipSize:           peerListGossipSize,
-		peerListStakerGossipFraction: peerListStakerGossipFraction,
-		getVersionTimeout:            getVersionTimeout,
-		allowPrivateIPs:              allowPrivateIPs,
-		gossipSize:                   gossipSize,
+		log:                                log,
+		id:                                 id,
+		ip:                                 ip,
+		networkID:                          networkID,
+		version:                            version,
+		parser:                             parser,
+		listener:                           listener,
+		dialer:                             dialer,
+		serverUpgrader:                     serverUpgrader,
+		clientUpgrader:                     clientUpgrader,
+		vdrs:                               vdrs,
+		router:                             router,
+		nodeID:                             rand.Uint32(),
+		initialReconnectDelay:              initialReconnectDelay,
+		maxReconnectDelay:                  maxReconnectDelay,
+		maxMessageSize:                     maxMessageSize,
+		sendQueueSize:                      sendQueueSize,
+		maxNetworkPendingSendBytes:         maxNetworkPendingSendBytes,
+		networkPendingSendBytesToRateLimit: networkPendingSendBytesToRateLimit,
+		maxClockDifference:                 maxClockDifference,
+		peerListGossipSpacing:              peerListGossipSpacing,
+		peerListGossipSize:                 peerListGossipSize,
+		peerListStakerGossipFraction:       peerListStakerGossipFraction,
+		getVersionTimeout:                  getVersionTimeout,
+		allowPrivateIPs:                    allowPrivateIPs,
+		gossipSize:                         gossipSize,
 
 		disconnectedIPs: make(map[string]struct{}),
 		connectedIPs:    make(map[string]struct{}),
 		retryDelay:      make(map[string]time.Duration),
-		myIPs:           map[string]struct{}{ip.String(): struct{}{}},
+		myIPs:           map[string]struct{}{ip.String(): {}},
 		peers:           make(map[[20]byte]*peer),
 	}
 	net.initialize(registerer)
@@ -738,11 +749,12 @@ func (n *network) connectTo(ip utils.IPDesc) {
 
 		if delay == 0 {
 			delay = n.initialReconnectDelay
-		} else {
-			delay *= 2
 		}
+
+		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
-			delay = n.maxReconnectDelay
+			// set the timeout to [.75, 1) * maxReconnectDelay
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
 		}
 
 		n.stateLock.Lock()
