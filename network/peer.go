@@ -198,7 +198,7 @@ func (p *peer) send(msg Msg) bool {
 	newConnPendingBytes := p.pendingBytes + len(msgBytes)
 	if newPendingBytes > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
 		(newPendingBytes > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
-			newConnPendingBytes > p.net.maxNetworkPendingSendBytes/len(p.net.peers)) { // Check to see if this connection is using too much memory
+			newConnPendingBytes > p.net.maxNetworkPendingSendBytes/20) { // Check to see if this connection is using too much memory
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
 	}

@@ -33,7 +33,7 @@ const (
 	defaultMaxReconnectDelay                         = time.Hour
 	DefaultMaxMessageSize                     uint32 = 1 << 21
 	defaultSendQueueSize                             = 1 << 10
-	defaultMaxNetworkPendingSendBytes                = 1 << 28 // 256MB
+	defaultMaxNetworkPendingSendBytes                = 1 << 29 // 512MB
 	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
 	defaultMaxClockDifference                        = time.Minute
 	defaultPeerListGossipSpacing                     = time.Minute
