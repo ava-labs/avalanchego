@@ -4,8 +4,10 @@
 package codec
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"unicode"
 
@@ -15,14 +17,14 @@ import (
 const (
 	defaultMaxSize        = 1 << 18 // default max size, in bytes, of something being marshalled by Marshal()
 	defaultMaxSliceLength = 1 << 18 // default max length of a slice being marshalled by Marshal()
+	maxStringLen          = math.MaxInt16
 )
 
 // ErrBadCodec is returned when one tries to perform an operation
 // using an unknown codec
 var (
 	errBadCodec                  = errors.New("wrong or unknown codec used")
-	errNil                       = errors.New("can't marshal nil value")
-	errUnmarshalNil              = errors.New("can't unmarshal into nil")
+	errNil                       = errors.New("can't marshal/unmarshal nil value")
 	errNeedPointer               = errors.New("must unmarshal into a pointer")
 	errMarshalUnregisteredType   = errors.New("can't marshal an unregistered type")
 	errUnmarshalUnregisteredType = errors.New("can't unmarshal an unregistered type")
@@ -62,7 +64,7 @@ func New(maxSize, maxSliceLen int) Codec {
 // NewDefault returns a new codec with reasonable default values
 func NewDefault() Codec { return New(defaultMaxSize, defaultMaxSliceLength) }
 
-// RegisterType is used to register types that may be unmarshaled into an interface typed value
+// RegisterType is used to register types that may be unmarshaled into an interface
 // [val] is a value of the type being registered
 func (c codec) RegisterType(val interface{}) error {
 	valType := reflect.TypeOf(val)
@@ -79,23 +81,20 @@ func (c codec) RegisterType(val interface{}) error {
 // 2) We use "marshal" and "serialize" interchangeably, and "unmarshal" and "deserialize" interchangeably
 // 3) To include a field of a struct in the serialized form, add the tag `serialize:"true"` to it
 // 4) These typed members of a struct may be serialized:
-//    bool, string, uint[8,16,32,64, int[8,16,32,64],
+//    bool, string, uint[8,16,32,64], int[8,16,32,64],
 //	  structs, slices, arrays, interface.
-//	  structs, slices and arrays can only be serialized if their constituent parts can be.
-// 5) To marshal an interface typed value, you must pass a _pointer_ to the value
-// 6) If you want to be able to unmarshal into an interface typed value,
-//    you must call codec.RegisterType([instance of the type that fulfills the interface]).
+//	  structs, slices and arrays can only be serialized if their constituent values can be.
+// 5) To marshal an interface, you must pass a pointer to the value
+// 6) To unmarshal an interface,  you must call codec.RegisterType([instance of the type that fulfills the interface]).
 // 7) nil slices will be unmarshaled as an empty slice of the appropriate type
 // 8) Serialized fields must be exported
 
 // Marshal returns the byte representation of [value]
-// If you want to marshal an interface, [value] must be a pointer
-// to the interface
+// To marshal an interface, [value] must be a pointer to the interface
 func (c codec) Marshal(value interface{}) ([]byte, error) {
 	if value == nil {
 		return nil, errNil
 	}
-
 	return c.marshal(reflect.ValueOf(value))
 }
 
@@ -105,46 +104,69 @@ func (c codec) marshal(value reflect.Value) ([]byte, error) {
 	t := value.Type()
 
 	valueKind := value.Kind()
+
+	// Case: Value can't be marshalled
 	switch valueKind {
-	case reflect.Interface, reflect.Ptr, reflect.Slice:
-		if value.IsNil() {
+	case reflect.Interface, reflect.Ptr, reflect.Slice, reflect.Invalid:
+		if value.IsNil() { // Can't marshal nil
 			return nil, errNil
 		}
 	}
 
+	// Case: Value is of known size; return its byte repr.
 	switch valueKind {
 	case reflect.Uint8:
-		p.PackByte(uint8(value.Uint()))
-		return p.Bytes, p.Err
+		return []byte{byte(value.Uint())}, nil
 	case reflect.Int8:
-		p.PackByte(uint8(value.Int()))
-		return p.Bytes, p.Err
+		return []byte{byte(value.Int())}, nil
 	case reflect.Uint16:
-		p.PackShort(uint16(value.Uint()))
-		return p.Bytes, p.Err
+		bytes := make([]byte, 2, 2)
+		binary.BigEndian.PutUint16(bytes, uint16(value.Uint()))
+		return bytes, nil
 	case reflect.Int16:
-		p.PackShort(uint16(value.Int()))
-		return p.Bytes, p.Err
+		bytes := make([]byte, 2, 2)
+		binary.BigEndian.PutUint16(bytes, uint16(value.Int()))
+		return bytes, nil
 	case reflect.Uint32:
-		p.PackInt(uint32(value.Uint()))
-		return p.Bytes, p.Err
+		bytes := make([]byte, 4, 4)
+		binary.BigEndian.PutUint32(bytes, uint32(value.Uint()))
+		return bytes, nil
 	case reflect.Int32:
-		p.PackInt(uint32(value.Int()))
-		return p.Bytes, p.Err
+		bytes := make([]byte, 4, 4)
+		binary.BigEndian.PutUint32(bytes, uint32(value.Int()))
+		return bytes, nil
 	case reflect.Uint64:
-		p.PackLong(value.Uint())
-		return p.Bytes, p.Err
+		bytes := make([]byte, 8, 8)
+		binary.BigEndian.PutUint64(bytes, uint64(value.Uint()))
+		return bytes, nil
 	case reflect.Int64:
-		p.PackLong(uint64(value.Int()))
-		return p.Bytes, p.Err
+		bytes := make([]byte, 8, 8)
+		binary.BigEndian.PutUint64(bytes, uint64(value.Int()))
+		return bytes, nil
 	case reflect.Uintptr, reflect.Ptr:
 		return c.marshal(value.Elem())
 	case reflect.String:
-		p.PackStr(value.String())
-		return p.Bytes, p.Err
+		asStr := value.String()
+		strSize := len(asStr)
+		if strSize > maxStringLen {
+			return nil, errSliceTooLarge
+		}
+		bytes := make([]byte, 2+strSize, 2+strSize)
+		binary.BigEndian.PutUint16(bytes[0:2], uint16(strSize))
+		if strSize == 0 {
+			return bytes, nil
+		}
+		copy(bytes[2:], []byte(asStr))
+		return bytes, nil
 	case reflect.Bool:
-		p.PackBool(value.Bool())
-		return p.Bytes, p.Err
+		if value.Bool() {
+			return []byte{1}, nil
+		}
+		return []byte{0}, nil
+	}
+
+	// Case: Value is of unknown size. Calculate its size and fill byte array.
+	switch valueKind {
 	case reflect.Interface:
 		typeID, ok := c.typeToTypeID[reflect.TypeOf(value.Interface())] // Get the type ID of the value being marshaled
 		if !ok {
@@ -181,7 +203,7 @@ func (c codec) marshal(value reflect.Value) ([]byte, error) {
 				continue
 			}
 			if unicode.IsLower(rune(field.Name[0])) { // Can only marshal exported fields
-				return nil, errMarshalUnexportedField
+				return nil, fmt.Errorf("can't marshal exported field %s", field.Name)
 			}
 			fieldVal := value.Field(i) // The field we're serializing
 			if fieldVal.Kind() == reflect.Slice && fieldVal.IsNil() {
@@ -195,8 +217,7 @@ func (c codec) marshal(value reflect.Value) ([]byte, error) {
 			p.PackFixedBytes(fieldBytes)
 		}
 		return p.Bytes, p.Err
-	case reflect.Invalid:
-		return nil, errUnmarshalNil
+
 	default:
 		return nil, errUnknownType
 	}
@@ -332,7 +353,7 @@ func (c codec) unmarshal(p *wrappers.Packer, field reflect.Value) error {
 		// Assign to the top-level struct's member
 		field.Set(underlyingValue)
 	case reflect.Invalid:
-		return errUnmarshalNil
+		return errNil
 	default:
 		return errUnknownType
 	}

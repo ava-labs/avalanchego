@@ -407,8 +407,8 @@ func TestSerializeUnexportedField(t *testing.T) {
 	}
 
 	codec := NewDefault()
-	if _, err := codec.Marshal(myS); err != errMarshalUnexportedField {
-		t.Fatalf("expected err to be errUnexportedField but was %v", err)
+	if _, err := codec.Marshal(myS); err == nil {
+		t.Fatalf("expected err but got none")
 	}
 }
 
