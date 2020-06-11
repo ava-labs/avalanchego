@@ -16,7 +16,13 @@ import (
 type ProposalTx interface {
 	initialize(vm *VM) error
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(database.Database) (onCommitDB *versiondb.Database, onAbortDB *versiondb.Database, onCommitFunc func(), onAbortFunc func(), err error)
+	SemanticVerify(database.Database) (
+		onCommitDB *versiondb.Database,
+		onAbortDB *versiondb.Database,
+		onCommitFunc func(),
+		onAbortFunc func(),
+		err TxError,
+	)
 	InitiallyPrefersCommit() bool
 }
 
@@ -99,7 +105,9 @@ func (pb *ProposalBlock) Verify() error {
 	parent, ok := parentIntf.(decision)
 	if !ok {
 		if err := pb.Reject(); err == nil {
-			pb.vm.DB.Commit()
+			if err := pb.vm.DB.Commit(); err != nil {
+				pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+			}
 		} else {
 			pb.vm.DB.Abort()
 		}
@@ -109,13 +117,19 @@ func (pb *ProposalBlock) Verify() error {
 	// pdb is the database if this block's parent is accepted
 	pdb := parent.onAccept()
 
-	var err error
+	var err TxError
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
 	if err != nil {
-		if err := pb.Reject(); err == nil {
-			pb.vm.DB.Commit()
-		} else {
-			pb.vm.DB.Abort()
+		// If this block's transaction proposes to advance the timestamp, the transaction may fail
+		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
+		if !err.Temporary() {
+			if err := pb.Reject(); err == nil {
+				if err := pb.vm.DB.Commit(); err != nil {
+					pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+				}
+			} else {
+				pb.vm.DB.Abort()
+			}
 		}
 		return err
 	}

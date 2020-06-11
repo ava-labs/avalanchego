@@ -166,186 +166,177 @@ func (h *Handler) dispatchMsg(msg message) bool {
 
 // GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
 // network to the consensus engine.
-func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) bool {
+	return h.sendMsg(message{
 		messageType: getAcceptedFrontierMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-	}
+	})
 }
 
 // AcceptedFrontier passes a AcceptedFrontier message received from the network
 // to the consensus engine.
-func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+	return h.sendMsg(message{
 		messageType:  acceptedFrontierMsg,
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
-	}
+	})
 }
 
 // GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
 // from the network to the consensus engine.
-func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) bool {
+	return h.sendMsg(message{
 		messageType: getAcceptedFrontierFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-	}
+	})
 }
 
 // GetAccepted passes a GetAccepted message received from the
 // network to the consensus engine.
-func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+	return h.sendMsg(message{
 		messageType:  getAcceptedMsg,
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
-	}
+	})
 }
 
 // Accepted passes a Accepted message received from the network to the consensus
 // engine.
-func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+	return h.sendMsg(message{
 		messageType:  acceptedMsg,
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
-	}
+	})
 }
 
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
 // network to the consensus engine.
-func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) bool {
+	return h.sendMsg(message{
 		messageType: getAcceptedFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-	}
+	})
 }
 
 // Get passes a Get message received from the network to the consensus engine.
-func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) bool {
+	return h.sendMsg(message{
 		messageType: getMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
-	}
+	})
 }
 
 // GetAncestors passes a GetAncestors message received from the network to the consensus engine.
-func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) bool {
+	return h.sendMsg(message{
 		messageType: getAncestorsMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
-	}
+	})
 }
 
 // Put passes a Put message received from the network to the consensus engine.
-func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) bool {
+	return h.sendMsg(message{
 		messageType: putMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
 		container:   container,
-	}
+	})
 }
 
 // MultiPut passes a MultiPut message received from the network to the consensus engine.
-func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) bool {
+	return h.sendMsg(message{
 		messageType: multiPutMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containers:  containers,
-	}
+	})
 }
 
 // GetFailed passes a GetFailed message to the consensus engine.
-func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) bool {
+	return h.sendMsg(message{
 		messageType: getFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-	}
+	})
 }
 
 // GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
-func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) bool {
+	return h.sendMsg(message{
 		messageType: getAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-	}
+	})
 }
 
 // PushQuery passes a PushQuery message received from the network to the consensus engine.
-func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, blockID ids.ID, block []byte) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, blockID ids.ID, block []byte) bool {
+	return h.sendMsg(message{
 		messageType: pushQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: blockID,
 		container:   block,
-	}
+	})
 }
 
 // PullQuery passes a PullQuery message received from the network to the consensus engine.
-func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, blockID ids.ID) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, blockID ids.ID) bool {
+	return h.sendMsg(message{
 		messageType: pullQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: blockID,
-	}
+	})
 }
 
 // Chits passes a Chits message received from the network to the consensus engine.
-func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set) bool {
+	return h.sendMsg(message{
 		messageType:  chitsMsg,
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: votes,
-	}
+	})
 }
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.
-func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
+func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) bool {
+	return h.sendMsg(message{
 		messageType: queryFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-	}
+	})
 }
 
 // Gossip passes a gossip request to the consensus engine
-func (h *Handler) Gossip() {
-	h.metrics.pending.Inc()
-	h.msgs <- message{messageType: gossipMsg}
+func (h *Handler) Gossip() bool {
+	return h.sendMsg(message{messageType: gossipMsg})
+}
+
+// Notify ...
+func (h *Handler) Notify(msg common.Message) bool {
+	return h.sendMsg(message{
+		messageType:  notifyMsg,
+		notification: msg,
+	})
 }
 
 // Shutdown shuts down the dispatcher
@@ -354,11 +345,13 @@ func (h *Handler) Shutdown() {
 	h.msgs <- message{messageType: shutdownMsg}
 }
 
-// Notify ...
-func (h *Handler) Notify(msg common.Message) {
-	h.metrics.pending.Inc()
-	h.msgs <- message{
-		messageType:  notifyMsg,
-		notification: msg,
+func (h *Handler) sendMsg(msg message) bool {
+	select {
+	case h.msgs <- msg:
+		h.metrics.pending.Inc()
+		return true
+	default:
+		h.metrics.dropped.Inc()
+		return false
 	}
 }

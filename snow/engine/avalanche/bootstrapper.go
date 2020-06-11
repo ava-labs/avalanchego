@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	cacheSize = 3000
+	cacheSize = 100000
 )
 
 // BootstrapConfig ...
@@ -40,8 +40,8 @@ type bootstrapper struct {
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
 
-	// number of vertices processed so far
-	numProcessed uint32
+	// number of vertices fetched so far
+	numFetched uint32
 
 	// tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
@@ -132,10 +132,6 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 		if _, ok := b.processedCache.Get(vtx.ID()); ok { // already processed this
 			continue
 		}
-		b.numProcessed++ // Progress tracker
-		if b.numProcessed%common.StatusUpdateFrequency == 0 {
-			b.BootstrapConfig.Context.Log.Info("processed %d vertices", b.numProcessed)
-		}
 
 		switch vtx.Status() {
 		case choices.Unknown:
@@ -152,6 +148,10 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				vtx:         vtx,
 			}); err == nil {
 				b.numBSBlockedVtx.Inc()
+				b.numFetched++ // Progress tracker
+				if b.numFetched%common.StatusUpdateFrequency == 0 {
+					b.BootstrapConfig.Context.Log.Info("fetched %d vertices", b.numFetched)
+				}
 			} else {
 				b.BootstrapConfig.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
 			}

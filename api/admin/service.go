@@ -15,12 +15,14 @@ import (
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/version"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
 
 // Admin is the API service for node admin management
 type Admin struct {
+	version      version.Version
 	nodeID       ids.ShortID
 	networkID    uint32
 	log          logging.Logger
@@ -31,12 +33,13 @@ type Admin struct {
 }
 
 // NewService returns a new admin API service
-func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
+func NewService(version version.Version, nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&Admin{
+		version:      version,
 		nodeID:       nodeID,
 		networkID:    networkID,
 		log:          log,
@@ -45,6 +48,19 @@ func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainM
 		httpServer:   httpServer,
 	}, "admin")
 	return &common.HTTPHandler{Handler: newServer}
+}
+
+// GetNodeVersionReply are the results from calling GetNodeVersion
+type GetNodeVersionReply struct {
+	Version string `json:"version"`
+}
+
+// GetNodeVersion returns the version this node is running
+func (service *Admin) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersionReply) error {
+	service.log.Debug("Admin: GetNodeVersion called")
+
+	reply.Version = service.version.String()
+	return nil
 }
 
 // GetNodeIDReply are the results from calling GetNodeID

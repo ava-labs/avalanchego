@@ -130,7 +130,7 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	b.pendingAccepted.Remove(validatorID)
 
 	weight := uint64(0)
-	if vdr, ok := b.Validators.Get(validatorID); ok {
+	if vdr, ok := b.Beacons.Get(validatorID); ok {
 		weight = vdr.Weight()
 	}
 

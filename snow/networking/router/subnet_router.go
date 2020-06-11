@@ -66,15 +66,15 @@ func (sr *ChainRouter) AddChain(chain *Handler) {
 func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 	sr.lock.RLock()
 	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
-
 	if !exists {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.lock.RUnlock()
 		return
 	}
-
 	chain.Shutdown()
 	close(chain.msgs)
+	delete(sr.chains, chainID.Key())
+	sr.lock.RUnlock()
 
 	ticker := time.NewTicker(sr.closeTimeout)
 	select {
@@ -83,10 +83,6 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
 	ticker.Stop()
-
-	sr.lock.Lock()
-	delete(sr.chains, chainID.Key())
-	sr.lock.Unlock()
 }
 
 // GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
@@ -94,10 +90,9 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 // chain with ID [chainID]
 func (sr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	sr.lock.RLock()
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
+	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAcceptedFrontier(validatorID, requestID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
@@ -109,12 +104,12 @@ func (sr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 // chain with ID [chainID]
 func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
-		chain.AcceptedFrontier(validatorID, requestID, containerIDs)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if chain.AcceptedFrontier(validatorID, requestID, containerIDs) {
+			sr.timeouts.Cancel(validatorID, chainID, requestID)
+		}
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
@@ -125,15 +120,21 @@ func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 // working on the chain with ID [chainID]
 func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
-		chain.GetAcceptedFrontierFailed(validatorID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if !chain.GetAcceptedFrontierFailed(validatorID, requestID) {
+			sr.log.Debug("deferring GetAcceptedFrontier timeout due to a full queue on %s", chainID)
+			// Defer this call to later
+			sr.timeouts.Register(validatorID, chainID, requestID, func() {
+				sr.GetAcceptedFrontierFailed(validatorID, chainID, requestID)
+			})
+			return
+		}
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // GetAccepted routes an incoming GetAccepted request from the
@@ -141,10 +142,9 @@ func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 // chain with ID [chainID]
 func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	sr.lock.RLock()
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
+	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAccepted(validatorID, requestID, containerIDs)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
@@ -156,12 +156,12 @@ func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 // [chainID]
 func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
-		chain.Accepted(validatorID, requestID, containerIDs)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if chain.Accepted(validatorID, requestID, containerIDs) {
+			sr.timeouts.Cancel(validatorID, chainID, requestID)
+		}
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
@@ -172,29 +172,20 @@ func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 // chain with ID [chainID]
 func (sr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if !chain.GetAcceptedFailed(validatorID, requestID) {
+			sr.timeouts.Register(validatorID, chainID, requestID, func() {
+				sr.log.Debug("deferring GetAccepted timeout due to a full queue on %s", chainID)
+				sr.GetAcceptedFailed(validatorID, chainID, requestID)
+			})
+			return
+		}
+	} else {
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
-
-	if exists {
-		chain.GetAcceptedFailed(validatorID, requestID)
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
-}
-
-// Get routes an incoming Get request from the validator with ID [validatorID]
-// to the consensus engine working on the chain with ID [chainID]
-func (sr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
-	sr.lock.RLock()
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
-
-	if exists {
-		chain.Get(validatorID, requestID, containerID)
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
 }
 
 // GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
@@ -202,28 +193,10 @@ func (sr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // The maximum number of ancestors to respond with is define in snow/engine/commong/bootstrapper.go
 func (sr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
 	sr.lock.RLock()
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
+	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAncestors(validatorID, requestID, containerID)
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
-}
-
-// Put routes an incoming Put request from the validator with ID [validatorID]
-// to the consensus engine working on the chain with ID [chainID]
-func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
-	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
-
-	// This message came in response to a Get message from this node, and when we sent that Get
-	// message we set a timeout. Since we got a response, cancel the timeout.
-	if exists {
-		chain.Put(validatorID, requestID, containerID, container)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
@@ -233,29 +206,14 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
 	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
 	// This message came in response to a GetAncestors message from this node, and when we sent that
 	// message we set a timeout. Since we got a response, cancel the timeout.
-	if exists {
-		chain.MultiPut(validatorID, requestID, containers)
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
-}
-
-// GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
-// to the consensus engine working on the chain with ID [chainID]
-func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
-
-	if exists {
-		chain.GetFailed(validatorID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if chain.MultiPut(validatorID, requestID, containers) {
+			sr.timeouts.Cancel(validatorID, chainID, requestID)
+		}
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
@@ -265,25 +223,79 @@ func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
-		chain.GetAncestorsFailed(validatorID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if !chain.GetAncestorsFailed(validatorID, requestID) {
+			sr.timeouts.Register(validatorID, chainID, requestID, func() {
+				sr.log.Debug("deferring GetAncestors timeout due to a full queue on %s", chainID)
+				sr.GetAncestorsFailed(validatorID, chainID, requestID)
+			})
+			return
+		}
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
+}
+
+// Get routes an incoming Get request from the validator with ID [validatorID]
+// to the consensus engine working on the chain with ID [chainID]
+func (sr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.Get(validatorID, requestID, containerID)
+	} else {
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+	}
+}
+
+// Put routes an incoming Put request from the validator with ID [validatorID]
+// to the consensus engine working on the chain with ID [chainID]
+func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	// This message came in response to a Get message from this node, and when we sent that Get
+	// message we set a timeout. Since we got a response, cancel the timeout.
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if chain.Put(validatorID, requestID, containerID, container) {
+			sr.timeouts.Cancel(validatorID, chainID, requestID)
+		}
+	} else {
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+	}
+}
+
+// GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
+// to the consensus engine working on the chain with ID [chainID]
+func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
+
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if !chain.GetFailed(validatorID, requestID) {
+			sr.timeouts.Register(validatorID, chainID, requestID, func() {
+				sr.log.Debug("deferring Get timeout due to a full queue on %s", chainID)
+				sr.GetFailed(validatorID, chainID, requestID)
+			})
+			return
+		}
+	} else {
+		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+	}
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	sr.lock.RLock()
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
+	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.PushQuery(validatorID, requestID, containerID, container)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
@@ -294,10 +306,9 @@ func (sr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
 	sr.lock.RLock()
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
+	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.PullQuery(validatorID, requestID, containerID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
@@ -308,14 +319,13 @@ func (sr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
 	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
 	// Cancel timeout we set when sent the message asking for these Chits
-
-	if exists {
-		chain.Chits(validatorID, requestID, votes)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if chain.Chits(validatorID, requestID, votes) {
+			sr.timeouts.Cancel(validatorID, chainID, requestID)
+		}
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
@@ -325,15 +335,20 @@ func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 // to the consensus engine working on the chain with ID [chainID]
 func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
 	sr.lock.RLock()
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
-	chain, exists := sr.chains[chainID.Key()]
-	sr.lock.RUnlock()
+	defer sr.lock.RUnlock()
 
-	if exists {
-		chain.QueryFailed(validatorID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		if !chain.QueryFailed(validatorID, requestID) {
+			sr.timeouts.Register(validatorID, chainID, requestID, func() {
+				sr.log.Debug("deferring Query timeout due to a full queue on %s", chainID)
+				sr.QueryFailed(validatorID, chainID, requestID)
+			})
+			return
+		}
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // Shutdown shuts down this router
@@ -367,13 +382,9 @@ func (sr *ChainRouter) Shutdown() {
 // Gossip accepted containers
 func (sr *ChainRouter) Gossip() {
 	sr.lock.Lock()
-	chains := []*Handler{}
-	for _, chain := range sr.chains {
-		chains = append(chains, chain)
-	}
-	sr.lock.Unlock()
+	defer sr.lock.Unlock()
 
-	for _, chain := range chains {
+	for _, chain := range sr.chains {
 		chain.Gossip()
 	}
 }

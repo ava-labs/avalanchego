@@ -55,7 +55,9 @@ func (sb *StandardBlock) Verify() error {
 	parent, ok := parentBlock.(decision)
 	if !ok {
 		if err := sb.Reject(); err == nil {
-			sb.vm.DB.Commit()
+			if err := sb.vm.DB.Commit(); err != nil {
+				sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+			}
 		} else {
 			sb.vm.DB.Abort()
 		}
@@ -70,7 +72,9 @@ func (sb *StandardBlock) Verify() error {
 		onAccept, err := tx.SemanticVerify(sb.onAcceptDB)
 		if err != nil {
 			if err := sb.Reject(); err == nil {
-				sb.vm.DB.Commit()
+				if err := sb.vm.DB.Commit(); err != nil {
+					sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+				}
 			} else {
 				sb.vm.DB.Abort()
 			}

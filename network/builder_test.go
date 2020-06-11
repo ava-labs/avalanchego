@@ -79,14 +79,8 @@ func TestBuildGetPeerList(t *testing.T) {
 
 func TestBuildPeerList(t *testing.T) {
 	ips := []utils.IPDesc{
-		utils.IPDesc{
-			IP:   net.IPv6loopback,
-			Port: 12345,
-		},
-		utils.IPDesc{
-			IP:   net.IPv6loopback,
-			Port: 54321,
-		},
+		{IP: net.IPv6loopback, Port: 12345},
+		{IP: net.IPv6loopback, Port: 54321},
 	}
 
 	msg, err := TestBuilder.PeerList(ips)

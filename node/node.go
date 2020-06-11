@@ -56,7 +56,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 5, 3)
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 5)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -295,10 +295,7 @@ func (n *Node) initVMManager() error {
 			AVA:      avaAssetID,
 			Platform: ids.Empty,
 		}),
-		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
-			Log:  n.Log,
-			Path: path.Join(n.Config.PluginDir, "evm"),
-		}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
@@ -464,7 +461,7 @@ func (n *Node) initMetricsAPI() {
 func (n *Node) initAdminAPI() {
 	if n.Config.AdminAPIEnabled {
 		n.Log.Info("initializing Admin API")
-		service := admin.NewService(n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
+		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
 		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 	}
 }

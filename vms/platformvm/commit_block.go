@@ -24,7 +24,9 @@ func (c *Commit) Verify() error {
 	parent, ok := c.parentBlock().(*ProposalBlock)
 	if !ok {
 		if err := c.Reject(); err == nil {
-			c.vm.DB.Commit()
+			if err := c.vm.DB.Commit(); err != nil {
+				c.vm.Ctx.Log.Error("error committing Commit block as rejected: %s", err)
+			}
 		} else {
 			c.vm.DB.Abort()
 		}
