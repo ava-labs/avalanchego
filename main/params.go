@@ -37,6 +37,7 @@ const (
 var (
 	Config                 = node.Config{}
 	Err                    error
+	defaultNetworkName     = genesis.TestnetName
 	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
 	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
 	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
@@ -169,7 +170,7 @@ func init() {
 	version := fs.Bool("version", false, "If true, print version and quit")
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.TestnetName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
@@ -234,7 +235,15 @@ func init() {
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
-		fmt.Println(node.Version.String())
+		networkID, err := genesis.NetworkID(defaultNetworkName)
+		if errs.Add(err); err != nil {
+			return
+		}
+		networkGeneration := genesis.NetworkName(networkID)
+		fmt.Printf(
+			"%s [database=%s, network=%s/%s]\n",
+			node.Version, dbVersion, defaultNetworkName, networkGeneration,
+		)
 		os.Exit(0)
 	}
 
