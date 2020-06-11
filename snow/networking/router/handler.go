@@ -7,10 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Handler passes incoming messages from the network to the consensus engine
