@@ -97,6 +97,7 @@ func TestStruct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("myStructBytes: %v", myStructBytes)
 
 	myStructUnmarshaled := &myStruct{}
 	err = codec.Unmarshal(myStructBytes, myStructUnmarshaled)
@@ -370,7 +371,7 @@ func TestString(t *testing.T) {
 	}
 }
 
-// Ensure a nil slice is unmarshaled as an empty slice
+// Ensure a nil slice is marshaled/unmarshaled correctly
 func TestNilSlice(t *testing.T) {
 	type structWithSlice struct {
 		Slice []byte `serialize:"true"`
@@ -388,13 +389,13 @@ func TestNilSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if structUnmarshaled.Slice == nil || len(structUnmarshaled.Slice) != 0 {
-		t.Fatal("expected slice to be empty slice")
+	if structUnmarshaled.Slice != nil {
+		t.Fatal("expected slice to be nil")
 	}
 }
 
 // Ensure that trying to serialize a struct with an unexported member
-// that has `serialize:"true"` returns errUnexportedField
+// that has `serialize:"true"` returns error
 func TestSerializeUnexportedField(t *testing.T) {
 	type s struct {
 		ExportedField   string `serialize:"true"`
@@ -426,12 +427,12 @@ func TestSerializeOfNoSerializeField(t *testing.T) {
 	codec := NewDefault()
 	marshalled, err := codec.Marshal(myS)
 	if err != nil {
-		t.Fatalf("Unexpected error %q", err)
+		t.Fatal(err)
 	}
 	unmarshalled := s{}
 	err = codec.Unmarshal(marshalled, &unmarshalled)
 	if err != nil {
-		t.Fatalf("Unexpected error %q", err)
+		t.Fatal(err)
 	}
 	expectedUnmarshalled := s{SerializedField: "Serialize me"}
 	if !reflect.DeepEqual(unmarshalled, expectedUnmarshalled) {
@@ -443,11 +444,12 @@ type simpleSliceStruct struct {
 	Arr []uint32 `serialize:"true"`
 }
 
-func TestEmptySliceSerialization(t *testing.T) {
+// Test marshalling of nil slice
+func TestNilSliceSerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &simpleSliceStruct{}
-	expected := []byte{0, 0, 0, 0}
+	expected := []byte{1} // 1 for isNil
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -455,6 +457,40 @@ func TestEmptySliceSerialization(t *testing.T) {
 
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+
+	valUnmarshaled := &simpleSliceStruct{}
+	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
+		t.Fatal(err)
+	} else if !reflect.DeepEqual(valUnmarshaled, val) {
+		t.Logf("val: %v\n", val)
+		t.Logf("valUnmarshaled: %v\n", valUnmarshaled)
+		t.Fatal("should be same")
+	}
+}
+
+// Test marshaling a slice that has 0 elements (but isn't nil)
+func TestEmptySliceSerialization(t *testing.T) {
+	codec := NewDefault()
+
+	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
+	expected := []byte{0, 0, 0, 0, 0} // 0 for isNil flag, 0 for size
+	result, err := codec.Marshal(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(expected, result) {
+		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+
+	valUnmarshaled := &simpleSliceStruct{}
+	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
+		t.Fatal(err)
+	} else if !reflect.DeepEqual(valUnmarshaled, val) {
+		t.Logf("val: %v\n", val)
+		t.Logf("valUnmarshaled: %v\n", valUnmarshaled)
+		t.Fatal("should be same")
 	}
 }
 
@@ -464,13 +500,14 @@ type nestedSliceStruct struct {
 	Arr []emptyStruct `serialize:"true"`
 }
 
+// Test marshaling slice that is not nil and not empty
 func TestSliceWithEmptySerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1000),
 	}
-	expected := []byte{0x00, 0x00, 0x03, 0xE8}
+	expected := []byte{0x00, 0x00, 0x00, 0x03, 0xE8} // 0 for isNil flag, then 1000 for numElts
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -485,7 +522,7 @@ func TestSliceWithEmptySerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(unmarshaled.Arr) != 1000 {
-		t.Fatalf("Should have created an array of length %d", 1000)
+		t.Fatalf("Should have created a slice of length %d", 1000)
 	}
 }
 
@@ -493,20 +530,15 @@ func TestSliceWithEmptySerializationOutOfMemory(t *testing.T) {
 	codec := NewDefault()
 
 	val := &nestedSliceStruct{
-		Arr: make([]emptyStruct, 1000000),
+		Arr: make([]emptyStruct, defaultMaxSliceLength+1),
 	}
-	expected := []byte{0x00, 0x0f, 0x42, 0x40} // 1,000,000 in hex
-	result, err := codec.Marshal(val)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	bytes, err := codec.Marshal(val)
+	if err == nil {
+		t.Fatal("should have failed due to slice length too large")
 	}
 
 	unmarshaled := nestedSliceStruct{}
-	if err := codec.Unmarshal(expected, &unmarshaled); err == nil {
+	if err := codec.Unmarshal(bytes, &unmarshaled); err == nil {
 		t.Fatalf("Should have errored due to excess memory requested")
 	}
 }
