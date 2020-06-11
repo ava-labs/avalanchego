@@ -122,19 +122,12 @@ func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetAcceptedFrontierFailed(validatorID, requestID) {
-			sr.log.Debug("deferring GetAcceptedFrontier timeout due to a full queue on %s", chainID)
-			// Defer this call to later
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.GetAcceptedFrontierFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
+		chain.GetAcceptedFrontierFailed(validatorID, requestID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // GetAccepted routes an incoming GetAccepted request from the
@@ -174,18 +167,12 @@ func (sr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetAcceptedFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring GetAccepted timeout due to a full queue on %s", chainID)
-				sr.GetAcceptedFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
+		chain.GetAcceptedFailed(validatorID, requestID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
@@ -225,18 +212,12 @@ func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetAncestorsFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring GetAncestors timeout due to a full queue on %s", chainID)
-				sr.GetAncestorsFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
+		chain.GetAncestorsFailed(validatorID, requestID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // Get routes an incoming Get request from the validator with ID [validatorID]
@@ -275,18 +256,12 @@ func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring Get timeout due to a full queue on %s", chainID)
-				sr.GetFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
+		chain.GetFailed(validatorID, requestID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
@@ -337,18 +312,12 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
+	sr.timeouts.Cancel(validatorID, chainID, requestID)
 	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.QueryFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring Query timeout due to a full queue on %s", chainID)
-				sr.QueryFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
+		chain.QueryFailed(validatorID, requestID)
 	} else {
 		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
 	}
-	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
 
 // Shutdown shuts down this router

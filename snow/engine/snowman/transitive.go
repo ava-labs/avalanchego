@@ -579,7 +579,6 @@ func (t *Transitive) pushSample(blk snowman.Block) {
 	}
 
 	t.Config.Sender.PushQuery(vdrSet, t.RequestID, blkID, blk.Bytes())
-	return
 }
 
 func (t *Transitive) deliver(blk snowman.Block) error {

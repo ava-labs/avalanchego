@@ -31,16 +31,15 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 
 // GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
-	if validatorIDs.Contains(s.ctx.NodeID) {
-		validatorIDs.Remove(s.ctx.NodeID)
-		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID)
-	}
-	validatorList := validatorIDs.List()
-	for _, validatorID := range validatorList {
+	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
 		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
 		})
+	}
+	if validatorIDs.Contains(s.ctx.NodeID) {
+		validatorIDs.Remove(s.ctx.NodeID)
+		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID)
 	}
 	s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID)
 }
@@ -49,23 +48,22 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
 	if validatorID.Equals(s.ctx.NodeID) {
 		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
-		return
+	} else {
+		s.sender.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
-	s.sender.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
 }
 
 // GetAccepted ...
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs ids.Set) {
-	if validatorIDs.Contains(s.ctx.NodeID) {
-		validatorIDs.Remove(s.ctx.NodeID)
-		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, containerIDs)
-	}
-	validatorList := validatorIDs.List()
-	for _, validatorID := range validatorList {
+	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
 		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
 		})
+	}
+	if validatorIDs.Contains(s.ctx.NodeID) {
+		validatorIDs.Remove(s.ctx.NodeID)
+		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, containerIDs)
 	}
 	s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, containerIDs)
 }
@@ -74,9 +72,9 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
 	if validatorID.Equals(s.ctx.NodeID) {
 		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
-		return
+	} else {
+		s.sender.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
-	s.sender.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 }
 
 // Get sends a Get message to the consensus engine running on the specified
@@ -85,6 +83,13 @@ func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerID
 // specified container.
 func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending Get to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
+
+	// Sending a Get to myself will always fail
+	if validatorID.Equals(s.ctx.NodeID) {
+		go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
+		return
+	}
+
 	// Add a timeout -- if we don't get a response before the timeout expires,
 	// send this consensus engine a GetFailed message
 	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
@@ -101,6 +106,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 		go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 		return
 	}
+
 	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 		s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 	})
@@ -130,6 +136,13 @@ func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers 
 // their preferred frontier given the existence of the specified container.
 func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
+	for _, validatorID := range validatorIDs.List() {
+		vID := validatorID
+		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+		})
+	}
+
 	// If one of the validators in [validatorIDs] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
@@ -139,13 +152,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		// If this were not a goroutine, then we would deadlock here when [handler].msgs is full
 		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, containerID, container)
 	}
-	validatorList := validatorIDs.List() // Convert set to list for easier iteration
-	for _, validatorID := range validatorList {
-		vID := validatorID
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
-			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
-		})
-	}
+
 	s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, containerID, container)
 }
 
@@ -155,6 +162,14 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 // their preferred frontier.
 func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
+
+	for _, validatorID := range validatorIDs.List() {
+		vID := validatorID
+		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
+		})
+	}
+
 	// If one of the validators in [validatorIDs] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
@@ -164,13 +179,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		// If this were not a goroutine, then we would deadlock when [handler].msgs is full
 		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, containerID)
 	}
-	validatorList := validatorIDs.List() // Convert set to list for easier iteration
-	for _, validatorID := range validatorList {
-		vID := validatorID
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
-			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
-		})
-	}
+
 	s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, containerID)
 }
 
@@ -181,9 +190,9 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set)
 	// to my own router rather than sending it over the network
 	if validatorID.Equals(s.ctx.NodeID) {
 		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes)
-		return
+	} else {
+		s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
 	}
-	s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
 }
 
 // Gossip the provided container
