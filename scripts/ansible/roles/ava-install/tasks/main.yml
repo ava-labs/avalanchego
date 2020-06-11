@@ -1,4 +1,5 @@
 - name: Create shared directories
+  become: true
   file:
     # Don't specify owner, mode etc for directories not specific to AVA.
     # OS defaults, or local defaults are better than any guess we could make.

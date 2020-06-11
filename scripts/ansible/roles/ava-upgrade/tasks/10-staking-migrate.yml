@@ -1,4 +1,5 @@
 - name: Migrate staking key
+  become: true
   vars:
     old_key: "{{ ava_daemon_home_dir }}/keys/staker.key"
     new_key: "{{ ava_daemon_home_dir }}/staking/staker.key"
@@ -24,6 +25,7 @@
         - Restart AVA service
 
 - name: Migrate staking certificate
+  become: true
   vars:
     old_cert: "{{ ava_daemon_home_dir }}/keys/staker.crt"
     new_cert: "{{ ava_daemon_home_dir }}/staking/staker.crt"
