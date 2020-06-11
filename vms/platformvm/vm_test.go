@@ -192,6 +192,8 @@ func defaultVM() *VM {
 		panic("no subnets found")
 	} // end delete
 
+	vm.registerDBTypes()
+
 	return vm
 }
 

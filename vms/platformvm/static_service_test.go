@@ -169,8 +169,13 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	genesis := &Genesis{}
-	Codec.Unmarshal(reply.Bytes.Bytes, genesis)
+	if err := Codec.Unmarshal(reply.Bytes.Bytes, genesis); err != nil {
+		t.Fatal(err)
+	}
 	validators := genesis.Validators
+	if validators.Len() == 0 {
+		t.Fatal("Validators should contain 3 validators")
+	}
 	currentValidator := validators.Remove()
 	for validators.Len() > 0 {
 		nextValidator := validators.Remove()

@@ -1290,7 +1290,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		service.vm.unissuedAtomicTxs = append(service.vm.unissuedAtomicTxs, tx)
 		response.TxID = tx.ID()
 	default:
-		return errors.New("Could not parse given tx. Must be a TimedTx, DecisionTx, or AtomicTx")
+		return errors.New("Could not parse given tx. Must not be a TimedTx, DecisionTx, or AtomicTx")
 	}
 
 	service.vm.resetTimer()
