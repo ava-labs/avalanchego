@@ -670,18 +670,16 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 		return fmt.Errorf("problem saving key while getting existing addresses: %w", err)
 	}
 	newAddress := sk.PublicKey().Address()
-	exists := false
 	for _, address := range addresses {
 		if newAddress.Equals(address) {
-			exists = true
+			reply.Address = service.vm.Format(newAddress.Bytes())
+			return nil
 		}
 	}
-	if !exists {
-		addresses = append(addresses, newAddress)
 
-		if err := user.SetAddresses(db, addresses); err != nil {
-			return fmt.Errorf("problem saving addresses: %w", err)
-		}
+	addresses = append(addresses, newAddress)
+	if err := user.SetAddresses(db, addresses); err != nil {
+		return fmt.Errorf("problem saving addresses: %w", err)
 	}
 
 	reply.Address = service.vm.Format(newAddress.Bytes())
