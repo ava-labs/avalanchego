@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultMaxSize        = 1 << 18 // default max size, in bytes, of something being marshalled by Marshal()
-	defaultMaxSliceLength = 1 << 18 // default max length of a slice being marshalled by Marshal()
+	defaultMaxSliceLength = 1 << 18 // default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
 	maxStringLen          = math.MaxUint16
 )
 
@@ -86,6 +86,7 @@ func (c codec) RegisterType(val interface{}) error {
 // 5) To marshal an interface, you must pass a pointer to the value
 // 6) To unmarshal an interface,  you must call codec.RegisterType([instance of the type that fulfills the interface]).
 // 7) Serialized fields must be exported
+// 8) nil slices are marshaled as empty slices
 
 // To marshal an interface, [value] must be a pointer to the interface
 func (c codec) Marshal(value interface{}) ([]byte, error) {
@@ -217,50 +218,27 @@ func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) 
 		}
 		return
 	case reflect.Slice:
-		if value.IsNil() {
-			size = 1
-			f = func(p *wrappers.Packer) error {
-				p.PackBool(true) // slice is nil; set isNil flag to 1
-				return p.Err
-			}
-			return
-		}
-
-		numElts := value.Len() // # elements in the slice/array (assumed to be <= math.MaxUint16)
+		numElts := value.Len() // # elements in the slice/array. 0 if this slice is nil.
 		if numElts > c.maxSliceLen {
-			return 0, nil, fmt.Errorf("slice length, %d, exceeds maximum length, %d", numElts, math.MaxUint32)
+			return 0, nil, fmt.Errorf("slice length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
 
-		size = 3 // 1 for the isNil flag. 2 for the size of the slice (uint16)
-
-		// offsets[i] is the index in the byte array that subFuncs[i] will start writing at
-		offsets := make([]int, numElts+1, numElts+1)
-		if numElts != 0 {
-			offsets[1] = 3
-		}
-		subFuncs := make([]func(*wrappers.Packer) error, numElts+1, numElts+1)
-		subFuncs[0] = func(p *wrappers.Packer) error { // write the nil flag and number of elements
-			p.PackBool(false)
-			p.PackShort(uint16(numElts))
-			return p.Err
-		}
-		for i := 1; i < numElts+1; i++ { // Process each element in the slice
-			subSize, subFunc, subErr := c.marshal(value.Index(i - 1))
+		subFuncs := make([]func(*wrappers.Packer) error, numElts, numElts)
+		size = wrappers.IntLen         // for # elements
+		for i := 0; i < numElts; i++ { // Process each element in the slice
+			subSize, subFunc, subErr := c.marshal(value.Index(i))
 			if subErr != nil {
 				return 0, nil, subErr
 			}
 			size += subSize
-			if i != numElts { // set offest for next function unless this is last ieration
-				offsets[i+1] = offsets[i] + subSize
-			}
 			subFuncs[i] = subFunc
 		}
 
-		if subFuncsLen := len(subFuncs); subFuncsLen != len(offsets) {
-			return 0, nil, fmt.Errorf("expected len(subFuncs) = %d. len(offsets) = %d. Should be same", subFuncsLen, len(offsets))
-		}
-
 		f = func(p *wrappers.Packer) error {
+			p.PackInt(uint32(numElts)) // pack # elements
+			if p.Err != nil {
+				return p.Err
+			}
 			for _, f := range subFuncs {
 				if err := f(p); err != nil {
 					return err
@@ -270,15 +248,12 @@ func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) 
 		}
 		return
 	case reflect.Array:
-		numElts := value.Len() // # elements in the slice/array (assumed to be <= math.MaxUint16)
-		if numElts > math.MaxUint32 {
-			return 0, nil, fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, math.MaxUint32)
+		numElts := value.Len()
+		if numElts > c.maxSliceLen {
+			return 0, nil, fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
 
 		size = 0
-		// offsets[i] is the index in the byte array that subFuncs[i] will start writing at
-		offsets := make([]int, numElts, numElts)
-		offsets[1] = 4 // 4 for slice size
 		subFuncs := make([]func(*wrappers.Packer) error, numElts, numElts)
 		for i := 0; i < numElts; i++ { // Process each element in the array
 			subSize, subFunc, subErr := c.marshal(value.Index(i))
@@ -286,14 +261,7 @@ func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) 
 				return 0, nil, subErr
 			}
 			size += subSize
-			if i != numElts-1 { // set offest for next function unless this is last ieration
-				offsets[i+1] = offsets[i] + subSize
-			}
 			subFuncs[i] = subFunc
-		}
-
-		if subFuncsLen := len(subFuncs); subFuncsLen != len(offsets) {
-			return 0, nil, fmt.Errorf("expected len(subFuncs) = %d. len(offsets) = %d. Should be same", subFuncsLen, len(offsets))
 		}
 
 		f = func(p *wrappers.Packer) error {
@@ -308,10 +276,8 @@ func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) 
 	case reflect.Struct:
 		t := value.Type()
 		numFields := t.NumField()
+
 		size = 0
-		// offsets[i] is the index in the byte array that subFuncs[i] will start writing at
-		offsets := make([]int, 0, numFields)
-		offsets = append(offsets, 0)
 		subFuncs := make([]func(*wrappers.Packer) error, 0, numFields)
 		for i := 0; i < numFields; i++ { // Go through all fields of this struct
 			field := t.Field(i)
@@ -328,9 +294,6 @@ func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) 
 			}
 			size += subSize
 			subFuncs = append(subFuncs, subfunc)
-			if i != numFields-1 { // set offset for next function if not last iteration
-				offsets = append(offsets, offsets[len(offsets)-1]+subSize)
-			}
 		}
 
 		f = func(p *wrappers.Packer) error {
@@ -440,23 +403,13 @@ func (c codec) unmarshal(p *wrappers.Packer, field reflect.Value) error {
 		field.SetBool(b)
 		return nil
 	case reflect.Slice:
-		isNil := p.UnpackBool()
+		numElts := int(p.UnpackInt())
 		if p.Err != nil {
 			return p.Err
 		}
-		if isNil { // slice is nil
-			return nil
-		}
-
-		numElts := int(p.UnpackShort())
-		if p.Err != nil {
-			return p.Err
-		}
-
 		// set [field] to be a slice of the appropriate type/capacity (right now [field] is nil)
 		slice := reflect.MakeSlice(field.Type(), numElts, numElts)
 		field.Set(slice)
-
 		// Unmarshal each element into the appropriate index of the slice
 		for i := 0; i < numElts; i++ {
 			if err := c.unmarshal(p, field.Index(i)); err != nil {

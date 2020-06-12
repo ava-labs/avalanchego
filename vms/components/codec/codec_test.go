@@ -371,7 +371,7 @@ func TestString(t *testing.T) {
 	}
 }
 
-// Ensure a nil slice is marshaled/unmarshaled correctly
+// Ensure a nil slice is unmarshaled to slice with length 0
 func TestNilSlice(t *testing.T) {
 	type structWithSlice struct {
 		Slice []byte `serialize:"true"`
@@ -389,8 +389,8 @@ func TestNilSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if structUnmarshaled.Slice != nil {
-		t.Fatal("expected slice to be nil")
+	if structUnmarshaled.Slice == nil || len(structUnmarshaled.Slice) != 0 {
+		t.Fatal("expected slice to be non-nil and length 0")
 	}
 }
 
@@ -449,7 +449,7 @@ func TestNilSliceSerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &simpleSliceStruct{}
-	expected := []byte{1} // 1 for isNil
+	expected := []byte{0, 0, 0, 0} // nil slice marshaled as 0 length slice
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -462,10 +462,8 @@ func TestNilSliceSerialization(t *testing.T) {
 	valUnmarshaled := &simpleSliceStruct{}
 	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
 		t.Fatal(err)
-	} else if !reflect.DeepEqual(valUnmarshaled, val) {
-		t.Logf("val: %v\n", val)
-		t.Logf("valUnmarshaled: %v\n", valUnmarshaled)
-		t.Fatal("should be same")
+	} else if len(valUnmarshaled.Arr) != 0 {
+		t.Fatal("should be 0 length")
 	}
 }
 
@@ -474,7 +472,7 @@ func TestEmptySliceSerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
-	expected := []byte{0, 0, 0} // 0 for isNil flag, 0 for size
+	expected := []byte{0, 0, 0, 0} // 0 for size
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -488,8 +486,6 @@ func TestEmptySliceSerialization(t *testing.T) {
 	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
 		t.Fatal(err)
 	} else if !reflect.DeepEqual(valUnmarshaled, val) {
-		t.Logf("val: %v\n", val)
-		t.Logf("valUnmarshaled: %v\n", valUnmarshaled)
 		t.Fatal("should be same")
 	}
 }
@@ -507,7 +503,7 @@ func TestSliceWithEmptySerialization(t *testing.T) {
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1000),
 	}
-	expected := []byte{0x00, 0x03, 0xE8} // 0 for isNil flag, then 1000 for numElts
+	expected := []byte{0x00, 0x00, 0x03, 0xE8} //1000 for numElts
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
