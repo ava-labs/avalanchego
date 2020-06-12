@@ -665,10 +665,8 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
-	addresses, err := user.Addresses(db)
-	if err != nil {
-		return fmt.Errorf("problem saving key while getting existing addresses: %w", err)
-	}
+	addresses, _ := user.Addresses(db)
+
 	newAddress := sk.PublicKey().Address()
 	for _, address := range addresses {
 		if newAddress.Equals(address) {
