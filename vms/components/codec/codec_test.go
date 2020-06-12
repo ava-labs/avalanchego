@@ -97,7 +97,6 @@ func TestStruct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("myStructBytes: %v", myStructBytes)
 
 	myStructUnmarshaled := &myStruct{}
 	err = codec.Unmarshal(myStructBytes, myStructUnmarshaled)

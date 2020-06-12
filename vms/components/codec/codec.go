@@ -93,15 +93,22 @@ func (c codec) Marshal(value interface{}) ([]byte, error) {
 	if value == nil {
 		return nil, errNil
 	}
-	size, f, err := c.marshal(reflect.ValueOf(value))
+
+	funcs := make([]func(*wrappers.Packer) error, 512, 512)
+	size, _, err := c.marshal(reflect.ValueOf(value), 0, &funcs)
 	if err != nil {
 		return nil, err
 	}
 
 	p := &wrappers.Packer{MaxSize: size, Bytes: make([]byte, 0, size)}
-	if err := f(p); err != nil {
-		return nil, err
+	for _, f := range funcs {
+		if f == nil {
+			break
+		} else if err := f(p); err != nil {
+			return nil, err
+		}
 	}
+
 	return p.Bytes, nil
 }
 
@@ -111,14 +118,14 @@ func (c codec) Marshal(value interface{}) ([]byte, error) {
 //    and returns the number of bytes it wrote.
 //    When these functions are called in order, they write [value] to a byte slice.
 // 3) An error
-func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) error, err error) {
+func (c codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.Packer) error) (size int, funcsWritten int, err error) {
 	valueKind := value.Kind()
 
 	// Case: Value can't be marshalled
 	switch valueKind {
 	case reflect.Interface, reflect.Ptr, reflect.Invalid:
 		if value.IsNil() { // Can't marshal nil or nil pointers
-			return 0, nil, errNil
+			return 0, 0, errNil
 		}
 	}
 
@@ -126,151 +133,150 @@ func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) 
 	switch valueKind {
 	case reflect.Uint8:
 		size = 1
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackByte(byte(value.Uint()))
 			return p.Err
 		}
 		return
 	case reflect.Int8:
 		size = 1
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackByte(byte(value.Int()))
 			return p.Err
 		}
 		return
 	case reflect.Uint16:
 		size = 2
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackShort(uint16(value.Uint()))
 			return p.Err
 		}
 		return
 	case reflect.Int16:
 		size = 2
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackShort(uint16(value.Int()))
 			return p.Err
 		}
 		return
 	case reflect.Uint32:
 		size = 4
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackInt(uint32(value.Uint()))
 			return p.Err
 		}
 		return
 	case reflect.Int32:
 		size = 4
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackInt(uint32(value.Int()))
 			return p.Err
 		}
 		return
 	case reflect.Uint64:
 		size = 8
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackLong(uint64(value.Uint()))
 			return p.Err
 		}
 		return
 	case reflect.Int64:
 		size = 8
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackLong(uint64(value.Int()))
 			return p.Err
 		}
 		return
 	case reflect.String:
+		funcsWritten = 1
 		asStr := value.String()
-		size = len(asStr) + 2
-		f = func(p *wrappers.Packer) error {
+		size = len(asStr) + wrappers.ShortLen
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackStr(asStr)
 			return p.Err
 		}
 		return
 	case reflect.Bool:
 		size = 1
-		f = func(p *wrappers.Packer) error {
+		funcsWritten = 1
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackBool(value.Bool())
 			return p.Err
 		}
 		return
 	case reflect.Uintptr, reflect.Ptr:
-		return c.marshal(value.Elem())
+		return c.marshal(value.Elem(), index, funcs)
 	case reflect.Interface:
 		typeID, ok := c.typeToTypeID[reflect.TypeOf(value.Interface())] // Get the type ID of the value being marshaled
 		if !ok {
-			return 0, nil, fmt.Errorf("can't marshal unregistered type '%v'", reflect.TypeOf(value.Interface()).String())
+			return 0, 0, fmt.Errorf("can't marshal unregistered type '%v'", reflect.TypeOf(value.Interface()).String())
 		}
 
-		subsize, subfunc, subErr := c.marshal(reflect.ValueOf(value.Interface())) // TODO: Is this right?
+		(*funcs)[index] = nil
+		subsize, subFuncsWritten, subErr := c.marshal(reflect.ValueOf(value.Interface()), index+1, funcs)
 		if subErr != nil {
-			return 0, nil, subErr
+			return 0, 0, subErr
 		}
 
 		size = 4 + subsize // 4 because we pack the type ID, a uint32
-		f = func(p *wrappers.Packer) error {
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackInt(typeID)
 			if p.Err != nil {
 				return p.Err
 			}
-			return subfunc(p)
+			return nil
 		}
+		funcsWritten = 1 + subFuncsWritten
 		return
 	case reflect.Slice:
 		numElts := value.Len() // # elements in the slice/array. 0 if this slice is nil.
 		if numElts > c.maxSliceLen {
-			return 0, nil, fmt.Errorf("slice length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
+			return 0, 0, fmt.Errorf("slice length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
 
-		subFuncs := make([]func(*wrappers.Packer) error, numElts, numElts)
-		size = wrappers.IntLen         // for # elements
+		size = wrappers.IntLen // for # elements
+		subFuncsWritten := 0
 		for i := 0; i < numElts; i++ { // Process each element in the slice
-			subSize, subFunc, subErr := c.marshal(value.Index(i))
+			subSize, n, subErr := c.marshal(value.Index(i), index+subFuncsWritten+1, funcs)
 			if subErr != nil {
-				return 0, nil, subErr
+				return 0, 0, subErr
 			}
 			size += subSize
-			subFuncs[i] = subFunc
+			subFuncsWritten += n
 		}
 
-		f = func(p *wrappers.Packer) error {
+		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackInt(uint32(numElts)) // pack # elements
 			if p.Err != nil {
 				return p.Err
 			}
-			for _, f := range subFuncs {
-				if err := f(p); err != nil {
-					return err
-				}
-			}
 			return nil
 		}
+		funcsWritten = subFuncsWritten + 1
 		return
 	case reflect.Array:
 		numElts := value.Len()
 		if numElts > c.maxSliceLen {
-			return 0, nil, fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
+			return 0, 0, fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
 
 		size = 0
-		subFuncs := make([]func(*wrappers.Packer) error, numElts, numElts)
+		funcsWritten = 0
 		for i := 0; i < numElts; i++ { // Process each element in the array
-			subSize, subFunc, subErr := c.marshal(value.Index(i))
+			subSize, n, subErr := c.marshal(value.Index(i), index+funcsWritten, funcs)
 			if subErr != nil {
-				return 0, nil, subErr
+				return 0, 0, subErr
 			}
 			size += subSize
-			subFuncs[i] = subFunc
-		}
-
-		f = func(p *wrappers.Packer) error {
-			for _, f := range subFuncs {
-				if err := f(p); err != nil {
-					return err
-				}
-			}
-			return nil
+			funcsWritten += n
 		}
 		return
 	case reflect.Struct:
@@ -278,35 +284,28 @@ func (c codec) marshal(value reflect.Value) (size int, f func(*wrappers.Packer) 
 		numFields := t.NumField()
 
 		size = 0
-		subFuncs := make([]func(*wrappers.Packer) error, 0, numFields)
+		fieldsMarshalled := 0
+		funcsWritten = 0
 		for i := 0; i < numFields; i++ { // Go through all fields of this struct
 			field := t.Field(i)
 			if !shouldSerialize(field) { // Skip fields we don't need to serialize
 				continue
 			}
 			if unicode.IsLower(rune(field.Name[0])) { // Can only marshal exported fields
-				return 0, nil, fmt.Errorf("can't marshal unexported field %s", field.Name)
+				return 0, 0, fmt.Errorf("can't marshal unexported field %s", field.Name)
 			}
-			fieldVal := value.Field(i)                   // The field we're serializing
-			subSize, subfunc, err := c.marshal(fieldVal) // Serialize the field
+			fieldVal := value.Field(i)                                        // The field we're serializing
+			subSize, n, err := c.marshal(fieldVal, index+funcsWritten, funcs) // Serialize the field
 			if err != nil {
-				return 0, nil, err
+				return 0, 0, err
 			}
+			fieldsMarshalled++
 			size += subSize
-			subFuncs = append(subFuncs, subfunc)
-		}
-
-		f = func(p *wrappers.Packer) error {
-			for _, f := range subFuncs {
-				if err := f(p); err != nil {
-					return err
-				}
-			}
-			return nil
+			funcsWritten += n
 		}
 		return
 	default:
-		return 0, nil, errUnknownType
+		return 0, 0, errUnknownType
 	}
 }
 
