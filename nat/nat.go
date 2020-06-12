@@ -22,7 +22,10 @@ type NATRouter interface {
 
 func GetNATRouter() NATRouter {
 	//TODO other protocol
-	return getUPnPRouter()
+	if r := getUPnPRouter(); r != nil {
+		return r
+	}
+	return nil
 }
 
 type Router struct {
@@ -61,13 +64,13 @@ func (dev *Router) mapPort(protocol string, intport, extport uint16, desc string
 	}()
 
 	if err := dev.r.MapPort(protocol, intport, extport, desc, mapTimeout); err != nil {
-		dev.log.Warn("Map port failed. Protocol %s Internal %d External %d. %s",
+		dev.log.Error("Map port failed. Protocol %s Internal %d External %d. %s",
 			protocol, intport, extport, err)
 		dev.errLock.Lock()
 		dev.errs.Add(err)
 		dev.errLock.Unlock()
 	} else {
-		dev.log.Info("Mapped Protocol %s Internal %d External %d. %s", protocol,
+		dev.log.Info("Mapped Protocol %s Internal %d External %d.", protocol,
 			intport, extport)
 	}
 
@@ -75,14 +78,16 @@ func (dev *Router) mapPort(protocol string, intport, extport uint16, desc string
 		select {
 		case <-updater.C:
 			if err := dev.r.MapPort(protocol, intport, extport, desc, mapTimeout); err != nil {
-				dev.log.Warn("Renew port mapping failed. Protocol %s Internal %d External %d. %s",
+				dev.log.Error("Renew port mapping failed. Protocol %s Internal %d External %d. %s",
 					protocol, intport, extport, err)
 			} else {
-				dev.log.Info("Renew port mapping Protocol %s Internal %d External %d. %s", protocol,
+				dev.log.Info("Renew port mapping Protocol %s Internal %d External %d.", protocol,
 					intport, extport)
 			}
 
 			updater.Reset(mapUpdate)
+		case _, _ = <-dev.closer:
+			return
 		}
 	}
 }
@@ -90,5 +95,6 @@ func (dev *Router) mapPort(protocol string, intport, extport uint16, desc string
 func (dev *Router) UnmapAllPorts() error {
 	close(dev.closer)
 	dev.wg.Wait()
+	dev.log.Info("Unmapped all ports")
 	return dev.errs.Err
 }

@@ -10,7 +10,10 @@ import (
 	"github.com/huin/goupnp/dcps/internetgateway2"
 )
 
-const soapRequestTimeout = 3 * time.Second
+const (
+	soapRequestTimeout = 3 * time.Second
+	mapRetry           = 20
+)
 
 // upnpClient is the interface used by goupnp for their client implementations
 type upnpClient interface {
@@ -79,7 +82,6 @@ func (r *upnpRouter) localIP() (net.IP, error) {
 		}
 	}
 	return nil, fmt.Errorf("couldn't find the local address in the same network as %s", deviceIP)
-
 }
 
 func (r *upnpRouter) ExternalIP() (net.IP, error) {
@@ -95,14 +97,26 @@ func (r *upnpRouter) ExternalIP() (net.IP, error) {
 	return ip, nil
 }
 
-func (r *upnpRouter) MapPort(protocol string, intport, extport uint16, desc string, duration time.Duration) error {
+func (r *upnpRouter) MapPort(protocol string, intport, extport uint16,
+	desc string, duration time.Duration) error {
 	ip, err := r.localIP()
 	if err != nil {
 		return nil
 	}
 	lifetime := uint32(duration / time.Second)
-	r.UnmapPort(protocol, extport)
-	return r.client.AddPortMapping("", extport, protocol, intport, ip.String(), true, desc, lifetime)
+
+	for i := 0; i < mapRetry; i++ {
+		externalPort := extport + uint16(i)
+		err = r.client.AddPortMapping("", externalPort, protocol, intport,
+			ip.String(), true, desc, lifetime)
+		if err == nil {
+			fmt.Printf("Mapped external port %d to local %s:%d\n", externalPort,
+				ip.String(), intport)
+			return nil
+		}
+		fmt.Printf("Unable to map port, retry with port %d\n", externalPort+1)
+	}
+	return err
 }
 
 func (r *upnpRouter) UnmapPort(protocol string, extport uint16) error {
@@ -184,17 +198,24 @@ func discover(target string) *upnpRouter {
 }
 
 func getUPnPRouter() *upnpRouter {
-	r := discover(internetgateway1.URN_WANConnectionDevice_1)
-	if r != nil {
-		return r
+	targets := []string{
+		internetgateway1.URN_WANConnectionDevice_1,
+		internetgateway2.URN_WANConnectionDevice_2,
 	}
-	return discover(internetgateway2.URN_WANConnectionDevice_2)
-}
 
-func GetUPnP() *upnpRouter {
-	r := discover(internetgateway1.URN_WANConnectionDevice_1)
-	if r != nil {
-		return r
+	routers := make(chan *upnpRouter, len(targets))
+
+	for _, urn := range targets {
+		go func(urn string) {
+			routers <- discover(urn)
+		}(urn)
 	}
-	return discover(internetgateway2.URN_WANConnectionDevice_2)
+
+	for i := 0; i < len(targets); i++ {
+		if r := <-routers; r != nil {
+			return r
+		}
+	}
+
+	return nil
 }
