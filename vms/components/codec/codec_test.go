@@ -474,7 +474,7 @@ func TestEmptySliceSerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
-	expected := []byte{0, 0, 0, 0, 0} // 0 for isNil flag, 0 for size
+	expected := []byte{0, 0, 0} // 0 for isNil flag, 0 for size
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -507,7 +507,7 @@ func TestSliceWithEmptySerialization(t *testing.T) {
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1000),
 	}
-	expected := []byte{0x00, 0x00, 0x00, 0x03, 0xE8} // 0 for isNil flag, then 1000 for numElts
+	expected := []byte{0x00, 0x03, 0xE8} // 0 for isNil flag, then 1000 for numElts
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
