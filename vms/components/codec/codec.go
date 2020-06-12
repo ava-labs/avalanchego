@@ -134,64 +134,72 @@ func (c codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.P
 	case reflect.Uint8:
 		size = 1
 		funcsWritten = 1
+		asByte := byte(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackByte(byte(value.Uint()))
+			p.PackByte(asByte)
 			return p.Err
 		}
 		return
 	case reflect.Int8:
 		size = 1
 		funcsWritten = 1
+		asByte := byte(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackByte(byte(value.Int()))
+			p.PackByte(asByte)
 			return p.Err
 		}
 		return
 	case reflect.Uint16:
 		size = 2
 		funcsWritten = 1
+		asShort := uint16(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackShort(uint16(value.Uint()))
+			p.PackShort(asShort)
 			return p.Err
 		}
 		return
 	case reflect.Int16:
 		size = 2
 		funcsWritten = 1
+		asShort := uint16(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackShort(uint16(value.Int()))
+			p.PackShort(asShort)
 			return p.Err
 		}
 		return
 	case reflect.Uint32:
 		size = 4
 		funcsWritten = 1
+		asInt := uint32(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackInt(uint32(value.Uint()))
+			p.PackInt(asInt)
 			return p.Err
 		}
 		return
 	case reflect.Int32:
 		size = 4
 		funcsWritten = 1
+		asInt := uint32(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackInt(uint32(value.Int()))
+			p.PackInt(asInt)
 			return p.Err
 		}
 		return
 	case reflect.Uint64:
 		size = 8
 		funcsWritten = 1
+		asInt := uint64(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackLong(uint64(value.Uint()))
+			p.PackLong(asInt)
 			return p.Err
 		}
 		return
 	case reflect.Int64:
 		size = 8
 		funcsWritten = 1
+		asInt := uint64(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackLong(uint64(value.Int()))
+			p.PackLong(asInt)
 			return p.Err
 		}
 		return
@@ -207,8 +215,9 @@ func (c codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.P
 	case reflect.Bool:
 		size = 1
 		funcsWritten = 1
+		asBool := value.Bool()
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackBool(value.Bool())
+			p.PackBool(asBool)
 			return p.Err
 		}
 		return
@@ -253,8 +262,9 @@ func (c codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.P
 			subFuncsWritten += n
 		}
 
+		numEltsAsUint32 := uint32(numElts)
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackInt(uint32(numElts)) // pack # elements
+			p.PackInt(numEltsAsUint32) // pack # elements
 			if p.Err != nil {
 				return p.Err
 			}
