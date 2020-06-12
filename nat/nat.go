@@ -1,6 +1,7 @@
 package nat
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -21,11 +22,25 @@ type NATRouter interface {
 }
 
 func GetNATRouter() NATRouter {
-	//TODO other protocol
-	if r := getUPnPRouter(); r != nil {
-		return r
+	router := make(chan NATRouter)
+
+	go func() {
+		r := getUPnPRouter()
+		if r != nil {
+			fmt.Println("Found UPnP Router")
+			router <- r
+		} else {
+			router <- nil
+		}
+	}()
+
+	for i := 0; i < 1; i++ {
+		if r := <-router; r != nil {
+			return r
+		}
 	}
-	return nil
+
+	return NewPublicIP()
 }
 
 type Router struct {

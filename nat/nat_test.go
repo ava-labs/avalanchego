@@ -20,6 +20,21 @@ const (
 	localPort    = 8080
 )
 
+func TestRouter(t *testing.T) {
+	n := GetNATRouter()
+	if n == nil {
+		fmt.Println("NAT Router is nil")
+		return
+	}
+
+	ip, err := n.ExternalIP()
+	if err != nil {
+		fmt.Printf("Unable to get external IP: %v\n", err)
+		return
+	}
+	fmt.Printf("External Address %s:%d\n", ip.String(), externalPort)
+}
+
 func TestHTTP(t *testing.T) {
 	config, err := logging.DefaultConfig()
 	if err != nil {
