@@ -56,7 +56,7 @@ type IssueTxReply struct {
 
 // IssueTx attempts to issue a transaction into consensus
 func (service *Service) IssueTx(r *http.Request, args *IssueTxArgs, reply *IssueTxReply) error {
-	service.vm.ctx.Log.Verbo("IssueTx called with %s", args.Tx)
+	service.vm.ctx.Log.Debug("AVM: IssueTx called with %s", args.Tx)
 
 	txID, err := service.vm.IssueTx(args.Tx.Bytes, nil)
 	if err != nil {
@@ -79,7 +79,7 @@ type GetTxStatusReply struct {
 
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, reply *GetTxStatusReply) error {
-	service.vm.ctx.Log.Verbo("GetTxStatus called with %s", args.TxID)
+	service.vm.ctx.Log.Debug("AVM: GetTxStatus called with %s", args.TxID)
 
 	if args.TxID.IsZero() {
 		return errNilTxID
@@ -106,7 +106,7 @@ type GetTxReply struct {
 
 // GetTx returns the specified transaction
 func (service *Service) GetTx(r *http.Request, args *GetTxArgs, reply *GetTxReply) error {
-	service.vm.ctx.Log.Verbo("GetTx called with %s", args.TxID)
+	service.vm.ctx.Log.Debug("AVM: GetTx called with %s", args.TxID)
 
 	if args.TxID.IsZero() {
 		return errNilTxID
@@ -136,7 +136,7 @@ type GetUTXOsReply struct {
 
 // GetUTXOs creates an empty account with the name passed in
 func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
-	service.vm.ctx.Log.Verbo("GetUTXOs called with %s", args.Addresses)
+	service.vm.ctx.Log.Debug("AVM: GetUTXOs called with %s", args.Addresses)
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
@@ -178,7 +178,7 @@ type GetAssetDescriptionReply struct {
 
 // GetAssetDescription creates an empty account with the name passed in
 func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescriptionArgs, reply *GetAssetDescriptionReply) error {
-	service.vm.ctx.Log.Verbo("GetAssetDescription called with %s", args.AssetID)
+	service.vm.ctx.Log.Debug("AVM: GetAssetDescription called with %s", args.AssetID)
 
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
@@ -222,7 +222,7 @@ type GetBalanceReply struct {
 
 // GetBalance returns the amount of an asset that an address at least partially owns
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
-	service.vm.ctx.Log.Verbo("GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
+	service.vm.ctx.Log.Debug("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
@@ -287,7 +287,7 @@ type GetAllBalancesReply struct {
 // Note that balances include assets that the address only _partially_ owns
 // (ie is one of several addresses specified in a multi-sig)
 func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
-	service.vm.ctx.Log.Verbo("GetAllBalances called with address: %s", args.Address)
+	service.vm.ctx.Log.Debug("AVM: GetAllBalances called with address: %s", args.Address)
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
@@ -360,7 +360,7 @@ type CreateFixedCapAssetReply struct {
 
 // CreateFixedCapAsset returns ID of the newly created asset
 func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCapAssetArgs, reply *CreateFixedCapAssetReply) error {
-	service.vm.ctx.Log.Verbo("CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
+	service.vm.ctx.Log.Debug("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
 		args.Name,
 		args.Symbol,
 		len(args.InitialHolders),
@@ -445,7 +445,7 @@ type CreateVariableCapAssetReply struct {
 
 // CreateVariableCapAsset returns ID of the newly created asset
 func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *CreateVariableCapAssetReply) error {
-	service.vm.ctx.Log.Verbo("CreateFixedCapAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Debug("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.MinterSets),
@@ -523,7 +523,7 @@ type CreateAddressReply struct {
 
 // CreateAddress creates an address for the user [args.Username]
 func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, reply *CreateAddressReply) error {
-	service.vm.ctx.Log.Verbo("CreateAddress called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: CreateAddress called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -603,7 +603,7 @@ type ExportKeyReply struct {
 
 // ExportKey returns a private key from the provided user
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
-	service.vm.ctx.Log.Verbo("ExportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ExportKey called for user '%s'", args.Username)
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
@@ -645,7 +645,7 @@ type ImportKeyReply struct {
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ImportKeyReply) error {
-	service.vm.ctx.Log.Verbo("ImportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ImportKey called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -692,7 +692,7 @@ type SendReply struct {
 
 // Send returns the ID of the newly created transaction
 func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) error {
-	service.vm.ctx.Log.Verbo("Send called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: Send called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidAmount
@@ -873,7 +873,7 @@ type CreateMintTxReply struct {
 
 // CreateMintTx returns the newly created unsigned transaction
 func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, reply *CreateMintTxReply) error {
-	service.vm.ctx.Log.Verbo("CreateMintTx called")
+	service.vm.ctx.Log.Debug("AVM: CreateMintTx called")
 
 	if args.Amount == 0 {
 		return errInvalidMintAmount
@@ -990,7 +990,7 @@ type SignMintTxReply struct {
 
 // SignMintTx returns the newly signed transaction
 func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply *SignMintTxReply) error {
-	service.vm.ctx.Log.Verbo("SignMintTx called")
+	service.vm.ctx.Log.Debug("AVM: SignMintTx called")
 
 	minter, err := service.vm.Parse(args.Minter)
 	if err != nil {
@@ -1116,7 +1116,7 @@ type ImportAVAReply struct {
 // The AVA must have already been exported from the P-Chain.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *ImportAVAReply) error {
-	service.vm.ctx.Log.Verbo("ImportAVA called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ImportAVA called with username: %s", args.Username)
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
@@ -1268,7 +1268,7 @@ type ExportAVAReply struct {
 // After this tx is accepted, the AVA must be imported to the P-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *ExportAVAReply) error {
-	service.vm.ctx.Log.Verbo("ExportAVA called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ExportAVA called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidAmount
