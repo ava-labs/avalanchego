@@ -35,13 +35,22 @@ func BenchmarkMarshal(b *testing.B) {
 		},
 		MyPointer: &temp,
 	}
+	var unmarshaledMyStructInstance myStruct
 
 	codec := NewDefault()
 	codec.RegisterType(&MyInnerStruct{}) // Register the types that may be unmarshaled into interfaces
 	codec.RegisterType(&MyInnerStruct2{})
+	codec.Marshal(myStructInstance) // warm up serializedFields cache
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		codec.Marshal(myStructInstance)
+		bytes, err := codec.Marshal(myStructInstance)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err := codec.Unmarshal(bytes, &unmarshaledMyStructInstance); err != nil {
+			b.Fatal(err)
+		}
+
 	}
 }
 
