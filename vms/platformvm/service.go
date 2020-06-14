@@ -495,7 +495,8 @@ type CreateAccountReply struct {
 }
 
 // CreateAccount creates a new account on the Platform Chain
-// The account is controlled by [args.Username]
+// The account is controlled by [args.Username], the user must already exist.
+// [args.PrivateKey] is optional, if omitted then a key will be generated.
 // The account's ID is [privKey].PublicKey().Address(), where [privKey] is a
 // private key controlled by the user.
 func (service *Service) CreateAccount(_ *http.Request, args *CreateAccountArgs, reply *CreateAccountReply) error {

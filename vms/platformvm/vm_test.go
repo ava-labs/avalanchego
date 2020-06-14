@@ -1798,3 +1798,52 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestParseAddress(t *testing.T) {
+	vm := &VM{}
+	if _, err := vm.ParseAddress("P-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParseAddressInvalid(t *testing.T) {
+	vm := &VM{}
+	tests := []struct {
+		in   string
+		want error
+	}{
+		{"", errEmptyAddress},
+		{"+", errInvalidAddressSeperator},
+		{"P", errInvalidAddressSeperator},
+		{"-", errEmptyAddressPrefix},
+		{"P-", errEmptyAddressSuffix},
+		{"X-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH", errInvalidAddressPrefix},
+		{"P-Bg6e45gxCUTLXcfUuoy", errInvalidAddress}, //truncated
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			_, err := vm.ParseAddress(tt.in)
+			if !errors.Is(err, tt.want) {
+				t.Errorf("want %q, got %q", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestFormatAddress(t *testing.T) {
+	vm := &VM{}
+	tests := []struct {
+		label string
+		in    ids.ShortID
+		want  string
+	}{
+		{"keys[0]", keys[0].PublicKey().Address(), "P-Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			if addrStr := vm.FormatAddress(tt.in); addrStr != tt.want {
+				t.Errorf("want %q, got %q", tt.want, addrStr)
+			}
+		})
+	}
+}
