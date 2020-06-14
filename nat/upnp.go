@@ -107,7 +107,7 @@ func (r *upnpRouter) ExternalIP() (net.IP, error) {
 	return ip, nil
 }
 
-func (r *upnpRouter) MapPort(protocol string, intport, extport uint16,
+func (r *upnpRouter) MapPort(protocol string, intPort, extPort uint16,
 	desc string, duration time.Duration) error {
 	ip, err := r.localIP()
 	if err != nil {
@@ -115,17 +115,17 @@ func (r *upnpRouter) MapPort(protocol string, intport, extport uint16,
 	}
 	lifetime := uint32(duration / time.Second)
 
-	return r.client.AddPortMapping("", extport, protocol, intport,
+	return r.client.AddPortMapping("", extPort, protocol, intPort,
 		ip.String(), true, desc, lifetime)
 }
 
-func (r *upnpRouter) UnmapPort(protocol string, extport uint16) error {
-	return r.client.DeletePortMapping("", extport, protocol)
+func (r *upnpRouter) UnmapPort(protocol string, extPort uint16) error {
+	return r.client.DeletePortMapping("", extPort, protocol)
 }
 
-func (r *upnpRouter) GetPortMappingEntry(extport uint16, protocol string) (string, uint16, string, error) {
-	intport, intaddr, _, desc, _, err := r.client.GetSpecificPortMappingEntry("", extport, protocol)
-	return intaddr, intport, desc, err
+func (r *upnpRouter) GetPortMappingEntry(extPort uint16, protocol string) (string, uint16, string, error) {
+	intPort, intAddr, _, desc, _, err := r.client.GetSpecificPortMappingEntry("", extPort, protocol)
+	return intAddr, intPort, desc, err
 }
 
 // create UPnP SOAP service client with URN
