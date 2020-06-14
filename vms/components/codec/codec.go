@@ -342,68 +342,32 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Uint8:
-		b := p.UnpackByte()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetUint(uint64(b))
-		return nil
+		value.SetUint(uint64(p.UnpackByte()))
+		return p.Err
 	case reflect.Int8:
-		b := p.UnpackByte()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetInt(int64(b))
-		return nil
+		value.SetInt(int64(p.UnpackByte()))
+		return p.Err
 	case reflect.Uint16:
-		b := p.UnpackShort()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetUint(uint64(b))
-		return nil
+		value.SetUint(uint64(p.UnpackShort()))
+		return p.Err
 	case reflect.Int16:
-		b := p.UnpackShort()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetInt(int64(b))
-		return nil
+		value.SetInt(int64(p.UnpackShort()))
+		return p.Err
 	case reflect.Uint32:
-		b := p.UnpackInt()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetUint(uint64(b))
-		return nil
+		value.SetUint(uint64(p.UnpackInt()))
+		return p.Err
 	case reflect.Int32:
-		b := p.UnpackInt()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetInt(int64(b))
-		return nil
+		value.SetInt(int64(p.UnpackInt()))
+		return p.Err
 	case reflect.Uint64:
-		b := p.UnpackLong()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetUint(uint64(b))
-		return nil
+		value.SetUint(uint64(p.UnpackLong()))
+		return p.Err
 	case reflect.Int64:
-		b := p.UnpackLong()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetInt(int64(b))
-		return nil
+		value.SetInt(int64(p.UnpackLong()))
+		return p.Err
 	case reflect.Bool:
-		b := p.UnpackBool()
-		if p.Err != nil {
-			return p.Err
-		}
-		value.SetBool(b)
-		return nil
+		value.SetBool(p.UnpackBool())
+		return p.Err
 	case reflect.Slice:
 		numElts := int(p.UnpackInt())
 		if p.Err != nil {
@@ -433,28 +397,26 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		if p.Err != nil {
 			return p.Err
 		}
-		// Get a struct that implements the interface
+		// Get a type that implements the interface
 		typ, ok := c.typeIDToType[typeID]
 		if !ok {
 			return errUnmarshalUnregisteredType
 		}
-		// Ensure struct actually does implement the interface
-		valueType := value.Type()
-		if !typ.Implements(valueType) {
+		// Ensure type actually does implement the interface
+		if valueType := value.Type(); !typ.Implements(valueType) {
 			return fmt.Errorf("%s does not implement interface %s", typ, valueType)
 		}
-		concreteInstancePtr := reflect.New(typ) // instance of the proper type
+		concreteInstance := reflect.New(typ).Elem() // instance of the proper type
 		// Unmarshal into the struct
-		if err := c.unmarshal(p, concreteInstancePtr.Elem()); err != nil {
+		if err := c.unmarshal(p, concreteInstance); err != nil {
 			return err
 		}
 		// And assign the filled struct to the value
-		value.Set(concreteInstancePtr.Elem())
+		value.Set(concreteInstance)
 		return nil
 	case reflect.Struct:
 		// Type of this struct
-		t := value.Type()
-		serializedFieldIndices, err := c.getSerializedFieldIndices(t)
+		serializedFieldIndices, err := c.getSerializedFieldIndices(value.Type())
 		if err != nil {
 			return err
 		}
