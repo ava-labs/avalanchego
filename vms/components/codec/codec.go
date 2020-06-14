@@ -127,12 +127,11 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 	// Case: Value can't be marshalled
 	switch valueKind {
 	case reflect.Interface, reflect.Ptr, reflect.Invalid:
-		if value.IsNil() { // Can't marshal nil or nil pointers
+		if value.IsNil() { // Can't marshal nil (except nil slices)
 			return 0, 0, errNil
 		}
 	}
 
-	// Case: Value is of known size; return its byte repr.
 	switch valueKind {
 	case reflect.Uint8:
 		size = 1
@@ -211,7 +210,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		asStr := value.String()
 		size = len(asStr) + wrappers.ShortLen
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackStr(asStr)
+			p.PackStrPtr(&asStr)
 			return p.Err
 		}
 		return

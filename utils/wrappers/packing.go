@@ -284,6 +284,16 @@ func (p *Packer) PackStr(str string) {
 	p.PackFixedBytes([]byte(str))
 }
 
+// PackStrPtr appends a string to the byte array
+func (p *Packer) PackStrPtr(str *string) {
+	strSize := len(*str)
+	if strSize > MaxStringLen {
+		p.Add(errInvalidInput)
+	}
+	p.PackShort(uint16(strSize))
+	p.PackFixedBytes([]byte(*str))
+}
+
 // UnpackStr unpacks a string from the byte array
 func (p *Packer) UnpackStr() string {
 	strSize := p.UnpackShort()
