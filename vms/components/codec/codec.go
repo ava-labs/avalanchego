@@ -97,7 +97,7 @@ func (c *codec) Marshal(value interface{}) ([]byte, error) {
 		return nil, errNil
 	}
 
-	funcs := make([]func(*wrappers.Packer) error, 512, 512)
+	funcs := make([]func(*wrappers.Packer) error, 256, 256)
 	size, _, err := c.marshal(reflect.ValueOf(value), 0, &funcs)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 
 	switch valueKind {
 	case reflect.Uint8:
-		size = 1
+		size = wrappers.ByteLen
 		funcsWritten = 1
 		asByte := byte(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -143,7 +143,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Int8:
-		size = 1
+		size = wrappers.ByteLen
 		funcsWritten = 1
 		asByte := byte(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -152,7 +152,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Uint16:
-		size = 2
+		size = wrappers.ShortLen
 		funcsWritten = 1
 		asShort := uint16(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -161,7 +161,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Int16:
-		size = 2
+		size = wrappers.ShortLen
 		funcsWritten = 1
 		asShort := uint16(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -170,7 +170,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Uint32:
-		size = 4
+		size = wrappers.IntLen
 		funcsWritten = 1
 		asInt := uint32(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -179,7 +179,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Int32:
-		size = 4
+		size = wrappers.IntLen
 		funcsWritten = 1
 		asInt := uint32(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -188,7 +188,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Uint64:
-		size = 8
+		size = wrappers.LongLen
 		funcsWritten = 1
 		asInt := uint64(value.Uint())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -197,7 +197,7 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Int64:
-		size = 8
+		size = wrappers.LongLen
 		funcsWritten = 1
 		asInt := uint64(value.Int())
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -206,16 +206,17 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.String:
+		// Note: it actually saves memory allocations to not do s := value.String()
+		// and use s in place of value.String(). Hence we don't do that.
 		funcsWritten = 1
-		asStr := value.String()
-		size = len(asStr) + wrappers.ShortLen
+		size = len(value.String()) + wrappers.ShortLen
 		(*funcs)[index] = func(p *wrappers.Packer) error {
-			p.PackStrPtr(&asStr)
+			p.PackStr(value.String())
 			return p.Err
 		}
 		return
 	case reflect.Bool:
-		size = 1
+		size = wrappers.BoolLen
 		funcsWritten = 1
 		asBool := value.Bool()
 		(*funcs)[index] = func(p *wrappers.Packer) error {
@@ -232,13 +233,11 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 			return 0, 0, fmt.Errorf("can't marshal unregistered type '%v'", reflect.TypeOf(underlyingValue).String())
 		}
 
-		(*funcs)[index] = nil
 		subsize, subFuncsWritten, subErr := c.marshal(value.Elem(), index+1, funcs)
 		if subErr != nil {
 			return 0, 0, subErr
 		}
-
-		size = 4 + subsize // 4 because we pack the type ID, a uint32
+		size = wrappers.IntLen + subsize
 		(*funcs)[index] = func(p *wrappers.Packer) error {
 			p.PackInt(typeID)
 			return p.Err
@@ -287,23 +286,18 @@ func (c *codec) marshal(value reflect.Value, index int, funcs *[]func(*wrappers.
 		}
 		return
 	case reflect.Struct:
-		t := value.Type()
-
-		size = 0
-		fieldsMarshalled := 0
-		funcsWritten = 0
-		serializedFields, subErr := c.getSerializedFieldIndices(t)
+		serializedFields, subErr := c.getSerializedFieldIndices(value.Type())
 		if subErr != nil {
 			return 0, 0, subErr
 		}
 
-		for _, f := range serializedFields { // Go through all fields of this struct
-			fieldVal := value.Field(f)                                        // The field we're serializing
-			subSize, n, err := c.marshal(fieldVal, index+funcsWritten, funcs) // Serialize the field
+		size = 0
+		funcsWritten = 0
+		for _, fieldIndex := range serializedFields { // Go through all fields of this struct
+			subSize, n, err := c.marshal(value.Field(fieldIndex), index+funcsWritten, funcs) // Serialize the field
 			if err != nil {
 				return 0, 0, err
 			}
-			fieldsMarshalled++
 			size += subSize
 			funcsWritten += n
 		}
