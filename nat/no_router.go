@@ -27,8 +27,8 @@ func (r noRouter) ExternalIP() (net.IP, error) {
 	return r.ip, nil
 }
 
-func (noRouter) IsMapped(uint16, string) bool {
-	return false
+func (noRouter) GetPortMappingEntry(uint16, string) (string, uint16, string, error) {
+	return "", 0, "", nil
 }
 
 func getOutboundIP() (net.IP, error) {

@@ -33,11 +33,12 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP       utils.IPDesc
-	EnableP2PTLS    bool
-	EnableStaking   bool
-	StakingKeyFile  string
-	StakingCertFile string
+	StakingIP        utils.IPDesc
+	StakingLocalPort uint16
+	EnableP2PTLS     bool
+	EnableStaking    bool
+	StakingKeyFile   string
+	StakingCertFile  string
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer

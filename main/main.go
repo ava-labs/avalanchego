@@ -68,11 +68,11 @@ func main() {
 		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
-	router := nat.NewRouter(log, Config.Nat)
-	defer router.UnmapAllPorts()
+	mapper := nat.NewPortMapper(log, Config.Nat)
+	defer mapper.UnmapAllPorts()
 
-	router.Map("TCP", Config.StakingIP.Port, Config.StakingIP.Port, "gecko")
-	router.Map("TCP", Config.HTTPPort, Config.HTTPPort, "gecko http")
+	Config.StakingIP.Port = mapper.Map("TCP", Config.StakingLocalPort, Config.StakingIP.Port, "gecko")
+	Config.HTTPPort = mapper.Map("TCP", Config.HTTPPort, Config.HTTPPort, "gecko http")
 
 	node := node.Node{}
 

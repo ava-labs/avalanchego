@@ -112,7 +112,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, n.Config.StakingIP.PortString())
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingLocalPort))
 	if err != nil {
 		return err
 	}

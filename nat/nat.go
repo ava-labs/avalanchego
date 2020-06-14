@@ -19,7 +19,12 @@ type NATRouter interface {
 	MapPort(protocol string, intport, extport uint16, desc string, duration time.Duration) error
 	UnmapPort(protocol string, extport uint16) error
 	ExternalIP() (net.IP, error)
-	IsMapped(extport uint16, protocol string) bool
+	GetPortMappingEntry(extport uint16, protocol string) (
+		InternalIP string,
+		InternalPort uint16,
+		Description string,
+		err error,
+	)
 }
 
 func GetNATRouter() NATRouter {
@@ -31,7 +36,7 @@ func GetNATRouter() NATRouter {
 	return NewNoRouter()
 }
 
-type Router struct {
+type Mapper struct {
 	log     logging.Logger
 	r       NATRouter
 	closer  chan struct{}
@@ -40,8 +45,8 @@ type Router struct {
 	errs    wrappers.Errs
 }
 
-func NewRouter(log logging.Logger, r NATRouter) Router {
-	return Router{
+func NewPortMapper(log logging.Logger, r NATRouter) Mapper {
+	return Mapper{
 		log:    log,
 		r:      r,
 		closer: make(chan struct{}),
@@ -51,7 +56,7 @@ func NewRouter(log logging.Logger, r NATRouter) Router {
 // Map sets up port mapping using given protocol, internal and external ports
 // and returns the final port mapped. It returns 0 if mapping failed after the
 // maximun number of retries
-func (dev *Router) Map(protocol string, intport, extport uint16, desc string) uint16 {
+func (dev *Mapper) Map(protocol string, intport, extport uint16, desc string) uint16 {
 	mappedPort := make(chan uint16)
 
 	dev.wg.Add(1)
@@ -62,7 +67,7 @@ func (dev *Router) Map(protocol string, intport, extport uint16, desc string) ui
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the
 // the port mapping in mapUpdateTimeout.
-func (dev *Router) keepPortMapping(mappedPort chan<- uint16, protocol string,
+func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 	intport, extport uint16, desc string) {
 	updateTimer := time.NewTimer(mapUpdateTimeout)
 	var port uint16 = 0
@@ -82,8 +87,9 @@ func (dev *Router) keepPortMapping(mappedPort chan<- uint16, protocol string,
 
 	for i := 0; i < maxRetries; i++ {
 		port = extport + uint16(i)
-		if dev.r.IsMapped(port, protocol) {
-			dev.log.Info("Port %d is occupied, retry with the next port", port)
+		if intaddr, intport, desc, err := dev.r.GetPortMappingEntry(port, protocol); err == nil {
+			dev.log.Info("Port %d is mapped to %s:%d: %s, retry with the next port",
+				port, intaddr, intport, desc)
 			continue
 		}
 		if err := dev.r.MapPort(protocol, intport, port, desc, mapTimeout); err != nil {
@@ -124,7 +130,7 @@ func (dev *Router) keepPortMapping(mappedPort chan<- uint16, protocol string,
 	}
 }
 
-func (dev *Router) UnmapAllPorts() error {
+func (dev *Mapper) UnmapAllPorts() error {
 	close(dev.closer)
 	dev.wg.Wait()
 	dev.log.Info("Unmapped all ports")

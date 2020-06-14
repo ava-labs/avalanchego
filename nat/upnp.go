@@ -62,7 +62,7 @@ type upnpRouter struct {
 
 func (r *upnpRouter) localIP() (net.IP, error) {
 	// attempt to get an address on the router
-	deviceAddr, err := net.ResolveUDPAddr("udp4", r.dev.URLBase.Host)
+	deviceAddr, err := net.ResolveUDPAddr("udp", r.dev.URLBase.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (r *upnpRouter) localIP() (net.IP, error) {
 		return nil, err
 	}
 
-	// attempt to find one of my ips that the router would know about
+	// attempt to find one of my IPs that matches router's record
 	for _, netInterface := range netInterfaces {
 		addrs, err := netInterface.Addrs()
 		if err != nil {
@@ -123,102 +123,62 @@ func (r *upnpRouter) UnmapPort(protocol string, extport uint16) error {
 	return r.client.DeletePortMapping("", extport, protocol)
 }
 
-func (r *upnpRouter) IsMapped(extport uint16, protocol string) bool {
-	_, _, enabled, _, _, _ := r.client.GetSpecificPortMappingEntry("", extport, protocol)
-	return enabled
+func (r *upnpRouter) GetPortMappingEntry(extport uint16, protocol string) (string, uint16, string, error) {
+	intport, intaddr, _, desc, _, err := r.client.GetSpecificPortMappingEntry("", extport, protocol)
+	return intaddr, intport, desc, err
 }
 
-func gateway1(client goupnp.ServiceClient) upnpClient {
+// create UPnP SOAP service client with URN
+func getUPnPClient(client goupnp.ServiceClient) upnpClient {
 	switch client.Service.ServiceType {
 	case internetgateway1.URN_WANIPConnection_1:
 		return &internetgateway1.WANIPConnection1{ServiceClient: client}
 	case internetgateway1.URN_WANPPPConnection_1:
 		return &internetgateway1.WANPPPConnection1{ServiceClient: client}
-	default:
-		return nil
-	}
-}
-
-func gateway2(client goupnp.ServiceClient) upnpClient {
-	switch client.Service.ServiceType {
-	case internetgateway2.URN_WANIPConnection_1:
-		return &internetgateway2.WANIPConnection1{ServiceClient: client}
 	case internetgateway2.URN_WANIPConnection_2:
 		return &internetgateway2.WANIPConnection2{ServiceClient: client}
-	case internetgateway2.URN_WANPPPConnection_1:
-		return &internetgateway2.WANPPPConnection1{ServiceClient: client}
 	default:
 		return nil
 	}
 }
 
-func getUPnPClient(client goupnp.ServiceClient) upnpClient {
-	c := gateway1(client)
-	if c != nil {
-		return c
-	}
-	return gateway2(client)
-}
-
-func getRootDevice(dev *goupnp.MaybeRootDevice) *upnpRouter {
-	var router *upnpRouter
-	dev.Root.Device.VisitServices(func(service *goupnp.Service) {
-		c := goupnp.ServiceClient{
-			SOAPClient: service.NewSOAPClient(),
-			RootDevice: dev.Root,
-			Location:   dev.Location,
-			Service:    service,
-		}
-		c.SOAPClient.HTTPClient.Timeout = soapRequestTimeout
-		client := getUPnPClient(c)
-		if client == nil {
-			return
-		}
-		router = &upnpRouter{dev.Root, client}
-		if router == nil {
-			return
-		}
-		if _, nat, err := router.client.GetNATRSIPStatus(); err != nil || !nat {
-			router = nil
-			return
-		}
-	})
-	return router
-}
-
+// discover() tries to find  gateway device
 func discover(target string) *upnpRouter {
 	devs, err := goupnp.DiscoverDevices(target)
 	if err != nil {
 		return nil
 	}
+
+	router := make(chan *upnpRouter)
 	for i := 0; i < len(devs); i++ {
 		if devs[i].Root == nil {
 			continue
 		}
-		u := getRootDevice(&devs[i])
-		if u != nil {
-			return u
-		}
+		go func(dev *goupnp.MaybeRootDevice) {
+			var r *upnpRouter = nil
+			dev.Root.Device.VisitServices(func(service *goupnp.Service) {
+				c := goupnp.ServiceClient{
+					SOAPClient: service.NewSOAPClient(),
+					RootDevice: dev.Root,
+					Location:   dev.Location,
+					Service:    service,
+				}
+				c.SOAPClient.HTTPClient.Timeout = soapRequestTimeout
+				client := getUPnPClient(c)
+				if client == nil {
+					return
+				}
+				if _, nat, err := client.GetNATRSIPStatus(); err != nil || !nat {
+					return
+				}
+				r = &upnpRouter{dev.Root, client}
+			})
+			router <- r
+		}(&devs[i])
 	}
-	return gateway2(client)
-}
 
-func getUPnPRouter() *upnpRouter {
-	targets := []string{
-		internetgateway1.URN_WANConnectionDevice_1,
-		internetgateway2.URN_WANConnectionDevice_2,
-	}
-
-	routers := make(chan *upnpRouter, len(targets))
-
-	for _, urn := range targets {
-		go func(urn string) {
-			routers <- discover(urn)
-		}(urn)
-	}
-
-	for i := 0; i < len(targets); i++ {
-		if r := <-routers; r != nil {
+	for i := 0; i < len(devs); i++ {
+		if r := <-router; r != nil {
 			return r
 		}
 	}
@@ -234,7 +194,7 @@ func getUPnPRouter() *upnpRouter {
 		internetgateway2.URN_WANConnectionDevice_2,
 	}
 
-	routers := make(chan *upnpRouter, len(targets))
+	routers := make(chan *upnpRouter)
 
 	for _, urn := range targets {
 		go func(urn string) {
