@@ -234,7 +234,7 @@ type GetCurrentValidatorsReply struct {
 
 // GetCurrentValidators returns the list of current validators
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
-	service.vm.Ctx.log.Info("Platform: GetCurrentValidators called")
+	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 
 	if args.SubnetID.IsZero() {
 		args.SubnetID = DefaultSubnetID
@@ -298,7 +298,7 @@ type GetPendingValidatorsReply struct {
 
 // GetPendingValidators returns the list of current validators
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
-	service.vm.Ctx.log.Info("Platform: GetPendingValidators called")
+	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
 
 	if args.SubnetID.IsZero() {
 		args.SubnetID = DefaultSubnetID
@@ -360,7 +360,7 @@ type SampleValidatorsReply struct {
 
 // SampleValidators returns a sampling of the list of current validators
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
-	service.vm.Ctx.log.Info("Platform: SampleValidators called with {Size = %d}", args.Size)
+	service.vm.Ctx.Log.Info("Platform: SampleValidators called with {Size = %d}", args.Size)
 
 	if args.SubnetID.IsZero() {
 		args.SubnetID = DefaultSubnetID
@@ -437,7 +437,7 @@ type ListAccountsReply struct {
 
 // ListAccounts lists all of the accounts controlled by [args.Username]
 func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, reply *ListAccountsReply) error {
-	service.vm.Ctx.log.Info("Platform: ListAccounts called for user '%s'", args.Username)
+	service.vm.Ctx.Log.Info("Platform: ListAccounts called for user '%s'", args.Username)
 
 	// db holds the user's info that pertains to the Platform Chain
 	userDB, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -499,7 +499,7 @@ type CreateAccountReply struct {
 // The account's ID is [privKey].PublicKey().Address(), where [privKey] is a
 // private key controlled by the user.
 func (service *Service) CreateAccount(_ *http.Request, args *CreateAccountArgs, reply *CreateAccountReply) error {
-	service.vm.Ctx.log.Info("Platform: CreateAccount called for user '%s'", args.Username)
+	service.vm.Ctx.Log.Info("Platform: CreateAccount called for user '%s'", args.Username)
 
 	// userDB holds the user's info that pertains to the Platform Chain
 	userDB, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -569,7 +569,7 @@ type AddDefaultSubnetValidatorArgs struct {
 // AddDefaultSubnetValidator returns an unsigned transaction to add a validator to the default subnet
 // The returned unsigned transaction should be signed using Sign()
 func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *CreateTxResponse) error {
-	service.vm.Ctx.log.Info("Platform: AddDefaultSubnetValidator called")
+	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
 
 	switch {
 	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
@@ -626,7 +626,7 @@ type AddDefaultSubnetDelegatorArgs struct {
 // to the default subnet
 // The returned unsigned transaction should be signed using Sign()
 func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *CreateTxResponse) error {
-	service.vm.Ctx.log.Info("Platform: AddDefaultSubnetDelegator called")
+	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
 
 	switch {
 	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
@@ -741,7 +741,7 @@ type CreateSubnetArgs struct {
 // CreateSubnet returns an unsigned transaction to create a new subnet.
 // The unsigned transaction must be signed with the key of [args.Payer]
 func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *CreateTxResponse) error {
-	service.vm.Ctx.log.Info("Platform: CreateSubnet called")
+	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
 	switch {
 	case args.PayerNonce == 0:
@@ -796,7 +796,7 @@ type ExportAVAArgs struct {
 // The unsigned transaction must be signed with the key of the account exporting the AVA
 // and paying the transaction fee
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *CreateTxResponse) error {
-	service.vm.Ctx.log.Info("Platform: ExportAVA called")
+	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
 
 	switch {
 	case args.PayerNonce == 0:
@@ -858,7 +858,7 @@ type SignResponse struct {
 
 // Sign [args.bytes]
 func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignResponse) error {
-	service.vm.Ctx.log.Info("Platform: Sign called")
+	service.vm.Ctx.Log.Info("Platform: Sign called")
 
 	if args.Signer == "" {
 		return errNilSigner
@@ -915,7 +915,7 @@ func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignRespons
 
 // Sign [unsigned] with [key]
 func (service *Service) signAddDefaultSubnetValidatorTx(tx *addDefaultSubnetValidatorTx, key *crypto.PrivateKeySECP256K1R) (*addDefaultSubnetValidatorTx, error) {
-	service.vm.Ctx.log.Info("Platform: signAddDefaultSubnetValidatorTx called")
+	service.vm.Ctx.Log.Info("Platform: signAddDefaultSubnetValidatorTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetValidatorTx)
@@ -938,7 +938,7 @@ func (service *Service) signAddDefaultSubnetValidatorTx(tx *addDefaultSubnetVali
 
 // Sign [unsigned] with [key]
 func (service *Service) signAddDefaultSubnetDelegatorTx(tx *addDefaultSubnetDelegatorTx, key *crypto.PrivateKeySECP256K1R) (*addDefaultSubnetDelegatorTx, error) {
-	service.vm.Ctx.log.Info("Platform: signAddDefaultSubnetDelegatorTx called")
+	service.vm.Ctx.Log.Info("Platform: signAddDefaultSubnetDelegatorTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetDelegatorTx)
@@ -961,7 +961,7 @@ func (service *Service) signAddDefaultSubnetDelegatorTx(tx *addDefaultSubnetDele
 
 // Sign [xt] with [key]
 func (service *Service) signCreateSubnetTx(tx *CreateSubnetTx, key *crypto.PrivateKeySECP256K1R) (*CreateSubnetTx, error) {
-	service.vm.Ctx.log.Info("Platform: signCreateSubnetTx called")
+	service.vm.Ctx.Log.Info("Platform: signCreateSubnetTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)
@@ -984,7 +984,7 @@ func (service *Service) signCreateSubnetTx(tx *CreateSubnetTx, key *crypto.Priva
 
 // Sign [tx] with [key]
 func (service *Service) signExportTx(tx *ExportTx, key *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
-	service.vm.Ctx.log.Info("Platform: signExportTx called")
+	service.vm.Ctx.Log.Info("Platform: signExportTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedExportTx)
@@ -1012,7 +1012,7 @@ func (service *Service) signExportTx(tx *ExportTx, key *crypto.PrivateKeySECP256
 // Sorts tx.ControlSigs before returning
 // Assumes each element of tx.ControlSigs is actually a signature, not just empty bytes
 func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubnetValidatorTx, key *crypto.PrivateKeySECP256K1R) (*addNonDefaultSubnetValidatorTx, error) {
-	service.vm.Ctx.log.Info("Platform: signAddNonDefaultSubnetValidatorTx called")
+	service.vm.Ctx.Log.Info("Platform: signAddNonDefaultSubnetValidatorTx called")
 
 	// Compute the byte repr. of the unsigned tx and the signature of [key] over it
 	unsignedIntf := interface{}(&tx.UnsignedAddNonDefaultSubnetValidatorTx)
@@ -1075,7 +1075,7 @@ type ImportAVAArgs struct {
 // The AVA must have already been exported from the X-Chain.
 // The unsigned transaction must be signed with the key of the tx fee payer.
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *SignResponse) error {
-	service.vm.Ctx.log.Info("Platform: ImportAVA called")
+	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
 
 	switch {
 	case args.To == "":
@@ -1203,7 +1203,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 // Sorts tx.ControlSigs before returning
 // Assumes each element of tx.ControlSigs is actually a signature, not just empty bytes
 func (service *Service) signCreateChainTx(tx *CreateChainTx, key *crypto.PrivateKeySECP256K1R) (*CreateChainTx, error) {
-	service.vm.Ctx.log.Info("Platform: signCreateChainTx called")
+	service.vm.Ctx.Log.Info("Platform: signCreateChainTx called")
 
 	// Compute the byte repr. of the unsigned tx and the signature of [key] over it
 	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
@@ -1263,7 +1263,7 @@ type IssueTxResponse struct {
 
 // IssueTx issues the transaction [args.Tx] to the network
 func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *IssueTxResponse) error {
-	service.vm.Ctx.log.Info("Platform: IssueTx called")
+	service.vm.Ctx.Log.Info("Platform: IssueTx called")
 
 	genTx := genericTx{}
 	if err := Codec.Unmarshal(args.Tx.Bytes, &genTx); err != nil {
@@ -1327,7 +1327,7 @@ type CreateBlockchainArgs struct {
 // CreateBlockchain returns an unsigned transaction to create a new blockchain
 // Must be signed with the Subnet's control keys and with a key that pays the transaction fee before issuance
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *CreateTxResponse) error {
-	service.vm.Ctx.log.Info("Platform: CreateBlockchain called")
+	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 
 	switch {
 	case args.PayerNonce == 0:
@@ -1410,7 +1410,7 @@ type GetBlockchainStatusReply struct {
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
 func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
-	service.vm.Ctx.log.Info("Platform: GetBlockchainStatus called")
+	service.vm.Ctx.Log.Info("Platform: GetBlockchainStatus called")
 
 	switch {
 	case args.BlockchainID == "":
@@ -1490,7 +1490,7 @@ type ValidatedByResponse struct {
 
 // ValidatedBy returns the ID of the Subnet that validates [args.BlockchainID]
 func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
-	service.vm.Ctx.log.Info("Platform: ValidatedBy called")
+	service.vm.Ctx.Log.Info("Platform: ValidatedBy called")
 
 	switch {
 	case args.BlockchainID == "":
@@ -1522,7 +1522,7 @@ type ValidatesResponse struct {
 
 // Validates returns the IDs of the blockchains validated by [args.SubnetID]
 func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response *ValidatesResponse) error {
-	service.vm.Ctx.log.Info("Platform: Validates called")
+	service.vm.Ctx.Log.Info("Platform: Validates called")
 
 	switch {
 	case args.SubnetID == "":
@@ -1576,7 +1576,7 @@ type GetBlockchainsResponse struct {
 
 // GetBlockchains returns all of the blockchains that exist
 func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
-	service.vm.Ctx.log.Info("Platform: GetBlockchains called")
+	service.vm.Ctx.Log.Info("Platform: GetBlockchains called")
 
 	chains, err := service.vm.getChains(service.vm.DB)
 	if err != nil {
