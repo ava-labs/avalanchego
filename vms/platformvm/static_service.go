@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"net/http"
 
@@ -174,8 +173,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return errAccountHasNoValue
 		}
 		accounts = append(accounts, newAccount(
-			account.Address, // ID
-			0,               // nonce
+			account.Address,         // ID
+			0,                       // nonce
 			uint64(account.Balance), // balance
 		))
 	}
@@ -210,7 +209,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return err
 		}
 
-		heap.Push(validators, tx)
+		validators.Add(tx)
 	}
 
 	// Specify the chains that exist at genesis.
