@@ -135,7 +135,7 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Debug("Keystore: CreateUser called with %.*s", maxUserPassLen, args.Username)
+	ks.log.Info("Keystore: CreateUser called with %.*s", maxUserPassLen, args.Username)
 
 	if len(args.Username) > maxUserPassLen || len(args.Password) > maxUserPassLen {
 		return errUserPassMaxLength
@@ -183,7 +183,7 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListU
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Debug("Keystore: ListUsers called")
+	ks.log.Info("Keystore: ListUsers called")
 
 	reply.Users = []string{}
 
@@ -211,7 +211,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Debug("Keystore: ExportUser called for %s", args.Username)
+	ks.log.Info("Keystore: ExportUser called for %s", args.Username)
 
 	usr, err := ks.getUser(args.Username)
 	if err != nil {
@@ -264,7 +264,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Debug("Keystore: ImportUser called for %s", args.Username)
+	ks.log.Info("Keystore: ImportUser called for %s", args.Username)
 
 	if args.Username == "" {
 		return errEmptyUsername
@@ -324,7 +324,7 @@ func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *Del
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Debug("Keystore: DeleteUser called with %s", args.Username)
+	ks.log.Info("Keystore: DeleteUser called with %s", args.Username)
 
 	if args.Username == "" {
 		return errEmptyUsername
