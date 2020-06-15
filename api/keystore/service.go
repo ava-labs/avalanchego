@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 
 	jsoncodec "github.com/ava-labs/gecko/utils/json"
 	zxcvbn "github.com/nbutton23/zxcvbn-go"
