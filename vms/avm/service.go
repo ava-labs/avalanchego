@@ -666,13 +666,20 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	}
 
 	addresses, _ := user.Addresses(db)
-	addresses = append(addresses, sk.PublicKey().Address())
 
+	newAddress := sk.PublicKey().Address()
+	reply.Address = service.vm.Format(newAddress.Bytes())
+	for _, address := range addresses {
+		if newAddress.Equals(address) {
+			return nil
+		}
+	}
+
+	addresses = append(addresses, newAddress)
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving addresses: %w", err)
 	}
 
-	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
 	return nil
 }
 
