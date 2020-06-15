@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"bytes"
-	"container/heap"
 	"errors"
 	"testing"
 	"time"
@@ -193,6 +192,8 @@ func defaultVM() *VM {
 		panic("no subnets found")
 	} // end delete
 
+	vm.registerDBTypes()
+
 	return vm
 }
 
@@ -226,7 +227,7 @@ func GenesisCurrentValidators() *EventHeap {
 			testNetworkID,                           // network ID
 			key,                                     // key paying tx fee and stake
 		)
-		heap.Push(validators, validator)
+		validators.Add(validator)
 	}
 	return validators
 }
@@ -1011,7 +1012,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.unissuedEvents.Push(addValidatorTx)
+	vm.unissuedEvents.Add(addValidatorTx)
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	if err != nil {
 		t.Fatal(err)

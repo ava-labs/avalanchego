@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"time"
@@ -698,7 +697,7 @@ func (vm *VM) resetTimer() {
 			vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
-		// If the tx doesn't meet the syncrony bound, drop it
+		// If the tx doesn't meet the synchrony bound, drop it
 		vm.unissuedEvents.Remove()
 		vm.Ctx.Log.Debug("dropping tx to add validator because its start time has passed")
 	}
@@ -780,8 +779,8 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 		if timestamp.Before(nextTx.StartTime()) {
 			break
 		}
-		heap.Push(current, nextTx)
-		heap.Pop(pending)
+		current.Add(nextTx)
+		pending.Remove()
 		started.Add(nextTx.Vdr().ID())
 	}
 	return current, pending, started, stopped, nil
