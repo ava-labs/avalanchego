@@ -151,6 +151,16 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	key := keys[0]
 
 	tx := &Tx{UnsignedTx: &ExportTx{
@@ -296,6 +306,16 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	key := keys[0]
 

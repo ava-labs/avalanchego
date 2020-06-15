@@ -31,6 +31,10 @@ type peer struct {
 	// state lock held.
 	closed bool
 
+	// number of bytes currently in the send queue, is only modifed when the
+	// network state lock held.
+	pendingBytes int
+
 	// queue of messages this connection is attempting to send the peer. Is
 	// closed when the connection is closed.
 	sender chan []byte
@@ -155,6 +159,10 @@ func (p *peer) WriteMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msg})
 
+		p.net.stateLock.Lock()
+		p.pendingBytes -= len(msg)
+		p.net.stateLock.Unlock()
+
 		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
 		packer.PackBytes(msg)
 		msg = packer.Bytes
@@ -184,8 +192,22 @@ func (p *peer) send(msg Msg) bool {
 		p.net.log.Debug("dropping message to %s due to a closed connection", p.id)
 		return false
 	}
+
+	msgBytes := msg.Bytes()
+	newPendingBytes := p.net.pendingBytes + len(msgBytes)
+	newConnPendingBytes := p.pendingBytes + len(msgBytes)
+	if newPendingBytes > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
+		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		(newPendingBytes > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
+			newConnPendingBytes > p.net.maxNetworkPendingSendBytes/20) { // Check to see if this connection is using too much memory
+		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
+		return false
+	}
+
 	select {
-	case p.sender <- msg.Bytes():
+	case p.sender <- msgBytes:
+		p.net.pendingBytes = newPendingBytes
+		p.pendingBytes = newConnPendingBytes
 		return true
 	default:
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
@@ -201,7 +223,7 @@ func (p *peer) handle(msg Msg) {
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
-		p.net.log.Debug("dropping an unknown message from %s with op %d", p.id, op)
+		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op.String())
 		return
 	}
 	msgMetrics.numReceived.Inc()
@@ -236,14 +258,20 @@ func (p *peer) handle(msg Msg) {
 		p.accepted(msg)
 	case Get:
 		p.get(msg)
+	case GetAncestors:
+		p.getAncestors(msg)
 	case Put:
 		p.put(msg)
+	case MultiPut:
+		p.multiPut(msg)
 	case PushQuery:
 		p.pushQuery(msg)
 	case PullQuery:
 		p.pullQuery(msg)
 	case Chits:
 		p.chits(msg)
+	default:
+		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op.String())
 	}
 }
 
@@ -537,6 +565,16 @@ func (p *peer) get(msg Msg) {
 	p.net.router.Get(p.id, chainID, requestID, containerID)
 }
 
+func (p *peer) getAncestors(msg Msg) {
+	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(RequestID).(uint32)
+	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
+	p.net.log.AssertNoError(err)
+
+	p.net.router.GetAncestors(p.id, chainID, requestID, containerID)
+}
+
 // assumes the stateLock is not held
 func (p *peer) put(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
@@ -547,6 +585,16 @@ func (p *peer) put(msg Msg) {
 	container := msg.Get(ContainerBytes).([]byte)
 
 	p.net.router.Put(p.id, chainID, requestID, containerID, container)
+}
+
+// assumes the stateLock is not held
+func (p *peer) multiPut(msg Msg) {
+	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(RequestID).(uint32)
+	containers := msg.Get(MultiContainerBytes).([][]byte)
+
+	p.net.router.MultiPut(p.id, chainID, requestID, containers)
 }
 
 // assumes the stateLock is not held

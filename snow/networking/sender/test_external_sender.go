@@ -16,7 +16,7 @@ type ExternalSenderTest struct {
 
 	CantGetAcceptedFrontier, CantAcceptedFrontier,
 	CantGetAccepted, CantAccepted,
-	CantGet, CantPut,
+	CantGet, CantGetAncestors, CantPut, CantMultiPut,
 	CantPullQuery, CantPushQuery, CantChits,
 	CantGossip bool
 
@@ -24,8 +24,9 @@ type ExternalSenderTest struct {
 	AcceptedFrontierF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
 	GetAcceptedF         func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerIDs ids.Set)
 	AcceptedF            func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
-	GetF                 func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
+	GetF, GetAncestorsF  func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
 	PutF                 func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	MultiPutF            func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
 	PushQueryF           func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 	PullQueryF           func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID)
 	ChitsF               func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
@@ -39,7 +40,9 @@ func (s *ExternalSenderTest) Default(cant bool) {
 	s.CantGetAccepted = cant
 	s.CantAccepted = cant
 	s.CantGet = cant
+	s.CantGetAncestors = cant
 	s.CantPut = cant
+	s.CantMultiPut = cant
 	s.CantPullQuery = cant
 	s.CantPushQuery = cant
 	s.CantChits = cant
@@ -111,6 +114,19 @@ func (s *ExternalSenderTest) Get(vdr ids.ShortID, chainID ids.ID, requestID uint
 	}
 }
 
+// GetAncestors calls GetAncestorsF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *ExternalSenderTest) GetAncestors(vdr ids.ShortID, chainID ids.ID, requestID uint32, vtxID ids.ID) {
+	if s.GetAncestorsF != nil {
+		s.GetAncestorsF(vdr, chainID, requestID, vtxID)
+	} else if s.CantGetAncestors && s.T != nil {
+		s.T.Fatalf("Unexpectedly called GetAncestors")
+	} else if s.CantGetAncestors && s.B != nil {
+		s.B.Fatalf("Unexpectedly called GetAncestors")
+	}
+}
+
 // Put calls PutF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
@@ -121,6 +137,19 @@ func (s *ExternalSenderTest) Put(vdr ids.ShortID, chainID ids.ID, requestID uint
 		s.T.Fatalf("Unexpectedly called Put")
 	} else if s.CantPut && s.B != nil {
 		s.B.Fatalf("Unexpectedly called Put")
+	}
+}
+
+// MultiPut calls MultiPutF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *ExternalSenderTest) MultiPut(vdr ids.ShortID, chainID ids.ID, requestID uint32, vtxs [][]byte) {
+	if s.MultiPutF != nil {
+		s.MultiPutF(vdr, chainID, requestID, vtxs)
+	} else if s.CantMultiPut && s.T != nil {
+		s.T.Fatalf("Unexpectedly called MultiPut")
+	} else if s.CantMultiPut && s.B != nil {
+		s.B.Fatalf("Unexpectedly called MultiPut")
 	}
 }
 

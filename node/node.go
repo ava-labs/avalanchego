@@ -55,7 +55,8 @@ const (
 var (
 	genesisHashKey = []byte("genesisID")
 
-	nodeVersion   = version.NewDefaultVersion("avalanche", 0, 5, 1)
+	// Version is the version of this code
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 5)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -156,7 +157,7 @@ func (n *Node) initNetworking() error {
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		nodeVersion,
+		Version,
 		versionParser,
 		listener,
 		dialer,
@@ -460,7 +461,7 @@ func (n *Node) initMetricsAPI() {
 func (n *Node) initAdminAPI() {
 	if n.Config.AdminAPIEnabled {
 		n.Log.Info("initializing Admin API")
-		service := admin.NewService(n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
+		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
 		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 	}
 }
@@ -525,6 +526,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = Config
+	n.Log.Info("Gecko version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {

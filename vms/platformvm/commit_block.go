@@ -23,6 +23,13 @@ func (c *Commit) Verify() error {
 	// the parent of an Commit block should always be a proposal
 	parent, ok := c.parentBlock().(*ProposalBlock)
 	if !ok {
+		if err := c.Reject(); err == nil {
+			if err := c.vm.DB.Commit(); err != nil {
+				c.vm.Ctx.Log.Error("error committing Commit block as rejected: %s", err)
+			}
+		} else {
+			c.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
 
