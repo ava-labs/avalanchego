@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package nat
 
 import (
@@ -10,14 +13,14 @@ import (
 )
 
 const (
-	mapTimeout       = 30 * time.Minute
+	mapTimeout       = 30 * time.Second
 	mapUpdateTimeout = mapTimeout / 2
 	maxRetries       = 20
 )
 
 type NATRouter interface {
 	MapPort(protocol string, intPort, extPort uint16, desc string, duration time.Duration) error
-	UnmapPort(protocol string, extPort uint16) error
+	UnmapPort(protocol string, intPort, extPort uint16) error
 	ExternalIP() (net.IP, error)
 	GetPortMappingEntry(extPort uint16, protocol string) (
 		InternalIP string,
@@ -28,8 +31,10 @@ type NATRouter interface {
 }
 
 func GetNATRouter() NATRouter {
-	//TODO add PMP support
 	if r := getUPnPRouter(); r != nil {
+		return r
+	}
+	if r := getPMPRouter(); r != nil {
 		return r
 	}
 
@@ -95,11 +100,9 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 				updateTimer.Stop()
 
 				dev.log.Info("Unmap protocol %s external port %d", protocol, port)
-				if port > 0 {
-					dev.errLock.Lock()
-					dev.errs.Add(dev.r.UnmapPort(protocol, port))
-					dev.errLock.Unlock()
-				}
+				dev.errLock.Lock()
+				dev.errs.Add(dev.r.UnmapPort(protocol, intPort, port))
+				dev.errLock.Unlock()
 
 				dev.wg.Done()
 			}(port)
@@ -120,7 +123,6 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 					return
 				}
 			}
-			break
 		}
 	}
 

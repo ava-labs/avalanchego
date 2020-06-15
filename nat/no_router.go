@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package nat
 
 import (
@@ -12,14 +15,14 @@ type noRouter struct {
 	ip net.IP
 }
 
-func (noRouter) MapPort(protocol string, intport, extport uint16, desc string, duration time.Duration) error {
-	if intport != extport {
-		return fmt.Errorf("cannot map port %d to %d", intport, extport)
+func (noRouter) MapPort(_ string, intPort, extPort uint16, _ string, _ time.Duration) error {
+	if intPort != extPort {
+		return fmt.Errorf("cannot map port %d to %d", intPort, extPort)
 	}
 	return nil
 }
 
-func (noRouter) UnmapPort(protocol string, extport uint16) error {
+func (noRouter) UnmapPort(string, uint16, uint16) error {
 	return nil
 }
 

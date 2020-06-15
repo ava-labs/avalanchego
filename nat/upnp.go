@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package nat
 
 import (
@@ -119,7 +122,7 @@ func (r *upnpRouter) MapPort(protocol string, intPort, extPort uint16,
 		ip.String(), true, desc, lifetime)
 }
 
-func (r *upnpRouter) UnmapPort(protocol string, extPort uint16) error {
+func (r *upnpRouter) UnmapPort(protocol string, _, extPort uint16) error {
 	return r.client.DeletePortMapping("", extPort, protocol)
 }
 
