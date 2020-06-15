@@ -668,9 +668,9 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	addresses, _ := user.Addresses(db)
 
 	newAddress := sk.PublicKey().Address()
+	reply.Address = service.vm.Format(newAddress.Bytes())
 	for _, address := range addresses {
 		if newAddress.Equals(address) {
-			reply.Address = service.vm.Format(newAddress.Bytes())
 			return nil
 		}
 	}
@@ -680,7 +680,6 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 		return fmt.Errorf("problem saving addresses: %w", err)
 	}
 
-	reply.Address = service.vm.Format(newAddress.Bytes())
 	return nil
 }
 
