@@ -16,11 +16,6 @@ const (
 	// MaxStringLen ...
 	MaxStringLen = math.MaxUint16
 
-	// When the byte array is expanded, this many extra bytes
-	// are added to capacity of the array.
-	// Higher value --> need to expand byte array less --> less memory allocations
-	expansionBoost = 256
-
 	// ByteLen is the number of bytes per byte...
 	ByteLen = 1
 	// ShortLen is the number of bytes per short
@@ -71,30 +66,19 @@ func (p *Packer) CheckSpace(bytes int) {
 // In order to understand this code, its important to understand the difference
 // between a slice's length and its capacity.
 func (p *Packer) Expand(bytes int) {
-	p.CheckSpace(0)
-	if p.Errored() {
+	neededSize := bytes + p.Offset // Need byte slice's length to be at least [neededSize]
+	switch {
+	case neededSize <= len(p.Bytes): // Byte slice has sufficient length already
 		return
-	}
-
-	neededSize := bytes + p.Offset  // Need byte slice's length to be at least [neededSize]
-	if neededSize <= len(p.Bytes) { // Byte slice has sufficient length already
+	case neededSize > p.MaxSize: // Lengthening the byte slice would cause it to grow too large
+		p.Err = errBadLength
 		return
-	} else if neededSize > p.MaxSize { // Lengthening the byte slice would cause it to grow too large
-		p.Add(errBadLength)
-		return
-	} else if neededSize <= cap(p.Bytes) { // Byte slice has sufficient capacity to lengthen it without mem alloc
+	case neededSize <= cap(p.Bytes): // Byte slice has sufficient capacity to lengthen it without mem alloc
 		p.Bytes = p.Bytes[:neededSize]
 		return
+	default: // Add capacity/length to byte slice
+		p.Bytes = append(p.Bytes[:cap(p.Bytes)], make([]byte, neededSize-cap(p.Bytes))...)
 	}
-
-	// See if we can expand the byte slice an extra [expansionBoost] bytes in order to
-	// prevent need for future expansions (and therefore memory allocations)
-	capToAdd := neededSize - cap(p.Bytes) + expansionBoost
-	if capToAdd > p.MaxSize {
-		capToAdd = neededSize - cap(p.Bytes)
-	}
-	// increase slice's length and capacity
-	p.Bytes = append(p.Bytes[:cap(p.Bytes)], make([]byte, neededSize-cap(p.Bytes), capToAdd)...)
 }
 
 // PackByte append a byte to the byte array
