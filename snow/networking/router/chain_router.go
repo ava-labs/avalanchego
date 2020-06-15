@@ -185,7 +185,7 @@ func (sr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 			return
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Error("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
@@ -200,7 +200,7 @@ func (sr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAncestors(validatorID, requestID, containerID)
 	} else {
-		sr.log.Error("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Debug("GetAncestors(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -217,7 +217,7 @@ func (sr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
 	}
 }
 
@@ -236,7 +236,7 @@ func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 			return
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Error("GetAncestorsFailed(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
 }
