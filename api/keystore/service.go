@@ -31,8 +31,17 @@ const (
 	// maxUserPassLen is the maximum length of the username or password allowed
 	maxUserPassLen = 1024
 
-	// requiredPassScore defines the score a password must achieve to be accepted
-	// as a password with strong characteristics by the zxcvbn package
+	// maxCheckedPassLen limits the length of the password that should be
+	// strength checked.
+	//
+	// As per issue https://github.com/ava-labs/gecko/issues/195 it was found
+	// the longer the length of password the slower zxcvbn.PasswordStrength()
+	// performs. To avoid performance issues, and a DoS vector, we only check
+	// the first 50 characters of the password.
+	maxCheckedPassLen = 50
+
+	// requiredPassScore defines the score a password must achieve to be
+	// accepted as a password with strong characteristics by the zxcvbn package
 	//
 	// The scoring mechanism defined is as follows;
 	//
@@ -138,10 +147,10 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	defer ks.lock.Unlock()
 
 	ks.log.Verbo("CreateUser called with %.*s", maxUserPassLen, args.Username)
-
 	if err := ks.AddUser(args.Username, args.Password); err != nil {
 		return err
 	}
+
 	reply.Success = true
 	return nil
 }
@@ -380,6 +389,8 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 	return encDB, nil
 }
 
+// AddUser attempts to register this username and password as a new user of the
+// keystore.
 func (ks *Keystore) AddUser(username, password string) error {
 	if len(username) > maxUserPassLen || len(password) > maxUserPassLen {
 		return errUserPassMaxLength
@@ -392,7 +403,12 @@ func (ks *Keystore) AddUser(username, password string) error {
 		return fmt.Errorf("user already exists: %s", username)
 	}
 
-	if zxcvbn.PasswordStrength(password, nil).Score < requiredPassScore {
+	checkPass := password
+	if len(password) > maxCheckedPassLen {
+		checkPass = password[:maxCheckedPassLen]
+	}
+
+	if zxcvbn.PasswordStrength(checkPass, nil).Score < requiredPassScore {
 		return errWeakPassword
 	}
 
@@ -414,6 +430,7 @@ func (ks *Keystore) AddUser(username, password string) error {
 	return nil
 }
 
+// CreateTestKeystore returns a new keystore that can be utilized for testing
 func CreateTestKeystore(t *testing.T) *Keystore {
 	ks := &Keystore{}
 	ks.Initialize(logging.NoLog{}, memdb.New())
