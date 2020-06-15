@@ -1275,7 +1275,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		if err := tx.initialize(service.vm); err != nil {
 			return fmt.Errorf("error initializing tx: %s", err)
 		}
-		service.vm.unissuedEvents.Push(tx)
+		service.vm.unissuedEvents.Add(tx)
 		response.TxID = tx.ID()
 	case DecisionTx:
 		if err := tx.initialize(service.vm); err != nil {
@@ -1290,7 +1290,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		service.vm.unissuedAtomicTxs = append(service.vm.unissuedAtomicTxs, tx)
 		response.TxID = tx.ID()
 	default:
-		return errors.New("Could not parse given tx. Must be a TimedTx, DecisionTx, or AtomicTx")
+		return errors.New("Could not parse given tx. Provided tx needs to be a TimedTx, DecisionTx, or AtomicTx")
 	}
 
 	service.vm.resetTimer()
