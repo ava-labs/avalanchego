@@ -36,8 +36,8 @@ const (
 	//
 	// As per issue https://github.com/ava-labs/gecko/issues/195 it was found
 	// the longer the length of password the slower zxcvbn.PasswordStrength()
-	// performs. To avoid performance issues and a DoS vector, we only check the
-	// first 50 characters of the password.
+	// performs. To avoid performance issues, and a DoS vector, we only check
+	// the first 50 characters of the password.
 	maxCheckedPassLen = 50
 
 	// requiredPassScore defines the score a password must achieve to be
