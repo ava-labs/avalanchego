@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"bytes"
-	"container/heap"
 	"errors"
 	"testing"
 	"time"
@@ -193,6 +192,8 @@ func defaultVM() *VM {
 		panic("no subnets found")
 	} // end delete
 
+	vm.registerDBTypes()
+
 	return vm
 }
 
@@ -226,7 +227,7 @@ func GenesisCurrentValidators() *EventHeap {
 			testNetworkID,                           // network ID
 			key,                                     // key paying tx fee and stake
 		)
-		heap.Push(validators, validator)
+		validators.Add(validator)
 	}
 	return validators
 }
@@ -373,6 +374,65 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	pendingSampler.Set(vm.getValidators(pendingValidators))
 	if !pendingSampler.Contains(ID) {
 		t.Fatalf("pending validator should have validator with ID %s", ID)
+	}
+}
+
+// verify invalid proposal to add validator to default subnet
+func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
+	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+	key, _ := vm.factory.NewPrivateKey()
+	ID := key.PublicKey().Address()
+
+	// create invalid tx
+	tx, err := vm.newAddDefaultSubnetValidatorTx(
+		defaultNonce+1,
+		defaultStakeAmount,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		ID,
+		ID,
+		NumberOfShares,
+		testNetworkID,
+		defaultKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blk, err := vm.newProposalBlock(vm.LastAccepted(), tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.DB.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err == nil {
+		t.Fatalf("Should have errored during verification")
+	}
+
+	if status := blk.Status(); status != choices.Rejected {
+		t.Fatalf("Should have marked the block as rejected")
+	}
+
+	parsedBlk, err := vm.GetBlock(blk.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := parsedBlk.Status(); status != choices.Rejected {
+		t.Fatalf("Should have marked the block as rejected")
 	}
 }
 
@@ -952,7 +1012,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.unissuedEvents.Push(addValidatorTx)
+	vm.unissuedEvents.Add(addValidatorTx)
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	if err != nil {
 		t.Fatal(err)
@@ -1551,8 +1611,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	advanceTimePreference := advanceTimeBlk.Options()[0]
 
+	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	vdrs := validators.NewSet()
-	vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+	vdrs.Add(validators.NewValidator(peerID, 1))
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
@@ -1597,7 +1658,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(&engine, msgChan, 1000)
+	handler.Initialize(
+		&engine,
+		msgChan,
+		1000,
+		"",
+		prometheus.NewRegistry(),
+	)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
@@ -1617,23 +1684,23 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	frontier := ids.Set{}
 	frontier.Add(advanceTimeBlkID)
-	engine.AcceptedFrontier(ctx.NodeID, *reqID, frontier)
+	engine.AcceptedFrontier(peerID, *reqID, frontier)
 
 	externalSender.GetAcceptedF = nil
-	externalSender.GetF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
 		*reqID = requestID
 		if !containerID.Equals(advanceTimeBlkID) {
 			t.Fatalf("wrong block requested")
 		}
 	}
 
-	engine.Accepted(ctx.NodeID, *reqID, frontier)
+	engine.Accepted(peerID, *reqID, frontier)
 
 	externalSender.GetF = nil
 	externalSender.CantPushQuery = false
 	externalSender.CantPullQuery = false
 
-	engine.Put(ctx.NodeID, *reqID, advanceTimeBlkID, advanceTimeBlkBytes)
+	engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes})
 
 	externalSender.CantPushQuery = true
 

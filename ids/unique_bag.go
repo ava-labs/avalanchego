@@ -62,6 +62,9 @@ func (b *UniqueBag) Difference(diff *UniqueBag) {
 // GetSet ...
 func (b *UniqueBag) GetSet(id ID) BitSet { return (*b)[*id.ID] }
 
+// RemoveSet ...
+func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id.Key()) }
+
 // List ...
 func (b *UniqueBag) List() []ID {
 	idList := []ID(nil)

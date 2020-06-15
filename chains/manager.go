@@ -38,7 +38,7 @@ import (
 
 const (
 	defaultChannelSize = 1000
-	requestTimeout     = 2 * time.Second
+	requestTimeout     = 4 * time.Second
 	gossipFrequency    = 10 * time.Second
 	shutdownTimeout    = 1 * time.Second
 )
@@ -204,6 +204,31 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		return
 	}
 
+	primaryAlias, err := m.PrimaryAlias(chain.ID)
+	if err != nil {
+		primaryAlias = chain.ID.String()
+	}
+
+	// Create the log and context of the chain
+	chainLog, err := m.logFactory.MakeChain(primaryAlias, "")
+	if err != nil {
+		m.log.Error("error while creating chain's log %s", err)
+		return
+	}
+
+	ctx := &snow.Context{
+		NetworkID:           m.networkID,
+		ChainID:             chain.ID,
+		Log:                 chainLog,
+		DecisionDispatcher:  m.decisionEvents,
+		ConsensusDispatcher: m.consensusEvents,
+		NodeID:              m.nodeID,
+		HTTP:                m.server,
+		Keystore:            m.keystore.NewBlockchainKeyStore(chain.ID),
+		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chain.ID),
+		BCLookup:            m,
+	}
+
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.vmManager.GetVMFactory(vmID)
 	if err != nil {
@@ -212,7 +237,7 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 	}
 
 	// Create the chain
-	vm, err := vmFactory.New()
+	vm, err := vmFactory.New(ctx)
 	if err != nil {
 		m.log.Error("error while creating vm: %s", err)
 		return
@@ -234,7 +259,7 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 			return
 		}
 
-		fx, err := fxFactory.New()
+		fx, err := fxFactory.New(ctx)
 		if err != nil {
 			m.log.Error("error while creating fx: %s", err)
 			return
@@ -247,31 +272,8 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		}
 	}
 
-	// Create the log and context of the chain
-	chainLog, err := m.logFactory.MakeChain(chain.ID, "")
-	if err != nil {
-		m.log.Error("error while creating chain's log %s", err)
-		return
-	}
-
-	ctx := &snow.Context{
-		NetworkID:           m.networkID,
-		ChainID:             chain.ID,
-		Log:                 chainLog,
-		DecisionDispatcher:  m.decisionEvents,
-		ConsensusDispatcher: m.consensusEvents,
-		NodeID:              m.nodeID,
-		HTTP:                m.server,
-		Keystore:            m.keystore.NewBlockchainKeyStore(chain.ID),
-		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chain.ID),
-		BCLookup:            m,
-	}
 	consensusParams := m.consensusParams
-	if alias, err := m.PrimaryAlias(ctx.ChainID); err == nil {
-		consensusParams.Namespace = fmt.Sprintf("gecko_%s", alias)
-	} else {
-		consensusParams.Namespace = fmt.Sprintf("gecko_%s", ctx.ChainID)
-	}
+	consensusParams.Namespace = fmt.Sprintf("gecko_%s", primaryAlias)
 
 	// The validators of this blockchain
 	var validators validators.Set // Validators validating this blockchain
@@ -360,8 +362,8 @@ func (m *manager) createAvalancheChain(
 	db := prefixdb.New(ctx.ChainID.Bytes(), m.db)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	vertexDB := prefixdb.New([]byte("vertex"), db)
-	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bootstrapping"), db)
-	txBootstrappingDB := prefixdb.New([]byte("tx_bootstrapping"), db)
+	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
+	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
 
 	vtxBlocker, err := queue.New(vertexBootstrappingDB)
 	if err != nil {
@@ -429,7 +431,13 @@ func (m *manager) createAvalancheChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(&engine, msgChan, defaultChannelSize)
+	handler.Initialize(
+		&engine,
+		msgChan,
+		defaultChannelSize,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
 
 	// Allows messages to be routed to the new chain
 	m.chainRouter.AddChain(handler)
@@ -465,7 +473,7 @@ func (m *manager) createSnowmanChain(
 
 	db := prefixdb.New(ctx.ChainID.Bytes(), m.db)
 	vmDB := prefixdb.New([]byte("vm"), db)
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), db)
+	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
 	blocked, err := queue.New(bootstrappingDB)
 	if err != nil {
@@ -515,7 +523,13 @@ func (m *manager) createSnowmanChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	handler.Initialize(&engine, msgChan, defaultChannelSize)
+	handler.Initialize(
+		&engine,
+		msgChan,
+		defaultChannelSize,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
 
 	// Allow incoming messages to be routed to the new chain
 	m.chainRouter.AddChain(handler)

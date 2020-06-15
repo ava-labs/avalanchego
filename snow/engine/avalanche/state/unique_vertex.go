@@ -121,6 +121,12 @@ func (vtx *uniqueVertex) Parents() []avalanche.Vertex {
 	return vtx.v.parents
 }
 
+func (vtx *uniqueVertex) Height() uint64 {
+	vtx.refresh()
+
+	return vtx.v.vtx.height
+}
+
 func (vtx *uniqueVertex) Txs() []snowstorm.Tx {
 	vtx.refresh()
 

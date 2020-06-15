@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"time"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -38,6 +38,9 @@ const (
 	chainsTypeID
 	blockTypeID
 	subnetsTypeID
+
+	platformAlias = "P"
+	addressSep    = "-"
 
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
@@ -98,6 +101,8 @@ var (
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
+	errInvalidAddress           = errors.New("invalid address")
+	errEmptyAddress             = errors.New("empty address")
 )
 
 // Codec does serialization and deserialization
@@ -399,6 +404,12 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 	vm.chainManager.CreateChain(chainParams)
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
@@ -686,7 +697,7 @@ func (vm *VM) resetTimer() {
 			vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
-		// If the tx doesn't meet the syncrony bound, drop it
+		// If the tx doesn't meet the synchrony bound, drop it
 		vm.unissuedEvents.Remove()
 		vm.Ctx.Log.Debug("dropping tx to add validator because its start time has passed")
 	}
@@ -768,8 +779,8 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 		if timestamp.Before(nextTx.StartTime()) {
 			break
 		}
-		heap.Push(current, nextTx)
-		heap.Pop(pending)
+		current.Add(nextTx)
+		pending.Remove()
 		started.Add(nextTx.Vdr().ID())
 	}
 	return current, pending, started, stopped, nil
@@ -853,4 +864,20 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 		utxos = append(utxos, utxo)
 	}
 	return utxos, nil
+}
+
+// ParseAddress ...
+func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
+	cb58 := formatting.CB58{}
+	err := cb58.FromString(addrStr)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return ids.ToShortID(cb58.Bytes)
+}
+
+// FormatAddress ...
+// Assumes addrID is not empty
+func (vm *VM) FormatAddress(addrID ids.ShortID) string {
+	return addrID.String()
 }
