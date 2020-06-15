@@ -120,7 +120,7 @@ func (n *Node) initNetworking() error {
 	dialer := network.NewDialer(TCP)
 
 	var serverUpgrader, clientUpgrader network.Upgrader
-	if n.Config.EnableStaking {
+	if n.Config.EnableP2PTLS {
 		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
 		if err != nil {
 			return err
@@ -254,7 +254,7 @@ func (n *Node) initDatabase() error {
 // Otherwise, it is a hash of the TLS certificate that this node
 // uses for P2P communication
 func (n *Node) initNodeID() error {
-	if !n.Config.EnableStaking {
+	if !n.Config.EnableP2PTLS {
 		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil

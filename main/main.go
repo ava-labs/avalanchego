@@ -45,7 +45,10 @@ func main() {
 	}
 
 	// Track if sybil control is enforced
-	if !Config.EnableStaking {
+	if !Config.EnableStaking && Config.EnableP2PTLS {
+		log.Warn("Staking is disabled. Sybil control is not enforced.")
+	}
+	if !Config.EnableStaking && !Config.EnableP2PTLS {
 		log.Warn("Staking and p2p encryption are disabled. Packet spoofing is possible.")
 	}
 
