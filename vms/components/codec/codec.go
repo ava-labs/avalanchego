@@ -19,7 +19,7 @@ const (
 	// initial capacity of byte slice that values are marshaled into.
 	// Larger value --> need less memory allocations but possibly have allocated but unused memory
 	// Smaller value --> need more memory allocations but more efficient use of allocated memory
-	initialSliceCap = 2048
+	initialSliceCap = 1024
 )
 
 var (
