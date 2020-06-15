@@ -35,7 +35,7 @@ const (
 	batchSize      = 30
 	stateCacheSize = 10000
 	idCacheSize    = 10000
-	txCacheSize    = 10000
+	txCacheSize    = 100000
 	addressSep     = "-"
 )
 
@@ -45,6 +45,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
+	errBootstrapping             = errors.New("chain is currently bootstrapping")
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -66,6 +67,9 @@ type VM struct {
 
 	// State management
 	state *prefixedState
+
+	// Set to true once this VM is marked as `Bootstrapped` by the engine
+	bootstrapped bool
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -171,7 +175,6 @@ func (vm *VM) Initialize(
 		tx:       &cache.LRU{Size: idCacheSize},
 		utxo:     &cache.LRU{Size: idCacheSize},
 		txStatus: &cache.LRU{Size: idCacheSize},
-		funds:    &cache.LRU{Size: idCacheSize},
 
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
@@ -198,10 +201,33 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
+// Bootstrapping is called by the consensus engine when it starts bootstrapping
+// this chain
+func (vm *VM) Bootstrapping() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapping(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Bootstrapped is called by the consensus engine when it is done bootstrapping
+// this chain
+func (vm *VM) Bootstrapped() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapped(); err != nil {
+			return err
+		}
+	}
+	vm.bootstrapped = true
+	return nil
+}
+
 // Shutdown implements the avalanche.DAGVM interface
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
-		return
+		return nil
 	}
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
@@ -210,9 +236,7 @@ func (vm *VM) Shutdown() {
 	vm.timer.Stop()
 	vm.ctx.Lock.Lock()
 
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
-	}
+	return vm.baseDB.Close()
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
@@ -275,6 +299,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
 func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
+	if !vm.bootstrapped {
+		return ids.ID{}, errBootstrapping
+	}
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err

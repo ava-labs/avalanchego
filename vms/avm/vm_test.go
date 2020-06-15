@@ -178,6 +178,14 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	}
 	vm.batchTimeout = 0
 
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
 	return genesisBytes, issuer, vm
 }
 
@@ -678,6 +686,16 @@ func TestIssueNFT(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	createAssetTx := &Tx{UnsignedTx: &CreateAssetTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
@@ -840,6 +858,16 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	createAssetTx := &Tx{UnsignedTx: &CreateAssetTx{
 		BaseTx: BaseTx{

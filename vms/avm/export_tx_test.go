@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
@@ -150,6 +151,16 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	key := keys[0]
 
 	tx := &Tx{UnsignedTx: &ExportTx{
@@ -245,6 +256,16 @@ func TestIssueExportTx(t *testing.T) {
 	if _, err := state.AVMUTXO(utxoID); err != nil {
 		t.Fatal(err)
 	}
+
+	addrID := ids.NewID(hashing.ComputeHash256Array(key.PublicKey().Address().Bytes()))
+
+	utxoIDs, err := state.AVMFunds(addrID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(utxoIDs) != 1 {
+		t.Fatalf("wrong number of utxoIDs %d", len(utxoIDs))
+	}
 }
 
 // Test force accepting an import transaction.
@@ -285,6 +306,16 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	key := keys[0]
 

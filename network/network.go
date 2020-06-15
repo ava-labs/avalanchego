@@ -21,24 +21,28 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/random"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/version"
 )
 
+// reasonable default values
 const (
-	defaultInitialReconnectDelay               = time.Second
-	defaultMaxReconnectDelay                   = time.Hour
-	defaultMaxMessageSize               uint32 = 1 << 21
-	defaultSendQueueSize                       = 1 << 10
-	defaultMaxClockDifference                  = time.Minute
-	defaultPeerListGossipSpacing               = time.Minute
-	defaultPeerListGossipSize                  = 100
-	defaultPeerListStakerGossipFraction        = 2
-	defaultGetVersionTimeout                   = 2 * time.Second
-	defaultAllowPrivateIPs                     = true
-	defaultGossipSize                          = 50
+	defaultInitialReconnectDelay                     = time.Second
+	defaultMaxReconnectDelay                         = time.Hour
+	DefaultMaxMessageSize                     uint32 = 1 << 21
+	defaultSendQueueSize                             = 1 << 10
+	defaultMaxNetworkPendingSendBytes                = 1 << 29 // 512MB
+	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
+	defaultMaxClockDifference                        = time.Minute
+	defaultPeerListGossipSpacing                     = time.Minute
+	defaultPeerListGossipSize                        = 100
+	defaultPeerListStakerGossipFraction              = 2
+	defaultGetVersionTimeout                         = 2 * time.Second
+	defaultAllowPrivateIPs                           = true
+	defaultGossipSize                                = 50
 )
 
 // Network defines the functionality of the networking library.
@@ -70,9 +74,9 @@ type Network interface {
 	// The handler will initially be called with this local node's ID.
 	RegisterHandler(h Handler)
 
-	// Returns the IPs of nodes this network is currently connected to
-	// externally. Thread safety must be managed internally to the network.
-	IPs() []utils.IPDesc
+	// Returns the description of the nodes this network is currently connected
+	// to externally. Thread safety must be managed internally to the network.
+	Peers() []PeerID
 
 	// Close this network and all existing connections it has. Thread safety
 	// must be managed internally to the network. Calling close multiple times
@@ -102,26 +106,30 @@ type network struct {
 	clock         timer.Clock
 	lastHeartbeat int64
 
-	initialReconnectDelay        time.Duration
-	maxReconnectDelay            time.Duration
-	maxMessageSize               uint32
-	sendQueueSize                int
-	maxClockDifference           time.Duration
-	peerListGossipSpacing        time.Duration
-	peerListGossipSize           int
-	peerListStakerGossipFraction int
-	getVersionTimeout            time.Duration
-	allowPrivateIPs              bool
-	gossipSize                   int
+	initialReconnectDelay              time.Duration
+	maxReconnectDelay                  time.Duration
+	maxMessageSize                     uint32
+	sendQueueSize                      int
+	maxNetworkPendingSendBytes         int
+	networkPendingSendBytesToRateLimit int
+	maxClockDifference                 time.Duration
+	peerListGossipSpacing              time.Duration
+	peerListGossipSize                 int
+	peerListStakerGossipFraction       int
+	getVersionTimeout                  time.Duration
+	allowPrivateIPs                    bool
+	gossipSize                         int
 
 	executor timer.Executor
 
 	b Builder
 
 	stateLock       sync.Mutex
+	pendingBytes    int
 	closed          bool
 	disconnectedIPs map[string]struct{}
 	connectedIPs    map[string]struct{}
+	retryDelay      map[string]time.Duration
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs    map[string]struct{} // set of IPs that resulted in my ID.
 	peers    map[[20]byte]*peer
@@ -161,8 +169,10 @@ func NewDefaultNetwork(
 		router,
 		defaultInitialReconnectDelay,
 		defaultMaxReconnectDelay,
-		defaultMaxMessageSize,
+		DefaultMaxMessageSize,
 		defaultSendQueueSize,
+		defaultMaxNetworkPendingSendBytes,
+		defaultNetworkPendingSendBytesToRateLimit,
 		defaultMaxClockDifference,
 		defaultPeerListGossipSpacing,
 		defaultPeerListGossipSize,
@@ -192,6 +202,8 @@ func NewNetwork(
 	maxReconnectDelay time.Duration,
 	maxMessageSize uint32,
 	sendQueueSize int,
+	maxNetworkPendingSendBytes int,
+	networkPendingSendBytesToRateLimit int,
 	maxClockDifference time.Duration,
 	peerListGossipSpacing time.Duration,
 	peerListGossipSize int,
@@ -201,34 +213,37 @@ func NewNetwork(
 	gossipSize int,
 ) Network {
 	net := &network{
-		log:                          log,
-		id:                           id,
-		ip:                           ip,
-		networkID:                    networkID,
-		version:                      version,
-		parser:                       parser,
-		listener:                     listener,
-		dialer:                       dialer,
-		serverUpgrader:               serverUpgrader,
-		clientUpgrader:               clientUpgrader,
-		vdrs:                         vdrs,
-		router:                       router,
-		nodeID:                       rand.Uint32(),
-		initialReconnectDelay:        initialReconnectDelay,
-		maxReconnectDelay:            maxReconnectDelay,
-		maxMessageSize:               maxMessageSize,
-		sendQueueSize:                sendQueueSize,
-		maxClockDifference:           maxClockDifference,
-		peerListGossipSpacing:        peerListGossipSpacing,
-		peerListGossipSize:           peerListGossipSize,
-		peerListStakerGossipFraction: peerListStakerGossipFraction,
-		getVersionTimeout:            getVersionTimeout,
-		allowPrivateIPs:              allowPrivateIPs,
-		gossipSize:                   gossipSize,
+		log:                                log,
+		id:                                 id,
+		ip:                                 ip,
+		networkID:                          networkID,
+		version:                            version,
+		parser:                             parser,
+		listener:                           listener,
+		dialer:                             dialer,
+		serverUpgrader:                     serverUpgrader,
+		clientUpgrader:                     clientUpgrader,
+		vdrs:                               vdrs,
+		router:                             router,
+		nodeID:                             rand.Uint32(),
+		initialReconnectDelay:              initialReconnectDelay,
+		maxReconnectDelay:                  maxReconnectDelay,
+		maxMessageSize:                     maxMessageSize,
+		sendQueueSize:                      sendQueueSize,
+		maxNetworkPendingSendBytes:         maxNetworkPendingSendBytes,
+		networkPendingSendBytesToRateLimit: networkPendingSendBytesToRateLimit,
+		maxClockDifference:                 maxClockDifference,
+		peerListGossipSpacing:              peerListGossipSpacing,
+		peerListGossipSize:                 peerListGossipSize,
+		peerListStakerGossipFraction:       peerListStakerGossipFraction,
+		getVersionTimeout:                  getVersionTimeout,
+		allowPrivateIPs:                    allowPrivateIPs,
+		gossipSize:                         gossipSize,
 
 		disconnectedIPs: make(map[string]struct{}),
 		connectedIPs:    make(map[string]struct{}),
-		myIPs:           map[string]struct{}{ip.String(): struct{}{}},
+		retryDelay:      make(map[string]time.Duration),
+		myIPs:           map[string]struct{}{ip.String(): {}},
 		peers:           make(map[[20]byte]*peer),
 	}
 	net.initialize(registerer)
@@ -264,8 +279,11 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
 	if err != nil {
-		n.log.Error("attempted to pack too large of an AcceptedFrontier message.\nNumber of containerIDs: %d",
-			containerIDs.Len())
+		n.log.Error("failed to build AcceptedFrontier(%s, %d, %s): %s",
+			chainID,
+			requestID,
+			containerIDs,
+			err)
 		return // Packing message failed
 	}
 
@@ -277,7 +295,11 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 		sent = peer.send(msg)
 	}
 	if !sent {
-		n.log.Debug("failed to send an AcceptedFrontier message to: %s", validatorID)
+		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
+			validatorID,
+			chainID,
+			requestID,
+			containerIDs)
 		n.acceptedFrontier.numFailed.Inc()
 	} else {
 		n.acceptedFrontier.numSent.Inc()
@@ -288,6 +310,11 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	msg, err := n.b.GetAccepted(chainID, requestID, containerIDs)
 	if err != nil {
+		n.log.Error("failed to build GetAccepted(%s, %d, %s): %s",
+			chainID,
+			requestID,
+			containerIDs,
+			err)
 		for _, validatorID := range validatorIDs.List() {
 			vID := validatorID
 			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
@@ -305,6 +332,11 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 			sent = peer.send(msg)
 		}
 		if !sent {
+			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
+				validatorID,
+				chainID,
+				requestID,
+				containerIDs)
 			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
 			n.getAccepted.numFailed.Inc()
 		} else {
@@ -317,8 +349,11 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
 	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
 	if err != nil {
-		n.log.Error("attempted to pack too large of an Accepted message.\nNumber of containerIDs: %d",
-			containerIDs.Len())
+		n.log.Error("failed to build Accepted(%s, %d, %s): %s",
+			chainID,
+			requestID,
+			containerIDs,
+			err)
 		return // Packing message failed
 	}
 
@@ -330,10 +365,69 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		sent = peer.send(msg)
 	}
 	if !sent {
-		n.log.Debug("failed to send an Accepted message to: %s", validatorID)
+		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
+			validatorID,
+			chainID,
+			requestID,
+			containerIDs)
 		n.accepted.numFailed.Inc()
 	} else {
 		n.accepted.numSent.Inc()
+	}
+}
+
+// GetAncestors implements the Sender interface.
+func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
+	msg, err := n.b.GetAncestors(chainID, requestID, containerID)
+	if err != nil {
+		n.log.Error("failed to build GetAncestors message: %w", err)
+		return
+	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		sent = peer.send(msg)
+	}
+	if !sent {
+		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
+			validatorID,
+			chainID,
+			requestID,
+			containerID)
+		n.executor.Add(func() { n.router.GetAncestorsFailed(validatorID, chainID, requestID) })
+		n.getAncestors.numFailed.Inc()
+	} else {
+		n.getAncestors.numSent.Inc()
+	}
+}
+
+// MultiPut implements the Sender interface.
+func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+	msg, err := n.b.MultiPut(chainID, requestID, containers)
+	if err != nil {
+		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
+		return
+	}
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		sent = peer.send(msg)
+	}
+	if !sent {
+		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
+			validatorID,
+			chainID,
+			requestID,
+			len(containers))
+		n.multiPut.numFailed.Inc()
+	} else {
+		n.multiPut.numSent.Inc()
 	}
 }
 
@@ -350,7 +444,12 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 		sent = peer.send(msg)
 	}
 	if !sent {
-		n.log.Debug("failed to send a Get message to: %s", validatorID)
+		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
+			validatorID,
+			chainID,
+			requestID,
+			containerID)
+		n.executor.Add(func() { n.router.GetFailed(validatorID, chainID, requestID) })
 		n.get.numFailed.Inc()
 	} else {
 		n.get.numSent.Inc()
@@ -361,7 +460,12 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	msg, err := n.b.Put(chainID, requestID, containerID, container)
 	if err != nil {
-		n.log.Error("failed to build Put message because of container of size %d", len(container))
+		n.log.Error("failed to build Put(%s, %d, %s): %s. len(container) : %d",
+			chainID,
+			requestID,
+			containerID,
+			err,
+			len(container))
 		return
 	}
 
@@ -373,7 +477,12 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 		sent = peer.send(msg)
 	}
 	if !sent {
-		n.log.Debug("failed to send a Put message to: %s", validatorID)
+		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
+			validatorID,
+			chainID,
+			requestID,
+			containerID)
+		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 		n.put.numFailed.Inc()
 	} else {
 		n.put.numSent.Inc()
@@ -384,11 +493,17 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	msg, err := n.b.PushQuery(chainID, requestID, containerID, container)
 	if err != nil {
+		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
+			chainID,
+			requestID,
+			containerID,
+			err,
+			len(container))
+		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 		for _, validatorID := range validatorIDs.List() {
 			vID := validatorID
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 		}
-		n.log.Error("attempted to pack too large of a PushQuery message.\nContainer length: %d", len(container))
 		return // Packing message failed
 	}
 
@@ -402,7 +517,12 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			sent = peer.send(msg)
 		}
 		if !sent {
-			n.log.Debug("failed sending a PushQuery message to: %s", vID)
+			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
+				validatorID,
+				chainID,
+				requestID,
+				containerID)
+			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 			n.pushQuery.numFailed.Inc()
 		} else {
@@ -426,7 +546,11 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			sent = peer.send(msg)
 		}
 		if !sent {
-			n.log.Debug("failed sending a PullQuery message to: %s", vID)
+			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
+				validatorID,
+				chainID,
+				requestID,
+				containerID)
 			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 			n.pullQuery.numFailed.Inc()
 		} else {
@@ -439,7 +563,11 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
 	msg, err := n.b.Chits(chainID, requestID, votes)
 	if err != nil {
-		n.log.Error("failed to build Chits message because of %d votes", votes.Len())
+		n.log.Error("failed to build Chits(%s, %d, %s): %s",
+			chainID,
+			requestID,
+			votes,
+			err)
 		return
 	}
 
@@ -451,7 +579,11 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 		sent = peer.send(msg)
 	}
 	if !sent {
-		n.log.Debug("failed to send a Chits message to: %s", validatorID)
+		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
+			validatorID,
+			chainID,
+			requestID,
+			votes)
 		n.chits.numFailed.Inc()
 	} else {
 		n.chits.numSent.Inc()
@@ -461,7 +593,8 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 // Gossip attempts to gossip the container to the network
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 	if err := n.gossipContainer(chainID, containerID, container); err != nil {
-		n.log.Error("error gossiping container %s to %s: %s", containerID, chainID, err)
+		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
+		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
 }
 
@@ -483,7 +616,15 @@ func (n *network) Dispatch() error {
 	for {
 		conn, err := n.listener.Accept()
 		if err != nil {
-			return err
+			n.stateLock.Lock()
+			closed := n.closed
+			n.stateLock.Unlock()
+
+			if closed {
+				return err
+			}
+			n.log.Debug("error during server accept: %s", err)
+			continue
 		}
 		go n.upgrade(&peer{
 			net:  n,
@@ -511,17 +652,24 @@ func (n *network) RegisterHandler(h Handler) {
 }
 
 // IPs implements the Network interface
-func (n *network) IPs() []utils.IPDesc {
+func (n *network) Peers() []PeerID {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	ips := []utils.IPDesc(nil)
+	peers := []PeerID{}
 	for _, peer := range n.peers {
 		if peer.connected {
-			ips = append(ips, peer.ip)
+			peers = append(peers, PeerID{
+				IP:           peer.conn.RemoteAddr().String(),
+				PublicIP:     peer.ip.String(),
+				ID:           peer.id,
+				Version:      peer.versionStr,
+				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
+				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
+			})
 		}
 	}
-	return ips
+	return peers
 }
 
 // Close implements the Network interface
@@ -620,7 +768,9 @@ func (n *network) gossip() {
 		}
 		msg, err := n.b.PeerList(ips)
 		if err != nil {
-			n.log.Warn("failed to gossip PeerList message due to %s", err)
+			n.log.Error("failed to build peer list to gossip: %s. len(ips): %d",
+				err,
+				len(ips))
 			continue
 		}
 
@@ -666,15 +816,28 @@ func (n *network) gossip() {
 // the network is closed
 func (n *network) connectTo(ip utils.IPDesc) {
 	str := ip.String()
-	delay := n.initialReconnectDelay
+	n.stateLock.Lock()
+	delay := n.retryDelay[str]
+	n.stateLock.Unlock()
+
 	for {
+		time.Sleep(delay)
+
+		if delay == 0 {
+			delay = n.initialReconnectDelay
+		}
+
+		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
+		if delay > n.maxReconnectDelay {
+			// set the timeout to [.75, 1) * maxReconnectDelay
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
+		}
+
 		n.stateLock.Lock()
 		_, isDisconnected := n.disconnectedIPs[str]
 		_, isConnected := n.connectedIPs[str]
 		_, isMyself := n.myIPs[str]
 		closed := n.closed
-
-		n.stateLock.Unlock()
 
 		if !isDisconnected || isConnected || isMyself || closed {
 			// If the IP was discovered by the peer connecting to us, we don't
@@ -685,8 +848,12 @@ func (n *network) connectTo(ip utils.IPDesc) {
 
 			// If the network was closed, we should stop attempting to connect
 			// to the peer
+
+			n.stateLock.Unlock()
 			return
 		}
+		n.retryDelay[str] = delay
+		n.stateLock.Unlock()
 
 		err := n.attemptConnect(ip)
 		if err == nil {
@@ -694,12 +861,6 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		}
 		n.log.Verbo("error attempting to connect to %s: %s. Reattempting in %s",
 			ip, err, delay)
-
-		time.Sleep(delay)
-		delay *= 2
-		if delay > n.maxReconnectDelay {
-			delay = n.maxReconnectDelay
-		}
 	}
 }
 
@@ -737,6 +898,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	defer n.stateLock.Unlock()
 
 	if n.closed {
+		p.conn.Close()
 		return nil
 	}
 
@@ -752,6 +914,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			}
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
+			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
 		p.conn.Close()
@@ -760,7 +923,9 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 
 	if _, ok := n.peers[key]; ok {
 		if !p.ip.IsZero() {
-			delete(n.disconnectedIPs, p.ip.String())
+			str := p.ip.String()
+			delete(n.disconnectedIPs, str)
+			delete(n.retryDelay, str)
 		}
 		p.conn.Close()
 		return nil
@@ -798,6 +963,7 @@ func (n *network) connected(p *peer) {
 		str := p.ip.String()
 
 		delete(n.disconnectedIPs, str)
+		delete(n.retryDelay, str)
 		n.connectedIPs[str] = struct{}{}
 	}
 

@@ -55,7 +55,8 @@ const (
 var (
 	genesisHashKey = []byte("genesisID")
 
-	nodeVersion   = version.NewDefaultVersion("avalanche", 0, 3, 0)
+	// Version is the version of this code
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 5)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -118,7 +119,7 @@ func (n *Node) initNetworking() error {
 	dialer := network.NewDialer(TCP)
 
 	var serverUpgrader, clientUpgrader network.Upgrader
-	if n.Config.EnableStaking {
+	if n.Config.EnableP2PTLS {
 		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
 		if err != nil {
 			return err
@@ -156,7 +157,7 @@ func (n *Node) initNetworking() error {
 		n.ID,
 		n.Config.StakingIP,
 		n.Config.NetworkID,
-		nodeVersion,
+		Version,
 		versionParser,
 		listener,
 		dialer,
@@ -195,7 +196,7 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 
 // Dispatch starts the node's servers.
 // Returns when the node exits.
-func (n *Node) Dispatch() {
+func (n *Node) Dispatch() error {
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
@@ -205,7 +206,7 @@ func (n *Node) Dispatch() {
 		}
 	}
 
-	n.Net.Dispatch()
+	return n.Net.Dispatch()
 }
 
 /*
@@ -252,7 +253,7 @@ func (n *Node) initDatabase() error {
 // Otherwise, it is a hash of the TLS certificate that this node
 // uses for P2P communication
 func (n *Node) initNodeID() error {
-	if !n.Config.EnableStaking {
+	if !n.Config.EnableP2PTLS {
 		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
 		return nil
@@ -460,7 +461,7 @@ func (n *Node) initMetricsAPI() {
 func (n *Node) initAdminAPI() {
 	if n.Config.AdminAPIEnabled {
 		n.Log.Info("initializing Admin API")
-		service := admin.NewService(n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
+		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
 		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 	}
 }
@@ -525,6 +526,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = Config
+	n.Log.Info("Gecko version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {
@@ -575,4 +577,5 @@ func (n *Node) Shutdown() {
 	n.Net.Close()
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
+	n.Log.Info("node shut down successfully")
 }

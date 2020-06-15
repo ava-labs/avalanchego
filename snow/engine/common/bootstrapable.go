@@ -16,6 +16,7 @@ type Bootstrapable interface {
 	// Returns the subset of containerIDs that are accepted by this chain.
 	FilterAccepted(containerIDs ids.Set) (acceptedContainerIDs ids.Set)
 
-	// Force the provided containers to be accepted.
-	ForceAccepted(acceptedContainerIDs ids.Set)
+	// Force the provided containers to be accepted. Only returns fatal errors
+	// if they occur.
+	ForceAccepted(acceptedContainerIDs ids.Set) error
 }

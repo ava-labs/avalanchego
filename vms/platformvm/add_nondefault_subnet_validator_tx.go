@@ -77,39 +77,39 @@ func (tx *addNonDefaultSubnetValidatorTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]
-func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
+func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() TxError {
 	switch {
 	case tx == nil:
-		return errNilTx
+		return tempError{errNilTx}
 	case !tx.senderID.IsZero():
 		return nil // Only verify the transaction once
 	case tx.id.IsZero():
-		return errInvalidID
+		return tempError{errInvalidID}
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
-		return errWrongNetworkID
+		return permError{errWrongNetworkID}
 	case tx.NodeID.IsZero():
-		return errInvalidID
+		return tempError{errInvalidID}
 	case tx.Subnet.IsZero():
-		return errInvalidID
+		return tempError{errInvalidID}
 	case tx.Wght == 0: // Ensure the validator has some weight
-		return errWeightTooSmall
+		return permError{errWeightTooSmall}
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
-		return errSigsNotSorted
+		return permError{errSigsNotSorted}
 	}
 
 	// Ensure staking length is not too short or long
 	stakingDuration := tx.Duration()
 	if stakingDuration < MinimumStakingDuration {
-		return errStakeTooShort
+		return permError{errStakeTooShort}
 	} else if stakingDuration > MaximumStakingDuration {
-		return errStakeTooLong
+		return permError{errStakeTooLong}
 	}
 
 	// Byte representation of the unsigned transaction
 	unsignedIntf := interface{}(&tx.UnsignedAddNonDefaultSubnetValidatorTx)
 	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
-		return err
+		return permError{err}
 	}
 	unsignedBytesHash := hashing.ComputeHash256(unsignedBytes)
 
@@ -118,7 +118,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	for i, sig := range tx.ControlSigs {
 		key, err := tx.vm.factory.RecoverHashPublicKey(unsignedBytesHash, sig[:])
 		if err != nil {
-			return err
+			return permError{err}
 		}
 		tx.controlIDs[i] = key.Address()
 	}
@@ -126,7 +126,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	// get account to pay tx fee from
 	key, err := tx.vm.factory.RecoverHashPublicKey(unsignedBytesHash, tx.PayerSig[:])
 	if err != nil {
-		return err
+		return permError{err}
 	}
 	tx.senderID = key.Address()
 
@@ -149,7 +149,7 @@ func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*addDefaultSubnetVal
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), error) {
+func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	// Ensure tx is syntactically valid
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, err
@@ -158,7 +158,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	// Get info about the subnet we're adding a validator to
 	subnets, err := tx.vm.getSubnets(db)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	var subnet *CreateSubnetTx
 	for _, sn := range subnets {
@@ -168,22 +168,22 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 		}
 	}
 	if subnet == nil {
-		return nil, nil, nil, nil, fmt.Errorf("there is no subnet with ID %s", tx.SubnetID())
+		return nil, nil, nil, nil, permError{fmt.Errorf("there is no subnet with ID %s", tx.SubnetID())}
 	}
 
 	// Ensure the sigs on [tx] are valid
 	if len(tx.ControlSigs) != int(subnet.Threshold) {
-		return nil, nil, nil, nil, fmt.Errorf("expected tx to have %d control sigs but has %d", subnet.Threshold, len(tx.ControlSigs))
+		return nil, nil, nil, nil, permError{fmt.Errorf("expected tx to have %d control sigs but has %d", subnet.Threshold, len(tx.ControlSigs))}
 	}
 	if !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs) {
-		return nil, nil, nil, nil, errors.New("control signatures aren't sorted")
+		return nil, nil, nil, nil, permError{errors.New("control signatures aren't sorted")}
 	}
 
 	controlKeys := ids.ShortSet{}
 	controlKeys.Add(subnet.ControlKeys...)
 	for _, controlID := range tx.controlIDs {
 		if !controlKeys.Contains(controlID) {
-			return nil, nil, nil, nil, errors.New("tx has control signature from key not in subnet's ControlKeys")
+			return nil, nil, nil, nil, permError{errors.New("tx has control signature from key not in subnet's ControlKeys")}
 		}
 	}
 
@@ -191,46 +191,46 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	// First, see if they're currently validating the default subnet
 	currentDSValidators, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("couldn't get current validators of default subnet: %v", err)
+		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
 	}
 
 	if dsValidator, err := currentDSValidators.getDefaultSubnetStaker(tx.NodeID); err == nil {
 		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
 			return nil, nil, nil, nil,
-				fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
+				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
 					tx.DurationValidator.StartTime(), tx.DurationValidator.EndTime(),
-					dsValidator.StartTime(), dsValidator.EndTime())
+					dsValidator.StartTime(), dsValidator.EndTime())}
 		}
 	} else {
 		// They aren't currently validating the default subnet.
 		// See if they will validate the default subnet in the future.
 		pendingDSValidators, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("couldn't get pending validators of default subnet: %v", err)
+			return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
 		}
 		dsValidator, err := pendingDSValidators.getDefaultSubnetStaker(tx.NodeID)
 		if err != nil {
 			return nil, nil, nil, nil,
-				fmt.Errorf("validator would not be validating default subnet while validating non-default subnet")
+				permError{fmt.Errorf("validator would not be validating default subnet while validating non-default subnet")}
 		}
 		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
 			return nil, nil, nil, nil,
-				fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
+				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
 					tx.DurationValidator.StartTime(), tx.DurationValidator.EndTime(),
-					dsValidator.StartTime(), dsValidator.EndTime())
+					dsValidator.StartTime(), dsValidator.EndTime())}
 		}
 	}
 
 	// Ensure the proposed validator starts after the current timestamp
 	currentTimestamp, err := tx.vm.getTimestamp(db)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("couldn't get current timestamp: %v", err)
+		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current timestamp: %v", err)}
 	}
 	validatorStartTime := tx.StartTime()
 	if !currentTimestamp.Before(validatorStartTime) {
-		return nil, nil, nil, nil, fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
+		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,
-			validatorStartTime)
+			validatorStartTime)}
 	}
 
 	// Get the account that is paying the transaction fee and, if the proposal is to add a validator
@@ -239,42 +239,40 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	accountID := tx.senderID
 	account, err := tx.vm.getAccount(db, accountID)
 	if err != nil {
-		return nil, nil, nil, nil, errDBAccount
+		return nil, nil, nil, nil, permError{errDBAccount}
 	}
 
 	// The account if this block's proposal is committed and the validator is added
 	// to the pending validator set. (Increase the account's nonce; decrease its balance.)
 	newAccount, err := account.Remove(0, tx.Nonce) // Remove also removes the fee
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
 	currentEvents, err := tx.vm.getCurrentValidators(db, tx.Subnet)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("couldn't get current validators of subnet %s: %v", tx.Subnet, err)
+		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of subnet %s: %v", tx.Subnet, err)}
 	}
 	currentValidators := validators.NewSet()
 	currentValidators.Set(tx.vm.getValidators(currentEvents))
 	if currentValidators.Contains(tx.NodeID) {
-		return nil, nil, nil, nil, fmt.Errorf("validator with ID %s already in the current validator set for subnet with ID %s",
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the current validator set for subnet with ID %s",
 			tx.NodeID,
-			tx.Subnet,
-		)
+			tx.Subnet)}
 	}
 
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
 	pendingEvents, err := tx.vm.getPendingValidators(db, tx.Subnet)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("couldn't get pending validators of subnet %s: %v", tx.Subnet, err)
+		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of subnet %s: %v", tx.Subnet, err)}
 	}
 	pendingValidators := validators.NewSet()
 	pendingValidators.Set(tx.vm.getValidators(pendingEvents))
 	if pendingValidators.Contains(tx.NodeID) {
-		return nil, nil, nil, nil, fmt.Errorf("validator with ID %s already in the pending validator set for subnet with ID %s",
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the pending validator set for subnet with ID %s",
 			tx.NodeID,
-			tx.Subnet,
-		)
+			tx.Subnet)}
 	}
 
 	pendingEvents.Add(tx) // add validator to set of pending validators
@@ -283,10 +281,10 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	// update the validator's account by removing the staked $AVA
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, tx.Subnet); err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("couldn't put current validators: %v", err)
+		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't put current validators: %v", err)}
 	}
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("couldn't put account: %v", err)
+		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't put account: %v", err)}
 	}
 
 	// If this proposal is aborted, chain state doesn't change

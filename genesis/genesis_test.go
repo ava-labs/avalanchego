@@ -17,11 +17,14 @@ func TestNetworkName(t *testing.T) {
 	if name := NetworkName(MainnetID); name != MainnetName {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, MainnetName)
 	}
-	if name := NetworkName(TestnetID); name != CascadeName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, CascadeName)
-	}
 	if name := NetworkName(CascadeID); name != CascadeName {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, CascadeName)
+	}
+	if name := NetworkName(DenaliID); name != DenaliName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, DenaliName)
+	}
+	if name := NetworkName(TestnetID); name != DenaliName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, DenaliName)
 	}
 	if name := NetworkName(4294967295); name != "network-4294967295" {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, "network-4294967295")
@@ -37,23 +40,39 @@ func TestNetworkID(t *testing.T) {
 		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", MainnetID, id)
 	}
 
-	id, err = NetworkID(TestnetName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != TestnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
-	}
-
 	id, err = NetworkID(CascadeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != TestnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
+	if id != CascadeID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", CascadeID, id)
 	}
 
 	id, err = NetworkID("cAsCaDe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != CascadeID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", CascadeID, id)
+	}
+
+	id, err = NetworkID(DenaliName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != DenaliID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", DenaliID, id)
+	}
+
+	id, err = NetworkID("dEnAlI")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != DenaliID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", DenaliID, id)
+	}
+
+	id, err = NetworkID(TestnetName)
 	if err != nil {
 		t.Fatal(err)
 	}
