@@ -5,6 +5,7 @@ package codec
 
 import (
 	"bytes"
+	"math"
 	"reflect"
 	"testing"
 )
@@ -104,36 +105,8 @@ func TestStruct(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(myStructUnmarshaled.Member1, myStructInstance.Member1) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !bytes.Equal(myStructUnmarshaled.MySlice, myStructInstance.MySlice) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice2, myStructInstance.MySlice2) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice3, myStructInstance.MySlice3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice3, myStructInstance.MySlice3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice4, myStructInstance.MySlice4) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.InnerStruct, myStructInstance.InnerStruct) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.InnerStruct2, myStructInstance.InnerStruct2) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyArray2, myStructInstance.MyArray2) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyArray3, myStructInstance.MyArray3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyArray4, myStructInstance.MyArray4) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyInterface, myStructInstance.MyInterface) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice5, myStructInstance.MySlice5) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.InnerStruct3, myStructInstance.InnerStruct3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyPointer, myStructInstance.MyPointer) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
+	if !reflect.DeepEqual(*myStructUnmarshaled, myStructInstance) {
+		t.Fatal("should be same")
 	}
 }
 
@@ -173,6 +146,28 @@ func TestSlice(t *testing.T) {
 	}
 }
 
+// Test marshalling/unmarshalling largest possible slice
+func TestMaxSizeSlice(t *testing.T) {
+	mySlice := make([]string, math.MaxUint16, math.MaxUint16)
+	mySlice[0] = "first!"
+	mySlice[math.MaxUint16-1] = "last!"
+	codec := NewDefault()
+	bytes, err := codec.Marshal(mySlice)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sliceUnmarshaled []string
+	if err := codec.Unmarshal(bytes, &sliceUnmarshaled); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(mySlice, sliceUnmarshaled) {
+		t.Fatal("expected marshaled and unmarshaled values to match")
+	}
+}
+
+// Test marshalling a bool
 func TestBool(t *testing.T) {
 	myBool := true
 	codec := NewDefault()
@@ -191,6 +186,7 @@ func TestBool(t *testing.T) {
 	}
 }
 
+// Test marshalling an array
 func TestArray(t *testing.T) {
 	myArr := [5]uint64{5, 6, 7, 8, 9}
 	codec := NewDefault()
@@ -209,6 +205,26 @@ func TestArray(t *testing.T) {
 	}
 }
 
+// Test marshalling a really big array
+func TestBigArray(t *testing.T) {
+	myArr := [30000]uint64{5, 6, 7, 8, 9}
+	codec := NewDefault()
+	bytes, err := codec.Marshal(myArr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var myArrUnmarshaled [30000]uint64
+	if err := codec.Unmarshal(bytes, &myArrUnmarshaled); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(myArr, myArrUnmarshaled) {
+		t.Fatal("expected marshaled and unmarshaled values to match")
+	}
+}
+
+// Test marshalling a pointer to a struct
 func TestPointerToStruct(t *testing.T) {
 	myPtr := &MyInnerStruct{Str: "Hello!"}
 	codec := NewDefault()
@@ -227,6 +243,7 @@ func TestPointerToStruct(t *testing.T) {
 	}
 }
 
+// Test marshalling a slice of structs
 func TestSliceOfStruct(t *testing.T) {
 	mySlice := []MyInnerStruct3{
 		MyInnerStruct3{
@@ -257,6 +274,7 @@ func TestSliceOfStruct(t *testing.T) {
 	}
 }
 
+// Test marshalling an interface
 func TestInterface(t *testing.T) {
 	codec := NewDefault()
 	codec.RegisterType(&MyInnerStruct2{})
@@ -278,6 +296,7 @@ func TestInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling a slice of interfaces
 func TestSliceOfInterface(t *testing.T) {
 	mySlice := []Foo{
 		&MyInnerStruct{
@@ -304,6 +323,7 @@ func TestSliceOfInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling an array of interfaces
 func TestArrayOfInterface(t *testing.T) {
 	myArray := [2]Foo{
 		&MyInnerStruct{
@@ -330,6 +350,7 @@ func TestArrayOfInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling a pointer to an interface
 func TestPointerToInterface(t *testing.T) {
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
 	var myPtr *Foo = &myinnerStruct
@@ -352,6 +373,7 @@ func TestPointerToInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling a string
 func TestString(t *testing.T) {
 	myString := "Ayy"
 	codec := NewDefault()
