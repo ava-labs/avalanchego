@@ -104,6 +104,78 @@ func TestAvalancheVoting(t *testing.T) {
 	}
 }
 
+func TestAvalancheIgnoreInvalidVoting(t *testing.T) {
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			Metrics:      prometheus.NewRegistry(),
+			K:            3,
+			Alpha:        2,
+			BetaVirtuous: 1,
+			BetaRogue:    1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+
+	vts := []Vertex{&Vtx{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}, &Vtx{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}}
+	utxos := []ids.ID{GenerateID()}
+
+	ta := Topological{}
+	ta.Initialize(snow.DefaultContextTest(), params, vts)
+
+	tx0 := &snowstorm.TestTx{
+		Identifier: GenerateID(),
+		Stat:       choices.Processing,
+	}
+	tx0.Ins.Add(utxos[0])
+
+	vtx0 := &Vtx{
+		dependencies: vts,
+		id:           GenerateID(),
+		txs:          []snowstorm.Tx{tx0},
+		height:       1,
+		status:       choices.Processing,
+	}
+
+	tx1 := &snowstorm.TestTx{
+		Identifier: GenerateID(),
+		Stat:       choices.Processing,
+	}
+	tx1.Ins.Add(utxos[0])
+
+	vtx1 := &Vtx{
+		dependencies: vts,
+		id:           GenerateID(),
+		txs:          []snowstorm.Tx{tx1},
+		height:       1,
+		status:       choices.Processing,
+	}
+
+	ta.Add(vtx0)
+	ta.Add(vtx1)
+
+	sm := make(ids.UniqueBag)
+
+	sm.Add(0, vtx0.id)
+	sm.Add(1, vtx1.id)
+
+	// Add Illegal Vote cast by Response 2
+	sm.Add(2, vtx0.id)
+	sm.Add(2, vtx1.id)
+
+	ta.RecordPoll(sm)
+
+	if ta.Finalized() {
+		t.Fatalf("An avalanche instance finalized too early")
+	}
+}
+
 func TestAvalancheTransitiveVoting(t *testing.T) {
 	params := Parameters{
 		Parameters: snowball.Parameters{

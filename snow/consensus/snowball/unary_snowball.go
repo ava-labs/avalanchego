@@ -27,11 +27,13 @@ func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
 			binarySlush: binarySlush{preference: choice},
+			confidence:  sb.confidence,
 			beta:        beta,
 			finalized:   sb.Finalized(),
 		},
 		preference: choice,
 	}
+	bs.numSuccessfulPolls[choice] = sb.numSuccessfulPolls
 	return bs
 }
 

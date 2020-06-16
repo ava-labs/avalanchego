@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
@@ -35,7 +35,7 @@ const (
 	batchSize      = 30
 	stateCacheSize = 10000
 	idCacheSize    = 10000
-	txCacheSize    = 1000000
+	txCacheSize    = 100000
 	addressSep     = "-"
 )
 

@@ -147,8 +147,11 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				numDropped:  b.numBSDroppedVtx,
 				vtx:         vtx,
 			}); err == nil {
-				b.numFetched++ // Progress tracker
 				b.numBSBlockedVtx.Inc()
+				b.numFetched++ // Progress tracker
+				if b.numFetched%common.StatusUpdateFrequency == 0 {
+					b.BootstrapConfig.Context.Log.Info("fetched %d vertices", b.numFetched)
+				}
 			} else {
 				b.BootstrapConfig.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
 			}
@@ -168,10 +171,6 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				toProcess = append(toProcess, parent)
 			}
 			b.processedCache.Put(vtx.ID(), nil)
-		}
-
-		if b.numFetched%common.StatusUpdateFrequency == 0 {
-			b.BootstrapConfig.Context.Log.Info("fetched %d vertices", b.numFetched)
 		}
 	}
 

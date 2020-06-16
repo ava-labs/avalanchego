@@ -37,6 +37,7 @@ const (
 var (
 	Config                 = node.Config{}
 	Err                    error
+	defaultNetworkName     = genesis.TestnetName
 	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
 	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
 	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
@@ -49,7 +50,8 @@ var (
 )
 
 var (
-	errBootstrapMismatch = errors.New("more bootstrap IDs provided than bootstrap IPs")
+	errBootstrapMismatch  = errors.New("more bootstrap IDs provided than bootstrap IPs")
+	errStakingRequiresTLS = errors.New("if staking is enabled, network TLS must also be enabled")
 )
 
 // GetIPs returns the default IPs for each network
@@ -169,7 +171,7 @@ func init() {
 	version := fs.Bool("version", false, "If true, print version and quit")
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.TestnetName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
@@ -200,7 +202,9 @@ func init() {
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
-	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
+	// TODO - keeping same flag for backwards compatibility, should be changed to "staking-enabled"
+	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Enable staking. If enabled, Network TLS is required.")
+	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
@@ -234,7 +238,15 @@ func init() {
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
-		fmt.Println(node.Version.String())
+		networkID, err := genesis.NetworkID(defaultNetworkName)
+		if errs.Add(err); err != nil {
+			return
+		}
+		networkGeneration := genesis.NetworkName(networkID)
+		fmt.Printf(
+			"%s [database=%s, network=%s/%s]\n",
+			node.Version, dbVersion, defaultNetworkName, networkGeneration,
+		)
 		os.Exit(0)
 	}
 
@@ -318,7 +330,13 @@ func init() {
 			*bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
 		}
 	}
-	if Config.EnableStaking {
+
+	if Config.EnableStaking && !Config.EnableP2PTLS {
+		errs.Add(errStakingRequiresTLS)
+		return
+	}
+
+	if Config.EnableP2PTLS {
 		i := 0
 		cb58 := formatting.CB58{}
 		for _, id := range strings.Split(*bootstrapIDs, ",") {

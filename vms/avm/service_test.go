@@ -9,8 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 )
 
@@ -338,5 +340,115 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 	if reply.AssetID.String() != "SscTvpQFCZPNiRXyueDc7LdHT9EstHiva3AK6kuTgHTMd7DsU" {
 		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
+	}
+}
+
+func TestImportAvmKey(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	userKeystore := keystore.CreateTestKeystore(t)
+
+	username := "bobby"
+	password := "StrnasfqewiurPasswdn56d"
+	if err := userKeystore.AddUser(username, password); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.ctx.Keystore = userKeystore.NewBlockchainKeyStore(vm.ctx.ChainID)
+	_, err := vm.ctx.Keystore.GetDatabase(username, password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	factory := crypto.FactorySECP256K1R{}
+	skIntf, err := factory.NewPrivateKey()
+	if err != nil {
+		t.Fatalf("problem generating private key: %w", err)
+	}
+	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+
+	args := ImportKeyArgs{
+		Username:   username,
+		Password:   password,
+		PrivateKey: formatting.CB58{Bytes: sk.Bytes()},
+	}
+	reply := ImportKeyReply{}
+	if err = s.ImportKey(nil, &args, &reply); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestImportAvmKeyNoDuplicates(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	userKeystore := keystore.CreateTestKeystore(t)
+
+	username := "bobby"
+	password := "StrnasfqewiurPasswdn56d"
+	if err := userKeystore.AddUser(username, password); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.ctx.Keystore = userKeystore.NewBlockchainKeyStore(vm.ctx.ChainID)
+	_, err := vm.ctx.Keystore.GetDatabase(username, password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	factory := crypto.FactorySECP256K1R{}
+	skIntf, err := factory.NewPrivateKey()
+	if err != nil {
+		t.Fatalf("problem generating private key: %w", err)
+	}
+	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+
+	args := ImportKeyArgs{
+		Username:   username,
+		Password:   password,
+		PrivateKey: formatting.CB58{Bytes: sk.Bytes()},
+	}
+	reply := ImportKeyReply{}
+	if err = s.ImportKey(nil, &args, &reply); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedAddress := vm.Format(sk.PublicKey().Address().Bytes())
+
+	if reply.Address != expectedAddress {
+		t.Fatalf("Reply address: %s did not match expected address: %s", reply.Address, expectedAddress)
+	}
+
+	reply2 := ImportKeyReply{}
+	if err = s.ImportKey(nil, &args, &reply2); err != nil {
+		t.Fatal(err)
+	}
+
+	if reply2.Address != expectedAddress {
+		t.Fatalf("Reply address: %s did not match expected address: %s", reply2.Address, expectedAddress)
+	}
+
+	addrsArgs := ListAddressesArgs{
+		Username: username,
+		Password: password,
+	}
+	addrsReply := ListAddressesResponse{}
+	if err := s.ListAddresses(nil, &addrsArgs, &addrsReply); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(addrsReply.Addresses) != 1 {
+		t.Fatal("Importing the same key twice created duplicate addresses")
+	}
+
+	if addrsReply.Addresses[0] != expectedAddress {
+		t.Fatal("List addresses returned an incorrect address")
 	}
 }

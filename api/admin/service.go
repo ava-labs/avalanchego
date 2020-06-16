@@ -15,12 +15,14 @@ import (
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/version"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
 
 // Admin is the API service for node admin management
 type Admin struct {
+	version      version.Version
 	nodeID       ids.ShortID
 	networkID    uint32
 	log          logging.Logger
@@ -31,12 +33,13 @@ type Admin struct {
 }
 
 // NewService returns a new admin API service
-func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
+func NewService(version version.Version, nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&Admin{
+		version:      version,
 		nodeID:       nodeID,
 		networkID:    networkID,
 		log:          log,
@@ -47,6 +50,19 @@ func NewService(nodeID ids.ShortID, networkID uint32, log logging.Logger, chainM
 	return &common.HTTPHandler{Handler: newServer}
 }
 
+// GetNodeVersionReply are the results from calling GetNodeVersion
+type GetNodeVersionReply struct {
+	Version string `json:"version"`
+}
+
+// GetNodeVersion returns the version this node is running
+func (service *Admin) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersionReply) error {
+	service.log.Info("Admin: GetNodeVersion called")
+
+	reply.Version = service.version.String()
+	return nil
+}
+
 // GetNodeIDReply are the results from calling GetNodeID
 type GetNodeIDReply struct {
 	NodeID ids.ShortID `json:"nodeID"`
@@ -54,7 +70,7 @@ type GetNodeIDReply struct {
 
 // GetNodeID returns the node ID of this node
 func (service *Admin) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
-	service.log.Debug("Admin: GetNodeID called")
+	service.log.Info("Admin: GetNodeID called")
 
 	reply.NodeID = service.nodeID
 	return nil
@@ -67,7 +83,7 @@ type GetNetworkIDReply struct {
 
 // GetNetworkID returns the network ID this node is running on
 func (service *Admin) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
-	service.log.Debug("Admin: GetNetworkID called")
+	service.log.Info("Admin: GetNetworkID called")
 
 	reply.NetworkID = cjson.Uint32(service.networkID)
 	return nil
@@ -80,7 +96,7 @@ type GetNetworkNameReply struct {
 
 // GetNetworkName returns the network name this node is running on
 func (service *Admin) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
-	service.log.Debug("Admin: GetNetworkName called")
+	service.log.Info("Admin: GetNetworkName called")
 
 	reply.NetworkName = genesis.NetworkName(service.networkID)
 	return nil
@@ -98,7 +114,7 @@ type GetBlockchainIDReply struct {
 
 // GetBlockchainID returns the blockchain ID that resolves the alias that was supplied
 func (service *Admin) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply *GetBlockchainIDReply) error {
-	service.log.Debug("Admin: GetBlockchainID called")
+	service.log.Info("Admin: GetBlockchainID called")
 
 	bID, err := service.chainManager.Lookup(args.Alias)
 	reply.BlockchainID = bID.String()
@@ -112,7 +128,7 @@ type PeersReply struct {
 
 // Peers returns the list of current validators
 func (service *Admin) Peers(_ *http.Request, _ *struct{}, reply *PeersReply) error {
-	service.log.Debug("Admin: Peers called")
+	service.log.Info("Admin: Peers called")
 	reply.Peers = service.networking.Peers()
 	return nil
 }
@@ -129,7 +145,7 @@ type StartCPUProfilerReply struct {
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
 func (service *Admin) StartCPUProfiler(_ *http.Request, args *StartCPUProfilerArgs, reply *StartCPUProfilerReply) error {
-	service.log.Debug("Admin: StartCPUProfiler called with %s", args.Filename)
+	service.log.Info("Admin: StartCPUProfiler called with %s", args.Filename)
 	reply.Success = true
 	return service.performance.StartCPUProfiler(args.Filename)
 }
@@ -141,7 +157,7 @@ type StopCPUProfilerReply struct {
 
 // StopCPUProfiler stops the cpu profile
 func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *StopCPUProfilerReply) error {
-	service.log.Debug("Admin: StopCPUProfiler called")
+	service.log.Info("Admin: StopCPUProfiler called")
 	reply.Success = true
 	return service.performance.StopCPUProfiler()
 }
@@ -158,7 +174,7 @@ type MemoryProfileReply struct {
 
 // MemoryProfile runs a memory profile writing to the specified file
 func (service *Admin) MemoryProfile(_ *http.Request, args *MemoryProfileArgs, reply *MemoryProfileReply) error {
-	service.log.Debug("Admin: MemoryProfile called with %s", args.Filename)
+	service.log.Info("Admin: MemoryProfile called with %s", args.Filename)
 	reply.Success = true
 	return service.performance.MemoryProfile(args.Filename)
 }
@@ -175,7 +191,7 @@ type LockProfileReply struct {
 
 // LockProfile runs a mutex profile writing to the specified file
 func (service *Admin) LockProfile(_ *http.Request, args *LockProfileArgs, reply *LockProfileReply) error {
-	service.log.Debug("Admin: LockProfile called with %s", args.Filename)
+	service.log.Info("Admin: LockProfile called with %s", args.Filename)
 	reply.Success = true
 	return service.performance.LockProfile(args.Filename)
 }
@@ -193,7 +209,7 @@ type AliasReply struct {
 
 // Alias attempts to alias an HTTP endpoint to a new name
 func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *AliasReply) error {
-	service.log.Debug("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
+	service.log.Info("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock(args.Endpoint, args.Alias)
 }
@@ -211,7 +227,7 @@ type AliasChainReply struct {
 
 // AliasChain attempts to alias a chain to a new name
 func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *AliasChainReply) error {
-	service.log.Debug("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
+	service.log.Info("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
 
 	chainID, err := service.chainManager.Lookup(args.Chain)
 	if err != nil {
