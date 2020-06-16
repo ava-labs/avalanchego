@@ -77,7 +77,8 @@ type Vertex interface {
 	// Returns the vertices this vertex depends on
 	Parents() []Vertex
 
-	// Returns the height of this vertex
+	// Returns the height of this vertex. A vertex's height is defined by one
+	// greater than the maximum height of the parents.
 	Height() uint64
 
 	// Returns a series of state transitions to be performed on acceptance

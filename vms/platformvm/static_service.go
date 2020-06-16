@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"net/http"
 
@@ -32,6 +31,13 @@ type StaticService struct{}
 // that exists at the chain's genesis.
 type APIAccount struct {
 	Address ids.ShortID `json:"address"`
+	Nonce   json.Uint64 `json:"nonce"`
+	Balance json.Uint64 `json:"balance"`
+}
+
+// FormattedAPIAccount is an APIAccount but allows for a formatted Address
+type FormattedAPIAccount struct {
+	Address string      `json:"address"`
 	Nonce   json.Uint64 `json:"nonce"`
 	Balance json.Uint64 `json:"balance"`
 }
@@ -67,6 +73,35 @@ type APIDefaultSubnetValidator struct {
 	APIValidator
 
 	Destination       ids.ShortID `json:"destination"`
+	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
+}
+
+// FormattedAPIValidator allows for a formatted address
+type FormattedAPIValidator struct {
+	StartTime   json.Uint64  `json:"startTime"`
+	EndTime     json.Uint64  `json:"endTime"`
+	Weight      *json.Uint64 `json:"weight,omitempty"`
+	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
+	Address     string       `json:"address,omitempty"`
+	ID          ids.ShortID  `json:"id"`
+}
+
+func (v *FormattedAPIValidator) weight() uint64 {
+	switch {
+	case v.Weight != nil:
+		return uint64(*v.Weight)
+	case v.StakeAmount != nil:
+		return uint64(*v.StakeAmount)
+	default:
+		return 0
+	}
+}
+
+// FormattedAPIDefaultSubnetValidator is a formatted validator of the default subnet
+type FormattedAPIDefaultSubnetValidator struct {
+	FormattedAPIValidator
+
+	Destination       string      `json:"destination"`
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
@@ -174,7 +209,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return err
 		}
 
-		heap.Push(validators, tx)
+		validators.Add(tx)
 	}
 
 	// Specify the chains that exist at genesis.

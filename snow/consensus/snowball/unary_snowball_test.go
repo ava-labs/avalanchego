@@ -42,11 +42,32 @@ func TestUnarySnowball(t *testing.T) {
 
 	binarySnowball := sbClone.Extend(beta, 0)
 
+	expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 2, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0)))"
+	if result := binarySnowball.String(); result != expected {
+		t.Fatalf("Expected:\n%s\nReturned:\n%s", expected, result)
+	}
+
 	binarySnowball.RecordUnsuccessfulPoll()
+	for i := 0; i < 3; i++ {
+		if binarySnowball.Preference() != 0 {
+			t.Fatalf("Wrong preference")
+		} else if binarySnowball.Finalized() {
+			t.Fatalf("Should not have finalized")
+		}
+		binarySnowball.RecordSuccessfulPoll(1)
+		binarySnowball.RecordUnsuccessfulPoll()
+	}
+
+	if binarySnowball.Preference() != 1 {
+		t.Fatalf("Wrong preference")
+	} else if binarySnowball.Finalized() {
+		t.Fatalf("Should not have finalized")
+	}
 
 	binarySnowball.RecordSuccessfulPoll(1)
-
-	if binarySnowball.Finalized() {
+	if binarySnowball.Preference() != 1 {
+		t.Fatalf("Wrong preference")
+	} else if binarySnowball.Finalized() {
 		t.Fatalf("Should not have finalized")
 	}
 
@@ -56,5 +77,10 @@ func TestUnarySnowball(t *testing.T) {
 		t.Fatalf("Wrong preference")
 	} else if !binarySnowball.Finalized() {
 		t.Fatalf("Should have finalized")
+	}
+
+	expected = "SB(NumSuccessfulPolls = 2, SF(Confidence = 1, Finalized = false))"
+	if str := sb.String(); str != expected {
+		t.Fatalf("Wrong state. Expected:\n%s\nGot:\n%s", expected, str)
 	}
 }

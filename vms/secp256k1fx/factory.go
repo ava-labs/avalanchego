@@ -5,6 +5,7 @@ package secp256k1fx
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
 )
 
 // ID that this Fx uses when labeled
@@ -16,4 +17,4 @@ var (
 type Factory struct{}
 
 // New ...
-func (f *Factory) New() (interface{}, error) { return &Fx{}, nil }
+func (f *Factory) New(*snow.Context) (interface{}, error) { return &Fx{}, nil }

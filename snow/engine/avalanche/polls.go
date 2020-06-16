@@ -38,10 +38,10 @@ type polls struct {
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
 //         should be made.
-func (p *polls) Add(requestID uint32, numPolled int) bool {
+func (p *polls) Add(requestID uint32, vdrs ids.ShortSet) bool {
 	poll, exists := p.m[requestID]
 	if !exists {
-		poll.numPending = numPolled
+		poll.polled = vdrs
 		p.m[requestID] = poll
 
 		p.numPolls.Set(float64(len(p.m))) // Tracks performance statistics
@@ -59,7 +59,7 @@ func (p *polls) Vote(requestID uint32, vdr ids.ShortID, votes []ids.ID) (ids.Uni
 		return nil, false
 	}
 
-	poll.Vote(votes)
+	poll.Vote(votes, vdr)
 	if poll.Finished() {
 		p.log.Verbo("Poll is finished")
 		delete(p.m, requestID)
@@ -83,19 +83,19 @@ func (p *polls) String() string {
 
 // poll represents the current state of a network poll for a vertex
 type poll struct {
-	votes      ids.UniqueBag
-	numPending int
+	votes  ids.UniqueBag
+	polled ids.ShortSet
 }
 
 // Vote registers a vote for this poll
-func (p *poll) Vote(votes []ids.ID) {
-	if p.numPending > 0 {
-		p.numPending--
-		p.votes.Add(uint(p.numPending), votes...)
+func (p *poll) Vote(votes []ids.ID, vdr ids.ShortID) {
+	if p.polled.Contains(vdr) {
+		p.polled.Remove(vdr)
+		p.votes.Add(uint(p.polled.Len()), votes...)
 	}
 }
 
 // Finished returns true if the poll has completed, with no more required
 // responses
-func (p poll) Finished() bool { return p.numPending <= 0 }
-func (p poll) String() string { return fmt.Sprintf("Waiting on %d chits", p.numPending) }
+func (p poll) Finished() bool { return p.polled.Len() == 0 }
+func (p poll) String() string { return fmt.Sprintf("Waiting on %d chits", p.polled.Len()) }

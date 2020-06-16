@@ -8,6 +8,8 @@ import (
 	"os/exec"
 
 	"github.com/hashicorp/go-plugin"
+
+	"github.com/ava-labs/gecko/snow"
 )
 
 var (
@@ -15,13 +17,11 @@ var (
 )
 
 // Factory ...
-type Factory struct {
-	Path string
-}
+type Factory struct{ Path string }
 
 // New ...
-func (f *Factory) New() (interface{}, error) {
-	client := plugin.NewClient(&plugin.ClientConfig{
+func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
+	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
 		Cmd:             exec.Command("sh", "-c", f.Path),
@@ -29,7 +29,13 @@ func (f *Factory) New() (interface{}, error) {
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
-	})
+	}
+	if ctx != nil {
+		config.Stderr = ctx.Log
+		config.SyncStdout = ctx.Log
+		config.SyncStderr = ctx.Log
+	}
+	client := plugin.NewClient(config)
 
 	rpcClient, err := client.Client()
 	if err != nil {

@@ -57,7 +57,7 @@ type metrics struct {
 	ping, pong,
 	getAcceptedFrontier, acceptedFrontier,
 	getAccepted, accepted,
-	get, put,
+	get, getAncestors, put, multiPut,
 	pushQuery, pullQuery, chits messageMetrics
 }
 
@@ -86,7 +86,9 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	errs.Add(m.getAccepted.initialize(GetAccepted, registerer))
 	errs.Add(m.accepted.initialize(Accepted, registerer))
 	errs.Add(m.get.initialize(Get, registerer))
+	errs.Add(m.getAncestors.initialize(GetAncestors, registerer))
 	errs.Add(m.put.initialize(Put, registerer))
+	errs.Add(m.multiPut.initialize(MultiPut, registerer))
 	errs.Add(m.pushQuery.initialize(PushQuery, registerer))
 	errs.Add(m.pullQuery.initialize(PullQuery, registerer))
 	errs.Add(m.chits.initialize(Chits, registerer))
@@ -118,8 +120,12 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 		return &m.accepted
 	case Get:
 		return &m.get
+	case GetAncestors:
+		return &m.getAncestors
 	case Put:
 		return &m.put
+	case MultiPut:
+		return &m.multiPut
 	case PushQuery:
 		return &m.pushQuery
 	case PullQuery:

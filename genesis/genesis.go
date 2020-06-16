@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"

@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/gecko/database/nodb"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 )
 
 // Database encrypts all values that are provided

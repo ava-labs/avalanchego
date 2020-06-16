@@ -59,17 +59,17 @@ func (v *voter) Update() {
 	}
 
 	if v.t.Consensus.Quiesce() {
-		v.t.Config.Context.Log.Verbo("Avalanche engine can quiesce")
+		v.t.Config.Context.Log.Debug("Avalanche engine can quiesce")
 		return
 	}
 
-	v.t.Config.Context.Log.Verbo("Avalanche engine can't quiesce")
+	v.t.Config.Context.Log.Debug("Avalanche engine can't quiesce")
 	v.t.errs.Add(v.t.repoll())
 }
 
 func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 	bubbledVotes := ids.UniqueBag{}
-	vertexHeap := NewMaxVertexHeap()
+	vertexHeap := newMaxVertexHeap()
 	for _, vote := range votes.List() {
 		vtx, err := v.t.Config.State.GetVertex(vote)
 		if err != nil {

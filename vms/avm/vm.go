@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
@@ -35,7 +35,7 @@ const (
 	batchSize      = 30
 	stateCacheSize = 10000
 	idCacheSize    = 10000
-	txCacheSize    = 10000
+	txCacheSize    = 100000
 	addressSep     = "-"
 )
 
@@ -68,6 +68,7 @@ type VM struct {
 	// State management
 	state *prefixedState
 
+	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
 	// Transaction issuing
@@ -200,7 +201,8 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
-// Bootstrapping marks this VM as bootstrapping
+// Bootstrapping is called by the consensus engine when it starts bootstrapping
+// this chain
 func (vm *VM) Bootstrapping() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
@@ -210,7 +212,8 @@ func (vm *VM) Bootstrapping() error {
 	return nil
 }
 
-// Bootstrapped marks this VM as bootstrapped
+// Bootstrapped is called by the consensus engine when it is done bootstrapping
+// this chain
 func (vm *VM) Bootstrapped() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
