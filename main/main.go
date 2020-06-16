@@ -67,7 +67,7 @@ func main() {
 	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
-	Config.StakingIP.Port = mapper.Map("TCP", Config.StakingLocalPort, Config.StakingIP.Port, "gecko")
+	Config.StakingIP.Port = mapper.Map("TCP", Config.StakingLocalPort, "gecko")
 
 	if Config.StakingIP.IsZero() {
 		log.Warn("NAT traversal has failed. It will be able to connect to less nodes.")

@@ -15,7 +15,7 @@ import (
 // Config contains all of the configurations of an Ava node.
 type Config struct {
 	// protocol to use for opening the network interface
-	Nat nat.NATRouter
+	Nat nat.Router
 
 	// ID of the network this node should connect to
 	NetworkID uint32

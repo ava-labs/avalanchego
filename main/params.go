@@ -281,7 +281,7 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.GetNATRouter()
+	Config.Nat = nat.GetRouter()
 
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig

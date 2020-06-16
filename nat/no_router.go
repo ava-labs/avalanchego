@@ -41,7 +41,11 @@ func getOutboundIP() (net.IP, error) {
 	}
 	defer conn.Close()
 
-	return conn.LocalAddr().(*net.UDPAddr).IP, nil
+	if udpAddr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+		return udpAddr.IP, conn.Close()
+	}
+
+	return nil, fmt.Errorf("getting outbound IP failed")
 }
 
 func NewNoRouter() *noRouter {
