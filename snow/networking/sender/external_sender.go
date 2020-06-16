@@ -15,9 +15,14 @@ type ExternalSender interface {
 	Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
 
 	Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
+	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
+
 	Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
 
 	PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 	PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID)
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
+
+	Gossip(chainID ids.ID, containerID ids.ID, container []byte)
 }

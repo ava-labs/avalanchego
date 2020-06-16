@@ -4,9 +4,8 @@
 package node
 
 import (
-	"github.com/ava-labs/go-ethereum/p2p/nat"
-
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/utils"
@@ -16,7 +15,7 @@ import (
 // Config contains all of the configurations of an Ava node.
 type Config struct {
 	// protocol to use for opening the network interface
-	Nat nat.Interface
+	Nat nat.Router
 
 	// ID of the network this node should connect to
 	NetworkID uint32
@@ -35,6 +34,7 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP       utils.IPDesc
+	EnableP2PTLS    bool
 	EnableStaking   bool
 	StakingKeyFile  string
 	StakingCertFile string
@@ -43,6 +43,7 @@ type Config struct {
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
+	HTTPHost      string
 	HTTPPort      uint16
 	EnableHTTPS   bool
 	HTTPSKeyFile  string
@@ -52,9 +53,13 @@ type Config struct {
 	AdminAPIEnabled    bool
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
+	HealthAPIEnabled   bool
 
 	// Logging configuration
 	LoggingConfig logging.Config
+
+	// Plugin directory
+	PluginDir string
 
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters

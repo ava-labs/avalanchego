@@ -1,0 +1,8 @@
+
+---
+- name: Update the network
+  connection: ssh
+  gather_facts: false
+  hosts: all
+  roles:
+    - name: ava-stop

@@ -9,23 +9,24 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/keystore"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/avalanche"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms"
 
 	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
@@ -37,7 +38,9 @@ import (
 
 const (
 	defaultChannelSize = 1000
-	requestTimeout     = 2 * time.Second
+	requestTimeout     = 4 * time.Second
+	gossipFrequency    = 10 * time.Second
+	shutdownTimeout    = 1 * time.Second
 )
 
 // Manager manages the chains running on this node.
@@ -92,23 +95,24 @@ type manager struct {
 	// That is, [chainID].String() is an alias for the chain, too
 	ids.Aliaser
 
+	stakingEnabled  bool // True iff the network has staking enabled
 	log             logging.Logger
 	logFactory      logging.Factory
 	vmManager       vms.Manager // Manage mappings from vm ID --> vm
 	decisionEvents  *triggers.EventDispatcher
 	consensusEvents *triggers.EventDispatcher
 	db              database.Database
-	chainRouter     router.Router         // Routes incoming messages to the appropriate chain
-	sender          sender.ExternalSender // Sends consensus messages to other validators
-	timeoutManager  *timeout.Manager      // Manages request timeouts when sending messages to other validators
-	consensusParams avacon.Parameters     // The consensus parameters (alpha, beta, etc.) for new chains
-	validators      validators.Manager    // Validators validating on this chain
-	registrants     []Registrant          // Those notified when a chain is created
-	nodeID          ids.ShortID           // The ID of this node
-	networkID       uint32                // ID of the network this node is connected to
-	awaiter         Awaiter               // Waits for required connections before running bootstrapping
-	server          *api.Server           // Handles HTTP API calls
+	chainRouter     router.Router      // Routes incoming messages to the appropriate chain
+	net             network.Network    // Sends consensus messages to other validators
+	timeoutManager  *timeout.Manager   // Manages request timeouts when sending messages to other validators
+	consensusParams avacon.Parameters  // The consensus parameters (alpha, beta, etc.) for new chains
+	validators      validators.Manager // Validators validating on this chain
+	registrants     []Registrant       // Those notified when a chain is created
+	nodeID          ids.ShortID        // The ID of this node
+	networkID       uint32             // ID of the network this node is connected to
+	server          *api.Server        // Handles HTTP API calls
 	keystore        *keystore.Keystore
+	sharedMemory    *atomic.SharedMemory
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -120,6 +124,7 @@ type manager struct {
 //     <validators> validate this chain
 // TODO: Make this function take less arguments
 func New(
+	stakingEnabled bool,
 	log logging.Logger,
 	logFactory logging.Factory,
 	vmManager vms.Manager,
@@ -127,22 +132,23 @@ func New(
 	consensusEvents *triggers.EventDispatcher,
 	db database.Database,
 	router router.Router,
-	sender sender.ExternalSender,
+	net network.Network,
 	consensusParams avacon.Parameters,
 	validators validators.Manager,
 	nodeID ids.ShortID,
 	networkID uint32,
-	awaiter Awaiter,
 	server *api.Server,
 	keystore *keystore.Keystore,
+	sharedMemory *atomic.SharedMemory,
 ) Manager {
 	timeoutManager := timeout.Manager{}
 	timeoutManager.Initialize(requestTimeout)
 	go log.RecoverAndPanic(timeoutManager.Dispatch)
 
-	router.Initialize(log, &timeoutManager)
+	router.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
 
 	m := &manager{
+		stakingEnabled:  stakingEnabled,
 		log:             log,
 		logFactory:      logFactory,
 		vmManager:       vmManager,
@@ -150,15 +156,15 @@ func New(
 		consensusEvents: consensusEvents,
 		db:              db,
 		chainRouter:     router,
-		sender:          sender,
+		net:             net,
 		timeoutManager:  &timeoutManager,
 		consensusParams: consensusParams,
 		validators:      validators,
 		nodeID:          nodeID,
 		networkID:       networkID,
-		awaiter:         awaiter,
 		server:          server,
 		keystore:        keystore,
+		sharedMemory:    sharedMemory,
 	}
 	m.Initialize()
 	return m
@@ -198,6 +204,31 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		return
 	}
 
+	primaryAlias, err := m.PrimaryAlias(chain.ID)
+	if err != nil {
+		primaryAlias = chain.ID.String()
+	}
+
+	// Create the log and context of the chain
+	chainLog, err := m.logFactory.MakeChain(primaryAlias, "")
+	if err != nil {
+		m.log.Error("error while creating chain's log %s", err)
+		return
+	}
+
+	ctx := &snow.Context{
+		NetworkID:           m.networkID,
+		ChainID:             chain.ID,
+		Log:                 chainLog,
+		DecisionDispatcher:  m.decisionEvents,
+		ConsensusDispatcher: m.consensusEvents,
+		NodeID:              m.nodeID,
+		HTTP:                m.server,
+		Keystore:            m.keystore.NewBlockchainKeyStore(chain.ID),
+		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chain.ID),
+		BCLookup:            m,
+	}
+
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.vmManager.GetVMFactory(vmID)
 	if err != nil {
@@ -206,7 +237,12 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 	}
 
 	// Create the chain
-	vm := vmFactory.New()
+	vm, err := vmFactory.New(ctx)
+	if err != nil {
+		m.log.Error("error while creating vm: %s", err)
+		return
+	}
+	// TODO: Shutdown VM if an error occurs
 
 	fxs := make([]*common.Fx, len(chain.FxAliases))
 	for i, fxAlias := range chain.FxAliases {
@@ -223,40 +259,30 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 			return
 		}
 
+		fx, err := fxFactory.New(ctx)
+		if err != nil {
+			m.log.Error("error while creating fx: %s", err)
+			return
+		}
+
 		// Create the fx
 		fxs[i] = &common.Fx{
 			ID: fxID,
-			Fx: fxFactory.New(),
+			Fx: fx,
 		}
 	}
 
-	// Create the log and context of the chain
-	chainLog, err := m.logFactory.MakeChain(chain.ID, "")
-	if err != nil {
-		m.log.Error("error while creating chain's log %s", err)
-		return
-	}
-
-	ctx := &snow.Context{
-		NetworkID:           m.networkID,
-		ChainID:             chain.ID,
-		Log:                 chainLog,
-		DecisionDispatcher:  m.decisionEvents,
-		ConsensusDispatcher: m.consensusEvents,
-		NodeID:              m.nodeID,
-		HTTP:                m.server,
-		Keystore:            m.keystore.NewBlockchainKeyStore(chain.ID),
-		BCLookup:            m,
-	}
 	consensusParams := m.consensusParams
-	if alias, err := m.PrimaryAlias(ctx.ChainID); err == nil {
-		consensusParams.Namespace = fmt.Sprintf("gecko_%s", alias)
-	} else {
-		consensusParams.Namespace = fmt.Sprintf("gecko_%s", ctx.ChainID)
-	}
+	consensusParams.Namespace = fmt.Sprintf("gecko_%s", primaryAlias)
 
 	// The validators of this blockchain
-	validators, ok := m.validators.GetValidatorSet(ids.Empty) // TODO: Change argument to chain.SubnetID
+	var validators validators.Set // Validators validating this blockchain
+	var ok bool
+	if m.stakingEnabled {
+		validators, ok = m.validators.GetValidatorSet(chain.SubnetID)
+	} else { // Staking is disabled. Every peer validates every subnet.
+		validators, ok = m.validators.GetValidatorSet(ids.Empty) // ids.Empty is the default subnet ID. TODO: Move to const package so we can use it here.
+	}
 	if !ok {
 		m.log.Error("couldn't get validator set of subnet with ID %s. The subnet may not exist", chain.SubnetID)
 		return
@@ -336,8 +362,8 @@ func (m *manager) createAvalancheChain(
 	db := prefixdb.New(ctx.ChainID.Bytes(), m.db)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	vertexDB := prefixdb.New([]byte("vertex"), db)
-	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bootstrapping"), db)
-	txBootstrappingDB := prefixdb.New([]byte("tx_bootstrapping"), db)
+	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
+	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
 
 	vtxBlocker, err := queue.New(vertexBootstrappingDB)
 	if err != nil {
@@ -353,7 +379,7 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
-		return err
+		return fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
 	// Handles serialization/deserialization of vertices and also the
@@ -363,7 +389,7 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.sender, m.chainRouter, m.timeoutManager)
+	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
 
 	// The engine handles consensus
 	engine := avaeng.Transitive{
@@ -376,13 +402,22 @@ func (m *manager) createAvalancheChain(
 		},
 	}
 
+	bootstrapWeight := uint64(0)
+	for _, beacon := range beacons.List() {
+		newWeight, err := math.Add64(bootstrapWeight, beacon.Weight())
+		if err != nil {
+			return err
+		}
+		bootstrapWeight = newWeight
+	}
+
 	engine.Initialize(avaeng.Config{
 		BootstrapConfig: avaeng.BootstrapConfig{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      (beacons.Len() + 1) / 2,
+				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			VtxBlocked: vtxBlocker,
@@ -395,26 +430,30 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
-	handler.Initialize(&engine, msgChan, defaultChannelSize)
+	handler := &router.Handler{}
+	handler.Initialize(
+		&engine,
+		msgChan,
+		defaultChannelSize,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
 
 	// Allows messages to be routed to the new chain
 	m.chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
-	awaiting := &networking.AwaitingConnections{
-		Finish: func() {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-
-			engine.Startup()
-		},
+	reqWeight := (3*bootstrapWeight + 3) / 4
+	if reqWeight == 0 {
+		engine.Startup()
+	} else {
+		go m.net.RegisterHandler(&awaiter{
+			vdrs:      beacons,
+			reqWeight: reqWeight, // 75% must be connected to
+			ctx:       ctx,
+			eng:       &engine,
+		})
 	}
-	for _, vdr := range beacons.List() {
-		awaiting.Requested.Add(vdr.ID())
-	}
-	awaiting.NumRequired = (3*awaiting.Requested.Len() + 3) / 4 // 75% must be connected to
-	m.awaiter.AwaitConnections(awaiting)
 
 	return nil
 }
@@ -434,7 +473,7 @@ func (m *manager) createSnowmanChain(
 
 	db := prefixdb.New(ctx.ChainID.Bytes(), m.db)
 	vmDB := prefixdb.New([]byte("vm"), db)
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), db)
+	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
 	blocked, err := queue.New(bootstrappingDB)
 	if err != nil {
@@ -452,7 +491,16 @@ func (m *manager) createSnowmanChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.sender, m.chainRouter, m.timeoutManager)
+	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
+
+	bootstrapWeight := uint64(0)
+	for _, beacon := range beacons.List() {
+		newWeight, err := math.Add64(bootstrapWeight, beacon.Weight())
+		if err != nil {
+			return err
+		}
+		bootstrapWeight = newWeight
+	}
 
 	// The engine handles consensus
 	engine := smeng.Transitive{}
@@ -462,7 +510,7 @@ func (m *manager) createSnowmanChain(
 				Context:    ctx,
 				Validators: validators,
 				Beacons:    beacons,
-				Alpha:      (beacons.Len() + 1) / 2,
+				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
 				Sender:     &sender,
 			},
 			Blocked:      blocked,
@@ -474,26 +522,30 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
-	handler.Initialize(&engine, msgChan, defaultChannelSize)
+	handler := &router.Handler{}
+	handler.Initialize(
+		&engine,
+		msgChan,
+		defaultChannelSize,
+		fmt.Sprintf("%s_handler", consensusParams.Namespace),
+		consensusParams.Metrics,
+	)
 
 	// Allow incoming messages to be routed to the new chain
 	m.chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
-	awaiting := &networking.AwaitingConnections{
-		Finish: func() {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-
-			engine.Startup()
-		},
+	reqWeight := (3*bootstrapWeight + 3) / 4
+	if reqWeight == 0 {
+		engine.Startup()
+	} else {
+		go m.net.RegisterHandler(&awaiter{
+			vdrs:      beacons,
+			reqWeight: reqWeight, // 75% must be connected to
+			ctx:       ctx,
+			eng:       &engine,
+		})
 	}
-	for _, vdr := range beacons.List() {
-		awaiting.Requested.Add(vdr.ID())
-	}
-	awaiting.NumRequired = (3*awaiting.Requested.Len() + 3) / 4 // 75% must be connected to
-	m.awaiter.AwaitConnections(awaiting)
 	return nil
 }
 

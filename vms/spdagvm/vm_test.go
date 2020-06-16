@@ -4,7 +4,6 @@
 package spdagvm
 
 import (
-	"math"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
@@ -92,6 +91,7 @@ func TestAva(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 	vm.batchTimeout = 0
 
@@ -173,6 +173,7 @@ func TestInvalidSpentTx(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 
 	ctx.Lock.Lock()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
@@ -259,6 +260,7 @@ func TestInvalidTxVerification(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 
 	ctx.Lock.Lock()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
@@ -320,6 +322,7 @@ func TestRPCAPI(t *testing.T) {
 	vmDB := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 	vm.batchTimeout = 0
 
@@ -452,7 +455,7 @@ func TestRPCAPI(t *testing.T) {
 	// it had (from genesis) minus the 2 amounts it sent to [addr1] minus 2 tx fees
 	if testbal, err := vm.GetBalance(pkToAddr[pks[0]], ""); err != nil {
 		t.Fatalf("GetBalance(%q): %s", pkToAddr[pks[0]], err)
-	} else if testbal != defaultInitBalance-send1Amt-send2Amt-2*txFeeTest { // TODO generalize
+	} else if testbal != defaultInitBalance-send1Amt-send2Amt-2*txFeeTest {
 		t.Fatalf("GetBalance(%q): returned wrong balance - expected: %d; returned: %d", pkToAddr[pks[0]], defaultInitBalance-send1Amt-send2Amt-2*txFeeTest, testbal)
 		// Send [send3Amt] from [addr1] to the address controlled by [pks[0]]
 	} else if _, err = vm.Send(send3Amt, "", pkToAddr[pks[0]], []string{addr1PrivKey}); err != nil {
@@ -527,6 +530,7 @@ func TestMultipleSend(t *testing.T) {
 	vmDB := memdb.New()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 
 	// Initialize these data structures
@@ -636,6 +640,7 @@ func TestIssuePendingDependency(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{}
+	defer func() { vm.ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
 	vm.batchTimeout = 0
 
@@ -722,89 +727,5 @@ func TestIssuePendingDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.Lock.Unlock()
-}
-
-// Ensure that an error is returned if an address will have more than
-// math.MaxUint64 NanoAva
-func TestTxOutputOverflow(t *testing.T) {
-	// Modify the genesis tx so the address controlled by [keys[0]]
-	// has math.MaxUint64 NanoAva
-	initBalances := map[string]uint64{
-		keys[0].PublicKey().Address().String(): math.MaxUint64,
-		keys[1].PublicKey().Address().String(): defaultInitBalance,
-		keys[2].PublicKey().Address().String(): defaultInitBalance,
-	}
-	genesisTx := GenesisTx(initBalances)
-
-	// Initialize vm
-	vmDB := memdb.New()
-	msgChan := make(chan common.Message, 1)
-	ctx.Lock.Lock()
-	vm := &VM{}
-	vm.Initialize(ctx, vmDB, genesisTx.Bytes(), msgChan, nil)
-	vm.batchTimeout = 0
-
-	// Create a new private key
-	testPK, err := vm.CreateKey()
-	if err != nil {
-		t.Fatalf("CreateKey(): %s", err)
-	}
-	// Get the address controlled by the new private key
-	testAddr, err := vm.GetAddress(testPK)
-	if err != nil {
-		t.Fatalf("GetAddress(%q): %s", testPK, err)
-	}
-
-	// Get string repr. of keys[0]
-	cb58 := formatting.CB58{Bytes: keys[0].Bytes()}
-	privKey0 := cb58.String()
-
-	// Send [math.MaxUint64 - txFeeTest] NanoAva from [privKey0] to [testAddr]
-	_, err = vm.Send(math.MaxUint64-txFeeTest, "", testAddr, []string{privKey0})
-	if err != nil {
-		t.Fatalf("Send(%d,%q,%q,%v): failed with error - %s", uint64(math.MaxUint64-txFeeTest), "", testAddr, []string{privKey0}, err)
-	}
-	ctx.Lock.Unlock()
-
-	if msg := <-msgChan; msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
-
-	// Accept the transaction
-	ctx.Lock.Lock()
-	if txs := vm.PendingTxs(); len(txs) != 1 {
-		t.Fatalf("PendingTxs(): returned wrong number of transactions - expected: %d; returned: %d", 1, len(txs))
-	} else {
-		txs[0].Accept()
-	}
-	if txs := vm.PendingTxs(); len(txs) != 0 {
-		t.Fatalf("PendingTxs(): there should not have been any pending transactions")
-	}
-
-	// Ensure that [testAddr] has balance [math.MaxUint64 - txFeeTest]
-	if testbal, err := vm.GetBalance(testAddr, ""); err != nil {
-		t.Fatalf("GetBalance(%q): %s", testAddr, err)
-	} else if testbal != math.MaxUint64-txFeeTest {
-		t.Fatalf("GetBalance(%q,%q): Balance Not Equal(%d,%d)", testAddr, "", uint64(math.MaxUint64-txFeeTest), testbal)
-	}
-
-	// Ensure that the address controlled by [keys[0]] has balance 0
-	if testbal, err := vm.GetBalance(keys[0].PublicKey().Address().String(), ""); err != nil {
-		t.Fatalf("GetBalance(%q): %s", keys[0].PublicKey().Address().String(), err)
-	} else if testbal != 0 {
-		// Balance of new address should be 0
-		t.Fatalf("GetBalance(%q,%q): Balance Not Equal(%d,%d)", keys[0].PublicKey().Address().String(), "", 0, testbal)
-	}
-
-	cb58.Bytes = keys[1].Bytes()
-	privKey1 := cb58.String()
-
-	// Send [2*txFeeTest+1] NanoAva from [key1Str] to [testAddr]
-	// Should overflow [testAddr] by 1
-	_, err = vm.Send(2*txFeeTest+1, "", testAddr, []string{privKey1})
-	if err == errOutputOverflow {
-		t.Fatalf("Expected output to overflow but it did not")
-	}
 	ctx.Lock.Unlock()
 }

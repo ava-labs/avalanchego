@@ -1,4 +1,9 @@
-#!/bin/bash -e
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 export GOPATH="$SRC_DIR/.build_image_gopath"
 WORKPREFIX="$GOPATH/src/github.com/ava-labs/"
@@ -17,8 +22,6 @@ fi
 if [[ ! -d "$WORKPREFIX" ]]; then
     mkdir -p "$WORKPREFIX"
     git config --global credential.helper cache
-    git clone https://github.com/ava-labs/coreth.git "$WORKPREFIX/coreth"
-    git clone --depth 1 https://github.com/ava-labs/go-ethereum.git "$WORKPREFIX/go-ethereum"
     git clone https://github.com/ava-labs/gecko.git "$WORKPREFIX/gecko"
 fi
 GECKO_COMMIT="$(git --git-dir="$WORKPREFIX/gecko/.git" rev-parse --short HEAD)"

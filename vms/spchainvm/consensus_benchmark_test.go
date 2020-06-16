@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -61,11 +60,12 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		timeoutManager.Initialize(2 * time.Second)
 		go timeoutManager.Dispatch()
 
-		router := &router.ChainRouter{}
-		router.Initialize(logging.NoLog{}, &timeoutManager)
+		chainRouter := &router.ChainRouter{}
+		chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 		// Initialize the VM
 		vm := &VM{}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		ctx.Lock.Lock()
 		if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, nil); err != nil {
 			b.Fatal(err)
@@ -76,7 +76,7 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		// Passes messages from the consensus engine to the network
 		sender := sender.Sender{}
 
-		sender.Initialize(ctx, externalSender, router, &timeoutManager)
+		sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
 		// The engine handles consensus
 		engine := smeng.Transitive{}
@@ -86,28 +86,35 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 					Context:    ctx,
 					Validators: vdrs,
 					Beacons:    beacons,
-					Alpha:      (beacons.Len() + 1) / 2,
+					Alpha:      uint64(beacons.Len()/2 + 1),
 					Sender:     &sender,
 				},
 				Blocked: blocked,
 				VM:      vm,
 			},
 			Params: snowball.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            1,
-				Alpha:        1,
-				BetaVirtuous: 20,
-				BetaRogue:    20,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 1,
+				Alpha:             1,
+				BetaVirtuous:      20,
+				BetaRogue:         20,
+				ConcurrentRepolls: 1,
 			},
 			Consensus: &smcon.Topological{},
 		})
 
 		// Asynchronously passes messages from the network to the consensus engine
-		handler := &handler.Handler{}
-		handler.Initialize(&engine, msgChan, 1000)
+		handler := &router.Handler{}
+		handler.Initialize(
+			&engine,
+			msgChan,
+			1000,
+			"",
+			prometheus.NewRegistry(),
+		)
 
 		// Allow incoming messages to be routed to the new chain
-		router.AddChain(handler)
+		chainRouter.AddChain(handler)
 		go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 		engine.Startup()
@@ -187,8 +194,8 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		timeoutManager.Initialize(2 * time.Second)
 		go timeoutManager.Dispatch()
 
-		router := &router.ChainRouter{}
-		router.Initialize(logging.NoLog{}, &timeoutManager)
+		chainRouter := &router.ChainRouter{}
+		chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 		wg := sync.WaitGroup{}
 		wg.Add(numBlocks)
@@ -197,6 +204,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		vm := &VM{
 			onAccept: func(ids.ID) { wg.Done() },
 		}
+		defer func() { ctx.Lock.Lock(); vm.Shutdown(); vm.ctx.Lock.Unlock() }()
 		ctx.Lock.Lock()
 		if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, nil); err != nil {
 			b.Fatal(err)
@@ -207,7 +215,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		// Passes messages from the consensus engine to the network
 		sender := sender.Sender{}
 
-		sender.Initialize(ctx, externalSender, router, &timeoutManager)
+		sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
 		// The engine handles consensus
 		engine := smeng.Transitive{}
@@ -217,28 +225,35 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 					Context:    ctx,
 					Validators: vdrs,
 					Beacons:    beacons,
-					Alpha:      (beacons.Len() + 1) / 2,
+					Alpha:      uint64(beacons.Len()/2 + 1),
 					Sender:     &sender,
 				},
 				Blocked: blocked,
 				VM:      vm,
 			},
 			Params: snowball.Parameters{
-				Metrics:      prometheus.NewRegistry(),
-				K:            1,
-				Alpha:        1,
-				BetaVirtuous: 20,
-				BetaRogue:    20,
+				Metrics:           prometheus.NewRegistry(),
+				K:                 1,
+				Alpha:             1,
+				BetaVirtuous:      20,
+				BetaRogue:         20,
+				ConcurrentRepolls: 1,
 			},
 			Consensus: &smcon.Topological{},
 		})
 
 		// Asynchronously passes messages from the network to the consensus engine
-		handler := &handler.Handler{}
-		handler.Initialize(&engine, msgChan, 1000)
+		handler := &router.Handler{}
+		handler.Initialize(
+			&engine,
+			msgChan,
+			1000,
+			"",
+			prometheus.NewRegistry(),
+		)
 
 		// Allow incoming messages to be routed to the new chain
-		router.AddChain(handler)
+		chainRouter.AddChain(handler)
 		go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 		engine.Startup()
@@ -246,7 +261,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 
 		b.StartTimer()
 		for _, block := range blocks {
-			router.Put(ctx.NodeID, ctx.ChainID, 0, block.ID(), block.Bytes())
+			chainRouter.Put(ctx.NodeID, ctx.ChainID, 0, block.ID(), block.Bytes())
 		}
 		wg.Wait()
 		b.StopTimer()

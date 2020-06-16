@@ -116,12 +116,25 @@ func (vm *VM) Initialize(
 	return nil
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown implements the snowman.ChainVM interface
-func (vm *VM) Shutdown() {
-	vm.timer.Stop()
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
+func (vm *VM) Shutdown() error {
+	if vm.timer == nil {
+		return nil
 	}
+
+	// There is a potential deadlock if the timer is about to execute a timeout.
+	// So, the lock must be released before stopping the timer.
+	vm.ctx.Lock.Unlock()
+	vm.timer.Stop()
+	vm.ctx.Lock.Lock()
+
+	return vm.baseDB.Close()
 }
 
 // BuildBlock implements the snowman.ChainVM interface

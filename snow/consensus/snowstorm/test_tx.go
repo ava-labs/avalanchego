@@ -14,6 +14,7 @@ type TestTx struct {
 	Deps       []Tx
 	Ins        ids.Set
 	Stat       choices.Status
+	Validity   error
 	Bits       []byte
 }
 
@@ -30,16 +31,16 @@ func (tx *TestTx) InputIDs() ids.Set { return tx.Ins }
 func (tx *TestTx) Status() choices.Status { return tx.Stat }
 
 // Accept implements the Consumer interface
-func (tx *TestTx) Accept() { tx.Stat = choices.Accepted }
+func (tx *TestTx) Accept() error { tx.Stat = choices.Accepted; return nil }
 
 // Reject implements the Consumer interface
-func (tx *TestTx) Reject() { tx.Stat = choices.Rejected }
+func (tx *TestTx) Reject() error { tx.Stat = choices.Rejected; return nil }
 
 // Reset sets the status to pending
 func (tx *TestTx) Reset() { tx.Stat = choices.Processing }
 
 // Verify returns nil
-func (tx *TestTx) Verify() error { return nil }
+func (tx *TestTx) Verify() error { return tx.Validity }
 
 // Bytes returns the bits
 func (tx *TestTx) Bytes() []byte { return tx.Bits }

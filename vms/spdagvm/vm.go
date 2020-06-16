@@ -128,12 +128,25 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown implements the avalanche.DAGVM interface
-func (vm *VM) Shutdown() {
-	vm.timer.Stop()
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
+func (vm *VM) Shutdown() error {
+	if vm.timer == nil {
+		return nil
 	}
+
+	// There is a potential deadlock if the timer is about to execute a timeout.
+	// So, the lock must be released before stopping the timer.
+	vm.ctx.Lock.Unlock()
+	vm.timer.Stop()
+	vm.ctx.Lock.Lock()
+
+	return vm.baseDB.Close()
 }
 
 // CreateHandlers makes new service objects with references to the vm
@@ -315,7 +328,7 @@ func (vm *VM) Send(amount uint64, assetID, toAddrStr string, fromPKs []string) (
 	}
 
 	// Add all of the keys in [fromPKs] to a keychain
-	keychain := KeyChain{}
+	keychain := NewKeychain(vm.ctx.NetworkID, vm.ctx.ChainID)
 	factory := crypto.FactorySECP256K1R{}
 	cb58 := formatting.CB58{}
 	for _, fpk := range fromPKs {
@@ -359,7 +372,7 @@ func (vm *VM) Send(amount uint64, assetID, toAddrStr string, fromPKs []string) (
 		ChainID:   vm.ctx.ChainID,
 	}
 	currentTime := vm.clock.Unix()
-	tx, err := builder.NewTxFromUTXOs(&keychain, utxos, amount, vm.TxFee, 0, 1, toAddrs, outAddr, currentTime)
+	tx, err := builder.NewTxFromUTXOs(keychain, utxos, amount, vm.TxFee, 0, 1, toAddrs, outAddr, currentTime)
 	if err != nil {
 		return "", err
 	}

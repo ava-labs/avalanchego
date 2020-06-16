@@ -18,8 +18,8 @@ var (
 
 // OutputOwners ...
 type OutputOwners struct {
-	Threshold uint32        `serialize:"true"`
-	Addrs     []ids.ShortID `serialize:"true"`
+	Threshold uint32        `serialize:"true" json:"threshold"`
+	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
 }
 
 // Addresses returns the addresses that manage this output

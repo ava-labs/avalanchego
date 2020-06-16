@@ -4,11 +4,11 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 )
@@ -35,17 +35,25 @@ type APIAccount struct {
 	Balance json.Uint64 `json:"balance"`
 }
 
+// FormattedAPIAccount is an APIAccount but allows for a formatted Address
+type FormattedAPIAccount struct {
+	Address string      `json:"address"`
+	Nonce   json.Uint64 `json:"nonce"`
+	Balance json.Uint64 `json:"balance"`
+}
+
 // APIValidator is a validator.
 // [Amount] is the amount of $AVA being staked.
 // [Endtime] is the Unix time repr. of when they are done staking
 // [ID] is the node ID of the staker
-// [Destination] is the address where the staked $AVA (and, if applicable, reward)
+// [Address] is the address where the staked AVA (and, if applicable, reward)
 // is sent when this staker is done staking.
 type APIValidator struct {
 	StartTime   json.Uint64  `json:"startTime"`
-	EndTime     json.Uint64  `json:"endtime"`
+	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
+	Address     *ids.ShortID `json:"address,omitempty"`
 	ID          ids.ShortID  `json:"id"`
 }
 
@@ -68,17 +76,48 @@ type APIDefaultSubnetValidator struct {
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
+// FormattedAPIValidator allows for a formatted address
+type FormattedAPIValidator struct {
+	StartTime   json.Uint64  `json:"startTime"`
+	EndTime     json.Uint64  `json:"endTime"`
+	Weight      *json.Uint64 `json:"weight,omitempty"`
+	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
+	Address     string       `json:"address,omitempty"`
+	ID          ids.ShortID  `json:"id"`
+}
+
+func (v *FormattedAPIValidator) weight() uint64 {
+	switch {
+	case v.Weight != nil:
+		return uint64(*v.Weight)
+	case v.StakeAmount != nil:
+		return uint64(*v.StakeAmount)
+	default:
+		return 0
+	}
+}
+
+// FormattedAPIDefaultSubnetValidator is a formatted validator of the default subnet
+type FormattedAPIDefaultSubnetValidator struct {
+	FormattedAPIValidator
+
+	Destination       string      `json:"destination"`
+	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
+}
+
 // APIChain defines a chain that exists
 // at the network's genesis.
 // [GenesisData] is the initial state of the chain.
 // [VMID] is the ID of the VM this chain runs.
 // [FxIDs] are the IDs of the Fxs the chain supports.
 // [Name] is a human-readable, non-unique name for the chain.
+// [SubnetID] is the ID of the subnet that validates the chain
 type APIChain struct {
 	GenesisData formatting.CB58 `json:"genesisData"`
 	VMID        ids.ID          `json:"vmID"`
 	FxIDs       []ids.ID        `json:"fxIDs"`
 	Name        string          `json:"name"`
+	SubnetID    ids.ID          `json:"subnetID"`
 }
 
 // BuildGenesisArgs are the arguments used to create
@@ -134,8 +173,8 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return errAccountHasNoValue
 		}
 		accounts = append(accounts, newAccount(
-			account.Address, // ID
-			0,               // nonce
+			account.Address,         // ID
+			0,                       // nonce
 			uint64(account.Balance), // balance
 		))
 	}
@@ -170,7 +209,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			return err
 		}
 
-		heap.Push(validators, tx)
+		validators.Add(tx)
 	}
 
 	// Specify the chains that exist at genesis.
@@ -182,12 +221,15 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		tx := &CreateChainTx{
 			UnsignedCreateChainTx: UnsignedCreateChainTx{
 				NetworkID:   uint32(args.NetworkID),
+				SubnetID:    chain.SubnetID,
 				Nonce:       0,
 				ChainName:   chain.Name,
 				VMID:        chain.VMID,
 				FxIDs:       chain.FxIDs,
 				GenesisData: chain.GenesisData.Bytes,
 			},
+			ControlSigs: [][crypto.SECP256K1RSigLen]byte{},
+			PayerSig:    [crypto.SECP256K1RSigLen]byte{},
 		}
 		if err := tx.initialize(nil); err != nil {
 			return err

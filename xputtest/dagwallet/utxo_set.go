@@ -11,49 +11,53 @@ import (
 	"github.com/ava-labs/gecko/vms/spdagvm"
 )
 
-// UtxoSet ...
-type UtxoSet struct {
-	// This can be used to iterate over. However, it should not be modified externally.
+// UTXOSet ...
+type UTXOSet struct {
+	// Key: The id of a UTXO
+	// Value: The index in UTXOs of that UTXO
 	utxoMap map[[32]byte]int
-	Utxos   []*spdagvm.UTXO
+
+	// List of UTXOs in this set
+	// This can be used to iterate over. It should not be modified externally.
+	UTXOs []*spdagvm.UTXO
 }
 
 // Put ...
-func (us *UtxoSet) Put(utxo *spdagvm.UTXO) {
+func (us *UTXOSet) Put(utxo *spdagvm.UTXO) {
 	if us.utxoMap == nil {
 		us.utxoMap = make(map[[32]byte]int)
 	}
 	if _, ok := us.utxoMap[utxo.ID().Key()]; !ok {
-		us.utxoMap[utxo.ID().Key()] = len(us.Utxos)
-		us.Utxos = append(us.Utxos, utxo)
+		us.utxoMap[utxo.ID().Key()] = len(us.UTXOs)
+		us.UTXOs = append(us.UTXOs, utxo)
 	}
 }
 
 // Get ...
-func (us *UtxoSet) Get(id ids.ID) *spdagvm.UTXO {
+func (us *UTXOSet) Get(id ids.ID) *spdagvm.UTXO {
 	if us.utxoMap == nil {
 		return nil
 	}
 	if i, ok := us.utxoMap[id.Key()]; ok {
-		utxo := us.Utxos[i]
+		utxo := us.UTXOs[i]
 		return utxo
 	}
 	return nil
 }
 
 // Remove ...
-func (us *UtxoSet) Remove(id ids.ID) *spdagvm.UTXO {
+func (us *UTXOSet) Remove(id ids.ID) *spdagvm.UTXO {
 	i, ok := us.utxoMap[id.Key()]
 	if !ok {
 		return nil
 	}
-	utxoI := us.Utxos[i]
+	utxoI := us.UTXOs[i]
 
-	j := len(us.Utxos) - 1
-	utxoJ := us.Utxos[j]
+	j := len(us.UTXOs) - 1
+	utxoJ := us.UTXOs[j]
 
-	us.Utxos[i] = us.Utxos[j]
-	us.Utxos = us.Utxos[:j]
+	us.UTXOs[i] = us.UTXOs[j]
+	us.UTXOs = us.UTXOs[:j]
 
 	us.utxoMap[utxoJ.ID().Key()] = i
 	delete(us.utxoMap, utxoI.ID().Key())
@@ -61,14 +65,14 @@ func (us *UtxoSet) Remove(id ids.ID) *spdagvm.UTXO {
 	return utxoI
 }
 
-func (us *UtxoSet) string(prefix string) string {
+func (us *UTXOSet) string(prefix string) string {
 	s := strings.Builder{}
 
-	for i, utxo := range us.Utxos {
+	for i, utxo := range us.UTXOs {
 		out := utxo.Out().(*spdagvm.OutputPayment)
 		sourceID, sourceIndex := utxo.Source()
 
-		s.WriteString(fmt.Sprintf("%sUtxo[%d]:"+
+		s.WriteString(fmt.Sprintf("%sUTXO[%d]:"+
 			"\n%s    InputID: %s"+
 			"\n%s    InputIndex: %d"+
 			"\n%s    Locktime: %d"+
@@ -83,6 +87,6 @@ func (us *UtxoSet) string(prefix string) string {
 	return strings.TrimSuffix(s.String(), "\n")
 }
 
-func (us *UtxoSet) String() string {
+func (us *UTXOSet) String() string {
 	return us.string("")
 }

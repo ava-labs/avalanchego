@@ -53,18 +53,28 @@ func (b *Block) Parent() snowman.Block {
 // Accept sets this block's status to Accepted and sets lastAccepted to this
 // block's ID and saves this info to b.vm.DB
 // Recall that b.vm.DB.Commit() must be called to persist to the DB
-func (b *Block) Accept() {
-	b.SetStatus(choices.Accepted)                           // Change state of this block
-	b.VM.State.PutStatus(b.VM.DB, b.ID(), choices.Accepted) // Persist data
-	b.VM.State.PutLastAccepted(b.VM.DB, b.ID())
-	b.VM.lastAccepted = b.ID() // Change state of VM
+func (b *Block) Accept() error {
+	b.SetStatus(choices.Accepted) // Change state of this block
+
+	blkID := b.ID()
+
+	// Persist data
+	if err := b.VM.State.PutStatus(b.VM.DB, blkID, choices.Accepted); err != nil {
+		return err
+	}
+	if err := b.VM.State.PutLastAccepted(b.VM.DB, blkID); err != nil {
+		return err
+	}
+
+	b.VM.LastAcceptedID = blkID // Change state of VM
+	return nil
 }
 
 // Reject sets this block's status to Rejected and saves the status in state
 // Recall that b.vm.DB.Commit() must be called to persist to the DB
-func (b *Block) Reject() {
+func (b *Block) Reject() error {
 	b.SetStatus(choices.Rejected)
-	b.VM.State.PutStatus(b.VM.DB, b.ID(), choices.Rejected)
+	return b.VM.State.PutStatus(b.VM.DB, b.ID(), choices.Rejected)
 }
 
 // Status returns the status of this block

@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"time"
@@ -20,12 +19,16 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 const (
@@ -36,16 +39,23 @@ const (
 	blockTypeID
 	subnetsTypeID
 
-	// Delta is the synchrony bound used for safe decision making
-	Delta = 10 * time.Second // TODO change to longer period (2 minutes?) before release
+	platformAlias = "P"
+	addressSep    = "-"
 
-	// InflationRate is the maximum inflation rate of AVA from staking
-	InflationRate = 1.04
+	// Delta is the synchrony bound used for safe decision making
+	Delta = 10 * time.Second
 
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
 
-	// TODO: Incorporate these constants + turn them into governable parameters
+	// NumberOfShares is the number of shares that a delegator is
+	// rewarded
+	NumberOfShares = 1000000
+
+	// TODO: Turn these constants into governable parameters
+
+	// InflationRate is the maximum inflation rate of AVA from staking
+	InflationRate = 1.04
 
 	// MinimumStakeAmount is the minimum amount of $AVA one must bond to be a staker
 	MinimumStakeAmount = 10 * units.MicroAva
@@ -57,10 +67,6 @@ const (
 	// MaximumStakingDuration is the longest amount of time a staker can bond
 	// their funds for.
 	MaximumStakingDuration = 365 * 24 * time.Hour
-
-	// NumberOfShares is the number of shares that a delegator is
-	// rewarded
-	NumberOfShares = 1000000
 )
 
 var (
@@ -78,22 +84,25 @@ var (
 )
 
 var (
-	errEndOfTime              = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
-	errTimeTooAdvanced        = errors.New("this is proposing a time too far in the future")
-	errNoPendingBlocks        = errors.New("no pending blocks")
-	errUnsupportedFXs         = errors.New("unsupported feature extensions")
-	errDB                     = errors.New("problem retrieving/putting value from/in database")
-	errDBCurrentValidators    = errors.New("couldn't retrieve current validators from database")
-	errDBPutCurrentValidators = errors.New("couldn't put current validators in database")
-	errDBPendingValidators    = errors.New("couldn't retrieve pending validators from database")
-	errDBPutPendingValidators = errors.New("couldn't put pending validators in database")
-	errDBAccount              = errors.New("couldn't retrieve account from database")
-	errDBPutAccount           = errors.New("couldn't put account in database")
-	errDBChains               = errors.New("couldn't retrieve chain list from database")
-	errDBPutChains            = errors.New("couldn't put chain list in database")
-	errDBPutBlock             = errors.New("couldn't put block in database")
-	errRegisteringType        = errors.New("error registering type with database")
-	errMissingBlock           = errors.New("missing block")
+	errEndOfTime                = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
+	errTimeTooAdvanced          = errors.New("this is proposing a time too far in the future")
+	errNoPendingBlocks          = errors.New("no pending blocks")
+	errUnsupportedFXs           = errors.New("unsupported feature extensions")
+	errDB                       = errors.New("problem retrieving/putting value from/in database")
+	errDBCurrentValidators      = errors.New("couldn't retrieve current validators from database")
+	errDBPutCurrentValidators   = errors.New("couldn't put current validators in database")
+	errDBPendingValidators      = errors.New("couldn't retrieve pending validators from database")
+	errDBPutPendingValidators   = errors.New("couldn't put pending validators in database")
+	errDBAccount                = errors.New("couldn't retrieve account from database")
+	errDBPutAccount             = errors.New("couldn't put account in database")
+	errDBChains                 = errors.New("couldn't retrieve chain list from database")
+	errDBPutChains              = errors.New("couldn't put chain list in database")
+	errDBPutBlock               = errors.New("couldn't put block in database")
+	errRegisteringType          = errors.New("error registering type with database")
+	errMissingBlock             = errors.New("missing block")
+	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
+	errInvalidAddress           = errors.New("invalid address")
+	errEmptyAddress             = errors.New("empty address")
 )
 
 // Codec does serialization and deserialization
@@ -108,6 +117,13 @@ func init() {
 		Codec.RegisterType(&Abort{}),
 		Codec.RegisterType(&Commit{}),
 		Codec.RegisterType(&StandardBlock{}),
+		Codec.RegisterType(&AtomicBlock{}),
+
+		Codec.RegisterType(&secp256k1fx.TransferInput{}),
+		Codec.RegisterType(&secp256k1fx.MintOutput{}),
+		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
+		Codec.RegisterType(&secp256k1fx.MintOperation{}),
+		Codec.RegisterType(&secp256k1fx.Credential{}),
 
 		Codec.RegisterType(&UnsignedAddDefaultSubnetValidatorTx{}),
 		Codec.RegisterType(&addDefaultSubnetValidatorTx{}),
@@ -124,6 +140,12 @@ func init() {
 		Codec.RegisterType(&UnsignedCreateSubnetTx{}),
 		Codec.RegisterType(&CreateSubnetTx{}),
 
+		Codec.RegisterType(&UnsignedImportTx{}),
+		Codec.RegisterType(&ImportTx{}),
+
+		Codec.RegisterType(&UnsignedExportTx{}),
+		Codec.RegisterType(&ExportTx{}),
+
 		Codec.RegisterType(&advanceTimeTx{}),
 		Codec.RegisterType(&rewardValidatorTx{}),
 	)
@@ -136,10 +158,24 @@ func init() {
 type VM struct {
 	*core.SnowmanVM
 
-	Validators validators.Manager
+	// Node's validator manager
+	// Maps Subnets --> nodes in the Subnet HEAD
+	validators validators.Manager
+
+	// true if the node is being run with staking enabled
+	stakingEnabled bool
 
 	// The node's chain manager
-	ChainManager chains.Manager
+	chainManager chains.Manager
+
+	// AVA asset ID
+	ava ids.ID
+
+	// AVM is the ID of the ava virtual machine
+	avm ids.ID
+
+	fx    secp256k1fx.Fx
+	codec codec.Codec
 
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
@@ -154,6 +190,7 @@ type VM struct {
 	// Transactions that have not been put into blocks yet
 	unissuedEvents      *EventHeap
 	unissuedDecisionTxs []DecisionTx
+	unissuedAtomicTxs   []AtomicTx
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
@@ -180,6 +217,12 @@ func (vm *VM) Initialize(
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
 		return err
 	}
+
+	vm.codec = codec.NewDefault()
+	if err := vm.fx.Initialize(vm); err != nil {
+		return err
+	}
+	vm.codec = Codec
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()
@@ -250,6 +293,10 @@ func (vm *VM) Initialize(
 		genesisBlock.CommonBlock.Accept()
 
 		vm.SetDBInitialized()
+
+		if err := vm.DB.Commit(); err != nil {
+			return errDB
+		}
 	}
 
 	// Transactions from clients that have not yet been put into blocks
@@ -265,8 +312,8 @@ func (vm *VM) Initialize(
 	})
 	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
 
-	if err := vm.updateValidators(DefaultSubnetID); err != nil {
-		ctx.Log.Error("failed to initialize the current validator set: %s", err)
+	if err := vm.initSubnets(); err != nil {
+		ctx.Log.Error("failed to initialize Subnets: %s", err)
 		return err
 	}
 
@@ -276,39 +323,106 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	lastAcceptedID := vm.LastAccepted()
+	vm.Ctx.Log.Info("Initializing last accepted block as %s", lastAcceptedID)
+
 	// Build off the most recently accepted block
-	vm.SetPreference(vm.LastAccepted())
+	vm.SetPreference(lastAcceptedID)
+
+	// Sanity check to make sure the DB is in a valid state
+	lastAcceptedIntf, err := vm.getBlock(lastAcceptedID)
+	if err != nil {
+		vm.Ctx.Log.Error("Error fetching the last accepted block (%s), %s", vm.Preferred(), err)
+		return err
+	}
+	if _, ok := lastAcceptedIntf.(decision); !ok {
+		vm.Ctx.Log.Fatal("The last accepted block, %s, must always be a decision block", lastAcceptedID)
+		return errInvalidLastAcceptedBlock
+	}
 
 	return nil
 }
 
-// Create all of the chains that the database says should exist
+// Create all chains that exist that this node validates
+// Can only be called after initSubnets()
 func (vm *VM) initBlockchains() error {
-	vm.Ctx.Log.Verbo("platform chain initializing existing blockchains")
-	existingChains, err := vm.getChains(vm.DB)
+	vm.Ctx.Log.Info("initializing blockchains")
+	blockchains, err := vm.getChains(vm.DB) // get blockchains that exist
 	if err != nil {
 		return err
 	}
-	for _, chain := range existingChains { // Create each blockchain
-		chainParams := chains.ChainParameters{
-			ID:          chain.ID(),
-			GenesisData: chain.GenesisData,
-			VMAlias:     chain.VMID.String(),
-		}
-		for _, fxID := range chain.FxIDs {
-			chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-		}
-		vm.ChainManager.CreateChain(chainParams)
+
+	for _, chain := range blockchains {
+		vm.createChain(chain)
 	}
 	return nil
 }
 
-// Shutdown this blockchain
-func (vm *VM) Shutdown() {
-	vm.timer.Stop()
-	if err := vm.DB.Close(); err != nil {
-		vm.Ctx.Log.Error("Closing the database failed with %s", err)
+// Set the node's validator manager to be up to date
+func (vm *VM) initSubnets() error {
+	vm.Ctx.Log.Info("initializing Subnets")
+	subnets, err := vm.getSubnets(vm.DB)
+	if err != nil {
+		return err
 	}
+
+	if err := vm.updateValidators(DefaultSubnetID); err != nil {
+		return err
+	}
+
+	for _, subnet := range subnets {
+		if err := vm.updateValidators(subnet.id); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Create the blockchain described in [tx], but only if this node is a member of
+// the Subnet that validates the chain
+func (vm *VM) createChain(tx *CreateChainTx) {
+	// The validators that compose the Subnet that validates this chain
+	validators, subnetExists := vm.validators.GetValidatorSet(tx.SubnetID)
+	if !subnetExists {
+		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
+		return
+	}
+	if vm.stakingEnabled && !DefaultSubnetID.Equals(tx.SubnetID) && !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
+		return
+	}
+
+	chainParams := chains.ChainParameters{
+		ID:          tx.ID(),
+		SubnetID:    tx.SubnetID,
+		GenesisData: tx.GenesisData,
+		VMAlias:     tx.VMID.String(),
+	}
+	for _, fxID := range tx.FxIDs {
+		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
+	}
+	vm.chainManager.CreateChain(chainParams)
+}
+
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
+// Shutdown this blockchain
+func (vm *VM) Shutdown() error {
+	if vm.timer == nil {
+		return nil
+	}
+
+	// There is a potential deadlock if the timer is about to execute a timeout.
+	// So, the lock must be released before stopping the timer.
+	vm.Ctx.Lock.Unlock()
+	vm.timer.Stop()
+	vm.Ctx.Lock.Lock()
+
+	return vm.DB.Close()
 }
 
 // BuildBlock builds a block to be added to consensus
@@ -325,6 +439,24 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		var txs []DecisionTx
 		txs, vm.unissuedDecisionTxs = vm.unissuedDecisionTxs[:numTxs], vm.unissuedDecisionTxs[numTxs:]
 		blk, err := vm.newStandardBlock(preferredID, txs)
+		if err != nil {
+			return nil, err
+		}
+		if err := blk.Verify(); err != nil {
+			vm.resetTimer()
+			return nil, err
+		}
+		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+			return nil, err
+		}
+		return blk, vm.DB.Commit()
+	}
+
+	// If there is a pending atomic tx, build a block with it
+	if len(vm.unissuedAtomicTxs) > 0 {
+		tx := vm.unissuedAtomicTxs[0]
+		vm.unissuedAtomicTxs = vm.unissuedAtomicTxs[1:]
+		blk, err := vm.newAtomicBlock(preferredID, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -502,24 +634,27 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 // Check if there is a block ready to be added to consensus
 // If so, notify the consensus engine
 func (vm *VM) resetTimer() {
-	// If there is a pending CreateChainTx, trigger building of a block
-	// with that transaction
-	if len(vm.unissuedDecisionTxs) > 0 {
+	// If there is a pending transaction, trigger building of a block with that
+	// transaction
+	if len(vm.unissuedDecisionTxs) > 0 || len(vm.unissuedAtomicTxs) > 0 {
 		vm.SnowmanVM.NotifyBlockReady()
 		return
 	}
 
 	// Get the preferred block
-	preferred, err := vm.getBlock(vm.Preferred())
-	vm.Ctx.Log.AssertNoError(err)
+	preferredIntf, err := vm.getBlock(vm.Preferred())
+	if err != nil {
+		vm.Ctx.Log.Error("Error fetching the preferred block (%s), %s", vm.Preferred(), err)
+		return
+	}
 
 	// The database if the preferred block were to be committed
 	var db database.Database
 	// The preferred block should always be a decision block
-	if preferred, ok := preferred.(decision); ok {
+	if preferred, ok := preferredIntf.(decision); ok {
 		db = preferred.onAccept()
 	} else {
-		vm.Ctx.Log.Error("The preferred block should always be a decision block")
+		vm.Ctx.Log.Error("The preferred block, %s, should always be a decision block", vm.Preferred())
 		return
 	}
 
@@ -562,7 +697,7 @@ func (vm *VM) resetTimer() {
 			vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
-		// If the tx doesn't meet the syncrony bound, drop it
+		// If the tx doesn't meet the synchrony bound, drop it
 		vm.unissuedEvents.Remove()
 		vm.Ctx.Log.Debug("dropping tx to add validator because its start time has passed")
 	}
@@ -584,7 +719,7 @@ func (vm *VM) nextValidatorChangeTime(db database.Database, start bool) time.Tim
 		return earliest
 	}
 	for _, subnet := range subnets {
-		t := vm.nextSubnetValidatorChangeTime(db, subnet.ID, start)
+		t := vm.nextSubnetValidatorChangeTime(db, subnet.id, start)
 		if t.Before(earliest) {
 			earliest = t
 		}
@@ -614,13 +749,16 @@ func (vm *VM) nextSubnetValidatorChangeTime(db database.Database, subnetID ids.I
 // Returns:
 // 1) The validator set of subnet with ID [subnetID] when timestamp is advanced to [timestamp]
 // 2) The pending validator set of subnet with ID [subnetID] when timestamp is advanced to [timestamp]
+// 3) The IDs of the validators that start validating [subnetID] between now and [timestamp]
+// 4) The IDs of the validators that stop validating [subnetID] between now and [timestamp]
 // Note that this method will not remove validators from the current validator set of the default subnet.
 // That happens in reward blocks.
-func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, subnetID ids.ID) (current, pending *EventHeap, err error) {
+func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, subnetID ids.ID) (current,
+	pending *EventHeap, started, stopped ids.ShortSet, err error) {
 	// remove validators whose end time <= [timestamp]
 	current, err = vm.getCurrentValidators(db, subnetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if !subnetID.Equals(DefaultSubnetID) { // validators of default subnet removed in rewardValidatorTxs, not here
 		for current.Len() > 0 {
@@ -629,21 +767,23 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 				break
 			}
 			current.Remove()
+			stopped.Add(next.Vdr().ID())
 		}
 	}
 	pending, err = vm.getPendingValidators(db, subnetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	for pending.Len() > 0 {
 		nextTx := pending.Peek() // pending staker with earliest start time
 		if timestamp.Before(nextTx.StartTime()) {
 			break
 		}
-		heap.Push(current, nextTx)
-		heap.Pop(pending)
+		current.Add(nextTx)
+		pending.Remove()
+		started.Add(nextTx.Vdr().ID())
 	}
-	return current, pending, nil
+	return current, pending, started, stopped, nil
 }
 
 func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
@@ -671,10 +811,12 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 	return vdrList
 }
 
+// update the node's validator manager to contain the current validator set of the given Subnet
 func (vm *VM) updateValidators(subnetID ids.ID) error {
-	validatorSet, ok := vm.Validators.GetValidatorSet(subnetID)
-	if !ok {
-		return fmt.Errorf("couldn't get the validator sampler of the %s subnet", subnetID)
+	validatorSet, subnetInitialized := vm.validators.GetValidatorSet(subnetID)
+	if !subnetInitialized { // validator manager doesn't know about this subnet yet
+		validatorSet = validators.NewSet()
+		vm.validators.PutValidatorSet(subnetID, validatorSet)
 	}
 
 	currentValidators, err := vm.getCurrentValidators(vm.DB, subnetID)
@@ -685,4 +827,57 @@ func (vm *VM) updateValidators(subnetID ids.ID) error {
 	validators := vm.getValidators(currentValidators)
 	validatorSet.Set(validators)
 	return nil
+}
+
+// Codec ...
+func (vm *VM) Codec() codec.Codec { return vm.codec }
+
+// Clock ...
+func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+
+// Logger ...
+func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
+
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+
+	utxoIDs := ids.Set{}
+	for _, addr := range addrs.List() {
+		utxos, err := state.AVMFunds(addr)
+		if err != nil {
+			return nil, err
+		}
+		utxoIDs.Add(utxos...)
+	}
+
+	utxos := []*ava.UTXO{}
+	for _, utxoID := range utxoIDs.List() {
+		utxo, err := state.AVMUTXO(utxoID)
+		if err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
+}
+
+// ParseAddress ...
+func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
+	cb58 := formatting.CB58{}
+	err := cb58.FromString(addrStr)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return ids.ToShortID(cb58.Bytes)
+}
+
+// FormatAddress ...
+// Assumes addrID is not empty
+func (vm *VM) FormatAddress(addrID ids.ShortID) string {
+	return addrID.String()
 }

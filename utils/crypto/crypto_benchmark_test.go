@@ -41,7 +41,7 @@ func init() {
 		RSA:       &FactoryRSA{},
 		RSAPSS:    &FactoryRSAPSS{},
 		ED25519:   &FactoryED25519{},
-		SECP256K1: &FactorySECP256K1{},
+		SECP256K1: &FactorySECP256K1R{},
 	}
 	for _, f := range factories {
 		fKeys := []PublicKey{}

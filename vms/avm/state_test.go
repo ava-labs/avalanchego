@@ -10,24 +10,32 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func TestStateIDs(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
-	id0 := ids.NewID([32]byte{0xff, 0})
-	id1 := ids.NewID([32]byte{0xff, 0})
-	id2 := ids.NewID([32]byte{0xff, 0})
+	id0 := ids.NewID([32]byte{0x00, 0})
+	id1 := ids.NewID([32]byte{0x01, 0})
+	id2 := ids.NewID([32]byte{0x02, 0})
 
-	if _, err := state.IDs(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
+	if _, err := state.IDs(ids.Empty); err != nil {
+		t.Fatal(err)
 	}
 
 	expected := []ids.ID{id0, id1}
-	if err := state.SetIDs(ids.Empty, expected); err != nil {
-		t.Fatal(err)
+	for _, id := range expected {
+		if err := state.AddID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	result, err := state.IDs(ids.Empty)
@@ -39,16 +47,34 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
 			t.Fatalf("Wrong ID returned")
 		}
+	}
+
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result, err = state.IDs(ids.Empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
 	}
 
 	expected = []ids.ID{id1, id2}
-	if err := state.SetIDs(ids.Empty, expected); err != nil {
-		t.Fatal(err)
+	for _, id := range expected {
+		if err := state.AddID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	result, err = state.IDs(ids.Empty)
@@ -60,6 +86,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -67,7 +94,7 @@ func TestStateIDs(t *testing.T) {
 		}
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	result, err = state.IDs(ids.Empty)
 	if err != nil {
@@ -78,6 +105,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -89,18 +117,6 @@ func TestStateIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during cache lookup")
-	}
-
-	state.c.Flush()
-
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during parsing")
-	}
-
 	statusResult, err := state.Status(ids.Empty)
 	if err != nil {
 		t.Fatal(err)
@@ -109,21 +125,37 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{ids.ID{}}); err == nil {
-		t.Fatalf("Should have errored during serialization")
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{}); err != nil {
+	result, err = state.IDs(ids.Empty)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := state.IDs(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
+	if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
+	}
+
+	if err := state.AddID(ids.Empty, ids.ID{}); err == nil {
+		t.Fatalf("Should have errored during serialization")
+	}
+
+	if err := state.RemoveID(ids.Empty, ids.ID{}); err == nil {
+		t.Fatalf("Should have errored during serialization")
 	}
 }
 
 func TestStateStatuses(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
 	if _, err := state.Status(ids.Empty); err == nil {
@@ -142,14 +174,7 @@ func TestStateStatuses(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{ids.Empty}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := state.Status(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
-	}
-
-	if err := state.SetStatus(ids.Empty, choices.Accepted); err != nil {
+	if err := state.AddID(ids.Empty, ids.Empty); err != nil {
 		t.Fatal(err)
 	}
 
@@ -171,22 +196,27 @@ func TestStateStatuses(t *testing.T) {
 }
 
 func TestStateUTXOs(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
-	vm.codec.RegisterType(&testVerifiable{})
+	vm.codec.RegisterType(&ava.TestVerifiable{})
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
-		Out:   &testVerifiable{},
+		Asset: ava.Asset{ID: ids.Empty},
+		Out:   &ava.TestVerifiable{},
 	}
 
 	if err := state.SetUTXO(ids.Empty, utxo); err != nil {
@@ -202,7 +232,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Wrong UTXO returned")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	result, err = state.UTXO(ids.Empty)
 	if err != nil {
@@ -221,7 +251,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	if err := state.SetUTXO(ids.Empty, &UTXO{}); err == nil {
+	if err := state.SetUTXO(ids.Empty, &ava.UTXO{}); err == nil {
 		t.Fatalf("Should have errored packing the utxo")
 	}
 
@@ -233,7 +263,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
@@ -241,38 +271,39 @@ func TestStateUTXOs(t *testing.T) {
 }
 
 func TestStateTXs(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state.state
 
-	vm.codec.RegisterType(&TestTransferable{})
+	vm.codec.RegisterType(&ava.TestTransferable{})
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")
 	}
 
-	tx := &Tx{UnsignedTx: &OperationTx{BaseTx: BaseTx{
+	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 0,
-				},
-				Asset: Asset{
-					ID: asset,
-				},
-				In: &secp256k1fx.TransferInput{
-					Amt: 20 * units.KiloAva,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 20 * units.KiloAva,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
-	}}}
+		}},
+	}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {
@@ -287,11 +318,9 @@ func TestStateTXs(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	tx.Creds = append(tx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 
@@ -314,7 +343,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatalf("Wrong Tx returned")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	result, err = state.Tx(ids.Empty)
 	if err != nil {
@@ -341,7 +370,7 @@ func TestStateTXs(t *testing.T) {
 		t.Fatalf("Should have errored when reading tx")
 	}
 
-	state.c.Flush()
+	state.Cache.Flush()
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")

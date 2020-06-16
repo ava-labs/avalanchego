@@ -35,14 +35,14 @@ func TestUnarySnowball(t *testing.T) {
 	sbCloneIntf := sb.Clone()
 	sbClone, ok := sbCloneIntf.(*unarySnowball)
 	if !ok {
-		t.Fatalf("Unexpectedly clone type")
+		t.Fatalf("Unexpected clone type")
 	}
 
 	UnarySnowballStateTest(t, sbClone, 2, 1, false)
 
 	binarySnowball := sbClone.Extend(beta, 0)
 
-	expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 2, NumSuccessfulPolls[1] = 0, SF = SF(Preference = 0, Confidence = 1, Finalized = false))"
+	expected := "SB(Preference = 0, NumSuccessfulPolls[0] = 2, NumSuccessfulPolls[1] = 0, SF(Confidence = 1, Finalized = false, SL(Preference = 0)))"
 	if result := binarySnowball.String(); result != expected {
 		t.Fatalf("Expected:\n%s\nReturned:\n%s", expected, result)
 	}
@@ -79,7 +79,7 @@ func TestUnarySnowball(t *testing.T) {
 		t.Fatalf("Should have finalized")
 	}
 
-	expected = "SB(NumSuccessfulPolls = 2, Confidence = 1, Finalized = false)"
+	expected = "SB(NumSuccessfulPolls = 2, SF(Confidence = 1, Finalized = false))"
 	if str := sb.String(); str != expected {
 		t.Fatalf("Wrong state. Expected:\n%s\nGot:\n%s", expected, str)
 	}

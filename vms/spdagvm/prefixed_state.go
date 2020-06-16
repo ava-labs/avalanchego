@@ -107,7 +107,6 @@ func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 	}
 
 	// Update funds
-	// TODO: Clean this up. More into the output object?
 	switch out := utxo.Out().(type) {
 	case *OutputPayment:
 		return s.removeUTXO(out.Addresses(), utxoID)

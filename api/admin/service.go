@@ -10,42 +10,71 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/genesis"
+	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/version"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
 
 // Admin is the API service for node admin management
 type Admin struct {
+	version      version.Version
+	nodeID       ids.ShortID
 	networkID    uint32
 	log          logging.Logger
-	networking   Networking
+	networking   network.Network
 	performance  Performance
 	chainManager chains.Manager
 	httpServer   *api.Server
 }
 
 // NewService returns a new admin API service
-func NewService(networkID uint32, log logging.Logger, chainManager chains.Manager, peers Peerable, httpServer *api.Server) *common.HTTPHandler {
+func NewService(version version.Version, nodeID ids.ShortID, networkID uint32, log logging.Logger, chainManager chains.Manager, peers network.Network, httpServer *api.Server) *common.HTTPHandler {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&Admin{
+		version:      version,
+		nodeID:       nodeID,
 		networkID:    networkID,
 		log:          log,
 		chainManager: chainManager,
-		networking: Networking{
-			peers: peers,
-		},
-		httpServer: httpServer,
+		networking:   peers,
+		httpServer:   httpServer,
 	}, "admin")
 	return &common.HTTPHandler{Handler: newServer}
 }
 
-// GetNetworkIDArgs are the arguments for calling GetNetworkID
-type GetNetworkIDArgs struct{}
+// GetNodeVersionReply are the results from calling GetNodeVersion
+type GetNodeVersionReply struct {
+	Version string `json:"version"`
+}
+
+// GetNodeVersion returns the version this node is running
+func (service *Admin) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersionReply) error {
+	service.log.Debug("Admin: GetNodeVersion called")
+
+	reply.Version = service.version.String()
+	return nil
+}
+
+// GetNodeIDReply are the results from calling GetNodeID
+type GetNodeIDReply struct {
+	NodeID ids.ShortID `json:"nodeID"`
+}
+
+// GetNodeID returns the node ID of this node
+func (service *Admin) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
+	service.log.Debug("Admin: GetNodeID called")
+
+	reply.NodeID = service.nodeID
+	return nil
+}
 
 // GetNetworkIDReply are the results from calling GetNetworkID
 type GetNetworkIDReply struct {
@@ -53,10 +82,23 @@ type GetNetworkIDReply struct {
 }
 
 // GetNetworkID returns the network ID this node is running on
-func (service *Admin) GetNetworkID(r *http.Request, args *GetNetworkIDArgs, reply *GetNetworkIDReply) error {
+func (service *Admin) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
 	service.log.Debug("Admin: GetNetworkID called")
 
 	reply.NetworkID = cjson.Uint32(service.networkID)
+	return nil
+}
+
+// GetNetworkNameReply is the result from calling GetNetworkName
+type GetNetworkNameReply struct {
+	NetworkName string `json:"networkName"`
+}
+
+// GetNetworkName returns the network name this node is running on
+func (service *Admin) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
+	service.log.Debug("Admin: GetNetworkName called")
+
+	reply.NetworkName = genesis.NetworkName(service.networkID)
 	return nil
 }
 
@@ -71,7 +113,7 @@ type GetBlockchainIDReply struct {
 }
 
 // GetBlockchainID returns the blockchain ID that resolves the alias that was supplied
-func (service *Admin) GetBlockchainID(r *http.Request, args *GetBlockchainIDArgs, reply *GetBlockchainIDReply) error {
+func (service *Admin) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply *GetBlockchainIDReply) error {
 	service.log.Debug("Admin: GetBlockchainID called")
 
 	bID, err := service.chainManager.Lookup(args.Alias)
@@ -79,21 +121,16 @@ func (service *Admin) GetBlockchainID(r *http.Request, args *GetBlockchainIDArgs
 	return err
 }
 
-// PeersArgs are the arguments for calling Peers
-type PeersArgs struct{}
-
 // PeersReply are the results from calling Peers
 type PeersReply struct {
-	Peers []string `json:"peers"`
+	Peers []network.PeerID `json:"peers"`
 }
 
 // Peers returns the list of current validators
-func (service *Admin) Peers(r *http.Request, args *PeersArgs, reply *PeersReply) error {
+func (service *Admin) Peers(_ *http.Request, _ *struct{}, reply *PeersReply) error {
 	service.log.Debug("Admin: Peers called")
-
-	peers, err := service.networking.Peers()
-	reply.Peers = peers
-	return err
+	reply.Peers = service.networking.Peers()
+	return nil
 }
 
 // StartCPUProfilerArgs are the arguments for calling StartCPUProfiler
@@ -107,14 +144,11 @@ type StartCPUProfilerReply struct {
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (service *Admin) StartCPUProfiler(r *http.Request, args *StartCPUProfilerArgs, reply *StartCPUProfilerReply) error {
+func (service *Admin) StartCPUProfiler(_ *http.Request, args *StartCPUProfilerArgs, reply *StartCPUProfilerReply) error {
 	service.log.Debug("Admin: StartCPUProfiler called with %s", args.Filename)
 	reply.Success = true
 	return service.performance.StartCPUProfiler(args.Filename)
 }
-
-// StopCPUProfilerArgs are the arguments for calling StopCPUProfiler
-type StopCPUProfilerArgs struct{}
 
 // StopCPUProfilerReply are the results from calling StopCPUProfiler
 type StopCPUProfilerReply struct {
@@ -122,7 +156,7 @@ type StopCPUProfilerReply struct {
 }
 
 // StopCPUProfiler stops the cpu profile
-func (service *Admin) StopCPUProfiler(r *http.Request, args *StopCPUProfilerArgs, reply *StopCPUProfilerReply) error {
+func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *StopCPUProfilerReply) error {
 	service.log.Debug("Admin: StopCPUProfiler called")
 	reply.Success = true
 	return service.performance.StopCPUProfiler()
@@ -139,7 +173,7 @@ type MemoryProfileReply struct {
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (service *Admin) MemoryProfile(r *http.Request, args *MemoryProfileArgs, reply *MemoryProfileReply) error {
+func (service *Admin) MemoryProfile(_ *http.Request, args *MemoryProfileArgs, reply *MemoryProfileReply) error {
 	service.log.Debug("Admin: MemoryProfile called with %s", args.Filename)
 	reply.Success = true
 	return service.performance.MemoryProfile(args.Filename)
@@ -156,7 +190,7 @@ type LockProfileReply struct {
 }
 
 // LockProfile runs a mutex profile writing to the specified file
-func (service *Admin) LockProfile(r *http.Request, args *LockProfileArgs, reply *LockProfileReply) error {
+func (service *Admin) LockProfile(_ *http.Request, args *LockProfileArgs, reply *LockProfileReply) error {
 	service.log.Debug("Admin: LockProfile called with %s", args.Filename)
 	reply.Success = true
 	return service.performance.LockProfile(args.Filename)
@@ -174,7 +208,7 @@ type AliasReply struct {
 }
 
 // Alias attempts to alias an HTTP endpoint to a new name
-func (service *Admin) Alias(r *http.Request, args *AliasArgs, reply *AliasReply) error {
+func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *AliasReply) error {
 	service.log.Debug("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock(args.Endpoint, args.Alias)
@@ -206,4 +240,18 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *A
 
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
+}
+
+// StacktraceArgs are the arguments for calling Stacktrace
+type StacktraceArgs struct{}
+
+// StacktraceReply are the results from calling Stacktrace
+type StacktraceReply struct {
+	Stacktrace string `json:"stacktrace"`
+}
+
+// Stacktrace returns the current global stacktrace
+func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *StacktraceReply) error {
+	reply.Stacktrace = logging.Stacktrace{Global: true}.String()
+	return nil
 }

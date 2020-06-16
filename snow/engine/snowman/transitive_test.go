@@ -56,12 +56,32 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 	te := &Transitive{}
 
 	te.Initialize(config)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !blkID.Equals(gBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
 	te.finishBootstrapping()
 
+	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
 	return vdr, vals, sender, vm, te, gBlk
+}
+
+func TestEngineShutdown(t *testing.T) {
+	_, _, _, vm, transitive, _ := setup(t)
+	vmShutdownCalled := false
+	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
+	vm.CantShutdown = false
+	transitive.Shutdown()
+	if !vmShutdownCalled {
+		t.Fatal("Shutting down the Transitive did not shutdown the VM")
+	}
 }
 
 func TestEngineAdd(t *testing.T) {
@@ -82,7 +102,9 @@ func TestEngineAdd(t *testing.T) {
 	}
 
 	asked := new(bool)
-	sender.GetF = func(inVdr ids.ShortID, _ uint32, blkID ids.ID) {
+	reqID := new(uint32)
+	sender.GetF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+		*reqID = requestID
 		if *asked {
 			t.Fatalf("Asked multiple times")
 		}
@@ -116,7 +138,7 @@ func TestEngineAdd(t *testing.T) {
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errParseBlock }
 
-	te.Put(vdr.ID(), 0, blk.Parent().ID(), nil)
+	te.Put(vdr.ID(), *reqID, blk.Parent().ID(), nil)
 
 	vm.ParseBlockF = nil
 
@@ -280,6 +302,18 @@ func TestEngineQuery(t *testing.T) {
 		if !bytes.Equal(b, blk1.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
+
+		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+			switch {
+			case blkID.Equals(blk.ID()):
+				return blk, nil
+			case blkID.Equals(blk1.ID()):
+				return blk1, nil
+			}
+			t.Fatalf("Wrong block requested")
+			panic("Should have failed")
+		}
+
 		return blk1, nil
 	}
 	te.Put(vdr.ID(), *getRequestID, blk1.ID(), blk1.Bytes())
@@ -304,11 +338,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            3,
-		Alpha:        2,
-		BetaVirtuous: 1,
-		BetaRogue:    2,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 3,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 
 	vdr0 := validators.GenerateRandomValidator(1)
@@ -345,8 +380,17 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	te := &Transitive{}
 	te.Initialize(config)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !blkID.Equals(gBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
 	te.finishBootstrapping()
 
+	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
@@ -418,6 +462,17 @@ func TestEngineMultipleQuery(t *testing.T) {
 	te.Chits(vdr1.ID(), *queryRequestID, blkSet)
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+			switch {
+			case blkID.Equals(blk0.ID()):
+				return blk0, nil
+			case blkID.Equals(blk1.ID()):
+				return blk1, nil
+			}
+			t.Fatalf("Wrong block requested")
+			panic("Should have failed")
+		}
+
 		return blk1, nil
 	}
 
@@ -672,11 +727,12 @@ func TestVoteCanceling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params = snowball.Parameters{
-		Metrics:      prometheus.NewRegistry(),
-		K:            3,
-		Alpha:        2,
-		BetaVirtuous: 1,
-		BetaRogue:    2,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 3,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 
 	vdr0 := validators.GenerateRandomValidator(1)
@@ -852,7 +908,11 @@ func TestEngineAbandonQuery(t *testing.T) {
 			panic("Should have failed")
 		}
 	}
-	sender.CantGet = false
+
+	reqID := new(uint32)
+	sender.GetF = func(_ ids.ShortID, requestID uint32, _ ids.ID) {
+		*reqID = requestID
+	}
 
 	te.PullQuery(vdr.ID(), 0, blkID)
 
@@ -860,7 +920,7 @@ func TestEngineAbandonQuery(t *testing.T) {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr.ID(), 0, blkID)
+	te.GetFailed(vdr.ID(), *reqID)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -893,7 +953,12 @@ func TestEngineAbandonChit(t *testing.T) {
 			panic("Should have failed")
 		}
 	}
-	sender.CantGet = false
+
+	reqID := new(uint32)
+	sender.GetF = func(_ ids.ShortID, requestID uint32, _ ids.ID) {
+		*reqID = requestID
+	}
+
 	fakeBlkIDSet := ids.Set{}
 	fakeBlkIDSet.Add(fakeBlkID)
 	te.Chits(vdr.ID(), 0, fakeBlkIDSet)
@@ -902,7 +967,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr.ID(), 0, fakeBlkID)
+	te.GetFailed(vdr.ID(), *reqID)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -1051,14 +1116,18 @@ func TestEngineRetryFetch(t *testing.T) {
 	}
 
 	vm.CantGetBlock = false
-	sender.CantGet = false
+
+	reqID := new(uint32)
+	sender.GetF = func(_ ids.ShortID, requestID uint32, _ ids.ID) {
+		*reqID = requestID
+	}
 
 	te.PullQuery(vdr.ID(), 0, missingBlk.ID())
 
 	vm.CantGetBlock = true
-	sender.CantGet = true
+	sender.GetF = nil
 
-	te.GetFailed(vdr.ID(), 0, missingBlk.ID())
+	te.GetFailed(vdr.ID(), *reqID)
 
 	vm.CantGetBlock = false
 
@@ -1070,10 +1139,387 @@ func TestEngineRetryFetch(t *testing.T) {
 	te.PullQuery(vdr.ID(), 0, missingBlk.ID())
 
 	vm.CantGetBlock = true
-	sender.CantGet = true
+	sender.GetF = nil
 
 	if !*called {
 		t.Fatalf("Should have requested the block again")
+	}
+}
+
+func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
+	vdr, _, sender, vm, te, gBlk := setup(t)
+
+	sender.Default(true)
+
+	validBlk := &Blk{
+		parent: gBlk,
+		id:     GenerateID(),
+		height: 1,
+		status: choices.Processing,
+		bytes:  []byte{1},
+	}
+
+	invalidBlk := &Blk{
+		parent:   validBlk,
+		id:       GenerateID(),
+		height:   2,
+		status:   choices.Processing,
+		validity: errors.New("invalid due to an undeclared dependency"),
+		bytes:    []byte{2},
+	}
+
+	validBlkID := validBlk.ID()
+	invalidBlkID := invalidBlk.ID()
+
+	reqID := new(uint32)
+	sender.PushQueryF = func(_ ids.ShortSet, requestID uint32, _ ids.ID, _ []byte) {
+		*reqID = requestID
+	}
+
+	te.insert(validBlk)
+
+	sender.PushQueryF = nil
+
+	te.insert(invalidBlk)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID.Equals(validBlkID):
+			return validBlk, nil
+		case blkID.Equals(invalidBlkID):
+			return invalidBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	votes := ids.Set{}
+	votes.Add(invalidBlkID)
+	te.Chits(vdr.ID(), *reqID, votes)
+
+	vm.GetBlockF = nil
+
+	if status := validBlk.Status(); status != choices.Accepted {
+		t.Fatalf("Should have bubbled invalid votes to the valid parent")
+	}
+}
+
+func TestEngineGossip(t *testing.T) {
+	_, _, sender, vm, te, gBlk := setup(t)
+
+	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID.Equals(gBlk.ID()):
+			return gBlk, nil
+		}
+		t.Fatal(errUnknownBlock)
+		return nil, errUnknownBlock
+	}
+
+	called := new(bool)
+	sender.GossipF = func(blkID ids.ID, blkBytes []byte) {
+		*called = true
+		switch {
+		case !blkID.Equals(gBlk.ID()):
+			t.Fatal(errUnknownBlock)
+		}
+		switch {
+		case !bytes.Equal(blkBytes, gBlk.Bytes()):
+			t.Fatal(errUnknownBytes)
+		}
+	}
+
+	te.Gossip()
+
+	if !*called {
+		t.Fatalf("Should have gossiped the block")
+	}
+}
+
+func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
+	vdr, vdrs, sender, vm, te, gBlk := setup(t)
+
+	secondVdr := validators.GenerateRandomValidator(1)
+	vdrs.Add(secondVdr)
+
+	sender.Default(true)
+
+	missingBlk := &Blk{
+		parent: gBlk,
+		id:     GenerateID(),
+		height: 1,
+		status: choices.Unknown,
+		bytes:  []byte{1},
+	}
+
+	pendingBlk := &Blk{
+		parent: missingBlk,
+		id:     GenerateID(),
+		height: 2,
+		status: choices.Processing,
+		bytes:  []byte{2},
+	}
+
+	parsed := new(bool)
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, pendingBlk.Bytes()):
+			*parsed = true
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !*parsed {
+			return nil, errUnknownBlock
+		}
+
+		switch {
+		case blkID.Equals(pendingBlk.ID()):
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	reqID := new(uint32)
+	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+		*reqID = requestID
+		if !reqVdr.Equals(vdr.ID()) {
+			t.Fatalf("Wrong validator requested")
+		}
+		if !blkID.Equals(missingBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+	}
+
+	te.PushQuery(vdr.ID(), 0, pendingBlk.ID(), pendingBlk.Bytes())
+
+	te.Put(secondVdr.ID(), *reqID, missingBlk.ID(), []byte{3})
+
+	*parsed = false
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, missingBlk.Bytes()):
+			*parsed = true
+			return missingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !*parsed {
+			return nil, errUnknownBlock
+		}
+
+		switch {
+		case blkID.Equals(missingBlk.ID()):
+			return missingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+	sender.CantPushQuery = false
+	sender.CantChits = false
+
+	missingBlk.status = choices.Processing
+
+	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
+
+	pref := te.Consensus.Preference()
+	if !pref.Equals(pendingBlk.ID()) {
+		t.Fatalf("Shouldn't have abandoned the pending block")
+	}
+}
+
+func TestEnginePushQueryRequestIDConflict(t *testing.T) {
+	vdr, _, sender, vm, te, gBlk := setup(t)
+
+	sender.Default(true)
+
+	missingBlk := &Blk{
+		parent: gBlk,
+		id:     GenerateID(),
+		height: 1,
+		status: choices.Unknown,
+		bytes:  []byte{1},
+	}
+
+	pendingBlk := &Blk{
+		parent: missingBlk,
+		id:     GenerateID(),
+		height: 2,
+		status: choices.Processing,
+		bytes:  []byte{2},
+	}
+
+	randomBlkID := GenerateID()
+
+	parsed := new(bool)
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, pendingBlk.Bytes()):
+			*parsed = true
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !*parsed {
+			return nil, errUnknownBlock
+		}
+
+		switch {
+		case blkID.Equals(pendingBlk.ID()):
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	reqID := new(uint32)
+	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, blkID ids.ID) {
+		*reqID = requestID
+		if !reqVdr.Equals(vdr.ID()) {
+			t.Fatalf("Wrong validator requested")
+		}
+		if !blkID.Equals(missingBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+	}
+
+	te.PushQuery(vdr.ID(), 0, pendingBlk.ID(), pendingBlk.Bytes())
+
+	sender.GetF = nil
+	sender.CantGet = false
+
+	te.PushQuery(vdr.ID(), *reqID, randomBlkID, []byte{3})
+
+	*parsed = false
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, missingBlk.Bytes()):
+			*parsed = true
+			return missingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !*parsed {
+			return nil, errUnknownBlock
+		}
+
+		switch {
+		case blkID.Equals(missingBlk.ID()):
+			return missingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+	sender.CantPushQuery = false
+	sender.CantChits = false
+
+	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
+
+	pref := te.Consensus.Preference()
+	if !pref.Equals(pendingBlk.ID()) {
+		t.Fatalf("Shouldn't have abandoned the pending block")
+	}
+}
+
+func TestEngineAggressivePolling(t *testing.T) {
+	config := DefaultConfig()
+
+	config.Params.ConcurrentRepolls = 2
+
+	vdr := validators.GenerateRandomValidator(1)
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vals.Add(vdr)
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+
+	vm := &VMTest{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+	vm.CantSetPreference = false
+
+	gBlk := &Blk{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}
+
+	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	sender.CantGetAcceptedFrontier = false
+
+	te := &Transitive{}
+
+	te.Initialize(config)
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !blkID.Equals(gBlk.ID()) {
+			t.Fatalf("Wrong block requested")
+		}
+		return gBlk, nil
+	}
+
+	te.finishBootstrapping()
+
+	vm.GetBlockF = nil
+	vm.LastAcceptedF = nil
+	sender.CantGetAcceptedFrontier = true
+
+	sender.Default(true)
+
+	pendingBlk := &Blk{
+		parent: gBlk,
+		id:     GenerateID(),
+		height: 2,
+		status: choices.Processing,
+		bytes:  []byte{1},
+	}
+
+	parsed := new(bool)
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, pendingBlk.Bytes()):
+			*parsed = true
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		if !*parsed {
+			return nil, errUnknownBlock
+		}
+
+		switch {
+		case blkID.Equals(pendingBlk.ID()):
+			return pendingBlk, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	numPushed := new(int)
+	sender.PushQueryF = func(_ ids.ShortSet, _ uint32, _ ids.ID, _ []byte) { *numPushed++ }
+
+	numPulled := new(int)
+	sender.PullQueryF = func(_ ids.ShortSet, _ uint32, _ ids.ID) { *numPulled++ }
+
+	te.Put(vdr.ID(), 0, pendingBlk.ID(), pendingBlk.Bytes())
+
+	if *numPushed != 1 {
+		t.Fatalf("Should have initially sent a push query")
+	}
+
+	if *numPulled != 1 {
+		t.Fatalf("Should have sent an additional pull query")
 	}
 }
 
@@ -1117,6 +1563,15 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
+
+	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+		switch {
+		case id.Equals(gBlk.ID()):
+			return gBlk, nil
+		}
+		t.Fatalf("Unknown block")
+		panic("Should have errored")
+	}
 
 	te := &Transitive{}
 	te.Initialize(config)

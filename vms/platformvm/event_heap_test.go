@@ -11,6 +11,12 @@ import (
 
 func TestTxHeapStart(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{SortByStartTime: true}
 
 	validator0, err := vm.newAddDefaultSubnetValidatorTx(
@@ -18,7 +24,7 @@ func TestTxHeapStart(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{1}),                   // node ID
+		ids.NewShortID([20]byte{}),                    // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID
@@ -33,7 +39,7 @@ func TestTxHeapStart(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{}),                    // node ID
+		ids.NewShortID([20]byte{1}),                   // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID
@@ -78,6 +84,12 @@ func TestTxHeapStart(t *testing.T) {
 
 func TestTxHeapStop(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{}
 
 	validator0, err := vm.newAddDefaultSubnetValidatorTx(
@@ -85,7 +97,7 @@ func TestTxHeapStop(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{1}),                   // node ID
+		ids.NewShortID([20]byte{}),                    // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID
@@ -100,7 +112,7 @@ func TestTxHeapStop(t *testing.T) {
 		123, // stake amount
 		1,   // startTime
 		3,   // endTime
-		ids.NewShortID([20]byte{}),                    // node ID
+		ids.NewShortID([20]byte{1}),                   // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
 		0,       // shares
 		0,       // network ID
@@ -145,6 +157,12 @@ func TestTxHeapStop(t *testing.T) {
 
 func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{SortByStartTime: true}
 
 	validator, err := vm.newAddDefaultSubnetValidatorTx(
@@ -186,6 +204,12 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 
 func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	txHeap := EventHeap{}
 
 	validator, err := vm.newAddDefaultSubnetValidatorTx(

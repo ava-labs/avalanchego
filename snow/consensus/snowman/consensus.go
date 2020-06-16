@@ -12,14 +12,15 @@ import (
 // Consensus represents a general snowman instance that can be used directly to
 // process a series of dependent operations.
 type Consensus interface {
-	// Takes in alpha, beta1, beta2, and an assumed accepted decision.
+	// Takes in the context, snowball parameters, and the last accepted block.
 	Initialize(*snow.Context, snowball.Parameters, ids.ID)
 
 	// Returns the parameters that describe this snowman instance
 	Parameters() snowball.Parameters
 
 	// Adds a new decision. Assumes the dependency has already been added.
-	Add(Block)
+	// Returns if a critical error has occurred.
+	Add(Block) error
 
 	// Issued returns true if the block has been issued into consensus
 	Issued(Block) bool
@@ -29,8 +30,8 @@ type Consensus interface {
 	Preference() ids.ID
 
 	// RecordPoll collects the results of a network poll. Assumes all decisions
-	// have been previously added.
-	RecordPoll(ids.Bag)
+	// have been previously added. Returns if a critical error has occurred.
+	RecordPoll(ids.Bag) error
 
 	// Finalized returns true if all decisions that have been added have been
 	// finalized. Note, it is possible that after returning finalized, a new

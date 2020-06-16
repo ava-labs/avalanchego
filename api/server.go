@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -28,30 +29,40 @@ var (
 
 // Server maintains the HTTP router
 type Server struct {
-	log     logging.Logger
-	factory logging.Factory
-	router  *router
-	portURL string
+	log           logging.Logger
+	factory       logging.Factory
+	router        *router
+	listenAddress string
 }
 
-// Initialize creates the API server at the provided port
-func (s *Server) Initialize(log logging.Logger, factory logging.Factory, port uint16) {
+// Initialize creates the API server at the provided host and port
+func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host string, port uint16) {
 	s.log = log
 	s.factory = factory
-	s.portURL = fmt.Sprintf(":%d", port)
+	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
 }
 
 // Dispatch starts the API server
 func (s *Server) Dispatch() error {
 	handler := cors.Default().Handler(s.router)
-	return http.ListenAndServe(s.portURL, handler)
+	listener, err := net.Listen("tcp", s.listenAddress)
+	if err != nil {
+		return err
+	}
+	s.log.Info("API server listening on %q", s.listenAddress)
+	return http.Serve(listener, handler)
 }
 
 // DispatchTLS starts the API server with the provided TLS certificate
 func (s *Server) DispatchTLS(certFile, keyFile string) error {
 	handler := cors.Default().Handler(s.router)
-	return http.ListenAndServeTLS(s.portURL, certFile, keyFile, handler)
+	listener, err := net.Listen("tcp", s.listenAddress)
+	if err != nil {
+		return err
+	}
+	s.log.Info("API server listening on %q", s.listenAddress)
+	return http.ServeTLS(listener, handler, certFile, keyFile)
 }
 
 // RegisterChain registers the API endpoints associated with this chain That
@@ -64,8 +75,9 @@ func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 	}
 
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := "bc/" + ctx.ChainID.String()
-	httpLogger, err := s.factory.MakeChain(ctx.ChainID, "http")
+	chainID := ctx.ChainID.String()
+	defaultEndpoint := "bc/" + chainID
+	httpLogger, err := s.factory.MakeChain(chainID, "http")
 	if err != nil {
 		s.log.Error("Failed to create new http logger: %s", err)
 		return

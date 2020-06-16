@@ -45,7 +45,7 @@ type SnowmanVM struct {
 	preferred ids.ID
 
 	// ID of the last accepted block
-	lastAccepted ids.ID
+	LastAcceptedID ids.ID
 
 	// unmarshals bytes to a block
 	unmarshalBlockFunc func([]byte) (snowman.Block, error)
@@ -61,7 +61,7 @@ func (svm *SnowmanVM) SetPreference(ID ids.ID) { svm.preferred = ID }
 func (svm *SnowmanVM) Preferred() ids.ID { return svm.preferred }
 
 // LastAccepted returns the block most recently accepted
-func (svm *SnowmanVM) LastAccepted() ids.ID { return svm.lastAccepted }
+func (svm *SnowmanVM) LastAccepted() ids.ID { return svm.LastAcceptedID }
 
 // ParseBlock parses [bytes] to a block
 func (svm *SnowmanVM) ParseBlock(bytes []byte) (snowman.Block, error) {
@@ -81,20 +81,34 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 	return nil, errBadData // Should never happen
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (svm *SnowmanVM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (svm *SnowmanVM) Bootstrapped() error { return nil }
+
 // Shutdown this vm
-func (svm *SnowmanVM) Shutdown() {
-	svm.DB.Commit()              // Flush DB
-	svm.DB.GetDatabase().Close() // close underlying database
-	svm.DB.Close()               // close versionDB
+func (svm *SnowmanVM) Shutdown() error {
+	if svm.DB == nil {
+		return nil
+	}
+
+	// flush DB
+	if err := svm.DB.Commit(); err != nil {
+		return err
+	}
+
+	// close underlying database
+	if err := svm.DB.GetDatabase().Close(); err != nil {
+		return err
+	}
+	return svm.DB.Close() // close versionDB
 }
 
 // DBInitialized returns true iff [svm]'s database has values in it already
 func (svm *SnowmanVM) DBInitialized() bool {
 	status := svm.State.GetStatus(svm.DB, dbInitializedID)
-	if status == choices.Accepted {
-		return true
-	}
-	return false
+	return status == choices.Accepted
 }
 
 // SetDBInitialized marks the database as initialized
@@ -113,7 +127,7 @@ func (svm *SnowmanVM) NotifyBlockReady() {
 	select {
 	case svm.ToEngine <- common.PendingTxs:
 	default:
-		svm.Ctx.Log.Warn("dropping message to consensus engine")
+		svm.Ctx.Log.Debug("dropping message to consensus engine")
 	}
 }
 
@@ -157,10 +171,10 @@ func (svm *SnowmanVM) Initialize(
 	}
 
 	if svm.DBInitialized() {
-		if svm.lastAccepted, err = svm.State.GetLastAccepted(svm.DB); err != nil {
+		if svm.LastAcceptedID, err = svm.State.GetLastAccepted(svm.DB); err != nil {
 			return err
 		}
-		svm.preferred = svm.lastAccepted
+		svm.preferred = svm.LastAcceptedID
 	}
 
 	return nil

@@ -4,6 +4,7 @@
 package sender
 
 import (
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -11,22 +12,36 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+func TestSenderContext(t *testing.T) {
+	context := snow.DefaultContextTest()
+	sender := Sender{}
+	sender.Initialize(
+		context,
+		&ExternalSenderTest{},
+		&router.ChainRouter{},
+		&timeout.Manager{},
+	)
+	if res := sender.Context(); !reflect.DeepEqual(res, context) {
+		t.Fatalf("Got %#v, expected %#v", res, context)
+	}
+}
 
 func TestTimeout(t *testing.T) {
 	tm := timeout.Manager{}
 	tm.Initialize(time.Millisecond)
 	go tm.Dispatch()
 
-	router := router.ChainRouter{}
-	router.Initialize(logging.NoLog{}, &tm)
+	chainRouter := router.ChainRouter{}
+	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour, time.Second)
 
 	sender := Sender{}
-	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &router, &tm)
+	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
@@ -37,16 +52,23 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 
 	failedVDRs := ids.ShortSet{}
-	engine.QueryFailedF = func(validatorID ids.ShortID, _ uint32) {
+	engine.QueryFailedF = func(validatorID ids.ShortID, _ uint32) error {
 		failedVDRs.Add(validatorID)
 		wg.Done()
+		return nil
 	}
 
-	handler := handler.Handler{}
-	handler.Initialize(&engine, nil, 1)
+	handler := router.Handler{}
+	handler.Initialize(
+		&engine,
+		nil,
+		1,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go handler.Dispatch()
 
-	router.AddChain(&handler)
+	chainRouter.AddChain(&handler)
 
 	vdrIDs := ids.ShortSet{}
 	vdrIDs.Add(ids.NewShortID([20]byte{255}))

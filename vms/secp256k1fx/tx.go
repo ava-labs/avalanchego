@@ -7,3 +7,9 @@ package secp256k1fx
 type Tx interface {
 	UnsignedBytes() []byte
 }
+
+// TestTx is a minimal implementation of a Tx
+type TestTx struct{ Bytes []byte }
+
+// UnsignedBytes returns Bytes
+func (tx *TestTx) UnsignedBytes() []byte { return tx.Bytes }

@@ -4,7 +4,6 @@
 package snowman
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 
@@ -16,571 +15,789 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
-func ParamsTest(t *testing.T, factory Factory) {
+var (
+	GenesisID = ids.Empty.Prefix(0)
+	Genesis   = &TestBlock{
+		id:     GenesisID,
+		status: choices.Accepted,
+	}
+
+	Tests = []func(*testing.T, Factory){
+		InitializeTest,
+		AddToTailTest,
+		AddToNonTailTest,
+		AddToUnknownTest,
+		IssuedPreviouslyAcceptedTest,
+		IssuedPreviouslyRejectedTest,
+		IssuedUnissuedTest,
+		IssuedIssuedTest,
+		RecordPollAcceptSingleBlockTest,
+		RecordPollAcceptAndRejectTest,
+		RecordPollWhenFinalizedTest,
+		RecordPollRejectTransitivelyTest,
+		RecordPollTransitivelyResetConfidenceTest,
+		RecordPollInvalidVoteTest,
+		RecordPollTransitiveVotingTest,
+		RecordPollDivergedVotingTest,
+		MetricsProcessingErrorTest,
+		MetricsAcceptedErrorTest,
+		MetricsRejectedErrorTest,
+		RandomizedConsistencyTest,
+	}
+)
+
+// Execute all tests against a consensus implementation
+func ConsensusTest(t *testing.T, factory Factory) {
+	for _, test := range Tests {
+		test(t, factory)
+	}
+}
+
+// Make sure that initialize sets the state correctly
+func InitializeTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Namespace: fmt.Sprintf("gecko_%s", ctx.ChainID),
-		Metrics:   prometheus.NewRegistry(),
-		K:         1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
 	}
 
-	numProcessing := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "processing",
-		})
-	numAccepted := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "accepted",
-		})
-	numRejected := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "rejected",
-		})
+	sm.Initialize(ctx, params, GenesisID)
 
-	params.Metrics.Register(numProcessing)
-	params.Metrics.Register(numAccepted)
-	params.Metrics.Register(numRejected)
-
-	sm.Initialize(ctx, params, Genesis.ID())
-
-	if p := sm.Parameters(); p.K != params.K {
-		t.Fatalf("Wrong K parameter")
-	} else if p.Alpha != params.Alpha {
-		t.Fatalf("Wrong Alpha parameter")
-	} else if p.BetaVirtuous != params.BetaVirtuous {
-		t.Fatalf("Wrong Beta1 parameter")
-	} else if p.BetaRogue != params.BetaRogue {
-		t.Fatalf("Wrong Beta2 parameter")
+	if p := sm.Parameters(); p != params {
+		t.Fatalf("Wrong returned parameters")
+	}
+	if pref := sm.Preference(); !pref.Equals(GenesisID) {
+		t.Fatalf("Wrong preference returned")
+	}
+	if !sm.Finalized() {
+		t.Fatalf("Wrong should have marked the instance as being finalized")
 	}
 }
 
-func AddTest(t *testing.T, factory Factory) {
+// Make sure that adding a block to the tail updates the preference
+func AddToTailTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
+	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 3, BetaRogue: 5,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
+	sm.Initialize(ctx, params, GenesisID)
 
-	if pref := sm.Preference(); !pref.Equals(Genesis.ID()) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", Genesis.ID(), pref)
-	}
-
-	dep0 := &Blk{
+	block := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
-	sm.Add(dep0)
-	if pref := sm.Preference(); !pref.Equals(dep0.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep0.id, pref)
-	}
 
-	dep1 := &Blk{
-		parent: Genesis,
-		id:     ids.Empty.Prefix(2),
-	}
-	sm.Add(dep1)
-	if pref := sm.Preference(); !pref.Equals(dep0.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep0.id, pref)
-	}
+	// Adding to the previous preference will update the preference
+	sm.Add(block)
 
-	dep2 := &Blk{
-		parent: dep0,
-		id:     ids.Empty.Prefix(3),
-	}
-	sm.Add(dep2)
-	if pref := sm.Preference(); !pref.Equals(dep2.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep2.id, pref)
-	}
-
-	dep3 := &Blk{
-		parent: &Blk{id: ids.Empty.Prefix(4)},
-		id:     ids.Empty.Prefix(5),
-	}
-	sm.Add(dep3)
-	if pref := sm.Preference(); !pref.Equals(dep2.id) {
-		t.Fatalf("Wrong preference. Expected %s, got %s", dep2.id, pref)
+	if pref := sm.Preference(); !pref.Equals(block.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block.id, pref)
 	}
 }
 
-func CollectTest(t *testing.T, factory Factory) {
+// Make sure that adding a block not to the tail doesn't change the preference
+func AddToNonTailTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
+	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
+	sm.Initialize(ctx, params, GenesisID)
 
-	dep1 := &Blk{
-		parent: Genesis,
-		id:     ids.Empty.Prefix(2),
-	}
-	sm.Add(dep1)
-
-	dep0 := &Blk{
+	firstBlock := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 	}
-	sm.Add(dep0)
-
-	dep2 := &Blk{
-		parent: dep0,
-		id:     ids.Empty.Prefix(3),
+	secondBlock := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(2),
 	}
-	sm.Add(dep2)
 
-	dep3 := &Blk{
-		parent: dep0,
+	// Adding to the previous preference will update the preference
+	sm.Add(firstBlock)
+
+	if pref := sm.Preference(); !pref.Equals(firstBlock.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.id, pref)
+	}
+
+	// Adding to something other than the previous preference won't update the
+	// preference
+	sm.Add(secondBlock)
+
+	if pref := sm.Preference(); !pref.Equals(firstBlock.id) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.id, pref)
+	}
+}
+
+// Make sure that adding a block that is detached from the rest of the tree
+// rejects the block
+func AddToUnknownTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: &TestBlock{id: ids.Empty.Prefix(1)},
+		id:     ids.Empty.Prefix(2),
+	}
+
+	// Adding a block with an unknown parent means the parent must have already
+	// been rejected. Therefore the block should be immediately rejected
+	sm.Add(block)
+
+	if pref := sm.Preference(); !pref.Equals(GenesisID) {
+		t.Fatalf("Wrong preference. Expected %s, got %s", GenesisID, pref)
+	} else if status := block.Status(); status != choices.Rejected {
+		t.Fatalf("Should have rejected the block")
+	}
+}
+
+func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	if !sm.Issued(Genesis) {
+		t.Fatalf("Should have marked an accepted block as having been issued")
+	}
+}
+
+func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Rejected,
+	}
+
+	if !sm.Issued(block) {
+		t.Fatalf("Should have marked a rejected block as having been issued")
+	}
+}
+
+func IssuedUnissuedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	if sm.Issued(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as having been issued")
+	}
+}
+
+func IssuedIssuedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      3,
+		BetaRogue:         5,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	sm.Add(block)
+
+	if !sm.Issued(block) {
+		t.Fatalf("Should have marked a pending block as having been issued")
+	}
+}
+
+func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      2,
+		BetaRogue:         3,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	sm.Add(block)
+
+	votes := ids.Bag{}
+	votes.Add(block.id)
+
+	sm.RecordPoll(votes)
+
+	if pref := sm.Preference(); !pref.Equals(block.id) {
+		t.Fatalf("Preference returned the wrong block")
+	} else if sm.Finalized() {
+		t.Fatalf("Snowman instance finalized too soon")
+	} else if status := block.Status(); status != choices.Processing {
+		t.Fatalf("Block's status changed unexpectedly")
+	}
+
+	sm.RecordPoll(votes)
+
+	if pref := sm.Preference(); !pref.Equals(block.id) {
+		t.Fatalf("Preference returned the wrong block")
+	} else if !sm.Finalized() {
+		t.Fatalf("Snowman instance didn't finalize")
+	} else if status := block.Status(); status != choices.Accepted {
+		t.Fatalf("Block's status should have been set to accepted")
+	}
+}
+
+func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	firstBlock := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+	secondBlock := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(2),
+		status: choices.Processing,
+	}
+
+	sm.Add(firstBlock)
+	sm.Add(secondBlock)
+
+	votes := ids.Bag{}
+	votes.Add(firstBlock.id)
+
+	sm.RecordPoll(votes)
+
+	if pref := sm.Preference(); !pref.Equals(firstBlock.id) {
+		t.Fatalf("Preference returned the wrong block")
+	} else if sm.Finalized() {
+		t.Fatalf("Snowman instance finalized too soon")
+	} else if status := firstBlock.Status(); status != choices.Processing {
+		t.Fatalf("Block's status changed unexpectedly")
+	} else if status := secondBlock.Status(); status != choices.Processing {
+		t.Fatalf("Block's status changed unexpectedly")
+	}
+
+	sm.RecordPoll(votes)
+
+	if pref := sm.Preference(); !pref.Equals(firstBlock.id) {
+		t.Fatalf("Preference returned the wrong block")
+	} else if !sm.Finalized() {
+		t.Fatalf("Snowman instance didn't finalize")
+	} else if status := firstBlock.Status(); status != choices.Accepted {
+		t.Fatalf("Block's status should have been set to accepted")
+	} else if status := secondBlock.Status(); status != choices.Rejected {
+		t.Fatalf("Block's status should have been set to rejected")
+	}
+}
+
+func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	votes := ids.Bag{}
+	votes.Add(GenesisID)
+	sm.RecordPoll(votes)
+
+	if !sm.Finalized() {
+		t.Fatalf("Consensus should still be finalized")
+	} else if pref := sm.Preference(); !GenesisID.Equals(pref) {
+		t.Fatalf("Wrong preference listed")
+	}
+}
+
+func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block0 := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+	block1 := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(2),
+		status: choices.Processing,
+	}
+	block2 := &TestBlock{
+		parent: block1,
+		id:     ids.Empty.Prefix(3),
+		status: choices.Processing,
+	}
+
+	sm.Add(block0)
+	sm.Add(block1)
+	sm.Add(block2)
+
+	// Current graph structure:
+	//   G
+	//  / \
+	// 0   1
+	//     |
+	//     2
+	// Tail = 0
+
+	votes := ids.Bag{}
+	votes.Add(block0.id)
+	sm.RecordPoll(votes)
+
+	// Current graph structure:
+	// 0
+	// Tail = 0
+
+	if !sm.Finalized() {
+		t.Fatalf("Finalized too late")
+	} else if pref := sm.Preference(); !block0.id.Equals(pref) {
+		t.Fatalf("Wrong preference listed")
+	}
+
+	if status := block0.Status(); status != choices.Accepted {
+		t.Fatalf("Wrong status returned")
+	} else if status := block1.Status(); status != choices.Rejected {
+		t.Fatalf("Wrong status returned")
+	} else if status := block2.Status(); status != choices.Rejected {
+		t.Fatalf("Wrong status returned")
+	}
+}
+
+func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      2,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block0 := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+	block1 := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(2),
+		status: choices.Processing,
+	}
+	block2 := &TestBlock{
+		parent: block1,
+		id:     ids.Empty.Prefix(3),
+		status: choices.Processing,
+	}
+	block3 := &TestBlock{
+		parent: block1,
 		id:     ids.Empty.Prefix(4),
-	}
-	sm.Add(dep3)
-
-	// Current graph structure:
-	//       G
-	//      / \
-	//     0   1
-	//    / \
-	//   2   3
-	// Tail = 1
-
-	dep2_2 := ids.Bag{}
-	dep2_2.AddCount(dep2.id, 2)
-	sm.RecordPoll(dep2_2)
-
-	// Current graph structure:
-	//       G
-	//      / \
-	//     0   1
-	//    / \
-	//   2   3
-	// Tail = 2
-
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if !dep2.id.Equals(sm.Preference()) {
-		t.Fatalf("Wrong preference listed")
-	}
-
-	dep3_2 := ids.Bag{}
-	dep3_2.AddCount(dep3.id, 2)
-	sm.RecordPoll(dep3_2)
-
-	// Current graph structure:
-	//     0
-	//    / \
-	//   2   3
-	// Tail = 2
-
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if !dep2.id.Equals(sm.Preference()) {
-		t.Fatalf("Wrong preference listed")
-	}
-
-	sm.RecordPoll(dep2_2)
-
-	// Current graph structure:
-	//     0
-	//    / \
-	//   2   3
-	// Tail = 2
-
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if !dep2.id.Equals(sm.Preference()) {
-		t.Fatalf("Wrong preference listed")
-	}
-
-	sm.RecordPoll(dep2_2)
-
-	// Current graph structure:
-	//   2
-	// Tail = 2
-
-	if !sm.Finalized() {
-		t.Fatalf("Finalized too late")
-	} else if !dep2.id.Equals(sm.Preference()) {
-		t.Fatalf("Wrong preference listed")
-	}
-
-	if dep0.Status() != choices.Accepted {
-		t.Fatalf("Should have accepted")
-	} else if dep1.Status() != choices.Rejected {
-		t.Fatalf("Should have rejected")
-	} else if dep2.Status() != choices.Accepted {
-		t.Fatalf("Should have accepted")
-	} else if dep3.Status() != choices.Rejected {
-		t.Fatalf("Should have rejected")
-	}
-}
-
-func CollectNothingTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
-	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
-
-	// Current graph structure:
-	//       G
-	// Tail = G
-
-	genesis1 := ids.Bag{}
-	genesis1.AddCount(Genesis.ID(), 1)
-	sm.RecordPoll(genesis1)
-
-	// Current graph structure:
-	//       G
-	// Tail = G
-
-	if !sm.Finalized() {
-		t.Fatalf("Finalized too late")
-	} else if !Genesis.ID().Equals(sm.Preference()) {
-		t.Fatalf("Wrong preference listed")
-	}
-}
-
-func CollectTransRejectTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
-	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
-
-	dep1 := &Blk{
-		parent: Genesis,
-		id:     ids.Empty.Prefix(2),
-	}
-	sm.Add(dep1)
-
-	dep0 := &Blk{
-		parent: Genesis,
-		id:     ids.Empty.Prefix(1),
-	}
-	sm.Add(dep0)
-
-	dep2 := &Blk{
-		parent: dep0,
-		id:     ids.Empty.Prefix(3),
-	}
-	sm.Add(dep2)
-
-	// Current graph structure:
-	//       G
-	//      / \
-	//     0   1
-	//    /
-	//   2
-	// Tail = 1
-
-	dep1_1 := ids.Bag{}
-	dep1_1.AddCount(dep1.id, 1)
-	sm.RecordPoll(dep1_1)
-	sm.RecordPoll(dep1_1)
-
-	// Current graph structure:
-	//       1
-	// Tail = 1
-
-	if !sm.Finalized() {
-		t.Fatalf("Finalized too late")
-	} else if !dep1.id.Equals(sm.Preference()) {
-		t.Fatalf("Wrong preference listed")
-	}
-
-	if dep0.Status() != choices.Rejected {
-		t.Fatalf("Should have rejected")
-	} else if dep1.Status() != choices.Accepted {
-		t.Fatalf("Should have accepted")
-	} else if dep2.Status() != choices.Rejected {
-		t.Fatalf("Should have rejected")
-	}
-}
-
-func CollectTransResetTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
-	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
-
-	dep1 := &Blk{
-		parent: Genesis,
-		id:     ids.Empty.Prefix(2),
 		status: choices.Processing,
 	}
-	sm.Add(dep1)
 
-	dep0 := &Blk{
+	sm.Add(block0)
+	sm.Add(block1)
+	sm.Add(block2)
+	sm.Add(block3)
+
+	// Current graph structure:
+	//   G
+	//  / \
+	// 0   1
+	//    / \
+	//   2   3
+
+	votesFor2 := ids.Bag{}
+	votesFor2.Add(block2.id)
+	sm.RecordPoll(votesFor2)
+
+	if sm.Finalized() {
+		t.Fatalf("Finalized too early")
+	} else if pref := sm.Preference(); !block2.id.Equals(pref) {
+		t.Fatalf("Wrong preference listed")
+	}
+
+	emptyVotes := ids.Bag{}
+	sm.RecordPoll(emptyVotes)
+
+	if sm.Finalized() {
+		t.Fatalf("Finalized too early")
+	} else if pref := sm.Preference(); !block2.id.Equals(pref) {
+		t.Fatalf("Wrong preference listed")
+	}
+
+	sm.RecordPoll(votesFor2)
+
+	if sm.Finalized() {
+		t.Fatalf("Finalized too early")
+	} else if pref := sm.Preference(); !block2.id.Equals(pref) {
+		t.Fatalf("Wrong preference listed")
+	}
+
+	votesFor3 := ids.Bag{}
+	votesFor3.Add(block3.id)
+	sm.RecordPoll(votesFor3)
+
+	if sm.Finalized() {
+		t.Fatalf("Finalized too early")
+	} else if pref := sm.Preference(); !block2.id.Equals(pref) {
+		t.Fatalf("Wrong preference listed")
+	}
+
+	sm.RecordPoll(votesFor3)
+
+	if !sm.Finalized() {
+		t.Fatalf("Finalized too late")
+	} else if pref := sm.Preference(); !block3.id.Equals(pref) {
+		t.Fatalf("Wrong preference listed")
+	}
+
+	if status := block0.Status(); status != choices.Rejected {
+		t.Fatalf("Wrong status returned")
+	} else if status := block1.Status(); status != choices.Accepted {
+		t.Fatalf("Wrong status returned")
+	} else if status := block2.Status(); status != choices.Rejected {
+		t.Fatalf("Wrong status returned")
+	} else if status := block3.Status(); status != choices.Accepted {
+		t.Fatalf("Wrong status returned")
+	}
+}
+
+func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      2,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
 		status: choices.Processing,
 	}
-	sm.Add(dep0)
+	unknownBlockID := ids.Empty.Prefix(2)
 
-	dep2 := &Blk{
-		parent: dep0,
-		id:     ids.Empty.Prefix(3),
-		status: choices.Processing,
-	}
-	sm.Add(dep2)
+	sm.Add(block)
 
-	// Current graph structure:
-	//       G
-	//      / \
-	//     0   1
-	//    /
-	//   2
-	// Tail = 1
+	validVotes := ids.Bag{}
+	validVotes.Add(block.id)
+	sm.RecordPoll(validVotes)
 
-	dep1_1 := ids.Bag{}
-	dep1_1.AddCount(dep1.id, 1)
-	sm.RecordPoll(dep1_1)
+	invalidVotes := ids.Bag{}
+	invalidVotes.Add(unknownBlockID)
+	sm.RecordPoll(invalidVotes)
 
-	// Current graph structure:
-	//       G
-	//      / \
-	//     0   1
-	//    /
-	//   2
-	// Tail = 1
-
-	dep2_1 := ids.Bag{}
-	dep2_1.AddCount(dep2.id, 1)
-	sm.RecordPoll(dep2_1)
+	sm.RecordPoll(validVotes)
 
 	if sm.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if status := dep0.Status(); status != choices.Processing {
-		t.Fatalf("Shouldn't have accepted yet %s", status)
-	}
-
-	if !dep1.id.Equals(sm.Preference()) {
+	} else if pref := sm.Preference(); !block.id.Equals(pref) {
 		t.Fatalf("Wrong preference listed")
-	}
-
-	sm.RecordPoll(dep2_1)
-	sm.RecordPoll(dep2_1)
-
-	if !sm.Finalized() {
-		t.Fatalf("Finalized too late")
-	} else if dep0.Status() != choices.Accepted {
-		t.Fatalf("Should have accepted")
-	} else if dep1.Status() != choices.Rejected {
-		t.Fatalf("Should have rejected")
-	} else if dep2.Status() != choices.Accepted {
-		t.Fatalf("Should have accepted")
 	}
 }
 
-func CollectTransVoteTest(t *testing.T, factory Factory) {
+func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
+	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       3, Alpha: 3, BetaVirtuous: 1, BetaRogue: 1,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 3,
+		Alpha:             3,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
+	sm.Initialize(ctx, params, GenesisID)
 
-	dep0 := &Blk{
+	block0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
 	}
-	sm.Add(dep0)
-
-	dep1 := &Blk{
-		parent: dep0,
+	block1 := &TestBlock{
+		parent: block0,
 		id:     ids.Empty.Prefix(2),
+		status: choices.Processing,
 	}
-	sm.Add(dep1)
-
-	dep2 := &Blk{
-		parent: dep1,
+	block2 := &TestBlock{
+		parent: block1,
 		id:     ids.Empty.Prefix(3),
+		status: choices.Processing,
 	}
-	sm.Add(dep2)
-
-	dep3 := &Blk{
-		parent: dep0,
+	block3 := &TestBlock{
+		parent: block0,
 		id:     ids.Empty.Prefix(4),
+		status: choices.Processing,
 	}
-	sm.Add(dep3)
-
-	dep4 := &Blk{
-		parent: dep3,
+	block4 := &TestBlock{
+		parent: block3,
 		id:     ids.Empty.Prefix(5),
+		status: choices.Processing,
 	}
-	sm.Add(dep4)
+
+	sm.Add(block0)
+	sm.Add(block1)
+	sm.Add(block2)
+	sm.Add(block3)
+	sm.Add(block4)
 
 	// Current graph structure:
-	//       G
-	//      /
-	//     0
-	//    / \
-	//   1   3
-	//  /     \
-	// 2       4
+	//   G
+	//   |
+	//   0
+	//  / \
+	// 1   3
+	// |   |
+	// 2   4
 	// Tail = 2
 
-	dep0_2_4_1 := ids.Bag{}
-	dep0_2_4_1.AddCount(dep0.id, 1)
-	dep0_2_4_1.AddCount(dep2.id, 1)
-	dep0_2_4_1.AddCount(dep4.id, 1)
-	sm.RecordPoll(dep0_2_4_1)
+	votes0_2_4 := ids.Bag{}
+	votes0_2_4.Add(block0.id)
+	votes0_2_4.Add(block2.id)
+	votes0_2_4.Add(block4.id)
+	sm.RecordPoll(votes0_2_4)
 
 	// Current graph structure:
-	//     0
-	//    / \
-	//   1   3
-	//  /     \
-	// 2       4
+	//   0
+	//  / \
+	// 1   3
+	// |   |
+	// 2   4
 	// Tail = 2
 
-	if !dep2.id.Equals(sm.Preference()) {
+	if pref := sm.Preference(); !block2.id.Equals(pref) {
 		t.Fatalf("Wrong preference listed")
+	} else if sm.Finalized() {
+		t.Fatalf("Finalized too early")
+	} else if block0.Status() != choices.Accepted {
+		t.Fatalf("Should have accepted")
+	} else if block1.Status() != choices.Processing {
+		t.Fatalf("Should have accepted")
+	} else if block2.Status() != choices.Processing {
+		t.Fatalf("Should have accepted")
+	} else if block3.Status() != choices.Processing {
+		t.Fatalf("Should have rejected")
+	} else if block4.Status() != choices.Processing {
+		t.Fatalf("Should have rejected")
 	}
 
-	dep2_3 := ids.Bag{}
-	dep2_3.AddCount(dep2.id, 3)
-	sm.RecordPoll(dep2_3)
+	dep2_2_2 := ids.Bag{}
+	dep2_2_2.AddCount(block2.id, 3)
+	sm.RecordPoll(dep2_2_2)
 
 	// Current graph structure:
 	//   2
 	// Tail = 2
 
-	if !dep2.id.Equals(sm.Preference()) {
+	if pref := sm.Preference(); !block2.id.Equals(pref) {
 		t.Fatalf("Wrong preference listed")
-	}
-
-	if !sm.Finalized() {
+	} else if !sm.Finalized() {
 		t.Fatalf("Finalized too late")
-	} else if dep0.Status() != choices.Accepted {
+	} else if block0.Status() != choices.Accepted {
 		t.Fatalf("Should have accepted")
-	} else if dep1.Status() != choices.Accepted {
+	} else if block1.Status() != choices.Accepted {
 		t.Fatalf("Should have accepted")
-	} else if dep2.Status() != choices.Accepted {
+	} else if block2.Status() != choices.Accepted {
 		t.Fatalf("Should have accepted")
-	} else if dep3.Status() != choices.Rejected {
+	} else if block3.Status() != choices.Rejected {
 		t.Fatalf("Should have rejected")
-	} else if dep4.Status() != choices.Rejected {
+	} else if block4.Status() != choices.Rejected {
 		t.Fatalf("Should have rejected")
 	}
 }
 
-func DivergedVotingTest(t *testing.T, factory Factory) {
+func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
+	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
+	sm.Initialize(ctx, params, GenesisID)
 
-	dep0 := &Blk{
+	block0 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0x0f}), // 0b1111
+		status: choices.Processing,
 	}
-	sm.Add(dep0)
-
-	dep1 := &Blk{
+	block1 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0x08}), // 0b1000
+		status: choices.Processing,
 	}
-	sm.Add(dep1)
-
-	dep0_1 := ids.Bag{}
-	dep0_1.AddCount(dep0.id, 1)
-	sm.RecordPoll(dep0_1)
-
-	dep2 := &Blk{
+	block2 := &TestBlock{
 		parent: Genesis,
 		id:     ids.NewID([32]byte{0x01}), // 0b0001
+		status: choices.Processing,
 	}
-	sm.Add(dep2)
+	block3 := &TestBlock{
+		parent: block2,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	sm.Add(block0)
+	sm.Add(block1)
+
+	votes0 := ids.Bag{}
+	votes0.Add(block0.id)
+	sm.RecordPoll(votes0)
+
+	sm.Add(block2)
 
 	// dep2 is already rejected.
 
-	dep3 := &Blk{
-		parent: dep2,
-		id:     ids.Empty.Prefix(3),
-	}
-	sm.Add(dep3)
+	sm.Add(block3)
 
-	if dep0.Status() == choices.Accepted {
+	if status := block0.Status(); status == choices.Accepted {
 		t.Fatalf("Shouldn't be accepted yet")
 	}
 
 	// Transitively increases dep2. However, dep2 shares the first bit with
 	// dep0. Because dep2 is already rejected, this will accept dep0.
-	dep3_1 := ids.Bag{}
-	dep3_1.AddCount(dep3.id, 1)
-	sm.RecordPoll(dep3_1)
+	votes3 := ids.Bag{}
+	votes3.Add(block3.id)
+	sm.RecordPoll(votes3)
 
 	if !sm.Finalized() {
 		t.Fatalf("Finalized too late")
-	} else if dep0.Status() != choices.Accepted {
+	} else if status := block0.Status(); status != choices.Accepted {
 		t.Fatalf("Should be accepted")
 	}
 }
 
-func IssuedTest(t *testing.T, factory Factory) {
-	sm := factory.New()
-
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
-	}
-
-	sm.Initialize(snow.DefaultContextTest(), params, Genesis.ID())
-
-	dep0 := &Blk{
-		parent: Genesis,
-		id:     ids.NewID([32]byte{0}),
-		status: choices.Processing,
-	}
-
-	if sm.Issued(dep0) {
-		t.Fatalf("Hasn't been issued yet")
-	}
-
-	sm.Add(dep0)
-
-	if !sm.Issued(dep0) {
-		t.Fatalf("Has been issued")
-	}
-
-	dep1 := &Blk{
-		parent: Genesis,
-		id:     ids.NewID([32]byte{0x1}), // 0b0001
-		status: choices.Accepted,
-	}
-
-	if !sm.Issued(dep1) {
-		t.Fatalf("Has accepted status")
-	}
-}
-
-func MetricsErrorTest(t *testing.T, factory Factory) {
+func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Namespace: fmt.Sprintf("gecko_%s", ctx.ChainID),
-		Metrics:   prometheus.NewRegistry(),
-		K:         1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 
 	numProcessing := prometheus.NewGauge(
@@ -588,31 +805,118 @@ func MetricsErrorTest(t *testing.T, factory Factory) {
 			Namespace: params.Namespace,
 			Name:      "processing",
 		})
-	numAccepted := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "accepted",
-		})
-	numRejected := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "rejected",
-		})
 
 	if err := params.Metrics.Register(numProcessing); err != nil {
 		t.Fatal(err)
 	}
+
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	sm.Add(block)
+
+	votes := ids.Bag{}
+	votes.Add(block.id)
+
+	sm.RecordPoll(votes)
+
+	if !sm.Finalized() {
+		t.Fatalf("Snowman instance didn't finalize")
+	}
+}
+
+func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
+	}
+
+	numAccepted := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: params.Namespace,
+			Name:      "accepted",
+		})
+
 	if err := params.Metrics.Register(numAccepted); err != nil {
 		t.Fatal(err)
 	}
+
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	sm.Add(block)
+
+	votes := ids.Bag{}
+	votes.Add(block.id)
+
+	sm.RecordPoll(votes)
+
+	if !sm.Finalized() {
+		t.Fatalf("Snowman instance didn't finalize")
+	}
+}
+
+func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
+	}
+
+	numRejected := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: params.Namespace,
+			Name:      "rejected",
+		})
+
 	if err := params.Metrics.Register(numRejected); err != nil {
 		t.Fatal(err)
 	}
 
-	sm.Initialize(ctx, params, Genesis.ID())
+	sm.Initialize(ctx, params, GenesisID)
+
+	block := &TestBlock{
+		parent: Genesis,
+		id:     ids.Empty.Prefix(1),
+		status: choices.Processing,
+	}
+
+	sm.Add(block)
+
+	votes := ids.Bag{}
+	votes.Add(block.id)
+
+	sm.RecordPoll(votes)
+
+	if !sm.Finalized() {
+		t.Fatalf("Snowman instance didn't finalize")
+	}
 }
 
-func ConsistentTest(t *testing.T, factory Factory) {
+func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	numColors := 50
 	numNodes := 100
 	params := snowball.Parameters{

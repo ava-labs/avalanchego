@@ -13,6 +13,11 @@ import (
 
 func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: tx is nil
 	var tx *addDefaultSubnetDelegatorTx
@@ -153,6 +158,11 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
 	// Case 1: Proposed validator currently validating default subnet
 	// but stops validating non-default subnet after stops validating default subnet
@@ -325,9 +335,9 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultNonce+1,              // nonce
-		defaultStakeAmount,          // weight
-		uint64(newTimestamp.Unix()), // start time
+		defaultNonce+1,                                          // nonce
+		defaultStakeAmount,                                      // weight
+		uint64(newTimestamp.Unix()),                             // start time
 		uint64(newTimestamp.Add(MinimumStakingDuration).Unix()), // end time
 		defaultKey.PublicKey().Address(),                        // node ID
 		defaultKey.PublicKey().Address(),                        // destination

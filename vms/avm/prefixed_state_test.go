@@ -11,47 +11,49 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func TestPrefixedSetsAndGets(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state
 
-	vm.codec.RegisterType(&testVerifiable{})
+	vm.codec.RegisterType(&ava.TestVerifiable{})
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
-		Out:   &testVerifiable{},
+		Asset: ava.Asset{ID: ids.Empty},
+		Out:   &ava.TestVerifiable{},
 	}
 
-	tx := &Tx{UnsignedTx: &OperationTx{BaseTx: BaseTx{
+	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*TransferableInput{
-			&TransferableInput{
-				UTXOID: UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: 0,
-				},
-				Asset: Asset{
-					ID: asset,
-				},
-				In: &secp256k1fx.TransferInput{
-					Amt: 20 * units.KiloAva,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
+		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			UTXOID: ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 20 * units.KiloAva,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
 					},
 				},
 			},
-		},
-	}}}
+		}},
+	}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {
@@ -66,11 +68,9 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	tx.Creds = append(tx.Creds, &Credential{
-		Cred: &secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
-			},
+	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			fixedSig,
 		},
 	})
 
@@ -115,18 +115,23 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 }
 
 func TestPrefixedFundingNoAddresses(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state
 
-	vm.codec.RegisterType(&testVerifiable{})
+	vm.codec.RegisterType(&ava.TestVerifiable{})
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
-		Out:   &testVerifiable{},
+		Asset: ava.Asset{ID: ids.Empty},
+		Out:   &ava.TestVerifiable{},
 	}
 
 	if err := state.FundUTXO(utxo); err != nil {
@@ -138,18 +143,23 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 }
 
 func TestPrefixedFundingAddresses(t *testing.T) {
-	vm := GenesisVM(t)
+	_, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
 	state := vm.state
 
-	vm.codec.RegisterType(&testAddressable{})
+	vm.codec.RegisterType(&ava.TestAddressable{})
 
-	utxo := &UTXO{
-		UTXOID: UTXOID{
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: Asset{ID: ids.Empty},
-		Out: &testAddressable{
+		Asset: ava.Asset{ID: ids.Empty},
+		Out: &ava.TestAddressable{
 			Addrs: [][]byte{
 				[]byte{0},
 			},
@@ -172,8 +182,11 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	_, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
-	if err == nil {
-		t.Fatalf("Should have returned no utxoIDs")
+	funds, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(funds) != 0 {
+		t.Fatalf("Should have returned 0 utxoIDs")
 	}
 }

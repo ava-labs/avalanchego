@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -15,7 +16,13 @@ import (
 type ProposalTx interface {
 	initialize(vm *VM) error
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(database.Database) (onCommitDB *versiondb.Database, onAbortDB *versiondb.Database, onCommitFunc func(), onAbortFunc func(), err error)
+	SemanticVerify(database.Database) (
+		onCommitDB *versiondb.Database,
+		onAbortDB *versiondb.Database,
+		onCommitFunc func(),
+		onAbortFunc func(),
+		err TxError,
+	)
 	InitiallyPrefersCommit() bool
 }
 
@@ -39,6 +46,13 @@ type ProposalBlock struct {
 	onCommitFunc func()
 	// The function to execute if this block's proposal is aborted
 	onAbortFunc func()
+}
+
+// Accept implements the snowman.Block interface
+func (pb *ProposalBlock) Accept() error {
+	pb.SetStatus(choices.Accepted)
+	pb.VM.LastAcceptedID = pb.ID()
+	return nil
 }
 
 // Initialize this block.
@@ -85,24 +99,43 @@ func (pb *ProposalBlock) onAbort() (*versiondb.Database, func()) {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
-	// pdb is the database if this block's parent is accepted
-	var pdb database.Database
-	parent := pb.parentBlock()
+	parentIntf := pb.parentBlock()
+
 	// The parent of a proposal block (ie this block) must be a decision block
-	if parent, ok := parent.(decision); ok {
-		pdb = parent.onAccept()
-	} else {
+	parent, ok := parentIntf.(decision)
+	if !ok {
+		if err := pb.Reject(); err == nil {
+			if err := pb.vm.DB.Commit(); err != nil {
+				pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+			}
+		} else {
+			pb.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
 
-	var err error
+	// pdb is the database if this block's parent is accepted
+	pdb := parent.onAccept()
+
+	var err TxError
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
 	if err != nil {
+		// If this block's transaction proposes to advance the timestamp, the transaction may fail
+		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
+		if !err.Temporary() {
+			if err := pb.Reject(); err == nil {
+				if err := pb.vm.DB.Commit(); err != nil {
+					pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+				}
+			} else {
+				pb.vm.DB.Abort()
+			}
+		}
 		return err
 	}
 
 	pb.vm.currentBlocks[pb.ID().Key()] = pb
-	parent.addChild(pb)
+	parentIntf.addChild(pb)
 	return nil
 }
 

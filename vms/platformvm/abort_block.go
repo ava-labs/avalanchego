@@ -11,7 +11,7 @@ import (
 // Abort being accepted results in the proposal of its parent (which must be a proposal block)
 // being rejected.
 type Abort struct {
-	CommonDecisionBlock `serialize:"true"`
+	DoubleDecisionBlock `serialize:"true"`
 }
 
 // Verify this block performs a valid state transition.
@@ -20,12 +20,20 @@ type Abort struct {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (a *Abort) Verify() error {
+	parent, ok := a.parentBlock().(*ProposalBlock)
 	// Abort is a decision, so its parent must be a proposal
-	if parent, ok := a.parentBlock().(*ProposalBlock); ok {
-		a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
-	} else {
+	if !ok {
+		if err := a.Reject(); err == nil {
+			if err := a.vm.DB.Commit(); err != nil {
+				a.vm.Ctx.Log.Error("error committing Abort block as rejected: %s", err)
+			}
+		} else {
+			a.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
+
+	a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
 
 	a.vm.currentBlocks[a.ID().Key()] = a
 	a.parentBlock().addChild(a)
@@ -35,14 +43,10 @@ func (a *Abort) Verify() error {
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
 // block, has ID [parentID].
 func (vm *VM) newAbortBlock(parentID ids.ID) *Abort {
-	abort := &Abort{
-		CommonDecisionBlock: CommonDecisionBlock{
-			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID),
-				vm:    vm,
-			},
-		},
-	}
+	abort := &Abort{DoubleDecisionBlock: DoubleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
+		Block: core.NewBlock(parentID),
+		vm:    vm,
+	}}}}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block

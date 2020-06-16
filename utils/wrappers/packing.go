@@ -24,6 +24,8 @@ const (
 	IntLen = 4
 	// LongLen is the number of bytes per long
 	LongLen = 8
+	// BoolLen is the number of bytes per bool
+	BoolLen = 1
 )
 
 var (
@@ -242,12 +244,32 @@ func (p *Packer) PackFixedByteSlices(byteSlices [][]byte) {
 	}
 }
 
-// UnpackFixedByteSlices unpack a byte slice slice to the byte array
+// UnpackFixedByteSlices returns a byte slice slice from the byte array.
+// Each byte slice has the specified size. The number of byte slices is
+// read from the byte array.
 func (p *Packer) UnpackFixedByteSlices(size int) [][]byte {
 	sliceSize := p.UnpackInt()
 	bytes := [][]byte(nil)
 	for i := uint32(0); i < sliceSize && !p.Errored(); i++ {
 		bytes = append(bytes, p.UnpackFixedBytes(size))
+	}
+	return bytes
+}
+
+// Pack2DByteSlice append a 2D byte slice to the byte array
+func (p *Packer) Pack2DByteSlice(byteSlices [][]byte) {
+	p.PackInt(uint32(len(byteSlices)))
+	for _, bytes := range byteSlices {
+		p.PackBytes(bytes)
+	}
+}
+
+// Unpack2DByteSlice returns a 2D byte slice from the byte array.
+func (p *Packer) Unpack2DByteSlice() [][]byte {
+	sliceSize := p.UnpackInt()
+	bytes := [][]byte(nil)
+	for i := uint32(0); i < sliceSize && !p.Errored(); i++ {
+		bytes = append(bytes, p.UnpackBytes())
 	}
 	return bytes
 }
@@ -426,6 +448,20 @@ func TryPackBytes(packer *Packer, valIntf interface{}) {
 // TryUnpackBytes attempts to unpack the value as a list of bytes
 func TryUnpackBytes(packer *Packer) interface{} {
 	return packer.UnpackBytes()
+}
+
+// TryPack2DBytes attempts to pack the value as a 2D byte slice
+func TryPack2DBytes(packer *Packer, valIntf interface{}) {
+	if val, ok := valIntf.([][]byte); ok {
+		packer.Pack2DByteSlice(val)
+	} else {
+		packer.Add(errBadType)
+	}
+}
+
+// TryUnpack2DBytes attempts to unpack the value as a 2D byte slice
+func TryUnpack2DBytes(packer *Packer) interface{} {
+	return packer.Unpack2DByteSlice()
 }
 
 // TryPackStr attempts to pack the value as a string

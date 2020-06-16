@@ -1,9 +1,0 @@
-Added bugs:
-
-- Inside of gecko/snow/consensus/avalanche/topological.go#Topological.pushVotes the votes must be properly filtered. Specifically, a byzantine node should not be able to vote for two different transactions that conflict with each other during the same poll. If a node votes for conflicting transactions during the same poll, either all the node's votes should be dropped, or the votes for the conflicting transactions should be dropped.
-
-- Inside of gecko/snow/consensus/snowball/unary_snowball.go#unarySnowball.Extend the confidence and bias fields should have been set to the values in the unary snowball instance.
-
-- Inside of gecko/snow/engine/avalanche/bootstrapper.go#bootstrapper.Put and gecko/snow/engine/snowman/bootstrapper.go#bootstrapper.Put the engine must check that the provided vtx/blk ID is the ID of the parsed container. Otherwise, a byzantine node could send a container and report the wrong container ID for it. This would allow an un-intended container to be marked as accepted during bootstrapping.
-
-- Inside of gecko/snow/engine/avalanche/polls.go#poll and gecko/snow/engine/snowman/polls.go#poll the poll should only allow a validator to vote once per poll. Also, this validator must have been part of set of validators that was polled during the query.

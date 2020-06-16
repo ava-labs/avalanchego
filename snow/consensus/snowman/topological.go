@@ -4,8 +4,6 @@
 package snowman
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
@@ -19,83 +17,57 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 
 // Topological implements the Snowman interface by using a tree tracking the
 // strongly preferred branch. This tree structure amortizes network polls to
-// vote on more than just the next position.
+// vote on more than just the next block.
 type Topological struct {
-	ctx    *snow.Context
+	metrics
+
+	// ctx is the context this snowman instance is executing in
+	ctx *snow.Context
+
+	// params are the parameters that should be used to initialize snowball
+	// instances
 	params snowball.Parameters
 
-	numProcessing            prometheus.Gauge
-	numAccepted, numRejected prometheus.Counter
+	// head is the last accepted block
+	head ids.ID
 
-	head  ids.ID
-	nodes map[[32]byte]node // ParentID -> Snowball instance
-	tail  ids.ID
-}
+	// blocks stores the last accepted block and all the pending blocks
+	blocks map[[32]byte]*snowmanBlock // blockID -> snowmanBlock
 
-// Tracks the state of a snowman vertex
-type node struct {
-	ts    *Topological
-	blkID ids.ID
-	blk   Block
-
-	shouldFalter bool
-	sb           snowball.Consensus
-	children     map[[32]byte]Block
+	// tail is the preferred block with no children
+	tail ids.ID
 }
 
 // Used to track the kahn topological sort status
 type kahnNode struct {
+	// inDegree is the number of children that haven't been processed yet. If
+	// inDegree is 0, then this node is a leaf
 	inDegree int
-	votes    ids.Bag
+	// votes for all the children of this node, so far
+	votes ids.Bag
 }
 
 // Used to track which children should receive votes
 type votes struct {
-	id    ids.ID
+	// parentID is the parent of all the votes provided in the votes bag
+	parentID ids.ID
+	// votes for all the children of the parent
 	votes ids.Bag
 }
 
 // Initialize implements the Snowman interface
 func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters, rootID ids.ID) {
-	ctx.Log.AssertDeferredNoError(params.Valid)
-
 	ts.ctx = ctx
 	ts.params = params
 
-	ts.numProcessing = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: params.Namespace,
-			Name:      "processing",
-			Help:      "Number of currently processing blocks",
-		})
-	ts.numAccepted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "accepted",
-			Help:      "Number of blocks accepted",
-		})
-	ts.numRejected = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: params.Namespace,
-			Name:      "rejected",
-			Help:      "Number of blocks rejected",
-		})
-
-	if err := ts.params.Metrics.Register(ts.numProcessing); err != nil {
-		ts.ctx.Log.Error("Failed to register processing statistics due to %s", err)
-	}
-	if err := ts.params.Metrics.Register(ts.numAccepted); err != nil {
-		ts.ctx.Log.Error("Failed to register accepted statistics due to %s", err)
-	}
-	if err := ts.params.Metrics.Register(ts.numRejected); err != nil {
-		ts.ctx.Log.Error("Failed to register rejected statistics due to %s", err)
+	if err := ts.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+		ts.ctx.Log.Error("%s", err)
 	}
 
 	ts.head = rootID
-	ts.nodes = map[[32]byte]node{
-		rootID.Key(): node{
-			ts:    ts,
-			blkID: rootID,
+	ts.blocks = map[[32]byte]*snowmanBlock{
+		rootID.Key(): &snowmanBlock{
+			sm: ts,
 		},
 	}
 	ts.tail = rootID
@@ -105,52 +77,57 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
 // Add implements the Snowman interface
-func (ts *Topological) Add(blk Block) {
+func (ts *Topological) Add(blk Block) error {
 	parent := blk.Parent()
 	parentID := parent.ID()
 	parentKey := parentID.Key()
 
 	blkID := blk.ID()
+	blkBytes := blk.Bytes()
 
-	bytes := blk.Bytes()
-	ts.ctx.DecisionDispatcher.Issue(ts.ctx.ChainID, blkID, bytes)
-	ts.ctx.ConsensusDispatcher.Issue(ts.ctx.ChainID, blkID, bytes)
+	// Notify anyone listening that this block was issued.
+	ts.ctx.DecisionDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
+	ts.ctx.ConsensusDispatcher.Issue(ts.ctx.ChainID, blkID, blkBytes)
+	ts.metrics.Issued(blkID)
 
-	if parent, ok := ts.nodes[parentKey]; ok {
-		parent.Add(blk)
-		ts.nodes[parentKey] = parent
-
-		ts.nodes[blkID.Key()] = node{
-			ts:    ts,
-			blkID: blkID,
-			blk:   blk,
-		}
-
-		// If we are extending the tail, this is the new tail
-		if ts.tail.Equals(parentID) {
-			ts.tail = blkID
-		}
-
-		ts.numProcessing.Inc()
-	} else {
+	parentNode, ok := ts.blocks[parentKey]
+	if !ok {
 		// If the ancestor is missing, this means the ancestor must have already
-		// been pruned. Therefore, the dependent is transitively rejected.
-		blk.Reject()
+		// been pruned. Therefore, the dependent should be transitively
+		// rejected.
+		if err := blk.Reject(); err != nil {
+			return err
+		}
 
-		bytes := blk.Bytes()
-		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, bytes)
-		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, bytes)
-
-		ts.numRejected.Inc()
+		// Notify anyone listening that this block was rejected.
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
+		ts.metrics.Rejected(blkID)
+		return nil
 	}
+
+	// add the block as a child of its parent, and add the block to the tree
+	parentNode.AddChild(blk)
+	ts.blocks[blkID.Key()] = &snowmanBlock{
+		sm:  ts,
+		blk: blk,
+	}
+
+	// If we are extending the tail, this is the new tail
+	if ts.tail.Equals(parentID) {
+		ts.tail = blkID
+	}
+	return nil
 }
 
 // Issued implements the Snowman interface
 func (ts *Topological) Issued(blk Block) bool {
+	// If the block is decided, then it must have been previously issued.
 	if blk.Status().Decided() {
 		return true
 	}
-	_, ok := ts.nodes[blk.ID().Key()]
+	// If the block is in the map of current blocks, then the block was issued.
+	_, ok := ts.blocks[blk.ID().Key()]
 	return ok
 }
 
@@ -158,16 +135,29 @@ func (ts *Topological) Issued(blk Block) bool {
 func (ts *Topological) Preference() ids.ID { return ts.tail }
 
 // RecordPoll implements the Snowman interface
-// This performs Kahn’s algorithm.
-// When a node is removed from the leaf queue, it is checked to see if the
-// number of votes is >= alpha. If it is, then it is added to the vote stack.
-// Once there are no nodes in the leaf queue. The vote stack is unwound and
-// voted on. If a decision is made, then that choice is marked as accepted, and
-// all alternative choices are marked as rejected.
+//
+// The votes bag contains at most K votes for blocks in the tree. If there is a
+// vote for a block that isn't in the tree, the vote is dropped.
+//
+// Votes are propagated transitively towards the genesis. All blocks in the tree
+// that result in at least Alpha votes will record the poll on their children.
+// Every other block will have an unsuccessful poll registered.
+//
+// After collecting which blocks should be voted on, the polls are registered
+// and blocks are accepted/rejected as needed. The tail is then updated to equal
+// the leaf on the preferred branch.
+//
+// To optimize the theoretical complexity of the vote propagation, a topological
+// sort is done over the blocks that are reachable from the provided votes.
+// During the sort, votes are pushed towards the genesis. To prevent interating
+// over all blocks that had unsuccessful polls, we set a flag on the block to
+// know that any future traversal through that block should register an
+// unsuccessful poll on that block and every descendant block.
+//
 // The complexity of this function is:
-// Runtime = 3 * |live set| + |votes|
-// Space = |live set| + |votes|
-func (ts *Topological) RecordPoll(votes ids.Bag) {
+// - Runtime = 3 * |live set| + |votes|
+// - Space = 2 * |live set| + |votes|
+func (ts *Topological) RecordPoll(votes ids.Bag) error {
 	// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
 	kahnGraph, leaves := ts.calculateInDegree(votes)
 
@@ -175,254 +165,339 @@ func (ts *Topological) RecordPoll(votes ids.Bag) {
 	voteStack := ts.pushVotes(kahnGraph, leaves)
 
 	// Runtime = |live set| ; Space = Constant
-	tail := ts.vote(voteStack)
-	tn := node{}
-	for tn = ts.nodes[tail.Key()]; tn.sb != nil; tn = ts.nodes[tail.Key()] {
-		tail = tn.sb.Preference()
+	preferred, err := ts.vote(voteStack)
+	if err != nil {
+		return err
 	}
 
-	ts.tail = tn.blkID
+	// Runtime = |live set| ; Space = Constant
+	ts.tail = ts.getPreferredDecendent(preferred)
+	return nil
 }
 
 // Finalized implements the Snowman interface
-func (ts *Topological) Finalized() bool { return len(ts.nodes) == 1 }
+func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
-// the non-transitively applied votes. Also returns the list of leaf nodes.
+// the non-transitively applied votes. Also returns the list of leaf blocks.
 func (ts *Topological) calculateInDegree(
 	votes ids.Bag) (map[[32]byte]kahnNode, []ids.ID) {
 	kahns := make(map[[32]byte]kahnNode)
 	leaves := ids.Set{}
 
 	for _, vote := range votes.List() {
-		voteNode, validVote := ts.nodes[vote.Key()]
-		// If it is not found, then the vote is either for something rejected,
-		// or something we haven't heard of yet.
-		if validVote && voteNode.blk != nil && !voteNode.blk.Status().Decided() {
-			parentID := voteNode.blk.Parent().ID()
-			parentKey := parentID.Key()
-			kahn, previouslySeen := kahns[parentKey]
-			// Add this new vote to the current bag of votes
-			kahn.votes.AddCount(vote, votes.Count(vote))
-			kahns[parentKey] = kahn
+		voteKey := vote.Key()
+		votedBlock, validVote := ts.blocks[voteKey]
 
-			if !previouslySeen {
-				// If I've never seen this node before, it is currently a leaf.
-				leaves.Add(parentID)
+		// If the vote is for a block that isn't in the current pending set,
+		// then the vote is dropped
+		if !validVote {
+			continue
+		}
 
-				for n, e := ts.nodes[parentKey]; e; n, e = ts.nodes[parentKey] {
-					if n.blk == nil || n.blk.Status().Decided() {
-						break // Ensure that we haven't traversed off the tree
-					}
-					parentID := n.blk.Parent().ID()
-					parentKey = parentID.Key()
+		// If the vote is for the last accepted block, the vote is dropped
+		if votedBlock.Accepted() {
+			continue
+		}
 
-					kahn := kahns[parentKey]
-					kahn.inDegree++
-					kahns[parentKey] = kahn
+		// The parent contains the snowball instance of its children
+		parent := votedBlock.blk.Parent()
+		parentID := parent.ID()
+		parentIDKey := parentID.Key()
 
-					if kahn.inDegree == 1 {
-						// If I am transitively seeing this node for the first
-						// time, it is no longer a leaf.
-						leaves.Remove(parentID)
-					} else {
-						// If I have already traversed this branch, stop.
-						break
-					}
-				}
+		// Add the votes for this block to the parent's set of responces
+		numVotes := votes.Count(vote)
+		kahn, previouslySeen := kahns[parentIDKey]
+		kahn.votes.AddCount(vote, numVotes)
+		kahns[parentIDKey] = kahn
+
+		// If the parent block already had registered votes, then there is no
+		// need to iterate into the parents
+		if previouslySeen {
+			continue
+		}
+
+		// If I've never seen this parent block before, it is currently a leaf.
+		leaves.Add(parentID)
+
+		// iterate through all the block's ancestors and set up the inDegrees of
+		// the blocks
+		for n := ts.blocks[parentIDKey]; !n.Accepted(); n = ts.blocks[parentIDKey] {
+			parent := n.blk.Parent()
+			parentID := parent.ID()
+			parentIDKey = parentID.Key() // move the loop variable forward
+
+			// Increase the inDegree by one
+			kahn := kahns[parentIDKey]
+			kahn.inDegree++
+			kahns[parentIDKey] = kahn
+
+			// If we have already seen this block, then we shouldn't increase
+			// the inDegree of the ancestors through this block again.
+			if kahn.inDegree != 1 {
+				break
 			}
+
+			// If I am transitively seeing this block for the first time, either
+			// the block was previously unknown or it was previously a leaf.
+			// Regardless, it shouldn't be tracked as a leaf.
+			leaves.Remove(parentID)
 		}
 	}
 
 	return kahns, leaves.List()
 }
 
-// convert the tree into a branch of snowball instances with an alpha threshold
+// convert the tree into a branch of snowball instances with at least alpha
+// votes
 func (ts *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode, leaves []ids.ID) []votes {
 	voteStack := []votes(nil)
 	for len(leaves) > 0 {
+		// pop a leaf off the stack
 		newLeavesSize := len(leaves) - 1
-		leaf := leaves[newLeavesSize]
+		leafID := leaves[newLeavesSize]
 		leaves = leaves[:newLeavesSize]
 
-		leafKey := leaf.Key()
-		kahn := kahnNodes[leafKey]
+		// get the block and sort infomation about the block
+		leafIDKey := leafID.Key()
+		kahnNode := kahnNodes[leafIDKey]
+		block := ts.blocks[leafIDKey]
 
-		if node, shouldVote := ts.nodes[leafKey]; shouldVote {
-			if kahn.votes.Len() >= ts.params.Alpha {
-				voteStack = append(voteStack, votes{
-					id:    leaf,
-					votes: kahn.votes,
-				})
-			}
+		// If there are at least Alpha votes, then this block needs to record
+		// the poll on the snowball instance
+		if kahnNode.votes.Len() >= ts.params.Alpha {
+			voteStack = append(voteStack, votes{
+				parentID: leafID,
+				votes:    kahnNode.votes,
+			})
+		}
 
-			if node.blk == nil || node.blk.Status().Decided() {
-				continue // Stop traversing once we pass into the decided frontier
-			}
+		// If the block is accepted, then we don't need to push votes to the
+		// parent block
+		if block.Accepted() {
+			continue
+		}
 
-			parentID := node.blk.Parent().ID()
-			parentKey := parentID.Key()
-			if depNode, notPruned := kahnNodes[parentKey]; notPruned {
-				// Remove one of the in-bound edges
-				depNode.inDegree--
-				// Push the votes to my parent
-				depNode.votes.AddCount(leaf, kahn.votes.Len())
-				kahnNodes[parentKey] = depNode
+		parent := block.blk.Parent()
+		parentID := parent.ID()
+		parentIDKey := parentID.Key()
 
-				if depNode.inDegree == 0 {
-					// Once I have no in-bound edges, I'm a leaf
-					leaves = append(leaves, parentID)
-				}
-			}
+		// Remove an inbound edge from the parent kahn node and push the votes.
+		parentKahnNode := kahnNodes[parentIDKey]
+		parentKahnNode.inDegree--
+		parentKahnNode.votes.AddCount(leafID, kahnNode.votes.Len())
+		kahnNodes[parentIDKey] = parentKahnNode
+
+		// If the inDegree is zero, then the parent node is now a leaf
+		if parentKahnNode.inDegree == 0 {
+			leaves = append(leaves, parentID)
 		}
 	}
 	return voteStack
 }
 
-func (ts *Topological) vote(voteStack []votes) ids.ID {
+// apply votes to the branch that received an Alpha threshold
+func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
+	// If the voteStack is empty, then the full tree should falter. This won't
+	// change the preferred branch.
 	if len(voteStack) == 0 {
+		ts.ctx.Log.Verbo("No progress was made after a vote with %d pending blocks", len(ts.blocks)-1)
+
 		headKey := ts.head.Key()
-		headNode := ts.nodes[headKey]
-		headNode.shouldFalter = true
-
-		ts.ctx.Log.Verbo("No progress was made on this vote even though we have %d nodes", len(ts.nodes))
-
-		ts.nodes[headKey] = headNode
-		return ts.tail
+		headBlock := ts.blocks[headKey]
+		headBlock.shouldFalter = true
+		return ts.tail, nil
 	}
 
-	onTail := true
-	tail := ts.head
+	// keep track of the new preferred block
+	newPreferred := ts.head
+	onPreferredBranch := true
 	for len(voteStack) > 0 {
+		// pop a vote off the stack
 		newStackSize := len(voteStack) - 1
-		voteGroup := voteStack[newStackSize]
+		vote := voteStack[newStackSize]
 		voteStack = voteStack[:newStackSize]
 
-		voteParentKey := voteGroup.id.Key()
-		parentNode, stillExists := ts.nodes[voteParentKey]
-		if !stillExists {
+		// get the block that we are going to vote on
+		voteParentIDKey := vote.parentID.Key()
+		parentBlock, notRejected := ts.blocks[voteParentIDKey]
+
+		// if the block block we are going to vote on was already rejected, then
+		// we should stop applying the votes
+		if !notRejected {
 			break
 		}
 
-		shouldTransFalter := parentNode.shouldFalter
-		if parentNode.shouldFalter {
-			parentNode.sb.RecordUnsuccessfulPoll()
-			parentNode.shouldFalter = false
-			ts.ctx.Log.Verbo("Reset confidence on %s", parentNode.blkID)
+		// keep track of transitive falters to propagate to this block's
+		// children
+		shouldTransitivelyFalter := parentBlock.shouldFalter
+
+		// if the block was previously marked as needing to falter, the block
+		// should falter before applying the vote
+		if shouldTransitivelyFalter {
+			ts.ctx.Log.Verbo("Resetting confidence below %s", vote.parentID)
+
+			parentBlock.sb.RecordUnsuccessfulPoll()
+			parentBlock.shouldFalter = false
 		}
-		parentNode.sb.RecordPoll(voteGroup.votes)
+
+		// apply the votes for this snowball instance
+		parentBlock.sb.RecordPoll(vote.votes)
 
 		// Only accept when you are finalized and the head.
-		if parentNode.sb.Finalized() && ts.head.Equals(voteGroup.id) {
-			ts.accept(parentNode)
-			tail = parentNode.sb.Preference()
-			delete(ts.nodes, voteParentKey)
-			ts.numProcessing.Dec()
-		} else {
-			ts.nodes[voteParentKey] = parentNode
+		if parentBlock.sb.Finalized() && ts.head.Equals(vote.parentID) {
+			if err := ts.accept(parentBlock); err != nil {
+				return ids.ID{}, err
+			}
+
+			// by accepting the child of parentBlock, the last accepted block is
+			// no longer voteParentID, but its child. So, voteParentID can be
+			// removed from the tree.
+			delete(ts.blocks, voteParentIDKey)
 		}
 
-		// If this is the last id that got votes, default to the empty id. This
-		// will cause all my children to be reset below.
+		// If we are on the preferred branch, then the parent's preference is
+		// the next block on the preferred branch.
+		parentPreference := parentBlock.sb.Preference()
+		if onPreferredBranch {
+			newPreferred = parentPreference
+		}
+
+		// Get the ID of the child that is having a RecordPoll called. All other
+		// children will need to have their confidence reset. If there isn't a
+		// child having RecordPoll called, then the nextID will default to the
+		// nil ID.
 		nextID := ids.ID{}
 		if len(voteStack) > 0 {
-			nextID = voteStack[newStackSize-1].id
+			nextID = voteStack[newStackSize-1].parentID
 		}
 
-		onTail = onTail && nextID.Equals(parentNode.sb.Preference())
-		if onTail {
-			tail = nextID
-		}
+		// If we are on the preferred branch and the nextID is the preference of
+		// the snowball instance, then we are following the preferred branch.
+		onPreferredBranch = onPreferredBranch && nextID.Equals(parentPreference)
 
 		// If there wasn't an alpha threshold on the branch (either on this vote
 		// or a past transitive vote), I should falter now.
-		for childIDBytes := range parentNode.children {
-			if childID := ids.NewID(childIDBytes); shouldTransFalter || !childID.Equals(nextID) {
-				if childNode, childExists := ts.nodes[childIDBytes]; childExists {
-					// The existence check is needed in case the current node
-					// was finalized. However, in this case, we still need to
-					// check for the next id.
-					ts.ctx.Log.Verbo("Defering confidence reset on %s with %d children. NextID: %s", childID, len(parentNode.children), nextID)
-					childNode.shouldFalter = true
-					ts.nodes[childIDBytes] = childNode
-				}
+		for childIDKey := range parentBlock.children {
+			childID := ids.NewID(childIDKey)
+			// If we don't need to transitively falter and the child is going to
+			// have RecordPoll called on it, then there is no reason to reset
+			// the block's confidence
+			if !shouldTransitivelyFalter && childID.Equals(nextID) {
+				continue
+			}
+
+			// If we finalized a child of the current block, then all other
+			// children will have been rejected and removed from the tree.
+			// Therefore, we need to make sure the child is still in the tree.
+			childBlock, notRejected := ts.blocks[childIDKey]
+			if notRejected {
+				ts.ctx.Log.Verbo("Defering confidence reset of %s. Voting for %s", childID, nextID)
+
+				// If the child is ever voted for positively, the confidence
+				// must be reset first.
+				childBlock.shouldFalter = true
 			}
 		}
 	}
-	return tail
+	return newPreferred, nil
 }
 
-func (ts *Topological) accept(n node) {
-	// Accept the preference, reject all transitive rejections
+// Get the preferred decendent of the provided block ID
+func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
+	// Traverse from the provided ID to the preferred child until there are no
+	// children.
+	for block := ts.blocks[blkID.Key()]; block.sb != nil; block = ts.blocks[blkID.Key()] {
+		blkID = block.sb.Preference()
+	}
+	return blkID
+}
+
+// accept the preferred child of the provided snowman block. By accepting the
+// preferred child, all other children will be rejected. When these children are
+// rejected, all their descendants will be rejected.
+func (ts *Topological) accept(n *snowmanBlock) error {
+	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
 
-	rejects := []ids.ID(nil)
-	for childIDBytes := range n.children {
-		if childID := ids.NewID(childIDBytes); !childID.Equals(pref) {
-			child := n.children[childIDBytes]
-			child.Reject()
+	ts.ctx.Log.Verbo("Accepting block with ID %s", pref)
 
-			bytes := child.Bytes()
-			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
-
-			ts.numRejected.Inc()
-			rejects = append(rejects, childID)
-		}
-	}
-	ts.rejectTransitively(rejects...)
-
-	ts.head = pref
+	// Get the child and accept it
 	child := n.children[pref.Key()]
-	ts.ctx.Log.Verbo("Accepting block with ID %s", child.ID())
+	if err := child.Accept(); err != nil {
+		return err
+	}
 
+	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	ts.ctx.DecisionDispatcher.Accept(ts.ctx.ChainID, child.ID(), bytes)
-	ts.ctx.ConsensusDispatcher.Accept(ts.ctx.ChainID, child.ID(), bytes)
+	ts.ctx.DecisionDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
+	ts.ctx.ConsensusDispatcher.Accept(ts.ctx.ChainID, pref, bytes)
+	ts.metrics.Accepted(pref)
 
-	child.Accept()
-	ts.numAccepted.Inc()
+	// Because this is the newest accepted block, this is the new head.
+	ts.head = pref
+
+	// Because ts.blocks contains the last accepted block, we don't delete the
+	// block from the blocks map here.
+
+	rejects := []ids.ID(nil)
+	for childIDKey, child := range n.children {
+		childID := ids.NewID(childIDKey)
+		if childID.Equals(pref) {
+			// don't reject the block we just accepted
+			continue
+		}
+
+		if err := child.Reject(); err != nil {
+			return err
+		}
+
+		// Notify anyone listening that this block was rejected.
+		bytes := child.Bytes()
+		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+		ts.metrics.Rejected(childID)
+
+		// Track which blocks have been directly rejected
+		rejects = append(rejects, childID)
+	}
+
+	// reject all the descendants of the blocks we just rejected
+	return ts.rejectTransitively(rejects)
 }
 
-// Takes in a list of newly rejected ids and rejects everything that depends on
-// them
-func (ts *Topological) rejectTransitively(rejected ...ids.ID) {
+// Takes in a list of rejected ids and rejects all descendants of these IDs
+func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
+	// the rejected array is treated as a queue, with the next element at index
+	// 0 and the last element at the end of the slice.
 	for len(rejected) > 0 {
+		// pop the rejected ID off the queue
 		newRejectedSize := len(rejected) - 1
-		rejectID := rejected[newRejectedSize]
+		rejectedID := rejected[newRejectedSize]
 		rejected = rejected[:newRejectedSize]
 
-		rejectKey := rejectID.Key()
-		rejectNode := ts.nodes[rejectKey]
-		delete(ts.nodes, rejectKey)
-		ts.numProcessing.Dec()
+		// get the rejected node, and remove it from the tree
+		rejectedKey := rejectedID.Key()
+		rejectedNode := ts.blocks[rejectedKey]
+		delete(ts.blocks, rejectedKey)
 
-		for childIDBytes, child := range rejectNode.children {
-			childID := ids.NewID(childIDBytes)
-			rejected = append(rejected, childID)
-			child.Reject()
+		for childIDKey, child := range rejectedNode.children {
+			if err := child.Reject(); err != nil {
+				return err
+			}
 
+			// Notify anyone listening that this block was rejected.
+			childID := ids.NewID(childIDKey)
 			bytes := child.Bytes()
 			ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
 			ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, childID, bytes)
+			ts.metrics.Rejected(childID)
 
-			ts.numRejected.Inc()
+			// add the newly rejected block to the end of the queue
+			rejected = append(rejected, childID)
 		}
 	}
-}
-
-func (n *node) Add(child Block) {
-	childID := child.ID()
-	if n.sb == nil {
-		n.sb = &snowball.Tree{}
-		n.sb.Initialize(n.ts.params, childID)
-	} else {
-		n.sb.Add(childID)
-	}
-	if n.children == nil {
-		n.children = make(map[[32]byte]Block)
-	}
-	n.children[childID.Key()] = child
+	return nil
 }

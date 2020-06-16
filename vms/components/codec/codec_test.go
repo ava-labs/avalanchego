@@ -46,6 +46,7 @@ type myStruct struct {
 	InnerStruct  MyInnerStruct      `serialize:"true"`
 	InnerStruct2 *MyInnerStruct     `serialize:"true"`
 	Member1      int64              `serialize:"true"`
+	Member2      uint16             `serialize:"true"`
 	MyArray2     [5]string          `serialize:"true"`
 	MyArray3     [3]MyInnerStruct   `serialize:"true"`
 	MyArray4     [2]*MyInnerStruct2 `serialize:"true"`
@@ -67,6 +68,7 @@ func TestStruct(t *testing.T) {
 		InnerStruct:  MyInnerStruct{"hello"},
 		InnerStruct2: &MyInnerStruct{"yello"},
 		Member1:      1,
+		Member2:      2,
 		MySlice:      []byte{1, 2, 3, 4},
 		MySlice2:     []string{"one", "two", "three"},
 		MySlice3:     []MyInnerStruct{MyInnerStruct{"a"}, MyInnerStruct{"b"}, MyInnerStruct{"c"}},
@@ -410,6 +412,33 @@ func TestSerializeUnexportedField(t *testing.T) {
 	}
 }
 
+func TestSerializeOfNoSerializeField(t *testing.T) {
+	type s struct {
+		SerializedField   string `serialize:"true"`
+		UnserializedField string `serialize:"false"`
+		UnmarkedField     string
+	}
+	myS := s{
+		SerializedField:   "Serialize me",
+		UnserializedField: "Do not serialize me",
+		UnmarkedField:     "No declared serialize",
+	}
+	codec := NewDefault()
+	marshalled, err := codec.Marshal(myS)
+	if err != nil {
+		t.Fatalf("Unexpected error %q", err)
+	}
+	unmarshalled := s{}
+	err = codec.Unmarshal(marshalled, &unmarshalled)
+	if err != nil {
+		t.Fatalf("Unexpected error %q", err)
+	}
+	expectedUnmarshalled := s{SerializedField: "Serialize me"}
+	if !reflect.DeepEqual(unmarshalled, expectedUnmarshalled) {
+		t.Fatalf("Got %#v, expected %#v", unmarshalled, expectedUnmarshalled)
+	}
+}
+
 type simpleSliceStruct struct {
 	Arr []uint32 `serialize:"true"`
 }
@@ -536,5 +565,44 @@ func TestTooLargeUnmarshal(t *testing.T) {
 	err := codec.Unmarshal(bytes, &s)
 	if err == nil {
 		t.Fatalf("Should have errored due to too many bytes provided")
+	}
+}
+
+type outerInterface interface {
+	ToInt() int
+}
+
+type outer struct {
+	Interface outerInterface `serialize:"true"`
+}
+
+type innerInterface struct{}
+
+func (it *innerInterface) ToInt() int {
+	return 0
+}
+
+type innerNoInterface struct{}
+
+// Ensure deserializing structs into the wrong interface errors gracefully
+func TestUnmarshalInvalidInterface(t *testing.T) {
+	codec := NewDefault()
+
+	codec.RegisterType(&innerInterface{})
+	codec.RegisterType(&innerNoInterface{})
+
+	{
+		bytes := []byte{0, 0, 0, 0}
+		s := outer{}
+		if err := codec.Unmarshal(bytes, &s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	{
+		bytes := []byte{0, 0, 0, 1}
+		s := outer{}
+		if err := codec.Unmarshal(bytes, &s); err == nil {
+			t.Fatalf("should have errored")
+		}
 	}
 }

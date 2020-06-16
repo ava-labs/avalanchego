@@ -8,8 +8,29 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 )
+
+// This was taken from: https://stackoverflow.com/a/50825191/3478466
+var privateIPBlocks []*net.IPNet
+
+func init() {
+	for _, cidr := range []string{
+		"127.0.0.0/8",    // IPv4 loopback
+		"10.0.0.0/8",     // RFC1918
+		"172.16.0.0/12",  // RFC1918
+		"192.168.0.0/16", // RFC1918
+		"169.254.0.0/16", // RFC3927 link-local
+		"::1/128",        // IPv6 loopback
+		"fe80::/10",      // IPv6 link-local
+		"fc00::/7",       // IPv6 unique local addr
+	} {
+		_, block, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic(fmt.Errorf("parse error on %q: %v", cidr, err))
+		}
+		privateIPBlocks = append(privateIPBlocks, block)
+	}
+}
 
 var (
 	errBadIP = errors.New("bad ip format")
@@ -33,21 +54,47 @@ func (ipDesc IPDesc) PortString() string {
 }
 
 func (ipDesc IPDesc) String() string {
-	return fmt.Sprintf("%s%s", ipDesc.IP, ipDesc.PortString())
+	return net.JoinHostPort(ipDesc.IP.String(), fmt.Sprintf("%d", ipDesc.Port))
+}
+
+// IsPrivate attempts to decide if the ip address in this descriptor is a local
+// ip address.
+// This function was taken from: https://stackoverflow.com/a/50825191/3478466
+func (ipDesc IPDesc) IsPrivate() bool {
+	ip := ipDesc.IP
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+
+	for _, block := range privateIPBlocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return true
+}
+
+// IsZero returns if the IP or port is zeroed out
+func (ipDesc IPDesc) IsZero() bool {
+	ip := ipDesc.IP
+	return ipDesc.Port == 0 ||
+		len(ip) == 0 ||
+		ip.Equal(net.IPv4zero) ||
+		ip.Equal(net.IPv6zero)
 }
 
 // ToIPDesc ...
-// TODO: this was kinda hacked together, it should be verified.
 func ToIPDesc(str string) (IPDesc, error) {
-	parts := strings.Split(str, ":")
-	if len(parts) != 2 {
+	host, portStr, err := net.SplitHostPort(str)
+	if err != nil {
 		return IPDesc{}, errBadIP
 	}
-	port, err := strconv.ParseUint(parts[1], 10 /*=base*/, 16 /*=size*/)
+	port, err := strconv.ParseUint(portStr, 10 /*=base*/, 16 /*=size*/)
 	if err != nil {
+		// TODO: Should this return a locally defined error? (e.g. errBadPort)
 		return IPDesc{}, err
 	}
-	ip := net.ParseIP(parts[0])
+	ip := net.ParseIP(host)
 	if ip == nil {
 		return IPDesc{}, errBadIP
 	}
@@ -55,10 +102,4 @@ func ToIPDesc(str string) (IPDesc, error) {
 		IP:   ip,
 		Port: uint16(port),
 	}, nil
-}
-
-// MyIP ...
-func MyIP() net.IP {
-	// TODO: Change this to consult a json-returning external service
-	return net.ParseIP("127.0.0.1")
 }

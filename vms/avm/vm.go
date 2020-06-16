@@ -21,8 +21,10 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
@@ -33,7 +35,7 @@ const (
 	batchSize      = 30
 	stateCacheSize = 10000
 	idCacheSize    = 10000
-	txCacheSize    = 10000
+	txCacheSize    = 100000
 	addressSep     = "-"
 )
 
@@ -43,11 +45,15 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
+	errBootstrapping             = errors.New("chain is currently bootstrapping")
 )
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
 	ids.Aliaser
+
+	ava      ids.ID
+	platform ids.ID
 
 	// Contains information of where this VM is executing
 	ctx *snow.Context
@@ -61,6 +67,9 @@ type VM struct {
 
 	// State management
 	state *prefixedState
+
+	// Set to true once this VM is marked as `Bootstrapped` by the engine
+	bootstrapped bool
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -86,8 +95,10 @@ func (cr *codecRegistry) RegisterType(val interface{}) error {
 	cr.typeToFxIndex[valType] = cr.index
 	return cr.codec.RegisterType(val)
 }
-func (cr *codecRegistry) Marshal(val interface{}) ([]byte, error)   { return cr.codec.Marshal(val) }
-func (cr *codecRegistry) Unmarshal(b []byte, val interface{}) error { return cr.codec.Unmarshal(b, val) }
+func (cr *codecRegistry) Marshal(val interface{}) ([]byte, error) { return cr.codec.Marshal(val) }
+func (cr *codecRegistry) Unmarshal(b []byte, val interface{}) error {
+	return cr.codec.Unmarshal(b, val)
+}
 
 /*
  ******************************************************************************
@@ -111,35 +122,23 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
+	c := codec.NewDefault()
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		vm.pubsub.Register("accepted"),
 		vm.pubsub.Register("rejected"),
 		vm.pubsub.Register("verified"),
+
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
 	)
 	if errs.Errored() {
 		return errs.Err
 	}
-
-	vm.state = &prefixedState{
-		state: &state{
-			c:  &cache.LRU{Size: stateCacheSize},
-			vm: vm,
-		},
-
-		tx:       &cache.LRU{Size: idCacheSize},
-		utxo:     &cache.LRU{Size: idCacheSize},
-		txStatus: &cache.LRU{Size: idCacheSize},
-		funds:    &cache.LRU{Size: idCacheSize},
-
-		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
-	}
-
-	c := codec.NewDefault()
-	c.RegisterType(&BaseTx{})
-	c.RegisterType(&CreateAssetTx{})
-	c.RegisterType(&OperationTx{})
 
 	vm.fxs = make([]*parsedFx, len(fxs))
 	for i, fxContainer := range fxs {
@@ -166,6 +165,20 @@ func (vm *VM) Initialize(
 
 	vm.codec = c
 
+	vm.state = &prefixedState{
+		state: &state{State: ava.State{
+			Cache: &cache.LRU{Size: stateCacheSize},
+			DB:    vm.db,
+			Codec: vm.codec,
+		}},
+
+		tx:       &cache.LRU{Size: idCacheSize},
+		utxo:     &cache.LRU{Size: idCacheSize},
+		txStatus: &cache.LRU{Size: idCacheSize},
+
+		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
+	}
+
 	if err := vm.initAliases(genesisBytes); err != nil {
 		return err
 	}
@@ -188,12 +201,42 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
-// Shutdown implements the avalanche.DAGVM interface
-func (vm *VM) Shutdown() {
-	vm.timer.Stop()
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
+// Bootstrapping is called by the consensus engine when it starts bootstrapping
+// this chain
+func (vm *VM) Bootstrapping() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapping(); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+// Bootstrapped is called by the consensus engine when it is done bootstrapping
+// this chain
+func (vm *VM) Bootstrapped() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapped(); err != nil {
+			return err
+		}
+	}
+	vm.bootstrapped = true
+	return nil
+}
+
+// Shutdown implements the avalanche.DAGVM interface
+func (vm *VM) Shutdown() error {
+	if vm.timer == nil {
+		return nil
+	}
+
+	// There is a potential deadlock if the timer is about to execute a timeout.
+	// So, the lock must be released before stopping the timer.
+	vm.ctx.Lock.Unlock()
+	vm.timer.Stop()
+	vm.ctx.Lock.Lock()
+
+	return vm.baseDB.Close()
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
@@ -251,8 +294,14 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
  ******************************************************************************
  */
 
-// IssueTx attempts to send a transaction to consensus
-func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
+// IssueTx attempts to send a transaction to consensus.
+// If onDecide is specified, the function will be called when the transaction is
+// either accepted or rejected with the appropriate status. This function will
+// go out of scope when the transaction is removed from memory.
+func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
+	if !vm.bootstrapped {
+		return ids.ID{}, errBootstrapping
+	}
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err
@@ -261,19 +310,45 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
+	tx.onDecide = onDecide
 	return tx.ID(), nil
+}
+
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+
+	utxoIDs := ids.Set{}
+	for _, addr := range addrs.List() {
+		utxos, _ := state.PlatformFunds(addr)
+		utxoIDs.Add(utxos...)
+	}
+
+	utxos := []*ava.UTXO{}
+	for _, utxoID := range utxoIDs.List() {
+		utxo, err := state.PlatformUTXO(utxoID)
+		if err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
 }
 
 // GetUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
-func (vm *VM) GetUTXOs(addrs ids.Set) ([]*UTXO, error) {
+func (vm *VM) GetUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
 		utxos, _ := vm.state.Funds(addr)
 		utxoIDs.Add(utxos...)
 	}
 
-	utxos := []*UTXO{}
+	utxos := []*ava.UTXO{}
 	for _, utxoID := range utxoIDs.List() {
 		utxo, err := vm.state.UTXO(utxoID)
 		if err != nil {
@@ -295,6 +370,9 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 
 // Codec returns a reference to the internal codec of this VM
 func (vm *VM) Codec() codec.Codec { return vm.codec }
+
+// Logger returns a reference to the internal logger of this VM
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 /*
  ******************************************************************************
@@ -343,7 +421,9 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 
 		txID := tx.ID()
 
-		vm.Alias(txID, genesisTx.Alias)
+		if err = vm.Alias(txID, genesisTx.Alias); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -398,21 +478,24 @@ func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
 	rawTx.Initialize(b)
 
 	tx := &UniqueTx{
+		TxState: &TxState{
+			Tx: rawTx,
+		},
 		vm:   vm,
 		txID: rawTx.ID(),
-		t: &txState{
-			tx: rawTx,
-		},
 	}
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, err
 	}
 
 	if tx.Status() == choices.Unknown {
-		if err := vm.state.SetTx(tx.ID(), tx.t.tx); err != nil {
+		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
-		tx.setStatus(choices.Processing)
+
+		if err := tx.setStatus(choices.Processing); err != nil {
+			return nil, err
+		}
 	}
 
 	return tx, nil
@@ -426,6 +509,32 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 	case len(vm.txs) == 1:
 		vm.timer.SetTimeoutIn(vm.batchTimeout)
 	}
+}
+
+func (vm *VM) getUTXO(utxoID *ava.UTXOID) (*ava.UTXO, error) {
+	inputID := utxoID.InputID()
+	utxo, err := vm.state.UTXO(inputID)
+	if err == nil {
+		return utxo, nil
+	}
+
+	inputTx, inputIndex := utxoID.InputSource()
+	parent := UniqueTx{
+		vm:   vm,
+		txID: inputTx,
+	}
+
+	if err := parent.Verify(); err != nil {
+		return nil, errMissingUTXO
+	} else if status := parent.Status(); status.Decided() {
+		return nil, errMissingUTXO
+	}
+
+	parentUTXOs := parent.UTXOs()
+	if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
+		return nil, errInvalidUTXO
+	}
+	return parentUTXOs[int(inputIndex)], nil
 }
 
 func (vm *VM) getFx(val interface{}) (int, error) {
@@ -445,7 +554,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	if status := tx.Status(); !status.Fetched() {
 		return false
 	}
-	createAssetTx, ok := tx.t.tx.UnsignedTx.(*CreateAssetTx)
+	createAssetTx, ok := tx.UnsignedTx.(*CreateAssetTx)
 	if !ok {
 		return false
 	}

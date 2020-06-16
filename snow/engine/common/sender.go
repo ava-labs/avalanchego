@@ -14,6 +14,7 @@ type Sender interface {
 	AcceptedSender
 	FetchSender
 	QuerySender
+	Gossiper
 }
 
 // FrontierSender defines how a consensus engine sends frontier messages to
@@ -49,9 +50,17 @@ type FetchSender interface {
 	// to this validator
 	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
 
+	// GetAncestors requests that the validator with ID [validatorID] send container [containerID] and its
+	// ancestors. The maximum number of ancestors to send in response is defined in snow/engine/common/bootstrapper.go
+	GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
+
 	// Tell the specified validator that the container whose ID is <containerID>
 	// has body <container>
 	Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte)
+
+	// Give the specified validator several containers at once
+	// Should be in response to a GetAncestors message with request ID [requestID] from the validator
+	MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte)
 }
 
 // QuerySender defines how a consensus engine sends query messages to other
@@ -69,4 +78,11 @@ type QuerySender interface {
 
 	// Chits sends chits to the specified validator
 	Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set)
+}
+
+// Gossiper defines how a consensus engine gossips a container on the accepted
+// frontier to other validators
+type Gossiper interface {
+	// Gossip gossips the provided container throughout the network
+	Gossip(containerID ids.ID, container []byte)
 }

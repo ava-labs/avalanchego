@@ -3,7 +3,10 @@
 
 package timestampvm
 
-import "github.com/ava-labs/gecko/ids"
+import (
+	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
+)
 
 // ID is a unique identifier for this VM
 var (
@@ -14,4 +17,4 @@ var (
 type Factory struct{}
 
 // New ...
-func (f *Factory) New() interface{} { return &VM{} }
+func (f *Factory) New(*snow.Context) (interface{}, error) { return &VM{}, nil }

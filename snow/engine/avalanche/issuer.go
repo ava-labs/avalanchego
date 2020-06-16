@@ -6,6 +6,7 @@ package avalanche
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
 type issuer struct {
@@ -36,7 +37,7 @@ func (i *issuer) Abandon() {
 }
 
 func (i *issuer) Update() {
-	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) {
+	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
 	i.issued = true
@@ -44,17 +45,30 @@ func (i *issuer) Update() {
 	vtxID := i.vtx.ID()
 	i.t.pending.Remove(vtxID)
 
-	for _, tx := range i.vtx.Txs() {
+	txs := i.vtx.Txs()
+	validTxs := []snowstorm.Tx{}
+	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
-			i.t.Config.Context.Log.Debug("Transaction failed verification due to %s, dropping vertex", err)
-			i.t.vtxBlocked.Abandon(vtxID)
-			return
+			i.t.Config.Context.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
+		} else {
+			validTxs = append(validTxs, tx)
 		}
+	}
+
+	if len(validTxs) != len(txs) {
+		i.t.Config.Context.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
+
+		i.t.batch(validTxs, false /*=force*/, false /*=empty*/)
+		i.t.vtxBlocked.Abandon(vtxID)
+		return
 	}
 
 	i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
 
-	i.t.Consensus.Add(i.vtx)
+	if err := i.t.Consensus.Add(i.vtx); err != nil {
+		i.t.errs.Add(err)
+		return
+	}
 
 	p := i.t.Consensus.Parameters()
 	vdrs := i.t.Config.Validators.Sample(p.K) // Validators to sample
@@ -78,6 +92,8 @@ func (i *issuer) Update() {
 	for _, tx := range i.vtx.Txs() {
 		i.t.txBlocked.Fulfill(tx.ID())
 	}
+
+	i.t.errs.Add(i.t.repoll())
 }
 
 type vtxIssuer struct{ i *issuer }

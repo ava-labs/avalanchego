@@ -12,6 +12,8 @@ import (
 
 // DecisionTx is an operation that can be decided without being proposed
 type DecisionTx interface {
+	ID() ids.ID
+
 	initialize(vm *VM) error
 
 	// Attempt to verify this transaction with the provided state. The provided
@@ -23,14 +25,14 @@ type DecisionTx interface {
 // StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
-	CommonDecisionBlock `serialize:"true"`
+	SingleDecisionBlock `serialize:"true"`
 
 	Txs []DecisionTx `serialize:"true"`
 }
 
 // initialize this block
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
-	if err := sb.CommonDecisionBlock.initialize(vm, bytes); err != nil {
+	if err := sb.SingleDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
 	for _, tx := range sb.Txs {
@@ -47,10 +49,18 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
+	parentBlock := sb.parentBlock()
 	// StandardBlock is not a modifier on a proposal block, so its parent must
 	// be a decision.
-	parent, ok := sb.parentBlock().(decision)
+	parent, ok := parentBlock.(decision)
 	if !ok {
+		if err := sb.Reject(); err == nil {
+			if err := sb.vm.DB.Commit(); err != nil {
+				sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+			}
+		} else {
+			sb.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
 
@@ -61,6 +71,13 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		onAccept, err := tx.SemanticVerify(sb.onAcceptDB)
 		if err != nil {
+			if err := sb.Reject(); err == nil {
+				if err := sb.vm.DB.Commit(); err != nil {
+					sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+				}
+			} else {
+				sb.vm.DB.Abort()
+			}
 			return err
 		}
 		if onAccept != nil {
@@ -87,12 +104,10 @@ func (sb *StandardBlock) Verify() error {
 // decision block, has ID [parentID].
 func (vm *VM) newStandardBlock(parentID ids.ID, txs []DecisionTx) (*StandardBlock, error) {
 	sb := &StandardBlock{
-		CommonDecisionBlock: CommonDecisionBlock{
-			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID),
-				vm:    vm,
-			},
-		},
+		SingleDecisionBlock: SingleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
+			Block: core.NewBlock(parentID),
+			vm:    vm,
+		}}},
 		Txs: txs,
 	}
 

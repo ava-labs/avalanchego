@@ -10,6 +10,31 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+func TestSetSet(t *testing.T) {
+	vdr0 := NewValidator(ids.ShortEmpty, 1)
+	vdr1_0 := NewValidator(ids.NewShortID([20]byte{0xFF}), 1)
+	// Should replace vdr1_0, because later additions replace earlier ones
+	vdr1_1 := NewValidator(ids.NewShortID([20]byte{0xFF}), math.MaxInt64-1)
+	// Should be discarded, because it has a weight of 0
+	vdr2 := NewValidator(ids.NewShortID([20]byte{0xAA}), 0)
+
+	s := NewSet()
+	s.Set([]Validator{vdr0, vdr1_0, vdr1_1, vdr2})
+
+	if !s.Contains(vdr0.ID()) {
+		t.Fatal("Should have contained vdr0", vdr0.ID())
+	}
+	if !s.Contains(vdr1_0.ID()) {
+		t.Fatal("Should have contained vdr1", vdr1_0.ID())
+	}
+	if sampled := s.Sample(1); !sampled[0].ID().Equals(vdr1_0.ID()) {
+		t.Fatal("Should have sampled vdr1")
+	}
+	if len := s.Len(); len != 2 {
+		t.Fatalf("Got size %d, expected 2", len)
+	}
+}
+
 func TestSamplerSample(t *testing.T) {
 	vdr0 := GenerateRandomValidator(1)
 	vdr1 := GenerateRandomValidator(math.MaxInt64 - 1)

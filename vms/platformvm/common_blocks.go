@@ -6,10 +6,12 @@ package platformvm
 import (
 	"errors"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/missing"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -87,6 +89,8 @@ type Block interface {
 	// [bytes] is the byte representation of this block
 	initialize(vm *VM, bytes []byte) error
 
+	conflicts(ids.Set) bool
+
 	// parentBlock returns the parent block, similarly to Parent. However, it
 	// provides the more specific staking.Block interface.
 	parentBlock() Block
@@ -120,26 +124,29 @@ type CommonBlock struct {
 	*core.Block `serialize:"true"`
 	vm          *VM
 
-	// This block's parent.
-	// nil before parentBlock() is called on this block
-	parent Block
-
 	// This block's children
 	children []Block
 }
 
 // Reject implements the snowman.Block interface
-func (cb *CommonBlock) Reject() {
+func (cb *CommonBlock) Reject() error {
 	defer cb.free() // remove this block from memory
 
-	cb.Block.Reject()
+	return cb.Block.Reject()
 }
 
 // free removes this block from memory
 func (cb *CommonBlock) free() {
 	delete(cb.vm.currentBlocks, cb.ID().Key())
-	cb.parent = nil
 	cb.children = nil
+}
+
+// Reject implements the snowman.Block interface
+func (cb *CommonBlock) conflicts(s ids.Set) bool {
+	if cb.Status() == choices.Accepted {
+		return false
+	}
+	return cb.parentBlock().conflicts(s)
 }
 
 // Parent returns this block's parent
@@ -153,19 +160,12 @@ func (cb *CommonBlock) Parent() snowman.Block {
 
 // parentBlock returns this block's parent
 func (cb *CommonBlock) parentBlock() Block {
-	// Check if the block already has a reference to its parent
-	if cb.parent != nil {
-		return cb.parent
-	}
-
 	// Get the parent from database
 	parentID := cb.ParentID()
 	parent, err := cb.vm.getBlock(parentID)
 	if err != nil {
-		cb.vm.Ctx.Log.Warn("could not get parent (ID %s) of block %s", parentID, cb.ID())
 		return nil
 	}
-	cb.parent = parent
 	return parent.(Block)
 }
 
@@ -173,7 +173,6 @@ func (cb *CommonBlock) parentBlock() Block {
 func (cb *CommonBlock) addChild(child Block) { cb.children = append(cb.children, child) }
 
 // CommonDecisionBlock contains the fields and methods common to all decision blocks
-// (ie *Commit and *Abort)
 type CommonDecisionBlock struct {
 	CommonBlock `serialize:"true"`
 
@@ -208,29 +207,82 @@ func (cdb *CommonDecisionBlock) onAccept() database.Database {
 	return cdb.onAcceptDB
 }
 
-// Accept implements the snowman.Block interface
-func (cdb *CommonDecisionBlock) Accept() {
-	cdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", cdb.ID())
+// SingleDecisionBlock contains the accept for standalone decision blocks
+type SingleDecisionBlock struct {
+	CommonDecisionBlock `serialize:"true"`
+}
 
-	cdb.CommonBlock.Accept()
+// Accept implements the snowman.Block interface
+func (sdb *SingleDecisionBlock) Accept() error {
+	sdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", sdb.ID())
+
+	if err := sdb.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
-	if err := cdb.onAcceptDB.Commit(); err != nil {
-		cdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+	if err := sdb.onAcceptDB.Commit(); err != nil {
+		sdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+		return err
 	}
-	if err := cdb.vm.DB.Commit(); err != nil {
-		cdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
-	}
-
-	for _, child := range cdb.children {
-		child.setBaseDatabase(cdb.vm.DB)
-	}
-	if cdb.onAcceptFunc != nil {
-		cdb.onAcceptFunc()
+	if err := sdb.vm.DB.Commit(); err != nil {
+		sdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+		return err
 	}
 
-	parent := cdb.parentBlock()
+	for _, child := range sdb.children {
+		child.setBaseDatabase(sdb.vm.DB)
+	}
+	if sdb.onAcceptFunc != nil {
+		sdb.onAcceptFunc()
+	}
+
+	sdb.free()
+	return nil
+}
+
+// DoubleDecisionBlock contains the accept for a pair of blocks
+type DoubleDecisionBlock struct {
+	CommonDecisionBlock `serialize:"true"`
+}
+
+// Accept implements the snowman.Block interface
+func (ddb *DoubleDecisionBlock) Accept() error {
+	ddb.VM.Ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
+
+	parent, ok := ddb.parentBlock().(*ProposalBlock)
+	if !ok {
+		ddb.vm.Ctx.Log.Error("double decision block should only follow a proposal block")
+		return errInvalidBlockType
+	}
+
+	if err := parent.CommonBlock.Accept(); err != nil {
+		return err
+	}
+
+	if err := ddb.CommonBlock.Accept(); err != nil {
+		return err
+	}
+
+	// Update the state of the chain in the database
+	if err := ddb.onAcceptDB.Commit(); err != nil {
+		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+		return err
+	}
+	if err := ddb.vm.DB.Commit(); err != nil {
+		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+		return err
+	}
+
+	for _, child := range ddb.children {
+		child.setBaseDatabase(ddb.vm.DB)
+	}
+	if ddb.onAcceptFunc != nil {
+		ddb.onAcceptFunc()
+	}
+
 	// remove this block and its parent from memory
 	parent.free()
-	cdb.free()
+	ddb.free()
+	return nil
 }
