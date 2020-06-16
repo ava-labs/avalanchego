@@ -405,10 +405,14 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 }
 
 // Bootstrapping marks this VM as bootstrapping
-func (vm *VM) Bootstrapping() error { return nil }
+func (vm *VM) Bootstrapping() error {
+	return vm.fx.Bootstrapping()
+}
 
 // Bootstrapped marks this VM as bootstrapped
-func (vm *VM) Bootstrapped() error { return nil }
+func (vm *VM) Bootstrapped() error {
+	return vm.fx.Bootstrapped()
+}
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
