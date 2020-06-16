@@ -32,7 +32,17 @@ import (
 type polls struct {
 	log      logging.Logger
 	numPolls prometheus.Gauge
+	alpha    int
 	m        map[uint32]poll
+}
+
+func newPolls(alpha int, log logging.Logger, numPolls prometheus.Gauge) polls {
+	return polls{
+		log:      log,
+		numPolls: numPolls,
+		alpha:    alpha,
+		m:        make(map[uint32]poll),
+	}
 }
 
 // Add to the current set of polls
@@ -42,6 +52,7 @@ func (p *polls) Add(requestID uint32, vdrs ids.ShortSet) bool {
 	poll, exists := p.m[requestID]
 	if !exists {
 		poll.polled = vdrs
+		poll.alpha = p.alpha
 		p.m[requestID] = poll
 
 		p.numPolls.Set(float64(len(p.m))) // Tracks performance statistics
@@ -85,6 +96,7 @@ func (p *polls) String() string {
 type poll struct {
 	votes  ids.UniqueBag
 	polled ids.ShortSet
+	alpha  int
 }
 
 // Vote registers a vote for this poll
@@ -97,5 +109,32 @@ func (p *poll) Vote(votes []ids.ID, vdr ids.ShortID) {
 
 // Finished returns true if the poll has completed, with no more required
 // responses
-func (p poll) Finished() bool { return p.polled.Len() == 0 }
+func (p poll) Finished() bool {
+	// If I have no outstanding polls, I'm finished
+	numPending := p.polled.Len()
+	if numPending == 0 {
+		return true
+	}
+	// If there are still enough pending responses to include another vertex,
+	// then I can't stop polling
+	if numPending > p.alpha {
+		return false
+	}
+
+	// I ignore any vertex that has already received alpha votes.
+	// To safely skip DAG traversal, assume that all votes for
+	// vertices with less than alpha votes will be applied to a
+	// single shared ancestor.
+	// In this case, I can terminate early, iff there are not enough
+	// pending votes for this ancestor to receive alpha votes.
+	partialVotes := ids.BitSet(0)
+	for _, vote := range p.votes.List() {
+		voters := p.votes.GetSet(vote)
+		if voters.Len() >= p.alpha {
+			continue
+		}
+		partialVotes.Union(voters)
+	}
+	return partialVotes.Len()+numPending < p.alpha
+}
 func (p poll) String() string { return fmt.Sprintf("Waiting on %d chits", p.polled.Len()) }
