@@ -37,7 +37,7 @@ func BenchmarkSetListMedium(b *testing.B) {
 	}
 }
 
-func BenchmarkSetListLarsge(b *testing.B) {
+func BenchmarkSetListLarge(b *testing.B) {
 	largeLen := 100000
 	set := Set{}
 	for i := 0; i < largeLen; i++ {
