@@ -471,8 +471,11 @@ func (t *Transitive) issueRepoll() {
 		vdrSet.Add(vdr.ID())
 	}
 
+	vdrCopy := ids.ShortSet{}
+	vdrCopy.Union((vdrSet))
+
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet.Len()) {
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrCopy) {
 		t.Config.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
 	} else if numVdrs < p.K {
 		t.Config.Context.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
