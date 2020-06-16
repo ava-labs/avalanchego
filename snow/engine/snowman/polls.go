@@ -22,11 +22,11 @@ type polls struct {
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
 //         should be made.
-func (p *polls) Add(requestID uint32, numPolled int) bool {
+func (p *polls) Add(requestID uint32, vdrs ids.ShortSet) bool {
 	poll, exists := p.m[requestID]
 	if !exists {
 		poll.alpha = p.alpha
-		poll.numPolled = numPolled
+		poll.polled = vdrs
 		p.m[requestID] = poll
 
 		p.numPolls.Set(float64(len(p.m))) // Tracks performance statistics
@@ -42,7 +42,7 @@ func (p *polls) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) (ids.Bag, b
 	if !exists {
 		return ids.Bag{}, false
 	}
-	poll.Vote(vote)
+	poll.Vote(vote, vdr)
 	if poll.Finished() {
 		delete(p.m, requestID)
 		p.numPolls.Set(float64(len(p.m))) // Tracks performance statistics
@@ -60,7 +60,7 @@ func (p *polls) CancelVote(requestID uint32, vdr ids.ShortID) (ids.Bag, bool) {
 		return ids.Bag{}, false
 	}
 
-	poll.CancelVote()
+	poll.CancelVote(vdr)
 	if poll.Finished() {
 		delete(p.m, requestID)
 		p.numPolls.Set(float64(len(p.m))) // Tracks performance statistics
@@ -83,22 +83,18 @@ func (p *polls) String() string {
 
 // poll represents the current state of a network poll for a block
 type poll struct {
-	alpha     int
-	votes     ids.Bag
-	numPolled int
+	alpha  int
+	votes  ids.Bag
+	polled ids.ShortSet
 }
 
 // Vote registers a vote for this poll
-func (p *poll) CancelVote() {
-	if p.numPolled > 0 {
-		p.numPolled--
-	}
-}
+func (p *poll) CancelVote(vdr ids.ShortID) { p.polled.Remove(vdr) }
 
 // Vote registers a vote for this poll
-func (p *poll) Vote(vote ids.ID) {
-	if p.numPolled > 0 {
-		p.numPolled--
+func (p *poll) Vote(vote ids.ID, vdr ids.ShortID) {
+	if p.polled.Contains(vdr) {
+		p.polled.Remove(vdr)
 		p.votes.Add(vote)
 	}
 }
@@ -106,13 +102,14 @@ func (p *poll) Vote(vote ids.ID) {
 // Finished returns true if the poll has completed, with no more required
 // responses
 func (p poll) Finished() bool {
+	remaining := p.polled.Len()
 	received := p.votes.Len()
 	_, freq := p.votes.Mode()
-	return p.numPolled == 0 || // All k nodes responded
+	return remaining == 0 || // All k nodes responded
 		freq >= p.alpha || // An alpha majority has returned
-		received+p.numPolled < p.alpha // An alpha majority can never return
+		received+remaining < p.alpha // An alpha majority can never return
 }
 
 func (p poll) String() string {
-	return fmt.Sprintf("Waiting on %d chits", p.numPolled)
+	return fmt.Sprintf("Waiting on %d chits from %s", p.polled.Len(), p.polled)
 }

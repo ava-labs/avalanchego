@@ -231,6 +231,7 @@ func (ta *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode,
 	leaves []ids.ID) ids.Bag {
 	votes := make(ids.UniqueBag)
+	txConflicts := make(map[[32]byte]ids.Set)
 
 	for len(leaves) > 0 {
 		newLeavesSize := len(leaves) - 1
@@ -245,6 +246,12 @@ func (ta *Topological) pushVotes(
 				// Give the votes to the consumer
 				txID := tx.ID()
 				votes.UnionSet(txID, kahn.votes)
+
+				// Map txID to set of Conflicts
+				txKey := txID.Key()
+				if _, exists := txConflicts[txKey]; !exists {
+					txConflicts[txKey] = ta.cg.Conflicts(tx)
+				}
 			}
 
 			for _, dep := range vtx.Parents() {
@@ -264,6 +271,18 @@ func (ta *Topological) pushVotes(
 			}
 		}
 	}
+
+	// Create bag of votes for conflicting transactions
+	conflictingVotes := make(ids.UniqueBag)
+	for txHash, conflicts := range txConflicts {
+		txID := ids.NewID(txHash)
+		for conflictTxHash := range conflicts {
+			conflictTxID := ids.NewID(conflictTxHash)
+			conflictingVotes.UnionSet(txID, votes.GetSet(conflictTxID))
+		}
+	}
+
+	votes.Difference(&conflictingVotes)
 
 	return votes.Bag(ta.params.Alpha)
 }

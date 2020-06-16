@@ -5,6 +5,7 @@ package codec
 
 import (
 	"bytes"
+	"math"
 	"reflect"
 	"testing"
 )
@@ -104,36 +105,8 @@ func TestStruct(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(myStructUnmarshaled.Member1, myStructInstance.Member1) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !bytes.Equal(myStructUnmarshaled.MySlice, myStructInstance.MySlice) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice2, myStructInstance.MySlice2) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice3, myStructInstance.MySlice3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice3, myStructInstance.MySlice3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice4, myStructInstance.MySlice4) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.InnerStruct, myStructInstance.InnerStruct) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.InnerStruct2, myStructInstance.InnerStruct2) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyArray2, myStructInstance.MyArray2) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyArray3, myStructInstance.MyArray3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyArray4, myStructInstance.MyArray4) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyInterface, myStructInstance.MyInterface) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MySlice5, myStructInstance.MySlice5) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.InnerStruct3, myStructInstance.InnerStruct3) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
-	} else if !reflect.DeepEqual(myStructUnmarshaled.MyPointer, myStructInstance.MyPointer) {
-		t.Fatal("expected unmarshaled struct to be same as original struct")
+	if !reflect.DeepEqual(*myStructUnmarshaled, myStructInstance) {
+		t.Fatal("should be same")
 	}
 }
 
@@ -173,6 +146,28 @@ func TestSlice(t *testing.T) {
 	}
 }
 
+// Test marshalling/unmarshalling largest possible slice
+func TestMaxSizeSlice(t *testing.T) {
+	mySlice := make([]string, math.MaxUint16, math.MaxUint16)
+	mySlice[0] = "first!"
+	mySlice[math.MaxUint16-1] = "last!"
+	codec := NewDefault()
+	bytes, err := codec.Marshal(mySlice)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sliceUnmarshaled []string
+	if err := codec.Unmarshal(bytes, &sliceUnmarshaled); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(mySlice, sliceUnmarshaled) {
+		t.Fatal("expected marshaled and unmarshaled values to match")
+	}
+}
+
+// Test marshalling a bool
 func TestBool(t *testing.T) {
 	myBool := true
 	codec := NewDefault()
@@ -191,6 +186,7 @@ func TestBool(t *testing.T) {
 	}
 }
 
+// Test marshalling an array
 func TestArray(t *testing.T) {
 	myArr := [5]uint64{5, 6, 7, 8, 9}
 	codec := NewDefault()
@@ -209,6 +205,26 @@ func TestArray(t *testing.T) {
 	}
 }
 
+// Test marshalling a really big array
+func TestBigArray(t *testing.T) {
+	myArr := [30000]uint64{5, 6, 7, 8, 9}
+	codec := NewDefault()
+	bytes, err := codec.Marshal(myArr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var myArrUnmarshaled [30000]uint64
+	if err := codec.Unmarshal(bytes, &myArrUnmarshaled); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(myArr, myArrUnmarshaled) {
+		t.Fatal("expected marshaled and unmarshaled values to match")
+	}
+}
+
+// Test marshalling a pointer to a struct
 func TestPointerToStruct(t *testing.T) {
 	myPtr := &MyInnerStruct{Str: "Hello!"}
 	codec := NewDefault()
@@ -227,6 +243,7 @@ func TestPointerToStruct(t *testing.T) {
 	}
 }
 
+// Test marshalling a slice of structs
 func TestSliceOfStruct(t *testing.T) {
 	mySlice := []MyInnerStruct3{
 		MyInnerStruct3{
@@ -257,6 +274,7 @@ func TestSliceOfStruct(t *testing.T) {
 	}
 }
 
+// Test marshalling an interface
 func TestInterface(t *testing.T) {
 	codec := NewDefault()
 	codec.RegisterType(&MyInnerStruct2{})
@@ -278,6 +296,7 @@ func TestInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling a slice of interfaces
 func TestSliceOfInterface(t *testing.T) {
 	mySlice := []Foo{
 		&MyInnerStruct{
@@ -304,6 +323,7 @@ func TestSliceOfInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling an array of interfaces
 func TestArrayOfInterface(t *testing.T) {
 	myArray := [2]Foo{
 		&MyInnerStruct{
@@ -330,6 +350,7 @@ func TestArrayOfInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling a pointer to an interface
 func TestPointerToInterface(t *testing.T) {
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
 	var myPtr *Foo = &myinnerStruct
@@ -352,6 +373,7 @@ func TestPointerToInterface(t *testing.T) {
 	}
 }
 
+// Test marshalling a string
 func TestString(t *testing.T) {
 	myString := "Ayy"
 	codec := NewDefault()
@@ -370,7 +392,7 @@ func TestString(t *testing.T) {
 	}
 }
 
-// Ensure a nil slice is unmarshaled as an empty slice
+// Ensure a nil slice is unmarshaled to slice with length 0
 func TestNilSlice(t *testing.T) {
 	type structWithSlice struct {
 		Slice []byte `serialize:"true"`
@@ -389,12 +411,12 @@ func TestNilSlice(t *testing.T) {
 	}
 
 	if structUnmarshaled.Slice == nil || len(structUnmarshaled.Slice) != 0 {
-		t.Fatal("expected slice to be empty slice")
+		t.Fatal("expected slice to be non-nil and length 0")
 	}
 }
 
 // Ensure that trying to serialize a struct with an unexported member
-// that has `serialize:"true"` returns errUnexportedField
+// that has `serialize:"true"` returns error
 func TestSerializeUnexportedField(t *testing.T) {
 	type s struct {
 		ExportedField   string `serialize:"true"`
@@ -407,8 +429,8 @@ func TestSerializeUnexportedField(t *testing.T) {
 	}
 
 	codec := NewDefault()
-	if _, err := codec.Marshal(myS); err != errMarshalUnexportedField {
-		t.Fatalf("expected err to be errUnexportedField but was %v", err)
+	if _, err := codec.Marshal(myS); err == nil {
+		t.Fatalf("expected err but got none")
 	}
 }
 
@@ -426,12 +448,12 @@ func TestSerializeOfNoSerializeField(t *testing.T) {
 	codec := NewDefault()
 	marshalled, err := codec.Marshal(myS)
 	if err != nil {
-		t.Fatalf("Unexpected error %q", err)
+		t.Fatal(err)
 	}
 	unmarshalled := s{}
 	err = codec.Unmarshal(marshalled, &unmarshalled)
 	if err != nil {
-		t.Fatalf("Unexpected error %q", err)
+		t.Fatal(err)
 	}
 	expectedUnmarshalled := s{SerializedField: "Serialize me"}
 	if !reflect.DeepEqual(unmarshalled, expectedUnmarshalled) {
@@ -443,11 +465,12 @@ type simpleSliceStruct struct {
 	Arr []uint32 `serialize:"true"`
 }
 
-func TestEmptySliceSerialization(t *testing.T) {
+// Test marshalling of nil slice
+func TestNilSliceSerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &simpleSliceStruct{}
-	expected := []byte{0, 0, 0, 0}
+	expected := []byte{0, 0, 0, 0} // nil slice marshaled as 0 length slice
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -455,6 +478,36 @@ func TestEmptySliceSerialization(t *testing.T) {
 
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+
+	valUnmarshaled := &simpleSliceStruct{}
+	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
+		t.Fatal(err)
+	} else if len(valUnmarshaled.Arr) != 0 {
+		t.Fatal("should be 0 length")
+	}
+}
+
+// Test marshaling a slice that has 0 elements (but isn't nil)
+func TestEmptySliceSerialization(t *testing.T) {
+	codec := NewDefault()
+
+	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
+	expected := []byte{0, 0, 0, 0} // 0 for size
+	result, err := codec.Marshal(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(expected, result) {
+		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+
+	valUnmarshaled := &simpleSliceStruct{}
+	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
+		t.Fatal(err)
+	} else if !reflect.DeepEqual(valUnmarshaled, val) {
+		t.Fatal("should be same")
 	}
 }
 
@@ -464,13 +517,14 @@ type nestedSliceStruct struct {
 	Arr []emptyStruct `serialize:"true"`
 }
 
+// Test marshaling slice that is not nil and not empty
 func TestSliceWithEmptySerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1000),
 	}
-	expected := []byte{0x00, 0x00, 0x03, 0xE8}
+	expected := []byte{0x00, 0x00, 0x03, 0xE8} //1000 for numElts
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -485,7 +539,7 @@ func TestSliceWithEmptySerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(unmarshaled.Arr) != 1000 {
-		t.Fatalf("Should have created an array of length %d", 1000)
+		t.Fatalf("Should have created a slice of length %d", 1000)
 	}
 }
 
@@ -493,20 +547,15 @@ func TestSliceWithEmptySerializationOutOfMemory(t *testing.T) {
 	codec := NewDefault()
 
 	val := &nestedSliceStruct{
-		Arr: make([]emptyStruct, 1000000),
+		Arr: make([]emptyStruct, defaultMaxSliceLength+1),
 	}
-	expected := []byte{0x00, 0x0f, 0x42, 0x40} // 1,000,000 in hex
-	result, err := codec.Marshal(val)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	bytes, err := codec.Marshal(val)
+	if err == nil {
+		t.Fatal("should have failed due to slice length too large")
 	}
 
 	unmarshaled := nestedSliceStruct{}
-	if err := codec.Unmarshal(expected, &unmarshaled); err == nil {
+	if err := codec.Unmarshal(bytes, &unmarshaled); err == nil {
 		t.Fatalf("Should have errored due to excess memory requested")
 	}
 }

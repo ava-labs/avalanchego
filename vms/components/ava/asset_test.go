@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 )
 
 func TestAssetVerifyNil(t *testing.T) {
