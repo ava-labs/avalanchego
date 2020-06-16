@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 
 	jsoncodec "github.com/ava-labs/gecko/utils/json"
 	zxcvbn "github.com/nbutton23/zxcvbn-go"
@@ -146,7 +146,7 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("CreateUser called with %.*s", maxUserPassLen, args.Username)
+	ks.log.Info("Keystore: CreateUser called with %.*s", maxUserPassLen, args.Username)
 	if err := ks.AddUser(args.Username, args.Password); err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListU
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("ListUsers called")
+	ks.log.Info("Keystore: ListUsers called")
 
 	reply.Users = []string{}
 
@@ -196,7 +196,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("ExportUser called for %s", args.Username)
+	ks.log.Info("Keystore: ExportUser called for %s", args.Username)
 
 	usr, err := ks.getUser(args.Username)
 	if err != nil {
@@ -249,7 +249,7 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("ImportUser called for %s", args.Username)
+	ks.log.Info("Keystore: ImportUser called for %s", args.Username)
 
 	if args.Username == "" {
 		return errEmptyUsername
@@ -309,7 +309,7 @@ func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *Del
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("DeleteUser called with %s", args.Username)
+	ks.log.Info("Keystore: DeleteUser called with %s", args.Username)
 
 	if args.Username == "" {
 		return errEmptyUsername
