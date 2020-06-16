@@ -37,7 +37,7 @@ func BenchmarkBagListMedium(b *testing.B) {
 	}
 }
 
-func BenchmarkBagListLarsge(b *testing.B) {
+func BenchmarkBagListLarge(b *testing.B) {
 	largeLen := 100000
 	bag := Bag{}
 	for i := 0; i < largeLen; i++ {
