@@ -335,10 +335,10 @@ func (t *Transitive) reinsertFrom(vdr ids.ShortID, vtxID ids.ID) (bool, error) {
 
 func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, error) {
 	issued := true
-	vts := []avalanche.Vertex{vtx}
-	for len(vts) > 0 {
-		vtx := vts[0]
-		vts = vts[1:]
+	vertexHeap := newMaxVertexHeap()
+	vertexHeap.Push(vtx)
+	for vertexHeap.Len() > 0 {
+		vtx := vertexHeap.Pop()
 
 		if t.Consensus.VertexIssued(vtx) {
 			continue
@@ -353,7 +353,7 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, er
 				t.sendRequest(vdr, parent.ID())
 				issued = false
 			} else {
-				vts = append(vts, parent)
+				vertexHeap.Push(parent)
 			}
 		}
 
