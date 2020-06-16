@@ -10,6 +10,10 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+const (
+	minCacheSize = 32
+)
+
 type entry struct {
 	Key   ids.ID
 	Value interface{}
@@ -59,7 +63,7 @@ func (c *LRU) Flush() {
 
 func (c *LRU) init() {
 	if c.entryMap == nil {
-		c.entryMap = make(map[[32]byte]*list.Element)
+		c.entryMap = make(map[[32]byte]*list.Element, minCacheSize)
 	}
 	if c.entryList == nil {
 		c.entryList = list.New()
@@ -134,6 +138,6 @@ func (c *LRU) evict(key ids.ID) {
 func (c *LRU) flush() {
 	c.init()
 
-	c.entryMap = make(map[[32]byte]*list.Element)
+	c.entryMap = make(map[[32]byte]*list.Element, minCacheSize)
 	c.entryList = list.New()
 }
