@@ -915,7 +915,7 @@ func (service *Service) Sign(_ *http.Request, args *SignArgs, reply *SignRespons
 
 // Sign [unsigned] with [key]
 func (service *Service) signAddDefaultSubnetValidatorTx(tx *addDefaultSubnetValidatorTx, key *crypto.PrivateKeySECP256K1R) (*addDefaultSubnetValidatorTx, error) {
-	service.vm.Ctx.Log.Info("Platform: signAddDefaultSubnetValidatorTx called")
+	service.vm.Ctx.Log.Debug("signAddDefaultSubnetValidatorTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetValidatorTx)
@@ -938,7 +938,7 @@ func (service *Service) signAddDefaultSubnetValidatorTx(tx *addDefaultSubnetVali
 
 // Sign [unsigned] with [key]
 func (service *Service) signAddDefaultSubnetDelegatorTx(tx *addDefaultSubnetDelegatorTx, key *crypto.PrivateKeySECP256K1R) (*addDefaultSubnetDelegatorTx, error) {
-	service.vm.Ctx.Log.Info("Platform: signAddDefaultSubnetDelegatorTx called")
+	service.vm.Ctx.Log.Debug("signAddDefaultSubnetDelegatorTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetDelegatorTx)
@@ -961,7 +961,7 @@ func (service *Service) signAddDefaultSubnetDelegatorTx(tx *addDefaultSubnetDele
 
 // Sign [xt] with [key]
 func (service *Service) signCreateSubnetTx(tx *CreateSubnetTx, key *crypto.PrivateKeySECP256K1R) (*CreateSubnetTx, error) {
-	service.vm.Ctx.Log.Info("Platform: signCreateSubnetTx called")
+	service.vm.Ctx.Log.Debug("signCreateSubnetTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)
@@ -984,7 +984,7 @@ func (service *Service) signCreateSubnetTx(tx *CreateSubnetTx, key *crypto.Priva
 
 // Sign [tx] with [key]
 func (service *Service) signExportTx(tx *ExportTx, key *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
-	service.vm.Ctx.Log.Info("Platform: signExportTx called")
+	service.vm.Ctx.Log.Debug("signExportTx called")
 
 	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedExportTx)
@@ -1012,7 +1012,7 @@ func (service *Service) signExportTx(tx *ExportTx, key *crypto.PrivateKeySECP256
 // Sorts tx.ControlSigs before returning
 // Assumes each element of tx.ControlSigs is actually a signature, not just empty bytes
 func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubnetValidatorTx, key *crypto.PrivateKeySECP256K1R) (*addNonDefaultSubnetValidatorTx, error) {
-	service.vm.Ctx.Log.Info("Platform: signAddNonDefaultSubnetValidatorTx called")
+	service.vm.Ctx.Log.Debug("signAddNonDefaultSubnetValidatorTx called")
 
 	// Compute the byte repr. of the unsigned tx and the signature of [key] over it
 	unsignedIntf := interface{}(&tx.UnsignedAddNonDefaultSubnetValidatorTx)
@@ -1203,7 +1203,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 // Sorts tx.ControlSigs before returning
 // Assumes each element of tx.ControlSigs is actually a signature, not just empty bytes
 func (service *Service) signCreateChainTx(tx *CreateChainTx, key *crypto.PrivateKeySECP256K1R) (*CreateChainTx, error) {
-	service.vm.Ctx.Log.Info("Platform: signCreateChainTx called")
+	service.vm.Ctx.Log.Debug("signCreateChainTx called")
 
 	// Compute the byte repr. of the unsigned tx and the signature of [key] over it
 	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)

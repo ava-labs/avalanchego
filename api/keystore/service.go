@@ -146,7 +146,7 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Debug("CreateUser called with %.*s", maxUserPassLen, args.Username)
+	ks.log.Info("Keystore: CreateUser called with %.*s", maxUserPassLen, args.Username)
 	if err := ks.AddUser(args.Username, args.Password); err != nil {
 		return err
 	}
