@@ -8,12 +8,16 @@ import (
 	"strings"
 )
 
+const (
+	minUniqueBagSize = 16
+)
+
 // UniqueBag ...
 type UniqueBag map[[32]byte]BitSet
 
 func (b *UniqueBag) init() {
 	if *b == nil {
-		*b = make(map[[32]byte]BitSet)
+		*b = make(map[[32]byte]BitSet, minUniqueBagSize)
 	}
 }
 
