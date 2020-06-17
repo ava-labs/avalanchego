@@ -74,7 +74,7 @@ type GetLivenessReply struct {
 
 // GetLiveness returns a summation of the health of the node
 func (h *Health) GetLiveness(_ *http.Request, _ *GetLivenessArgs, reply *GetLivenessReply) error {
-	h.log.Debug("Health: GetLiveness called")
+	h.log.Info("Health: GetLiveness called")
 	reply.Checks, reply.Healthy = h.health.Results()
 	return nil
 }
