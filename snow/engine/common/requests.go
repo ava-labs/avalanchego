@@ -7,6 +7,10 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+const (
+	minRequestsSize = 32
+)
+
 type req struct {
 	vdr ids.ShortID
 	id  uint32
@@ -22,7 +26,7 @@ type Requests struct {
 // are only in one request at a time.
 func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 	if r.reqsToID == nil {
-		r.reqsToID = make(map[[20]byte]map[uint32]ids.ID)
+		r.reqsToID = make(map[[20]byte]map[uint32]ids.ID, minRequestsSize)
 	}
 	vdrKey := vdr.Key()
 	vdrReqs, ok := r.reqsToID[vdrKey]
@@ -33,7 +37,7 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 	vdrReqs[requestID] = containerID
 
 	if r.idToReq == nil {
-		r.idToReq = make(map[[32]byte]req)
+		r.idToReq = make(map[[32]byte]req, minRequestsSize)
 	}
 	r.idToReq[containerID.Key()] = req{
 		vdr: vdr,
