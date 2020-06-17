@@ -39,12 +39,12 @@ func getOutboundIP() (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
 
 	if udpAddr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
 		return udpAddr.IP, conn.Close()
 	}
 
+	conn.Close()
 	return nil, fmt.Errorf("getting outbound IP failed")
 }
 

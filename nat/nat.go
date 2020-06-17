@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
 const (
@@ -42,12 +41,10 @@ func GetRouter() Router {
 }
 
 type Mapper struct {
-	log     logging.Logger
-	r       Router
-	closer  chan struct{}
-	wg      sync.WaitGroup
-	errLock sync.Mutex
-	errs    wrappers.Errs
+	log    logging.Logger
+	r      Router
+	closer chan struct{}
+	wg     sync.WaitGroup
 }
 
 func NewPortMapper(log logging.Logger, r Router) Mapper {
@@ -81,13 +78,9 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 			dev.log.Debug("Port %d is taken by %s:%d: %s, retry with the next port",
 				extPort, intaddr, intPort, desc)
 			continue
-		}
-		if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
-			dev.log.Error("Map port failed. Protocol %s Internal %d External %d. %s",
+		} else if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
+			dev.log.Debug("Map port failed. Protocol %s Internal %d External %d. %s",
 				protocol, intPort, extPort, err)
-			dev.errLock.Lock()
-			dev.errs.Add(err)
-			dev.errLock.Unlock()
 		} else {
 			dev.log.Info("Mapped Protocol %s Internal %d External %d.", protocol,
 				intPort, extPort)
@@ -128,9 +121,8 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 	mappedPort <- 0
 }
 
-func (dev *Mapper) UnmapAllPorts() error {
+func (dev *Mapper) UnmapAllPorts() {
 	close(dev.closer)
 	dev.wg.Wait()
 	dev.log.Info("Unmapped all ports")
-	return dev.errs.Err
 }
