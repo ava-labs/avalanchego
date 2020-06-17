@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/gecko/api/admin"
 
 	commonEng "github.com/ava-labs/gecko/snow/engine/common"
 )
@@ -362,6 +363,7 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler.RegisterName("snowman", &SnowmanAPI{vm})
 	handler.RegisterName("web3", &Web3API{})
 	handler.RegisterName("debug", &DebugAPI{vm})
+	handler.RegisterName("admin", &admin.Performance{})
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler)},
