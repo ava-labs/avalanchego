@@ -335,9 +335,9 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultNonce+1,                                          // nonce
-		defaultStakeAmount,                                      // weight
-		uint64(newTimestamp.Unix()),                             // start time
+		defaultNonce+1,              // nonce
+		defaultStakeAmount,          // weight
+		uint64(newTimestamp.Unix()), // start time
 		uint64(newTimestamp.Add(MinimumStakingDuration).Unix()), // end time
 		defaultKey.PublicKey().Address(),                        // node ID
 		defaultKey.PublicKey().Address(),                        // destination
@@ -389,33 +389,33 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 
 	// Case 8: fail verification for spending more funds than it has
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		1,                                         // nonce (new account has nonce 0 so use nonce 1)
-		defaultBalance*2,                          // weight
-		uint64(defaultValidateStartTime.Unix()),   // start time
-		uint64(defaultValidateEndTime.Unix()),     // end time
-		defaultKey.PublicKey().Address(),          // node ID
-		defaultKey.PublicKey().Address(),          // destination
-		testNetworkID,                             // network ID
-		newAcctKey.(*crypto.PrivateKeySECP256K1R), // tx fee payer
+		defaultNonce+1,
+		defaultBalance*2,                        // weight
+		uint64(defaultValidateStartTime.Unix()), // start time
+		uint64(defaultValidateEndTime.Unix()),   // end time
+		defaultKey.PublicKey().Address(),        // node ID
+		defaultKey.PublicKey().Address(),        // destination
+		testNetworkID,                           // network ID
+		defaultKey,                              // tx fee payer
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, _, _, _, err = tx.SemanticVerify(vm.DB)
 	if err == nil {
-		t.Fatal("should have failed verification because payer account spent twice the default balance")
+		t.Fatal("should have failed verification because payer account spent twice the account's balance")
 	}
 
 	// Case 9: Confirm balance is correct
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		1,                                         // nonce (new account has nonce 0 so use nonce 1)
-		defaultStakeAmount,                        // weight
-		uint64(defaultValidateStartTime.Unix()),   // start time
-		uint64(defaultValidateEndTime.Unix()),     // end time
-		defaultKey.PublicKey().Address(),          // node ID
-		defaultKey.PublicKey().Address(),          // destination
-		testNetworkID,                             // network ID
-		newAcctKey.(*crypto.PrivateKeySECP256K1R), // tx fee payer
+		defaultNonce+1,
+		defaultStakeAmount,                      // weight
+		uint64(defaultValidateStartTime.Unix()), // start time
+		uint64(defaultValidateEndTime.Unix()),   // end time
+		defaultKey.PublicKey().Address(),        // node ID
+		defaultKey.PublicKey().Address(),        // destination
+		testNetworkID,                           // network ID
+		defaultKey,                              // tx fee payer
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -431,7 +431,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	}
 	balance := account.Balance
 
-	if balance == defaultBalance-(defaultStakeAmount+txFee) {
-		t.Fatal("")
+	if balance != defaultBalance-(defaultStakeAmount+txFee) {
+		t.Fatalf("balance was not updated correctly after subnet delegator tx")
 	}
 }
