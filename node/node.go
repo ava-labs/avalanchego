@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
+	"github.com/ava-labs/gecko/api/info"
 	"github.com/ava-labs/gecko/api/ipcs"
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
@@ -461,8 +462,16 @@ func (n *Node) initMetricsAPI() {
 func (n *Node) initAdminAPI() {
 	if n.Config.AdminAPIEnabled {
 		n.Log.Info("initializing Admin API")
-		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
+		service := admin.NewService(n.Log, n.chainManager, n.Net, &n.APIServer)
 		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+	}
+}
+
+func (n *Node) initInfoAPI() {
+	if n.Config.InfoAPIEnabled {
+		n.Log.Info("initializing Info API")
+		service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+		n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
 	}
 }
 
@@ -562,6 +571,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.initChainManager()    // Set up the chain manager
 
 	n.initAdminAPI()  // Start the Admin API
+	n.initInfoAPI()   // Start the Info API
 	n.initHealthAPI() // Start the Health API
 	n.initIPCAPI()    // Start the IPC API
 
