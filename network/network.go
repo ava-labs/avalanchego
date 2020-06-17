@@ -43,6 +43,12 @@ const (
 	defaultGetVersionTimeout                         = 2 * time.Second
 	defaultAllowPrivateIPs                           = true
 	defaultGossipSize                                = 50
+	defaultPingPongTimeout                           = time.Minute
+	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
+
+	// Request ID used when sending a Put message to gossip an accepted container
+	// (ie not sent in response to a Get)
+	GossipMsgRequestID = math.MaxUint32
 )
 
 // Network defines the functionality of the networking library.
@@ -119,6 +125,8 @@ type network struct {
 	getVersionTimeout                  time.Duration
 	allowPrivateIPs                    bool
 	gossipSize                         int
+	pingPongTimeout                    time.Duration
+	pingFrequency                      time.Duration
 
 	executor timer.Executor
 
@@ -180,6 +188,8 @@ func NewDefaultNetwork(
 		defaultGetVersionTimeout,
 		defaultAllowPrivateIPs,
 		defaultGossipSize,
+		defaultPingPongTimeout,
+		defaultPingFrequency,
 	)
 }
 
@@ -211,6 +221,8 @@ func NewNetwork(
 	getVersionTimeout time.Duration,
 	allowPrivateIPs bool,
 	gossipSize int,
+	pingPongTimeout time.Duration,
+	pingFrequency time.Duration,
 ) Network {
 	net := &network{
 		log:                                log,
@@ -239,6 +251,8 @@ func NewNetwork(
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
 		gossipSize:                         gossipSize,
+		pingPongTimeout:                    pingPongTimeout,
+		pingFrequency:                      pingFrequency,
 
 		disconnectedIPs: make(map[string]struct{}),
 		connectedIPs:    make(map[string]struct{}),
@@ -705,7 +719,7 @@ func (n *network) Track(ip utils.IPDesc) {
 
 // assumes the stateLock is not held.
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
-	msg, err := n.b.Put(chainID, math.MaxUint32, containerID, container)
+	msg, err := n.b.Put(chainID, GossipMsgRequestID, containerID, container)
 	if err != nil {
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}

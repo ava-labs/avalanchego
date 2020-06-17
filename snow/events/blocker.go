@@ -10,12 +10,16 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+const (
+	minBlockerSize = 16
+)
+
 // Blocker tracks objects that are blocked
 type Blocker map[[32]byte][]Blockable
 
 func (b *Blocker) init() {
 	if *b == nil {
-		*b = make(map[[32]byte][]Blockable)
+		*b = make(map[[32]byte][]Blockable, minBlockerSize)
 	}
 }
 

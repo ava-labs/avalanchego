@@ -5,11 +5,18 @@ package ids
 
 import "strings"
 
+const (
+	minShortSetSize = 16
+)
+
 // ShortSet is a set of ShortIDs
 type ShortSet map[[20]byte]bool
 
 func (ids *ShortSet) init(size int) {
 	if *ids == nil {
+		if minShortSetSize > size {
+			size = minShortSetSize
+		}
 		*ids = make(map[[20]byte]bool, size)
 	}
 }
@@ -65,9 +72,11 @@ func (ids ShortSet) CappedList(size int) []ShortID {
 
 // List converts this set into a list
 func (ids ShortSet) List() []ShortID {
-	idList := make([]ShortID, len(ids))[:0]
+	idList := make([]ShortID, len(ids), len(ids))
+	i := 0
 	for id := range ids {
-		idList = append(idList, NewShortID(id))
+		idList[i] = NewShortID(id)
+		i++
 	}
 	return idList
 }
