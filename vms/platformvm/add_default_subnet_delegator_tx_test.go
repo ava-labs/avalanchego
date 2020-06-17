@@ -386,4 +386,52 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal("should have failed verification because payer account has no $AVA to pay fee")
 	}
 	txFee = txFeeSaved // Reset tx fee
+
+	// Case 8: fail verification for spending more funds than it has
+	tx, err = vm.newAddDefaultSubnetDelegatorTx(
+		1,                                         // nonce (new account has nonce 0 so use nonce 1)
+		defaultBalance*2,                          // weight
+		uint64(defaultValidateStartTime.Unix()),   // start time
+		uint64(defaultValidateEndTime.Unix()),     // end time
+		defaultKey.PublicKey().Address(),          // node ID
+		defaultKey.PublicKey().Address(),          // destination
+		testNetworkID,                             // network ID
+		newAcctKey.(*crypto.PrivateKeySECP256K1R), // tx fee payer
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, _, err = tx.SemanticVerify(vm.DB)
+	if err == nil {
+		t.Fatal("should have failed verification because payer account spent twice the default balance")
+	}
+
+	// Case 9: Confirm balance is correct
+	tx, err = vm.newAddDefaultSubnetDelegatorTx(
+		1,                                         // nonce (new account has nonce 0 so use nonce 1)
+		defaultStakeAmount,                        // weight
+		uint64(defaultValidateStartTime.Unix()),   // start time
+		uint64(defaultValidateEndTime.Unix()),     // end time
+		defaultKey.PublicKey().Address(),          // node ID
+		defaultKey.PublicKey().Address(),          // destination
+		testNetworkID,                             // network ID
+		newAcctKey.(*crypto.PrivateKeySECP256K1R), // tx fee payer
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onCommitDB, _, _, _, err := tx.SemanticVerify(vm.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account, err := tx.vm.getAccount(onCommitDB, defaultKey.PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	balance := account.Balance
+
+	if balance == defaultBalance-(defaultStakeAmount+txFee) {
+		t.Fatal("")
+	}
 }
