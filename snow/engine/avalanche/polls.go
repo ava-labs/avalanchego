@@ -110,30 +110,27 @@ func (p *poll) Vote(votes []ids.ID, vdr ids.ShortID) {
 // Finished returns true if the poll has completed, with no more required
 // responses
 func (p poll) Finished() bool {
-	// If I have no outstanding polls, I'm finished
+	// If there are no outstanding queries, the poll is finished
 	numPending := p.polled.Len()
 	if numPending == 0 {
 		return true
 	}
 	// If there are still enough pending responses to include another vertex,
-	// then I can't stop polling
+	// then the poll must wait for more responses
 	if numPending > p.alpha {
 		return false
 	}
 
-	// I ignore any vertex that has already received alpha votes.
-	// To safely skip DAG traversal, assume that all votes for
-	// vertices with less than alpha votes will be applied to a
-	// single shared ancestor.
-	// In this case, I can terminate early, iff there are not enough
-	// pending votes for this ancestor to receive alpha votes.
+	// Ignore any vertex that has already received alpha votes. To safely skip
+	// DAG traversal, assume that all votes for vertices with less than alpha
+	// votes will be applied to a single shared ancestor. In this case, the poll
+	// can terminate early, iff there are not enough pending votes for this
+	// ancestor to receive alpha votes.
 	partialVotes := ids.BitSet(0)
 	for _, vote := range p.votes.List() {
-		voters := p.votes.GetSet(vote)
-		if voters.Len() >= p.alpha {
-			continue
+		if voters := p.votes.GetSet(vote); voters.Len() < p.alpha {
+			partialVotes.Union(voters)
 		}
-		partialVotes.Union(voters)
 	}
 	return partialVotes.Len()+numPending < p.alpha
 }
