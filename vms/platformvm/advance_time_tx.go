@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -35,47 +36,47 @@ func (tx *advanceTimeTx) initialize(vm *VM) error {
 func (tx *advanceTimeTx) Timestamp() time.Time { return time.Unix(int64(tx.Time), 0) }
 
 // SyntacticVerify that this transaction is well formed
-func (tx *advanceTimeTx) SyntacticVerify() error {
+func (tx *advanceTimeTx) SyntacticVerify() TxError {
 	switch {
 	case tx == nil:
-		return errNilTx
+		return tempError{errNilTx}
 	case tx.vm.clock.Time().Add(Delta).Before(tx.Timestamp()):
-		return errTimeTooAdvanced
+		return tempError{errTimeTooAdvanced}
 	default:
 		return nil
 	}
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), error) {
+func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
 	currentTimestamp, err := tx.vm.getTimestamp(db)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	if tx.Time <= uint64(currentTimestamp.Unix()) {
-		return nil, nil, nil, nil, fmt.Errorf("proposed timestamp %s not after current timestamp %s",
+		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp %s not after current timestamp %s",
 			tx.Timestamp(),
-			currentTimestamp)
+			currentTimestamp)}
 	}
 
 	// Only allow timestamp to move forward as far as the next validator's end time
 	nextValidatorEndTime := tx.vm.nextValidatorChangeTime(db, false)
 	if tx.Time > uint64(nextValidatorEndTime.Unix()) {
-		return nil, nil, nil, nil, fmt.Errorf("proposed timestamp %v later than next validator end time %s",
+		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp %v later than next validator end time %s",
 			tx.Time,
-			nextValidatorEndTime)
+			nextValidatorEndTime)}
 	}
 
 	// Only allow timestamp to move forward as far as the next pending validator's start time
 	nextValidatorStartTime := tx.vm.nextValidatorChangeTime(db, true)
 	if tx.Time > uint64(nextValidatorStartTime.Unix()) {
-		return nil, nil, nil, nil, fmt.Errorf("proposed timestamp %v later than next validator start time %s",
+		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp %v later than next validator start time %s",
 			tx.Time,
-			nextValidatorStartTime)
+			nextValidatorStartTime)}
 	}
 
 	// Calculate what the validator sets will be given new timestamp
@@ -85,19 +86,19 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 	// Specify what the state of the chain will be if this proposal is committed
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putTimestamp(onCommitDB, tx.Timestamp()); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 
 	current, pending, _, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 
 	if err := tx.vm.putCurrentValidators(onCommitDB, current, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	if err := tx.vm.putPendingValidators(onCommitDB, pending, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 
 	// For each Subnet, calculate what current and pending validator sets should be
@@ -106,23 +107,23 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 	// Key: Subnet ID
 	// Value: IDs of validators that will have started validating this Subnet when
 	// timestamp is advanced to tx.Timestamp()
-	startedValidating := make(map[ids.ID]ids.ShortSet, 0)
+	startedValidating := make(map[[32]byte]ids.ShortSet, 0)
 	subnets, err := tx.vm.getSubnets(db)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	for _, subnet := range subnets {
 		current, pending, started, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), subnet.id)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, permError{err}
 		}
 		if err := tx.vm.putCurrentValidators(onCommitDB, current, subnet.id); err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, permError{err}
 		}
 		if err := tx.vm.putPendingValidators(onCommitDB, pending, subnet.id); err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, permError{err}
 		}
-		startedValidating[subnet.ID()] = started
+		startedValidating[subnet.ID().Key()] = started
 	}
 
 	// If this block is committed, update the validator sets
@@ -154,7 +155,7 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 				continue
 			}
 			for _, chain := range chains {
-				if chain.SubnetID.Equals(subnetID) {
+				if bytes.Equal(subnetID[:], chain.SubnetID.Bytes()) {
 					tx.vm.createChain(chain)
 				}
 			}

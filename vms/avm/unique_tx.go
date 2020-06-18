@@ -61,8 +61,8 @@ func (tx *UniqueTx) refresh() {
 		// intermediate object whose state I must reflect
 		if status, err := tx.vm.state.Status(tx.ID()); err == nil {
 			tx.status = status
-			tx.unique = true
 		}
+		tx.unique = true
 	} else {
 		// If someone is in the cache, they must be up to date
 
