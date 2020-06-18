@@ -34,8 +34,7 @@ type Block struct {
 func (b *Block) Initialize(bytes []byte, vm *SnowmanVM) {
 	b.VM = vm
 	b.Metadata.Initialize(bytes)
-	status := b.VM.State.GetStatus(vm.DB, b.ID())
-	b.SetStatus(status)
+	b.SetStatus(choices.Unknown) // don't set status until it is queried
 }
 
 // ParentID returns [b]'s parent's ID
@@ -55,7 +54,6 @@ func (b *Block) Parent() snowman.Block {
 // Recall that b.vm.DB.Commit() must be called to persist to the DB
 func (b *Block) Accept() error {
 	b.SetStatus(choices.Accepted) // Change state of this block
-
 	blkID := b.ID()
 
 	// Persist data
