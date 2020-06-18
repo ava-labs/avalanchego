@@ -52,6 +52,7 @@ type Config struct {
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
+	InfoAPIEnabled     bool
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool

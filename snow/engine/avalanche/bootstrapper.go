@@ -107,6 +107,9 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 
 	// Make sure we don't already have this vertex
 	if _, err := b.State.GetVertex(vtxID); err == nil {
+		if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+			return b.finish()
+		}
 		return nil
 	}
 
@@ -124,15 +127,12 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 
 // Process vertices
 func (b *bootstrapper) process(vtx avalanche.Vertex) error {
-	toProcess := []avalanche.Vertex{vtx}
-	for len(toProcess) > 0 {
-		newLen := len(toProcess) - 1
-		vtx := toProcess[newLen]
-		toProcess = toProcess[:newLen]
-		if _, ok := b.processedCache.Get(vtx.ID()); ok { // already processed this
-			continue
-		}
-
+	toProcess := newMaxVertexHeap()
+	if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process if we haven't already
+		toProcess.Push(vtx)
+	}
+	for toProcess.Len() > 0 {
+		vtx := toProcess.Pop()
 		switch vtx.Status() {
 		case choices.Unknown:
 			if err := b.fetch(vtx.ID()); err != nil {
@@ -168,7 +168,9 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				}
 			}
 			for _, parent := range vtx.Parents() {
-				toProcess = append(toProcess, parent)
+				if _, ok := b.processedCache.Get(parent.ID()); !ok { // already processed this
+					toProcess.Push(parent)
+				}
 			}
 			b.processedCache.Put(vtx.ID(), nil)
 		}

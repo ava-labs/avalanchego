@@ -805,3 +805,113 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 		t.Fatal("should be accepted")
 	}
 }
+
+func TestBootstrapperFinalized(t *testing.T) {
+	config, peerID, sender, state, vm := newConfig(t)
+
+	vtxID0 := ids.Empty.Prefix(0)
+	vtxID1 := ids.Empty.Prefix(1)
+
+	vtxBytes0 := []byte{0}
+	vtxBytes1 := []byte{1}
+
+	vtx0 := &Vtx{
+		id:     vtxID0,
+		height: 0,
+		status: choices.Unknown,
+		bytes:  vtxBytes0,
+	}
+	vtx1 := &Vtx{
+		id:      vtxID1,
+		height:  1,
+		parents: []avalanche.Vertex{vtx0},
+		status:  choices.Unknown,
+		bytes:   vtxBytes1,
+	}
+
+	bs := bootstrapper{}
+	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
+	bs.Initialize(config)
+	finished := new(bool)
+	bs.onFinished = func() error { *finished = true; return nil }
+
+	acceptedIDs := ids.Set{}
+	acceptedIDs.Add(vtxID0)
+	acceptedIDs.Add(vtxID1)
+
+	parsedVtx0 := false
+	parsedVtx1 := false
+	state.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case vtxID.Equals(vtxID0):
+			if parsedVtx0 {
+				return vtx0, nil
+			}
+			return nil, errUnknownVertex
+		case vtxID.Equals(vtxID1):
+			if parsedVtx1 {
+				return vtx1, nil
+			}
+			return nil, errUnknownVertex
+		default:
+			t.Fatal(errUnknownVertex)
+			panic(errUnknownVertex)
+		}
+	}
+	state.parseVertex = func(vtxBytes []byte) (avalanche.Vertex, error) {
+		switch {
+		case bytes.Equal(vtxBytes, vtxBytes0):
+			vtx0.status = choices.Processing
+			parsedVtx0 = true
+			return vtx0, nil
+		case bytes.Equal(vtxBytes, vtxBytes1):
+			vtx1.status = choices.Processing
+			parsedVtx1 = true
+			return vtx1, nil
+		}
+		t.Fatal(errUnknownVertex)
+		return nil, errUnknownVertex
+	}
+
+	requestIDs := map[[32]byte]uint32{}
+	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+		if !vdr.Equals(peerID) {
+			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
+		}
+		requestIDs[vtxID.Key()] = reqID
+	}
+
+	vm.CantBootstrapping = false
+
+	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0 and vtx1
+		t.Fatal(err)
+	}
+
+	reqID, ok := requestIDs[vtxID1.Key()]
+	if !ok {
+		t.Fatalf("should have requested vtx1")
+	}
+
+	vm.CantBootstrapped = false
+
+	if err := bs.MultiPut(peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
+		t.Fatal(err)
+	}
+
+	reqID, ok = requestIDs[vtxID0.Key()]
+	if !ok {
+		t.Fatalf("should have requested vtx0")
+	}
+
+	if err := bs.GetAncestorsFailed(peerID, reqID); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*finished {
+		t.Fatalf("Bootstrapping should have finished")
+	} else if vtx0.Status() != choices.Accepted {
+		t.Fatalf("Vertex should be accepted")
+	} else if vtx1.Status() != choices.Accepted {
+		t.Fatalf("Vertex should be accepted")
+	}
+}
