@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -93,7 +93,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
-			Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
+			Outs: []*ava.TransferableOutput{{
 				Asset: ava.Asset{
 					ID: ids.NewID([32]byte{
 						0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -122,7 +122,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 					},
 				},
 			}},
-			Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			Ins: []*ava.TransferableInput{{
 				UTXOID: ava.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xf1, 0xe1, 0xd1, 0xc1, 0xb1, 0xa1, 0x91, 0x81,
@@ -152,7 +152,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 		Symbol:       "VIX",
 		Denomination: 2,
 		States: []*InitialState{
-			&InitialState{
+			{
 				FxID: 0,
 				Outs: []verify.Verifiable{
 					&secp256k1fx.TransferOutput{

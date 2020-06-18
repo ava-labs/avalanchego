@@ -792,7 +792,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+	outs := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt:      uint64(args.Amount),
@@ -946,7 +946,7 @@ func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, re
 					BCID:  service.vm.ctx.ChainID,
 				},
 				Ops: []*Operation{
-					&Operation{
+					{
 						Asset: ava.Asset{ID: assetID},
 						UTXOIDs: []*ava.UTXOID{
 							&utxo.UTXOID,
@@ -1197,7 +1197,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 
 	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+	outs := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: service.vm.ava},
 		Out: &secp256k1fx.TransferOutput{
 			Amt:      amount,
@@ -1352,7 +1352,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 
 	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	exportOuts := []*ava.TransferableOutput{&ava.TransferableOutput{
+	exportOuts := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: service.vm.ava},
 		Out: &secp256k1fx.TransferOutput{
 			Amt:      uint64(args.Amount),

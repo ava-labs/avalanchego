@@ -206,22 +206,25 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 			continue
 		}
 		txID, _ := in.InputSource()
-		if !txIDs.Contains(txID) {
-			txIDs.Add(txID)
-			tx.deps = append(tx.deps, &UniqueTx{
-				vm:   tx.vm,
-				txID: txID,
-			})
+		if txIDs.Contains(txID) {
+			continue
 		}
+		txIDs.Add(txID)
+		tx.deps = append(tx.deps, &UniqueTx{
+			vm:   tx.vm,
+			txID: txID,
+		})
 	}
+	consumedIDs := tx.Tx.ConsumedAssetIDs()
 	for _, assetID := range tx.Tx.AssetIDs().List() {
-		if !txIDs.Contains(assetID) {
-			txIDs.Add(assetID)
-			tx.deps = append(tx.deps, &UniqueTx{
-				vm:   tx.vm,
-				txID: assetID,
-			})
+		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
+			continue
 		}
+		txIDs.Add(assetID)
+		tx.deps = append(tx.deps, &UniqueTx{
+			vm:   tx.vm,
+			txID: assetID,
+		})
 	}
 	return tx.deps
 }
