@@ -18,7 +18,7 @@ var (
 	DenaliID  uint32 = 3
 	EverestID uint32 = 4
 
-	TestnetID uint32 = 4
+	TestnetID uint32 = 3
 	LocalID   uint32 = 12345
 
 	MainnetName = "mainnet"

@@ -64,7 +64,7 @@ func (p *peer) Start() {
 	// Initially send the version to the peer
 	go p.Version()
 	go p.requestVersion()
-	go p.sendPings()
+	// go p.sendPings()
 }
 
 func (p *peer) sendPings() {
@@ -107,10 +107,10 @@ func (p *peer) requestVersion() {
 func (p *peer) ReadMessages() {
 	defer p.Close()
 
-	if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
-		p.net.log.Verbo("error on setting the connection read timeout %s", err)
-		return
-	}
+	// if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
+	// 	p.net.log.Verbo("error on setting the connection read timeout %s", err)
+	// 	return
+	// }
 
 	pendingBuffer := wrappers.Packer{}
 	readBuffer := make([]byte, 1<<10)
@@ -246,11 +246,11 @@ func (p *peer) handle(msg Msg) {
 	currentTime := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, currentTime.Unix())
 
-	if err := p.conn.SetReadDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
-		p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
-		p.Close()
-		return
-	}
+	// if err := p.conn.SetReadDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
+	// 	p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
+	// 	p.Close()
+	// 	return
+	// }
 
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
