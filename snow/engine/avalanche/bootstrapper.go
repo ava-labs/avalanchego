@@ -126,11 +126,14 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 }
 
 // Process vertices
-func (b *bootstrapper) process(vtx avalanche.Vertex) error {
+func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	toProcess := newMaxVertexHeap()
-	if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process if we haven't already
-		toProcess.Push(vtx)
+	for _, vtx := range vtxs {
+		if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process if we haven't already
+			toProcess.Push(vtx)
+		}
 	}
+
 	for toProcess.Len() > 0 {
 		vtx := toProcess.Pop()
 		switch vtx.Status() {
@@ -217,14 +220,19 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		return b.fetch(neededVtxID)
 	}
 
+	processVertices := make([]avalanche.Vertex, 1, len(vtxs))
+	processVertices[0] = neededVtx
+
 	for _, vtxBytes := range vtxs { // Parse/persist all the vertices
-		if _, err := b.State.ParseVertex(vtxBytes); err != nil { // Persists the vtx
+		if vtx, err := b.State.ParseVertex(vtxBytes); err != nil { // Persists the vtx
 			b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
 			b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
+		} else {
+			processVertices = append(processVertices, vtx)
 		}
 	}
 
-	return b.process(neededVtx)
+	return b.process(processVertices...)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
@@ -245,14 +253,16 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 			err)
 	}
 
+	storedVtxs := make([]avalanche.Vertex, 0, acceptedContainerIDs.Len())
 	for _, vtxID := range acceptedContainerIDs.List() {
 		if vtx, err := b.State.GetVertex(vtxID); err == nil {
-			if err := b.process(vtx); err != nil {
-				return err
-			}
+			storedVtxs = append(storedVtxs, vtx)
 		} else if err := b.fetch(vtxID); err != nil {
 			return err
 		}
+	}
+	if err := b.process(storedVtxs...); err != nil {
+		return err
 	}
 	b.processedStartingAcceptedFrontier = true
 
