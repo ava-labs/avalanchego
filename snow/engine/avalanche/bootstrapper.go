@@ -125,13 +125,11 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 // Process vertices
 func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 	toProcess := newMaxVertexHeap()
-	toProcess.Push(vtx)
+	if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process if we haven't already
+		toProcess.Push(vtx)
+	}
 	for toProcess.Len() > 0 {
 		vtx := toProcess.Pop()
-		if _, ok := b.processedCache.Get(vtx.ID()); ok { // already processed this
-			continue
-		}
-
 		switch vtx.Status() {
 		case choices.Unknown:
 			if err := b.fetch(vtx.ID()); err != nil {
