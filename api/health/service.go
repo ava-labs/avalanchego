@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/AppsFlyer/go-sundheit"
+	health "github.com/AppsFlyer/go-sundheit"
+
+	"github.com/gorilla/rpc/v2"
+
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/gorilla/rpc/v2"
 )
 
 // defaultCheckOpts is a Check whose properties represent a default Check

@@ -12,6 +12,8 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	zxcvbn "github.com/nbutton23/zxcvbn-go"
+
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/encdb"
@@ -19,12 +21,11 @@ import (
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/codec"
 
 	jsoncodec "github.com/ava-labs/gecko/utils/json"
-	zxcvbn "github.com/nbutton23/zxcvbn-go"
 )
 
 const (
