@@ -165,10 +165,9 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				}
 			}
 			for _, parent := range vtx.Parents() {
-				if _, ok := b.processedCache.Get(parent.ID()); ok { // already processed this
-					continue
+				if _, ok := b.processedCache.Get(parent.ID()); !ok { // already processed this
+					toProcess.Push(parent)
 				}
-				toProcess.Push(parent)
 			}
 			b.processedCache.Put(vtx.ID(), nil)
 		}
