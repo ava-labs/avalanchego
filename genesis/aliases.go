@@ -18,27 +18,27 @@ import (
 // Aliases returns the default aliases based on the network ID
 func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[[32]byte][]string, error) {
 	generalAliases := map[string][]string{
-		"vm/" + platformvm.ID.String():  []string{"vm/platform"},
-		"vm/" + avm.ID.String():         []string{"vm/avm"},
-		"vm/" + EVMID.String():          []string{"vm/evm"},
-		"vm/" + spdagvm.ID.String():     []string{"vm/spdag"},
-		"vm/" + spchainvm.ID.String():   []string{"vm/spchain"},
-		"vm/" + timestampvm.ID.String(): []string{"vm/timestamp"},
-		"bc/" + ids.Empty.String():      []string{"P", "platform", "bc/P", "bc/platform"},
+		"vm/" + platformvm.ID.String():  {"vm/platform"},
+		"vm/" + avm.ID.String():         {"vm/avm"},
+		"vm/" + EVMID.String():          {"vm/evm"},
+		"vm/" + spdagvm.ID.String():     {"vm/spdag"},
+		"vm/" + spchainvm.ID.String():   {"vm/spchain"},
+		"vm/" + timestampvm.ID.String(): {"vm/timestamp"},
+		"bc/" + ids.Empty.String():      {"P", "platform", "bc/P", "bc/platform"},
 	}
 	chainAliases := map[[32]byte][]string{
-		ids.Empty.Key(): []string{"P", "platform"},
+		ids.Empty.Key(): {"P", "platform"},
 	}
 	vmAliases := map[[32]byte][]string{
-		platformvm.ID.Key():  []string{"platform"},
-		avm.ID.Key():         []string{"avm"},
-		EVMID.Key():          []string{"evm"},
-		spdagvm.ID.Key():     []string{"spdag"},
-		spchainvm.ID.Key():   []string{"spchain"},
-		timestampvm.ID.Key(): []string{"timestamp"},
-		secp256k1fx.ID.Key(): []string{"secp256k1fx"},
-		nftfx.ID.Key():       []string{"nftfx"},
-		propertyfx.ID.Key():  []string{"propertyfx"},
+		platformvm.ID.Key():  {"platform"},
+		avm.ID.Key():         {"avm"},
+		EVMID.Key():          {"evm"},
+		spdagvm.ID.Key():     {"spdag"},
+		spchainvm.ID.Key():   {"spchain"},
+		timestampvm.ID.Key(): {"timestamp"},
+		secp256k1fx.ID.Key(): {"secp256k1fx"},
+		nftfx.ID.Key():       {"nftfx"},
+		propertyfx.ID.Key():  {"propertyfx"},
 	}
 
 	genesisBytes, err := Genesis(networkID)
