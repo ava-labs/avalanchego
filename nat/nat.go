@@ -17,6 +17,8 @@ const (
 	maxRetries       = 20
 )
 
+// Router describes the functionality that a network device must support to be
+// able to open ports to an external IP.
 type Router interface {
 	MapPort(protocol string, intPort, extPort uint16, desc string, duration time.Duration) error
 	UnmapPort(protocol string, intPort, extPort uint16) error
@@ -29,6 +31,7 @@ type Router interface {
 	)
 }
 
+// GetRouter returns a router on the current network.
 func GetRouter() Router {
 	if r := getUPnPRouter(); r != nil {
 		return r
@@ -40,6 +43,7 @@ func GetRouter() Router {
 	return NewNoRouter()
 }
 
+// Mapper attempts to open a set of ports on a router
 type Mapper struct {
 	log    logging.Logger
 	r      Router
@@ -47,6 +51,7 @@ type Mapper struct {
 	wg     sync.WaitGroup
 }
 
+// NewPortMapper returns an initialized mapper
 func NewPortMapper(log logging.Logger, r Router) Mapper {
 	return Mapper{
 		log:    log,
@@ -77,7 +82,6 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 		if intaddr, intPort, desc, err := dev.r.GetPortMappingEntry(extPort, protocol); err == nil {
 			dev.log.Debug("Port %d is taken by %s:%d: %s, retry with the next port",
 				extPort, intaddr, intPort, desc)
-			continue
 		} else if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
 			dev.log.Debug("Map port failed. Protocol %s Internal %d External %d. %s",
 				protocol, intPort, extPort, err)
@@ -121,6 +125,8 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 	mappedPort <- 0
 }
 
+// UnmapAllPorts stops mapping all ports from this mapper and attempts to unmap
+// them.
 func (dev *Mapper) UnmapAllPorts() {
 	close(dev.closer)
 	dev.wg.Wait()

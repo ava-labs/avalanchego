@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/jackpal/gateway"
-	"github.com/jackpal/go-nat-pmp"
+
+	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
 var (

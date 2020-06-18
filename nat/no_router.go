@@ -48,7 +48,8 @@ func getOutboundIP() (net.IP, error) {
 	return nil, fmt.Errorf("getting outbound IP failed")
 }
 
-func NewNoRouter() *noRouter {
+// NewNoRouter returns a router that assumes the network is public
+func NewNoRouter() Router {
 	ip, err := getOutboundIP()
 	if err != nil {
 		return nil
