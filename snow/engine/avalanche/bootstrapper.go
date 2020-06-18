@@ -107,6 +107,9 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 
 	// Make sure we don't already have this vertex
 	if _, err := b.State.GetVertex(vtxID); err == nil {
+		if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+			return b.finish()
+		}
 		return nil
 	}
 
