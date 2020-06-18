@@ -124,11 +124,10 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 
 // Process vertices
 func (b *bootstrapper) process(vtx avalanche.Vertex) error {
-	toProcess := []avalanche.Vertex{vtx}
-	for len(toProcess) > 0 {
-		newLen := len(toProcess) - 1
-		vtx := toProcess[newLen]
-		toProcess = toProcess[:newLen]
+	toProcess := newMaxVertexHeap()
+	toProcess.Push(vtx)
+	for toProcess.Len() > 0 {
+		vtx := toProcess.Pop()
 		if _, ok := b.processedCache.Get(vtx.ID()); ok { // already processed this
 			continue
 		}
@@ -168,7 +167,10 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 				}
 			}
 			for _, parent := range vtx.Parents() {
-				toProcess = append(toProcess, parent)
+				if _, ok := b.processedCache.Get(parent.ID()); ok { // already processed this
+					continue
+				}
+				toProcess.Push(parent)
 			}
 			b.processedCache.Put(vtx.ID(), nil)
 		}
