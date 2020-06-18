@@ -115,6 +115,9 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
+		if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+			return b.finish()
+		}
 		return nil
 	}
 
