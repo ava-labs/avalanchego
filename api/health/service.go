@@ -39,8 +39,12 @@ func (h *Health) Handler() *common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(h, "health")
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet { // GET request --> reply with 200
-			w.WriteHeader(http.StatusOK)
+		if r.Method == http.MethodGet { // GET request --> return 200 if getLiveness returns true, else 500
+			if _, healthy := h.health.Results(); healthy {
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
 		} else {
 			newServer.ServeHTTP(w, r) // Other request --> use JSON RPC
 		}
