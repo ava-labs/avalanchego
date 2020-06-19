@@ -18,9 +18,7 @@ ls -ltrh "${GOPATH}"/src/
 ls -ltrh "${GOPATH}"/src/github.com
 ls -ltrh "${GOPATH}"/src/github.com/kurtosis-tech
 ls -ltrh "${GOPATH}"/src/github.com/kurtosis-tech/ava-e2e-tests/
-cd "${GOPATH}"/src/ || exit
-
-cd "${E2E_TEST_HOME}" || exit
+cd "${GOPATH}"/src/github.com/kurtosis-tech/ava-e2e-tests/ || exit
 
 ./scripts/full_rebuild_and_run.sh
 
