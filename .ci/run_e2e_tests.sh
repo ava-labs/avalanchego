@@ -11,10 +11,12 @@ bash "${SRC_PATH}"/scripts/build_image.sh
 # get docker image label
 GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
+export GOPATH="${GOPATH}"
 go get -t -v github.com/kurtosis-tech/ava-e2e-tests/...
 
 ls -ltrh "${GOPATH}"
 ls -ltrh "${GOPATH}"/src/
+ls -ltrh "${GOPATH}"/bin/
 ls -ltrh "${GOPATH}"/src/github.com
 ls -ltrh "${GOPATH}"/src/github.com/kurtosis-tech
 ls -ltrh "${GOPATH}"/src/github.com/kurtosis-tech/ava-e2e-tests/
