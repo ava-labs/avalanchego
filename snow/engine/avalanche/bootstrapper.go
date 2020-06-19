@@ -230,7 +230,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	processVertices := make([]avalanche.Vertex, 1, len(vtxs))
 	processVertices[0] = neededVtx
 
-	for _, vtxBytes := range vtxs { // Parse/persist all the vertices
+	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
 		if vtx, err := b.State.ParseVertex(vtxBytes); err != nil { // Persists the vtx
 			b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
 			b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
