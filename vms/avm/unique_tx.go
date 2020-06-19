@@ -85,7 +85,11 @@ func (tx *UniqueTx) refresh() {
 
 // Evict is called when this UniqueTx will no longer be returned from a cache
 // lookup
-func (tx *UniqueTx) Evict() { tx.unique = false } // Lock is already held here
+func (tx *UniqueTx) Evict() {
+	// Lock is already held here
+	tx.unique = false
+	tx.deps = nil
+}
 
 func (tx *UniqueTx) setStatus(status choices.Status) error {
 	tx.refresh()
