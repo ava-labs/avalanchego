@@ -20,10 +20,8 @@ const (
 	// We cache processed vertices where height = c * stripeDistance for c = {1,2,3...}
 	// This forms a "stripe" of cached DAG vertices at height stripeDistance, 2*stripeDistance, etc.
 	// This helps to limit the number of repeated DAG traversals performed
-	//
-	// With stripeDistance == 2500, average DAG width == 25 and processedCache size == 100,000
-	// the graph can have depth up to 10,000,000 and hold every stripe in cache (100,000 / 25 == x / 2,500)
-	stripeDistance = 2500
+	stripeDistance = 2000
+	stripeWidth    = 5
 	cacheSize      = 100000
 )
 
@@ -182,10 +180,9 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 					toProcess.Push(parent)
 				}
 			}
-			if vtx.Height()%stripeDistance == 0 {
+			if vtx.Height()%stripeDistance < stripeWidth {
 				b.processedCache.Put(vtx.ID(), nil)
 			}
-			b.processedCache.Put(vtx.ID(), nil)
 		}
 	}
 
