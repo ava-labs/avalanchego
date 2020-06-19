@@ -38,7 +38,14 @@ func (h *Health) Handler() *common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(h, "health")
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet { // GET request --> reply with 200
+			w.WriteHeader(http.StatusOK)
+		} else {
+			newServer.ServeHTTP(w, r) // Other request --> use JSON RPC
+		}
+	})
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}
 }
 
 // RegisterHeartbeat adds a check with default options and a CheckFn that checks
