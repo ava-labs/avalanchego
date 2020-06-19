@@ -51,6 +51,11 @@ type bootstrapper struct {
 	// tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
 
+	// IDs of vertices that we will send a GetAncestors request for once we are not at the
+	// max number of outstanding requests
+	// Invariant: The intersection of needToFetch and outstandingRequests is empty
+	needToFetch ids.Set
+
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU
 
@@ -103,11 +108,21 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 	return acceptedVtxIDs
 }
 
-// Get vertex [vtxID] and its ancestors
+// Calls fetch for a pending vertex if there are any
+func (b *bootstrapper) fetchANeededVtx() error {
+	if b.needToFetch.Len() > 0 {
+		return b.fetch(b.needToFetch.List()[0])
+	}
+	return nil
+}
+
+// Get vertex [vtxID] and its ancestors.
+// If [vtxID] has already been requested or is already fetched, and there are
+// unrequested vertices, requests one such vertex instead of [vtxID]
 func (b *bootstrapper) fetch(vtxID ids.ID) error {
 	// Make sure we haven't already requested this block
 	if b.outstandingRequests.Contains(vtxID) {
-		return nil
+		return b.fetchANeededVtx()
 	}
 
 	// Make sure we don't already have this vertex
@@ -115,6 +130,13 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 		if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
 			return b.finish()
 		}
+		b.needToFetch.Remove(vtxID) // we have this vertex. no need to request it.
+		return b.fetchANeededVtx()
+	}
+
+	// If we're already at maximum number of outstanding requests, queue for later
+	if b.outstandingRequests.Len() >= common.MaxOutstandingRequests {
+		b.needToFetch.Add(vtxID)
 		return nil
 	}
 
@@ -126,6 +148,7 @@ func (b *bootstrapper) fetch(vtxID ids.ID) error {
 	b.RequestID++
 
 	b.outstandingRequests.Add(validatorID, b.RequestID, vtxID)
+	b.needToFetch.Remove(vtxID)                                            // maintains invariant that intersection with outstandingRequests is empty
 	b.BootstrapConfig.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
 	return nil
 }
@@ -236,7 +259,13 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 			b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
 		} else {
 			processVertices = append(processVertices, vtx)
+			b.needToFetch.Remove(vtx.ID()) // No need to fetch this vertex since we have it now
 		}
+	}
+
+	// Now there is one less outstanding request; send another if needed
+	if err := b.fetchANeededVtx(); err != nil {
+		return err
 	}
 
 	return b.process(processVertices...)

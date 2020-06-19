@@ -17,6 +17,9 @@ const (
 
 	// StatusUpdateFrequency ... bootstrapper logs "processed X blocks/vertices" every [statusUpdateFrequency] blocks/vertices
 	StatusUpdateFrequency = 2500
+
+	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not responsded to/failed
+	MaxOutstandingRequests = 15
 )
 
 var (
