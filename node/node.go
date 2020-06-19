@@ -541,7 +541,10 @@ func (n *Node) initIPCAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
-	service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	service, err := ipcs.NewService(n.Log, n.chainManager, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, n.Config.IPCDefaultChainIDs, &n.APIServer)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
@@ -635,6 +638,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize ipc API: %w", err)
 	}
+
 	if err := n.initAliases(); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
