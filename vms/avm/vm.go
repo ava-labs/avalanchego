@@ -20,12 +20,12 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/utils/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
@@ -35,7 +35,7 @@ const (
 	batchSize      = 30
 	stateCacheSize = 10000
 	idCacheSize    = 10000
-	txCacheSize    = 100000
+	txCacheSize    = 10000
 	addressSep     = "-"
 )
 
@@ -248,8 +248,8 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	rpcServer.RegisterService(&Service{vm: vm}, "avm") // name this service "avm"
 
 	return map[string]*common.HTTPHandler{
-		"":        &common.HTTPHandler{Handler: rpcServer},
-		"/pubsub": &common.HTTPHandler{LockOptions: common.NoLock, Handler: vm.pubsub},
+		"":        {Handler: rpcServer},
+		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}
 }
 
@@ -261,7 +261,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&StaticService{}, "avm") // name this service "avm"
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{LockOptions: common.WriteLock, Handler: newServer},
+		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}
 }
 
