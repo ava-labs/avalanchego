@@ -141,7 +141,9 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	votes := ta.pushVotes(kahns, leaves)
 	// Update the conflict graph: O(|Transactions|)
 	ta.ctx.Log.Verbo("Updating consumer confidences based on:\n%s", &votes)
-	ta.cg.RecordPoll(votes)
+	if err := ta.cg.RecordPoll(votes); err != nil {
+		return err
+	}
 	// Update the dag: O(|Live Set|)
 	return ta.updateFrontiers()
 }
