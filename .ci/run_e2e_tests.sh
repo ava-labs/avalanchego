@@ -1,7 +1,7 @@
-LATEST_KURTOSIS_TAG="kurtosistech/kurtosis:latest"
-LATEST_CONTROLLER_TAG="kurtosistech/ava-test-controller:latest"
-
+#LATEST_CONTROLLER_TAG="kurtosistech/ava-test-controller:latest"
 #docker pull ${LATEST_CONTROLLER_TAG}
+
+set -x
 
 SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
@@ -12,6 +12,13 @@ bash "${SRC_PATH}"/scripts/build_image.sh
 GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
 go get -d -t -v github.com/kurtosis-tech/ava-e2e-tests/...
+
+ls -ltrh "${GOPATH}"
+ls -ltrh "${GOPATH}"/src/
+ls -ltrh "${GOPATH}"/src/github.com
+ls -ltrh "${GOPATH}"/src/github.com/kurtosis-tech
+ls -ltrh "${GOPATH}"/src/github.com/kurtosis-tech/ava-e2e-tests/
+cd "${GOPATH}"/src/ || exit
 
 cd "${E2E_TEST_HOME}" || exit
 
