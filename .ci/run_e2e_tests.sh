@@ -12,7 +12,7 @@ bash "${SRC_PATH}"/scripts/build_image.sh
 GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
 export GOPATH="${GOPATH}"
-go get -t -v github.com/kurtosis-tech/ava-e2e-tests/...
+GO111MODULE=off go get -t -v github.com/kurtosis-tech/ava-e2e-tests/...
 
 ls -ltrh "${GOPATH}"
 ls -ltrh "${GOPATH}"/src/
