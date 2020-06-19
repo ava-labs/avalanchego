@@ -57,7 +57,7 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.onFinished = t.finishBootstrapping
 
-	t.polls = newPolls(int(config.Alpha), config.Context.Log, t.numPolls)
+	t.polls = newPolls(int(config.Params.Alpha), config.Context.Log, t.numPolls)
 
 	return t.bootstrapper.Initialize(config.BootstrapConfig)
 }
