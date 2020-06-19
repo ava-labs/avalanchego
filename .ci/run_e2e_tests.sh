@@ -13,7 +13,7 @@ GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
 go get -d -t -v github.com/kurtosis-tech/ava-e2e-tests/...
 
-cd "${GOPATH}"/src/github.com/kurtosis-tech/ava-e2e-tests
+cd "${E2E_TEST_HOME}" || exit
 
 ./scripts/full_rebuild_and_run.sh
 
