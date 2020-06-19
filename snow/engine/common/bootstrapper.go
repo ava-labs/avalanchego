@@ -19,7 +19,7 @@ const (
 	StatusUpdateFrequency = 2500
 
 	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not responsded to/failed
-	MaxOutstandingRequests = 15
+	MaxOutstandingRequests = 8
 )
 
 var (
