@@ -25,7 +25,7 @@ type RestCodecRequest struct {
 var (
 	RestBaseURL = "/rest"
 )
-
+// return list of rest endpoints
 func (m *URIMethodMap) GetKeys() []string {
 	var keys []string
 	for k := range map[string]string(*m) {
@@ -34,9 +34,8 @@ func (m *URIMethodMap) GetKeys() []string {
 	return keys
 }
 
-//  Checks if the uri is in the mapping of RestCodecRequest
+//  Return rpc-method name for the rest api call
 func (r *RestCodecRequest) Method() (string, error) {
-	//
 	return r.method, nil
 }
 
