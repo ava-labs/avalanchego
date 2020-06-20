@@ -1,3 +1,5 @@
+set -x
+
 SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 # Build the runnable Gecko docker image
@@ -13,4 +15,6 @@ bash "./scripts/rebuild_controller_image.sh"
 # TODO: Make the controller image label a parameter to rebuild_controller_image script
 # Standard controller image label used by above scripts.
 CONTROLLER_IMAGE="kurtosistech/ava-e2e-tests_controller:latest"
+ls -ltrh ./
+ls -ltrh ./build/
 bash "./build/ava-e2e-tests --gecko-image-name=${GECKO_IMAGE} --test-controller-image-name=${CONTROLLER_IMAGE}"
