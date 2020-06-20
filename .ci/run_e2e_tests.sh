@@ -17,4 +17,4 @@ bash "./scripts/rebuild_controller_image.sh"
 CONTROLLER_IMAGE="kurtosistech/ava-e2e-tests_controller:latest"
 ls -ltrh ./
 ls -ltrh ./build/
-bash "./build/ava-e2e-tests --gecko-image-name=${GECKO_IMAGE} --test-controller-image-name=${CONTROLLER_IMAGE}"
+./build/ava-e2e-tests --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${CONTROLLER_IMAGE}"
