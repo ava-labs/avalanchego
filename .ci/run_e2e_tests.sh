@@ -7,4 +7,10 @@ GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 # Turn off GO111MODULE to pull e2e test source code in order to get run script.
 GO111MODULE=off go get -t -v github.com/kurtosis-tech/ava-e2e-tests/...
 cd "${GOPATH}"/src/github.com/kurtosis-tech/ava-e2e-tests/ || exit
-./scripts/full_rebuild_and_run.sh
+
+bash "./scripts/rebuild_initializer_binary.sh"
+bash "./scripts/rebuild_controller_image.sh"
+# TODO: Make the controller image label a parameter to rebuild_controller_image script
+# Standard controller image label used by above scripts.
+CONTROLLER_IMAGE="kurtosistech/ava-e2e-tests_controller:latest"
+bash "./build/ava-e2e-tests --gecko-image-name=${GECKO_IMAGE} --test-controller-image-name=${CONTROLLER_IMAGE}"
