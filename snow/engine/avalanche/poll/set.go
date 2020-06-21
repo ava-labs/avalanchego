@@ -33,7 +33,7 @@ func NewSet(
 		Help:      "Number of pending network polls",
 	})
 	if err := registerer.Register(numPolls); err != nil {
-		log.Error("failed to register av_polls statistics due to %s", err)
+		log.Error("failed to register polls statistics due to %s", err)
 	}
 
 	return &set{
