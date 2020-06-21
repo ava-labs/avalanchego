@@ -3085,3 +3085,120 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	te.Notify(common.PendingTxs)
 }
+
+func TestEngineDoubleChit(t *testing.T) {
+	config := DefaultConfig()
+
+	config.Params.Alpha = 2
+	config.Params.K = 2
+
+	vdr0 := validators.GenerateRandomValidator(1)
+	vdr1 := validators.GenerateRandomValidator(1)
+	vals := validators.NewSet()
+	vals.Add(vdr0)
+	vals.Add(vdr1)
+	config.Validators = vals
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+	sender.CantGetAcceptedFrontier = false
+
+	st := &stateTest{t: t}
+	config.State = st
+
+	st.Default(true)
+
+	gVtx := &Vtx{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}
+	mVtx := &Vtx{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}
+
+	vts := []avalanche.Vertex{gVtx, mVtx}
+	utxos := []ids.ID{GenerateID()}
+
+	tx := &TestTx{
+		TestTx: snowstorm.TestTx{
+			Identifier: GenerateID(),
+			Stat:       choices.Processing,
+		},
+	}
+	tx.Ins.Add(utxos[0])
+
+	vtx := &Vtx{
+		parents: vts,
+		id:      GenerateID(),
+		txs:     []snowstorm.Tx{tx},
+		height:  1,
+		status:  choices.Processing,
+		bytes:   []byte{1, 1, 2, 3},
+	}
+
+	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case id.Equals(gVtx.ID()):
+			return gVtx, nil
+		case id.Equals(mVtx.ID()):
+			return mVtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	te := &Transitive{}
+	te.Initialize(config)
+	te.finishBootstrapping()
+
+	reqID := new(uint32)
+	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, _ []byte) {
+		*reqID = requestID
+		if inVdrs.Len() != 2 {
+			t.Fatalf("Wrong number of validators")
+		}
+		if !vtxID.Equals(vtx.ID()) {
+			t.Fatalf("Wrong vertex requested")
+		}
+	}
+	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case id.Equals(vtx.ID()):
+			return vtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	te.insert(vtx)
+
+	votes := ids.Set{}
+	votes.Add(vtx.ID())
+
+	if status := tx.Status(); status != choices.Processing {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr0.ID(), *reqID, votes)
+
+	if status := tx.Status(); status != choices.Processing {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr0.ID(), *reqID, votes)
+
+	if status := tx.Status(); status != choices.Processing {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr1.ID(), *reqID, votes)
+
+	if status := tx.Status(); status != choices.Accepted {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Accepted)
+	}
+}

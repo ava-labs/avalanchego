@@ -18,8 +18,8 @@ func TestBagAdd(t *testing.T) {
 	} else if count := bag.Count(id1); count != 0 {
 		t.Fatalf("Bag.Count returned %d expected %d", count, 0)
 	} else if size := bag.Len(); size != 0 {
-		t.Fatalf("Bag.Len returned %d expected %d", count, 0)
-	} else if list := bag.List(); list != nil {
+		t.Fatalf("Bag.Len returned %d elements expected %d", count, 0)
+	} else if list := bag.List(); len(list) != 0 {
 		t.Fatalf("Bag.List returned %v expected %v", list, nil)
 	} else if mode, freq := bag.Mode(); !mode.IsZero() {
 		t.Fatalf("Bag.Mode[0] returned %s expected %s", mode, ID{})

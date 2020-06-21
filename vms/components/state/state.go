@@ -128,19 +128,10 @@ func (s *state) Get(db database.Database, typeID uint64, key ids.ID) (interface{
 	// The unique ID of this key/typeID pair
 	uID := s.uniqueID(key, typeID)
 
-	// See if exists in database
-	exists, err := db.Has(uID.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, database.ErrNotFound
-	}
-
 	// Get the value from the database
 	valueBytes, err := db.Get(uID.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("problem getting value from database: %w", err)
+		return nil, err
 	}
 
 	// Unmarshal the value from bytes and return it

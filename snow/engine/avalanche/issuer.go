@@ -78,9 +78,12 @@ func (i *issuer) Update() {
 		vdrSet.Add(vdr.ID())
 	}
 
+	toSample := ids.ShortSet{} // Copy to a new variable because we may remove an element in sender.Sender
+	toSample.Union(vdrSet)     // and we don't want that to affect the set of validators we wait for [ie vdrSet]
+
 	i.t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
-		i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet) {
+		i.t.Config.Sender.PushQuery(toSample, i.t.RequestID, vtxID, i.vtx.Bytes())
 	} else if numVdrs < p.K {
 		i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}

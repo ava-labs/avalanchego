@@ -57,9 +57,7 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.onFinished = t.finishBootstrapping
 
-	t.polls.log = config.Context.Log
-	t.polls.numPolls = t.numPolls
-	t.polls.m = make(map[uint32]poll)
+	t.polls = newPolls(int(config.Alpha), config.Context.Log, t.numPolls)
 
 	return t.bootstrapper.Initialize(config.BootstrapConfig)
 }
@@ -169,7 +167,11 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 	t.Config.Context.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
 
 	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
-		t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		if requestID == network.GossipMsgRequestID {
+			t.Config.Context.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		} else {
+			t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		}
 		return nil
 	}
 
@@ -471,8 +473,11 @@ func (t *Transitive) issueRepoll() {
 		vdrSet.Add(vdr.ID())
 	}
 
+	vdrCopy := ids.ShortSet{}
+	vdrCopy.Union((vdrSet))
+
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet.Len()) {
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrCopy) {
 		t.Config.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
 	} else if numVdrs < p.K {
 		t.Config.Context.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
