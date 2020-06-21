@@ -1,5 +1,3 @@
-set -x
-
 SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 # Build the runnable Gecko docker image
