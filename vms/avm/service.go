@@ -134,7 +134,7 @@ type GetUTXOsReply struct {
 	UTXOs []formatting.CB58 `json:"utxos"`
 }
 
-// GetUTXOs creates an empty account with the name passed in
+// GetUTXOs gets all utxos for passed in addresses
 func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
 	service.vm.ctx.Log.Verbo("GetUTXOs called with %s", args.Addresses)
 
@@ -148,6 +148,45 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	}
 
 	utxos, err := service.vm.GetUTXOs(addrSet)
+	if err != nil {
+		return err
+	}
+
+	reply.UTXOs = []formatting.CB58{}
+	for _, utxo := range utxos {
+		b, err := service.vm.codec.Marshal(utxo)
+		if err != nil {
+			return err
+		}
+		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: b})
+	}
+	return nil
+}
+
+// GetAtomicUTXOsArgs are arguments for passing into GetAtomicUTXOs requests
+type GetAtomicUTXOsArgs struct {
+	Addresses []string `json:"addresses"`
+}
+
+// GetAtomicUTXOsReply defines the GetUTXOs replies returned from the API
+type GetAtomicUTXOsReply struct {
+	UTXOs []formatting.CB58 `json:"utxos"`
+}
+
+// GetAtomicUTXOs creates an empty account with the name passed in
+func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
+	service.vm.ctx.Log.Verbo("GetAtomicUTXOs called with %s", args.Addresses)
+
+	addrSet := ids.Set{}
+	for _, addr := range args.Addresses {
+		addrBytes, err := service.vm.Parse(addr)
+		if err != nil {
+			return err
+		}
+		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
+	}
+
+	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
 	if err != nil {
 		return err
 	}
