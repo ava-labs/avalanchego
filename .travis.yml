@@ -6,8 +6,8 @@ jobs:
   include:
     - os: linux
       dist: bionic
-    #- os: osx
-    #  osx_image: xcode11.4
+    - os: osx
+      osx_image: xcode11.4
 services:
 - docker
 env:
