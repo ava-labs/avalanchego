@@ -6,8 +6,8 @@ jobs:
   include:
     - os: linux
       dist: bionic
-    #- os: osx
-    #  osx_image: xcode11.4
+    - os: osx
+      osx_image: xcode11.4
 services:
 - docker
 env:
@@ -23,7 +23,7 @@ before_install:
  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/before_install_linux.sh; fi
 
 install: 
- - if [ "$TRAVIS_OS_NAME" = "linux" ]; then DOCKER_BUILDKIT=1 docker build --progress plain -t $DOCKERHUB_REPO:$COMMIT .; fi
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then DOCKER_BUILDKIT=1 docker build --progress plain -t $DOCKERHUB_REPO:$COMMIT . ; fi
 
 script: 
  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then .ci/runscript_osx.sh; fi
