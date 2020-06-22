@@ -125,14 +125,10 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		return nil, nil, nil, nil, permError{errDBAccount}
 	}
 
-	// If the transaction adds a validator to the default subnet, also deduct
-	// staked $AVA
-	amount := tx.Weight()
-
 	// The account if this block's proposal is committed and the validator is
 	// added to the pending validator set. (Increase the account's nonce;
 	// decrease its balance.)
-	newAccount, err := account.Remove(amount, tx.Nonce) // Remove also removes the fee
+	newAccount, err := account.Remove(tx.Wght, tx.Nonce) // Remove also removes the fee
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
