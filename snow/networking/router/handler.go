@@ -54,6 +54,12 @@ func (h *Handler) Initialize(
 // Context of this Handler
 func (h *Handler) Context() *snow.Context { return h.engine.Context() }
 
+// Engine returns the engine this handler dispatches to
+func (h *Handler) Engine() common.Engine { return h.engine }
+
+// SetEngine sets the engine this handler dispatches to
+func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
+
 // Dispatch waits for incoming messages from the network
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
