@@ -57,15 +57,23 @@ func (ids *ShortSet) Remove(idList ...ShortID) {
 // Clear empties this set
 func (ids *ShortSet) Clear() { *ids = nil }
 
-// CappedList returns a list of length at most [size]. Size should be >= 0
+// CappedList returns a list of length at most [size].
+// Size should be >= 0. If size < 0, returns empty list.
 func (ids ShortSet) CappedList(size int) []ShortID {
-	idList := make([]ShortID, size)[:0]
+	if size < 0 {
+		return make([]ShortID, 0, 0)
+	}
+	if l := ids.Len(); l < size {
+		size = l
+	}
+	i := 0
+	idList := make([]ShortID, size)
 	for id := range ids {
-		if size <= 0 {
+		if i >= size {
 			break
 		}
-		size--
-		idList = append(idList, NewShortID(id))
+		idList[i] = NewShortID(id)
+		i++
 	}
 	return idList
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -26,7 +27,6 @@ import (
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -808,9 +808,11 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 		validator.Wght = weight
 	}
 
-	vdrList := make([]validators.Validator, len(vdrMap))[:0]
+	vdrList := make([]validators.Validator, len(vdrMap), len(vdrMap))
+	i := 0
 	for _, validator := range vdrMap {
-		vdrList = append(vdrList, validator)
+		vdrList[i] = validator
+		i++
 	}
 	return vdrList
 }

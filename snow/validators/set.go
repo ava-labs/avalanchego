@@ -71,9 +71,10 @@ func (s *set) Set(vdrs []Validator) {
 }
 
 func (s *set) set(vdrs []Validator) {
-	s.vdrMap = make(map[[20]byte]int, len(vdrs))
-	s.vdrSlice = s.vdrSlice[:0]
-	s.sampler.Weights = s.sampler.Weights[:0]
+	lenVdrs := len(vdrs)
+	s.vdrMap = make(map[[20]byte]int, lenVdrs)
+	s.vdrSlice = make([]Validator, 0, lenVdrs)
+	s.sampler.Weights = make([]uint64, 0, lenVdrs)
 
 	for _, vdr := range vdrs {
 		s.add(vdr)
