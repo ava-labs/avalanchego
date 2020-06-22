@@ -6,18 +6,26 @@ package poll
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 )
+
+type poll struct {
+	Poll
+	start time.Time
+}
 
 type set struct {
 	log      logging.Logger
 	numPolls prometheus.Gauge
+	durPolls prometheus.Histogram
 	factory  Factory
-	polls    map[uint32]Poll
+	polls    map[uint32]poll
 }
 
 // NewSet returns a new empty set of polls
@@ -36,11 +44,22 @@ func NewSet(
 		log.Error("failed to register polls statistics due to %s", err)
 	}
 
+	durPolls := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "poll_duration",
+		Help:      "Length of time the poll existed in milliseconds",
+		Buckets:   timer.MillisecondsBuckets,
+	})
+	if err := registerer.Register(durPolls); err != nil {
+		log.Error("failed to register poll_duration statistics due to %s", err)
+	}
+
 	return &set{
 		log:      log,
 		numPolls: numPolls,
+		durPolls: durPolls,
 		factory:  factory,
-		polls:    make(map[uint32]Poll),
+		polls:    make(map[uint32]poll),
 	}
 }
 
@@ -57,8 +76,11 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortSet) bool {
 		requestID,
 		vdrs)
 
-	s.polls[requestID] = s.factory.New(vdrs) // create the new poll
-	s.numPolls.Inc()                         // increase the metrics
+	s.polls[requestID] = poll{
+		Poll:  s.factory.New(vdrs), // create the new poll
+		start: time.Now(),
+	}
+	s.numPolls.Inc() // increase the metrics
 	return true
 }
 
@@ -90,7 +112,8 @@ func (s *set) Vote(
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
 	delete(s.polls, requestID) // remove the poll from the current set
-	s.numPolls.Dec()           // decrease the metrics
+	s.durPolls.Observe(float64(time.Now().Sub(poll.start).Milliseconds()))
+	s.numPolls.Dec() // decrease the metrics
 	return poll.Result(), true
 }
 

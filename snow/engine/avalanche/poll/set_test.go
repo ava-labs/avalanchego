@@ -20,6 +20,9 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 	registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "polls",
 	}))
+	registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "poll_duration",
+	}))
 
 	_ = NewSet(factory, log, namespace, registerer)
 }
