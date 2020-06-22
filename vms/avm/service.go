@@ -168,13 +168,13 @@ type GetAtomicUTXOsArgs struct {
 	Addresses []string `json:"addresses"`
 }
 
-// GetAtomicUTXOsReply defines the GetUTXOs replies returned from the API
+// GetAtomicUTXOsReply defines the GetAtomicUTXOs replies returned from the API
 type GetAtomicUTXOsReply struct {
 	UTXOs []formatting.CB58 `json:"utxos"`
 }
 
 // GetAtomicUTXOs creates an empty account with the name passed in
-func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
+func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs, reply *GetAtomicUTXOsReply) error {
 	service.vm.ctx.Log.Verbo("GetAtomicUTXOs called with %s", args.Addresses)
 
 	addrSet := ids.Set{}
