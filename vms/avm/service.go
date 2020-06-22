@@ -175,7 +175,7 @@ type GetAtomicUTXOsReply struct {
 
 // GetAtomicUTXOs gets all atomic utxos for passed in addresses
 func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs, reply *GetAtomicUTXOsReply) error {
-	service.vm.ctx.Log.Verbo("GetAtomicUTXOs called with %s", args.Addresses)
+	service.vm.ctx.Log.Info("GetAtomicUTXOs called with %s", args.Addresses)
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
