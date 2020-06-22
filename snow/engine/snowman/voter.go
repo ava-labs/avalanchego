@@ -32,7 +32,7 @@ func (v *voter) Update() {
 	results := ids.Bag{}
 	finished := false
 	if v.response.IsZero() {
-		results, finished = v.t.polls.CancelVote(v.requestID, v.vdr)
+		results, finished = v.t.polls.Drop(v.requestID, v.vdr)
 	} else {
 		results, finished = v.t.polls.Vote(v.requestID, v.vdr, v.response)
 	}

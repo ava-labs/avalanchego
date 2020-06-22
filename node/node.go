@@ -57,7 +57,11 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
+<<<<<<< HEAD
 	Version       = version.NewDefaultVersion("avalanche", 0, 6, 0)
+=======
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 6)
+>>>>>>> denali
 	versionParser = version.NewDefaultParser()
 )
 
