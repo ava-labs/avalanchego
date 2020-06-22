@@ -236,6 +236,88 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 }
 
+func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	addr0 := keys[0].PublicKey().Address()
+	tests := []struct {
+		label string
+		args  *GetAtomicUTXOsArgs
+	}{
+		{"[", &GetAtomicUTXOsArgs{[]string{""}}},
+		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}}},
+		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}}},
+		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}}},
+		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}}},
+		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}}},
+		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			utxosReply := &GetAtomicUTXOsReply{}
+			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err == nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestServiceGetAtomicUTXOs(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	addr0 := keys[0].PublicKey().Address()
+	tests := []struct {
+		label string
+		args  *GetAtomicUTXOsArgs
+		count int
+	}{
+		{
+			"Empty",
+			&GetAtomicUTXOsArgs{},
+			0,
+		}, {
+			"[<ChainID>-<unrelated address>]",
+			&GetAtomicUTXOsArgs{[]string{
+				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
+				//		 longer than addr0.String()
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+			}},
+			0,
+		}, {
+			"[<ChainID>-<addr0>]",
+			&GetAtomicUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			}},
+			7,
+		}, {
+			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
+			&GetAtomicUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			}},
+			7,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			utxosReply := &GetAtomicUTXOsReply{}
+			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err != nil {
+				t.Error(err)
+			} else if tt.count != len(utxosReply.UTXOs) {
+				t.Errorf("Expected %d utxos, got %#v", tt.count, len(utxosReply.UTXOs))
+			}
+		})
+	}
+}
+
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
 	defer func() {
