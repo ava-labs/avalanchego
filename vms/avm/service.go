@@ -173,7 +173,7 @@ type GetAtomicUTXOsReply struct {
 	UTXOs []formatting.CB58 `json:"utxos"`
 }
 
-// GetAtomicUTXOs creates an empty account with the name passed in
+// GetAtomicUTXOs gets all atomic utxos for passed in addresses
 func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs, reply *GetAtomicUTXOsReply) error {
 	service.vm.ctx.Log.Verbo("GetAtomicUTXOs called with %s", args.Addresses)
 
