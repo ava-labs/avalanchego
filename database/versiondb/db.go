@@ -234,9 +234,6 @@ func (db *Database) commitBatch() (database.Batch, error) {
 			return nil, err
 		}
 	}
-	if err := db.batch.Write(); err != nil {
-		return nil, err
-	}
 
 	return db.batch, nil
 }
