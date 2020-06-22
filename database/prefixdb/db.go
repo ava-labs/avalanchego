@@ -12,6 +12,10 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 )
 
+const (
+	minBatchSize = 32
+)
+
 // Database partitions a database into a sub-database by prefixing all keys with
 // a unique value.
 type Database struct {
@@ -199,7 +203,7 @@ func (b *batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
-	b.writes = b.writes[:0]
+	b.writes = make([]keyValue, 0, minBatchSize)
 	b.Batch.Reset()
 }
 
