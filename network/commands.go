@@ -170,21 +170,23 @@ const (
 	Version
 	GetPeerList
 	PeerList
-	Ping
-	Pong
 	// Bootstrapping:
 	GetAcceptedFrontier
 	AcceptedFrontier
 	GetAccepted
 	Accepted
-	GetAncestors
-	MultiPut
 	// Consensus:
 	Get
 	Put
 	PushQuery
 	PullQuery
 	Chits
+
+	// TODO: Reorder these messages when we transition to everest
+	GetAncestors
+	MultiPut
+	Ping
+	Pong
 )
 
 // Defines the messages that can be sent/received with this network
