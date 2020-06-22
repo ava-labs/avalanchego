@@ -311,7 +311,7 @@ func TestCommitBatch(t *testing.T) {
 	}
 	db.Abort()
 
-	if has, err := baseDB.Has(key1); err != nil {
+	if has, err := db.Has(key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if has {
 		t.Fatalf("Unexpected result of db.Has: %v", has)
