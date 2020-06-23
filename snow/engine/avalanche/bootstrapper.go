@@ -111,7 +111,7 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 // Calls fetch for a pending vertex if there are any
 func (b *bootstrapper) fetchANeededVtx() error {
 	if b.needToFetch.Len() > 0 {
-		return b.fetch(b.needToFetch.List()[0])
+		return b.fetch(b.needToFetch.CappedList(1)[0])
 	}
 	return nil
 }
