@@ -31,10 +31,10 @@ func (tx *TestTx) InputIDs() ids.Set { return tx.Ins }
 func (tx *TestTx) Status() choices.Status { return tx.Stat }
 
 // Accept implements the Consumer interface
-func (tx *TestTx) Accept() error { tx.Stat = choices.Accepted; return nil }
+func (tx *TestTx) Accept() error { tx.Stat = choices.Accepted; return tx.Validity }
 
 // Reject implements the Consumer interface
-func (tx *TestTx) Reject() error { tx.Stat = choices.Rejected; return nil }
+func (tx *TestTx) Reject() error { tx.Stat = choices.Rejected; return tx.Validity }
 
 // Reset sets the status to pending
 func (tx *TestTx) Reset() { tx.Stat = choices.Processing }

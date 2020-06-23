@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -31,7 +32,7 @@ type Transitive struct {
 	Config
 	bootstrapper
 
-	polls polls // track people I have asked for their preference
+	polls poll.Set // track people I have asked for their preference
 
 	// vtxReqs prevents asking validators for the same vertex
 	vtxReqs common.Requests
@@ -57,7 +58,12 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.onFinished = t.finishBootstrapping
 
-	t.polls = newPolls(int(config.Params.Alpha), config.Context.Log, t.numPolls)
+	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	t.polls = poll.NewSet(factory,
+		config.Context.Log,
+		config.Params.Namespace,
+		config.Params.Metrics,
+	)
 
 	return t.bootstrapper.Initialize(config.BootstrapConfig)
 }
@@ -309,7 +315,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 }
 
 func (t *Transitive) repoll() error {
-	if len(t.polls.m) >= t.Params.ConcurrentRepolls || t.errs.Errored() {
+	if t.polls.Len() >= t.Params.ConcurrentRepolls || t.errs.Errored() {
 		return nil
 	}
 
@@ -318,7 +324,7 @@ func (t *Transitive) repoll() error {
 		return err
 	}
 
-	for i := len(t.polls.m); i < t.Params.ConcurrentRepolls; i++ {
+	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
 		if err := t.batch(nil, false /*=force*/, true /*=empty*/); err != nil {
 			return err
 		}
