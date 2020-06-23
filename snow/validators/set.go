@@ -93,17 +93,11 @@ func (s *set) set(vdrs []Validator) {
 			newCap = lenVdrs
 		}
 		s.vdrSlice = make([]Validator, 0, newCap)
-	} else {
-		s.vdrSlice = s.vdrSlice[:0]
-	}
-	if cap(s.sampler.Weights) > len(s.sampler.Weights)*maxExcessCapacityFactor {
-		newCap := cap(s.sampler.Weights) / capacityReductionFactor
-		if newCap < lenVdrs {
-			newCap = lenVdrs
-		}
 		s.sampler.Weights = make([]uint64, 0, newCap)
 	} else {
+		s.vdrSlice = s.vdrSlice[:0]
 		s.sampler.Weights = s.sampler.Weights[:0]
+
 	}
 	s.vdrMap = make(map[[20]byte]int, lenVdrs)
 
