@@ -151,7 +151,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 
 		switch vtx.Status() {
 		case choices.Unknown:
-			b.fetch(vtxID)
+			b.needToFetch.Add(vtxID)
 		case choices.Rejected:
 			b.needToFetch.Remove(vtxID)
 			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtx.ID())
@@ -275,10 +275,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 			b.needToFetch.Add(vtxID)
 		}
 	}
-	if err := b.process(storedVtxs...); err != nil {
-		return err
-	}
-	return b.fetch()
+	return b.process(storedVtxs...)
 }
 
 // Finish bootstrapping
