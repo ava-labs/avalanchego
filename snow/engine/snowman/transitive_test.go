@@ -810,13 +810,13 @@ func TestVoteCanceling(t *testing.T) {
 
 	te.insert(blk)
 
-	if len(te.polls.m) != 1 {
+	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
 	}
 
 	te.QueryFailed(vdr0.ID(), *queryRequestID)
 
-	if len(te.polls.m) != 1 {
+	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
 	}
 

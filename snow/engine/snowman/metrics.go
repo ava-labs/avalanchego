@@ -13,7 +13,7 @@ type metrics struct {
 	numPendingRequests, numBlocked prometheus.Gauge
 	numBootstrapped, numDropped    prometheus.Counter
 
-	numPolls, numBlkRequests, numBlockedBlk prometheus.Gauge
+	numBlkRequests, numBlockedBlk prometheus.Gauge
 }
 
 // Initialize implements the Engine interface
@@ -42,12 +42,6 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 			Name:      "sm_bs_dropped",
 			Help:      "Number of dropped bootstrap blocks",
 		})
-	m.numPolls = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "sm_polls",
-			Help:      "Number of pending network polls",
-		})
 	m.numBlkRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -72,9 +66,6 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 	}
 	if err := registerer.Register(m.numDropped); err != nil {
 		log.Error("Failed to register sm_bs_dropped statistics due to %s", err)
-	}
-	if err := registerer.Register(m.numPolls); err != nil {
-		log.Error("Failed to register sm_polls statistics due to %s", err)
 	}
 	if err := registerer.Register(m.numBlkRequests); err != nil {
 		log.Error("Failed to register sm_blk_requests statistics due to %s", err)
