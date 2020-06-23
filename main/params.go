@@ -35,17 +35,19 @@ const (
 
 // Results of parsing the CLI
 var (
-	Config                 = node.Config{}
-	Err                    error
-	defaultNetworkName     = genesis.TestnetName
-	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
-	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
-	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+	Config             = node.Config{}
+	Err                error
+	defaultNetworkName = genesis.TestnetName
 
-	defaultPluginDirs = []string{
-		"./build/plugins",
-		"./plugins",
-		os.ExpandEnv(filepath.Join("$HOME", ".gecko", "plugins")),
+	homeDir                = os.ExpandEnv("$HOME")
+	defaultDbDir           = filepath.Join(homeDir, ".gecko", "db")
+	defaultStakingKeyPath  = filepath.Join(homeDir, ".gecko", "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(homeDir, ".gecko", "staking", "staker.crt")
+	defaultPluginDirs      = []string{
+		filepath.Join(".", "build", "plugins"),
+		filepath.Join(".", "plugins"),
+		filepath.Join("/", "usr", "local", "lib", "gecko"),
+		filepath.Join(homeDir, ".gecko", "plugins"),
 	}
 )
 
