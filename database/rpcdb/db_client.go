@@ -14,10 +14,6 @@ import (
 	"github.com/ava-labs/gecko/utils"
 )
 
-const (
-	minBatchSize = 32
-)
-
 var (
 	errClosed   = fmt.Sprintf("rpc error: code = Unknown desc = %s", database.ErrClosed)
 	errNotFound = fmt.Sprintf("rpc error: code = Unknown desc = %s", database.ErrNotFound)
@@ -184,7 +180,11 @@ func (b *batch) Write() error {
 }
 
 func (b *batch) Reset() {
-	b.writes = make([]keyValue, 0, minBatchSize)
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.size = 0
 }
 

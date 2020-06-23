@@ -13,6 +13,19 @@ import (
 	"github.com/ava-labs/gecko/utils/random"
 )
 
+const (
+	// maxExcessCapacityFactor ...
+	// If, when the validator set is reset, cap(set)/len(set) > MaxExcessCapacityFactor,
+	// the underlying arrays' capacities will be reduced by a factor of capacityReductionFactor.
+	// Higher value for maxExcessCapacityFactor --> less aggressive array downsizing --> less memory allocations
+	// but more unnecessary data in the underlying array that can't be garbage collected.
+	// Higher value for capacityReductionFactor --> more aggressive array downsizing --> more memory allocations
+	// but less unnecessary data in the underlying array that can't be garbage collected.
+	maxExcessCapacityFactor = 4
+	// CapacityReductionFactor ...
+	capacityReductionFactor = 2
+)
+
 // Set of validators that can be sampled
 type Set interface {
 	fmt.Stringer
@@ -72,9 +85,27 @@ func (s *set) Set(vdrs []Validator) {
 
 func (s *set) set(vdrs []Validator) {
 	lenVdrs := len(vdrs)
+	// If the underlying arrays are much larger than necessary, resize them to
+	// allow garbage collection of unused memory
+	if cap(s.vdrSlice) > len(s.vdrSlice)*maxExcessCapacityFactor {
+		newCap := cap(s.vdrSlice) / capacityReductionFactor
+		if newCap < lenVdrs {
+			newCap = lenVdrs
+		}
+		s.vdrSlice = make([]Validator, 0, newCap)
+	} else {
+		s.vdrSlice = s.vdrSlice[:0]
+	}
+	if cap(s.sampler.Weights) > len(s.sampler.Weights)*maxExcessCapacityFactor {
+		newCap := cap(s.sampler.Weights) / capacityReductionFactor
+		if newCap < lenVdrs {
+			newCap = lenVdrs
+		}
+		s.sampler.Weights = make([]uint64, 0, newCap)
+	} else {
+		s.sampler.Weights = s.sampler.Weights[:0]
+	}
 	s.vdrMap = make(map[[20]byte]int, lenVdrs)
-	s.vdrSlice = make([]Validator, 0, lenVdrs)
-	s.sampler.Weights = make([]uint64, 0, lenVdrs)
 
 	for _, vdr := range vdrs {
 		s.add(vdr)

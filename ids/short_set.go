@@ -58,10 +58,10 @@ func (ids *ShortSet) Remove(idList ...ShortID) {
 func (ids *ShortSet) Clear() { *ids = nil }
 
 // CappedList returns a list of length at most [size].
-// Size should be >= 0. If size < 0, returns empty list.
+// Size should be >= 0. If size < 0, returns nil.
 func (ids ShortSet) CappedList(size int) []ShortID {
 	if size < 0 {
-		return make([]ShortID, 0, 0)
+		return nil
 	}
 	if l := ids.Len(); l < size {
 		size = l

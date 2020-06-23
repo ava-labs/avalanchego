@@ -15,8 +15,7 @@ import (
 
 const (
 	// DefaultSize is the default initial size of the memory database
-	DefaultSize  = 1 << 10
-	minBatchSize = 32
+	DefaultSize = 1 << 10
 )
 
 // Database is an ephemeral key-value store that implements the Database
@@ -194,7 +193,11 @@ func (b *batch) Write() error {
 
 // Reset implements the Batch interface
 func (b *batch) Reset() {
-	b.writes = make([]keyValue, 0, minBatchSize)
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.size = 0
 }
 

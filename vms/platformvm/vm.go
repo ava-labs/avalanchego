@@ -808,7 +808,7 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 		validator.Wght = weight
 	}
 
-	vdrList := make([]validators.Validator, len(vdrMap), len(vdrMap))
+	vdrList := make([]validators.Validator, len(vdrMap))
 	i := 0
 	for _, validator := range vdrMap {
 		vdrList[i] = validator

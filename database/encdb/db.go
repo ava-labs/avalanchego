@@ -17,10 +17,6 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 )
 
-const (
-	minBatchSize = 32
-)
-
 // Database encrypts all values that are provided
 type Database struct {
 	lock   sync.RWMutex
@@ -205,7 +201,11 @@ func (b *batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
-	b.writes = make([]keyValue, 0, minBatchSize)
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.Batch.Reset()
 }
 
