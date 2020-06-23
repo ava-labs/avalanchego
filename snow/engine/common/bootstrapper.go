@@ -24,7 +24,7 @@ const (
 
 var (
 	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching vertices during a call to GetAncestors
-	MaxTimeFetchingAncestors = 100 * time.Millisecond
+	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
 // Bootstrapper implements the Engine interface.
