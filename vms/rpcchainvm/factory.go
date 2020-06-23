@@ -5,6 +5,8 @@ package rpcchainvm
 
 import (
 	"errors"
+	"io/ioutil"
+	"log"
 	"os/exec"
 
 	"github.com/hashicorp/go-plugin"
@@ -31,6 +33,9 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 		},
 	}
 	if ctx != nil {
+		// disable go-plugin logging (since it is not controlled by Gecko's own
+		// logging facility)
+		log.SetOutput(ioutil.Discard)
 		config.Stderr = ctx.Log
 		config.SyncStdout = ctx.Log
 		config.SyncStderr = ctx.Log
