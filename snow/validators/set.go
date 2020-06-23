@@ -97,7 +97,6 @@ func (s *set) set(vdrs []Validator) {
 	} else {
 		s.vdrSlice = s.vdrSlice[:0]
 		s.sampler.Weights = s.sampler.Weights[:0]
-
 	}
 	s.vdrMap = make(map[[20]byte]int, lenVdrs)
 
