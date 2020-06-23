@@ -50,8 +50,6 @@ type bootstrapper struct {
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
-	// Invariant: The intersection of needToFetch and outstandingRequests is
-	//            empty
 	needToFetch ids.Set
 
 	// Contains IDs of vertices that have recently been processed
