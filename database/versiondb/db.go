@@ -195,6 +195,7 @@ func (db *Database) Commit() error {
 	if err := batch.Write(); err != nil {
 		return err
 	}
+	batch.Reset()
 	db.abort()
 	return nil
 }
@@ -209,9 +210,10 @@ func (db *Database) Abort() {
 
 func (db *Database) abort() { db.mem = make(map[string]valueDelete, memdb.DefaultSize) }
 
-// CommitBatch returns a batch that will commit all pending writes to the
-// underlying database. The returned batch should be written before future calls
-// to this DB unless the batch will never be written.
+// CommitBatch returns a batch that contains all uncommitted puts/deletes.
+// Calling Write() on the returned batch causes the puts/deletes to be
+// written to the underlying database. The returned batch should be written before
+// future calls to this DB unless the batch will never be written.
 func (db *Database) CommitBatch() (database.Batch, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -219,6 +221,8 @@ func (db *Database) CommitBatch() (database.Batch, error) {
 	return db.commitBatch()
 }
 
+// Put all of the puts/deletes in memory into db.batch
+// and return the batch
 func (db *Database) commitBatch() (database.Batch, error) {
 	if db.mem == nil {
 		return nil, database.ErrClosed
@@ -234,9 +238,6 @@ func (db *Database) commitBatch() (database.Batch, error) {
 			return nil, err
 		}
 	}
-	if err := db.batch.Write(); err != nil {
-		return nil, err
-	}
 
 	return db.batch, nil
 }
@@ -249,6 +250,7 @@ func (db *Database) Close() error {
 	if db.mem == nil {
 		return database.ErrClosed
 	}
+	db.batch = nil
 	db.mem = nil
 	db.db = nil
 	return nil
@@ -303,7 +305,11 @@ func (b *batch) Write() error {
 
 // Reset implements the Database interface
 func (b *batch) Reset() {
-	b.writes = b.writes[:0]
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.size = 0
 }
 

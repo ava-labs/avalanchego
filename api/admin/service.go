@@ -133,21 +133,16 @@ func (service *Admin) Peers(_ *http.Request, _ *struct{}, reply *PeersReply) err
 	return nil
 }
 
-// StartCPUProfilerArgs are the arguments for calling StartCPUProfiler
-type StartCPUProfilerArgs struct {
-	Filename string `json:"filename"`
-}
-
 // StartCPUProfilerReply are the results from calling StartCPUProfiler
 type StartCPUProfilerReply struct {
 	Success bool `json:"success"`
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (service *Admin) StartCPUProfiler(_ *http.Request, args *StartCPUProfilerArgs, reply *StartCPUProfilerReply) error {
-	service.log.Info("Admin: StartCPUProfiler called with %s", args.Filename)
+func (service *Admin) StartCPUProfiler(_ *http.Request, args *struct{}, reply *StartCPUProfilerReply) error {
+	service.log.Info("Admin: StartCPUProfiler called")
 	reply.Success = true
-	return service.performance.StartCPUProfiler(args.Filename)
+	return service.performance.StartCPUProfiler()
 }
 
 // StopCPUProfilerReply are the results from calling StopCPUProfiler
@@ -162,26 +157,16 @@ func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *StopC
 	return service.performance.StopCPUProfiler()
 }
 
-// MemoryProfileArgs are the arguments for calling MemoryProfile
-type MemoryProfileArgs struct {
-	Filename string `json:"filename"`
-}
-
 // MemoryProfileReply are the results from calling MemoryProfile
 type MemoryProfileReply struct {
 	Success bool `json:"success"`
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (service *Admin) MemoryProfile(_ *http.Request, args *MemoryProfileArgs, reply *MemoryProfileReply) error {
-	service.log.Info("Admin: MemoryProfile called with %s", args.Filename)
+func (service *Admin) MemoryProfile(_ *http.Request, args *struct{}, reply *MemoryProfileReply) error {
+	service.log.Info("Admin: MemoryProfile called")
 	reply.Success = true
-	return service.performance.MemoryProfile(args.Filename)
-}
-
-// LockProfileArgs are the arguments for calling LockProfile
-type LockProfileArgs struct {
-	Filename string `json:"filename"`
+	return service.performance.MemoryProfile()
 }
 
 // LockProfileReply are the results from calling LockProfile
@@ -190,10 +175,10 @@ type LockProfileReply struct {
 }
 
 // LockProfile runs a mutex profile writing to the specified file
-func (service *Admin) LockProfile(_ *http.Request, args *LockProfileArgs, reply *LockProfileReply) error {
-	service.log.Info("Admin: LockProfile called with %s", args.Filename)
+func (service *Admin) LockProfile(_ *http.Request, args *struct{}, reply *LockProfileReply) error {
+	service.log.Info("Admin: LockProfile called")
 	reply.Success = true
-	return service.performance.LockProfile(args.Filename)
+	return service.performance.LockProfile()
 }
 
 // AliasArgs are the arguments for calling Alias

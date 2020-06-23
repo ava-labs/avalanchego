@@ -71,8 +71,10 @@ func main() {
 	mapper := nat.NewDefaultMapper(log, Config.Nat, nat.TCP, "gecko")
 	defer mapper.UnmapAllPorts()
 
-	mapper.MapPort(Config.StakingIP.Port, Config.StakingIP.Port)
-	mapper.MapPort(Config.HTTPPort, Config.HTTPPort)
+	mapper.MapPort(Config.StakingIP.Port, Config.StakingIP.Port)          // Open staking port
+	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" { // Open HTTP port iff HTTP server not listening on localhost
+		mapper.MapPort(Config.HTTPPort, Config.HTTPPort)
+	}
 
 	node := node.Node{}
 
