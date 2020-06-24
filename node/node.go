@@ -57,7 +57,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 5, 6)
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 7)
 	versionParser = version.NewDefaultParser()
 )
 
