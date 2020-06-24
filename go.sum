@@ -22,6 +22,8 @@ github.com/aristanetworks/goarista v0.0.0-20200520141224-0f14e646773f/go.mod h1:
 github.com/aristanetworks/splunk-hec-go v0.3.3/go.mod h1:1VHO9r17b0K7WmOlLb9nTk/2YanvOEnLMUgsFrxBROc=
 github.com/ava-labs/coreth v0.2.4 h1:MhnbuRyMcij7WU4+frayp40quc44AMPc4IrxXhmucWw=
 github.com/ava-labs/coreth v0.2.4/go.mod h1:pGolKipwq5vGIY2IBBcBkMYrqniXMsS5SBn+BBi4+Js=
+github.com/ava-labs/coreth v0.2.5 h1:2Al753rpPHvvZfcz7w96YbKhGFvrcZzsIZ/sIp0A0Ao=
+github.com/ava-labs/coreth v0.2.5/go.mod h1:pGolKipwq5vGIY2IBBcBkMYrqniXMsS5SBn+BBi4+Js=
 github.com/ava-labs/go-ethereum v1.9.3 h1:GmnMZ/dlvVAPFmWBzEpRJX49pUAymPfoASLNRJqR0AY=
 github.com/ava-labs/go-ethereum v1.9.3/go.mod h1:a+agc6fXfZFsPZCylA3ry4Y8CLCqLKg3Rc23NXZ9aw8=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=

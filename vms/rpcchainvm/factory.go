@@ -5,11 +5,12 @@ package rpcchainvm
 
 import (
 	"errors"
-	"os/exec"
-
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/ava-labs/gecko/snow"
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
+	"io/ioutil"
+	"log"
+	"os/exec"
 )
 
 var (
@@ -31,9 +32,18 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 		},
 	}
 	if ctx != nil {
+		log.SetOutput(ctx.Log)
 		config.Stderr = ctx.Log
-		config.SyncStdout = ctx.Log
-		config.SyncStderr = ctx.Log
+		config.Logger = hclog.New(&hclog.LoggerOptions{
+			Output: ctx.Log,
+			Level:  hclog.Info,
+		})
+	} else {
+		log.SetOutput(ioutil.Discard)
+		config.Stderr = ioutil.Discard
+		config.Logger = hclog.New(&hclog.LoggerOptions{
+			Output: ioutil.Discard,
+		})
 	}
 	client := plugin.NewClient(config)
 
