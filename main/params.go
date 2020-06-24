@@ -35,17 +35,19 @@ const (
 
 // Results of parsing the CLI
 var (
-	Config                 = node.Config{}
-	Err                    error
-	defaultNetworkName     = genesis.TestnetName
-	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
-	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
-	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+	Config             = node.Config{}
+	Err                error
+	defaultNetworkName = genesis.TestnetName
 
-	defaultPluginDirs = []string{
-		"./build/plugins",
-		"./plugins",
-		os.ExpandEnv(filepath.Join("$HOME", ".gecko", "plugins")),
+	homeDir                = os.ExpandEnv("$HOME")
+	defaultDbDir           = filepath.Join(homeDir, ".gecko", "db")
+	defaultStakingKeyPath  = filepath.Join(homeDir, ".gecko", "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(homeDir, ".gecko", "staking", "staker.crt")
+	defaultPluginDirs      = []string{
+		filepath.Join(".", "build", "plugins"),
+		filepath.Join(".", "plugins"),
+		filepath.Join("/", "usr", "local", "lib", "gecko"),
+		filepath.Join(homeDir, ".gecko", "plugins"),
 	}
 )
 
@@ -227,7 +229,7 @@ func init() {
 	// Enable/Disable APIs:
 	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", false, "If true, this node exposes the Admin API")
 	fs.BoolVar(&Config.InfoAPIEnabled, "api-info-enabled", true, "If true, this node exposes the Info API")
-	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", false, "If true, this node exposes the Keystore API")
+	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
 	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
 	fs.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
@@ -282,12 +284,12 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.NewRouter()
+	Config.Nat = nat.GetRouter()
 
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		ip, err = Config.Nat.IP()
+		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
@@ -304,6 +306,7 @@ func init() {
 		IP:   ip,
 		Port: uint16(*consensusPort),
 	}
+	Config.StakingLocalPort = uint16(*consensusPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := GetDefaultBootstraps(networkID, 5)
 

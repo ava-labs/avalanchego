@@ -40,10 +40,6 @@ func main() {
 	defer log.StopOnPanic()
 	defer Config.DB.Close()
 
-	if Config.StakingIP.IsZero() {
-		log.Warn("NAT traversal has failed. It will be able to connect to less nodes.")
-	}
-
 	// Track if sybil control is enforced
 	if !Config.EnableStaking && Config.EnableP2PTLS {
 		log.Warn("Staking is disabled. Sybil control is not enforced.")
@@ -68,12 +64,16 @@ func main() {
 		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
-	mapper := nat.NewDefaultMapper(log, Config.Nat, nat.TCP, "gecko")
+	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
-	mapper.MapPort(Config.StakingIP.Port, Config.StakingIP.Port)          // Open staking port
-	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" { // Open HTTP port iff HTTP server not listening on localhost
-		mapper.MapPort(Config.HTTPPort, Config.HTTPPort)
+	Config.StakingIP.Port = mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking") // Open staking port
+	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {               // Open HTTP port iff HTTP server not listening on localhost
+		mapper.Map("TCP", Config.HTTPPort, "gecko-http")
+	}
+
+	if Config.StakingIP.IsZero() {
+		log.Warn("NAT traversal has failed. The node will be able to connect to less nodes.")
 	}
 
 	node := node.Node{}

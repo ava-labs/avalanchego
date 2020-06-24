@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -106,9 +107,10 @@ func TestIssueImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
+	baseDB := memdb.New()
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
@@ -127,7 +129,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
 		[]*common.Fx{{
@@ -265,9 +267,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
+	baseDB := memdb.New()
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
@@ -285,7 +288,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
 		[]*common.Fx{{

@@ -492,10 +492,10 @@ func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
 		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
-
 		if err := tx.setStatus(choices.Processing); err != nil {
 			return nil, err
 		}
+		return tx, vm.db.Commit()
 	}
 
 	return tx, nil

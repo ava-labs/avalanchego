@@ -57,7 +57,11 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
+<<<<<<< HEAD
 	Version       = version.NewDefaultVersion("avalanche", 0, 6, 0)
+=======
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 7)
+>>>>>>> denali
 	versionParser = version.NewDefaultParser()
 )
 
@@ -113,7 +117,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, n.Config.StakingIP.PortString())
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingLocalPort))
 	if err != nil {
 		return err
 	}
@@ -462,7 +466,7 @@ func (n *Node) initMetricsAPI() {
 func (n *Node) initAdminAPI() {
 	if n.Config.AdminAPIEnabled {
 		n.Log.Info("initializing Admin API")
-		service := admin.NewService(n.Log, n.chainManager, n.Net, &n.APIServer)
+		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
 		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 	}
 }
