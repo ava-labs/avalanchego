@@ -4,6 +4,7 @@
 package nat
 
 import (
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -63,12 +64,16 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 // Map sets up port mapping using given protocol, internal and external ports
 // and returns the final port mapped. It returns 0 if mapping failed after the
 // maximun number of retries
-func (dev *Mapper) Map(protocol string, intPort uint16, desc string) uint16 {
+func (dev *Mapper) Map(protocol string, intPort uint16, desc string) (uint16, error) {
 	mappedPort := make(chan uint16)
 
 	go dev.keepPortMapping(mappedPort, protocol, intPort, desc)
 
-	return <-mappedPort
+	port := <-mappedPort
+	if port == 0 {
+		return 0, errors.New("failed to map port")
+	}
+	return port, nil
 }
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the

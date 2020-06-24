@@ -67,13 +67,15 @@ func main() {
 	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
-	Config.StakingIP.Port = mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking") // Open staking port
-	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {               // Open HTTP port iff HTTP server not listening on localhost
-		mapper.Map("TCP", Config.HTTPPort, "gecko-http")
+	port, err := mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking") // Open staking port
+	if err == nil {
+		Config.StakingIP.Port = port
+	} else {
+		log.Warn("NAT traversal has failed. The node will be able to connect to less nodes.")
 	}
 
-	if Config.StakingIP.IsZero() {
-		log.Warn("NAT traversal has failed. The node will be able to connect to less nodes.")
+	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" { // Open HTTP port iff HTTP server not listening on localhost
+		_, _ = mapper.Map("TCP", Config.HTTPPort, "gecko-http")
 	}
 
 	node := node.Node{}
