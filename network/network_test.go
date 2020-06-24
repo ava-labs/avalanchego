@@ -197,6 +197,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net)
@@ -280,6 +281,7 @@ func TestEstablishConnection(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -296,6 +298,7 @@ func TestEstablishConnection(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -419,6 +422,7 @@ func TestDoubleTrack(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -435,6 +439,7 @@ func TestDoubleTrack(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -559,6 +564,7 @@ func TestDoubleClose(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -575,6 +581,7 @@ func TestDoubleClose(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -704,6 +711,7 @@ func TestRemoveHandlers(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -720,6 +728,7 @@ func TestRemoveHandlers(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -858,6 +867,7 @@ func TestTrackConnected(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -874,6 +884,7 @@ func TestTrackConnected(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -999,6 +1010,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -1015,6 +1027,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
