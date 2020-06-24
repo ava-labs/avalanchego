@@ -109,7 +109,7 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 						dev.log.Error("Renewing port mapping from external port %d to internal port %d failed with %s",
 							intPort, extPort, err)
 					} else {
-						dev.log.Info("Renewed port mapping from external port %d to internal port %d.",
+						dev.log.Debug("Renewed port mapping from external port %d to internal port %d.",
 							intPort, extPort)
 					}
 
