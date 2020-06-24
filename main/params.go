@@ -284,12 +284,12 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.NewRouter()
+	Config.Nat = nat.GetRouter()
 
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		ip, err = Config.Nat.IP()
+		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
@@ -306,6 +306,7 @@ func init() {
 		IP:   ip,
 		Port: uint16(*consensusPort),
 	}
+	Config.StakingLocalPort = uint16(*consensusPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := GetDefaultBootstraps(networkID, 5)
 
