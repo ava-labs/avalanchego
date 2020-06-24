@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 

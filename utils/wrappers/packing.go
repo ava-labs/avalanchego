@@ -61,26 +61,23 @@ func (p *Packer) CheckSpace(bytes int) {
 	}
 }
 
-// Expand ensures that there is [bytes] bytes left of space in the byte array.
-// If this is not allowed due to the maximum size, an error is added to the
-// packer
+// Expand ensures that there is [bytes] bytes left of space in the byte slice.
+// If this is not allowed due to the maximum size, an error is added to the packer
+// In order to understand this code, its important to understand the difference
+// between a slice's length and its capacity.
 func (p *Packer) Expand(bytes int) {
-	p.CheckSpace(0)
-	if p.Errored() {
+	neededSize := bytes + p.Offset // Need byte slice's length to be at least [neededSize]
+	switch {
+	case neededSize <= len(p.Bytes): // Byte slice has sufficient length already
 		return
-	}
-
-	neededSize := bytes + p.Offset
-	if neededSize <= len(p.Bytes) {
+	case neededSize > p.MaxSize: // Lengthening the byte slice would cause it to grow too large
+		p.Err = errBadLength
 		return
-	}
-
-	if neededSize > p.MaxSize {
-		p.Add(errBadLength)
-	} else if neededSize > cap(p.Bytes) {
-		p.Bytes = append(p.Bytes[:cap(p.Bytes)], make([]byte, neededSize-cap(p.Bytes))...)
-	} else {
+	case neededSize <= cap(p.Bytes): // Byte slice has sufficient capacity to lengthen it without mem alloc
 		p.Bytes = p.Bytes[:neededSize]
+		return
+	default: // Add capacity/length to byte slice
+		p.Bytes = append(p.Bytes[:cap(p.Bytes)], make([]byte, neededSize-cap(p.Bytes))...)
 	}
 }
 

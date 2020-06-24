@@ -132,6 +132,10 @@ func (op Op) String() string {
 		return "get_peerlist"
 	case PeerList:
 		return "peerlist"
+	case Ping:
+		return "ping"
+	case Pong:
+		return "pong"
 	case GetAcceptedFrontier:
 		return "get_accepted_frontier"
 	case AcceptedFrontier:
@@ -177,11 +181,12 @@ const (
 	PushQuery
 	PullQuery
 	Chits
-	// Bootstrapping:
-	// TODO: Move GetAncestors and MultiPut with the rest of the bootstrapping
-	// commands when we do non-backwards compatible upgrade
+
+	// TODO: Reorder these messages when we transition to everest
 	GetAncestors
 	MultiPut
+	Ping
+	Pong
 )
 
 // Defines the messages that can be sent/received with this network
@@ -192,6 +197,8 @@ var (
 		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr},
 		GetPeerList: {},
 		PeerList:    {Peers},
+		Ping:        {},
+		Pong:        {},
 		// Bootstrapping:
 		GetAcceptedFrontier: {ChainID, RequestID},
 		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},

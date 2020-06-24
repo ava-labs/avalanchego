@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
 

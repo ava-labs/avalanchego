@@ -4,11 +4,13 @@
 package nat
 
 import (
+	"fmt"
 	"net"
 	"time"
 
 	"github.com/jackpal/gateway"
-	"github.com/jackpal/go-nat-pmp"
+
+	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
 var (
@@ -17,12 +19,12 @@ var (
 
 // natPMPClient adapts the NAT-PMP protocol implementation so it conforms to
 // the common interface.
-type pmpClient struct {
+type pmpRouter struct {
 	client *natpmp.Client
 }
 
-func (pmp *pmpClient) MapPort(
-	networkProtocol NetworkProtocol,
+func (pmp *pmpRouter) MapPort(
+	networkProtocol string,
 	newInternalPort uint16,
 	newExternalPort uint16,
 	mappingName string,
@@ -37,8 +39,8 @@ func (pmp *pmpClient) MapPort(
 	return err
 }
 
-func (pmp *pmpClient) UnmapPort(
-	networkProtocol NetworkProtocol,
+func (pmp *pmpRouter) UnmapPort(
+	networkProtocol string,
 	internalPort uint16,
 	_ uint16) error {
 	protocol := string(networkProtocol)
@@ -48,7 +50,7 @@ func (pmp *pmpClient) UnmapPort(
 	return err
 }
 
-func (pmp *pmpClient) IP() (net.IP, error) {
+func (pmp *pmpRouter) ExternalIP() (net.IP, error) {
 	response, err := pmp.client.GetExternalAddress()
 	if err != nil {
 		return nil, err
@@ -56,14 +58,20 @@ func (pmp *pmpClient) IP() (net.IP, error) {
 	return response.ExternalIPAddress[:], nil
 }
 
-func getPMPRouter() Router {
+// go-nat-pmp does not support port mapping entry query
+func (pmp *pmpRouter) GetPortMappingEntry(externalPort uint16, protocol string) (
+	string, uint16, string, error) {
+	return "", 0, "", fmt.Errorf("port mapping entry not found")
+}
+
+func getPMPRouter() *pmpRouter {
 	gatewayIP, err := gateway.DiscoverGateway()
 	if err != nil {
 		return nil
 	}
 
-	pmp := &pmpClient{natpmp.NewClientWithTimeout(gatewayIP, pmpClientTimeout)}
-	if _, err := pmp.IP(); err != nil {
+	pmp := &pmpRouter{natpmp.NewClientWithTimeout(gatewayIP, pmpClientTimeout)}
+	if _, err := pmp.ExternalIP(); err != nil {
 		return nil
 	}
 
