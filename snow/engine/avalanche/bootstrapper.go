@@ -132,7 +132,6 @@ func (b *bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		b.RequestID++
 
 		b.outstandingRequests.Add(validatorID, b.RequestID, vtxID)
-		b.needToFetch.Remove(vtxID)
 		b.BootstrapConfig.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.finish()
