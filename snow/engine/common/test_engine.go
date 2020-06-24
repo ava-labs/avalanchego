@@ -15,6 +15,7 @@ import (
 type EngineTest struct {
 	T *testing.T
 
+	Bootstrapped,
 	CantStartup,
 	CantGossip,
 	CantShutdown,
@@ -58,6 +59,8 @@ var _ Engine = &EngineTest{}
 
 // Default ...
 func (e *EngineTest) Default(cant bool) {
+	e.Bootstrapped = cant
+
 	e.CantStartup = cant
 	e.CantGossip = cant
 	e.CantShutdown = cant
@@ -353,4 +356,9 @@ func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerI
 		return errors.New("Unexpectedly called Chits")
 	}
 	return nil
+}
+
+// IsBootstrapped ...
+func (e *EngineTest) IsBootstrapped() bool {
+	return e.Bootstrapped
 }

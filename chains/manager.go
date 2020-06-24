@@ -76,6 +76,9 @@ type Manager interface {
 	// Add an alias to a chain
 	Alias(ids.ID, string) error
 
+	// Returns true iff the chain with the given ID exists and is finished bootstrapping
+	IsBootstrapped(ids.ID) bool
+
 	Shutdown()
 }
 
@@ -113,6 +116,10 @@ type manager struct {
 	server          *api.Server        // Handles HTTP API calls
 	keystore        *keystore.Keystore
 	sharedMemory    *atomic.SharedMemory
+
+	// Key: Chain's ID
+	// Value: The chain
+	chains map[[32]byte]common.Engine
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -165,6 +172,7 @@ func New(
 		server:          server,
 		keystore:        keystore,
 		sharedMemory:    sharedMemory,
+		chains:          make(map[[32]byte]common.Engine),
 	}
 	m.Initialize()
 	return m
@@ -454,7 +462,7 @@ func (m *manager) createAvalancheChain(
 			eng:       &engine,
 		})
 	}
-
+	m.chains[ctx.ChainID.Key()] = &engine
 	return nil
 }
 
@@ -546,7 +554,15 @@ func (m *manager) createSnowmanChain(
 			eng:       &engine,
 		})
 	}
+	m.chains[ctx.ChainID.Key()] = &engine
 	return nil
+}
+
+func (m *manager) IsBootstrapped(id ids.ID) bool {
+	if chain, exists := m.chains[id.Key()]; exists && chain.IsBootstrapped() {
+		return true
+	}
+	return false
 }
 
 // Shutdown stops all the chains
