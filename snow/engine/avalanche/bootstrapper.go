@@ -283,7 +283,8 @@ func (b *bootstrapper) finish() error {
 	if b.finished || b.outstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
 		return nil
 	}
-	b.BootstrapConfig.Context.Log.Info("finished fetching vertices. executing transaction state transitions...")
+	b.BootstrapConfig.Context.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
+		b.numFetched)
 
 	if err := b.executeAll(b.TxBlocked, b.numBSBlockedTx); err != nil {
 		return err
@@ -325,5 +326,6 @@ func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge)
 			b.BootstrapConfig.Context.Log.Info("executed %d operations", numExecuted)
 		}
 	}
+	b.BootstrapConfig.Context.Log.Info("executed %d operations", numExecuted)
 	return nil
 }
