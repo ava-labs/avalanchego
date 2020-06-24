@@ -9,6 +9,10 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
+const (
+	minMapSize = 16
+)
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
@@ -183,7 +187,7 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 // the non-transitively applied votes. Also returns the list of leaf blocks.
 func (ts *Topological) calculateInDegree(
 	votes ids.Bag) (map[[32]byte]kahnNode, []ids.ID) {
-	kahns := make(map[[32]byte]kahnNode)
+	kahns := make(map[[32]byte]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
 	for _, vote := range votes.List() {
