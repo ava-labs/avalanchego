@@ -17,7 +17,12 @@ import (
 )
 
 const (
-	cacheSize = 100000
+	// We cache processed vertices where height = c * stripeDistance for c = {1,2,3...}
+	// This forms a "stripe" of cached DAG vertices at height stripeDistance, 2*stripeDistance, etc.
+	// This helps to limit the number of repeated DAG traversals performed
+	stripeDistance = 2000
+	stripeWidth    = 5
+	cacheSize      = 100000
 )
 
 // BootstrapConfig ...
@@ -37,14 +42,15 @@ type bootstrapper struct {
 	metrics
 	common.Bootstrapper
 
-	// true if all of the vertices in the original accepted frontier have been processed
-	processedStartingAcceptedFrontier bool
-
 	// number of vertices fetched so far
 	numFetched uint32
 
 	// tracks which validators were asked for which containers in which requests
 	outstandingRequests common.Requests
+
+	// IDs of vertices that we will send a GetAncestors request for once we are
+	// not at the max number of outstanding requests
+	needToFetch ids.Set
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU
@@ -98,49 +104,60 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 	return acceptedVtxIDs
 }
 
-// Get vertex [vtxID] and its ancestors
-func (b *bootstrapper) fetch(vtxID ids.ID) error {
-	// Make sure we haven't already requested this block
-	if b.outstandingRequests.Contains(vtxID) {
-		return nil
-	}
+// Fetch vertices and their ancestors from the set of vertices that are needed
+// to be fetched.
+func (b *bootstrapper) fetch(vtxIDs ...ids.ID) error {
+	b.needToFetch.Add(vtxIDs...)
+	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() < common.MaxOutstandingRequests {
+		vtxID := b.needToFetch.CappedList(1)[0]
+		b.needToFetch.Remove(vtxID)
 
-	// Make sure we don't already have this vertex
-	if _, err := b.State.GetVertex(vtxID); err == nil {
-		if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
-			return b.finish()
+		// Make sure we haven't already requested this vertex
+		if b.outstandingRequests.Contains(vtxID) {
+			continue
 		}
-		return nil
-	}
 
-	validators := b.BootstrapConfig.Validators.Sample(1) // validator to send request to
-	if len(validators) == 0 {
-		return fmt.Errorf("Dropping request for %s as there are no validators", vtxID)
-	}
-	validatorID := validators[0].ID()
-	b.RequestID++
+		// Make sure we don't already have this vertex
+		if _, err := b.State.GetVertex(vtxID); err == nil {
+			continue
+		}
 
-	b.outstandingRequests.Add(validatorID, b.RequestID, vtxID)
-	b.BootstrapConfig.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
-	return nil
+		validators := b.BootstrapConfig.Validators.Sample(1) // validator to send request to
+		if len(validators) == 0 {
+			return fmt.Errorf("Dropping request for %s as there are no validators", vtxID)
+		}
+		validatorID := validators[0].ID()
+		b.RequestID++
+
+		b.outstandingRequests.Add(validatorID, b.RequestID, vtxID)
+		b.needToFetch.Remove(vtxID)                                            // maintains invariant that intersection with outstandingRequests is empty
+		b.BootstrapConfig.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
+	}
+	return b.finish()
 }
 
 // Process vertices
-func (b *bootstrapper) process(vtx avalanche.Vertex) error {
+func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	toProcess := newMaxVertexHeap()
-	if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process if we haven't already
-		toProcess.Push(vtx)
+	for _, vtx := range vtxs {
+		if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process if we haven't already
+			toProcess.Push(vtx)
+		}
 	}
+
 	for toProcess.Len() > 0 {
 		vtx := toProcess.Pop()
+		vtxID := vtx.ID()
+
 		switch vtx.Status() {
 		case choices.Unknown:
-			if err := b.fetch(vtx.ID()); err != nil {
-				return err
-			}
+			b.needToFetch.Add(vtxID)
 		case choices.Rejected:
+			b.needToFetch.Remove(vtxID)
 			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtx.ID())
 		case choices.Processing:
+			b.needToFetch.Remove(vtxID)
+
 			if err := b.VtxBlocked.Push(&vertexJob{
 				log:         b.BootstrapConfig.Context.Log,
 				numAccepted: b.numBSVtx,
@@ -172,7 +189,9 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 					toProcess.Push(parent)
 				}
 			}
-			b.processedCache.Put(vtx.ID(), nil)
+			if vtx.Height()%stripeDistance < stripeWidth {
+				b.processedCache.Put(vtx.ID(), nil)
+			}
 		}
 	}
 
@@ -183,10 +202,7 @@ func (b *bootstrapper) process(vtx avalanche.Vertex) error {
 		return err
 	}
 
-	if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
-		return b.finish()
-	}
-	return nil
+	return b.fetch()
 }
 
 // MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
@@ -217,14 +233,20 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		return b.fetch(neededVtxID)
 	}
 
-	for _, vtxBytes := range vtxs { // Parse/persist all the vertices
-		if _, err := b.State.ParseVertex(vtxBytes); err != nil { // Persists the vtx
+	processVertices := make([]avalanche.Vertex, 1, len(vtxs))
+	processVertices[0] = neededVtx
+
+	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
+		if vtx, err := b.State.ParseVertex(vtxBytes); err != nil { // Persists the vtx
 			b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
 			b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
+		} else {
+			processVertices = append(processVertices, vtx)
+			b.needToFetch.Remove(vtx.ID()) // No need to fetch this vertex since we have it now
 		}
 	}
 
-	return b.process(neededVtx)
+	return b.process(processVertices...)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
@@ -245,26 +267,20 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 			err)
 	}
 
+	storedVtxs := make([]avalanche.Vertex, 0, acceptedContainerIDs.Len())
 	for _, vtxID := range acceptedContainerIDs.List() {
 		if vtx, err := b.State.GetVertex(vtxID); err == nil {
-			if err := b.process(vtx); err != nil {
-				return err
-			}
-		} else if err := b.fetch(vtxID); err != nil {
-			return err
+			storedVtxs = append(storedVtxs, vtx)
+		} else {
+			b.needToFetch.Add(vtxID)
 		}
 	}
-	b.processedStartingAcceptedFrontier = true
-
-	if numPending := b.outstandingRequests.Len(); numPending == 0 {
-		return b.finish()
-	}
-	return nil
+	return b.process(storedVtxs...)
 }
 
 // Finish bootstrapping
 func (b *bootstrapper) finish() error {
-	if b.finished {
+	if b.finished || b.outstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
 		return nil
 	}
 	b.BootstrapConfig.Context.Log.Info("finished fetching vertices. executing transaction state transitions...")

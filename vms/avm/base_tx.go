@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -46,13 +46,18 @@ func (t *BaseTx) InputUTXOs() []*ava.UTXOID {
 	return utxos
 }
 
-// AssetIDs returns the IDs of the assets this transaction depends on
-func (t *BaseTx) AssetIDs() ids.Set {
+// ConsumedAssetIDs returns the IDs of the assets this transaction consumes
+func (t *BaseTx) ConsumedAssetIDs() ids.Set {
 	assets := ids.Set{}
 	for _, in := range t.Ins {
 		assets.Add(in.AssetID())
 	}
 	return assets
+}
+
+// AssetIDs returns the IDs of the assets this transaction depends on
+func (t *BaseTx) AssetIDs() ids.Set {
+	return t.ConsumedAssetIDs()
 }
 
 // NumCredentials returns the number of expected credentials

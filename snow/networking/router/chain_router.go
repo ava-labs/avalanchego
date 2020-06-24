@@ -320,7 +320,7 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.QueryFailed(validatorID, requestID)
 	} else {
-		sr.log.Error("QueryFailed(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Error("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 

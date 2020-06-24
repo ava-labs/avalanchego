@@ -17,6 +17,7 @@ type TestBlock struct {
 	height int
 	status choices.Status
 	bytes  []byte
+	err    error
 }
 
 func (b *TestBlock) Parent() Block          { return b.parent }
@@ -27,16 +28,16 @@ func (b *TestBlock) Accept() error {
 		return errors.New("Dis-agreement")
 	}
 	b.status = choices.Accepted
-	return nil
+	return b.err
 }
 func (b *TestBlock) Reject() error {
 	if b.status.Decided() && b.status != choices.Rejected {
 		return errors.New("Dis-agreement")
 	}
 	b.status = choices.Rejected
-	return nil
+	return b.err
 }
-func (b *TestBlock) Verify() error { return nil }
+func (b *TestBlock) Verify() error { return b.err }
 func (b *TestBlock) Bytes() []byte { return b.bytes }
 
 type sortBlocks []*TestBlock

@@ -137,7 +137,7 @@ func defaultVM() *VM {
 	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
-	db := memdb.New()
+	db := prefixdb.New([]byte{0}, memdb.New())
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
@@ -1189,7 +1189,7 @@ func TestAtomicImport(t *testing.T) {
 	key := keys[0]
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
 
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
@@ -1282,7 +1282,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	key := keys[0]
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
 
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
