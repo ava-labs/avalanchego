@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/snowman/poll"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -30,7 +31,7 @@ type Transitive struct {
 	bootstrapper
 
 	// track outstanding preference requests
-	polls polls
+	polls poll.Set
 
 	// blocks that have outstanding get requests
 	blkReqs common.Requests
@@ -64,10 +65,12 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.onFinished = t.finishBootstrapping
 
-	t.polls.log = config.Context.Log
-	t.polls.numPolls = t.numPolls
-	t.polls.alpha = t.Params.Alpha
-	t.polls.m = make(map[uint32]poll)
+	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	t.polls = poll.NewSet(factory,
+		config.Context.Log,
+		config.Params.Namespace,
+		config.Params.Metrics,
+	)
 
 	return t.bootstrapper.Initialize(config.BootstrapConfig)
 }
@@ -409,7 +412,7 @@ func (t *Transitive) repoll() {
 	// propagate the most likely branch as quickly as possible
 	prefID := t.Consensus.Preference()
 
-	for i := len(t.polls.m); i < t.Params.ConcurrentRepolls; i++ {
+	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
 		t.pullSample(prefID)
 	}
 }

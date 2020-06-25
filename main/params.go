@@ -30,22 +30,24 @@ import (
 )
 
 const (
-	dbVersion = "v0.6.0"
+	dbVersion = "v0.5.0"
 )
 
 // Results of parsing the CLI
 var (
-	Config                 = node.Config{}
-	Err                    error
-	defaultNetworkName     = genesis.TestnetName
-	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
-	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
-	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+	Config             = node.Config{}
+	Err                error
+	defaultNetworkName = genesis.TestnetName
 
-	defaultPluginDirs = []string{
-		"./build/plugins",
-		"./plugins",
-		os.ExpandEnv(filepath.Join("$HOME", ".gecko", "plugins")),
+	homeDir                = os.ExpandEnv("$HOME")
+	defaultDbDir           = filepath.Join(homeDir, ".gecko", "db")
+	defaultStakingKeyPath  = filepath.Join(homeDir, ".gecko", "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(homeDir, ".gecko", "staking", "staker.crt")
+	defaultPluginDirs      = []string{
+		filepath.Join(".", "build", "plugins"),
+		filepath.Join(".", "plugins"),
+		filepath.Join("/", "usr", "local", "lib", "gecko"),
+		filepath.Join(homeDir, ".gecko", "plugins"),
 	}
 )
 
@@ -190,7 +192,7 @@ func init() {
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 
 	// HTTP Server:
-	httpHost := fs.String("http-host", "", "Address of the HTTP server")
+	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
 	fs.BoolVar(&Config.EnableHTTPS, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
@@ -225,7 +227,7 @@ func init() {
 	fs.IntVar(&Config.ConsensusParams.ConcurrentRepolls, "snow-concurrent-repolls", 1, "Minimum number of concurrent polls for finalizing consensus")
 
 	// Enable/Disable APIs:
-	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", true, "If true, this node exposes the Admin API")
+	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", false, "If true, this node exposes the Admin API")
 	fs.BoolVar(&Config.InfoAPIEnabled, "api-info-enabled", true, "If true, this node exposes the Info API")
 	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
@@ -282,16 +284,16 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.NewRouter()
-
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		ip, err = Config.Nat.IP()
+		Config.Nat = nat.GetRouter()
+		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
 	} else {
+		Config.Nat = nat.NewNoRouter()
 		ip = net.ParseIP(*consensusIP)
 	}
 
@@ -304,6 +306,7 @@ func init() {
 		IP:   ip,
 		Port: uint16(*consensusPort),
 	}
+	Config.StakingLocalPort = uint16(*consensusPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := GetDefaultBootstraps(networkID, 5)
 

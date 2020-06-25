@@ -57,7 +57,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 6, 0)
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 7)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -93,6 +93,9 @@ type Node struct {
 	// Net runs the networking stack
 	Net network.Network
 
+	// this node's initial connections to the network
+	beacons validators.Set
+
 	// current validators of the network
 	vdrs validators.Manager
 
@@ -113,7 +116,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, n.Config.StakingIP.PortString())
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingLocalPort))
 	if err != nil {
 		return err
 	}
@@ -165,6 +168,7 @@ func (n *Node) initNetworking() error {
 		serverUpgrader,
 		clientUpgrader,
 		defaultSubnetValidators,
+		n.beacons,
 		n.Config.ConsensusRouter,
 	)
 
@@ -278,6 +282,14 @@ func (n *Node) initNodeID() error {
 	return nil
 }
 
+// Create the IDs of the peers this node should first connect to
+func (n *Node) initBeacons() {
+	n.beacons = validators.NewSet()
+	for _, peer := range n.Config.BootstrapPeers {
+		n.beacons.Add(validators.NewValidator(peer.ID, 1))
+	}
+}
+
 // Create the vmManager and register the following vms:
 // AVM, Simple Payments DAG, Simple Payments Chain
 // The Platform VM is registered in initStaking because
@@ -360,11 +372,6 @@ func (n *Node) initChains() error {
 		return err
 	}
 
-	beacons := validators.NewSet()
-	for _, peer := range n.Config.BootstrapPeers {
-		beacons.Add(validators.NewValidator(peer.ID, 1))
-	}
-
 	genesisBytes, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return err
@@ -376,7 +383,7 @@ func (n *Node) initChains() error {
 		SubnetID:      platformvm.DefaultSubnetID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMAlias:       platformvm.ID.String(),
-		CustomBeacons: beacons,
+		CustomBeacons: n.beacons,
 	})
 
 	return nil
@@ -462,7 +469,7 @@ func (n *Node) initMetricsAPI() {
 func (n *Node) initAdminAPI() {
 	if n.Config.AdminAPIEnabled {
 		n.Log.Info("initializing Admin API")
-		service := admin.NewService(n.Log, n.chainManager, n.Net, &n.APIServer)
+		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
 		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 	}
 }
@@ -550,6 +557,8 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err = n.initNodeID(); err != nil { // Derive this node's ID
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
+
+	n.initBeacons()
 
 	// Start HTTP APIs
 	n.initAPIServer()   // Start the API Server

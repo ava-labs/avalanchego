@@ -17,11 +17,14 @@ const (
 
 	// StatusUpdateFrequency ... bootstrapper logs "processed X blocks/vertices" every [statusUpdateFrequency] blocks/vertices
 	StatusUpdateFrequency = 2500
+
+	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not responsded to/failed
+	MaxOutstandingRequests = 8
 )
 
 var (
 	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching vertices during a call to GetAncestors
-	MaxTimeFetchingAncestors = 100 * time.Millisecond
+	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
 // Bootstrapper implements the Engine interface.

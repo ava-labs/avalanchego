@@ -10,6 +10,10 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
+const (
+	minMapSize = 16
+)
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
@@ -65,12 +69,12 @@ func (ta *Topological) Initialize(ctx *snow.Context, params Parameters, frontier
 		ta.ctx.Log.Error("%s", err)
 	}
 
-	ta.nodes = make(map[[32]byte]Vertex)
+	ta.nodes = make(map[[32]byte]Vertex, minMapSize)
 
 	ta.cg = &snowstorm.Directed{}
 	ta.cg.Initialize(ctx, params.Parameters)
 
-	ta.frontier = make(map[[32]byte]Vertex)
+	ta.frontier = make(map[[32]byte]Vertex, minMapSize)
 	for _, vtx := range frontier {
 		ta.frontier[vtx.ID().Key()] = vtx
 	}
@@ -141,7 +145,9 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	votes := ta.pushVotes(kahns, leaves)
 	// Update the conflict graph: O(|Transactions|)
 	ta.ctx.Log.Verbo("Updating consumer confidences based on:\n%s", &votes)
-	ta.cg.RecordPoll(votes)
+	if err := ta.cg.RecordPoll(votes); err != nil {
+		return err
+	}
 	// Update the dag: O(|Live Set|)
 	return ta.updateFrontiers()
 }
@@ -157,7 +163,7 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 // the non-transitively applied votes. Also returns the list of leaf nodes.
 func (ta *Topological) calculateInDegree(
 	responses ids.UniqueBag) (map[[32]byte]kahnNode, []ids.ID) {
-	kahns := make(map[[32]byte]kahnNode)
+	kahns := make(map[[32]byte]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
 	for _, vote := range responses.List() {
@@ -231,7 +237,7 @@ func (ta *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode,
 	leaves []ids.ID) ids.Bag {
 	votes := make(ids.UniqueBag)
-	txConflicts := make(map[[32]byte]ids.Set)
+	txConflicts := make(map[[32]byte]ids.Set, minMapSize)
 
 	for len(leaves) > 0 {
 		newLeavesSize := len(leaves) - 1
@@ -441,9 +447,9 @@ func (ta *Topological) updateFrontiers() error {
 	ta.preferred.Clear()
 	ta.virtuous.Clear()
 	ta.orphans.Clear()
-	ta.frontier = make(map[[32]byte]Vertex)
-	ta.preferenceCache = make(map[[32]byte]bool)
-	ta.virtuousCache = make(map[[32]byte]bool)
+	ta.frontier = make(map[[32]byte]Vertex, minMapSize)
+	ta.preferenceCache = make(map[[32]byte]bool, minMapSize)
+	ta.virtuousCache = make(map[[32]byte]bool, minMapSize)
 
 	ta.orphans.Union(ta.cg.Virtuous()) // Initially, nothing is preferred
 
