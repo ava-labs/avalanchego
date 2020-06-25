@@ -390,10 +390,12 @@ func (n *Node) initChains() error {
 }
 
 // initAPIServer initializes the server that handles HTTP calls
-func (n *Node) initAPIServer() {
+func (n *Node) initAPIServer() error {
 	n.Log.Info("Initializing API server")
 
-	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort, n.Config.HTTPRequireAuthToken, n.Config.HTTPAuthPassword)
+	if err := n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort, n.Config.HTTPRequireAuthToken, n.Config.HTTPAuthPassword); err != nil {
+		return err
+	}
 
 	go n.Log.RecoverAndPanic(func() {
 		if n.Config.EnableHTTPS {
@@ -408,6 +410,7 @@ func (n *Node) initAPIServer() {
 		n.Log.Fatal("API server initialization failed with %s", err)
 		n.Net.Close()
 	})
+	return nil
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
@@ -561,7 +564,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.initBeacons()
 
 	// Start HTTP APIs
-	n.initAPIServer()   // Start the API Server
+	if err := n.initAPIServer(); err != nil { // Start the API Server
+		return fmt.Errorf("couldn't initialize API server: %w", err)
+	}
 	n.initKeystoreAPI() // Start the Keystore API
 	n.initMetricsAPI()  // Start the Metrics API
 

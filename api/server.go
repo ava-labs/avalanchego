@@ -10,10 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"path"
 	"sync"
-
-	jwt "github.com/dgrijalva/jwt-go"
 
 	"github.com/gorilla/handlers"
 
@@ -26,8 +23,7 @@ import (
 )
 
 const (
-	baseURL      = "/ext"
-	authEndpoint = "auth"
+	baseURL = "/ext"
 )
 
 var (
@@ -36,58 +32,35 @@ var (
 
 // Server maintains the HTTP router
 type Server struct {
-	log              logging.Logger
-	factory          logging.Factory
-	router           *router
-	listenAddress    string
-	requireAuthToken bool
-	auth             *auth.Auth
-}
-
-// Wrap a handler. Before passing a request to the handler, check that
-func (s *Server) authMiddleware(h http.Handler) http.Handler {
-	if !s.requireAuthToken {
-		return h
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if path.Base(r.URL.Path) == authEndpoint { // Don't require auth token to hit auth endpoint
-			h.ServeHTTP(w, r)
-			return
-		}
-		tokenStr, err := auth.GetToken(r) // Get the token from the header
-		if err == auth.ErrNoToken {
-			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, err.Error())
-			return
-		} else if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "couldn't parse auth token. Header \"Authorization\" should be \"Bearer TOKEN.GOES.HERE\"")
-			return
-		}
-		token, err := jwt.Parse(tokenStr, func(*jwt.Token) (interface{}, error) {
-			return []byte(s.auth.Password), nil
-		})
-		if !token.Valid {
-			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "auth token is invalid")
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
+	// log this server writes to
+	log logging.Logger
+	// generates new logs for chains to write to
+	factory logging.Factory
+	// Maps endpoints to handlers
+	router *router
+	// Listens for HTTP traffic on this address
+	listenAddress string
+	// Handles authorization. Must be non-nil after initialization, even if token authorization is off.
+	// Assumes the auth service is the only endpoint whose path ends with /auth
+	auth *auth.Auth
 }
 
 // Initialize creates the API server at the provided host and port
-func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host string, port uint16, requireAuthToken bool, authPassword string) {
+func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host string, port uint16, authEnabled bool, authPassword string) error {
 	s.log = log
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
-	if requireAuthToken {
-		s.requireAuthToken = requireAuthToken
-		s.auth = &auth.Auth{Password: authPassword}
-		authService := auth.NewService(s.log, s.auth)
-		s.AddRoute(authService, &sync.RWMutex{}, authEndpoint, "", s.log) // TODO check error
+	s.auth = &auth.Auth{
+		Enabled:  authEnabled,
+		Password: authPassword,
 	}
+	if authEnabled { // only create auth service if token authorization is required
+		s.log.Info("API authorization is enabled. Auth token must be passed in header of API requests (except requests to auth service.)")
+		authService := auth.NewService(s.log, s.auth)
+		return s.AddRoute(authService, &sync.RWMutex{}, auth.Endpoint, "", s.log)
+	}
+	return nil
 }
 
 // Dispatch starts the API server
@@ -98,7 +71,7 @@ func (s *Server) Dispatch() error {
 	}
 	s.log.Info("HTTP API server listening on %q", s.listenAddress)
 	handler := cors.Default().Handler(s.router)
-	handler = s.authMiddleware(handler)
+	handler = s.auth.WrapHandler(handler)
 	return http.Serve(listener, handler)
 }
 
@@ -110,7 +83,7 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 	}
 	s.log.Info("HTTPS API server listening on %q", s.listenAddress)
 	handler := cors.Default().Handler(s.router)
-	handler = s.authMiddleware(handler)
+	handler = s.auth.WrapHandler(handler)
 	return http.ServeTLS(listener, handler, certFile, keyFile)
 }
 
