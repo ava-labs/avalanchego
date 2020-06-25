@@ -10,18 +10,25 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"sync"
+
+	jwt "github.com/dgrijalva/jwt-go"
 
 	"github.com/gorilla/handlers"
 
 	"github.com/rs/cors"
 
+	"github.com/ava-labs/gecko/api/auth"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-const baseURL = "/ext"
+const (
+	baseURL      = "/ext"
+	authEndpoint = "auth"
+)
 
 var (
 	errUnknownLockOption = errors.New("invalid lock options")
@@ -29,39 +36,81 @@ var (
 
 // Server maintains the HTTP router
 type Server struct {
-	log           logging.Logger
-	factory       logging.Factory
-	router        *router
-	listenAddress string
+	log              logging.Logger
+	factory          logging.Factory
+	router           *router
+	listenAddress    string
+	requireAuthToken bool
+	auth             *auth.Auth
+}
+
+// Wrap a handler. Before passing a request to the handler, check that
+func (s *Server) authMiddleware(h http.Handler) http.Handler {
+	if !s.requireAuthToken {
+		return h
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if path.Base(r.URL.Path) == authEndpoint { // Don't require auth token to hit auth endpoint
+			h.ServeHTTP(w, r)
+			return
+		}
+		tokenStr, err := auth.GetToken(r) // Get the token from the header
+		if err == auth.ErrNoToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			io.WriteString(w, err.Error())
+			return
+		} else if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			io.WriteString(w, "couldn't parse auth token. Header \"Authorization\" should be \"Bearer TOKEN.GOES.HERE\"")
+			return
+		}
+		token, err := jwt.Parse(tokenStr, func(*jwt.Token) (interface{}, error) {
+			return []byte(s.auth.Password), nil
+		})
+		if !token.Valid {
+			w.WriteHeader(http.StatusUnauthorized)
+			io.WriteString(w, "auth token is invalid")
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 // Initialize creates the API server at the provided host and port
-func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host string, port uint16) {
+func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host string, port uint16, requireAuthToken bool, authPassword string) {
 	s.log = log
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
+	if requireAuthToken {
+		s.requireAuthToken = requireAuthToken
+		s.auth = &auth.Auth{Password: authPassword}
+		authService := auth.NewService(s.log, s.auth)
+		s.AddRoute(authService, &sync.RWMutex{}, authEndpoint, "", s.log) // TODO check error
+	}
 }
 
 // Dispatch starts the API server
 func (s *Server) Dispatch() error {
-	handler := cors.Default().Handler(s.router)
 	listener, err := net.Listen("tcp", s.listenAddress)
 	if err != nil {
 		return err
 	}
-	s.log.Info("API server listening on %q", s.listenAddress)
+	s.log.Info("HTTP API server listening on %q", s.listenAddress)
+	handler := cors.Default().Handler(s.router)
+	handler = s.authMiddleware(handler)
 	return http.Serve(listener, handler)
 }
 
 // DispatchTLS starts the API server with the provided TLS certificate
 func (s *Server) DispatchTLS(certFile, keyFile string) error {
-	handler := cors.Default().Handler(s.router)
 	listener, err := net.Listen("tcp", s.listenAddress)
 	if err != nil {
 		return err
 	}
-	s.log.Info("API server listening on %q", s.listenAddress)
+	s.log.Info("HTTPS API server listening on %q", s.listenAddress)
+	handler := cors.Default().Handler(s.router)
+	handler = s.authMiddleware(handler)
 	return http.ServeTLS(listener, handler, certFile, keyFile)
 }
 

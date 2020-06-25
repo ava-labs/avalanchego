@@ -197,6 +197,8 @@ func init() {
 	fs.BoolVar(&Config.EnableHTTPS, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
+	fs.BoolVar(&Config.HTTPRequireAuthToken, "http-require-auth-token", false, "Require auth token to call HTTP APIs")
+	fs.StringVar(&Config.HTTPAuthPassword, "http-auth-password", "", "Password used to verify auth tokens. Can be changed via API call.")
 
 	// Bootstrapping:
 	bootstrapIPs := fs.String("bootstrap-ips", "default", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
@@ -407,6 +409,10 @@ func init() {
 	// HTTP:
 	Config.HTTPHost = *httpHost
 	Config.HTTPPort = uint16(*httpPort)
+	if Config.HTTPRequireAuthToken && Config.HTTPAuthPassword == "" {
+		errs.Add(errors.New("http-auth-password must be provided if http-require-auth-token is true"))
+		return
+	}
 
 	// Logging:
 	if *logsDir != "" {

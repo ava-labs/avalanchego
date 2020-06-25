@@ -44,11 +44,13 @@ type Config struct {
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
-	HTTPHost      string
-	HTTPPort      uint16
-	EnableHTTPS   bool
-	HTTPSKeyFile  string
-	HTTPSCertFile string
+	HTTPHost             string
+	HTTPPort             uint16
+	EnableHTTPS          bool
+	HTTPSKeyFile         string
+	HTTPSCertFile        string
+	HTTPRequireAuthToken bool
+	HTTPAuthPassword     string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
