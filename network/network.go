@@ -105,6 +105,7 @@ type network struct {
 	serverUpgrader Upgrader
 	clientUpgrader Upgrader
 	vdrs           validators.Set // set of current validators in the AVAnet
+	beacons        validators.Set // set of beacons in the AVAnet
 	router         router.Router  // router must be thread safe
 
 	nodeID uint32
@@ -159,6 +160,7 @@ func NewDefaultNetwork(
 	serverUpgrader,
 	clientUpgrader Upgrader,
 	vdrs validators.Set,
+	beacons validators.Set,
 	router router.Router,
 ) Network {
 	return NewNetwork(
@@ -174,6 +176,7 @@ func NewDefaultNetwork(
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		beacons,
 		router,
 		defaultInitialReconnectDelay,
 		defaultMaxReconnectDelay,
@@ -207,6 +210,7 @@ func NewNetwork(
 	serverUpgrader,
 	clientUpgrader Upgrader,
 	vdrs validators.Set,
+	beacons validators.Set,
 	router router.Router,
 	initialReconnectDelay,
 	maxReconnectDelay time.Duration,
@@ -236,6 +240,7 @@ func NewNetwork(
 		serverUpgrader:                     serverUpgrader,
 		clientUpgrader:                     clientUpgrader,
 		vdrs:                               vdrs,
+		beacons:                            beacons,
 		router:                             router,
 		nodeID:                             rand.Uint32(),
 		initialReconnectDelay:              initialReconnectDelay,

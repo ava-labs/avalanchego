@@ -34,7 +34,7 @@ func (f *Flat) Parameters() Parameters { return f.params }
 // RecordPoll implements the Consensus interface
 func (f *Flat) RecordPoll(votes ids.Bag) {
 	if pollMode, numVotes := votes.Mode(); numVotes >= f.params.Alpha {
-		f.nnarySnowball.RecordSuccessfulPoll(pollMode)
+		f.RecordSuccessfulPoll(pollMode)
 	} else {
 		f.RecordUnsuccessfulPoll()
 	}

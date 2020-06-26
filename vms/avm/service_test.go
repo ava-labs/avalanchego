@@ -382,7 +382,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		Name:         "test asset",
 		Symbol:       "test",
 		Denomination: 1,
-		InitialHolders: []*Holder{&Holder{
+		InitialHolders: []*Holder{{
 			Amount:  123456789,
 			Address: vm.Format(keys[0].PublicKey().Address().Bytes()),
 		}},
@@ -408,7 +408,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		Name:   "test asset",
 		Symbol: "test",
 		MinterSets: []Owners{
-			Owners{
+			{
 				Threshold: 1,
 				Minters: []string{
 					vm.Format(keys[0].PublicKey().Address().Bytes()),
@@ -420,8 +420,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "SscTvpQFCZPNiRXyueDc7LdHT9EstHiva3AK6kuTgHTMd7DsU" {
-		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
+	if reply.AssetID.String() != "2jpMDuqSgSo73JzAmVcnoJiP4G5TBQPPvFcCtbjKN8b5eH9RKH" {
+		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 }
 
@@ -449,7 +449,7 @@ func TestImportAvmKey(t *testing.T) {
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.NewPrivateKey()
 	if err != nil {
-		t.Fatalf("problem generating private key: %w", err)
+		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
@@ -488,7 +488,7 @@ func TestImportAvmKeyNoDuplicates(t *testing.T) {
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.NewPrivateKey()
 	if err != nil {
-		t.Fatalf("problem generating private key: %w", err)
+		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 

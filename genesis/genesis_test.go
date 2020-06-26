@@ -145,14 +145,34 @@ func TestVMGenesis(t *testing.T) {
 		expectedID string
 	}{
 		{
+			networkID:  EverestID,
+			vmID:       avm.ID,
+			expectedID: "2SffEuAxZzKFhXV1izZvXLPzo2vyP8qvFLcb6Ay9GRXZ3K8u6n",
+		},
+		{
+			networkID:  DenaliID,
+			vmID:       avm.ID,
+			expectedID: "8dBgYLckoe6M6JLW9VpYSB1tQzVWBsanPTJv16UjY2soLgoLW",
+		},
+		{
 			networkID:  CascadeID,
 			vmID:       avm.ID,
-			expectedID: "4ktRjsAKxgMr2aEzv9SWmrU7Xk5FniHUrVCX4P1TZSfTLZWFM",
+			expectedID: "2NyJW9NB9eJ2prZEPR96E77fb9HRg1fJjnqfMmZwuM36Hy89K3",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       avm.ID,
 			expectedID: "4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH",
+		},
+		{
+			networkID:  EverestID,
+			vmID:       EVMID,
+			expectedID: "E4vHfCD9XheaJAgUvszjjdZwq2GWhghssUFZsqYZFubSfrWWE",
+		},
+		{
+			networkID:  DenaliID,
+			vmID:       EVMID,
+			expectedID: "zJytnh96Pc8rM337bBrtMvJDbEdDNjcXG3WkTNCiLp18ergm9",
 		},
 		{
 			networkID:  CascadeID,
@@ -187,8 +207,16 @@ func TestAVAAssetID(t *testing.T) {
 		expectedID string
 	}{
 		{
+			networkID:  EverestID,
+			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
+		},
+		{
+			networkID:  DenaliID,
+			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
+		},
+		{
 			networkID:  CascadeID,
-			expectedID: "21d7KVtPrubc5fHr6CGNcgbUb4seUjmZKr35ZX7BZb5iP8pXWA",
+			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
 		},
 		{
 			networkID:  LocalID,

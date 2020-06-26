@@ -84,11 +84,11 @@ func BuildGenesisTest(t *testing.T) []byte {
 	addr2 := keys[2].PublicKey().Address()
 
 	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": AssetDefinition{
+		"asset1": {
 			Name:   "myFixedCapAsset",
 			Symbol: "MFCA",
 			InitialState: map[string][]interface{}{
-				"fixedCap": []interface{}{
+				"fixedCap": {
 					Holder{
 						Amount:  100000,
 						Address: addr0.String(),
@@ -108,11 +108,11 @@ func BuildGenesisTest(t *testing.T) []byte {
 				},
 			},
 		},
-		"asset2": AssetDefinition{
+		"asset2": {
 			Name:   "myVarCapAsset",
 			Symbol: "MVCA",
 			InitialState: map[string][]interface{}{
-				"variableCap": []interface{}{
+				"variableCap": {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
@@ -131,10 +131,10 @@ func BuildGenesisTest(t *testing.T) []byte {
 				},
 			},
 		},
-		"asset3": AssetDefinition{
+		"asset3": {
 			Name: "myOtherVarCapAsset",
 			InitialState: map[string][]interface{}{
-				"variableCap": []interface{}{
+				"variableCap": {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
@@ -168,7 +168,7 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 		memdb.New(),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{&common.Fx{
+		[]*common.Fx{{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
@@ -195,7 +195,7 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	newTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: ava.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
@@ -336,6 +336,8 @@ func TestTxSerialization(t *testing.T) {
 		// fxID:
 		0x00, 0x00, 0x00, 0x06,
 		// secp256k1 Mint Output:
+		// locktime:
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		// threshold:
 		0x00, 0x00, 0x00, 0x01,
 		// number of addresses:
@@ -357,7 +359,7 @@ func TestTxSerialization(t *testing.T) {
 		Symbol:       "symb",
 		Denomination: 0,
 		States: []*InitialState{
-			&InitialState{
+			{
 				FxID: 0,
 				Outs: []verify.Verifiable{
 					&secp256k1fx.MintOutput{
@@ -456,7 +458,7 @@ func TestFxInitializationFailure(t *testing.T) {
 		/*db=*/ memdb.New(),
 		/*genesisState=*/ genesisBytes,
 		/*engineMessenger=*/ make(chan common.Message, 1),
-		/*fxs=*/ []*common.Fx{&common.Fx{
+		/*fxs=*/ []*common.Fx{{
 			ID: ids.Empty,
 			Fx: &testFx{initialize: errUnknownFx},
 		}},
@@ -537,7 +539,7 @@ func TestIssueDependentTx(t *testing.T) {
 	firstTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: ava.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
@@ -552,7 +554,7 @@ func TestIssueDependentTx(t *testing.T) {
 				},
 			},
 		}},
-		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
+		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
@@ -596,7 +598,7 @@ func TestIssueDependentTx(t *testing.T) {
 	secondTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: ava.UTXOID{
 				TxID:        firstTx.ID(),
 				OutputIndex: 0,
@@ -671,11 +673,11 @@ func TestIssueNFT(t *testing.T) {
 		genesisBytes,
 		issuer,
 		[]*common.Fx{
-			&common.Fx{
+			{
 				ID: ids.Empty.Prefix(0),
 				Fx: &secp256k1fx.Fx{},
 			},
-			&common.Fx{
+			{
 				ID: ids.Empty.Prefix(1),
 				Fx: &nftfx.Fx{},
 			},
@@ -704,7 +706,7 @@ func TestIssueNFT(t *testing.T) {
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
-		States: []*InitialState{&InitialState{
+		States: []*InitialState{{
 			FxID: 1,
 			Outs: []verify.Verifiable{
 				&nftfx.MintOutput{
@@ -740,9 +742,9 @@ func TestIssueNFT(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ops: []*Operation{&Operation{
+		Ops: []*Operation{{
 			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{&ava.UTXOID{
+			UTXOIDs: []*ava.UTXOID{{
 				TxID:        createAssetTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -752,9 +754,7 @@ func TestIssueNFT(t *testing.T) {
 				},
 				GroupID: 1,
 				Payload: []byte{'h', 'e', 'l', 'l', 'o'},
-				Outputs: []*secp256k1fx.OutputOwners{
-					&secp256k1fx.OutputOwners{},
-				},
+				Outputs: []*secp256k1fx.OutputOwners{{}},
 			},
 		}},
 	}}
@@ -793,9 +793,9 @@ func TestIssueNFT(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ops: []*Operation{&Operation{
+		Ops: []*Operation{{
 			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{&ava.UTXOID{
+			UTXOIDs: []*ava.UTXOID{{
 				TxID:        mintNFTTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -840,15 +840,15 @@ func TestIssueProperty(t *testing.T) {
 		genesisBytes,
 		issuer,
 		[]*common.Fx{
-			&common.Fx{
+			{
 				ID: ids.Empty.Prefix(0),
 				Fx: &secp256k1fx.Fx{},
 			},
-			&common.Fx{
+			{
 				ID: ids.Empty.Prefix(1),
 				Fx: &nftfx.Fx{},
 			},
-			&common.Fx{
+			{
 				ID: ids.Empty.Prefix(2),
 				Fx: &propertyfx.Fx{},
 			},
@@ -877,7 +877,7 @@ func TestIssueProperty(t *testing.T) {
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
-		States: []*InitialState{&InitialState{
+		States: []*InitialState{{
 			FxID: 2,
 			Outs: []verify.Verifiable{
 				&propertyfx.MintOutput{
@@ -905,9 +905,9 @@ func TestIssueProperty(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ops: []*Operation{&Operation{
+		Ops: []*Operation{{
 			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{&ava.UTXOID{
+			UTXOIDs: []*ava.UTXOID{{
 				TxID:        createAssetTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -960,9 +960,9 @@ func TestIssueProperty(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ops: []*Operation{&Operation{
+		Ops: []*Operation{{
 			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{&ava.UTXOID{
+			UTXOIDs: []*ava.UTXOID{{
 				TxID:        mintPropertyTx.ID(),
 				OutputIndex: 1,
 			}},

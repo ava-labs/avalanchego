@@ -470,8 +470,13 @@ func (p *peer) version(msg Msg) {
 	}
 
 	if p.net.version.Before(peerVersion) {
-		p.net.log.Info("peer attempting to connect with newer version %s. You may want to update your client",
-			peerVersion)
+		if p.net.beacons.Contains(p.id) {
+			p.net.log.Info("beacon attempting to connect with newer version %s. You may want to update your client",
+				peerVersion)
+		} else {
+			p.net.log.Debug("peer attempting to connect with newer version %s. You may want to update your client",
+				peerVersion)
+		}
 	}
 
 	if err := p.net.version.Compatible(peerVersion); err != nil {

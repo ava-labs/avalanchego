@@ -78,9 +78,30 @@ func (ids *Set) Clear() { *ids = nil }
 
 // List converts this set into a list
 func (ids Set) List() []ID {
-	idList := make([]ID, ids.Len(), ids.Len())
+	idList := make([]ID, ids.Len())
 	i := 0
 	for id := range ids {
+		idList[i] = NewID(id)
+		i++
+	}
+	return idList
+}
+
+// CappedList returns a list of length at most [size].
+// Size should be >= 0. If size < 0, returns nil.
+func (ids Set) CappedList(size int) []ID {
+	if size < 0 {
+		return nil
+	}
+	if l := ids.Len(); l < size {
+		size = l
+	}
+	i := 0
+	idList := make([]ID, size)
+	for id := range ids {
+		if i >= size {
+			break
+		}
 		idList[i] = NewID(id)
 		i++
 	}
