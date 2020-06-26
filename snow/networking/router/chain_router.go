@@ -15,17 +15,22 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
+const (
+	DefaultCPUInterval = 5 * time.Second
+)
+
 // ChainRouter routes incoming messages from the validator network
 // to the consensus engines that the messages are intended for.
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	log          logging.Logger
-	lock         sync.RWMutex
-	chains       map[[32]byte]*Handler
-	timeouts     *timeout.Manager
-	gossiper     *timer.Repeater
-	closeTimeout time.Duration
+	log              logging.Logger
+	lock             sync.RWMutex
+	chains           map[[32]byte]*Handler
+	timeouts         *timeout.Manager
+	gossiper         *timer.Repeater
+	intervalNotifier *timer.Repeater
+	closeTimeout     time.Duration
 }
 
 // Initialize the router.
@@ -46,9 +51,11 @@ func (sr *ChainRouter) Initialize(
 	sr.chains = make(map[[32]byte]*Handler)
 	sr.timeouts = timeouts
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
+	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, DefaultCPUInterval)
 	sr.closeTimeout = closeTimeout
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
+	go log.RecoverAndPanic(sr.intervalNotifier.Dispatch)
 }
 
 // AddChain registers the specified chain so that incoming
@@ -331,6 +338,9 @@ func (sr *ChainRouter) Shutdown() {
 	sr.chains = map[[32]byte]*Handler{}
 	sr.lock.Unlock()
 
+	sr.gossiper.Stop()
+	sr.intervalNotifier.Stop()
+
 	for _, chain := range prevChains {
 		chain.Shutdown()
 	}
@@ -348,7 +358,6 @@ func (sr *ChainRouter) Shutdown() {
 		sr.log.Warn("timed out while shutting down the chains")
 	}
 	ticker.Stop()
-	sr.gossiper.Stop()
 }
 
 // Gossip accepted containers
@@ -358,5 +367,15 @@ func (sr *ChainRouter) Gossip() {
 
 	for _, chain := range sr.chains {
 		chain.Gossip()
+	}
+}
+
+// EndInterval notifies the chains that the current CPU interval has ended
+func (sr *ChainRouter) EndInterval() {
+	sr.lock.Lock()
+	defer sr.lock.Unlock()
+
+	for _, chain := range sr.chains {
+		chain.EndInterval()
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -21,8 +20,6 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 )
 
@@ -39,10 +36,6 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	sender := &common.SenderTest{}
 	state := &stateTest{}
 	vm := &VMTest{}
-	engine := &Transitive{}
-	handler := &router.Handler{}
-	router := &router.ChainRouter{}
-	timeouts := &timeout.Manager{}
 
 	sender.T = t
 	state.t = t
@@ -57,16 +50,6 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	peer := validators.GenerateRandomValidator(1)
 	peerID := peer.ID()
 	peers.Add(peer)
-
-	handler.Initialize(
-		engine,
-		make(chan common.Message),
-		1,
-		"",
-		prometheus.NewRegistry(),
-	)
-	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
 	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
 	txBlocker, _ := queue.New(prefixdb.New([]byte("tx"), db))
