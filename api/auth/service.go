@@ -1,11 +1,9 @@
 package auth
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
-	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -34,30 +32,43 @@ type Success struct {
 	Success bool `json:"success"`
 }
 
-// NewTokenArgs ...
-type NewTokenArgs struct {
+// Password ...
+type Password struct {
 	Password string `json:"password"` // The authotization password
 }
 
-// NewTokenResponse ...
-type NewTokenResponse struct {
+// Token ...
+type Token struct {
 	Token string `json:"token"` // The new token. Expires in [TokenLifespan].
 }
 
 // NewToken returns a new token
-func (s *Service) NewToken(_ *http.Request, args *NewTokenArgs, reply *NewTokenResponse) error {
+func (s *Service) NewToken(_ *http.Request, args *Password, reply *Token) error {
 	s.log.Info("Auth: NewToken called")
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	if args.Password != s.Password {
-		return errors.New("incorrect password")
+	if args.Password == "" {
+		return fmt.Errorf("password not given")
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{ // Make a new token
-		ExpiresAt: time.Now().Add(TokenLifespan).Unix(),
-	})
-	var err error
-	reply.Token, err = token.SignedString([]byte(s.Password))
+	token, err := s.newToken(args.Password)
+	reply.Token = token
 	return err
+}
+
+// RevokeTokenArgs ...
+type RevokeTokenArgs struct {
+	Password
+	Token
+}
+
+// RevokeToken revokes a token
+func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, reply *Success) error {
+	s.log.Info("Auth: RevokeToken called")
+	if args.Password.Password == "" {
+		return fmt.Errorf("password not given")
+	} else if args.Token.Token == "" {
+		return fmt.Errorf("token not given")
+	}
+	reply.Success = true
+	return s.revokeToken(args.Token.Token, args.Password.Password)
 }
 
 // ChangePasswordArgs ...
@@ -66,17 +77,13 @@ type ChangePasswordArgs struct {
 	NewPassword string `json:"newPassword"` // New authorization password
 }
 
-// ChangePassword ...
+// ChangePassword changes the password required to create and revoke tokens
+// Changing the password makes tokens issued under a previous password invalid
 func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, reply *Success) error {
 	s.log.Info("Auth: ChangePassword called")
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	if args.OldPassword != s.Password {
-		return errors.New("incorrect password")
-	} else if len(args.NewPassword) == 0 {
-		return errors.New("new password can't be empty")
+	if err := s.changePassword(args.OldPassword, args.NewPassword); err != nil {
+		return err
 	}
-	s.Password = args.NewPassword
 	reply.Success = true
 	return nil
 }
