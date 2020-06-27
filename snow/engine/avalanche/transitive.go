@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/poll"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -343,7 +344,7 @@ func (t *Transitive) reinsertFrom(vdr ids.ShortID, vtxID ids.ID) (bool, error) {
 
 func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, error) {
 	issued := true
-	vertexHeap := newMaxVertexHeap()
+	vertexHeap := vertex.NewHeap()
 	vertexHeap.Push(vtx)
 	for vertexHeap.Len() > 0 {
 		vtx := vertexHeap.Pop()

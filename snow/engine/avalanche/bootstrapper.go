@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -142,7 +143,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	// Vertices that we need to process. Store them in a heap for de-deduplication
 	// and so we always process vertices further down in the DAG first. This helps
 	// to reduce the number of repeated DAG traversals.
-	toProcess := newMaxVertexHeap()
+	toProcess := vertex.NewHeap()
 	for _, vtx := range vtxs {
 		if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process a vertex if we haven't already
 			toProcess.Push(vtx)

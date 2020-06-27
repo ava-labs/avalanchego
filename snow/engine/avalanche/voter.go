@@ -6,6 +6,7 @@ package avalanche
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 )
 
 type voter struct {
@@ -69,7 +70,7 @@ func (v *voter) Update() {
 
 func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 	bubbledVotes := ids.UniqueBag{}
-	vertexHeap := newMaxVertexHeap()
+	vertexHeap := vertex.NewHeap()
 	for _, vote := range votes.List() {
 		vtx, err := v.t.Config.State.GetVertex(vote)
 		if err != nil {
