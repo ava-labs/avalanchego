@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -22,10 +21,6 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
-)
-
-var (
-	errUnknownBlock = errors.New("unknown block")
 )
 
 func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, *VMTest) {
@@ -88,18 +83,22 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	blkBytes0 := []byte{0}
 	blkBytes1 := []byte{1}
 
-	blk0 := &Blk{
-		id:     blkID0,
-		height: 0,
-		status: choices.Accepted,
-		bytes:  blkBytes0,
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID0,
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  blkBytes0,
 	}
-	blk1 := &Blk{
-		parent: blk0,
-		id:     blkID1,
-		height: 1,
-		status: choices.Processing,
-		bytes:  blkBytes1,
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID1,
+			StatusV: choices.Processing,
+		},
+		ParentV: blk0,
+		HeightV: 1,
+		BytesV:  blkBytes1,
 	}
 
 	bs := bootstrapper{}
@@ -160,25 +159,31 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	blkBytes1 := []byte{1}
 	blkBytes2 := []byte{2}
 
-	blk0 := &Blk{
-		id:     blkID0,
-		height: 0,
-		status: choices.Accepted,
-		bytes:  blkBytes0,
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID0,
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  blkBytes0,
 	}
-	blk1 := &Blk{
-		parent: blk0,
-		id:     blkID1,
-		height: 1,
-		status: choices.Unknown,
-		bytes:  blkBytes1,
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID1,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk0,
+		HeightV: 1,
+		BytesV:  blkBytes1,
 	}
-	blk2 := &Blk{
-		parent: blk1,
-		id:     blkID2,
-		height: 2,
-		status: choices.Processing,
-		bytes:  blkBytes2,
+	blk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID2,
+			StatusV: choices.Processing,
+		},
+		ParentV: blk1,
+		HeightV: 2,
+		BytesV:  blkBytes2,
 	}
 
 	bs := bootstrapper{}
@@ -212,7 +217,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.status = choices.Processing
+			blk1.StatusV = choices.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
@@ -288,32 +293,40 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	blkBytes2 := []byte{2}
 	blkBytes3 := []byte{3}
 
-	blk0 := &Blk{
-		id:     blkID0,
-		height: 0,
-		status: choices.Accepted,
-		bytes:  blkBytes0,
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID0,
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  blkBytes0,
 	}
-	blk1 := &Blk{
-		parent: blk0,
-		id:     blkID1,
-		height: 1,
-		status: choices.Unknown,
-		bytes:  blkBytes1,
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID1,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk0,
+		HeightV: 1,
+		BytesV:  blkBytes1,
 	}
-	blk2 := &Blk{
-		parent: blk1,
-		id:     blkID2,
-		height: 2,
-		status: choices.Unknown,
-		bytes:  blkBytes2,
+	blk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID2,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk1,
+		HeightV: 2,
+		BytesV:  blkBytes2,
 	}
-	blk3 := &Blk{
-		parent: blk2,
-		id:     blkID3,
-		height: 3,
-		status: choices.Processing,
-		bytes:  blkBytes3,
+	blk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID3,
+			StatusV: choices.Processing,
+		},
+		ParentV: blk2,
+		HeightV: 3,
+		BytesV:  blkBytes3,
 	}
 
 	bs := bootstrapper{}
@@ -353,11 +366,11 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.status = choices.Processing
+			blk1.StatusV = choices.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.status = choices.Processing
+			blk2.StatusV = choices.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		case bytes.Equal(blkBytes, blkBytes3):
@@ -427,33 +440,42 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	blkBytes2 := []byte{2}
 	blkBytes3 := []byte{3}
 
-	blk0 := &Blk{
-		id:     blkID0,
-		height: 0,
-		status: choices.Accepted,
-		bytes:  blkBytes0,
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID0,
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  blkBytes0,
 	}
-	blk1 := &Blk{
-		parent: blk0,
-		id:     blkID1,
-		height: 1,
-		status: choices.Unknown,
-		bytes:  blkBytes1,
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID1,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk0,
+		HeightV: 1,
+		BytesV:  blkBytes1,
 	}
-	blk2 := &Blk{
-		parent: blk1,
-		id:     blkID2,
-		height: 2,
-		status: choices.Unknown,
-		bytes:  blkBytes2,
+	blk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID2,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk1,
+		HeightV: 2,
+		BytesV:  blkBytes2,
 	}
-	blk3 := &Blk{
-		parent: blk2,
-		id:     blkID3,
-		height: 3,
-		status: choices.Processing,
-		bytes:  blkBytes3,
+	blk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID3,
+			StatusV: choices.Processing,
+		},
+		ParentV: blk2,
+		HeightV: 3,
+		BytesV:  blkBytes3,
 	}
+
 	vm.CantBootstrapping = false
 
 	bs := bootstrapper{}
@@ -493,11 +515,11 @@ func TestBootstrapperMultiPut(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.status = choices.Processing
+			blk1.StatusV = choices.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.status = choices.Processing
+			blk2.StatusV = choices.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		case bytes.Equal(blkBytes, blkBytes3):
@@ -548,7 +570,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	config, _, _, vm := newConfig(t)
 
-	blkID := GenerateID()
+	blkID := ids.GenerateTestID()
 
 	bs := bootstrapper{}
 	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
@@ -569,18 +591,18 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 func TestBootstrapperFilterAccepted(t *testing.T) {
 	config, _, _, vm := newConfig(t)
 
-	blkID0 := GenerateID()
-	blkID1 := GenerateID()
-	blkID2 := GenerateID()
+	blkID0 := ids.GenerateTestID()
+	blkID1 := ids.GenerateTestID()
+	blkID2 := ids.GenerateTestID()
 
-	blk0 := &Blk{
-		id:     blkID0,
-		status: choices.Accepted,
-	}
-	blk1 := &Blk{
-		id:     blkID1,
-		status: choices.Accepted,
-	}
+	blk0 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     blkID0,
+		StatusV: choices.Accepted,
+	}}
+	blk1 := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     blkID1,
+		StatusV: choices.Accepted,
+	}}
 
 	bs := bootstrapper{}
 	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
@@ -634,25 +656,31 @@ func TestBootstrapperFinalized(t *testing.T) {
 	blkBytes1 := []byte{1}
 	blkBytes2 := []byte{2}
 
-	blk0 := &Blk{
-		id:     blkID0,
-		height: 0,
-		status: choices.Accepted,
-		bytes:  blkBytes0,
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID0,
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  blkBytes0,
 	}
-	blk1 := &Blk{
-		parent: blk0,
-		id:     blkID1,
-		height: 1,
-		status: choices.Unknown,
-		bytes:  blkBytes1,
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID1,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk0,
+		HeightV: 1,
+		BytesV:  blkBytes1,
 	}
-	blk2 := &Blk{
-		parent: blk1,
-		id:     blkID2,
-		height: 2,
-		status: choices.Unknown,
-		bytes:  blkBytes2,
+	blk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     blkID2,
+			StatusV: choices.Unknown,
+		},
+		ParentV: blk1,
+		HeightV: 2,
+		BytesV:  blkBytes2,
 	}
 
 	bs := bootstrapper{}
@@ -691,11 +719,11 @@ func TestBootstrapperFinalized(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes0):
 			return blk0, nil
 		case bytes.Equal(blkBytes, blkBytes1):
-			blk1.status = choices.Processing
+			blk1.StatusV = choices.Processing
 			parsedBlk1 = true
 			return blk1, nil
 		case bytes.Equal(blkBytes, blkBytes2):
-			blk2.status = choices.Processing
+			blk2.StatusV = choices.Processing
 			parsedBlk2 = true
 			return blk2, nil
 		}

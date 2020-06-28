@@ -22,6 +22,8 @@ import (
 var (
 	errFailedParsing = errors.New("failed parsing")
 	errMissing       = errors.New("missing")
+
+	Genesis = ids.GenerateTestID()
 )
 
 func TestEngineShutdown(t *testing.T) {
@@ -259,7 +261,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Sent multiple chits")
 		}
 		*chitted = true
-		if !Matches(prefs.List(), []ids.ID{vtx0.ID()}) {
+		if prefs.Len() != 1 || !prefs.Contains(vtx0.ID()) {
 			t.Fatalf("Wrong chits preferences")
 		}
 	}
@@ -612,7 +614,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 	vtx1.ParentsV[0] = vtx0
 	te.insert(vtx0)
 
-	if !Matches(te.Consensus.Preferences().List(), []ids.ID{vtx1.ID()}) {
+	if prefs := te.Consensus.Preferences(); prefs.Len() != 1 || !prefs.Contains(vtx1.ID()) {
 		t.Fatalf("Should have issued vtx1")
 	}
 }
