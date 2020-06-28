@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	ZeroAddr = common.Address{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	BlackholeAddr = common.Address{
+		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
 )
@@ -66,7 +66,7 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	backend, _ := eth.New(&ctx, config, cb, mcb, bcb, chainDB)
 	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
 	if etherBase == nil {
-		etherBase = &ZeroAddr
+		etherBase = &BlackholeAddr
 	}
 	backend.SetEtherbase(*etherBase)
 	return chain

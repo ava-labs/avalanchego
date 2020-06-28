@@ -39,11 +39,10 @@ import (
 )
 
 var (
-	oldZeroAddr = common.Address{
-		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	zeroAddr = common.Address{
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
-	zeroAddr = coreth.ZeroAddr
 )
 
 const (
@@ -84,6 +83,7 @@ type VM struct {
 
 	chainID           *big.Int
 	networkID         uint64
+	genesisHash       common.Hash
 	chain             *coreth.ETHChain
 	chaindb           Database
 	newBlockChan      chan *Block
@@ -146,7 +146,7 @@ func (vm *VM) Initialize(
 		panic(err)
 	}
 	nodecfg := node.Config{NoUSB: true}
-	chain := coreth.NewETHChain(&config, &nodecfg, &zeroAddr, vm.chaindb)
+	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb)
 	vm.chain = chain
 	vm.networkID = config.NetworkId
 	chain.SetOnHeaderNew(func(header *types.Header) {
@@ -245,6 +245,7 @@ func (vm *VM) Initialize(
 		ethBlock: lastAccepted,
 		vm:       vm,
 	}
+	vm.genesisHash = chain.GetGenesisBlock().Hash()
 	vm.ctx.Log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
 	// TODO: shutdown this go routine
@@ -313,14 +314,14 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
 	}
+	blockHash := ethBlock.Hash()
 	// Coinbase must be zero on C-Chain
-	coinbase := ethBlock.Coinbase()
-	if bytes.Compare(coinbase.Bytes(), oldZeroAddr.Bytes()) != 0 &&
-		bytes.Compare(coinbase.Bytes(), zeroAddr.Bytes()) != 0 {
+	if bytes.Compare(blockHash.Bytes(), vm.genesisHash.Bytes()) != 0 &&
+		bytes.Compare(ethBlock.Coinbase().Bytes(), coreth.BlackholeAddr.Bytes()) != 0 {
 		return nil, errInvalidBlock
 	}
 	block := &Block{
-		id:       ids.NewID(ethBlock.Hash()),
+		id:       ids.NewID(blockHash),
 		ethBlock: ethBlock,
 		vm:       vm,
 	}
