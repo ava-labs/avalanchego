@@ -23,13 +23,13 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 )
 
-func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, *VMTest) {
+func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, *TestVM) {
 	ctx := snow.DefaultContextTest()
 
 	peers := validators.NewSet()
 	db := memdb.New()
 	sender := &common.SenderTest{}
-	vm := &VMTest{}
+	vm := &TestVM{}
 	engine := &Transitive{}
 	handler := &router.Handler{}
 	router := &router.ChainRouter{}

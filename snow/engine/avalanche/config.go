@@ -5,11 +5,12 @@ package avalanche
 
 import (
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 )
 
 // Config wraps all the parameters needed for an avalanche engine
 type Config struct {
-	BootstrapConfig
+	bootstrap.Config
 
 	Params    avalanche.Parameters
 	Consensus avalanche.Consensus

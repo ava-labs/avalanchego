@@ -4,6 +4,7 @@
 package avalanche
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -31,7 +33,8 @@ const (
 // transitive dependencies.
 type Transitive struct {
 	Config
-	bootstrapper
+	bootstrap.Bootstrapper
+	metrics
 
 	polls poll.Set // track people I have asked for their preference
 
@@ -55,9 +58,9 @@ func (t *Transitive) Initialize(config Config) error {
 	config.Context.Log.Info("Initializing consensus engine")
 
 	t.Config = config
-	t.metrics.Initialize(config.Context.Log, config.Params.Namespace, config.Params.Metrics)
-
-	t.onFinished = t.finishBootstrapping
+	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+		return err
+	}
 
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
@@ -66,14 +69,19 @@ func (t *Transitive) Initialize(config Config) error {
 		config.Params.Metrics,
 	)
 
-	return t.bootstrapper.Initialize(config.BootstrapConfig)
+	return t.Bootstrapper.Initialize(
+		config.Config,
+		t.finishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Params.Namespace),
+		config.Params.Metrics,
+	)
 }
 
 func (t *Transitive) finishBootstrapping() error {
 	// Load the vertices that were last saved as the accepted frontier
 	frontier := []avalanche.Vertex(nil)
-	for _, vtxID := range t.Config.State.Edge() {
-		if vtx, err := t.Config.State.GetVertex(vtxID); err == nil {
+	for _, vtxID := range t.Config.Manager.Edge() {
+		if vtx, err := t.Config.Manager.GetVertex(vtxID); err == nil {
 			frontier = append(frontier, vtx)
 		} else {
 			t.Config.Context.Log.Error("vertex %s failed to be loaded from the frontier with %s", vtxID, err)
@@ -88,7 +96,7 @@ func (t *Transitive) finishBootstrapping() error {
 
 // Gossip implements the Engine interface
 func (t *Transitive) Gossip() error {
-	edge := t.Config.State.Edge()
+	edge := t.Config.Manager.Edge()
 	if len(edge) == 0 {
 		t.Config.Context.Log.Verbo("dropping gossip request as no vertices have been accepted")
 		return nil
@@ -96,7 +104,7 @@ func (t *Transitive) Gossip() error {
 
 	sampler := random.Uniform{N: len(edge)}
 	vtxID := edge[sampler.Sample()]
-	vtx, err := t.Config.State.GetVertex(vtxID)
+	vtx, err := t.Config.Manager.GetVertex(vtxID)
 	if err != nil {
 		t.Config.Context.Log.Warn("dropping gossip request as %s couldn't be loaded due to: %s", vtxID, err)
 		return nil
@@ -119,7 +127,7 @@ func (t *Transitive) Context() *snow.Context { return t.Config.Context }
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
-	if vtx, err := t.Config.State.GetVertex(vtxID); err == nil {
+	if vtx, err := t.Config.Manager.GetVertex(vtxID); err == nil {
 		t.Config.Sender.Put(vdr, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
@@ -129,7 +137,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
 	t.Config.Context.Log.Verbo("GetAncestors(%s, %d, %s) called", vdr, requestID, vtxID)
-	vertex, err := t.Config.State.GetVertex(vtxID)
+	vertex, err := t.Config.Manager.GetVertex(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		t.Config.Context.Log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
@@ -182,7 +190,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 		return nil
 	}
 
-	vtx, err := t.Config.State.ParseVertex(vtxBytes)
+	vtx, err := t.Config.Manager.ParseVertex(vtxBytes)
 	if err != nil {
 		t.Config.Context.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
 		t.Config.Context.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
@@ -216,7 +224,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len()))
-	t.numTxRequests.Set(float64(t.missingTxs.Len()))
+	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
 	return t.errs.Err
 }
 
@@ -255,7 +263,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 		return nil
 	}
 
-	vtx, err := t.Config.State.ParseVertex(vtxBytes)
+	vtx, err := t.Config.Manager.ParseVertex(vtxBytes)
 	if err != nil {
 		t.Config.Context.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
 		t.Config.Context.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
@@ -334,7 +342,7 @@ func (t *Transitive) repoll() error {
 }
 
 func (t *Transitive) reinsertFrom(vdr ids.ShortID, vtxID ids.ID) (bool, error) {
-	vtx, err := t.Config.State.GetVertex(vtxID)
+	vtx, err := t.Config.Manager.GetVertex(vtxID)
 	if err != nil {
 		t.sendRequest(vdr, vtxID)
 		return false, nil
@@ -421,8 +429,8 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 
 	// Track performance statistics
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len()))
-	t.numTxRequests.Set(float64(t.missingTxs.Len()))
-	t.numPendingVtx.Set(float64(t.pending.Len()))
+	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.numPendingVts.Set(float64(t.pending.Len()))
 	return t.errs.Err
 }
 
@@ -501,7 +509,7 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 		parentIDs.Add(virtuousIDs[sampler.Sample()])
 	}
 
-	vtx, err := t.Config.State.BuildVertex(parentIDs, txs)
+	vtx, err := t.Config.Manager.BuildVertex(parentIDs, txs)
 	if err != nil {
 		t.Config.Context.Log.Warn("error building new vertex with %d parents and %d transactions", len(parentIDs), len(txs))
 		return nil

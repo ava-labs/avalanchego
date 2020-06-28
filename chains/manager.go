@@ -16,8 +16,9 @@ import (
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/engine/avalanche"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
 	"github.com/ava-labs/gecko/snow/networking/router"
@@ -294,7 +295,7 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 	}
 
 	switch vm := vm.(type) {
-	case avalanche.DAGVM:
+	case vertex.DAGVM:
 		err := m.createAvalancheChain(
 			ctx,
 			chain.GenesisData,
@@ -352,7 +353,7 @@ func (m *manager) createAvalancheChain(
 	genesisData []byte,
 	validators,
 	beacons validators.Set,
-	vm avalanche.DAGVM,
+	vm vertex.DAGVM,
 	fxs []*common.Fx,
 	consensusParams avacon.Parameters,
 ) error {
@@ -384,23 +385,12 @@ func (m *manager) createAvalancheChain(
 
 	// Handles serialization/deserialization of vertices and also the
 	// persistence of vertices
-	vtxState := &state.Serializer{}
-	vtxState.Initialize(ctx, vm, vertexDB)
+	vtxManager := &state.Serializer{}
+	vtxManager.Initialize(ctx, vm, vertexDB)
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
 	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
-
-	// The engine handles consensus
-	engine := avaeng.Transitive{
-		Config: avaeng.Config{
-			BootstrapConfig: avaeng.BootstrapConfig{
-				Config: common.Config{
-					Context: ctx,
-				},
-			},
-		},
-	}
 
 	bootstrapWeight := uint64(0)
 	for _, beacon := range beacons.List() {
@@ -411,8 +401,10 @@ func (m *manager) createAvalancheChain(
 		bootstrapWeight = newWeight
 	}
 
+	// The engine handles consensus
+	engine := avaeng.Transitive{}
 	engine.Initialize(avaeng.Config{
-		BootstrapConfig: avaeng.BootstrapConfig{
+		Config: bootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,
@@ -422,7 +414,7 @@ func (m *manager) createAvalancheChain(
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
-			State:      vtxState,
+			Manager:    vtxManager,
 			VM:         vm,
 		},
 		Params:    consensusParams,

@@ -25,7 +25,7 @@ var (
 	Genesis = ids.GenerateTestID()
 )
 
-func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTest, *VMTest, *Transitive, snowman.Block) {
+func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTest, *TestVM, *Transitive, snowman.Block) {
 	config := DefaultConfig()
 
 	vdr := validators.GenerateRandomValidator(1)
@@ -41,7 +41,7 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &TestVM{}
 	vm.T = t
 	config.VM = vm
 
@@ -375,7 +375,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &TestVM{}
 	vm.T = t
 	config.VM = vm
 
@@ -784,7 +784,7 @@ func TestVoteCanceling(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &TestVM{}
 	vm.T = t
 	config.VM = vm
 
@@ -881,7 +881,7 @@ func TestEngineNoQuery(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm := &VMTest{}
+	vm := &TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 
@@ -918,7 +918,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm := &VMTest{}
+	vm := &TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 
@@ -1511,7 +1511,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &TestVM{}
 	vm.T = t
 	config.VM = vm
 
@@ -1620,7 +1620,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &TestVM{}
 	vm.T = t
 	config.VM = vm
 

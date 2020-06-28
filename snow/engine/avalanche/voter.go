@@ -72,7 +72,7 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 	bubbledVotes := ids.UniqueBag{}
 	vertexHeap := vertex.NewHeap()
 	for _, vote := range votes.List() {
-		vtx, err := v.t.Config.State.GetVertex(vote)
+		vtx, err := v.t.Config.Manager.GetVertex(vote)
 		if err != nil {
 			continue
 		}

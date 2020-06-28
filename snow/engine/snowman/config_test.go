@@ -19,15 +19,15 @@ func DefaultConfig() Config {
 		BootstrapConfig: BootstrapConfig{
 			Config:  common.DefaultConfigTest(),
 			Blocked: blocked,
-			VM:      &VMTest{},
+			VM:      &TestVM{},
 		},
 		Params: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:                    1,
-			Alpha:                1,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 1,
+			Alpha:             1,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Consensus: &snowman.Topological{},
 	}
