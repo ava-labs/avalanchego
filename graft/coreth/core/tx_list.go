@@ -22,8 +22,8 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/log"
 )
 

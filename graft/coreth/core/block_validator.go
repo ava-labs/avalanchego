@@ -19,10 +19,10 @@ package core
 import (
 	"fmt"
 
-	"github.com/ava-labs/go-ethereum/consensus"
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/go-ethereum/params"
+	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and

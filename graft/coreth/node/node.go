@@ -26,14 +26,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ava-labs/coreth/accounts"
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/internal/debug"
-	"github.com/ava-labs/go-ethereum/accounts"
-	"github.com/ava-labs/go-ethereum/core/rawdb"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/p2p"
-	"github.com/ava-labs/go-ethereum/rpc"
 	"github.com/prometheus/tsdb/fileutil"
 )
 
@@ -236,13 +236,13 @@ func (n *Node) Start() error {
 		started = append(started, kind)
 	}
 	// Lastly start the configured RPC interfaces
-	if err := n.startRPC(services); err != nil {
-		for _, service := range services {
-			service.Stop()
-		}
-		running.Stop()
-		return err
-	}
+	//if err := n.startRPC(services); err != nil {
+	//	for _, service := range services {
+	//		service.Stop()
+	//	}
+	//	running.Stop()
+	//	return err
+	//}
 	// Finish initializing the startup
 	n.services = services
 	n.server = running
@@ -277,35 +277,35 @@ func (n *Node) openDataDir() error {
 // startRPC is a helper method to start all the various RPC endpoint during node
 // startup. It's not meant to be called at any time afterwards as it makes certain
 // assumptions about the state of the node.
-func (n *Node) startRPC(services map[reflect.Type]Service) error {
-	// Gather all the possible APIs to surface
-	apis := n.apis()
-	for _, service := range services {
-		apis = append(apis, service.APIs()...)
-	}
-	// Start the various API endpoints, terminating all in case of errors
-	if err := n.startInProc(apis); err != nil {
-		return err
-	}
-	if err := n.startIPC(apis); err != nil {
-		n.stopInProc()
-		return err
-	}
-	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTimeouts); err != nil {
-		n.stopIPC()
-		n.stopInProc()
-		return err
-	}
-	if err := n.startWS(n.wsEndpoint, apis, n.config.WSModules, n.config.WSOrigins, n.config.WSExposeAll); err != nil {
-		n.stopHTTP()
-		n.stopIPC()
-		n.stopInProc()
-		return err
-	}
-	// All API endpoints started successfully
-	n.rpcAPIs = apis
-	return nil
-}
+//func (n *Node) startRPC(services map[reflect.Type]Service) error {
+//	// Gather all the possible APIs to surface
+//	apis := n.apis()
+//	for _, service := range services {
+//		apis = append(apis, service.APIs()...)
+//	}
+//	// Start the various API endpoints, terminating all in case of errors
+//	if err := n.startInProc(apis); err != nil {
+//		return err
+//	}
+//	if err := n.startIPC(apis); err != nil {
+//		n.stopInProc()
+//		return err
+//	}
+//	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTimeouts); err != nil {
+//		n.stopIPC()
+//		n.stopInProc()
+//		return err
+//	}
+//	if err := n.startWS(n.wsEndpoint, apis, n.config.WSModules, n.config.WSOrigins, n.config.WSExposeAll); err != nil {
+//		n.stopHTTP()
+//		n.stopIPC()
+//		n.stopInProc()
+//		return err
+//	}
+//	// All API endpoints started successfully
+//	n.rpcAPIs = apis
+//	return nil
+//}
 
 // startInProc initializes an in-process RPC endpoint.
 func (n *Node) startInProc(apis []rpc.API) error {
@@ -329,20 +329,20 @@ func (n *Node) stopInProc() {
 	}
 }
 
-// startIPC initializes and starts the IPC RPC endpoint.
-func (n *Node) startIPC(apis []rpc.API) error {
-	if n.ipcEndpoint == "" {
-		return nil // IPC disabled.
-	}
-	listener, handler, err := rpc.StartIPCEndpoint(n.ipcEndpoint, apis)
-	if err != nil {
-		return err
-	}
-	n.ipcListener = listener
-	n.ipcHandler = handler
-	n.log.Info("IPC endpoint opened", "url", n.ipcEndpoint)
-	return nil
-}
+//// startIPC initializes and starts the IPC RPC endpoint.
+//func (n *Node) startIPC(apis []rpc.API) error {
+//	if n.ipcEndpoint == "" {
+//		return nil // IPC disabled.
+//	}
+//	listener, handler, err := rpc.StartIPCEndpoint(n.ipcEndpoint, apis)
+//	if err != nil {
+//		return err
+//	}
+//	n.ipcListener = listener
+//	n.ipcHandler = handler
+//	n.log.Info("IPC endpoint opened", "url", n.ipcEndpoint)
+//	return nil
+//}
 
 // stopIPC terminates the IPC RPC endpoint.
 func (n *Node) stopIPC() {
@@ -359,23 +359,23 @@ func (n *Node) stopIPC() {
 }
 
 // startHTTP initializes and starts the HTTP RPC endpoint.
-func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors []string, vhosts []string, timeouts rpc.HTTPTimeouts) error {
-	// Short circuit if the HTTP endpoint isn't being exposed
-	if endpoint == "" {
-		return nil
-	}
-	listener, handler, err := rpc.StartHTTPEndpoint(endpoint, apis, modules, cors, vhosts, timeouts)
-	if err != nil {
-		return err
-	}
-	n.log.Info("HTTP endpoint opened", "url", fmt.Sprintf("http://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
-	// All listeners booted successfully
-	n.httpEndpoint = endpoint
-	n.httpListener = listener
-	n.httpHandler = handler
-
-	return nil
-}
+//func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors []string, vhosts []string, timeouts rpc.HTTPTimeouts) error {
+//	// Short circuit if the HTTP endpoint isn't being exposed
+//	if endpoint == "" {
+//		return nil
+//	}
+//	listener, handler, err := rpc.StartHTTPEndpoint(endpoint, apis, modules, cors, vhosts, timeouts)
+//	if err != nil {
+//		return err
+//	}
+//	n.log.Info("HTTP endpoint opened", "url", fmt.Sprintf("http://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
+//	// All listeners booted successfully
+//	n.httpEndpoint = endpoint
+//	n.httpListener = listener
+//	n.httpHandler = handler
+//
+//	return nil
+//}
 
 // stopHTTP terminates the HTTP RPC endpoint.
 func (n *Node) stopHTTP() {
@@ -391,24 +391,24 @@ func (n *Node) stopHTTP() {
 	}
 }
 
-// startWS initializes and starts the websocket RPC endpoint.
-func (n *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsOrigins []string, exposeAll bool) error {
-	// Short circuit if the WS endpoint isn't being exposed
-	if endpoint == "" {
-		return nil
-	}
-	listener, handler, err := rpc.StartWSEndpoint(endpoint, apis, modules, wsOrigins, exposeAll)
-	if err != nil {
-		return err
-	}
-	n.log.Info("WebSocket endpoint opened", "url", fmt.Sprintf("ws://%s", listener.Addr()))
-	// All listeners booted successfully
-	n.wsEndpoint = endpoint
-	n.wsListener = listener
-	n.wsHandler = handler
-
-	return nil
-}
+//// startWS initializes and starts the websocket RPC endpoint.
+//func (n *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsOrigins []string, exposeAll bool) error {
+//	// Short circuit if the WS endpoint isn't being exposed
+//	if endpoint == "" {
+//		return nil
+//	}
+//	listener, handler, err := rpc.StartWSEndpoint(endpoint, apis, modules, wsOrigins, exposeAll)
+//	if err != nil {
+//		return err
+//	}
+//	n.log.Info("WebSocket endpoint opened", "url", fmt.Sprintf("ws://%s", listener.Addr()))
+//	// All listeners booted successfully
+//	n.wsEndpoint = endpoint
+//	n.wsListener = listener
+//	n.wsHandler = handler
+//
+//	return nil
+//}
 
 // stopWS terminates the websocket RPC endpoint.
 func (n *Node) stopWS() {
@@ -504,16 +504,16 @@ func (n *Node) Restart() error {
 	return nil
 }
 
-// Attach creates an RPC client attached to an in-process API handler.
-func (n *Node) Attach() (*rpc.Client, error) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
-
-	if n.server == nil {
-		return nil, ErrNodeStopped
-	}
-	return rpc.DialInProc(n.inprocHandler), nil
-}
+//// Attach creates an RPC client attached to an in-process API handler.
+//func (n *Node) Attach() (*rpc.Client, error) {
+//	n.lock.RLock()
+//	defer n.lock.RUnlock()
+//
+//	if n.server == nil {
+//		return nil, ErrNodeStopped
+//	}
+//	return rpc.DialInProc(n.inprocHandler), nil
+//}
 
 // RPCHandler returns the in-process RPC request handler.
 func (n *Node) RPCHandler() (*rpc.Server, error) {

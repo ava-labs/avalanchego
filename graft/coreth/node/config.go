@@ -26,17 +26,17 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ava-labs/go-ethereum/accounts"
-	"github.com/ava-labs/go-ethereum/accounts/external"
-	"github.com/ava-labs/go-ethereum/accounts/keystore"
-	"github.com/ava-labs/go-ethereum/accounts/scwallet"
-	"github.com/ava-labs/go-ethereum/accounts/usbwallet"
+	"github.com/ava-labs/coreth/accounts"
+	"github.com/ava-labs/coreth/accounts/external"
+	"github.com/ava-labs/coreth/accounts/keystore"
+	"github.com/ava-labs/coreth/accounts/scwallet"
+	"github.com/ava-labs/coreth/accounts/usbwallet"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/p2p"
 	"github.com/ava-labs/go-ethereum/p2p/enode"
-	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 const (

@@ -11,9 +11,9 @@ import (
 
 	"github.com/ava-labs/coreth"
 
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/crypto"
 )
 
