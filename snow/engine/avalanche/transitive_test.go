@@ -616,7 +616,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 	vtx1.ParentsV[0] = vtx0
 	te.insert(vtx0)
 
-	if prefs := te.Consensus.Preferences(); prefs.Len() != 1 || !prefs.Contains(vtx1.ID()) {
+	if prefs := te.consensus.Preferences(); prefs.Len() != 1 || !prefs.Contains(vtx1.ID()) {
 		t.Fatalf("Should have issued vtx1")
 	}
 }
@@ -2070,7 +2070,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 
 	te.insert(vtx)
 
-	if prefs := te.Consensus.Preferences(); !prefs.Contains(vtx.ID()) {
+	if prefs := te.consensus.Preferences(); !prefs.Contains(vtx.ID()) {
 		t.Fatalf("Vertex should be preferred")
 	}
 }
@@ -2805,7 +2805,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	te.Put(vdr.ID(), *reqID, vtx0.ID(), vtx0.Bytes())
 
-	prefs := te.Consensus.Preferences()
+	prefs := te.consensus.Preferences()
 	if !prefs.Contains(vtx1.ID()) {
 		t.Fatalf("Shouldn't have abandoned the pending vertex")
 	}
@@ -2947,7 +2947,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	te.Put(vdr.ID(), *reqID, vtx0.ID(), vtx0.Bytes())
 
-	prefs := te.Consensus.Preferences()
+	prefs := te.consensus.Preferences()
 	if !prefs.Contains(vtx1.ID()) {
 		t.Fatalf("Shouldn't have abandoned the pending vertex")
 	}

@@ -38,14 +38,14 @@ func (v *voter) Update() {
 	results = v.bubbleVotes(results)
 
 	v.t.Config.Context.Log.Debug("Finishing poll with:\n%s", &results)
-	if err := v.t.Consensus.RecordPoll(results); err != nil {
+	if err := v.t.consensus.RecordPoll(results); err != nil {
 		v.t.errs.Add(err)
 		return
 	}
 
 	txs := []snowstorm.Tx(nil)
-	for _, orphanID := range v.t.Consensus.Orphans().List() {
-		if tx, err := v.t.Config.VM.GetTx(orphanID); err == nil {
+	for _, orphanID := range v.t.consensus.Orphans().List() {
+		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
 			v.t.Config.Context.Log.Warn("Failed to fetch %s during attempted re-issuance", orphanID)
@@ -59,7 +59,7 @@ func (v *voter) Update() {
 		return
 	}
 
-	if v.t.Consensus.Quiesce() {
+	if v.t.consensus.Quiesce() {
 		v.t.Config.Context.Log.Debug("Avalanche engine can quiesce")
 		return
 	}
@@ -72,7 +72,7 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 	bubbledVotes := ids.UniqueBag{}
 	vertexHeap := vertex.NewHeap()
 	for _, vote := range votes.List() {
-		vtx, err := v.t.Config.Manager.GetVertex(vote)
+		vtx, err := v.t.Manager.GetVertex(vote)
 		if err != nil {
 			continue
 		}
@@ -98,7 +98,7 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 			continue
 		}
 
-		if v.t.Consensus.VertexIssued(vtx) {
+		if v.t.consensus.VertexIssued(vtx) {
 			v.t.Config.Context.Log.Verbo("Applying %d vote(s) for %s", set.Len(), vtx.ID())
 			bubbledVotes.UnionSet(vtx.ID(), set)
 		} else {
