@@ -556,7 +556,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 	blk0.StatusV = choices.Processing
 	te.insert(blk0)
 
-	if !blk1.ID().Equals(te.Consensus.Preference()) {
+	if !blk1.ID().Equals(te.consensus.Preference()) {
 		t.Fatalf("Should have issued blk1")
 	}
 }
@@ -1391,7 +1391,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
 
-	pref := te.Consensus.Preference()
+	pref := te.consensus.Preference()
 	if !pref.Equals(pendingBlk.ID()) {
 		t.Fatalf("Shouldn't have abandoned the pending block")
 	}
@@ -1488,7 +1488,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
 
-	pref := te.Consensus.Preference()
+	pref := te.consensus.Preference()
 	if !pref.Equals(pendingBlk.ID()) {
 		t.Fatalf("Shouldn't have abandoned the pending block")
 	}
