@@ -28,19 +28,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/eth/tracers"
 	"github.com/ava-labs/coreth/internal/ethapi"
-	myrpc "github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/core"
-	"github.com/ava-labs/go-ethereum/core/rawdb"
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/go-ethereum/core/vm"
-	"github.com/ava-labs/go-ethereum/eth/tracers"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/rpc"
 	"github.com/ava-labs/go-ethereum/trie"
 )
 
@@ -102,26 +101,26 @@ type txTraceTask struct {
 
 // TraceChain returns the structured logs created during the execution of EVM
 // between two blocks (excluding start) and returns them as a JSON object.
-func (api *PrivateDebugAPI) TraceChain(ctx context.Context, start, end myrpc.BlockNumber, config *TraceConfig) (*rpc.Subscription, error) {
+func (api *PrivateDebugAPI) TraceChain(ctx context.Context, start, end rpc.BlockNumber, config *TraceConfig) (*rpc.Subscription, error) {
 	// Fetch the block interval that we want to trace
 	var from, to *types.Block
 
 	switch start {
-	case myrpc.PendingBlockNumber:
+	case rpc.PendingBlockNumber:
 		from = api.eth.miner.PendingBlock()
-	case myrpc.LatestBlockNumber:
+	case rpc.LatestBlockNumber:
 		from = api.eth.blockchain.CurrentBlock()
-	case myrpc.AcceptedBlockNumber:
+	case rpc.AcceptedBlockNumber:
 		from = api.eth.AcceptedBlock()
 	default:
 		from = api.eth.blockchain.GetBlockByNumber(uint64(start))
 	}
 	switch end {
-	case myrpc.PendingBlockNumber:
+	case rpc.PendingBlockNumber:
 		to = api.eth.miner.PendingBlock()
-	case myrpc.LatestBlockNumber:
+	case rpc.LatestBlockNumber:
 		to = api.eth.blockchain.CurrentBlock()
-	case myrpc.AcceptedBlockNumber:
+	case rpc.AcceptedBlockNumber:
 		from = api.eth.AcceptedBlock()
 	default:
 		to = api.eth.blockchain.GetBlockByNumber(uint64(end))
@@ -357,16 +356,16 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 
 // TraceBlockByNumber returns the structured logs created during the execution of
 // EVM and returns them as a JSON object.
-func (api *PrivateDebugAPI) TraceBlockByNumber(ctx context.Context, number myrpc.BlockNumber, config *TraceConfig) ([]*txTraceResult, error) {
+func (api *PrivateDebugAPI) TraceBlockByNumber(ctx context.Context, number rpc.BlockNumber, config *TraceConfig) ([]*txTraceResult, error) {
 	// Fetch the block that we want to trace
 	var block *types.Block
 
 	switch number {
-	case myrpc.PendingBlockNumber:
+	case rpc.PendingBlockNumber:
 		block = api.eth.miner.PendingBlock()
-	case myrpc.LatestBlockNumber:
+	case rpc.LatestBlockNumber:
 		block = api.eth.blockchain.CurrentBlock()
-	case myrpc.AcceptedBlockNumber:
+	case rpc.AcceptedBlockNumber:
 		block = api.eth.AcceptedBlock()
 	default:
 		block = api.eth.blockchain.GetBlockByNumber(uint64(number))

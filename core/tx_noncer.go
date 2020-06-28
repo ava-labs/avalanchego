@@ -19,8 +19,8 @@ package core
 import (
 	"sync"
 
+	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core/state"
 )
 
 // txNoncer is a tiny virtual state database to manage the executable nonces of

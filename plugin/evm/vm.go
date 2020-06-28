@@ -18,13 +18,13 @@ import (
 
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
 
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/rpc"
 
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/cache"

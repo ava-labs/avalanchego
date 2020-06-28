@@ -22,9 +22,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/p2p"
 	"github.com/ava-labs/go-ethereum/p2p/nat"
-	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 const (
