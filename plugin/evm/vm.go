@@ -38,6 +38,14 @@ import (
 	commonEng "github.com/ava-labs/gecko/snow/engine/common"
 )
 
+var (
+	oldZeroAddr = common.Address{
+		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
+	zeroAddr = coreth.ZeroAddr
+)
+
 const (
 	lastAcceptedKey = "snowman_lastAccepted"
 )
@@ -138,7 +146,7 @@ func (vm *VM) Initialize(
 		panic(err)
 	}
 	nodecfg := node.Config{NoUSB: true}
-	chain := coreth.NewETHChain(&config, &nodecfg, nil, vm.chaindb)
+	chain := coreth.NewETHChain(&config, &nodecfg, &zeroAddr, vm.chaindb)
 	vm.chain = chain
 	vm.networkID = config.NetworkId
 	chain.SetOnHeaderNew(func(header *types.Header) {
@@ -306,7 +314,9 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 	// Coinbase must be zero on C-Chain
-	if bytes.Compare(ethBlock.Coinbase().Bytes(), coreth.ZeroAddr.Bytes()) != 0 {
+	coinbase := ethBlock.Coinbase()
+	if bytes.Compare(coinbase.Bytes(), oldZeroAddr.Bytes()) != 0 &&
+		bytes.Compare(coinbase.Bytes(), zeroAddr.Bytes()) != 0 {
 		return nil, errInvalidBlock
 	}
 	block := &Block{
