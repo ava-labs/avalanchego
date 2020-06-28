@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/coreth/accounts/external"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/accounts/scwallet"
-	"github.com/ava-labs/coreth/accounts/usbwallet"
+	//"github.com/ava-labs/coreth/accounts/usbwallet"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/crypto"
@@ -494,26 +494,26 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 		// we can have both, but it's very confusing for the user to see the same
 		// accounts in both externally and locally, plus very racey.
 		backends = append(backends, keystore.NewKeyStore(keydir, scryptN, scryptP))
-		if !conf.NoUSB {
-			// Start a USB hub for Ledger hardware wallets
-			if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
-				log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
-			} else {
-				backends = append(backends, ledgerhub)
-			}
-			// Start a USB hub for Trezor hardware wallets (HID version)
-			if trezorhub, err := usbwallet.NewTrezorHubWithHID(); err != nil {
-				log.Warn(fmt.Sprintf("Failed to start HID Trezor hub, disabling: %v", err))
-			} else {
-				backends = append(backends, trezorhub)
-			}
-			// Start a USB hub for Trezor hardware wallets (WebUSB version)
-			if trezorhub, err := usbwallet.NewTrezorHubWithWebUSB(); err != nil {
-				log.Warn(fmt.Sprintf("Failed to start WebUSB Trezor hub, disabling: %v", err))
-			} else {
-				backends = append(backends, trezorhub)
-			}
-		}
+		//if !conf.NoUSB {
+		//	// Start a USB hub for Ledger hardware wallets
+		//	if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
+		//		log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
+		//	} else {
+		//		backends = append(backends, ledgerhub)
+		//	}
+		//	// Start a USB hub for Trezor hardware wallets (HID version)
+		//	if trezorhub, err := usbwallet.NewTrezorHubWithHID(); err != nil {
+		//		log.Warn(fmt.Sprintf("Failed to start HID Trezor hub, disabling: %v", err))
+		//	} else {
+		//		backends = append(backends, trezorhub)
+		//	}
+		//	// Start a USB hub for Trezor hardware wallets (WebUSB version)
+		//	if trezorhub, err := usbwallet.NewTrezorHubWithWebUSB(); err != nil {
+		//		log.Warn(fmt.Sprintf("Failed to start WebUSB Trezor hub, disabling: %v", err))
+		//	} else {
+		//		backends = append(backends, trezorhub)
+		//	}
+		//}
 		if len(conf.SmartCardDaemonPath) > 0 {
 			// Start a smart card hub
 			if schub, err := scwallet.NewHub(conf.SmartCardDaemonPath, scwallet.Scheme, keydir); err != nil {

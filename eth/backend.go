@@ -173,6 +173,8 @@ func New(ctx *node.ServiceContext, config *Config,
 		bcb:            bcb,
 	}
 
+	fmt.Println(eth.config.Genesis.GasLimit)
+
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
 	var dbVer = "<nil>"
 	if bcVersion != nil {
