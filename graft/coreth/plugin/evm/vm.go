@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/go-ethereum/rlp"
 	"github.com/ava-labs/go-ethereum/rpc"
 
+	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -32,7 +33,6 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/api/admin"
 
 	commonEng "github.com/ava-labs/gecko/snow/engine/common"
 )
@@ -59,6 +59,7 @@ var (
 	errUnknownBlock   = errors.New("unknown block")
 	errBlockFrequency = errors.New("too frequent block issuance")
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
+	errInvalidBlock   = errors.New("invalid block")
 )
 
 func maxDuration(x, y time.Duration) time.Duration {
@@ -302,6 +303,10 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	ethBlock := new(types.Block)
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
+	}
+	// Coinbase must be zero on C-Chain
+	if bytes.Compare(ethBlock.Coinbase(), coreth.ZeroAddr) != 0 {
+		return nil, errInvalidBlock
 	}
 	block := &Block{
 		id:       ids.NewID(ethBlock.Hash()),
