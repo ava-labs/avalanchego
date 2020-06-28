@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -1634,7 +1635,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	engine.Initialize(smeng.Config{
-		BootstrapConfig: smeng.BootstrapConfig{
+		Config: bootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: vdrs,

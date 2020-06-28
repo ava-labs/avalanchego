@@ -1,13 +1,13 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package snowman
+package bootstrap
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -18,22 +18,21 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/snow/validators"
 )
 
-func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, *TestVM) {
+var (
+	errUnknownBlock = errors.New("unknown block")
+)
+
+func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.TestVM) {
 	ctx := snow.DefaultContextTest()
 
 	peers := validators.NewSet()
 	db := memdb.New()
 	sender := &common.SenderTest{}
-	vm := &TestVM{}
-	engine := &Transitive{}
-	handler := &router.Handler{}
-	router := &router.ChainRouter{}
-	timeouts := &timeout.Manager{}
+	vm := &block.TestVM{}
 
 	sender.T = t
 	vm.T = t
@@ -47,16 +46,6 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	peerID := peer.ID()
 	peers.Add(peer)
 
-	handler.Initialize(
-		engine,
-		make(chan common.Message),
-		1,
-		"",
-		prometheus.NewRegistry(),
-	)
-	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
-
 	blocker, _ := queue.New(db)
 
 	commonConfig := common.Config{
@@ -66,7 +55,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 		Alpha:      uint64(peers.Len()/2 + 1),
 		Sender:     sender,
 	}
-	return BootstrapConfig{
+	return Config{
 		Config:  commonConfig,
 		Blocked: blocker,
 		VM:      vm,
@@ -101,11 +90,17 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		BytesV:  blkBytes1,
 	}
 
-	bs := bootstrapper{}
-	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
-	bs.Initialize(config)
 	finished := new(bool)
-	bs.onFinished = func() error { *finished = true; return nil }
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		func() error { *finished = true; return nil },
+		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	acceptedIDs := ids.Set{}
 	acceptedIDs.Add(blkID1)
@@ -186,11 +181,17 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		BytesV:  blkBytes2,
 	}
 
-	bs := bootstrapper{}
-	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
-	bs.Initialize(config)
 	finished := new(bool)
-	bs.onFinished = func() error { *finished = true; return nil }
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		func() error { *finished = true; return nil },
+		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	acceptedIDs := ids.Set{}
 	acceptedIDs.Add(blkID2)
@@ -329,11 +330,17 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		BytesV:  blkBytes3,
 	}
 
-	bs := bootstrapper{}
-	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
-	bs.Initialize(config)
 	finished := new(bool)
-	bs.onFinished = func() error { *finished = true; return nil }
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		func() error { *finished = true; return nil },
+		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	acceptedIDs := ids.Set{}
 	acceptedIDs.Add(blkID3)
@@ -478,11 +485,17 @@ func TestBootstrapperMultiPut(t *testing.T) {
 
 	vm.CantBootstrapping = false
 
-	bs := bootstrapper{}
-	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
-	bs.Initialize(config)
 	finished := new(bool)
-	bs.onFinished = func() error { *finished = true; return nil }
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		func() error { *finished = true; return nil },
+		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	acceptedIDs := ids.Set{}
 	acceptedIDs.Add(blkID3)
@@ -572,9 +585,16 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 
 	blkID := ids.GenerateTestID()
 
-	bs := bootstrapper{}
-	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
-	bs.Initialize(config)
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		nil,
+		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	vm.LastAcceptedF = func() ids.ID { return blkID }
 
@@ -604,9 +624,16 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	bs := bootstrapper{}
-	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
-	bs.Initialize(config)
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		nil,
+		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	blkIDs := ids.Set{}
 	blkIDs.Add(
@@ -683,11 +710,17 @@ func TestBootstrapperFinalized(t *testing.T) {
 		BytesV:  blkBytes2,
 	}
 
-	bs := bootstrapper{}
-	bs.metrics.Initialize(config.Context.Log, fmt.Sprintf("gecko_%s", config.Context.ChainID), prometheus.NewRegistry())
-	bs.Initialize(config)
 	finished := new(bool)
-	bs.onFinished = func() error { *finished = true; return nil }
+	bs := Bootstrapper{}
+	err := bs.Initialize(
+		config,
+		func() error { *finished = true; return nil },
+		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	acceptedIDs := ids.Set{}
 	acceptedIDs.Add(blkID1)

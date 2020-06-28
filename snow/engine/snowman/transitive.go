@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/engine/snowman/poll"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -28,7 +30,8 @@ const (
 // transitive dependencies.
 type Transitive struct {
 	Config
-	bootstrapper
+	bootstrap.Bootstrapper
+	metrics
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -57,13 +60,9 @@ func (t *Transitive) Initialize(config Config) error {
 	config.Context.Log.Info("initializing consensus engine")
 
 	t.Config = config
-	t.metrics.Initialize(
-		config.Context.Log,
-		config.Params.Namespace,
-		config.Params.Metrics,
-	)
-
-	t.onFinished = t.finishBootstrapping
+	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+		return err
+	}
 
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
@@ -72,7 +71,12 @@ func (t *Transitive) Initialize(config Config) error {
 		config.Params.Metrics,
 	)
 
-	return t.bootstrapper.Initialize(config.BootstrapConfig)
+	return t.Bootstrapper.Initialize(
+		config.Config,
+		t.finishBootstrapping,
+		fmt.Sprintf("%s_bs", config.Params.Namespace),
+		config.Params.Metrics,
+	)
 }
 
 // when bootstrapping is finished, this will be called. This initializes the
@@ -519,8 +523,8 @@ func (t *Transitive) insert(blk snowman.Block) error {
 	t.blocked.Register(i)
 
 	// Tracks performance statistics
-	t.numBlkRequests.Set(float64(t.blkReqs.Len()))
-	t.numBlockedBlk.Set(float64(t.pending.Len()))
+	t.numRequests.Set(float64(t.blkReqs.Len()))
+	t.numBlocked.Set(float64(t.pending.Len()))
 	return t.errs.Err
 }
 
@@ -536,7 +540,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 	t.Config.Sender.Get(vdr, t.RequestID, blkID)
 
 	// Tracks performance statistics
-	t.numBlkRequests.Set(float64(t.blkReqs.Len()))
+	t.numRequests.Set(float64(t.blkReqs.Len()))
 }
 
 // send a pull request for this block ID
@@ -595,7 +599,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 		// if verify fails, then all decedents are also invalid
 		t.blocked.Abandon(blkID)
-		t.numBlockedBlk.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
 		return t.errs.Err
 	}
 
@@ -643,7 +647,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.repoll()
 
 	// Tracks performance statistics
-	t.numBlkRequests.Set(float64(t.blkReqs.Len()))
-	t.numBlockedBlk.Set(float64(t.pending.Len()))
+	t.numRequests.Set(float64(t.blkReqs.Len()))
+	t.numBlocked.Set(float64(t.pending.Len()))
 	return t.errs.Err
 }

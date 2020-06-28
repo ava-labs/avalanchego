@@ -16,11 +16,11 @@ import (
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -32,9 +32,11 @@ import (
 
 	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
 	avaeng "github.com/ava-labs/gecko/snow/engine/avalanche"
+	avabootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 
 	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
+	smbootstrap "github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 )
 
 const (
@@ -309,7 +311,7 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 			m.log.Error("error while creating new avalanche vm %s", err)
 			return
 		}
-	case smeng.ChainVM:
+	case block.ChainVM:
 		err := m.createSnowmanChain(
 			ctx,
 			chain.GenesisData,
@@ -404,7 +406,7 @@ func (m *manager) createAvalancheChain(
 	// The engine handles consensus
 	engine := avaeng.Transitive{}
 	engine.Initialize(avaeng.Config{
-		Config: bootstrap.Config{
+		Config: avabootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,
@@ -456,7 +458,7 @@ func (m *manager) createSnowmanChain(
 	genesisData []byte,
 	validators,
 	beacons validators.Set,
-	vm smeng.ChainVM,
+	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
 ) error {
@@ -497,7 +499,7 @@ func (m *manager) createSnowmanChain(
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	engine.Initialize(smeng.Config{
-		BootstrapConfig: smeng.BootstrapConfig{
+		Config: smbootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,

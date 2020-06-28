@@ -23,12 +23,12 @@ func (m *metrics) Initialize(
 ) error {
 	m.numRequests = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
-		Name:      "vtx_requests",
+		Name:      "requests",
 		Help:      "Number of outstanding bootstrap vertex requests",
 	})
 	m.numPendingRequests = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
-		Name:      "pending_vtx_requests",
+		Name:      "pending_requests",
 		Help:      "Number of pending bootstrap vertex requests",
 	})
 
