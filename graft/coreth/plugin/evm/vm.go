@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -305,7 +306,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 	// Coinbase must be zero on C-Chain
-	if bytes.Compare(ethBlock.Coinbase(), coreth.ZeroAddr) != 0 {
+	if bytes.Compare(ethBlock.Coinbase().Bytes(), coreth.ZeroAddr.Bytes()) != 0 {
 		return nil, errInvalidBlock
 	}
 	block := &Block{
