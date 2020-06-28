@@ -22,6 +22,13 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
+var (
+	ZeroAddr = common.Address{
+		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
+)
+
 type Tx = types.Transaction
 type Block = types.Block
 type Hash = common.Hash
@@ -59,10 +66,7 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	backend, _ := eth.New(&ctx, config, cb, mcb, bcb, chainDB)
 	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
 	if etherBase == nil {
-		etherBase = &common.Address{
-			1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		}
+		etherBase = &ZeroAddr
 	}
 	backend.SetEtherbase(*etherBase)
 	return chain
