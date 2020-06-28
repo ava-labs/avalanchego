@@ -16,6 +16,7 @@ var (
 	MainnetID uint32 = 1
 	CascadeID uint32 = 2
 	DenaliID  uint32 = 3
+	EverestID uint32 = 4
 
 	TestnetID uint32 = 3
 	LocalID   uint32 = 12345
@@ -23,6 +24,7 @@ var (
 	MainnetName = "mainnet"
 	CascadeName = "cascade"
 	DenaliName  = "denali"
+	EverestName = "everest"
 
 	TestnetName = "testnet"
 	LocalName   = "local"
@@ -31,6 +33,7 @@ var (
 		MainnetID: MainnetName,
 		CascadeID: CascadeName,
 		DenaliID:  DenaliName,
+		EverestID: EverestName,
 
 		LocalID: LocalName,
 	}
@@ -38,6 +41,7 @@ var (
 		MainnetName: MainnetID,
 		CascadeName: CascadeID,
 		DenaliName:  DenaliID,
+		EverestName: EverestID,
 
 		TestnetName: TestnetID,
 		LocalName:   LocalID,

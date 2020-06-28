@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -31,7 +32,7 @@ type Transitive struct {
 	Config
 	bootstrapper
 
-	polls polls // track people I have asked for their preference
+	polls poll.Set // track people I have asked for their preference
 
 	// vtxReqs prevents asking validators for the same vertex
 	vtxReqs common.Requests
@@ -57,9 +58,12 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.onFinished = t.finishBootstrapping
 
-	t.polls.log = config.Context.Log
-	t.polls.numPolls = t.numPolls
-	t.polls.m = make(map[uint32]poll)
+	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	t.polls = poll.NewSet(factory,
+		config.Context.Log,
+		config.Params.Namespace,
+		config.Params.Metrics,
+	)
 
 	return t.bootstrapper.Initialize(config.BootstrapConfig)
 }
@@ -169,7 +173,11 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 	t.Config.Context.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
 
 	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
-		t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		if requestID == network.GossipMsgRequestID {
+			t.Config.Context.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		} else {
+			t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		}
 		return nil
 	}
 
@@ -307,7 +315,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 }
 
 func (t *Transitive) repoll() error {
-	if len(t.polls.m) >= t.Params.ConcurrentRepolls || t.errs.Errored() {
+	if t.polls.Len() >= t.Params.ConcurrentRepolls || t.errs.Errored() {
 		return nil
 	}
 
@@ -316,7 +324,7 @@ func (t *Transitive) repoll() error {
 		return err
 	}
 
-	for i := len(t.polls.m); i < t.Params.ConcurrentRepolls; i++ {
+	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
 		if err := t.batch(nil, false /*=force*/, true /*=empty*/); err != nil {
 			return err
 		}
@@ -471,8 +479,11 @@ func (t *Transitive) issueRepoll() {
 		vdrSet.Add(vdr.ID())
 	}
 
+	vdrCopy := ids.ShortSet{}
+	vdrCopy.Union((vdrSet))
+
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet.Len()) {
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrCopy) {
 		t.Config.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
 	} else if numVdrs < p.K {
 		t.Config.Context.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)

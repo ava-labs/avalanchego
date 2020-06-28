@@ -57,7 +57,7 @@ type GetNodeVersionReply struct {
 
 // GetNodeVersion returns the version this node is running
 func (service *Admin) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersionReply) error {
-	service.log.Debug("Admin: GetNodeVersion called")
+	service.log.Info("Admin: GetNodeVersion called")
 
 	reply.Version = service.version.String()
 	return nil
@@ -70,7 +70,7 @@ type GetNodeIDReply struct {
 
 // GetNodeID returns the node ID of this node
 func (service *Admin) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
-	service.log.Debug("Admin: GetNodeID called")
+	service.log.Info("Admin: GetNodeID called")
 
 	reply.NodeID = service.nodeID
 	return nil
@@ -83,7 +83,7 @@ type GetNetworkIDReply struct {
 
 // GetNetworkID returns the network ID this node is running on
 func (service *Admin) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
-	service.log.Debug("Admin: GetNetworkID called")
+	service.log.Info("Admin: GetNetworkID called")
 
 	reply.NetworkID = cjson.Uint32(service.networkID)
 	return nil
@@ -96,7 +96,7 @@ type GetNetworkNameReply struct {
 
 // GetNetworkName returns the network name this node is running on
 func (service *Admin) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
-	service.log.Debug("Admin: GetNetworkName called")
+	service.log.Info("Admin: GetNetworkName called")
 
 	reply.NetworkName = genesis.NetworkName(service.networkID)
 	return nil
@@ -114,7 +114,7 @@ type GetBlockchainIDReply struct {
 
 // GetBlockchainID returns the blockchain ID that resolves the alias that was supplied
 func (service *Admin) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply *GetBlockchainIDReply) error {
-	service.log.Debug("Admin: GetBlockchainID called")
+	service.log.Info("Admin: GetBlockchainID called")
 
 	bID, err := service.chainManager.Lookup(args.Alias)
 	reply.BlockchainID = bID.String()
@@ -128,14 +128,9 @@ type PeersReply struct {
 
 // Peers returns the list of current validators
 func (service *Admin) Peers(_ *http.Request, _ *struct{}, reply *PeersReply) error {
-	service.log.Debug("Admin: Peers called")
+	service.log.Info("Admin: Peers called")
 	reply.Peers = service.networking.Peers()
 	return nil
-}
-
-// StartCPUProfilerArgs are the arguments for calling StartCPUProfiler
-type StartCPUProfilerArgs struct {
-	Filename string `json:"filename"`
 }
 
 // StartCPUProfilerReply are the results from calling StartCPUProfiler
@@ -144,10 +139,10 @@ type StartCPUProfilerReply struct {
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (service *Admin) StartCPUProfiler(_ *http.Request, args *StartCPUProfilerArgs, reply *StartCPUProfilerReply) error {
-	service.log.Debug("Admin: StartCPUProfiler called with %s", args.Filename)
+func (service *Admin) StartCPUProfiler(_ *http.Request, args *struct{}, reply *StartCPUProfilerReply) error {
+	service.log.Info("Admin: StartCPUProfiler called")
 	reply.Success = true
-	return service.performance.StartCPUProfiler(args.Filename)
+	return service.performance.StartCPUProfiler()
 }
 
 // StopCPUProfilerReply are the results from calling StopCPUProfiler
@@ -157,14 +152,9 @@ type StopCPUProfilerReply struct {
 
 // StopCPUProfiler stops the cpu profile
 func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *StopCPUProfilerReply) error {
-	service.log.Debug("Admin: StopCPUProfiler called")
+	service.log.Info("Admin: StopCPUProfiler called")
 	reply.Success = true
 	return service.performance.StopCPUProfiler()
-}
-
-// MemoryProfileArgs are the arguments for calling MemoryProfile
-type MemoryProfileArgs struct {
-	Filename string `json:"filename"`
 }
 
 // MemoryProfileReply are the results from calling MemoryProfile
@@ -173,15 +163,10 @@ type MemoryProfileReply struct {
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (service *Admin) MemoryProfile(_ *http.Request, args *MemoryProfileArgs, reply *MemoryProfileReply) error {
-	service.log.Debug("Admin: MemoryProfile called with %s", args.Filename)
+func (service *Admin) MemoryProfile(_ *http.Request, args *struct{}, reply *MemoryProfileReply) error {
+	service.log.Info("Admin: MemoryProfile called")
 	reply.Success = true
-	return service.performance.MemoryProfile(args.Filename)
-}
-
-// LockProfileArgs are the arguments for calling LockProfile
-type LockProfileArgs struct {
-	Filename string `json:"filename"`
+	return service.performance.MemoryProfile()
 }
 
 // LockProfileReply are the results from calling LockProfile
@@ -190,10 +175,10 @@ type LockProfileReply struct {
 }
 
 // LockProfile runs a mutex profile writing to the specified file
-func (service *Admin) LockProfile(_ *http.Request, args *LockProfileArgs, reply *LockProfileReply) error {
-	service.log.Debug("Admin: LockProfile called with %s", args.Filename)
+func (service *Admin) LockProfile(_ *http.Request, args *struct{}, reply *LockProfileReply) error {
+	service.log.Info("Admin: LockProfile called")
 	reply.Success = true
-	return service.performance.LockProfile(args.Filename)
+	return service.performance.LockProfile()
 }
 
 // AliasArgs are the arguments for calling Alias
@@ -209,7 +194,7 @@ type AliasReply struct {
 
 // Alias attempts to alias an HTTP endpoint to a new name
 func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *AliasReply) error {
-	service.log.Debug("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
+	service.log.Info("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock(args.Endpoint, args.Alias)
 }
@@ -227,7 +212,7 @@ type AliasChainReply struct {
 
 // AliasChain attempts to alias a chain to a new name
 func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *AliasChainReply) error {
-	service.log.Debug("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
+	service.log.Info("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
 
 	chainID, err := service.chainManager.Lookup(args.Chain)
 	if err != nil {

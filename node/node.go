@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
+	"github.com/ava-labs/gecko/api/info"
 	"github.com/ava-labs/gecko/api/ipcs"
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
@@ -56,7 +57,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 5, 5)
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 7)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -92,6 +93,9 @@ type Node struct {
 	// Net runs the networking stack
 	Net network.Network
 
+	// this node's initial connections to the network
+	beacons validators.Set
+
 	// current validators of the network
 	vdrs validators.Manager
 
@@ -112,7 +116,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, n.Config.StakingIP.PortString())
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingLocalPort))
 	if err != nil {
 		return err
 	}
@@ -164,6 +168,7 @@ func (n *Node) initNetworking() error {
 		serverUpgrader,
 		clientUpgrader,
 		defaultSubnetValidators,
+		n.beacons,
 		n.Config.ConsensusRouter,
 	)
 
@@ -277,6 +282,14 @@ func (n *Node) initNodeID() error {
 	return nil
 }
 
+// Create the IDs of the peers this node should first connect to
+func (n *Node) initBeacons() {
+	n.beacons = validators.NewSet()
+	for _, peer := range n.Config.BootstrapPeers {
+		n.beacons.Add(validators.NewValidator(peer.ID, 1))
+	}
+}
+
 // Create the vmManager and register the following vms:
 // AVM, Simple Payments DAG, Simple Payments Chain
 // The Platform VM is registered in initStaking because
@@ -359,11 +372,6 @@ func (n *Node) initChains() error {
 		return err
 	}
 
-	beacons := validators.NewSet()
-	for _, peer := range n.Config.BootstrapPeers {
-		beacons.Add(validators.NewValidator(peer.ID, 1))
-	}
-
 	genesisBytes, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return err
@@ -375,7 +383,7 @@ func (n *Node) initChains() error {
 		SubnetID:      platformvm.DefaultSubnetID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMAlias:       platformvm.ID.String(),
-		CustomBeacons: beacons,
+		CustomBeacons: n.beacons,
 	})
 
 	return nil
@@ -466,6 +474,14 @@ func (n *Node) initAdminAPI() {
 	}
 }
 
+func (n *Node) initInfoAPI() {
+	if n.Config.InfoAPIEnabled {
+		n.Log.Info("initializing Info API")
+		service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+		n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+	}
+}
+
 // initHealthAPI initializes the Health API service
 // Assumes n.Log, n.ConsensusAPI, and n.ValidatorAPI already initialized
 func (n *Node) initHealthAPI() {
@@ -542,6 +558,8 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
 
+	n.initBeacons()
+
 	// Start HTTP APIs
 	n.initAPIServer()   // Start the API Server
 	n.initKeystoreAPI() // Start the Keystore API
@@ -562,6 +580,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.initChainManager()    // Set up the chain manager
 
 	n.initAdminAPI()  // Start the Admin API
+	n.initInfoAPI()   // Start the Info API
 	n.initHealthAPI() // Start the Health API
 	n.initIPCAPI()    // Start the IPC API
 

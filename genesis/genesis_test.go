@@ -23,7 +23,10 @@ func TestNetworkName(t *testing.T) {
 	if name := NetworkName(DenaliID); name != DenaliName {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, DenaliName)
 	}
-	if name := NetworkName(TestnetID); name != DenaliName {
+	if name := NetworkName(EverestID); name != EverestName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, EverestName)
+	}
+	if name := NetworkName(DenaliID); name != DenaliName {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, DenaliName)
 	}
 	if name := NetworkName(4294967295); name != "network-4294967295" {
