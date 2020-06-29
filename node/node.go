@@ -563,6 +563,10 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 
 	n.initBeacons()
 
+	if err = n.initNetworking(); err != nil { // Set up P2P networking
+		return fmt.Errorf("problem initializing networking: %w", err)
+	}
+
 	// Start HTTP APIs
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
@@ -572,10 +576,6 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 
 	// initialize shared memory
 	n.initSharedMemory()
-
-	if err = n.initNetworking(); err != nil { // Set up all networking
-		return fmt.Errorf("problem initializing networking: %w", err)
-	}
 
 	if err := n.initVMManager(); err != nil { // Set up the vm manager
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
