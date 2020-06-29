@@ -159,6 +159,26 @@ func TestGetToken(t *testing.T) {
 	}
 }
 
+func TestRevokeToken(t *testing.T) {
+	auth := Auth{
+		Enabled:  true,
+		Password: password,
+	}
+
+	// Make a token
+	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
+	tokenStr, err := auth.newToken(password, endpoints)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := auth.revokeToken(tokenStr, password); err != nil {
+		t.Fatal("should have succeeded")
+	} else if len(auth.revoked) != 1 || auth.revoked[0] != tokenStr {
+		t.Fatal("revoked token list is incorrect")
+	}
+}
+
 func TestWrapHandlerHappyPath(t *testing.T) {
 	auth := Auth{
 		Enabled:  true,
@@ -181,6 +201,35 @@ func TestWrapHandlerHappyPath(t *testing.T) {
 		wrappedHandler.ServeHTTP(rr, req)
 		if rr.Code != http.StatusOK {
 			t.Fatal("should have passed authorization")
+		}
+	}
+}
+
+func TestWrapHandlerRevokedToken(t *testing.T) {
+	auth := Auth{
+		Enabled:  true,
+		Password: password,
+	}
+
+	// Make a token
+	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
+	tokenStr, err := auth.newToken(password, endpoints)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := auth.revokeToken(tokenStr, password); err != nil {
+		t.Fatalf("should have been able to revoke token but got: %s", err)
+	}
+
+	wrappedHandler := auth.WrapHandler(dummyHandler)
+
+	for _, endpoint := range endpoints {
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusUnauthorized {
+			t.Fatal("should have failed authorization because token was revoked")
 		}
 	}
 }
