@@ -11,6 +11,10 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
+const (
+	maxEndpoints = 128
+)
+
 // Service ...
 type Service struct {
 	log   logging.Logger
@@ -37,18 +41,33 @@ type Password struct {
 	Password string `json:"password"` // The authotization password
 }
 
+// NewTokenArgs ...
+type NewTokenArgs struct {
+	Password
+	// Endpoints that may be accessed with this token
+	// e.g. if endpoints is ["/ext/bc/X", "/ext/admin"] then the token holder
+	// can hit the X-Chain API and the admin API
+	// If [Endpoints] contains an element "*" then the token
+	// allows access to all API endpoints
+	// [Endpoints] must have between 1 and [maxEndpoints] elements
+	Endpoints []string `json:"endpoints"`
+}
+
 // Token ...
 type Token struct {
 	Token string `json:"token"` // The new token. Expires in [TokenLifespan].
 }
 
 // NewToken returns a new token
-func (s *Service) NewToken(_ *http.Request, args *Password, reply *Token) error {
+func (s *Service) NewToken(_ *http.Request, args *NewTokenArgs, reply *Token) error {
 	s.log.Info("Auth: NewToken called")
-	if args.Password == "" {
-		return fmt.Errorf("password not given")
+	if args.Password.Password == "" {
+		return fmt.Errorf("argument 'password' not given")
 	}
-	token, err := s.newToken(args.Password)
+	if l := len(args.Endpoints); l < 1 || l > maxEndpoints {
+		return fmt.Errorf("argument 'endpoints' must have between %d and %d elements, but has %d", 1, maxEndpoints, l)
+	}
+	token, err := s.newToken(args.Password.Password, args.Endpoints)
 	reply.Token = token
 	return err
 }

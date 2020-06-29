@@ -393,7 +393,7 @@ func (n *Node) initChains() error {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("Initializing API server")
 
-	if err := n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort, n.Config.HTTPRequireAuthToken, n.Config.HTTPAuthPassword); err != nil {
+	if err := n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort, n.Config.APIRequireAuthToken, n.Config.APIAuthPassword); err != nil {
 		return err
 	}
 
