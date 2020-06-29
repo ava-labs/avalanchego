@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/timer"
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
@@ -35,6 +36,7 @@ var (
 type Auth struct {
 	lock     sync.RWMutex // Prevent race condition when accessing password
 	Enabled  bool         // True iff API calls need auth token
+	clock    timer.Clock  // Tells the time. Can be faked for testing
 	Password string       // The password. Can be changed via API call.
 	revoked  []string     // List of tokens that have been revoked
 }
@@ -80,7 +82,7 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 	}
 	claims := endpointClaims{
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(TokenLifespan).Unix(),
+			ExpiresAt: auth.clock.Time().Add(TokenLifespan).Unix(),
 		},
 	}
 	if canAccessAll {
@@ -178,11 +180,6 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		if !ok {
 			w.WriteHeader(http.StatusUnauthorized)
 			io.WriteString(w, "expected auth token's claims to be type endpointClaims but is different type")
-			return
-		}
-		if l := len(claims.Endpoints); l < 1 || l > maxEndpoints {
-			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, fmt.Sprintf("expected auth token to allow access to between %d and %d endpoints, but does %d", 1, maxEndpoints, l))
 			return
 		}
 		canAccess := false // true iff the token authorizes access to the API

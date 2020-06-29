@@ -38,7 +38,7 @@ type Success struct {
 
 // Password ...
 type Password struct {
-	Password string `json:"password"` // The authotization password
+	Password string `json:"password"` // The authorization password
 }
 
 // NewTokenArgs ...
