@@ -12,9 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
 // DirectedFactory implements Factory by returning a directed struct
@@ -26,74 +24,43 @@ func (DirectedFactory) New() Consensus { return &Directed{} }
 // Directed is an implementation of a multi-color, non-transitive, snowball
 // instance
 type Directed struct {
-	metrics
-
-	ctx    *snow.Context
-	params snowball.Parameters
-
-	// Each element of preferences is the ID of a transaction that is preferred.
-	// That is, each transaction has no out edges
-	preferences ids.Set
-
-	// Each element of virtuous is the ID of a transaction that is virtuous.
-	// That is, each transaction that has no incident edges
-	virtuous ids.Set
-
-	// Each element is in the virtuous set and is still being voted on
-	virtuousVoting ids.Set
-
-	// Key: UTXO ID
-	// Value: IDs of transactions that consume the UTXO specified in the key
-	spends map[[32]byte]ids.Set
+	common
 
 	// Key: Transaction ID
 	// Value: Node that represents this transaction in the conflict graph
-	nodes map[[32]byte]*flatNode
+	txs map[[32]byte]*directedTx
 
-	// Keep track of whether dependencies have been accepted or rejected
-	pendingAccept, pendingReject events.Blocker
-
-	// Number of times RecordPoll has been called
-	currentVote int
-
-	errs wrappers.Errs
+	// Key: UTXO ID
+	// Value: IDs of transactions that consume the UTXO specified in the key
+	utxos map[[32]byte]ids.Set
 }
 
-type flatNode struct {
+type directedTx struct {
 	bias, confidence, lastVote int
+	rogue                      bool
 
-	pendingAccept, accepted, rogue bool
-	ins, outs                      ids.Set
+	pendingAccept, accepted bool
+	ins, outs               ids.Set
 
 	tx Tx
 }
 
 // Initialize implements the Consensus interface
 func (dg *Directed) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	ctx.Log.AssertDeferredNoError(params.Valid)
+	dg.common.Initialize(ctx, params)
 
-	dg.ctx = ctx
-	dg.params = params
-
-	if err := dg.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
-		dg.ctx.Log.Error("%s", err)
-	}
-
-	dg.spends = make(map[[32]byte]ids.Set)
-	dg.nodes = make(map[[32]byte]*flatNode)
+	dg.utxos = make(map[[32]byte]ids.Set)
+	dg.txs = make(map[[32]byte]*directedTx)
 }
-
-// Parameters implements the Snowstorm interface
-func (dg *Directed) Parameters() snowball.Parameters { return dg.params }
 
 // IsVirtuous implements the Consensus interface
 func (dg *Directed) IsVirtuous(tx Tx) bool {
 	id := tx.ID()
-	if node, exists := dg.nodes[id.Key()]; exists {
+	if node, exists := dg.txs[id.Key()]; exists {
 		return !node.rogue
 	}
 	for _, input := range tx.InputIDs().List() {
-		if _, exists := dg.spends[input.Key()]; exists {
+		if _, exists := dg.utxos[input.Key()]; exists {
 			return false
 		}
 	}
@@ -105,12 +72,12 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	id := tx.ID()
 	conflicts := ids.Set{}
 
-	if node, exists := dg.nodes[id.Key()]; exists {
+	if node, exists := dg.txs[id.Key()]; exists {
 		conflicts.Union(node.ins)
 		conflicts.Union(node.outs)
 	} else {
 		for _, input := range tx.InputIDs().List() {
-			if spends, exists := dg.spends[input.Key()]; exists {
+			if spends, exists := dg.utxos[input.Key()]; exists {
 				conflicts.Union(spends)
 			}
 		}
@@ -142,7 +109,7 @@ func (dg *Directed) Add(tx Tx) error {
 		return nil
 	}
 
-	fn := &flatNode{tx: tx}
+	fn := &directedTx{tx: tx}
 
 	// Note: Below, for readability, we sometimes say "transaction" when we actually mean
 	// "the flatNode representing a transaction."
@@ -152,7 +119,7 @@ func (dg *Directed) Add(tx Tx) error {
 	// * Mark those transactions as rogue
 	for _, inputID := range inputs.List() {
 		inputKey := inputID.Key()
-		spends := dg.spends[inputKey] // Transactions spending this UTXO
+		spends := dg.utxos[inputKey] // Transactions spending this UTXO
 
 		// Add edges to conflict graph
 		fn.outs.Union(spends)
@@ -160,7 +127,7 @@ func (dg *Directed) Add(tx Tx) error {
 		// Mark transactions conflicting with Tx as rogue
 		for _, conflictID := range spends.List() {
 			conflictKey := conflictID.Key()
-			conflict := dg.nodes[conflictKey]
+			conflict := dg.txs[conflictKey]
 
 			dg.virtuous.Remove(conflictID)
 			dg.virtuousVoting.Remove(conflictID)
@@ -168,16 +135,16 @@ func (dg *Directed) Add(tx Tx) error {
 			conflict.rogue = true
 			conflict.ins.Add(txID)
 
-			dg.nodes[conflictKey] = conflict
+			dg.txs[conflictKey] = conflict
 		}
 		// Add Tx to list of transactions consuming UTXO whose ID is id
 		spends.Add(txID)
-		dg.spends[inputKey] = spends
+		dg.utxos[inputKey] = spends
 	}
 	fn.rogue = fn.outs.Len() != 0 // Mark this transaction as rogue if it has conflicts
 
 	// Add the node representing Tx to the node set
-	dg.nodes[txID.Key()] = fn
+	dg.txs[txID.Key()] = fn
 	if !fn.rogue {
 		// I'm not rogue
 		dg.virtuous.Add(txID)
@@ -208,15 +175,9 @@ func (dg *Directed) Issued(tx Tx) bool {
 	if tx.Status().Decided() {
 		return true
 	}
-	_, ok := dg.nodes[tx.ID().Key()]
+	_, ok := dg.txs[tx.ID().Key()]
 	return ok
 }
-
-// Virtuous implements the Consensus interface
-func (dg *Directed) Virtuous() ids.Set { return dg.virtuous }
-
-// Preferences implements the Consensus interface
-func (dg *Directed) Preferences() ids.Set { return dg.preferences }
 
 // RecordPoll implements the Consensus interface
 func (dg *Directed) RecordPoll(votes ids.Bag) error {
@@ -226,7 +187,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) error {
 	threshold := votes.Threshold() // Each element is ID of transaction preferred by >= Alpha poll respondents
 	for _, toInc := range threshold.List() {
 		incKey := toInc.Key()
-		fn, exist := dg.nodes[incKey]
+		fn, exist := dg.txs[incKey]
 		if !exist {
 			// Votes for decided consumers are ignored
 			continue
@@ -258,24 +219,9 @@ func (dg *Directed) RecordPoll(votes ids.Bag) error {
 	return dg.errs.Err
 }
 
-// Quiesce implements the Consensus interface
-func (dg *Directed) Quiesce() bool {
-	numVirtuous := dg.virtuousVoting.Len()
-	dg.ctx.Log.Verbo("Conflict graph has %d voting virtuous transactions and %d transactions",
-		numVirtuous, len(dg.nodes))
-	return numVirtuous == 0
-}
-
-// Finalized implements the Consensus interface
-func (dg *Directed) Finalized() bool {
-	numNodes := len(dg.nodes)
-	dg.ctx.Log.Verbo("Conflict graph has %d pending transactions", numNodes)
-	return numNodes == 0
-}
-
 func (dg *Directed) String() string {
-	nodes := []*flatNode{}
-	for _, fn := range dg.nodes {
+	nodes := []*directedTx{}
+	for _, fn := range dg.txs {
 		nodes = append(nodes, fn)
 	}
 	sortFlatNodes(nodes)
@@ -286,7 +232,7 @@ func (dg *Directed) String() string {
 
 	format := fmt.Sprintf(
 		"\n    Choice[%s] = ID: %%50s Confidence: %s Bias: %%d",
-		formatting.IntFormat(len(dg.nodes)-1),
+		formatting.IntFormat(len(dg.txs)-1),
 		formatting.IntFormat(dg.params.BetaRogue-1))
 
 	for i, fn := range nodes {
@@ -306,7 +252,7 @@ func (dg *Directed) String() string {
 	return sb.String()
 }
 
-func (dg *Directed) deferAcceptance(fn *flatNode) {
+func (dg *Directed) deferAcceptance(fn *directedTx) {
 	fn.pendingAccept = true
 
 	toAccept := &directedAccepter{
@@ -326,8 +272,8 @@ func (dg *Directed) deferAcceptance(fn *flatNode) {
 func (dg *Directed) reject(ids ...ids.ID) error {
 	for _, conflict := range ids {
 		conflictKey := conflict.Key()
-		conf := dg.nodes[conflictKey]
-		delete(dg.nodes, conflictKey)
+		conf := dg.txs[conflictKey]
+		delete(dg.txs, conflictKey)
 
 		dg.preferences.Remove(conflict)
 
@@ -348,7 +294,7 @@ func (dg *Directed) reject(ids ...ids.ID) error {
 	return nil
 }
 
-func (dg *Directed) redirectEdges(fn *flatNode) {
+func (dg *Directed) redirectEdges(fn *directedTx) {
 	for _, conflictID := range fn.outs.List() {
 		dg.redirectEdge(fn, conflictID)
 	}
@@ -356,9 +302,9 @@ func (dg *Directed) redirectEdges(fn *flatNode) {
 
 // Set the confidence of all conflicts to 0
 // Change the direction of edges if needed
-func (dg *Directed) redirectEdge(fn *flatNode, conflictID ids.ID) {
+func (dg *Directed) redirectEdge(fn *directedTx, conflictID ids.ID) {
 	nodeID := fn.tx.ID()
-	if conflict := dg.nodes[conflictID.Key()]; fn.bias > conflict.bias {
+	if conflict := dg.txs[conflictID.Key()]; fn.bias > conflict.bias {
 		conflict.confidence = 0
 
 		// Change the edge direction
@@ -379,7 +325,7 @@ func (dg *Directed) removeConflict(id ids.ID, ids ...ids.ID) {
 	for _, neighborID := range ids {
 		neighborKey := neighborID.Key()
 		// If the neighbor doesn't exist, they may have already been rejected
-		if neighbor, exists := dg.nodes[neighborKey]; exists {
+		if neighbor, exists := dg.txs[neighborKey]; exists {
 			neighbor.ins.Remove(id)
 			neighbor.outs.Remove(id)
 
@@ -388,7 +334,7 @@ func (dg *Directed) removeConflict(id ids.ID, ids ...ids.ID) {
 				dg.preferences.Add(neighborID)
 			}
 
-			dg.nodes[neighborKey] = neighbor
+			dg.txs[neighborKey] = neighbor
 		}
 	}
 }
@@ -397,7 +343,7 @@ type directedAccepter struct {
 	dg       *Directed
 	deps     ids.Set
 	rejected bool
-	fn       *flatNode
+	fn       *directedTx
 }
 
 func (a *directedAccepter) Dependencies() ids.Set { return a.deps }
@@ -410,16 +356,17 @@ func (a *directedAccepter) Fulfill(id ids.ID) {
 func (a *directedAccepter) Abandon(id ids.ID) { a.rejected = true }
 
 func (a *directedAccepter) Update() {
-	// If I was rejected or I am still waiting on dependencies to finish do nothing.
+	// If I was rejected or I am still waiting on dependencies to finish do
+	// nothing.
 	if a.rejected || a.deps.Len() != 0 || a.dg.errs.Errored() {
 		return
 	}
 
 	id := a.fn.tx.ID()
-	delete(a.dg.nodes, id.Key())
+	delete(a.dg.txs, id.Key())
 
 	for _, inputID := range a.fn.tx.InputIDs().List() {
-		delete(a.dg.spends, inputID.Key())
+		delete(a.dg.utxos, inputID.Key())
 	}
 	a.dg.virtuous.Remove(id)
 	a.dg.preferences.Remove(id)
@@ -453,7 +400,7 @@ type directedRejector struct {
 	dg       *Directed
 	deps     ids.Set
 	rejected bool // true if the transaction represented by fn has been rejected
-	fn       *flatNode
+	fn       *directedTx
 }
 
 func (r *directedRejector) Dependencies() ids.Set { return r.deps }
@@ -470,7 +417,7 @@ func (*directedRejector) Abandon(id ids.ID) {}
 
 func (*directedRejector) Update() {}
 
-type sortFlatNodeData []*flatNode
+type sortFlatNodeData []*directedTx
 
 func (fnd sortFlatNodeData) Less(i, j int) bool {
 	return bytes.Compare(
@@ -480,4 +427,4 @@ func (fnd sortFlatNodeData) Less(i, j int) bool {
 func (fnd sortFlatNodeData) Len() int      { return len(fnd) }
 func (fnd sortFlatNodeData) Swap(i, j int) { fnd[j], fnd[i] = fnd[i], fnd[j] }
 
-func sortFlatNodes(nodes []*flatNode) { sort.Sort(sortFlatNodeData(nodes)) }
+func sortFlatNodes(nodes []*directedTx) { sort.Sort(sortFlatNodeData(nodes)) }
