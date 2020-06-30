@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ava-labs/gecko/api/auth"
 	"github.com/ava-labs/gecko/database/leveldb"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
@@ -25,6 +26,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/password"
 	"github.com/ava-labs/gecko/utils/random"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
@@ -411,6 +413,10 @@ func init() {
 	Config.HTTPPort = uint16(*httpPort)
 	if Config.APIRequireAuthToken && Config.APIAuthPassword == "" {
 		errs.Add(errors.New("api-auth-password must be provided if api-require-auth is true"))
+		return
+	}
+	if !password.SufficientlyStrong(Config.APIAuthPassword, auth.RequiredPasswordStrength) {
+		errs.Add(errors.New("api-auth-password is not strong enough. Add more characters"))
 		return
 	}
 

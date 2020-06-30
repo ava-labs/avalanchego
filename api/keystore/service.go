@@ -10,9 +10,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gorilla/rpc/v2"
+	pw "github.com/ava-labs/gecko/utils/password"
 
-	zxcvbn "github.com/nbutton23/zxcvbn-go"
+	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -32,26 +32,8 @@ const (
 	// maxUserPassLen is the maximum length of the username or password allowed
 	maxUserPassLen = 1024
 
-	// maxCheckedPassLen limits the length of the password that should be
-	// strength checked.
-	//
-	// As per issue https://github.com/ava-labs/gecko/issues/195 it was found
-	// the longer the length of password the slower zxcvbn.PasswordStrength()
-	// performs. To avoid performance issues, and a DoS vector, we only check
-	// the first 50 characters of the password.
-	maxCheckedPassLen = 50
-
-	// requiredPassScore defines the score a password must achieve to be
-	// accepted as a password with strong characteristics by the zxcvbn package
-	//
-	// The scoring mechanism defined is as follows;
-	//
-	// 0 # too guessable: risky password. (guesses < 10^3)
-	// 1 # very guessable: protection from throttled online attacks. (guesses < 10^6)
-	// 2 # somewhat guessable: protection from unthrottled online attacks. (guesses < 10^8)
-	// 3 # safely unguessable: moderate protection from offline slow-hash scenario. (guesses < 10^10)
-	// 4 # very unguessable: strong protection from offline slow-hash scenario. (guesses >= 10^10)
-	requiredPassScore = 2
+	// required strength of a keystore password
+	requiredPassStrength = pw.OK
 )
 
 var (
@@ -404,12 +386,7 @@ func (ks *Keystore) AddUser(username, password string) error {
 		return fmt.Errorf("user already exists: %s", username)
 	}
 
-	checkPass := password
-	if len(password) > maxCheckedPassLen {
-		checkPass = password[:maxCheckedPassLen]
-	}
-
-	if zxcvbn.PasswordStrength(checkPass, nil).Score < requiredPassScore {
+	if !pw.SufficientlyStrong(password, requiredPassStrength) {
 		return errWeakPassword
 	}
 

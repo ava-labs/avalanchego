@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	password       = "password"
-	hashedPassword = hashing.ComputeHash256([]byte(password))
+	testPassword   = "password!@#$%$#@!"
+	hashedPassword = hashing.ComputeHash256([]byte(testPassword))
 )
 
 var (
@@ -49,7 +49,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestTokenHasWrongSig(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,14 +114,14 @@ func TestChangePassword(t *testing.T) {
 		HashedPassword: hashedPassword,
 	}
 
-	password2 := "password2"
+	password2 := "fejhkefjhefjhefhje"
 	if err := auth.changePassword("", password2); err == nil {
 		t.Fatal("should have failed because old password is wrong")
 	} else if err := auth.changePassword("notThePassword", password2); err == nil {
 		t.Fatal("should have failed because old password is wrong")
-	} else if err := auth.changePassword(password, ""); err == nil {
+	} else if err := auth.changePassword(testPassword, ""); err == nil {
 		t.Fatal("should have failed because new password is empty")
-	} else if err := auth.changePassword(password, password2); err != nil {
+	} else if err := auth.changePassword(testPassword, password2); err != nil {
 		t.Fatal("should have succeeded")
 	}
 
@@ -129,8 +129,8 @@ func TestChangePassword(t *testing.T) {
 		t.Fatal("password should have been changed")
 	}
 
-	password3 := "password3"
-	if err := auth.changePassword(password, password3); err == nil {
+	password3 := "ufwhwohwfohawfhwdwd"
+	if err := auth.changePassword(testPassword, password3); err == nil {
 		t.Fatal("should have failed because old password is wrong")
 	} else if err := auth.changePassword(password2, password3); err != nil {
 		t.Fatal("should have succeeded")
@@ -171,12 +171,12 @@ func TestRevokeToken(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := auth.revokeToken(tokenStr, password); err != nil {
+	if err := auth.revokeToken(tokenStr, testPassword); err != nil {
 		t.Fatal("should have succeeded")
 	} else if len(auth.revoked) != 1 || auth.revoked[0] != tokenStr {
 		t.Fatal("revoked token list is incorrect")
@@ -191,7 +191,7 @@ func TestWrapHandlerHappyPath(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,11 +217,11 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := auth.revokeToken(tokenStr, password); err != nil {
+	if err := auth.revokeToken(tokenStr, testPassword); err != nil {
 		t.Fatalf("should have been able to revoke token but got: %s", err)
 	}
 
@@ -248,7 +248,7 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 
 	// Make a token that expired well in the past
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +292,7 @@ func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +319,7 @@ func TestWrapHandlerAuthEndpoint(t *testing.T) {
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/info/foo"}
-	tokenStr, err := auth.newToken(password, endpoints)
+	tokenStr, err := auth.newToken(testPassword, endpoints)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +342,7 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 
 	// Make a token that allows access to all endpoints
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/foo/info"}
-	tokenStr, err := auth.newToken(password, []string{"*"})
+	tokenStr, err := auth.newToken(testPassword, []string{"*"})
 	if err != nil {
 		t.Fatal(err)
 	}

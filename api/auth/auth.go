@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/password"
 
 	"github.com/ava-labs/gecko/utils/timer"
 	jwt "github.com/dgrijalva/jwt-go"
@@ -23,6 +24,8 @@ const (
 	// Endpoint is the base of the auth URL
 	Endpoint       = "auth"
 	maxPasswordLen = 1024
+	// RequiredPasswordStrength defines the minimum strength of a password
+	RequiredPasswordStrength = password.OK
 )
 
 var (
@@ -129,10 +132,14 @@ func (auth *Auth) changePassword(oldPassword, newPassword string) error {
 	defer auth.lock.Unlock()
 	if !bytes.Equal(auth.HashedPassword, hashing.ComputeHash256([]byte(oldPassword))) {
 		return errWrongPassword
-	} else if len(newPassword) == 0 || len(newPassword) > maxPasswordLen {
+	} else if len(newPassword) == 0 {
+		return errors.New("newPassword can't be empty")
+	} else if len(newPassword) > maxPasswordLen {
 		return fmt.Errorf("new password length exceeds maximum length, %d", maxPasswordLen)
 	} else if oldPassword == newPassword {
 		return errors.New("new password can't be same as old password")
+	} else if !password.SufficientlyStrong(newPassword, RequiredPasswordStrength) {
+		return errors.New("new password isn't strong enough. Add more characters")
 	}
 	auth.HashedPassword = hashing.ComputeHash256([]byte(newPassword))
 	auth.revoked = []string{} // All the revoked tokens are now invalid; no need to mark specifically as revoked
