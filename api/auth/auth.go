@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ava-labs/gecko/utils/hashing"
 
 	"github.com/ava-labs/gecko/utils/timer"
 	jwt "github.com/dgrijalva/jwt-go"
@@ -34,11 +37,11 @@ var (
 
 // Auth handles HTTP API authorization for this node
 type Auth struct {
-	lock     sync.RWMutex // Prevent race condition when accessing password
-	Enabled  bool         // True iff API calls need auth token
-	clock    timer.Clock  // Tells the time. Can be faked for testing
-	Password string       // The password. Can be changed via API call.
-	revoked  []string     // List of tokens that have been revoked
+	lock           sync.RWMutex // Prevent race condition when accessing password
+	Enabled        bool         // True iff API calls need auth token
+	clock          timer.Clock  // Tells the time. Can be faked for testing
+	HashedPassword []byte       // Hash of the password. Can be changed via API call.
+	revoked        []string     // List of tokens that have been revoked
 }
 
 // Custom claim type used for API access token
@@ -70,7 +73,7 @@ func getToken(r *http.Request) (string, error) {
 func (auth *Auth) newToken(password string, endpoints []string) (string, error) {
 	auth.lock.RLock()
 	defer auth.lock.RUnlock()
-	if password != auth.Password {
+	if !bytes.Equal(hashing.ComputeHash256([]byte(password)), auth.HashedPassword) {
 		return "", errWrongPassword
 	}
 	canAccessAll := false
@@ -91,7 +94,7 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 		claims.Endpoints = endpoints
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(auth.Password)) // Sign the token and return its string repr.
+	return token.SignedString(auth.HashedPassword) // Sign the token and return its string repr.
 
 }
 
@@ -104,12 +107,12 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 func (auth *Auth) revokeToken(tokenStr string, password string) error {
 	auth.lock.Lock()
 	defer auth.lock.Unlock()
-	if auth.Password != password {
+	if !bytes.Equal(auth.HashedPassword, hashing.ComputeHash256([]byte(password))) {
 		return errWrongPassword
 	}
 
 	token, err := jwt.Parse(tokenStr, func(*jwt.Token) (interface{}, error) { // See if token is well-formed and signature is right
-		return []byte(auth.Password), nil
+		return auth.HashedPassword, nil
 	})
 	if err == nil && token.Valid { // Only need to revoke if the token is valid
 		auth.revoked = append(auth.revoked, tokenStr)
@@ -124,14 +127,14 @@ func (auth *Auth) revokeToken(tokenStr string, password string) error {
 func (auth *Auth) changePassword(oldPassword, newPassword string) error {
 	auth.lock.Lock()
 	defer auth.lock.Unlock()
-	if auth.Password != oldPassword {
+	if !bytes.Equal(auth.HashedPassword, hashing.ComputeHash256([]byte(oldPassword))) {
 		return errWrongPassword
 	} else if len(newPassword) == 0 || len(newPassword) > maxPasswordLen {
 		return fmt.Errorf("new password length exceeds maximum length, %d", maxPasswordLen)
 	} else if oldPassword == newPassword {
 		return errors.New("new password can't be same as old password")
 	}
-	auth.Password = newPassword
+	auth.HashedPassword = hashing.ComputeHash256([]byte(newPassword))
 	auth.revoked = []string{} // All the revoked tokens are now invalid; no need to mark specifically as revoked
 	return nil
 }
@@ -162,7 +165,7 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) { // See if token is well-formed and signature is right
 			auth.lock.RLock()
 			defer auth.lock.RUnlock()
-			return []byte(auth.Password), nil
+			return auth.HashedPassword, nil
 		})
 		if err != nil { // Probably because signature wrong
 			w.WriteHeader(http.StatusUnauthorized)
