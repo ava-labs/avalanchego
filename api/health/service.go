@@ -17,7 +17,7 @@ import (
 )
 
 // defaultCheckOpts is a Check whose properties represent a default Check
-var defaultCheckOpts = Check{ExecutionPeriod: time.Minute}
+var defaultCheckOpts = check{executionPeriod: time.Minute}
 
 // Health observes a set of vital signs and makes them available through an HTTP
 // API.
@@ -61,18 +61,18 @@ func (h *Health) RegisterHeartbeat(name string, hb Heartbeater, max time.Duratio
 // RegisterCheckFunc adds a Check with default options and the given CheckFn
 func (h *Health) RegisterCheckFunc(name string, checkFn CheckFn) error {
 	check := defaultCheckOpts
-	check.Name = name
-	check.CheckFn = checkFn
+	check.name = name
+	check.checkFn = checkFn
 	return h.RegisterCheck(check)
 }
 
 // RegisterCheck adds the given Check
 func (h *Health) RegisterCheck(c Check) error {
 	return h.health.RegisterCheck(&health.Config{
-		InitialDelay:     c.InitialDelay,
-		ExecutionPeriod:  c.ExecutionPeriod,
-		InitiallyPassing: c.InitiallyPassing,
-		Check:            gosundheitCheck{c.Name, c.CheckFn},
+		InitialDelay:     c.InitialDelay(),
+		ExecutionPeriod:  c.ExecutionPeriod(),
+		InitiallyPassing: c.InitiallyPassing(),
+		Check:            c,
 	})
 }
 
