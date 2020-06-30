@@ -248,6 +248,11 @@ func (self *StateDB) EnableMultiCoin(addr common.Address) error {
 	return nil
 }
 
+func (self *StateDB) ForceEnableMultiCoin(addr common.Address) {
+	stateObject := self.GetOrNewStateObject(addr)
+	stateObject.EnableMultiCoin()
+}
+
 func (self *StateDB) IsMultiCoin(addr common.Address) bool {
 	stateObject := self.getStateObject(addr)
 	if stateObject != nil {

@@ -49,8 +49,8 @@ type txdata struct {
 	GasLimit     uint64          `json:"gas"      gencodec:"required"`
 	Recipient    *common.Address `json:"to"       rlp:"nil"` // nil means contract creation
 	Amount       *big.Int        `json:"value"    gencodec:"required"`
-	CoinID       *common.Hash    `json:"coinid" rlp:"-"`
-	Amount2      *big.Int        `json:"value2"`
+	CoinID       *common.Hash    `json:"coinid"   rlp:"nil"`
+	Amount2      *big.Int        `json:"value2"   rlp:"nil"`
 	Payload      []byte          `json:"input"    gencodec:"required"`
 
 	// Signature values
@@ -67,7 +67,7 @@ type txdataMarshaling struct {
 	Price        *hexutil.Big
 	GasLimit     hexutil.Uint64
 	Amount       *hexutil.Big
-	CoinID       *hexutil.Bytes
+	CoinID       *common.Hash
 	Amount2      *hexutil.Big
 	Payload      hexutil.Bytes
 	V            *hexutil.Big
@@ -183,14 +183,14 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func (tx *Transaction) Data() []byte       { return common.CopyBytes(tx.data.Payload) }
-func (tx *Transaction) Gas() uint64        { return tx.data.GasLimit }
-func (tx *Transaction) GasPrice() *big.Int { return new(big.Int).Set(tx.data.Price) }
-func (tx *Transaction) Value() *big.Int    { return new(big.Int).Set(tx.data.Amount) }
-func (tx *Transaction) CoinID() *big.Int   { return big.NewInt(0) }
-func (tx *Transaction) Value2() *big.Int   { return big.NewInt(0) }
-func (tx *Transaction) Nonce() uint64      { return tx.data.AccountNonce }
-func (tx *Transaction) CheckNonce() bool   { return true }
+func (tx *Transaction) Data() []byte         { return common.CopyBytes(tx.data.Payload) }
+func (tx *Transaction) Gas() uint64          { return tx.data.GasLimit }
+func (tx *Transaction) GasPrice() *big.Int   { return new(big.Int).Set(tx.data.Price) }
+func (tx *Transaction) Value() *big.Int      { return new(big.Int).Set(tx.data.Amount) }
+func (tx *Transaction) CoinID() *common.Hash { return tx.data.CoinID }
+func (tx *Transaction) Value2() *big.Int     { return new(big.Int).Set(tx.data.Amount2) }
+func (tx *Transaction) Nonce() uint64        { return tx.data.AccountNonce }
+func (tx *Transaction) CheckNonce() bool     { return true }
 
 // To returns the recipient address of the transaction.
 // It returns nil if the transaction is a contract creation.

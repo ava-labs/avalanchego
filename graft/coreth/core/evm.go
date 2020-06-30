@@ -99,7 +99,7 @@ func CanTransferMC(db vm.StateDB, addr common.Address, to common.Address, coinID
 	}
 	if !db.IsMultiCoin(addr) {
 		err := db.EnableMultiCoin(addr)
-		log.Debug("try to enable MC", "err", err)
+		log.Debug("try to enable MC", "addr", addr.Hex(), "err", err)
 	}
 	if !(db.IsMultiCoin(addr) && db.IsMultiCoin(to)) {
 		// incompatible
@@ -124,8 +124,5 @@ func TransferMultiCoin(db vm.StateDB, sender, recipient common.Address, coinID *
 		return
 	}
 	db.SubBalanceMultiCoin(sender, *coinID, amount)
-	z := &big.Int{}
-	z.Add(amount, big.NewInt(1000000000000000000))
-	log.Info("hi")
-	db.AddBalanceMultiCoin(recipient, *coinID, z)
+	db.AddBalanceMultiCoin(recipient, *coinID, amount)
 }

@@ -17,7 +17,6 @@
 package vm
 
 import (
-	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -260,7 +259,6 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 
 // This allows the user transfer balance of a specified coinId in addition to a normal Call().
 func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int, coinID *common.Hash, value2 *big.Int) (ret []byte, leftOverGas uint64, err error) {
-	fmt.Println("CallExpert")
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
 		return nil, gas, nil
 	}
