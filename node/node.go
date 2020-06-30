@@ -511,20 +511,17 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register heartbeat health check: %w", err)
 	}
 	isBootstrappedFunc := func() (interface{}, error) {
-		pChainID, err := n.chainManager.Lookup("P")
-		if err != nil {
+		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
 			return nil, errors.New("P-Chain not created")
 		} else if !n.chainManager.IsBootstrapped(pChainID) {
 			return nil, errors.New("P-Chain not bootstrapped")
 		}
-		xChainID, err := n.chainManager.Lookup("X")
-		if err != nil {
+		if xChainID, err := n.chainManager.Lookup("X"); err != nil {
 			return nil, errors.New("X-Chain not created")
 		} else if !n.chainManager.IsBootstrapped(xChainID) {
 			return nil, errors.New("X-Chain not bootstrapped")
 		}
-		cChainID, err := n.chainManager.Lookup("C")
-		if err != nil {
+		if cChainID, err := n.chainManager.Lookup("C"); err != nil {
 			return nil, errors.New("C-Chain not created")
 		} else if !n.chainManager.IsBootstrapped(cChainID) {
 			return nil, errors.New("C-Chain not bootstrapped")
