@@ -63,6 +63,24 @@ func (c check) InitialDelay() time.Duration { return c.initialDelay }
 // InitiallyPassing is whether or not to consider the Check healthy before the initial execution
 func (c check) InitiallyPassing() bool { return c.initiallyPassing }
 
+// monotonicCheck is a check that will run until it passes once, and after that it will
+// always pass without performing any logic. Used for bootstrapping, for example.
+type monotonicCheck struct {
+	passed bool
+	check
+}
+
+func (mc monotonicCheck) Execute() (interface{}, error) {
+	if mc.passed {
+		return nil, nil
+	}
+	details, pass := mc.Execute()
+	if pass == nil {
+		mc.passed = true
+	}
+	return details, pass
+}
+
 // Heartbeater provides a getter to the most recently observed heartbeat
 type Heartbeater interface {
 	GetHeartbeat() int64

@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -507,6 +508,30 @@ func (n *Node) initHealthAPI() error {
 	n.Log.Info("initializing Health API")
 	service := health.NewService(n.Log)
 	service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute)
+	isBootstrappedFunc := func() (interface{}, error) {
+		pChainID, err := n.chainManager.Lookup("P")
+		if err != nil {
+			return nil, errors.New("P-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(pChainID) {
+			return nil, errors.New("P-Chain not bootstrapped")
+		}
+		xChainID, err := n.chainManager.Lookup("X")
+		if err != nil {
+			return nil, errors.New("X-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(xChainID) {
+			return nil, errors.New("X-Chain not bootstrapped")
+		}
+		cChainID, err := n.chainManager.Lookup("C")
+		if err != nil {
+			return nil, errors.New("C-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(cChainID) {
+			return nil, errors.New("C-Chain not bootstrapped")
+		}
+		return nil, nil
+	}
+	if err := service.RegisterMonotonicCheckFunc("defaultChainsBootstrapped", isBootstrappedFunc); err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 

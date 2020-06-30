@@ -66,6 +66,15 @@ func (h *Health) RegisterCheckFunc(name string, checkFn CheckFn) error {
 	return h.RegisterCheck(check)
 }
 
+// RegisterMonotonicCheckFunc adds a Check with default options and the given CheckFn
+// After it passes once, its logic (checkFunc) is never run again; it just passes
+func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn CheckFn) error {
+	check := monotonicCheck{check: defaultCheckOpts}
+	check.name = name
+	check.checkFn = checkFn
+	return h.RegisterCheck(check)
+}
+
 // RegisterCheck adds the given Check
 func (h *Health) RegisterCheck(c Check) error {
 	return h.health.RegisterCheck(&health.Config{
