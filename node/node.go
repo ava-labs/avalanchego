@@ -507,7 +507,9 @@ func (n *Node) initHealthAPI() error {
 	}
 	n.Log.Info("initializing Health API")
 	service := health.NewService(n.Log)
-	service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute)
+	if err := service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute); err != nil {
+		return fmt.Errorf("couldn't register heartbeat health check: %w", err)
+	}
 	isBootstrappedFunc := func() (interface{}, error) {
 		pChainID, err := n.chainManager.Lookup("P")
 		if err != nil {
@@ -529,6 +531,7 @@ func (n *Node) initHealthAPI() error {
 		}
 		return nil, nil
 	}
+	// Passes if the P, X and C chains are finished bootstrapping
 	if err := service.RegisterMonotonicCheckFunc("defaultChainsBootstrapped", isBootstrappedFunc); err != nil {
 		return err
 	}
