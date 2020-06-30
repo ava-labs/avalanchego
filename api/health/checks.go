@@ -74,7 +74,7 @@ func (mc monotonicCheck) Execute() (interface{}, error) {
 	if mc.passed {
 		return nil, nil
 	}
-	details, pass := mc.Execute()
+	details, pass := mc.check.Execute()
 	if pass == nil {
 		mc.passed = true
 	}
