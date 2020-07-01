@@ -201,14 +201,12 @@ func (vm *VM) putTimestamp(db database.Database, timestamp time.Time) error {
 }
 
 // put the subnets that exist to [db]
-/* TODO fix
 func (vm *VM) putSubnets(db database.Database, subnets CreateSubnetTxList) error {
 	if err := vm.State.Put(db, subnetsTypeID, subnetsKey, subnets); err != nil {
 		return err
 	}
 	return nil
 }
-*/
 
 // get the subnets that exist in [db]
 func (vm *VM) getSubnets(db database.Database) ([]*CreateSubnetTx, error) {

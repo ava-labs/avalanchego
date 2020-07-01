@@ -52,7 +52,8 @@ type CreateSubnetTx struct {
 	Creds []verify.Verifiable `serialize:"true"`
 }
 
-// initialize sets [tx.vm] to [vm]
+// initialize [tx]
+// Set [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *CreateSubnetTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
@@ -91,11 +92,7 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 	case !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys):
 		return errControlKeysNotSortedAndUnique
 	}
-
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
-		return err
-	}
-	return nil
+	return syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID)
 }
 
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
@@ -110,47 +107,33 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 	subnets = append(subnets, tx) // add new subnet
-	/* TODO add this back
 	if err := tx.vm.putSubnets(db, subnets); err != nil {
 		return nil, err
 	}
-	*/
 
-	// Deduct tx fee from payer's account
-	/* TODO: Deduct tx fee
-	account, err := tx.vm.getAccount(db, tx.key.Address())
-	if err != nil {
-		return nil, err
+	// Update the UTXO set
+	for _, in := range tx.Ins {
+		utxoID := in.InputID() // ID of the UTXO that [in] spends
+		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
+			return nil, tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
+		}
 	}
-	account, err = account.Remove(0, tx.Nonce)
-	if err != nil {
-		return nil, err
+	for _, out := range tx.Outs {
+		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
+			return nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
+		}
 	}
-	if err := tx.vm.putAccount(db, account); err != nil {
-		return nil, err
-	}
-	*/
 
 	// Register new subnet in validator manager
 	onAccept := func() {
 		tx.vm.validators.PutValidatorSet(tx.id, validators.NewSet())
 	}
-
 	return onAccept, nil
 }
 
 // Bytes returns the byte representation of [tx]
-func (tx *CreateSubnetTx) Bytes() []byte {
-	if tx.bytes != nil {
-		return tx.bytes
-	}
-	var err error
-	tx.bytes, err = Codec.Marshal(tx)
-	if err != nil {
-		tx.vm.Ctx.Log.Error("problem marshaling tx: %v", err)
-	}
-	return tx.bytes
-}
+// Should only be called after initialize
+func (tx *CreateSubnetTx) Bytes() []byte { return tx.bytes }
 
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
@@ -190,13 +173,14 @@ func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []id
 
 	return tx, tx.initialize(vm)
 }
+*/
 
 // CreateSubnetTxList is a list of *CreateSubnetTx
 type CreateSubnetTxList []*CreateSubnetTx
 
 // Bytes returns the binary representation of [lst]
+// TODO handle error here
 func (lst CreateSubnetTxList) Bytes() []byte {
 	bytes, _ := Codec.Marshal(lst)
 	return bytes
 }
-*/
