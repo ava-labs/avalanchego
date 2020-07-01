@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -121,38 +120,24 @@ func (tx *ImportTx) SyntacticVerify() error {
 }
 
 // SemanticVerify this transaction is valid.
+// TODO make sure the ins and outs are semantically valid
 func (tx *ImportTx) SemanticVerify(db database.Database) error {
 	if err := tx.SyntacticVerify(); err != nil {
 		return err
 	}
 
-	amount := uint64(0)
+	// Update the UTXO set
 	for _, in := range tx.Ins {
-		newAmount, err := math.Add64(in.In.Amount(), amount)
-		if err != nil {
-			return err
+		utxoID := in.InputID() // ID of the UTXO that [in] spends
+		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
+			return tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
 		}
-		amount = newAmount
 	}
-
-	/* TODO deduct fee
-	// Deduct tx fee from payer's account
-	account, err := tx.vm.getAccount(db, tx.Key().Address())
-	if err != nil {
-		return err
+	for _, out := range tx.Outs {
+		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
+			return tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
+		}
 	}
-	account, err = account.Add(amount)
-	if err != nil {
-		return err
-	}
-	account, err = account.Remove(0, tx.Nonce)
-	if err != nil {
-		return err
-	}
-	if err := tx.vm.putAccount(db, account); err != nil {
-		return err
-	}
-	*/
 
 	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
 	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
@@ -171,13 +156,10 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 		inAssetID := in.AssetID()
 		if !utxoAssetID.Equals(inAssetID) {
 			return errAssetIDMismatch
-		}
-
-		if err := tx.vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
+		} else if err := tx.vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -200,7 +182,6 @@ func (tx *ImportTx) Accept(batch database.Batch) error {
 	if err != nil {
 		return err
 	}
-
 	return atomic.WriteAll(batch, sharedBatch)
 }
 

@@ -140,6 +140,7 @@ func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*addDefaultSubnetVal
 }
 
 // SemanticVerify this transaction is valid.
+// TODO make sure the ins and outs are semantically valid
 func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	// Ensure tx is syntactically valid
 	if err := tx.SyntacticVerify(); err != nil {

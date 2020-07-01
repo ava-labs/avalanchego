@@ -61,7 +61,7 @@ type CreateChainTx struct {
 }
 
 // initialize [tx]
-// set tx.unsignedBytes, tx.bytes, tx.id
+// set tx.vm, tx.unsignedBytes, tx.bytes, tx.id
 func (tx *CreateChainTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
@@ -112,6 +112,7 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 }
 
 // SemanticVerify this transaction is valid.
+// TODO make sure the ins and outs are semantically valid
 func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, err

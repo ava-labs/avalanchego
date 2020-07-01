@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -43,6 +42,8 @@ type ExportTx struct {
 	Creds []verify.Verifiable `serialize:"true"`
 }
 
+// initialize [tx]
+// set tx.vm, tx.unsignedBytes, tx.bytes, tx.id
 func (tx *ExportTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
@@ -62,6 +63,7 @@ func (tx *ExportTx) initialize(vm *VM) error {
 func (tx *ExportTx) ID() ids.ID { return tx.id }
 
 // Bytes returns the byte representation of an ExportTx
+// Should only be called after initialize
 func (tx *ExportTx) Bytes() []byte { return tx.bytes }
 
 // InputUTXOs returns an empty set
@@ -92,39 +94,29 @@ func (tx *ExportTx) SyntacticVerify() error {
 	if !ava.IsSortedTransferableOutputs(tx.Outs, Codec) {
 		return errOutputsNotSorted
 	}
-
 	return nil
 }
 
 // SemanticVerify this transaction is valid.
+// TODO make sure the ins and outs are semantically valid
 func (tx *ExportTx) SemanticVerify(db database.Database) error {
 	if err := tx.SyntacticVerify(); err != nil {
 		return err
 	}
 
-	amount := uint64(0)
-	for _, out := range tx.Outs {
-		newAmount, err := math.Add64(out.Out.Amount(), amount)
-		if err != nil {
-			return err
+	// Update the UTXO set
+	for _, in := range tx.Ins {
+		utxoID := in.InputID() // ID of the UTXO that [in] spends
+		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
+			return tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
 		}
-		amount = newAmount
 	}
-
-	/* TODO replace this
-	accountID := tx.key.Address()
-	account, err := tx.vm.getAccount(db, accountID)
-	if err != nil {
-		return errDBAccount
+	for _, out := range tx.Outs {
+		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
+			return tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
+		}
 	}
-
-	account, err = account.Remove(amount, tx.Nonce)
-	if err != nil {
-		return err
-	}
-	return tx.vm.putAccount(db, account)
-	*/
-	return errors.New("TODO")
+	return nil
 }
 
 // Accept this transaction.

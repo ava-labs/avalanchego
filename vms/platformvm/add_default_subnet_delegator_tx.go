@@ -96,6 +96,7 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 }
 
 // SemanticVerify this transaction is valid.
+// TODO make sure the ins and outs are semantically valid
 func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, permError{err}

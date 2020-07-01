@@ -96,6 +96,7 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 }
 
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
+// TODO make sure the ins and outs are semantically valid
 func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, err
