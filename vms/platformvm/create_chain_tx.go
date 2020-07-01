@@ -60,6 +60,8 @@ type CreateChainTx struct {
 	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
 }
 
+// initialize [tx]
+// set tx.unsignedBytes, tx.bytes, tx.id
 func (tx *CreateChainTx) initialize(vm *VM) error {
 	tx.vm = vm
 	var err error
@@ -121,7 +123,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	}
 	for _, chain := range currentChains {
 		if chain.ID().Equals(tx.ID()) {
-			return nil, fmt.Errorf("chain with ID %s already exists", chain.ID())
+			return nil, fmt.Errorf("chain %s already exists", chain.ID())
 		}
 	}
 	currentChains = append(currentChains, tx) // add this new chain
@@ -129,22 +131,18 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 
-	/* TODO deduct fees
-	// Deduct tx fee from payer's account
-	account, err := tx.vm.getAccount(db, tx.PayerAddress)
-	if err != nil {
-		return nil, err
+	// Update the UTXO set
+	for _, in := range tx.Ins {
+		utxoID := in.InputID() // ID of the UTXO that [in] spends
+		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
+			return nil, tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
+		}
 	}
-	// txFee is removed in account.Remove
-	// TODO: Consider changing Remove to be parameterized on total amount (inc. tx fee) to remove
-	account, err = account.Remove(0, tx.Nonce)
-	if err != nil {
-		return nil, err
+	for _, out := range tx.Outs {
+		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
+			return nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
+		}
 	}
-	if err := tx.vm.putAccount(db, account); err != nil {
-		return nil, err
-	}
-	*/
 
 	// Verify that this transaction has sufficient control signatures
 	subnets, err := tx.vm.getSubnets(db) // all subnets that exist
@@ -159,19 +157,11 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 		}
 	}
 	if subnet == nil {
-		return nil, fmt.Errorf("there is no subnet with ID %s", tx.SubnetID)
-	}
-	if len(tx.ControlSigs) != int(subnet.Threshold) {
+		return nil, fmt.Errorf("subnet %s doesn't exist", tx.SubnetID)
+	} else if len(tx.ControlSigs) != int(subnet.Threshold) {
 		return nil, fmt.Errorf("expected tx to have %d control sigs but has %d", subnet.Threshold, len(tx.ControlSigs))
 	}
-
-	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte representation of the unsigned transaction
-	if err != nil {
-		return nil, err
-	}
-	unsignedBytesHash := hashing.ComputeHash256(unsignedBytes)
-
+	unsignedBytesHash := hashing.ComputeHash256(tx.unsignedBytes)
 	// Each element is ID of key that signed this tx
 	controlIDs := make([]ids.ShortID, len(tx.ControlSigs))
 	for i, sig := range tx.ControlSigs {
@@ -193,10 +183,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() {
-		tx.vm.createChain(tx)
-	}
-
+	onAccept := func() { tx.vm.createChain(tx) }
 	return onAccept, nil
 }
 
