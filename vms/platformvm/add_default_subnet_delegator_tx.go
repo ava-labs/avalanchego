@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
 
@@ -183,9 +182,11 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
+	/* TODO: Add this (or something like it) back
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
+	*/
 
 	// If this proposal is aborted, chain state doesn't change
 	onAbortDB := versiondb.New(db)
@@ -200,6 +201,7 @@ func (tx *addDefaultSubnetDelegatorTx) InitiallyPrefersCommit() bool {
 }
 
 // TODO: Implement
+/*
 func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	nonce,
 	weight,
@@ -242,3 +244,4 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 
 	return tx, tx.initialize(vm)
 }
+*/

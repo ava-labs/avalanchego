@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"bytes"
 	"errors"
@@ -125,7 +126,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
  ******************************************************
  ******************* Get Subnets **********************
  ******************************************************
- */
+
 
 // APISubnet is a representation of a subnet used in API calls
 type APISubnet struct {
@@ -218,7 +219,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
  ******************************************************
  **************** Get/Sample Validators ***************
  ******************************************************
- */
+
 
 // GetCurrentValidatorsArgs are the arguments for calling GetCurrentValidators
 type GetCurrentValidatorsArgs struct {
@@ -389,7 +390,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
  ******************************************************
  *************** Get/Create Accounts ******************
  ******************************************************
- */
+
 
 // GetAccountArgs are the arguments for calling GetAccount
 type GetAccountArgs struct {
@@ -551,7 +552,7 @@ type genericTx struct {
  ******************************************************
  ************ Add Validators to Subnets ***************
  ******************************************************
- */
+
 
 // CreateTxResponse is the response from calls to create a transaction
 type CreateTxResponse struct {
@@ -834,7 +835,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
  ******************************************************
  **************** Sign/Issue Txs **********************
  ******************************************************
- */
+
 
 // SignArgs are the arguments to Sign
 type SignArgs struct {
@@ -1301,7 +1302,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
  ******************************************************
  ******** Create/get status of a blockchain ***********
  ******************************************************
- */
+
 
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
@@ -1593,3 +1594,4 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	}
 	return nil
 }
+*/

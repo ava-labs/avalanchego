@@ -247,6 +247,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 			validatorStartTime)}
 	}
 
+	/* TODO put this (or replacement) back
 	// Get the account that is paying the transaction fee and, if the proposal is to add a validator
 	// to the default subnet, providing the staked $AVA.
 	// The ID of this account is the address associated with the public key that signed this tx
@@ -262,6 +263,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
+	*/
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
 	currentEvents, err := tx.vm.getCurrentValidators(db, tx.Subnet)
@@ -297,9 +299,11 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, tx.Subnet); err != nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't put current validators: %v", err)}
 	}
+	/* TODO: Put this (or replacement) back
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't put account: %v", err)}
 	}
+	*/
 
 	// If this proposal is aborted, chain state doesn't change
 	onAbortDB := versiondb.New(db)
@@ -313,6 +317,7 @@ func (tx *addNonDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 	return tx.StartTime().After(tx.vm.clock.Time())
 }
 
+/* TODO: Implement this
 func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	nonce,
 	weight,
@@ -370,3 +375,4 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 
 	return tx, tx.initialize(vm)
 }
+*/

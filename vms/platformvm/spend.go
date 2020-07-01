@@ -1,14 +1,10 @@
 package platformvm
 
 import (
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
+/*
 // return the inputs and outputs resulting from [key] paying the tx fee
 func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (ins []*ava.TransferableInput, outs []*ava.TransferableOutput, err error) {
 	// Get UTXOs controlled by [key]
@@ -16,7 +12,7 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 	addrSet.Add(key.PublicKey().Address())
 	utxos, err := vm.getUTXOs(db, addrSet)
 	if err != nil {
-		return nil.nfmt.Errorf("couldn't get UTXOs: %w", err)
+		return nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
 
 	// Spend the tx fee
@@ -24,16 +20,16 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 	kc.Add(key)
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
-		if !utxo.AssetID().Equals(vm.ava) { // should never happen
+		if !utxo.AssetID().Equals(vm.ava) { // should never happen. TODO: log
 			continue
 		}
 		inputIntf, signers, err := kc.Spend(utxo.Out, time)
 		if err != nil {
-			continue
+			continue // should never happen. TODO: log
 		}
 		input, ok := inputIntf.(ava.Transferable)
 		if !ok {
-			continue // should never happen
+			continue // should never happen. TODO: log
 		}
 		spent, err := safemath.Add64(amountSpent, input.Amount())
 		if err != nil {
@@ -90,6 +86,7 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 
 	ava.SortTransferableOutputs(outs, service.vm.codec)
 }
+*/
 
 // Verify that:
 // * inputs and outputs are sorted
@@ -123,6 +120,7 @@ func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.Transferable
 	return nil
 }
 
+/* TODO implement
 func (vm *VM) semanticVerifySpend(db database.Database, tx interface{}, creds []verify.Verifiable) error {
 	for i, in := range ins {
 		cred := creds[i]
@@ -154,3 +152,4 @@ func (vm *VM) semanticVerifySpend(db database.Database, tx interface{}, creds []
 	}
 	return nil
 }
+*/

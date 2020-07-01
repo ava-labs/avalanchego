@@ -5,14 +5,12 @@ package platformvm
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	stdmath "math"
 
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
@@ -102,6 +100,7 @@ var (
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
 	errInvalidID                = errors.New("invalid ID")
+	errDSCantValidate           = errors.New("new blockchain can't be validated by default Subnet")
 )
 
 // Codec does serialization and deserialization
@@ -205,6 +204,7 @@ func (vm *VM) Initialize(
 	msgs chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	/* TODO replace
 	ctx.Log.Verbo("initializing platform chain")
 
 	if len(fxs) != 0 {
@@ -340,6 +340,8 @@ func (vm *VM) Initialize(
 	}
 
 	return nil
+	*/
+	return errors.New("TODO")
 }
 
 // Create all chains that exist that this node validates
@@ -620,18 +622,24 @@ func (vm *VM) SetPreference(blkID ids.ID) {
 // * values are API handlers
 // See API documentation for more information
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+	/* TODO put this back
 	// Create a service with name "platform"
 	handler := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
 	return map[string]*common.HTTPHandler{"": handler}
+	*/
+	return map[string]*common.HTTPHandler{"TODO": nil}
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+	/* TODO put this back
 	// Static service's name is platform
 	handler := vm.SnowmanVM.NewHandler("platform", &StaticService{})
 	return map[string]*common.HTTPHandler{
 		"": handler,
 	}
+	*/
+	return map[string]*common.HTTPHandler{"TODO": nil}
 }
 
 // Check if there is a block ready to be added to consensus

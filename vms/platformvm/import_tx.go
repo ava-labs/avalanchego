@@ -11,12 +11,10 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -85,10 +83,6 @@ func (tx *ImportTx) initialize(vm *VM) error {
 // ID of this transaction
 func (tx *ImportTx) ID() ids.ID { return tx.id }
 
-// Key returns the public key of the signer of this transaction
-// Precondition: tx.Verify() has been called and returned nil
-func (tx *ImportTx) Key() crypto.PublicKey { return tx.key }
-
 // UnsignedBytes returns the unsigned byte representation of an ImportTx
 func (tx *ImportTx) UnsignedBytes() []byte { return tx.unsignedBytes }
 
@@ -138,23 +132,6 @@ func (tx *ImportTx) SyntacticVerify() error {
 		}
 	}
 
-	unsignedIntf := interface{}(&tx.UnsignedImportTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr of unsigned tx
-	if err != nil {
-		return err
-	}
-
-	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
-	if err != nil {
-		return err
-	}
-
-	if !tx.Account.Equals(key.Address()) {
-		return errPublicKeySignatureMismatch
-	}
-
-	tx.key = key
-	tx.unsignedBytes = unsignedBytes
 	return nil
 }
 
@@ -173,6 +150,7 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 		amount = newAmount
 	}
 
+	/* TODO deduct fee
 	// Deduct tx fee from payer's account
 	account, err := tx.vm.getAccount(db, tx.Key().Address())
 	if err != nil {
@@ -189,6 +167,7 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 	if err := tx.vm.putAccount(db, account); err != nil {
 		return err
 	}
+	*/
 
 	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
 	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
@@ -240,6 +219,7 @@ func (tx *ImportTx) Accept(batch database.Batch) error {
 	return atomic.WriteAll(batch, sharedBatch)
 }
 
+/* TODO implement
 func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.TransferableInput, from [][]*crypto.PrivateKeySECP256K1R, to *crypto.PrivateKeySECP256K1R) (*ImportTx, error) {
 	ava.SortTransferableInputsWithSigners(ins, from)
 
@@ -281,3 +261,4 @@ func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.Transferabl
 
 	return tx, tx.initialize(vm)
 }
+*/

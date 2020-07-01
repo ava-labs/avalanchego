@@ -139,10 +139,11 @@ func (vm *VM) putRefedBy(db database.Database, addr ids.ShortID, utxoIDs []ids.I
 
 // getUTXOs returns UTXOs that reference at least one of the addresses in [addrs]
 func (vm *VM) getUTXOs(db database.Database, addrs ids.ShortSet) ([]*ava.UTXO, error) {
+	/* TODO
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
-		// TODO
 	}
+	*/
 	return nil, errors.New("TODO")
 }
 
@@ -200,12 +201,14 @@ func (vm *VM) putTimestamp(db database.Database, timestamp time.Time) error {
 }
 
 // put the subnets that exist to [db]
+/* TODO fix
 func (vm *VM) putSubnets(db database.Database, subnets CreateSubnetTxList) error {
 	if err := vm.State.Put(db, subnetsTypeID, subnetsKey, subnets); err != nil {
 		return err
 	}
 	return nil
 }
+*/
 
 // get the subnets that exist in [db]
 func (vm *VM) getSubnets(db database.Database) ([]*CreateSubnetTx, error) {
@@ -255,17 +258,6 @@ func (vm *VM) registerDBTypes() {
 		return &stakers, nil
 	}
 	if err := vm.State.RegisterType(validatorsTypeID, unmarshalValidatorsFunc); err != nil {
-		vm.Ctx.Log.Warn(errRegisteringType.Error())
-	}
-
-	unmarshalAccountFunc := func(bytes []byte) (interface{}, error) {
-		var account Account
-		if err := Codec.Unmarshal(bytes, &account); err != nil {
-			return nil, err
-		}
-		return account, nil
-	}
-	if err := vm.State.RegisterType(accountTypeID, unmarshalAccountFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 

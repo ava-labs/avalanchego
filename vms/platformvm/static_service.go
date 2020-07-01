@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 )
@@ -166,87 +165,90 @@ func (g *Genesis) Initialize() error {
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the AVA network.)
 func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	// Specify the accounts on the Platform chain that exist at genesis.
-	accounts := []Account(nil)
-	for _, account := range args.Accounts {
-		if account.Balance == 0 {
-			return errAccountHasNoValue
-		}
-		accounts = append(accounts, newAccount(
-			account.Address,         // ID
-			0,                       // nonce
-			uint64(account.Balance), // balance
-		))
-	}
-
-	// Specify the validators that are validating the default subnet at genesis.
-	validators := &EventHeap{}
-	for _, validator := range args.Validators {
-		weight := validator.weight()
-		if weight == 0 {
-			return errValidatorAddsNoValue
-		}
-		if uint64(validator.EndTime) <= uint64(args.Time) {
-			return errValidatorAddsNoValue
+	/*
+		// Specify the accounts on the Platform chain that exist at genesis.
+		accounts := []Account(nil)
+		for _, account := range args.Accounts {
+			if account.Balance == 0 {
+				return errAccountHasNoValue
+			}
+			accounts = append(accounts, newAccount(
+				account.Address,         // ID
+				0,                       // nonce
+				uint64(account.Balance), // balance
+			))
 		}
 
-		tx := &addDefaultSubnetValidatorTx{
-			UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
-				DurationValidator: DurationValidator{
-					Validator: Validator{
-						NodeID: validator.ID,
-						Wght:   weight,
+		// Specify the validators that are validating the default subnet at genesis.
+		validators := &EventHeap{}
+		for _, validator := range args.Validators {
+			weight := validator.weight()
+			if weight == 0 {
+				return errValidatorAddsNoValue
+			}
+			if uint64(validator.EndTime) <= uint64(args.Time) {
+				return errValidatorAddsNoValue
+			}
+
+			tx := &addDefaultSubnetValidatorTx{
+				UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
+					DurationValidator: DurationValidator{
+						Validator: Validator{
+							NodeID: validator.ID,
+							Wght:   weight,
+						},
+						Start: uint64(args.Time),
+						End:   uint64(validator.EndTime),
 					},
-					Start: uint64(args.Time),
-					End:   uint64(validator.EndTime),
+					NetworkID:   uint32(args.NetworkID),
+					Nonce:       0,
+					Destination: validator.Destination,
 				},
-				NetworkID:   uint32(args.NetworkID),
-				Nonce:       0,
-				Destination: validator.Destination,
-			},
-		}
-		if err := tx.initialize(nil); err != nil {
-			return err
-		}
+			}
+			if err := tx.initialize(nil); err != nil {
+				return err
+			}
 
-		validators.Add(tx)
-	}
-
-	// Specify the chains that exist at genesis.
-	chains := []*CreateChainTx{}
-	for _, chain := range args.Chains {
-		// Ordinarily we sign a createChainTx. For genesis, there is no key.
-		// We generate the ID of this tx by hashing the bytes of the unsigned transaction
-		// TODO: Should we just sign this tx with a private key that we share publicly?
-		tx := &CreateChainTx{
-			UnsignedCreateChainTx: UnsignedCreateChainTx{
-				NetworkID:   uint32(args.NetworkID),
-				SubnetID:    chain.SubnetID,
-				Nonce:       0,
-				ChainName:   chain.Name,
-				VMID:        chain.VMID,
-				FxIDs:       chain.FxIDs,
-				GenesisData: chain.GenesisData.Bytes,
-			},
-			ControlSigs: [][crypto.SECP256K1RSigLen]byte{},
-			PayerSig:    [crypto.SECP256K1RSigLen]byte{},
-		}
-		if err := tx.initialize(nil); err != nil {
-			return err
+			validators.Add(tx)
 		}
 
-		chains = append(chains, tx)
-	}
+		// Specify the chains that exist at genesis.
+		chains := []*CreateChainTx{}
+		for _, chain := range args.Chains {
+			// Ordinarily we sign a createChainTx. For genesis, there is no key.
+			// We generate the ID of this tx by hashing the bytes of the unsigned transaction
+			// TODO: Should we just sign this tx with a private key that we share publicly?
+			tx := &CreateChainTx{
+				UnsignedCreateChainTx: UnsignedCreateChainTx{
+					NetworkID:   uint32(args.NetworkID),
+					SubnetID:    chain.SubnetID,
+					Nonce:       0,
+					ChainName:   chain.Name,
+					VMID:        chain.VMID,
+					FxIDs:       chain.FxIDs,
+					GenesisData: chain.GenesisData.Bytes,
+				},
+				ControlSigs: [][crypto.SECP256K1RSigLen]byte{},
+				PayerSig:    [crypto.SECP256K1RSigLen]byte{},
+			}
+			if err := tx.initialize(nil); err != nil {
+				return err
+			}
 
-	// genesis holds the genesis state
-	genesis := Genesis{
-		Accounts:   accounts,
-		Validators: validators,
-		Chains:     chains,
-		Timestamp:  uint64(args.Time),
-	}
-	// Marshal genesis to bytes
-	bytes, err := Codec.Marshal(genesis)
-	reply.Bytes.Bytes = bytes
-	return err
+			chains = append(chains, tx)
+		}
+
+		// genesis holds the genesis state
+		genesis := Genesis{
+			Accounts:   accounts,
+			Validators: validators,
+			Chains:     chains,
+			Timestamp:  uint64(args.Time),
+		}
+		// Marshal genesis to bytes
+		bytes, err := Codec.Marshal(genesis)
+		reply.Bytes.Bytes = bytes
+		return err
+	*/
+	return errors.New("TODO")
 }

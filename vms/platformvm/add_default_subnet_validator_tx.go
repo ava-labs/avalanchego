@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -213,9 +212,11 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
+	/* TODO: Add this (or something like it) back
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
+	*/
 
 	// If this proposal is aborted, chain state doesn't change
 	onAbortDB := versiondb.New(db)
@@ -230,6 +231,7 @@ func (tx *addDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 }
 
 // NewAddDefaultSubnetValidatorTx returns a new NewAddDefaultSubnetValidatorTx
+/* TODO: Implement
 func (vm *VM) newAddDefaultSubnetValidatorTx(nonce, stakeAmt, startTime, endTime uint64, nodeID, destination ids.ShortID, shares, networkID uint32, key *crypto.PrivateKeySECP256K1R,
 ) (*addDefaultSubnetValidatorTx, error) {
 	tx := &addDefaultSubnetValidatorTx{
@@ -262,3 +264,4 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(nonce, stakeAmt, startTime, endTime
 
 	return tx, tx.initialize(vm)
 }
+*/

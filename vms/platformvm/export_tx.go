@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -70,16 +69,12 @@ func (tx *ExportTx) initialize(vm *VM) error {
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ExportTx: %w", err)
 	}
-	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
+	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
 
 // ID of this transaction
 func (tx *ExportTx) ID() ids.ID { return tx.id }
-
-// Key returns the public key of the signer of this transaction
-// Precondition: tx.Verify() has been called and returned nil
-func (tx *ExportTx) Key() crypto.PublicKey { return tx.key }
 
 // Bytes returns the byte representation of an ExportTx
 func (tx *ExportTx) Bytes() []byte { return tx.bytes }
@@ -113,18 +108,6 @@ func (tx *ExportTx) SyntacticVerify() error {
 		return errOutputsNotSorted
 	}
 
-	unsignedIntf := interface{}(&tx.UnsignedExportTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr of unsigned tx
-	if err != nil {
-		return err
-	}
-
-	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
-	if err != nil {
-		return err
-	}
-
-	tx.key = key
 	return nil
 }
 
@@ -143,6 +126,7 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 		amount = newAmount
 	}
 
+	/* TODO replace this
 	accountID := tx.key.Address()
 	account, err := tx.vm.getAccount(db, accountID)
 	if err != nil {
@@ -154,6 +138,8 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 		return err
 	}
 	return tx.vm.putAccount(db, account)
+	*/
+	return errors.New("TODO")
 }
 
 // Accept this transaction.
@@ -188,6 +174,7 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 	return atomic.WriteAll(batch, sharedBatch)
 }
 
+/* TODO implement
 func (vm *VM) newExportTx(nonce uint64, networkID uint32, outs []*ava.TransferableOutput, from *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
 	ava.SortTransferableOutputs(outs, Codec)
 
@@ -211,3 +198,4 @@ func (vm *VM) newExportTx(nonce uint64, networkID uint32, outs []*ava.Transferab
 
 	return tx, tx.initialize(vm)
 }
+*/

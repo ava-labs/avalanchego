@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -109,8 +108,10 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		return nil, nil, nil, nil, permError{errDBPutCurrentValidators}
 	}
 
+	/* TODO replace
 	switch vdrTx := vdrTx.(type) {
 	case *addDefaultSubnetValidatorTx:
+
 		duration := vdrTx.Duration()
 		amount := vdrTx.Wght
 		reward := reward(duration, amount, InflationRate)
@@ -177,6 +178,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 			tx.vm.Ctx.Log.Error("error while calculating balance with reward: %s", err)
 		}
 
+		/* TODO replace
 		delegatorAccountID := vdrTx.Destination
 		delegatorAccount, err := tx.vm.getAccount(db, delegatorAccountID) // account receiving staked $AVA (and, if applicable, reward)
 		// Error is likely because the staked $AVA is being sent to a new
@@ -227,9 +229,11 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		if err := tx.vm.putAccount(onCommitDB, validatorAccountWithReward); err != nil {
 			return nil, nil, nil, nil, permError{errDBPutAccount}
 		}
+		return nil, nil, nil, nil, tempError{errors.New("TODO")}
 	default:
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
+	*/
 
 	// Regardless of whether this tx is committed or aborted, update the
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit

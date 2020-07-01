@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -90,12 +89,11 @@ func (tx *CreateSubnetTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify nil iff [tx] is syntactically valid.
 // If [tx] is valid, this method sets [tx.key]
+// TODO: Only verify once
 func (tx *CreateSubnetTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.key != nil:
-		return nil // Only verify the transaction once
 	case tx.id.IsZero():
 		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
@@ -128,11 +126,14 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 	subnets = append(subnets, tx) // add new subnet
+	/* TODO add this back
 	if err := tx.vm.putSubnets(db, subnets); err != nil {
 		return nil, err
 	}
+	*/
 
 	// Deduct tx fee from payer's account
+	/* TODO: Deduct tx fee
 	account, err := tx.vm.getAccount(db, tx.key.Address())
 	if err != nil {
 		return nil, err
@@ -144,6 +145,7 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	if err := tx.vm.putAccount(db, account); err != nil {
 		return nil, err
 	}
+	*/
 
 	// Register new subnet in validator manager
 	onAccept := func() {
@@ -168,6 +170,7 @@ func (tx *CreateSubnetTx) Bytes() []byte {
 
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
+/* TODO implement
 func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []ids.ShortID,
 	threshold uint16, payerKey *crypto.PrivateKeySECP256K1R,
 ) (*CreateSubnetTx, error) {
@@ -212,3 +215,4 @@ func (lst CreateSubnetTxList) Bytes() []byte {
 	bytes, _ := Codec.Marshal(lst)
 	return bytes
 }
+*/

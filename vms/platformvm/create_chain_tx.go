@@ -145,6 +145,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 
+	/* TODO deduct fees
 	// Deduct tx fee from payer's account
 	account, err := tx.vm.getAccount(db, tx.PayerAddress)
 	if err != nil {
@@ -159,6 +160,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	if err := tx.vm.putAccount(db, account); err != nil {
 		return nil, err
 	}
+	*/
 
 	// Verify that this transaction has sufficient control signatures
 	subnets, err := tx.vm.getSubnets(db) // all subnets that exist
@@ -224,6 +226,7 @@ func (chains createChainList) Bytes() []byte {
 	return bytes
 }
 
+/* TODO implement
 func (vm *VM) newCreateChainTx(nonce uint64, subnetID ids.ID, genesisData []byte,
 	vmID ids.ID, fxIDs []ids.ID, chainName string, networkID uint32,
 	controlKeys []*crypto.PrivateKeySECP256K1R,
@@ -270,3 +273,4 @@ func (vm *VM) newCreateChainTx(nonce uint64, subnetID ids.ID, genesisData []byte
 
 	return tx, tx.initialize(vm)
 }
+*/
