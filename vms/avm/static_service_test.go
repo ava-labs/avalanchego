@@ -11,12 +11,12 @@ func TestBuildGenesis(t *testing.T) {
 	ss := StaticService{}
 
 	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
-		"asset1": AssetDefinition{
+		"asset1": {
 			Name:         "myFixedCapAsset",
 			Symbol:       "MFCA",
 			Denomination: 8,
 			InitialState: map[string][]interface{}{
-				"fixedCap": []interface{}{
+				"fixedCap": {
 					Holder{
 						Amount:  100000,
 						Address: "A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy",
@@ -36,11 +36,11 @@ func TestBuildGenesis(t *testing.T) {
 				},
 			},
 		},
-		"asset2": AssetDefinition{
+		"asset2": {
 			Name:   "myVarCapAsset",
 			Symbol: "MVCA",
 			InitialState: map[string][]interface{}{
-				"variableCap": []interface{}{
+				"variableCap": {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
@@ -58,10 +58,10 @@ func TestBuildGenesis(t *testing.T) {
 				},
 			},
 		},
-		"asset3": AssetDefinition{
+		"asset3": {
 			Name: "myOtherVarCapAsset",
 			InitialState: map[string][]interface{}{
-				"variableCap": []interface{}{
+				"variableCap": {
 					Owners{
 						Threshold: 1,
 						Minters: []string{

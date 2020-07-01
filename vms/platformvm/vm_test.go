@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"bytes"
-	"container/heap"
 	"errors"
 	"testing"
 	"time"
@@ -22,7 +21,6 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -139,7 +137,7 @@ func defaultVM() *VM {
 	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
-	db := memdb.New()
+	db := prefixdb.New([]byte{0}, memdb.New())
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
@@ -194,6 +192,8 @@ func defaultVM() *VM {
 		panic("no subnets found")
 	} // end delete
 
+	vm.registerDBTypes()
+
 	return vm
 }
 
@@ -227,7 +227,7 @@ func GenesisCurrentValidators() *EventHeap {
 			testNetworkID,                           // network ID
 			key,                                     // key paying tx fee and stake
 		)
-		heap.Push(validators, validator)
+		validators.Add(validator)
 	}
 	return validators
 }
@@ -374,6 +374,65 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	pendingSampler.Set(vm.getValidators(pendingValidators))
 	if !pendingSampler.Contains(ID) {
 		t.Fatalf("pending validator should have validator with ID %s", ID)
+	}
+}
+
+// verify invalid proposal to add validator to default subnet
+func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
+	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+	key, _ := vm.factory.NewPrivateKey()
+	ID := key.PublicKey().Address()
+
+	// create invalid tx
+	tx, err := vm.newAddDefaultSubnetValidatorTx(
+		defaultNonce+1,
+		defaultStakeAmount,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		ID,
+		ID,
+		NumberOfShares,
+		testNetworkID,
+		defaultKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blk, err := vm.newProposalBlock(vm.LastAccepted(), tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.DB.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err == nil {
+		t.Fatalf("Should have errored during verification")
+	}
+
+	if status := blk.Status(); status != choices.Rejected {
+		t.Fatalf("Should have marked the block as rejected")
+	}
+
+	parsedBlk, err := vm.GetBlock(blk.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := parsedBlk.Status(); status != choices.Rejected {
+		t.Fatalf("Should have marked the block as rejected")
 	}
 }
 
@@ -953,7 +1012,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.unissuedEvents.Push(addValidatorTx)
+	vm.unissuedEvents.Add(addValidatorTx)
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	if err != nil {
 		t.Fatal(err)
@@ -1130,7 +1189,7 @@ func TestAtomicImport(t *testing.T) {
 	key := keys[0]
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
 
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
@@ -1223,7 +1282,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	key := keys[0]
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
 
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
@@ -1552,16 +1611,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	advanceTimePreference := advanceTimeBlk.Options()[0]
 
+	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	vdrs := validators.NewSet()
-	vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+	vdrs.Add(validators.NewValidator(peerID, 1))
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
 	timeoutManager.Initialize(2 * time.Second)
 	go timeoutManager.Dispatch()
 
-	router := &router.ChainRouter{}
-	router.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
+	chainRouter := &router.ChainRouter{}
+	chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -1569,7 +1629,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
 
-	sender.Initialize(ctx, externalSender, router, &timeoutManager)
+	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
 	// The engine handles consensus
 	engine := smeng.Transitive{}
@@ -1597,11 +1657,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	})
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler := &handler.Handler{}
-	handler.Initialize(&engine, msgChan, 1000)
+	handler := &router.Handler{}
+	handler.Initialize(
+		&engine,
+		msgChan,
+		1000,
+		"",
+		prometheus.NewRegistry(),
+	)
 
 	// Allow incoming messages to be routed to the new chain
-	router.AddChain(handler)
+	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	reqID := new(uint32)
@@ -1618,23 +1684,23 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	frontier := ids.Set{}
 	frontier.Add(advanceTimeBlkID)
-	engine.AcceptedFrontier(ctx.NodeID, *reqID, frontier)
+	engine.AcceptedFrontier(peerID, *reqID, frontier)
 
 	externalSender.GetAcceptedF = nil
-	externalSender.GetF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
 		*reqID = requestID
 		if !containerID.Equals(advanceTimeBlkID) {
 			t.Fatalf("wrong block requested")
 		}
 	}
 
-	engine.Accepted(ctx.NodeID, *reqID, frontier)
+	engine.Accepted(peerID, *reqID, frontier)
 
 	externalSender.GetF = nil
 	externalSender.CantPushQuery = false
 	externalSender.CantPullQuery = false
 
-	engine.Put(ctx.NodeID, *reqID, advanceTimeBlkID, advanceTimeBlkBytes)
+	engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes})
 
 	externalSender.CantPushQuery = true
 
@@ -1646,7 +1712,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	ctx.Lock.Unlock()
 
-	router.Shutdown()
+	chainRouter.Shutdown()
 }
 
 func TestUnverifiedParent(t *testing.T) {

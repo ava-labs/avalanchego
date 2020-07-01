@@ -76,7 +76,7 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 func TestEngineShutdown(t *testing.T) {
 	_, _, _, vm, transitive, _ := setup(t)
 	vmShutdownCalled := false
-	vm.ShutdownF = func() { vmShutdownCalled = true }
+	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	vm.CantShutdown = false
 	transitive.Shutdown()
 	if !vmShutdownCalled {
@@ -810,13 +810,13 @@ func TestVoteCanceling(t *testing.T) {
 
 	te.insert(blk)
 
-	if len(te.polls.m) != 1 {
+	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
 	}
 
 	te.QueryFailed(vdr0.ID(), *queryRequestID)
 
-	if len(te.polls.m) != 1 {
+	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
 	}
 
@@ -1520,5 +1520,126 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	if *numPulled != 1 {
 		t.Fatalf("Should have sent an additional pull query")
+	}
+}
+
+func TestEngineDoubleChit(t *testing.T) {
+	config := DefaultConfig()
+
+	config.Params = snowball.Parameters{
+		Metrics:      prometheus.NewRegistry(),
+		K:            2,
+		Alpha:        2,
+		BetaVirtuous: 1,
+		BetaRogue:    2,
+	}
+
+	vdr0 := validators.GenerateRandomValidator(1)
+	vdr1 := validators.GenerateRandomValidator(1)
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vals.Add(vdr0)
+	vals.Add(vdr1)
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+
+	vm := &VMTest{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+	vm.CantSetPreference = false
+
+	gBlk := &Blk{
+		id:     GenerateID(),
+		status: choices.Accepted,
+	}
+
+	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	sender.CantGetAcceptedFrontier = false
+
+	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+		switch {
+		case id.Equals(gBlk.ID()):
+			return gBlk, nil
+		}
+		t.Fatalf("Unknown block")
+		panic("Should have errored")
+	}
+
+	te := &Transitive{}
+	te.Initialize(config)
+	te.finishBootstrapping()
+
+	vm.LastAcceptedF = nil
+	sender.CantGetAcceptedFrontier = true
+
+	blk := &Blk{
+		parent: gBlk,
+		id:     GenerateID(),
+		status: choices.Processing,
+		bytes:  []byte{1},
+	}
+
+	queried := new(bool)
+	queryRequestID := new(uint32)
+	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+		if *queried {
+			t.Fatalf("Asked multiple times")
+		}
+		*queried = true
+		*queryRequestID = requestID
+		vdrSet := ids.ShortSet{}
+		vdrSet.Add(vdr0.ID(), vdr1.ID())
+		if !inVdrs.Equals(vdrSet) {
+			t.Fatalf("Asking wrong validator for preference")
+		}
+		if !blk.ID().Equals(blkID) {
+			t.Fatalf("Asking for wrong block")
+		}
+	}
+
+	te.insert(blk)
+
+	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+		switch {
+		case id.Equals(gBlk.ID()):
+			return gBlk, nil
+		case id.Equals(blk.ID()):
+			return blk, nil
+		}
+		t.Fatalf("Unknown block")
+		panic("Should have errored")
+	}
+
+	blkSet := ids.Set{}
+	blkSet.Add(blk.ID())
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr0.ID(), *queryRequestID, blkSet)
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr0.ID(), *queryRequestID, blkSet)
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr1.ID(), *queryRequestID, blkSet)
+
+	if status := blk.Status(); status != choices.Accepted {
+		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Accepted)
 	}
 }

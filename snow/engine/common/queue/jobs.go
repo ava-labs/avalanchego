@@ -79,14 +79,19 @@ func (j *Jobs) HasNext() (bool, error) {
 
 // Execute ...
 func (j *Jobs) Execute(job Job) error {
-	job.Execute()
+	if err := job.Execute(); err != nil {
+		return err
+	}
 
 	jobID := job.ID()
 
-	blocking, _ := j.state.Blocking(j.db, jobID)
-	j.state.DeleteBlocking(j.db, jobID)
+	blocking, err := j.state.Blocking(j.db, jobID)
+	if err != nil {
+		return err
+	}
+	j.state.DeleteBlocking(j.db, jobID, blocking)
 
-	for _, blockedID := range blocking.List() {
+	for _, blockedID := range blocking {
 		job, err := j.state.Job(j.db, blockedID)
 		if err != nil {
 			return err
@@ -128,15 +133,19 @@ func (j *Jobs) push(job Job) error {
 }
 
 func (j *Jobs) block(job Job, deps ids.Set) error {
+	if has, err := j.state.HasJob(j.db, job.ID()); err != nil {
+		return err
+	} else if has {
+		return errDuplicate
+	}
+
 	if err := j.state.SetJob(j.db, job); err != nil {
 		return err
 	}
 
 	jobID := job.ID()
 	for _, depID := range deps.List() {
-		blocking, _ := j.state.Blocking(j.db, depID)
-		blocking.Add(jobID)
-		if err := j.state.SetBlocking(j.db, depID, blocking); err != nil {
+		if err := j.state.AddBlocking(j.db, depID, jobID); err != nil {
 			return err
 		}
 	}

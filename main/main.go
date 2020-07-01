@@ -40,12 +40,11 @@ func main() {
 	defer log.StopOnPanic()
 	defer Config.DB.Close()
 
-	if Config.StakingIP.IsZero() {
-		log.Warn("NAT traversal has failed. If this node becomes a staker, it may lose its reward due to being unreachable.")
-	}
-
 	// Track if sybil control is enforced
-	if !Config.EnableStaking {
+	if !Config.EnableStaking && Config.EnableP2PTLS {
+		log.Warn("Staking is disabled. Sybil control is not enforced.")
+	}
+	if !Config.EnableStaking && !Config.EnableP2PTLS {
 		log.Warn("Staking and p2p encryption are disabled. Packet spoofing is possible.")
 	}
 
@@ -62,30 +61,34 @@ func main() {
 
 	// Track if assertions should be executed
 	if Config.LoggingConfig.Assertions {
-		log.Warn("assertions are enabled. This may slow down execution")
+		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
-	mapper := nat.NewDefaultMapper(log, Config.Nat, nat.TCP, "gecko")
+	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
-	mapper.MapPort(Config.StakingIP.Port, Config.StakingIP.Port)
-	mapper.MapPort(Config.HTTPPort, Config.HTTPPort)
+	port, err := mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking") // Open staking port
+	if err == nil {
+		Config.StakingIP.Port = port
+	} else {
+		log.Warn("NAT traversal has failed. The node will be able to connect to less nodes.")
+	}
+
+	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" { // Open HTTP port iff HTTP server not listening on localhost
+		_, _ = mapper.Map("TCP", Config.HTTPPort, "gecko-http")
+	}
+
+	node := node.Node{}
 
 	log.Debug("initializing node state")
-	// MainNode is a global variable in the node.go file
-	if err := node.MainNode.Initialize(&Config, log, factory); err != nil {
+	if err := node.Initialize(&Config, log, factory); err != nil {
 		log.Fatal("error initializing node state: %s", err)
 		return
 	}
 
-	log.Debug("Starting servers")
-	if err := node.MainNode.StartConsensusServer(); err != nil {
-		log.Fatal("problem starting servers: %s", err)
-		return
-	}
+	defer node.Shutdown()
 
-	defer node.MainNode.Shutdown()
-
-	log.Debug("Dispatching node handlers")
-	node.MainNode.Dispatch()
+	log.Debug("dispatching node handlers")
+	err = node.Dispatch()
+	log.Debug("node dispatching returned with %s", err)
 }

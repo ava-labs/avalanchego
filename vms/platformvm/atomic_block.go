@@ -36,7 +36,7 @@ type AtomicTx interface {
 // AtomicBlock being accepted results in the transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
-	SingleDecisionBlock `serialize:"true"`
+	CommonDecisionBlock `serialize:"true"`
 
 	Tx AtomicTx `serialize:"true"`
 
@@ -45,7 +45,7 @@ type AtomicBlock struct {
 
 // initialize this block
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
-	if err := ab.SingleDecisionBlock.initialize(vm, bytes); err != nil {
+	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
 	return ab.Tx.initialize(vm)
@@ -96,24 +96,29 @@ func (ab *AtomicBlock) Verify() error {
 }
 
 // Accept implements the snowman.Block interface
-func (ab *AtomicBlock) Accept() {
+func (ab *AtomicBlock) Accept() error {
 	ab.vm.Ctx.Log.Verbo("Accepting block with ID %s", ab.ID())
 
-	ab.CommonBlock.Accept()
+	if err := ab.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
 	if err := ab.onAcceptDB.Commit(); err != nil {
 		ab.vm.Ctx.Log.Error("unable to commit onAcceptDB")
+		return err
 	}
 
 	batch, err := ab.vm.DB.CommitBatch()
 	if err != nil {
 		ab.vm.Ctx.Log.Fatal("unable to commit vm's DB")
+		return err
 	}
 	defer ab.vm.DB.Abort()
 
 	if err := ab.Tx.Accept(batch); err != nil {
 		ab.vm.Ctx.Log.Error("unable to atomically commit block")
+		return err
 	}
 
 	for _, child := range ab.children {
@@ -123,21 +128,17 @@ func (ab *AtomicBlock) Accept() {
 		ab.onAcceptFunc()
 	}
 
-	parent := ab.parentBlock()
-	// remove this block and its parent from memory
-	parent.free()
 	ab.free()
+	return nil
 }
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
 func (vm *VM) newAtomicBlock(parentID ids.ID, tx AtomicTx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
-		SingleDecisionBlock: SingleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{
-			CommonBlock: CommonBlock{
-				Block: core.NewBlock(parentID),
-				vm:    vm,
-			},
+		CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
+			Block: core.NewBlock(parentID),
+			vm:    vm,
 		}},
 		Tx: tx,
 	}

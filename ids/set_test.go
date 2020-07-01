@@ -55,3 +55,46 @@ func TestSet(t *testing.T) {
 		t.Fatalf("Sets overlap")
 	}
 }
+
+func TestSetCappedList(t *testing.T) {
+	set := Set{}
+
+	id := Empty
+
+	if list := set.CappedList(0); len(list) != 0 {
+		t.Fatalf("List should have been empty but was %v", list)
+	}
+
+	set.Add(id)
+
+	if list := set.CappedList(0); len(list) != 0 {
+		t.Fatalf("List should have been empty but was %v", list)
+	} else if list := set.CappedList(1); len(list) != 1 {
+		t.Fatalf("List should have had length %d but had %d", 1, len(list))
+	} else if returnedID := list[0]; !id.Equals(returnedID) {
+		t.Fatalf("List should have been %s but was %s", id, returnedID)
+	} else if list := set.CappedList(2); len(list) != 1 {
+		t.Fatalf("List should have had length %d but had %d", 1, len(list))
+	} else if returnedID := list[0]; !id.Equals(returnedID) {
+		t.Fatalf("List should have been %s but was %s", id, returnedID)
+	}
+
+	id2 := NewID([32]byte{1})
+	set.Add(id2)
+
+	if list := set.CappedList(0); len(list) != 0 {
+		t.Fatalf("List should have been empty but was %v", list)
+	} else if list := set.CappedList(1); len(list) != 1 {
+		t.Fatalf("List should have had length %d but had %d", 1, len(list))
+	} else if returnedID := list[0]; !id.Equals(returnedID) && !id2.Equals(returnedID) {
+		t.Fatalf("List should have been %s but was %s", id, returnedID)
+	} else if list := set.CappedList(2); len(list) != 2 {
+		t.Fatalf("List should have had length %d but had %d", 2, len(list))
+	} else if list := set.CappedList(3); len(list) != 2 {
+		t.Fatalf("List should have had length %d but had %d", 2, len(list))
+	} else if returnedID := list[0]; !id.Equals(returnedID) && !id2.Equals(returnedID) {
+		t.Fatalf("list contains unexpected element %s", returnedID)
+	} else if returnedID := list[1]; !id.Equals(returnedID) && !id2.Equals(returnedID) {
+		t.Fatalf("list contains unexpected element %s", returnedID)
+	}
+}

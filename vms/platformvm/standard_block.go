@@ -54,6 +54,13 @@ func (sb *StandardBlock) Verify() error {
 	// be a decision.
 	parent, ok := parentBlock.(decision)
 	if !ok {
+		if err := sb.Reject(); err == nil {
+			if err := sb.vm.DB.Commit(); err != nil {
+				sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+			}
+		} else {
+			sb.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
 
@@ -64,6 +71,13 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		onAccept, err := tx.SemanticVerify(sb.onAcceptDB)
 		if err != nil {
+			if err := sb.Reject(); err == nil {
+				if err := sb.vm.DB.Commit(); err != nil {
+					sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+				}
+			} else {
+				sb.vm.DB.Abort()
+			}
 			return err
 		}
 		if onAccept != nil {

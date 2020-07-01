@@ -129,27 +129,44 @@ func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server 
 	return server
 }
 
+// Bootstrapping ...
+func (vm *VMClient) Bootstrapping() error {
+	_, err := vm.client.Bootstrapping(context.Background(), &vmproto.BootstrappingRequest{})
+	return err
+}
+
+// Bootstrapped ...
+func (vm *VMClient) Bootstrapped() error {
+	_, err := vm.client.Bootstrapped(context.Background(), &vmproto.BootstrappedRequest{})
+	return err
+}
+
 // Shutdown ...
-func (vm *VMClient) Shutdown() {
+func (vm *VMClient) Shutdown() error {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 
 	if vm.closed {
-		return
+		return nil
 	}
 
 	vm.closed = true
 
-	vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{})
+	if _, err := vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{}); err != nil {
+		return err
+	}
 
 	for _, server := range vm.servers {
 		server.Stop()
 	}
 	for _, conn := range vm.conns {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			return err
+		}
 	}
 
 	vm.proc.Kill()
+	return nil
 }
 
 // CreateHandlers ...
@@ -289,23 +306,23 @@ type BlockClient struct {
 func (b *BlockClient) ID() ids.ID { return b.id }
 
 // Accept ...
-func (b *BlockClient) Accept() {
+func (b *BlockClient) Accept() error {
 	delete(b.vm.blks, b.id.Key())
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
 		Id: b.id.Bytes(),
 	})
-	b.vm.ctx.Log.AssertNoError(err)
+	return err
 }
 
 // Reject ...
-func (b *BlockClient) Reject() {
+func (b *BlockClient) Reject() error {
 	delete(b.vm.blks, b.id.Key())
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id.Bytes(),
 	})
-	b.vm.ctx.Log.AssertNoError(err)
+	return err
 }
 
 // Status ...

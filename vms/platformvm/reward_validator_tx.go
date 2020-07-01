@@ -41,12 +41,12 @@ func (tx *rewardValidatorTx) initialize(vm *VM) error {
 }
 
 // SyntacticVerify that this transaction is well formed
-func (tx *rewardValidatorTx) SyntacticVerify() error {
+func (tx *rewardValidatorTx) SyntacticVerify() TxError {
 	switch {
 	case tx == nil:
-		return errNilTx
+		return tempError{errNilTx}
 	case tx.TxID.IsZero():
-		return errInvalidID
+		return tempError{errInvalidID}
 	default:
 		return nil
 	}
@@ -58,39 +58,39 @@ func (tx *rewardValidatorTx) SyntacticVerify() error {
 // The next validator to be removed must be the validator specified in this block.
 // The next validator to be removed must be have an end time equal to the current
 //   chain timestamp.
-func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), error) {
+func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	if db == nil {
-		return nil, nil, nil, nil, errDBNil
+		return nil, nil, nil, nil, tempError{errDBNil}
 	}
 
 	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, errDBCurrentValidators
+		return nil, nil, nil, nil, permError{errDBCurrentValidators}
 	}
 	if currentEvents.Len() == 0 { // there is no validator to remove
-		return nil, nil, nil, nil, errEmptyValidatingSet
+		return nil, nil, nil, nil, permError{errEmptyValidatingSet}
 	}
 
 	vdrTx := currentEvents.Peek()
 
 	if txID := vdrTx.ID(); !txID.Equals(tx.TxID) {
-		return nil, nil, nil, nil, fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
+		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
 			tx.TxID,
-			txID)
+			txID)}
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
 	currentTime, err := tx.vm.getTimestamp(db)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, permError{err}
 	}
 	if endTime := vdrTx.EndTime(); !endTime.Equal(currentTime) {
-		return nil, nil, nil, nil, fmt.Errorf("attempting to remove TxID: %s before their end time %s",
+		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s before their end time %s",
 			tx.TxID,
-			endTime)
+			endTime)}
 	}
 
 	heap.Pop(currentEvents) // Remove validator from the validator set
@@ -99,14 +99,14 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	// If this tx's proposal is committed, remove the validator from the validator set and update the
 	// account balance to reflect the return of staked $AVA and their reward.
 	if err := tx.vm.putCurrentValidators(onCommitDB, currentEvents, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, errDBPutCurrentValidators
+		return nil, nil, nil, nil, permError{errDBPutCurrentValidators}
 	}
 
 	onAbortDB := versiondb.New(db)
 	// If this tx's proposal is aborted, remove the validator from the validator set and update the
 	// account balance to reflect the return of staked $AVA. The validator receives no reward.
 	if err := tx.vm.putCurrentValidators(onAbortDB, currentEvents, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, errDBPutCurrentValidators
+		return nil, nil, nil, nil, permError{errDBPutCurrentValidators}
 	}
 
 	switch vdrTx := vdrTx.(type) {
@@ -144,15 +144,15 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		}
 
 		if err := tx.vm.putAccount(onCommitDB, accountWithReward); err != nil {
-			return nil, nil, nil, nil, errDBPutAccount
+			return nil, nil, nil, nil, tempError{errDBPutAccount}
 		}
 		if err := tx.vm.putAccount(onAbortDB, accountNoReward); err != nil {
-			return nil, nil, nil, nil, errDBPutAccount
+			return nil, nil, nil, nil, tempError{errDBPutAccount}
 		}
 	case *addDefaultSubnetDelegatorTx:
 		parentTx, err := currentEvents.getDefaultSubnetStaker(vdrTx.NodeID)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, permError{err}
 		}
 
 		duration := vdrTx.Duration()
@@ -201,10 +201,10 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		}
 
 		if err := tx.vm.putAccount(onCommitDB, delegatorAccountWithReward); err != nil {
-			return nil, nil, nil, nil, errDBPutAccount
+			return nil, nil, nil, nil, tempError{errDBPutAccount}
 		}
 		if err := tx.vm.putAccount(onAbortDB, delegatorAccountNoReward); err != nil {
-			return nil, nil, nil, nil, errDBPutAccount
+			return nil, nil, nil, nil, tempError{errDBPutAccount}
 		}
 
 		validatorAccountID := parentTx.Destination
@@ -225,10 +225,10 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		}
 
 		if err := tx.vm.putAccount(onCommitDB, validatorAccountWithReward); err != nil {
-			return nil, nil, nil, nil, errDBPutAccount
+			return nil, nil, nil, nil, permError{errDBPutAccount}
 		}
 	default:
-		return nil, nil, nil, nil, errShouldBeDSValidator
+		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
 
 	// Regardless of whether this tx is committed or aborted, update the

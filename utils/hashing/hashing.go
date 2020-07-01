@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 
 	"golang.org/x/crypto/ripemd160"
@@ -50,7 +49,7 @@ func ByteArraysToHash256Array(byteArray ...[]byte) [32]byte {
 	for _, b := range byteArray {
 		err := binary.Write(buffer, binary.LittleEndian, b)
 		if err != nil {
-			fmt.Println(err)
+			panic(err)
 		}
 	}
 	return ComputeHash256Array(buffer.Bytes())

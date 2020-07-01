@@ -23,17 +23,19 @@ func TestStateIDs(t *testing.T) {
 
 	state := vm.state.state
 
-	id0 := ids.NewID([32]byte{0xff, 0})
-	id1 := ids.NewID([32]byte{0xff, 0})
-	id2 := ids.NewID([32]byte{0xff, 0})
+	id0 := ids.NewID([32]byte{0x00, 0})
+	id1 := ids.NewID([32]byte{0x01, 0})
+	id2 := ids.NewID([32]byte{0x02, 0})
 
-	if _, err := state.IDs(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
+	if _, err := state.IDs(ids.Empty); err != nil {
+		t.Fatal(err)
 	}
 
 	expected := []ids.ID{id0, id1}
-	if err := state.SetIDs(ids.Empty, expected); err != nil {
-		t.Fatal(err)
+	for _, id := range expected {
+		if err := state.AddID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	result, err := state.IDs(ids.Empty)
@@ -45,6 +47,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -52,9 +55,26 @@ func TestStateIDs(t *testing.T) {
 		}
 	}
 
-	expected = []ids.ID{id1, id2}
-	if err := state.SetIDs(ids.Empty, expected); err != nil {
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result, err = state.IDs(ids.Empty)
+	if err != nil {
 		t.Fatal(err)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
+	}
+
+	expected = []ids.ID{id1, id2}
+	for _, id := range expected {
+		if err := state.AddID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	result, err = state.IDs(ids.Empty)
@@ -66,6 +86,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -84,6 +105,7 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -95,18 +117,6 @@ func TestStateIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during cache lookup")
-	}
-
-	state.Cache.Flush()
-
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during parsing")
-	}
-
 	statusResult, err := state.Status(ids.Empty)
 	if err != nil {
 		t.Fatal(err)
@@ -115,16 +125,27 @@ func TestStateIDs(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{ids.ID{}}); err == nil {
-		t.Fatalf("Should have errored during serialization")
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{}); err != nil {
+	result, err = state.IDs(ids.Empty)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := state.IDs(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
+	if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
+	}
+
+	if err := state.AddID(ids.Empty, ids.ID{}); err == nil {
+		t.Fatalf("Should have errored during serialization")
+	}
+
+	if err := state.RemoveID(ids.Empty, ids.ID{}); err == nil {
+		t.Fatalf("Should have errored during serialization")
 	}
 }
 
@@ -153,14 +174,7 @@ func TestStateStatuses(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{ids.Empty}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := state.Status(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
-	}
-
-	if err := state.SetStatus(ids.Empty, choices.Accepted); err != nil {
+	if err := state.AddID(ids.Empty, ids.Empty); err != nil {
 		t.Fatal(err)
 	}
 
@@ -274,7 +288,7 @@ func TestStateTXs(t *testing.T) {
 	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: ava.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,

@@ -4,41 +4,29 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Ted: contact me when you make any changes
+# Download dependencies
+echo "Downloading dependencies..."
+go mod download
 
-PREFIX="${PREFIX:-$(pwd)/build}"
-PLUGIN_PREFIX="$PREFIX/plugins"
+# Set GOPATH
+GOPATH="$(go env GOPATH)"
 
-SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SRC_DIR/env.sh"
+GECKO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
+BUILD_DIR=$GECKO_PATH/build # Where binaries go
+PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 
-CORETH_PKG=github.com/ava-labs/coreth
-CORETH_PATH="$GOPATH/src/$CORETH_PKG"
-if [[ -d "$CORETH_PATH/.git" ]]; then
-    cd "$CORETH_PATH"
-    go get -t -v -d "./..."
-    cd -
-else
-    go get -t -v -d "$CORETH_PKG/..."
-fi
-cd "$CORETH_PATH"
-git -c advice.detachedHead=false checkout v0.1.0
-cd -
+CORETH_VER="0.2.5" # Should match coreth version in go.mod
+CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@v$CORETH_VER"
 
-GECKO_PKG=github.com/ava-labs/gecko
-GECKO_PATH="$GOPATH/src/$GECKO_PKG"
-if [[ -d "$GECKO_PATH/.git" ]]; then
-    cd "$GECKO_PATH"
-    go get -t -v -d "./..."
-    cd -
-else
-    go get -t -v -d "$GECKO_PKG/..."
-fi
+# Build Gecko
+echo "Building Gecko..."
+go build -o "$BUILD_DIR/ava" "$GECKO_PATH/main/"*.go
 
-go build -o "$PREFIX/ava" "$GECKO_PATH/main/"*.go
-go build -o "$PREFIX/xputtest" "$GECKO_PATH/xputtest/"*.go
-go build -o "$PLUGIN_PREFIX/evm" "$CORETH_PATH/plugin/"*.go
-if [[ -f "$PREFIX/ava" && -f "$PREFIX/xputtest" && -f "$PLUGIN_PREFIX/evm" ]]; then
+# Build Coreth, which is run as a subprocess by Gecko
+echo "Building Coreth..."
+go build -o "$PLUGIN_DIR/evm" "$CORETH_PATH/plugin/"*.go
+
+if [[ -f "$BUILD_DIR/ava" && -f "$PLUGIN_DIR/evm" ]]; then
         echo "Build Successful" 
 else
         echo "Build failure" 

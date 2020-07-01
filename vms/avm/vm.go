@@ -20,12 +20,12 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
@@ -45,6 +45,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
+	errBootstrapping             = errors.New("chain is currently bootstrapping")
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -66,6 +67,9 @@ type VM struct {
 
 	// State management
 	state *prefixedState
+
+	// Set to true once this VM is marked as `Bootstrapped` by the engine
+	bootstrapped bool
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -171,7 +175,6 @@ func (vm *VM) Initialize(
 		tx:       &cache.LRU{Size: idCacheSize},
 		utxo:     &cache.LRU{Size: idCacheSize},
 		txStatus: &cache.LRU{Size: idCacheSize},
-		funds:    &cache.LRU{Size: idCacheSize},
 
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
@@ -198,10 +201,33 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
+// Bootstrapping is called by the consensus engine when it starts bootstrapping
+// this chain
+func (vm *VM) Bootstrapping() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapping(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Bootstrapped is called by the consensus engine when it is done bootstrapping
+// this chain
+func (vm *VM) Bootstrapped() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapped(); err != nil {
+			return err
+		}
+	}
+	vm.bootstrapped = true
+	return nil
+}
+
 // Shutdown implements the avalanche.DAGVM interface
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
-		return
+		return nil
 	}
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
@@ -210,9 +236,7 @@ func (vm *VM) Shutdown() {
 	vm.timer.Stop()
 	vm.ctx.Lock.Lock()
 
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
-	}
+	return vm.baseDB.Close()
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
@@ -224,8 +248,8 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	rpcServer.RegisterService(&Service{vm: vm}, "avm") // name this service "avm"
 
 	return map[string]*common.HTTPHandler{
-		"":        &common.HTTPHandler{Handler: rpcServer},
-		"/pubsub": &common.HTTPHandler{LockOptions: common.NoLock, Handler: vm.pubsub},
+		"":        {Handler: rpcServer},
+		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}
 }
 
@@ -237,7 +261,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&StaticService{}, "avm") // name this service "avm"
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{LockOptions: common.WriteLock, Handler: newServer},
+		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}
 }
 
@@ -275,6 +299,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
 func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
+	if !vm.bootstrapped {
+		return ids.ID{}, errBootstrapping
+	}
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err
@@ -465,10 +492,10 @@ func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
 		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
-
 		if err := tx.setStatus(choices.Processing); err != nil {
 			return nil, err
 		}
+		return tx, vm.db.Commit()
 	}
 
 	return tx, nil

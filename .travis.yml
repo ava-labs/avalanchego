@@ -1,16 +1,34 @@
-dist: bionic
 language: go
+go:
+  - 1.13.x
+
+jobs:
+  include:
+    - os: linux
+      dist: bionic
+    - os: osx
+      osx_image: xcode11.4
 services:
 - docker
 env:
   global:
   - CODECOV_TOKEN="8c18c993-fc6e-4706-998b-01ddc7987804"
   - GECKO_HOME=/go/src/github.com/ava-labs/gecko/
+  - E2E_TEST_HOME=/go/src/github.com/kurtosis-tech/ava-e2e-tests/
   - COMMIT=${TRAVIS_COMMIT::8}
   - DOCKERHUB_REPO=avaplatform/gecko
   - secure: "L/A9+re0NEKP6EV6H9RcTGiDhX3WMvsiWrkRKDYKqnviqbjY30RK6EM4vvjrM4Lrw2QwsO3YKgnku3+zioE/TxEZFkpkbjNUXru0nYBrWAg1TKVsDXnYaIZkHUejfryST3E8N7F4Hx6zCtGEO0sEdUeKuT+MNUIuHezHooTgGzDjMogm70EWMFjQHc7VucTJu7dWU1RBPjovWQ0q9qflrtCpbrvXFIiihQQ1PQha1Q2C4wLakKuLbhhSafue90Mnyss0blaPHy/tyewcASJu4vsGTKRBn0DzttlkNTwuD6+nKrbmJY0ohunnkVFzYjrZAw1gyN+DCDb/lPbz4ZDItKPwrIUPEtL5xuUOrxUZPUh+0io3Q2d6rjaqkdGjd1KQXzbnW1mn0BxX3d3b2UpIqhBn9umYYjHBKnMuoRiTK33b7U9+LF3K84+tEvVDCPeHs/mw6Inp5jGRSravnM6yPQ6feGzogs4+3EMzZXxnkngKFKCsnd67Oe9xfV9amOU2aQAx4jaAwlPjEpBEkUa8YKx3lPznvmUk1QsNCUbLjdSl5JBaXojLJoiuPbj29hp4S5AXXgn+3Hvwk3ndcFCxi6/l1W9mjYSOtFqg3EAUdF4EgnA/ykQg9ZokkoKY0+qgOzG2bKOAYuCDWeGr7P1apToh00ccsQXL81nVPiq7uDw="
   - secure: "zfTm7tJBYiPYrli76d4Ep6Lc2TJQ8Xv//+7OoqTA/aIf6YJDHe05f2GFTWAHG2iOIix/yjwHYwnhyIW66eWPb+Ujejnmh4eXlYZFufX9J5jUpDpbFu/+ybOLgE1Tmr0je0ycneSMe/NAaS74nWU1wnP34/cEE4sYL7TJyhwbeEtgz3cbSWwkpdvHFbXCjSOA196jdIYYUwsnqU9yycAG+2WUSk3DHHzzdtMrh/UOH2r1VFyp5US0zmbW90WkWX+o3TIlzZJgTUGQRNnWKq95Mrh1EQotxgL6CJ8NkfY4bVAGAhusPjdjscJsHxfY93WRMH64TzPYYp0zdibatH0ztyhnZPXVKqv+AIIVTEW+xWv5V18kTQAd1uBW103NFacbgXhIGWtbFcN9g1+ws29HROMclYs7ci6+72Qnq0eL55huqSyFx6+InhYwn+LfJmaBcGW4wx1umdp505M0obZ4ghlyn6b0pDYmqsu1XyBC3mjUTFbwlQmWE2Fize4L5o+DdH4ZDc9japF9ntxIMvO+b3nOicr7tplY2AGp61bB89o3dUAFlN5mDaEJotiAuFk5mo244rY1FjSzyGiKkA3M9TkTIbgcbN098hOJoMCYybH7yqiPwNnZiFvUuYjHuC5D1kIYBWuqqO0iVcbIZn0rV2jyzbVFlhFVk2clTZGhkrY="
-before_install: .ci/before_install.sh
-install: DOCKER_BUILDKIT=1 docker build --progress plain -t $DOCKERHUB_REPO:$COMMIT .
-script: docker run --rm -v "$PWD:$GECKO_HOME" $DOCKERHUB_REPO:$COMMIT bash "$GECKO_HOME/scripts/build_test.sh"
-after_success: .ci/after_success.sh
+before_install: 
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/before_install_linux.sh; fi
+
+install: 
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then DOCKER_BUILDKIT=1 docker build --progress plain -t $DOCKERHUB_REPO:$COMMIT . ; fi
+
+script: 
+ - if [ "$TRAVIS_OS_NAME" = "osx" ]; then .ci/runscript_osx.sh; fi
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/runscript_linux.sh; .ci/run_e2e_tests.sh; fi
+
+#Need to push to docker hub only from one build
+after_success: 
+ - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/after_success.sh; fi

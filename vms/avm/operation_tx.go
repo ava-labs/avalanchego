@@ -8,8 +8,8 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -37,6 +37,17 @@ func (t *OperationTx) InputUTXOs() []*ava.UTXOID {
 		utxos = append(utxos, op.UTXOIDs...)
 	}
 	return utxos
+}
+
+// ConsumedAssetIDs returns the IDs of the assets this transaction consumes
+func (t *OperationTx) ConsumedAssetIDs() ids.Set {
+	assets := t.BaseTx.AssetIDs()
+	for _, op := range t.Ops {
+		if len(op.UTXOIDs) > 0 {
+			assets.Add(op.AssetID())
+		}
+	}
+	return assets
 }
 
 // AssetIDs returns the IDs of the assets this transaction depends on

@@ -125,14 +125,14 @@ func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 
 func TestParametersInvalidConcurrentRepolls(t *testing.T) {
 	tests := []Parameters{
-		Parameters{
+		{
 			K:                 1,
 			Alpha:             1,
 			BetaVirtuous:      1,
 			BetaRogue:         1,
 			ConcurrentRepolls: 2,
 		},
-		Parameters{
+		{
 			K:                 1,
 			Alpha:             1,
 			BetaVirtuous:      1,

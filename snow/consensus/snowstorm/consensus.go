@@ -28,8 +28,9 @@ type Consensus interface {
 	// That is, no transaction has been added that conflicts with <Tx>
 	IsVirtuous(Tx) bool
 
-	// Adds a new transaction to vote on
-	Add(Tx)
+	// Adds a new transaction to vote on. Returns if a critical error has
+	// occurred.
+	Add(Tx) error
 
 	// Returns true iff transaction <Tx> has been added
 	Issued(Tx) bool
@@ -45,8 +46,8 @@ type Consensus interface {
 	Conflicts(Tx) ids.Set
 
 	// Collects the results of a network poll. Assumes all transactions
-	// have been previously added
-	RecordPoll(ids.Bag)
+	// have been previously added. Returns if a critical error has occurred.
+	RecordPoll(ids.Bag) error
 
 	// Returns true iff all remaining transactions are rogue. Note, it is
 	// possible that after returning quiesce, a new decision may be added such

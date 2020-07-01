@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 )
 
 const (

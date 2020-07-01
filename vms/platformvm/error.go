@@ -1,0 +1,19 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package platformvm
+
+// TxError provides the ability for errors to be distinguished as permenant or
+// temporary
+type TxError interface {
+	error
+	Temporary() bool
+}
+
+type tempError struct{ error }
+
+func (tempError) Temporary() bool { return true }
+
+type permError struct{ error }
+
+func (permError) Temporary() bool { return false }

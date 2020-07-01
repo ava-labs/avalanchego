@@ -36,9 +36,9 @@ func (i *issuer) Abandon(ids.ID) {
 }
 
 func (i *issuer) Update() {
-	if i.abandoned || i.deps.Len() != 0 {
+	if i.abandoned || i.deps.Len() != 0 || i.t.errs.Errored() {
 		return
 	}
 
-	i.t.deliver(i.blk)
+	i.t.errs.Add(i.t.deliver(i.blk))
 }

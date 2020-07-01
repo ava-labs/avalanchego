@@ -33,15 +33,18 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP       utils.IPDesc
-	EnableStaking   bool
-	StakingKeyFile  string
-	StakingCertFile string
+	StakingIP        utils.IPDesc
+	StakingLocalPort uint16
+	EnableP2PTLS     bool
+	EnableStaking    bool
+	StakingKeyFile   string
+	StakingCertFile  string
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
+	HTTPHost      string
 	HTTPPort      uint16
 	EnableHTTPS   bool
 	HTTPSKeyFile  string
@@ -49,8 +52,10 @@ type Config struct {
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
+	InfoAPIEnabled     bool
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
+	HealthAPIEnabled   bool
 
 	// Logging configuration
 	LoggingConfig logging.Config

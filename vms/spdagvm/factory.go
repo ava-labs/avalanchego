@@ -5,6 +5,7 @@ package spdagvm
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
 )
 
 // ID this VM should be referenced with
@@ -16,6 +17,6 @@ var (
 type Factory struct{ TxFee uint64 }
 
 // New ...
-func (f *Factory) New() (interface{}, error) {
+func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{TxFee: f.TxFee}, nil
 }

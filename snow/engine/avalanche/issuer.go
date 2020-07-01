@@ -37,7 +37,7 @@ func (i *issuer) Abandon() {
 }
 
 func (i *issuer) Update() {
-	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) {
+	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
 	i.issued = true
@@ -65,7 +65,10 @@ func (i *issuer) Update() {
 
 	i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
 
-	i.t.Consensus.Add(i.vtx)
+	if err := i.t.Consensus.Add(i.vtx); err != nil {
+		i.t.errs.Add(err)
+		return
+	}
 
 	p := i.t.Consensus.Parameters()
 	vdrs := i.t.Config.Validators.Sample(p.K) // Validators to sample
@@ -75,9 +78,12 @@ func (i *issuer) Update() {
 		vdrSet.Add(vdr.ID())
 	}
 
+	toSample := ids.ShortSet{} // Copy to a new variable because we may remove an element in sender.Sender
+	toSample.Union(vdrSet)     // and we don't want that to affect the set of validators we wait for [ie vdrSet]
+
 	i.t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet.Len()) {
-		i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet) {
+		i.t.Config.Sender.PushQuery(toSample, i.t.RequestID, vtxID, i.vtx.Bytes())
 	} else if numVdrs < p.K {
 		i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
@@ -87,7 +93,7 @@ func (i *issuer) Update() {
 		i.t.txBlocked.Fulfill(tx.ID())
 	}
 
-	i.t.repoll()
+	i.t.errs.Add(i.t.repoll())
 }
 
 type vtxIssuer struct{ i *issuer }

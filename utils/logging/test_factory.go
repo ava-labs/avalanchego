@@ -3,10 +3,6 @@
 
 package logging
 
-import (
-	"github.com/ava-labs/gecko/ids"
-)
-
 // NoFactory ...
 type NoFactory struct{}
 
@@ -14,7 +10,7 @@ type NoFactory struct{}
 func (NoFactory) Make() (Logger, error) { return NoLog{}, nil }
 
 // MakeChain ...
-func (NoFactory) MakeChain(ids.ID, string) (Logger, error) { return NoLog{}, nil }
+func (NoFactory) MakeChain(string, string) (Logger, error) { return NoLog{}, nil }
 
 // MakeSubdir ...
 func (NoFactory) MakeSubdir(string) (Logger, error) { return NoLog{}, nil }

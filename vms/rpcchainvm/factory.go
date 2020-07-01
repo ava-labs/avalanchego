@@ -5,9 +5,12 @@ package rpcchainvm
 
 import (
 	"errors"
-	"os/exec"
-
+	"github.com/ava-labs/gecko/snow"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
+	"io/ioutil"
+	"log"
+	"os/exec"
 )
 
 var (
@@ -15,13 +18,11 @@ var (
 )
 
 // Factory ...
-type Factory struct {
-	Path string
-}
+type Factory struct{ Path string }
 
 // New ...
-func (f *Factory) New() (interface{}, error) {
-	client := plugin.NewClient(&plugin.ClientConfig{
+func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
+	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
 		Cmd:             exec.Command("sh", "-c", f.Path),
@@ -29,7 +30,22 @@ func (f *Factory) New() (interface{}, error) {
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
-	})
+	}
+	if ctx != nil {
+		log.SetOutput(ctx.Log)
+		config.Stderr = ctx.Log
+		config.Logger = hclog.New(&hclog.LoggerOptions{
+			Output: ctx.Log,
+			Level:  hclog.Info,
+		})
+	} else {
+		log.SetOutput(ioutil.Discard)
+		config.Stderr = ioutil.Discard
+		config.Logger = hclog.New(&hclog.LoggerOptions{
+			Output: ioutil.Discard,
+		})
+	}
+	client := plugin.NewClient(config)
 
 	rpcClient, err := client.Client()
 	if err != nil {

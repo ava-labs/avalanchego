@@ -7,11 +7,19 @@ import (
 	"strings"
 )
 
+const (
+	// The minimum capacity of a set
+	minSetSize = 16
+)
+
 // Set is a set of IDs
 type Set map[[32]byte]bool
 
 func (ids *Set) init(size int) {
 	if *ids == nil {
+		if minSetSize > size {
+			size = minSetSize
+		}
 		*ids = make(map[[32]byte]bool, size)
 	}
 }
@@ -70,9 +78,32 @@ func (ids *Set) Clear() { *ids = nil }
 
 // List converts this set into a list
 func (ids Set) List() []ID {
-	idList := []ID(nil)
+	idList := make([]ID, ids.Len())
+	i := 0
 	for id := range ids {
-		idList = append(idList, NewID(id))
+		idList[i] = NewID(id)
+		i++
+	}
+	return idList
+}
+
+// CappedList returns a list of length at most [size].
+// Size should be >= 0. If size < 0, returns nil.
+func (ids Set) CappedList(size int) []ID {
+	if size < 0 {
+		return nil
+	}
+	if l := ids.Len(); l < size {
+		size = l
+	}
+	i := 0
+	idList := make([]ID, size)
+	for id := range ids {
+		if i >= size {
+			break
+		}
+		idList[i] = NewID(id)
+		i++
 	}
 	return idList
 }

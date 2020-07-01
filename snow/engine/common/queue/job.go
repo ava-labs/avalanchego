@@ -12,7 +12,7 @@ type Job interface {
 	ID() ids.ID
 
 	MissingDependencies() ids.Set
-	Execute()
+	Execute() error
 
 	Bytes() []byte
 }

@@ -16,10 +16,11 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -37,6 +38,7 @@ var (
 	errUnknownOutputType         = errors.New("unknown output type")
 	errUnneededAddress           = errors.New("address not required to sign")
 	errUnknownCredentialType     = errors.New("unknown credential type")
+	errNilTxID                   = errors.New("nil transaction ID")
 )
 
 // Service defines the base service for the asset vm
@@ -54,7 +56,7 @@ type IssueTxReply struct {
 
 // IssueTx attempts to issue a transaction into consensus
 func (service *Service) IssueTx(r *http.Request, args *IssueTxArgs, reply *IssueTxReply) error {
-	service.vm.ctx.Log.Verbo("IssueTx called with %s", args.Tx)
+	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
 	txID, err := service.vm.IssueTx(args.Tx.Bytes, nil)
 	if err != nil {
@@ -75,13 +77,9 @@ type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
 
-var (
-	errNilTxID = errors.New("nil transaction ID")
-)
-
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *GetTxStatusArgs, reply *GetTxStatusReply) error {
-	service.vm.ctx.Log.Verbo("GetTxStatus called with %s", args.TxID)
+	service.vm.ctx.Log.Info("AVM: GetTxStatus called with %s", args.TxID)
 
 	if args.TxID.IsZero() {
 		return errNilTxID
@@ -108,7 +106,7 @@ type GetTxReply struct {
 
 // GetTx returns the specified transaction
 func (service *Service) GetTx(r *http.Request, args *GetTxArgs, reply *GetTxReply) error {
-	service.vm.ctx.Log.Verbo("GetTx called with %s", args.TxID)
+	service.vm.ctx.Log.Info("AVM: GetTx called with %s", args.TxID)
 
 	if args.TxID.IsZero() {
 		return errNilTxID
@@ -138,7 +136,7 @@ type GetUTXOsReply struct {
 
 // GetUTXOs creates an empty account with the name passed in
 func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
-	service.vm.ctx.Log.Verbo("GetUTXOs called with %s", args.Addresses)
+	service.vm.ctx.Log.Info("AVM: GetUTXOs called with %s", args.Addresses)
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
@@ -180,7 +178,7 @@ type GetAssetDescriptionReply struct {
 
 // GetAssetDescription creates an empty account with the name passed in
 func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescriptionArgs, reply *GetAssetDescriptionReply) error {
-	service.vm.ctx.Log.Verbo("GetAssetDescription called with %s", args.AssetID)
+	service.vm.ctx.Log.Info("AVM: GetAssetDescription called with %s", args.AssetID)
 
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
@@ -224,7 +222,7 @@ type GetBalanceReply struct {
 
 // GetBalance returns the amount of an asset that an address at least partially owns
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
-	service.vm.ctx.Log.Verbo("GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
+	service.vm.ctx.Log.Info("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
@@ -247,6 +245,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		return err
 	}
 
+	reply.UTXOIDs = make([]ava.UTXOID, 0, len(utxos))
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(assetID) {
 			continue
@@ -288,7 +287,7 @@ type GetAllBalancesReply struct {
 // Note that balances include assets that the address only _partially_ owns
 // (ie is one of several addresses specified in a multi-sig)
 func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
-	service.vm.ctx.Log.Verbo("GetAllBalances called with address: %s", args.Address)
+	service.vm.ctx.Log.Info("AVM: GetAllBalances called with address: %s", args.Address)
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
@@ -361,7 +360,7 @@ type CreateFixedCapAssetReply struct {
 
 // CreateFixedCapAsset returns ID of the newly created asset
 func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCapAssetArgs, reply *CreateFixedCapAssetReply) error {
-	service.vm.ctx.Log.Verbo("CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
+	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
 		args.Name,
 		args.Symbol,
 		len(args.InitialHolders),
@@ -446,7 +445,7 @@ type CreateVariableCapAssetReply struct {
 
 // CreateVariableCapAsset returns ID of the newly created asset
 func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *CreateVariableCapAssetReply) error {
-	service.vm.ctx.Log.Verbo("CreateFixedCapAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.MinterSets),
@@ -524,7 +523,7 @@ type CreateAddressReply struct {
 
 // CreateAddress creates an address for the user [args.Username]
 func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, reply *CreateAddressReply) error {
-	service.vm.ctx.Log.Verbo("CreateAddress called for user '%s'", args.Username)
+	service.vm.ctx.Log.Info("AVM: CreateAddress called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -545,13 +544,47 @@ func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, 
 	}
 
 	addresses, _ := user.Addresses(db)
-	addresses = append(addresses, ids.NewID(hashing.ComputeHash256Array(sk.PublicKey().Address().Bytes())))
+	addresses = append(addresses, sk.PublicKey().Address())
 
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving address: %w", err)
 	}
 
 	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
+	return nil
+}
+
+// ListAddressesArgs ...
+type ListAddressesArgs struct {
+	// User that we're listing the addresses of
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// ListAddressesResponse ...
+type ListAddressesResponse struct {
+	// Each element is an address controlled by specified account
+	Addresses []string `json:"addresses"`
+}
+
+// ListAddresses returns all of the addresses controlled by user [args.Username]
+func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, response *ListAddressesResponse) error {
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	response.Addresses = []string{}
+
+	user := userState{vm: service.vm}
+	addresses, err := user.Addresses(db)
+	if err != nil {
+		return nil
+	}
+
+	for _, address := range addresses {
+		response.Addresses = append(response.Addresses, service.vm.Format(address.Bytes()))
+	}
 	return nil
 }
 
@@ -570,9 +603,13 @@ type ExportKeyReply struct {
 
 // ExportKey returns a private key from the provided user
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
-	service.vm.ctx.Log.Verbo("ExportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Info("AVM: ExportKey called for user '%s'", args.Username)
 
 	address, err := service.vm.Parse(args.Address)
+	if err != nil {
+		return fmt.Errorf("problem parsing address: %w", err)
+	}
+	addr, err := ids.ToShortID(address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address: %w", err)
 	}
@@ -584,7 +621,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	user := userState{vm: service.vm}
 
-	sk, err := user.Key(db, ids.NewID(hashing.ComputeHash256Array(address)))
+	sk, err := user.Key(db, addr)
 	if err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
@@ -608,7 +645,7 @@ type ImportKeyReply struct {
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ImportKeyReply) error {
-	service.vm.ctx.Log.Verbo("ImportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Info("AVM: ImportKey called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -629,13 +666,20 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	}
 
 	addresses, _ := user.Addresses(db)
-	addresses = append(addresses, ids.NewID(hashing.ComputeHash256Array(sk.PublicKey().Address().Bytes())))
 
+	newAddress := sk.PublicKey().Address()
+	reply.Address = service.vm.Format(newAddress.Bytes())
+	for _, address := range addresses {
+		if newAddress.Equals(address) {
+			return nil
+		}
+	}
+
+	addresses = append(addresses, newAddress)
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving addresses: %w", err)
 	}
 
-	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
 	return nil
 }
 
@@ -655,7 +699,7 @@ type SendReply struct {
 
 // Send returns the ID of the newly created transaction
 func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) error {
-	service.vm.ctx.Log.Verbo("Send called with username: %s", args.Username)
+	service.vm.ctx.Log.Info("AVM: Send called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidAmount
@@ -688,7 +732,9 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.Set{}
-	addrs.Add(addresses...)
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
 	utxos, err := service.vm.GetUTXOs(addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
@@ -746,7 +792,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+	outs := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt:      uint64(args.Amount),
@@ -834,7 +880,7 @@ type CreateMintTxReply struct {
 
 // CreateMintTx returns the newly created unsigned transaction
 func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, reply *CreateMintTxReply) error {
-	service.vm.ctx.Log.Verbo("CreateMintTx called")
+	service.vm.ctx.Log.Info("AVM: CreateMintTx called")
 
 	if args.Amount == 0 {
 		return errInvalidMintAmount
@@ -900,7 +946,7 @@ func (service *Service) CreateMintTx(r *http.Request, args *CreateMintTxArgs, re
 					BCID:  service.vm.ctx.ChainID,
 				},
 				Ops: []*Operation{
-					&Operation{
+					{
 						Asset: ava.Asset{ID: assetID},
 						UTXOIDs: []*ava.UTXOID{
 							&utxo.UTXOID,
@@ -951,9 +997,13 @@ type SignMintTxReply struct {
 
 // SignMintTx returns the newly signed transaction
 func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply *SignMintTxReply) error {
-	service.vm.ctx.Log.Verbo("SignMintTx called")
+	service.vm.ctx.Log.Info("AVM: SignMintTx called")
 
 	minter, err := service.vm.Parse(args.Minter)
+	if err != nil {
+		return fmt.Errorf("problem parsing address '%s': %w", args.Minter, err)
+	}
+	addr, err := ids.ToShortID(minter)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Minter, err)
 	}
@@ -965,7 +1015,6 @@ func (service *Service) SignMintTx(r *http.Request, args *SignMintTxArgs, reply 
 
 	user := userState{vm: service.vm}
 
-	addr := ids.NewID(hashing.ComputeHash256Array(minter))
 	sk, err := user.Key(db, addr)
 	if err != nil {
 		return fmt.Errorf("problem retriving private key: %w", err)
@@ -1074,7 +1123,7 @@ type ImportAVAReply struct {
 // The AVA must have already been exported from the P-Chain.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *ImportAVAReply) error {
-	service.vm.ctx.Log.Verbo("ImportAVA called with username: %s", args.Username)
+	service.vm.ctx.Log.Info("AVM: ImportAVA called with username: %s", args.Username)
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
@@ -1095,7 +1144,10 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.Set{}
-	addrs.Add(addresses...)
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
+
 	utxos, err := service.vm.GetAtomicUTXOs(addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
@@ -1145,7 +1197,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 
 	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
+	outs := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: service.vm.ava},
 		Out: &secp256k1fx.TransferOutput{
 			Amt:      amount,
@@ -1223,7 +1275,7 @@ type ExportAVAReply struct {
 // After this tx is accepted, the AVA must be imported to the P-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *ExportAVAReply) error {
-	service.vm.ctx.Log.Verbo("ExportAVA called with username: %s", args.Username)
+	service.vm.ctx.Log.Info("AVM: ExportAVA called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidAmount
@@ -1239,7 +1291,10 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.Set{}
-	addrs.Add(addresses...)
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
+
 	utxos, err := service.vm.GetUTXOs(addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
@@ -1297,7 +1352,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 
 	ava.SortTransferableInputsWithSigners(ins, keys)
 
-	exportOuts := []*ava.TransferableOutput{&ava.TransferableOutput{
+	exportOuts := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: service.vm.ava},
 		Out: &secp256k1fx.TransferOutput{
 			Amt:      uint64(args.Amount),

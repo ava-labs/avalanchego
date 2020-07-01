@@ -46,7 +46,7 @@ borealis_node:
       node1:
         ansible_host: 34.207.133.167
       node2:
-        ansible_host: 107.23.241.199
+        ansible_host: 54.162.71.9
       node3:
         ansible_host: 54.197.215.186
       node4:
