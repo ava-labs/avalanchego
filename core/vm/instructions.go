@@ -18,7 +18,6 @@ package vm
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -418,7 +417,6 @@ func opBalance(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memo
 
 func opBalanceMultiCoin(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	addr, cid := stack.pop(), stack.pop()
-	fmt.Println(addr, cid)
 	stack.push(interpreter.evm.StateDB.GetBalanceMultiCoin(common.BigToAddress(addr), common.BigToHash(cid)))
 	return nil, nil
 }
