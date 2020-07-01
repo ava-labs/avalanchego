@@ -41,6 +41,7 @@ type revision struct {
 var (
 	// emptyRoot is the known root hash of an empty trie.
 	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	zeroRoot  = common.HexToHash("0000000000000000000000000000000000000000000000000000000000000000")
 
 	// emptyCode is the known hash of the empty EVM bytecode.
 	emptyCode = crypto.Keccak256Hash(nil)
@@ -239,7 +240,7 @@ func (self *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash
 
 func (self *StateDB) EnableMultiCoin(addr common.Address) error {
 	stateObject := self.GetOrNewStateObject(addr)
-	if stateObject.data.Root != emptyRoot {
+	if stateObject.data.Root != emptyRoot && stateObject.data.Root != zeroRoot {
 		return errors.New("not a fresh account")
 	}
 	if !stateObject.EnableMultiCoin() {
