@@ -28,17 +28,8 @@ var (
 type UnsignedCreateSubnetTx struct {
 	vm *VM
 
-	// ID of this tx
-	id ids.ID
-
-	// Byte representation of the unsigned transaction
-	unsignedBytes []byte
-
-	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
-	bytes []byte
-
-	// NetworkID is the ID of the network this tx was issued on
-	NetworkID uint32 `serialize:"true"`
+	// Metadata about this transaction
+	Metadata `serialize:"true"`
 
 	// Each element in ControlKeys is the address of a public key
 	// In order to add a validator to this subnet, a tx must be signed
@@ -74,11 +65,11 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateSubnetTx))
 	if err != nil {
-		fmt.Errorf("couldn't marshal UnsignedCreateSubnetTx: %w", err)
+		return fmt.Errorf("couldn't marshal UnsignedCreateSubnetTx: %w", err)
 	}
 	tx.bytes, err = Codec.Marshal(tx)
 	if err != nil {
-		fmt.Errorf("couldn't marshal CreateSubnetTx: %w", err)
+		return fmt.Errorf("couldn't marshal CreateSubnetTx: %w", err)
 	}
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
@@ -108,7 +99,7 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 		return errControlKeysNotSortedAndUnique
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	return nil

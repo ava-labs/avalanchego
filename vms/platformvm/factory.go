@@ -30,7 +30,7 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		chainManager:   f.ChainManager,
 		validators:     f.Validators,
 		stakingEnabled: f.StakingEnabled,
-		ava:            f.AVA,
+		avaxAssetID:    f.AVA,
 		avm:            f.AVM,
 	}, nil
 }

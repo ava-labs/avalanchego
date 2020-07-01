@@ -26,17 +26,8 @@ var (
 type UnsignedExportTx struct {
 	vm *VM
 
-	// ID of this tx
-	id ids.ID
-
-	// Byte representation of the unsigned transaction
-	unsignedBytes []byte
-
-	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
-	bytes []byte
-
-	// ID of the network this blockchain exists on
-	NetworkID uint32 `serialize:"true"`
+	// Metadata about this transaction
+	Metadata `serialize:"true"`
 
 	// Input UTXOs
 	Ins []*ava.TransferableInput `serialize:"true"`
@@ -100,7 +91,7 @@ func (tx *ExportTx) SyntacticVerify() error {
 		if err := out.Verify(); err != nil {
 			return err
 		}
-		if !out.AssetID().Equals(tx.vm.ava) {
+		if !out.AssetID().Equals(tx.vm.avaxAssetID) {
 			return errUnknownAsset
 		}
 	}

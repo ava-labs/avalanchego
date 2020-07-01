@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"testing"
 	"time"
@@ -248,3 +249,4 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatalf("expected account balance to be %d was %d", expectedBalance, account.Balance)
 	}
 }
+*/

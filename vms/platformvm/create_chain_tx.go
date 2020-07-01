@@ -25,17 +25,8 @@ var (
 type UnsignedCreateChainTx struct {
 	vm *VM
 
-	// ID of this tx
-	id ids.ID
-
-	// Byte representation of the unsigned transaction
-	unsignedBytes []byte
-
-	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
-	bytes []byte
-
-	// ID of the network this blockchain exists on
-	NetworkID uint32 `serialize:"true"`
+	// Metadata about this transaction
+	Metadata `serialize:"true"`
 
 	// ID of the Subnet that validates this blockchain
 	SubnetID ids.ID `serialize:"true"`
@@ -81,11 +72,11 @@ func (tx *CreateChainTx) initialize(vm *VM) error {
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateChainTx))
 	if err != nil {
-		fmt.Errorf("couldn't marshal UnsignedCreateChainTx: %w", err)
+		return fmt.Errorf("couldn't marshal UnsignedCreateChainTx: %w", err)
 	}
 	tx.bytes, err = Codec.Marshal(tx) // byte representation of the signed transaction
 	if err != nil {
-		fmt.Errorf("couldn't marshal CreateChainTx: %w", err)
+		return fmt.Errorf("couldn't marshal CreateChainTx: %w", err)
 	}
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
@@ -118,7 +109,7 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return errControlSigsNotSortedAndUnique
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 

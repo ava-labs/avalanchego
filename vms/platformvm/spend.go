@@ -1,7 +1,16 @@
 package platformvm
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/ava-labs/gecko/ids"
+	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
+)
+
+var (
+	errSpendOverflow = errors.New("spent amount overflows uint64")
 )
 
 /*
@@ -19,11 +28,12 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 	kc := secp256k1fx.NewKeychain()
 	kc.Add(key)
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	amountSpent := uint64(0)
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(vm.ava) { // should never happen. TODO: log
 			continue
 		}
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		inputIntf, signers, err := kc.Spend(utxo.Out, 0)
 		if err != nil {
 			continue // should never happen. TODO: log
 		}
@@ -31,11 +41,10 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 		if !ok {
 			continue // should never happen. TODO: log
 		}
-		spent, err := safemath.Add64(amountSpent, input.Amount())
+		amountSpent, err = safemath.Add64(amountSpent, input.Amount())
 		if err != nil {
-			return errSpendOverflow
+			return nil, nil, errSpendOverflow
 		}
-		amountSpent = spent
 
 		in := &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
@@ -90,33 +99,42 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 
 // Verify that:
 // * inputs and outputs are sorted
-// * value of outputs is no greater than that of inputs
-// TODO: Should we check that value of outputs is [txFee] less than inputs?
-func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.TransferableOutput) error {
-	fc := ava.NewFlowChecker()
-	for _, out := range outs {
-		if err := out.Verify(); err != nil {
+// * inputs and outputs are all AVAX
+// * sum(inputs) >= sum(outputs) + txFee
+func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.TransferableOutput, txFee uint64, avaxAssetID ids.ID) error {
+	var err error
+
+	avaxConsumed := uint64(0) // AVAX consumed in this tx
+	for _, in := range ins {
+		if !in.AssetID().Equals(avaxAssetID) { // all inputs must be AVAX
+			return fmt.Errorf("input has unexpected asset ID %s", in.AssetID())
+		} else if err := in.Verify(); err != nil {
 			return err
+		} else if avaxConsumed, err = safemath.Add64(avaxConsumed, in.Input().Amount()); err != nil {
+			return errors.New("inputs overflowed uint64")
 		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !ava.IsSortedTransferableOutputs(outs, Codec) {
-		return errOutputsNotSorted
+	avaxProduced := uint64(txFee) // AVAX produced in this tx, plus the txFee
+	for _, out := range outs {
+		if !out.AssetID().Equals(avaxAssetID) { // all outputs must be AVAX
+			return fmt.Errorf("output has unexpected asset ID %s", out.AssetID())
+		} else if err = out.Verify(); err != nil {
+			return err
+		} else if avaxProduced, err = safemath.Add64(avaxProduced, out.Output().Amount()); err != nil {
+			return errors.New("outputs overflowed uint64")
+		}
 	}
 
-	for _, in := range ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
+	if avaxProduced > avaxConsumed {
+		return fmt.Errorf("tx outputs (%d) + txFee (%d) > inputs (%d)", avaxProduced-txFee, txFee, avaxConsumed)
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(ins) {
+
+	if !ava.IsSortedTransferableOutputs(outs, Codec) {
+		return errOutputsNotSorted
+	} else if !ava.IsSortedAndUniqueTransferableInputs(ins) {
 		return errInputsNotSortedUnique
 	}
 
-	if err := fc.Verify(); err != nil {
-		return err
-	}
 	return nil
 }
 

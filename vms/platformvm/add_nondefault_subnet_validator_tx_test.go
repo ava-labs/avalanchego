@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"reflect"
 	"testing"
@@ -646,3 +647,4 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal("should be equal")
 	}
 }
+*/

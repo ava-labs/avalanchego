@@ -30,17 +30,8 @@ var (
 type UnsignedImportTx struct {
 	vm *VM
 
-	// ID of this tx
-	id ids.ID
-
-	// Byte representation of the unsigned transaction
-	unsignedBytes []byte
-
-	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
-	bytes []byte
-
-	// ID of the network this blockchain exists on
-	NetworkID uint32 `serialize:"true"`
+	// Metadata about this transaction
+	Metadata `serialize:"true"`
 
 	// Account that this transaction is being sent by. This is needed to ensure the Credentials are replay safe.
 	Account ids.ShortID `serialize:"true"`
@@ -118,7 +109,7 @@ func (tx *ImportTx) SyntacticVerify() error {
 		if err := in.Verify(); err != nil {
 			return err
 		}
-		if !in.AssetID().Equals(tx.vm.ava) {
+		if !in.AssetID().Equals(tx.vm.avaxAssetID) {
 			return errUnknownAsset
 		}
 	}

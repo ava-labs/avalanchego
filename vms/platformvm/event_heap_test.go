@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"testing"
 
@@ -271,3 +272,4 @@ func TestMarshalAddValidatorTxHeap(t *testing.T) {
 		}
 	}
 }
+*/

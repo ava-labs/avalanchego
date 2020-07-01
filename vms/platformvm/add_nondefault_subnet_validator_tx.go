@@ -27,23 +27,14 @@ var (
 type UnsignedAddNonDefaultSubnetValidatorTx struct {
 	vm *VM
 
-	// ID of this tx
-	id ids.ID
-
-	// Byte representation of the unsigned transaction
-	unsignedBytes []byte
-
-	// Byte representation of the signed transaction (ie with Creds and ControlSigs)
-	bytes []byte
+	// Metadata about this transaction
+	Metadata `serialize:"true"`
 
 	// IDs of control keys
 	controlIDs []ids.ShortID
 
 	// The validator
 	SubnetValidator `serialize:"true"`
-
-	// ID of the network
-	NetworkID uint32 `serialize:"true"`
 
 	// Input UTXOs
 	Ins []*ava.TransferableInput `serialize:"true"`
@@ -80,11 +71,11 @@ func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddNonDefaultSubnetValidatorTx))
 	if err != nil {
-		fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
+		return fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
 	}
 	tx.bytes, err = Codec.Marshal(tx) // byte representation of the signed transaction
 	if err != nil {
-		fmt.Errorf("couldn't marshal addNonDefaultSubnetValidatorTx: %w", err)
+		return fmt.Errorf("couldn't marshal addNonDefaultSubnetValidatorTx: %w", err)
 	}
 	tx.vm = vm
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
@@ -140,7 +131,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 		tx.controlIDs[i] = key.Address()
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 

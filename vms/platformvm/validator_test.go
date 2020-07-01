@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"errors"
 	"testing"
@@ -94,3 +95,4 @@ func TestValidatorBoundedBy(t *testing.T) {
 		t.Fatal(errCalculatedSubsetWrong)
 	}
 }
+*/

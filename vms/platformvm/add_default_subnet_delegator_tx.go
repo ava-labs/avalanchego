@@ -19,20 +19,11 @@ import (
 type UnsignedAddDefaultSubnetDelegatorTx struct {
 	vm *VM
 
-	// ID of this tx
-	id ids.ID
-
-	// Byte representation of this unsigned tx
-	unsignedBytes []byte
-
-	// Byte representation of the signed transaction (ie with credentials)
-	bytes []byte
+	// Metadata about this transaction
+	Metadata `serialize:"true"`
 
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
-
-	// ID of the network on which this tx was issued
-	NetworkID uint32 `serialize:"true"`
 
 	// Where to send staked AVA after done validating
 	Destination ids.ShortID `serialize:"true"`
@@ -105,7 +96,7 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 		return permError{errStakeTooLong}
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -127,7 +118,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	}
 	for _, out := range tx.Outs {
 		if err := tx.vm.putUTXO(db, out); err != nil {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't add UTXO %s to UTXO set: %w", err)}
+			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
 		}
 	}
 

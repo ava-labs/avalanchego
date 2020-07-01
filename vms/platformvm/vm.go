@@ -166,8 +166,8 @@ type VM struct {
 	// The node's chain manager
 	chainManager chains.Manager
 
-	// AVA asset ID
-	ava ids.ID
+	// AVAX asset ID
+	avaxAssetID ids.ID
 
 	// AVM is the ID of the ava virtual machine
 	avm ids.ID
@@ -189,6 +189,8 @@ type VM struct {
 	unissuedEvents      *EventHeap
 	unissuedDecisionTxs []DecisionTx
 	unissuedAtomicTxs   []AtomicTx
+
+	txFee uint64 // TODO: Where should this be managed? Probably stored in the database, not here.
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block

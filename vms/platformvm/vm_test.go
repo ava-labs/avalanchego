@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"bytes"
 	"errors"
@@ -1798,3 +1799,4 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/

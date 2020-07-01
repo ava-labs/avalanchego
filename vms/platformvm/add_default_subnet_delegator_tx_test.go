@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"testing"
 	"time"
@@ -435,3 +436,4 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	// 	t.Fatalf("balance was not updated correctly after subnet delegator tx")
 	// }
 }
+*/
