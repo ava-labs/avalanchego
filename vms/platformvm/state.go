@@ -113,7 +113,7 @@ func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.TransferableOutput,
 }
 
 // putUTXO persists the given UTXO
-func (vm *VM) putUTXO(db database.Database, utxo *ava.TransferableOutput) error {
+func (vm *VM) putUTXO(db database.Database, txID ids.ID, out *ava.TransferableOutput) error {
 	// TODO
 	// TODO: Map addr --> UTXOs that ref it
 	return errors.New("TODO")

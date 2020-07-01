@@ -81,15 +81,14 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 		return permError{errWeightTooSmall}
 	}
 
-	// Ensure staking length is not too short or long
+	// Ensure staking length is not too short or long,
+	// and that the inputs/outputs of this tx are syntactically valid
 	stakingDuration := tx.Duration()
 	if stakingDuration < MinimumStakingDuration {
 		return permError{errStakeTooShort}
 	} else if stakingDuration > MaximumStakingDuration {
 		return permError{errStakeTooLong}
-	}
-
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -110,7 +109,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		}
 	}
 	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, out); err != nil {
+		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
 			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
 		}
 	}

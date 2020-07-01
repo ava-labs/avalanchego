@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -96,15 +95,14 @@ func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 		return permError{errTooManyShares}
 	}
 
-	// Ensure staking length is not too short or long
+	// Ensure staking length is not too short or long,
+	// and that the inputs/outputs of this tx are syntactically valid
 	stakingDuration := tx.Duration()
 	if stakingDuration < MinimumStakingDuration {
 		return permError{errStakeTooShort}
 	} else if stakingDuration > MaximumStakingDuration {
 		return permError{errStakeTooLong}
-	}
-
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -117,6 +115,42 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 		return nil, nil, nil, nil, permError{err}
 	}
 
+	// Ensure the proposed validator starts after the current time
+	currentTime, err := tx.vm.getTimestamp(db)
+	if err != nil {
+		return nil, nil, nil, nil, permError{err}
+	}
+	if startTime := tx.StartTime(); !currentTime.Before(startTime) {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
+			currentTime,
+			startTime)}
+	}
+
+	// Ensure the proposed validator is not already a validator of the specified subnet
+	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	if err != nil {
+		return nil, nil, nil, nil, permError{err}
+	}
+	for _, currentVdr := range tx.vm.getValidators(currentValidatorHeap) {
+		if currentVdr.ID().Equals(tx.NodeID) {
+			return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a Default Subnet validator",
+				tx.NodeID)}
+		}
+	}
+
+	// Ensure the proposed validator is not already slated to validate for the specified subnet
+	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+	if err != nil {
+		return nil, nil, nil, nil, permError{err}
+	}
+	pendingValidators := tx.vm.getValidators(pendingValidatorHeap)
+	for _, pendingVdr := range pendingValidators {
+		if pendingVdr.ID().Equals(tx.NodeID) {
+			return nil, nil, nil, nil, permError{fmt.Errorf("validator %s is already a pending Default Subnet validator",
+				tx.NodeID)}
+		}
+	}
+
 	// Update the UTXO set
 	for _, in := range tx.Ins {
 		utxoID := in.InputID() // ID of the UTXO that [in] spends
@@ -125,84 +159,22 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 		}
 	}
 	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, out); err != nil {
+		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
 			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
 		}
 	}
 
-	// Get the account that is paying the transaction fee and, if the proposal is to add a validator
-	// to the default subnet, providing the staked $AVA.
-	// The ID of this account is the address associated with the public key that signed this tx
-	/*
-		accountID := tx.senderID
-		account, err := tx.vm.getAccount(db, accountID)
-		if err != nil {
-			return nil, nil, nil, nil, errDBAccount
-		}
+	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
-		// If the transaction adds a validator to the default subnet, also deduct
-		// staked $AVA
-		amount := tx.Weight()
-
-		// The account if this block's proposal is committed and the validator is added
-		// to the pending validator set. (Increase the account's nonce; decrease its balance.)
-		newAccount, err := account.Remove(amount, tx.Nonce)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-	*/
-
-	// Ensure the proposed validator starts after the current time
-	currentTime, err := tx.vm.getTimestamp(db)
-	if err != nil {
-		return nil, nil, nil, nil, permError{err}
-	}
-	startTime := tx.StartTime()
-	if !currentTime.Before(startTime) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
-			currentTime,
-			startTime)}
-	}
-
-	// Ensure the proposed validator is not already a validator of the specified subnet
-	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
-	if err != nil {
-		return nil, nil, nil, nil, permError{err}
-	}
-	currentValidators := validators.NewSet()
-	currentValidators.Set(tx.vm.getValidators(currentEvents))
-	if currentValidators.Contains(tx.NodeID) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the current default validator set",
-			tx.NodeID)}
-	}
-
-	// Ensure the proposed validator is not already slated to validate for the specified subnet
-	pendingEvents, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
-	if err != nil {
-		return nil, nil, nil, nil, permError{err}
-	}
-	pendingValidators := validators.NewSet()
-	pendingValidators.Set(tx.vm.getValidators(pendingEvents))
-	if pendingValidators.Contains(tx.NodeID) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the pending default validator set",
-			tx.NodeID)}
-	}
-
-	pendingEvents.Add(tx) // add validator to set of pending validators
-
-	// If this proposal is committed, update the pending validator set to include the validator,
-	// update the validator's account by removing the staked $AVA
+	// If this proposal is committed, update the pending validator set to include the validator
 	onCommitDB := versiondb.New(db)
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-	/* TODO: Add this (or something like it) back
-	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {
-		return nil, nil, nil, nil, permError{err}
-	}
-	*/
 
-	// If this proposal is aborted, chain state doesn't change
+	// If this proposal is aborted, return the AVAX (but not the tx fee)
+	// TODO: Implement this
+	// TODO: Should they get the tx fee back?
 	onAbortDB := versiondb.New(db)
 
 	return onCommitDB, onAbortDB, tx.vm.resetTimer, nil, nil
