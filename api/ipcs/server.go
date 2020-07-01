@@ -13,52 +13,35 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
 // IPCs maintains the IPCs
-type IPCs struct {
-	log             logging.Logger
-	chainManager    chains.Manager
-	networkID       uint32
-	httpServer      *api.Server
-	chains          map[[32]byte]*ChainIPCs
-	consensusEvents *triggers.EventDispatcher
-	decisionEvents  *triggers.EventDispatcher
+type IPCServer struct {
+	httpServer   *api.Server
+	chainManager chains.Manager
+	log          logging.Logger
+	ipcs         *ipcs.ChainIPCs
 }
 
 // NewService returns a new IPCs API service
-func NewService(log logging.Logger, chainManager chains.Manager, networkID uint32, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher, defaultChainIDs []string, httpServer *api.Server) (*common.HTTPHandler, error) {
-	ipcs := &IPCs{
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
+	ipcServer := &IPCServer{
 		log:          log,
 		chainManager: chainManager,
-		networkID:    networkID,
 		httpServer:   httpServer,
-		chains:       map[[32]byte]*ChainIPCs{},
 
-		consensusEvents: consensusEvents,
-		decisionEvents:  decisionEvents,
-	}
-
-	for _, chainID := range defaultChainIDs {
-		id, err := ids.FromString(chainID)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := ipcs.publish(id); err != nil {
-			return nil, err
-		}
+		ipcs: ipcs,
 	}
 
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(ipcs, "ipcs")
+	newServer.RegisterService(ipcServer, "ipcs")
 	return &common.HTTPHandler{Handler: newServer}, nil
 }
 
@@ -74,22 +57,22 @@ type PublishBlockchainReply struct {
 }
 
 // PublishBlockchain publishes the finalized accepted transactions from the blockchainID over the IPC
-func (ipc *IPCs) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
-	ipc.log.Info("IPCs: PublishBlockchain called with BlockchainID: %s", args.BlockchainID)
-	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
+func (ipcServer *IPCServer) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
+	ipcServer.log.Info("IPCs: PublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+	chainID, err := ipcServer.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
-		ipc.log.Error("unknown blockchainID: %s", err)
+		ipcServer.log.Error("unknown blockchainID: %s", err)
 		return err
 	}
 
-	ipcs, err := ipc.publish(chainID)
+	ipcs, err := ipcServer.ipcs.Publish(chainID)
 	if err != nil {
-		ipc.log.Error("couldn't publish blockchainID: %s", err)
+		ipcServer.log.Error("couldn't publish blockchainID: %s", err)
 		return err
 	}
 
-	reply.ConsensusURL = ipcs.Consensus.URL()
-	reply.DecisionsURL = ipcs.Decisions.URL()
+	reply.ConsensusURL = ipcs.ConsensusURL()
+	reply.DecisionsURL = ipcs.DecisionsURL()
 
 	return nil
 }
@@ -105,7 +88,7 @@ type UnpublishBlockchainReply struct {
 }
 
 // UnpublishBlockchain closes publishing of a blockchainID
-func (ipc *IPCs) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, reply *UnpublishBlockchainReply) error {
+func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, reply *UnpublishBlockchainReply) error {
 	ipc.log.Info("IPCs: UnpublishBlockchain called with BlockchainID: %s", args.BlockchainID)
 	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
@@ -113,29 +96,11 @@ func (ipc *IPCs) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainA
 		return err
 	}
 
-	chainIPCs, ok := ipc.chains[chainID.Key()]
+	ok, err := ipc.ipcs.Unpublish(chainID)
 	if !ok {
 		return fmt.Errorf("blockchainID not publishing: %s", chainID)
 	}
 
 	reply.Success = true
-	return chainIPCs.Stop()
-}
-
-func (ipc *IPCs) publish(chainID ids.ID) (*ChainIPCs, error) {
-	chainIDKey := chainID.Key()
-
-	if ipcs, ok := ipc.chains[chainIDKey]; ok {
-		ipc.log.Info("returning existing blockchainID %s", chainID.String())
-		return ipcs, nil
-	}
-
-	ipcs, err := NewChainIPCs(ipc.log, ipc.networkID, chainID, ipc.consensusEvents, ipc.decisionEvents)
-	if err != nil {
-		ipc.log.Error("can't create ipcs: %s", err)
-		return nil, err
-	}
-
-	ipc.chains[chainIDKey] = ipcs
-	return ipcs, nil
+	return err
 }

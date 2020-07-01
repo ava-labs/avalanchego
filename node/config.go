@@ -71,7 +71,7 @@ type Config struct {
 	ThroughputServerEnabled bool
 
 	// IPC configuration
-	IPCEnabled         bool
+	IPCAPIEnabled      bool
 	IPCDefaultChainIDs []string
 
 	// Router that is used to handle incoming consensus messages

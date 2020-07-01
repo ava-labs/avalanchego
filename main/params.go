@@ -232,12 +232,14 @@ func init() {
 	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
 	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
-	fs.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
-	ipcChainIDs := fs.String("api-ipc-chain-ids", "", "Comma separated list of chain ids to connect to. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
+	fs.BoolVar(&Config.IPCAPIEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
 
 	// Throughput Server
 	throughputPort := fs.Uint("xput-server-port", 9652, "Port of the deprecated throughput test server")
 	fs.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
+
+	// IPC
+	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -437,7 +439,7 @@ func init() {
 	Config.ConsensusRouter = &router.ChainRouter{}
 
 	// IPCs
-	if *ipcChainIDs != "" {
-		Config.IPCDefaultChainIDs = strings.Split(*ipcChainIDs, ",")
+	if *ipcsChainIDs != "" {
+		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
 	}
 }
