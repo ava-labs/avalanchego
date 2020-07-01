@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -27,20 +26,14 @@ var (
 type UnsignedAddNonDefaultSubnetValidatorTx struct {
 	vm *VM
 
-	// Metadata about this transaction
-	Metadata `serialize:"true"`
+	// Metadata, inputs and outputs
+	CommonTx `serialize:"true"`
 
 	// IDs of control keys
 	controlIDs []ids.ShortID
 
 	// The validator
 	SubnetValidator `serialize:"true"`
-
-	// Input UTXOs
-	Ins []*ava.TransferableInput `serialize:"true"`
-
-	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx

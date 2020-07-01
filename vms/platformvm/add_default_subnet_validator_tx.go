@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -29,8 +28,8 @@ var (
 type UnsignedAddDefaultSubnetValidatorTx struct {
 	vm *VM
 
-	// Metadata about this transaction
-	Metadata `serialize:"true"`
+	// Metadata, inputs and outputs
+	CommonTx `serialize:"true"`
 
 	// Describes the validator
 	DurationValidator `serialize:"true"`
@@ -41,12 +40,6 @@ type UnsignedAddDefaultSubnetValidatorTx struct {
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
 	Shares uint32 `serialize:"true"`
-
-	// Input UTXOs
-	Ins []*ava.TransferableInput `serialize:"true"`
-
-	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx

@@ -26,14 +26,8 @@ var (
 type UnsignedExportTx struct {
 	vm *VM
 
-	// Metadata about this transaction
-	Metadata `serialize:"true"`
-
-	// Input UTXOs
-	Ins []*ava.TransferableInput `serialize:"true"`
-
-	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
+	// Metadata, inputs and outputs
+	CommonTx `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx

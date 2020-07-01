@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -25,8 +24,8 @@ var (
 type UnsignedCreateChainTx struct {
 	vm *VM
 
-	// Metadata about this transaction
-	Metadata `serialize:"true"`
+	// Metadata, inputs and outputs
+	CommonTx `serialize:"true"`
 
 	// ID of the Subnet that validates this blockchain
 	SubnetID ids.ID `serialize:"true"`
@@ -42,12 +41,6 @@ type UnsignedCreateChainTx struct {
 
 	// Byte representation of genesis state of the new chain
 	GenesisData []byte `serialize:"true"`
-
-	// Input UTXOs
-	Ins []*ava.TransferableInput `serialize:"true"`
-
-	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx

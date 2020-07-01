@@ -30,17 +30,11 @@ var (
 type UnsignedImportTx struct {
 	vm *VM
 
-	// Metadata about this transaction
-	Metadata `serialize:"true"`
+	// Metadata, inputs and outputs
+	CommonTx `serialize:"true"`
 
 	// Account that this transaction is being sent by. This is needed to ensure the Credentials are replay safe.
 	Account ids.ShortID `serialize:"true"`
-
-	// Input UTXOs
-	Ins []*ava.TransferableInput `serialize:"true"`
-
-	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx
