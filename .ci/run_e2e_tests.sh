@@ -13,4 +13,4 @@ bash "./scripts/rebuild_controller_image.sh"
 # TODO: Make the controller image label a parameter to rebuild_controller_image script
 # Standard controller image label used by above scripts.
 CONTROLLER_IMAGE="kurtosistech/ava-e2e-tests_controller:latest"
-./build/ava-e2e-tests --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${CONTROLLER_IMAGE}" --test-names="fiveStakingNodeFullyConnectedTest,stakingNodeRpcWorkflowTest"
+./build/ava-e2e-tests --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${CONTROLLER_IMAGE}"
