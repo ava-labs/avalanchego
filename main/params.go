@@ -411,13 +411,15 @@ func init() {
 	// HTTP:
 	Config.HTTPHost = *httpHost
 	Config.HTTPPort = uint16(*httpPort)
-	if Config.APIRequireAuthToken && Config.APIAuthPassword == "" {
-		errs.Add(errors.New("api-auth-password must be provided if api-require-auth is true"))
-		return
-	}
-	if !password.SufficientlyStrong(Config.APIAuthPassword, auth.RequiredPasswordStrength) {
-		errs.Add(errors.New("api-auth-password is not strong enough. Add more characters"))
-		return
+	if Config.APIRequireAuthToken {
+		if Config.APIAuthPassword == "" {
+			errs.Add(errors.New("api-auth-password must be provided if api-require-auth is true"))
+			return
+		}
+		if !password.SufficientlyStrong(Config.APIAuthPassword, auth.RequiredPasswordStrength) {
+			errs.Add(errors.New("api-auth-password is not strong enough. Add more characters"))
+			return
+		}
 	}
 
 	// Logging:
