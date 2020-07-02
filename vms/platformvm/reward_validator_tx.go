@@ -7,10 +7,14 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	safemath "github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -27,11 +31,11 @@ var (
 // If this transaction is accepted and the next block accepted is an Abort
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX but no reward.
+// TODO: Add parent field for uniqueness?
 type rewardValidatorTx struct {
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true"`
-
-	vm *VM
+	vm   *VM
 }
 
 func (tx *rewardValidatorTx) initialize(vm *VM) error {
@@ -70,7 +74,6 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	} else if defaultSubnetVdrHeap.Len() == 0 { // there is no validator to remove
 		return nil, nil, nil, nil, permError{errEmptyValidatingSet}
 	}
-
 	vdrTx := defaultSubnetVdrHeap.Peek()
 
 	if txID := vdrTx.ID(); !txID.Equals(tx.TxID) {
@@ -83,8 +86,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	currentTime, err := tx.vm.getTimestamp(db)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
-	}
-	if endTime := vdrTx.EndTime(); !endTime.Equal(currentTime) {
+	} else if endTime := vdrTx.EndTime(); !endTime.Equal(currentTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s before their end time %s",
 			tx.TxID,
 			endTime)}
@@ -106,50 +108,95 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		return nil, nil, nil, nil, tempError{errDBPutCurrentValidators}
 	}
 
-	/* TODO
+	utxo := ava.UTXO{ // Will be copied, modified, added to UTXO set. Cleaner than re-declaring same struct many places.
+		UTXOID: ava.UTXOID{
+			TxID:        vdrTx.ID(),         // Produced UTXO points to the tx that added the validator
+			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
+		},
+		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+		Out: &ava.TransferableOutput{
+			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+			Out:   nil, // Will be modified
+		},
+	}
+	out := secp256k1fx.TransferOutput{ // Will be copied, modified, added as output of [utxo]
+		Amt:      0, // Will be modified
+		Locktime: 0,
+		OutputOwners: secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     nil, // Will be modified
+		},
+	}
+
 	switch vdrTx := vdrTx.(type) {
-	case *addDefaultSubnetValidatorTx:
-			duration := vdrTx.Duration()
-			stakedAmount := vdrTx.Wght
-			reward := reward(duration, stakedAmount, InflationRate)
-			amountWithReward, err := math.Add64(stakedAmount, reward)
-			if err != nil {
-				amountWithReward = stakedAmount
-				tx.vm.Ctx.Log.Error("error while calculating balance + reward: %s", err)
-			}
-			destination := vdrTx.Destination
-			// TODO create UTXO that rewards this validator
-			// It should probably be part of the tx itself
-		return nil, nil, nil, nil, tempError{errors.New("TODO")}
-	case *addDefaultSubnetDelegatorTx:
-			parentTx, err := defaultSubnetVdrHeap.getDefaultSubnetStaker(vdrTx.NodeID)
-			if err != nil {
-				return nil, nil, nil, nil, permError{err}
-			}
+	case *addDefaultSubnetValidatorTx: // We're removing a default subnet validator
+		reward := reward(vdrTx.Duration(), vdrTx.Wght, InflationRate)
+		amountWithReward, err := safemath.Add64(vdrTx.Wght, reward) // overflow...should never happen
+		if err != nil {
+			amountWithReward = math.MaxUint64
+			tx.vm.Ctx.Log.Error("overflow while calculating validator reward")
+		}
 
-			duration := vdrTx.Duration()
-			amount := vdrTx.Wght
-			reward := reward(duration, amount, InflationRate)
+		commitUTXO := utxo // Copies the struct (_not_ a reference)
+		commitOut := out   // Copies the struct (_not_ a reference)
+		commitOut.Amt = amountWithReward
+		commitUTXO.Out = &commitOut
+		if err := tx.vm.putUTXO(onCommitDB, &commitUTXO); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
 
-			// Because parentTx.Shares <= NumberOfShares this will never underflow
-			delegatorShares := NumberOfShares - uint64(parentTx.Shares)
-			// Because delegatorShares <= NumberOfShares this will never overflow
-			delegatorReward := delegatorShares * (reward / NumberOfShares)
-			// Delay rounding as long as possible for small numbers
-			if optimisticReward, err := math.Mul64(delegatorShares, reward); err == nil {
-				delegatorReward = optimisticReward / NumberOfShares
-			}
+		abortUTXO := utxo         // Copies the struct (_not_ a reference)
+		abortOut := out           // Copies the struct (_not_ a reference)
+		abortOut.Amt = vdrTx.Wght // No reward --> just get staked AVAX back
+		abortUTXO.Out = &abortOut
+		if err := tx.vm.putUTXO(onAbortDB, &commitUTXO); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+	case *addDefaultSubnetDelegatorTx: // We're removing a delegator
+		parentTx, err := defaultSubnetVdrHeap.getDefaultSubnetStaker(vdrTx.NodeID)
+		if err != nil {
+			return nil, nil, nil, nil, permError{err}
+		}
 
-			// Because delegatorReward <= reward this will never underflow
-			//validatorReward := reward - delegatorReward
+		// If reward given, it will be this amount
+		reward := reward(vdrTx.Duration(), vdrTx.Wght, InflationRate)
 
-			// TODO 		// TODO create UTXO that rewards this validator
-			// It should probably be part of the tx itself
-		return nil, nil, nil, nil, tempError{errors.New("TODO")}
+		// Calculate split of reward between delegator/delegatee
+		delegatorShares := NumberOfShares - uint64(parentTx.Shares)    // parentTx.Shares <= NumberOfShares so no underflow
+		delegatorReward := delegatorShares * (reward / NumberOfShares) // delegatorShares <= NumberOfShares so no overflow
+		// Delay rounding as long as possible for small numbers
+		if optimisticReward, err := safemath.Mul64(delegatorShares, reward); err == nil {
+			delegatorReward = optimisticReward / NumberOfShares
+		}
+		delegateeReward := reward - delegatorReward // delegatorReward <= reward so no underflow
+
+		// Record the amount the delegator/delegatee receive if a reward is given
+		delegatorCommitUTXO := utxo // Copies the struct (_not_ a reference)
+		delegatorCommitOut := out   // Copies the struct (_not_ a reference)
+		delegatorCommitOut.Amt = delegatorReward
+		delegatorCommitUTXO.Out = &delegatorCommitOut
+		if err := tx.vm.putUTXO(onCommitDB, &delegatorCommitUTXO); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+		delegateeCommitUTXO := utxo // Copies the struct (_not_ a reference)
+		delegateeCommitOut := out   // Copies the struct (_not_ a reference)
+		delegateeCommitOut.Amt = delegateeReward
+		delegateeCommitUTXO.Out = &delegateeCommitOut
+		if err := tx.vm.putUTXO(onCommitDB, &delegateeCommitUTXO); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+
+		// If no reward is given, just give delegatee their AVAX back
+		abortUTXO := utxo // Copies the struct (_not_ a reference)
+		abortOut := out
+		abortOut.Amt = vdrTx.Wght // No reward --> just get staked AVAX back
+		abortUTXO.Out = &abortOut
+		if err := tx.vm.putUTXO(onAbortDB, &abortUTXO); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
 	default:
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
-	*/
 
 	// Regardless of whether this tx is committed or aborted, update the
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
