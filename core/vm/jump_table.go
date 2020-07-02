@@ -183,6 +183,7 @@ func newTangerineWhistleInstructionSet() JumpTable {
 	instructionSet[SLOAD].constantGas = params.SloadGasEIP150
 	instructionSet[EXTCODECOPY].constantGas = params.ExtcodeCopyBaseEIP150
 	instructionSet[CALL].constantGas = params.CallGasEIP150
+	instructionSet[CALLEX].constantGas = params.CallGasEIP150
 	instructionSet[CALLCODE].constantGas = params.CallGasEIP150
 	instructionSet[DELEGATECALL].constantGas = params.CallGasEIP150
 	return instructionSet
@@ -1147,7 +1148,7 @@ func newFrontierInstructionSet() JumpTable {
 			dynamicGas:  gasCall,
 			minStack:    minStack(9, 1),
 			maxStack:    maxStack(9, 1),
-			memorySize:  memoryCall,
+			memorySize:  memoryCallExpert,
 			valid:       true,
 			returns:     true,
 		},
