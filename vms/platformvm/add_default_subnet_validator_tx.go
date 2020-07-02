@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
@@ -156,11 +159,31 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// If this proposal is committed, update the pending validator set to include the validator
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// If this proposal is aborted, return the AVAX (but not the tx fee)
 	onAbortDB := versiondb.New(db)
+	if err := tx.vm.putUTXO(onAbortDB, &ava.UTXO{
+		UTXOID: ava.UTXOID{
+			TxID:        tx.ID(),            // Produced UTXO points to this transaction
+			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
+		},
+		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+		Out: &ava.TransferableOutput{
+			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      tx.Validator.Wght, // Returned AVAX
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{tx.Destination}, // Spendable by destination address
+				},
+			},
+		},
+	}); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
 	return onCommitDB, onAbortDB, tx.vm.resetTimer, nil, nil
 }
 

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	stdmath "math"
+	"math"
 
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database"
@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -49,6 +49,9 @@ const (
 	// NumberOfShares is the number of shares that a delegator is
 	// rewarded
 	NumberOfShares = 1000000
+
+	// TODO: Document this
+	virtualOutputIndex = math.MaxUint32
 
 	// TODO: Turn these constants into governable parameters
 
@@ -810,9 +813,9 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 			validator = &Validator{NodeID: vdrID}
 			vdrMap[vdrKey] = validator
 		}
-		weight, err := math.Add64(validator.Wght, vdr.Weight())
+		weight, err := safemath.Add64(validator.Wght, vdr.Weight())
 		if err != nil {
-			weight = stdmath.MaxUint64
+			weight = math.MaxUint64
 		}
 		validator.Wght = weight
 	}

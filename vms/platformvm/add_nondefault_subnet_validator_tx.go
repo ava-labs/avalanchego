@@ -120,20 +120,6 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	return nil
 }
 
-// getDefaultSubnetStaker ...
-func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*addDefaultSubnetValidatorTx, error) {
-	for _, txIntf := range h.Txs {
-		tx, ok := txIntf.(*addDefaultSubnetValidatorTx)
-		if !ok {
-			continue
-		}
-		if id.Equals(tx.NodeID) {
-			return tx, nil
-		}
-	}
-	return nil, errors.New("couldn't find validator in the default subnet")
-}
-
 // SemanticVerify this transaction is valid.
 func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil { // Ensure tx is syntactically valid

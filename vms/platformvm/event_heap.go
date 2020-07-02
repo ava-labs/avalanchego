@@ -6,6 +6,7 @@ package platformvm
 import (
 	"bytes"
 	"container/heap"
+	"errors"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -95,4 +96,18 @@ func (h *EventHeap) Pop() interface{} {
 func (h *EventHeap) Bytes() []byte {
 	bytes, _ := Codec.Marshal(h)
 	return bytes
+}
+
+// getDefaultSubnetStaker ...
+func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*addDefaultSubnetValidatorTx, error) {
+	for _, txIntf := range h.Txs {
+		tx, ok := txIntf.(*addDefaultSubnetValidatorTx)
+		if !ok {
+			continue
+		}
+		if id.Equals(tx.NodeID) {
+			return tx, nil
+		}
+	}
+	return nil, errors.New("couldn't find validator in the default subnet")
 }

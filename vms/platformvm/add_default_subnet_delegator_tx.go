@@ -6,7 +6,9 @@ package platformvm
 import (
 	"fmt"
 
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -32,8 +34,7 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 // ProposalBlock that is accepted and followed by a Commit block, adds a
 // delegator to the pending validator set of the default subnet. (That is, the
 // validator in the tx will have their weight increase at some point in the
-// future.) The transaction fee will be paid from the account who signed the
-// transaction.
+// future.)
 type addDefaultSubnetDelegatorTx struct {
 	UnsignedAddDefaultSubnetDelegatorTx `serialize:"true"`
 
@@ -81,18 +82,19 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	// Ensure staking length is not too short or long,
 	// and that the inputs/outputs of this tx are syntactically valid
 	stakingDuration := tx.Duration()
-	if stakingDuration < MinimumStakingDuration {
+	switch {
+	case stakingDuration < MinimumStakingDuration:
 		return permError{errStakeTooShort}
-	} else if stakingDuration > MaximumStakingDuration {
+	case stakingDuration > MaximumStakingDuration:
 		return permError{errStakeTooLong}
-	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
-		return err
+	}
+	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return permError{err}
 	}
 	return nil
 }
 
 // SemanticVerify this transaction is valid.
-// TODO make sure the ins and outs are semantically valid
 func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, permError{err}
@@ -144,15 +146,34 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	}
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
-	// If this proposal is committed, update the pending validator set to include the validator,
-	// update the validator's account by removing the staked AVAX
+	// If this proposal is committed, update the pending validator set to include the validator
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	// If this proposal is aborted, chain state doesn't change
+	// If this proposal is aborted, return the AVAX (but not the tx fee)
 	onAbortDB := versiondb.New(db)
+	if err := tx.vm.putUTXO(onAbortDB, &ava.UTXO{
+		UTXOID: ava.UTXOID{
+			TxID:        tx.ID(),            // Produced UTXO points to this transaction
+			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
+		},
+		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+		Out: &ava.TransferableOutput{
+			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:      tx.Validator.Wght, // Returned AVAX
+				Locktime: 0,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{tx.Destination}, // Spendable by destination address
+				},
+			},
+		},
+	}); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
 
 	return onCommitDB, onAbortDB, nil, nil, nil
 }
