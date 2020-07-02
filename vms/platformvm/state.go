@@ -107,7 +107,7 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 }
 
 // getUTXO returns the UTXO with the specified ID
-func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.TransferableOutput, error) {
+func (vm *VM) getUTXO(db database.Database, utxoID *ava.UTXOID) (*ava.TransferableOutput, error) {
 	// TODO
 	return nil, errors.New("TODO")
 }

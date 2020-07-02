@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -103,7 +104,6 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 // * sum(inputs) >= sum(outputs) + txFee
 func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.TransferableOutput, txFee uint64, avaxAssetID ids.ID) error {
 	var err error
-
 	avaxConsumed := uint64(0) // AVAX consumed in this tx
 	for _, in := range ins {
 		if !in.AssetID().Equals(avaxAssetID) { // all inputs must be AVAX
@@ -124,50 +124,26 @@ func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.Transferable
 			return errors.New("outputs overflowed uint64")
 		}
 	}
-
 	if avaxProduced > avaxConsumed {
 		return fmt.Errorf("tx outputs (%d) + txFee (%d) > inputs (%d)", avaxProduced-txFee, txFee, avaxConsumed)
-	}
-
-	if !ava.IsSortedTransferableOutputs(outs, Codec) {
+	} else if !ava.IsSortedTransferableOutputs(outs, Codec) {
 		return errOutputsNotSorted
 	} else if !ava.IsSortedAndUniqueTransferableInputs(ins) {
 		return errInputsNotSortedUnique
 	}
-
 	return nil
 }
 
-/* TODO implement
-func (vm *VM) semanticVerifySpend(db database.Database, tx interface{}, creds []verify.Verifiable) error {
-	for i, in := range ins {
-		cred := creds[i]
-
-		fxIndex, err := vm.getFx(cred)
-		if err != nil {
+// verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
+// TODO: Is this right?
+func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) error {
+	creds := tx.Creds()
+	for i, in := range tx.Ins() {
+		if utxo, err := vm.getUTXO(db, &in.UTXOID); err != nil {
 			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
-		utxo, err := vm.getUTXO(db, &in.UTXOID)
-		if err != nil {
-			return err
-		}
-
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-
-		if !vm.verifyFxUsage(fxIndex, inAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
+		} else if err := vm.fx.VerifyTransfer(tx, in.In, creds[i], utxo.Out); err != nil {
 			return err
 		}
 	}
 	return nil
 }
-*/
