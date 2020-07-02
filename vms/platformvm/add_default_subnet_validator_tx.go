@@ -114,12 +114,15 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	// Ensure the proposed validator starts after the current time
-	currentTime, err := tx.vm.getTimestamp(db)
-	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+	// Verify inputs/outputs and update the UTXO set
+	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
-	if startTime := tx.StartTime(); !currentTime.Before(startTime) {
+
+	// Ensure the proposed validator starts after the current time
+	if currentTime, err := tx.vm.getTimestamp(db); err != nil {
+		return nil, nil, nil, nil, permError{err}
+	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
 			currentTime,
 			startTime)}
@@ -149,12 +152,6 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 				tx.NodeID)}
 		}
 	}
-
-	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
-	}
-
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
 	// If this proposal is committed, update the pending validator set to include the validator
