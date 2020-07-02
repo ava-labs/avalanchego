@@ -78,7 +78,6 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	case tx.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
 		return permError{errWeightTooSmall}
 	}
-
 	// Ensure staking length is not too short or long,
 	// and that the inputs/outputs of this tx are syntactically valid
 	stakingDuration := tx.Duration()
@@ -89,7 +88,6 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -106,12 +104,9 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// Ensure the proposed validator starts after the current timestamp
-	currentTimestamp, err := tx.vm.getTimestamp(db)
-	if err != nil {
+	if currentTimestamp, err := tx.vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, permError{err}
-	}
-	validatorStartTime := tx.StartTime()
-	if !currentTimestamp.Before(validatorStartTime) {
+	} else if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,
 			validatorStartTime)}
@@ -119,11 +114,11 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 
 	// Ensure that the period this validator validates the specified subnet is a subnet of the time they validate the default subnet
 	// First, see if they're currently validating the default subnet
-	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
 	}
-	if dsValidator, err := currentEvents.getDefaultSubnetStaker(tx.NodeID); err == nil {
+	if dsValidator, err := currentValidatorHeap.getDefaultSubnetStaker(tx.NodeID); err == nil {
 		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
@@ -143,24 +138,18 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		}
 	}
 
-	pendingEvents, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-
-	pendingEvents.Add(tx) // add validator to set of pending validators
+	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
 	// If this proposal is committed, update the pending validator set to include the validator,
-	// update the validator's account by removing the staked $AVA
+	// update the validator's account by removing the staked AVAX
 	onCommitDB := versiondb.New(db)
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-	/* TODO: Add this (or something like it) back
-	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {
-		return nil, nil, nil, nil, permError{err}
-	}
-	*/
 
 	// If this proposal is aborted, chain state doesn't change
 	onAbortDB := versiondb.New(db)
