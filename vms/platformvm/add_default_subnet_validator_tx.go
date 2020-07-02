@@ -145,8 +145,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-	pendingValidators := tx.vm.getValidators(pendingValidatorHeap)
-	for _, pendingVdr := range pendingValidators {
+	for _, pendingVdr := range tx.vm.getValidators(pendingValidatorHeap) {
 		if pendingVdr.ID().Equals(tx.NodeID) {
 			return nil, nil, nil, nil, permError{fmt.Errorf("validator %s is already a pending Default Subnet validator",
 				tx.NodeID)}
@@ -161,10 +160,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// If this proposal is aborted, return the AVAX (but not the tx fee)
-	// TODO: Implement this
-	// TODO: Should they get the tx fee back?
 	onAbortDB := versiondb.New(db)
-
 	return onCommitDB, onAbortDB, tx.vm.resetTimer, nil, nil
 }
 
