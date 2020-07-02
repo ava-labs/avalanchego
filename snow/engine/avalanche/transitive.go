@@ -153,7 +153,11 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		} else { // reached maximum response size
 			break
 		}
-		for _, parent := range vtx.Parents() {
+		parents, err := vtx.Parents()
+		if err != nil {
+			return err
+		}
+		for _, parent := range parents {
 			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
 				continue
 			}
@@ -356,7 +360,11 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, er
 			continue
 		}
 
-		for _, parent := range vtx.Parents() {
+		parents, err := vtx.Parents()
+		if err != nil {
+			return false, err
+		}
+		for _, parent := range parents {
 			if !parent.Status().Fetched() {
 				t.sendRequest(vdr, parent.ID())
 				issued = false
@@ -383,13 +391,20 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 		vtx: vtx,
 	}
 
-	for _, parent := range vtx.Parents() {
+	parents, err := vtx.Parents()
+	if err != nil {
+		return errGetTx
+	}
+	for _, parent := range parents {
 		if !t.Consensus.VertexIssued(parent) {
 			i.vtxDeps.Add(parent.ID())
 		}
 	}
 
-	txs := vtx.Txs()
+	txs, err := vtx.Txs()
+	if err != nil {
+		return err
+	}
 
 	txIDs := ids.Set{}
 	for _, tx := range txs {

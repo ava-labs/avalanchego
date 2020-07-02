@@ -32,7 +32,17 @@ func (pq priorityQueue) Less(i, j int) bool {
 	if !statusJ.Fetched() {
 		return false
 	}
-	return pq[i].vertex.Height() > pq[j].vertex.Height()
+
+	// Treat errors on retrieving the height as if the vertex is not fetched
+	heightI, errI := pq[i].vertex.Height()
+	if errI != nil {
+		return true
+	}
+	heightJ, errJ := pq[j].vertex.Height()
+	if errJ != nil {
+		return false
+	}
+	return heightI > heightJ
 }
 
 func (pq priorityQueue) Swap(i, j int) {
