@@ -48,11 +48,16 @@ type CreateChainTx struct {
 	UnsignedCreateChainTx `serialize:"true"`
 
 	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true"`
 
 	// Signatures from Subnet's control keys
 	// Should not empty slice, not nil, if there are no control sigs
 	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
+}
+
+// Creds returns this transactions credentials
+func (tx *CreateChainTx) Creds() []verify.Verifiable {
+	return tx.Credentials
 }
 
 // initialize [tx]
@@ -93,7 +98,7 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return errControlSigsNotSortedAndUnique
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -121,17 +126,9 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 
-	// Update the UTXO set
-	for _, in := range tx.Ins {
-		utxoID := in.InputID() // ID of the UTXO that [in] spends
-		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
-			return nil, tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
-		}
-	}
-	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
-			return nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
-		}
+	// Verify inputs/outputs and update the UTXO set
+	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+		return nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
 
 	// Verify that this transaction has sufficient control signatures

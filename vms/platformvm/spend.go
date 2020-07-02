@@ -102,7 +102,14 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 // * inputs and outputs are sorted
 // * inputs and outputs are all AVAX
 // * sum(inputs) >= sum(outputs) + txFee
-func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.TransferableOutput, txFee uint64, avaxAssetID ids.ID) error {
+func syntacticVerifySpend(tx SpendTx, txFee uint64, avaxAssetID ids.ID) error {
+	ins := tx.Ins()
+	outs := tx.Outs()
+	creds := tx.Creds()
+	if len(ins) != len(creds) {
+		return fmt.Errorf("there are %d inputs but %d credentials. Should be same number", len(ins), len(outs))
+	}
+
 	var err error
 	avaxConsumed := uint64(0) // AVAX consumed in this tx
 	for _, in := range ins {
@@ -134,14 +141,32 @@ func syntacticVerifySpend(ins []*ava.TransferableInput, outs []*ava.Transferable
 	return nil
 }
 
-// verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
+// Verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
+// Adds/removes the new/old UTXOs
+// [db] should not be committed if an error is returned
+// Precondition: [tx] has already been semantically verified
 // TODO: Is this right?
 func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) error {
 	creds := tx.Creds()
-	for i, in := range tx.Ins() {
+	for index, in := range tx.Ins() {
 		if utxo, err := vm.getUTXO(db, &in.UTXOID); err != nil {
 			return err
-		} else if err := vm.fx.VerifyTransfer(tx, in.In, creds[i], utxo.Out); err != nil {
+		} else if err := vm.fx.VerifyTransfer(tx, in.In, creds[index], utxo.Out); err != nil {
+			return err
+		} else if err := vm.removeUTXO(db, &in.UTXOID); err != nil {
+			return err
+		}
+	}
+	txID := tx.ID()
+	for index, out := range tx.Outs() {
+		if err := vm.putUTXO(db, &ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(index),
+			},
+			Asset: ava.Asset{ID: vm.avaxAssetID},
+			Out:   out,
+		}); err != nil {
 			return err
 		}
 	}

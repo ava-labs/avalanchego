@@ -34,7 +34,12 @@ type ExportTx struct {
 	UnsignedExportTx `serialize:"true"`
 
 	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true"`
+}
+
+// Creds returns this transactions credentials
+func (tx *ExportTx) Creds() []verify.Verifiable {
+	return tx.Credentials
 }
 
 // initialize [tx]
@@ -67,11 +72,11 @@ func (tx *ExportTx) SyntacticVerify() error {
 		return errWrongNetworkID
 	case tx.id.IsZero():
 		return errInvalidID
-	case len(tx.Outs) == 0:
+	case len(tx.Outputs) == 0:
 		return errNoExportOutputs
 	}
 
-	for _, out := range tx.Outs {
+	for _, out := range tx.Outputs {
 		if err := out.Verify(); err != nil {
 			return err
 		}
@@ -79,7 +84,7 @@ func (tx *ExportTx) SyntacticVerify() error {
 			return errUnknownAsset
 		}
 	}
-	if !ava.IsSortedTransferableOutputs(tx.Outs, Codec) {
+	if !ava.IsSortedTransferableOutputs(tx.Outputs, Codec) {
 		return errOutputsNotSorted
 	}
 	return nil
@@ -92,17 +97,9 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 		return err
 	}
 
-	// Update the UTXO set
-	for _, in := range tx.Ins {
-		utxoID := in.InputID() // ID of the UTXO that [in] spends
-		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
-		}
-	}
-	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
-			return tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
-		}
+	// Verify inputs/outputs and update the UTXO set
+	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+		return tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
 	return nil
 }
@@ -117,7 +114,7 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := ava.NewPrefixedState(vsmDB, Codec)
-	for i, out := range tx.Outs {
+	for i, out := range tx.Outputs {
 		utxo := &ava.UTXO{
 			UTXOID: ava.UTXOID{
 				TxID:        txID,

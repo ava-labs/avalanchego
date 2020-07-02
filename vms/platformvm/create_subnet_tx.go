@@ -44,7 +44,12 @@ type CreateSubnetTx struct {
 	UnsignedCreateSubnetTx `serialize:"true"`
 
 	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true"`
+}
+
+// Creds returns this transactions credentials
+func (tx *CreateSubnetTx) Creds() []verify.Verifiable {
+	return tx.Credentials
 }
 
 // initialize [tx]
@@ -84,7 +89,7 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 	case !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys):
 		return errControlKeysNotSortedAndUnique
 	}
-	return syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID)
+	return syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID)
 }
 
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
@@ -104,17 +109,9 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 		return nil, err
 	}
 
-	// Update the UTXO set
-	for _, in := range tx.Ins {
-		utxoID := in.InputID() // ID of the UTXO that [in] spends
-		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
-			return nil, tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
-		}
-	}
-	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
-			return nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
-		}
+	// Verify inputs/outputs and update the UTXO set
+	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+		return nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
 
 	// Register new subnet in validator manager

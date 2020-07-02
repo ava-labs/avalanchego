@@ -44,13 +44,18 @@ type addNonDefaultSubnetValidatorTx struct {
 	UnsignedAddNonDefaultSubnetValidatorTx `serialize:"true"`
 
 	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true"`
 
 	// When a subnet is created, it specifies a set of public keys ("control keys") such
 	// that in order to add a validator to the subnet, a tx must be signed with
 	// a certain threshold of those keys
 	// Each element of ControlSigs is the signature of one of those keys
 	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
+}
+
+// Creds returns this transactions credentials
+func (tx *addNonDefaultSubnetValidatorTx) Creds() []verify.Verifiable {
+	return tx.Credentials
 }
 
 // initialize [tx]
@@ -111,7 +116,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 		tx.controlIDs[i] = key.Address()
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	return nil
@@ -243,17 +248,9 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
-	// Update the UTXO set
-	for _, in := range tx.Ins {
-		utxoID := in.InputID() // ID of the UTXO that [in] spends
-		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
-		}
-	}
-	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
-		}
+	// Verify inputs/outputs and update the UTXO set
+	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
 
 	// If this proposal is committed, update the pending validator set to include the validator

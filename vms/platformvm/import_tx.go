@@ -41,7 +41,12 @@ type ImportTx struct {
 	UnsignedImportTx `serialize:"true"`
 
 	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true"`
+}
+
+// Creds returns this transactions credentials
+func (tx *ImportTx) Creds() []verify.Verifiable {
+	return tx.Credentials
 }
 
 func (tx *ImportTx) initialize(vm *VM) error {
@@ -62,7 +67,7 @@ func (tx *ImportTx) initialize(vm *VM) error {
 // InputUTXOs returns an empty set
 func (tx *ImportTx) InputUTXOs() ids.Set {
 	set := ids.Set{}
-	for _, in := range tx.Ins {
+	for _, in := range tx.Inputs {
 		set.Add(in.InputID())
 	}
 	return set
@@ -78,13 +83,13 @@ func (tx *ImportTx) SyntacticVerify() error {
 		return errWrongNetworkID
 	case tx.id.IsZero():
 		return errInvalidID
-	case len(tx.Ins) == 0:
+	case len(tx.Inputs) == 0:
 		return errNoImportInputs
-	case len(tx.Ins) != len(tx.Creds):
+	case len(tx.Inputs) != len(tx.Credentials):
 		return errWrongNumberOfCredentials
 	}
 
-	for _, in := range tx.Ins {
+	for _, in := range tx.Inputs {
 		if err := in.Verify(); err != nil {
 			return err
 		}
@@ -92,11 +97,11 @@ func (tx *ImportTx) SyntacticVerify() error {
 			return errUnknownAsset
 		}
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(tx.Ins) {
+	if !ava.IsSortedAndUniqueTransferableInputs(tx.Inputs) {
 		return errInputsNotSortedUnique
 	}
 
-	for _, cred := range tx.Creds {
+	for _, cred := range tx.Credentials {
 		if err := cred.Verify(); err != nil {
 			return err
 		}
@@ -112,17 +117,9 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 		return err
 	}
 
-	// Update the UTXO set
-	for _, in := range tx.Ins {
-		utxoID := in.InputID() // ID of the UTXO that [in] spends
-		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
-		}
-	}
-	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
-			return tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
-		}
+	// Verify inputs/outputs and update the UTXO set
+	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+		return tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
 
 	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
@@ -130,8 +127,8 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 
 	state := ava.NewPrefixedState(smDB, Codec)
 
-	for i, in := range tx.Ins {
-		cred := tx.Creds[i]
+	for i, in := range tx.Inputs {
+		cred := tx.Credentials[i]
 
 		utxoID := in.UTXOID.InputID()
 		utxo, err := state.AVMUTXO(utxoID)
@@ -157,7 +154,7 @@ func (tx *ImportTx) Accept(batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := ava.NewPrefixedState(vsmDB, Codec)
-	for _, in := range tx.Ins {
+	for _, in := range tx.Inputs {
 		utxoID := in.UTXOID.InputID()
 		if err := state.SpendAVMUTXO(utxoID); err != nil {
 			return err

@@ -37,8 +37,13 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 type addDefaultSubnetDelegatorTx struct {
 	UnsignedAddDefaultSubnetDelegatorTx `serialize:"true"`
 
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
+	// Credentials that authorize the inputs to be spent
+	Credentials []verify.Verifiable `serialize:"true"`
+}
+
+// Creds returns this transactions credentials
+func (tx *addDefaultSubnetDelegatorTx) Creds() []verify.Verifiable {
+	return tx.Credentials
 }
 
 // initialize [tx]
@@ -81,7 +86,7 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 		return permError{errStakeTooShort}
 	} else if stakingDuration > MaximumStakingDuration {
 		return permError{errStakeTooLong}
-	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -95,17 +100,9 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	// Update the UTXO set
-	for _, in := range tx.Ins {
-		utxoID := in.InputID() // ID of the UTXO that [in] spends
-		if err := tx.vm.removeUTXO(db, utxoID); err != nil {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't remove UTXO %s from UTXO set: %w", utxoID, err)}
-		}
-	}
-	for _, out := range tx.Outs {
-		if err := tx.vm.putUTXO(db, tx.ID(), out); err != nil {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't add UTXO to UTXO set: %w", err)}
-		}
+	// Verify inputs/outputs and update the UTXO set
+	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
 
 	// Ensure the proposed validator starts after the current timestamp

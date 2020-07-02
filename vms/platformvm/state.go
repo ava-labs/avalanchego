@@ -113,14 +113,14 @@ func (vm *VM) getUTXO(db database.Database, utxoID *ava.UTXOID) (*ava.Transferab
 }
 
 // putUTXO persists the given UTXO
-func (vm *VM) putUTXO(db database.Database, txID ids.ID, out *ava.TransferableOutput) error {
+func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 	// TODO
 	// TODO: Map addr --> UTXOs that ref it
 	return errors.New("TODO")
 }
 
 // removeUTXO removes the UTXO with the given ID
-func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
+func (vm *VM) removeUTXO(db database.Database, utxoID *ava.UTXOID) error {
 	// TODO
 	return errors.New("TODO")
 }

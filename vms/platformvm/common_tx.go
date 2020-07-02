@@ -21,10 +21,10 @@ type CommonTx struct {
 	NetworkID uint32 `serialize:"true"`
 
 	// Input UTXOs
-	Ins []*ava.TransferableInput `serialize:"true"`
+	Inputs []*ava.TransferableInput `serialize:"true"`
 
 	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
+	Outputs []*ava.TransferableOutput `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx
@@ -39,3 +39,9 @@ func (tx CommonTx) Bytes() []byte {
 
 // ID returns this transaction's ID
 func (tx CommonTx) ID() ids.ID { return tx.id }
+
+// Ins returns this transaction's inputs
+func (tx CommonTx) Ins() []*ava.TransferableInput { return tx.Inputs }
+
+// Outs returns this transaction's outputs
+func (tx CommonTx) Outs() []*ava.TransferableOutput { return tx.Outputs }
