@@ -20,13 +20,13 @@ var (
 // rewardValidatorTx is a transaction that represents a proposal to remove a
 // validator that is currently validating from the validator set.
 //
-// If this transaction is accepted and the next block accepted is a *Commit
-// block, the validator is removed and the account that the validator specified
-// receives the staked $AVA as well as a validating reward.
+// If this transaction is accepted and the next block accepted is a Commit
+// block, the validator is removed and the address that the validator specified
+// receives the staked AVAX as well as a validating reward.
 //
-// If this transaction is accepted and the next block accepted is an *Abort
-// block, the validator is removed and the account that the validator specified
-// receives the staked $AVA but no reward.
+// If this transaction is accepted and the next block accepted is an Abort
+// block, the validator is removed and the address that the validator specified
+// receives the staked AVAX but no reward.
 type rewardValidatorTx struct {
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true"`
@@ -60,20 +60,18 @@ func (tx *rewardValidatorTx) SyntacticVerify() TxError {
 func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, err
-	}
-	if db == nil {
+	} else if db == nil {
 		return nil, nil, nil, nil, tempError{errDBNil}
 	}
 
-	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	defaultSubnetVdrHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{errDBCurrentValidators}
-	}
-	if currentEvents.Len() == 0 { // there is no validator to remove
+	} else if defaultSubnetVdrHeap.Len() == 0 { // there is no validator to remove
 		return nil, nil, nil, nil, permError{errEmptyValidatingSet}
 	}
 
-	vdrTx := currentEvents.Peek()
+	vdrTx := defaultSubnetVdrHeap.Peek()
 
 	if txID := vdrTx.ID(); !txID.Equals(tx.TxID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
@@ -92,143 +90,61 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 			endTime)}
 	}
 
-	heap.Pop(currentEvents) // Remove validator from the validator set
+	heap.Pop(defaultSubnetVdrHeap) // Remove validator from the validator set
 
 	onCommitDB := versiondb.New(db)
 	// If this tx's proposal is committed, remove the validator from the validator set and update the
-	// account balance to reflect the return of staked $AVA and their reward.
-	if err := tx.vm.putCurrentValidators(onCommitDB, currentEvents, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, permError{errDBPutCurrentValidators}
+	// account balance to reflect the return of staked AVAX and their reward.
+	if err := tx.vm.putCurrentValidators(onCommitDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
+		return nil, nil, nil, nil, tempError{errDBPutCurrentValidators}
 	}
 
 	onAbortDB := versiondb.New(db)
 	// If this tx's proposal is aborted, remove the validator from the validator set and update the
-	// account balance to reflect the return of staked $AVA. The validator receives no reward.
-	if err := tx.vm.putCurrentValidators(onAbortDB, currentEvents, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, permError{errDBPutCurrentValidators}
+	// account balance to reflect the return of staked AVAX
+	if err := tx.vm.putCurrentValidators(onAbortDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
+		return nil, nil, nil, nil, tempError{errDBPutCurrentValidators}
 	}
 
-	/* TODO replace
+	/* TODO
 	switch vdrTx := vdrTx.(type) {
 	case *addDefaultSubnetValidatorTx:
-
-		duration := vdrTx.Duration()
-		amount := vdrTx.Wght
-		reward := reward(duration, amount, InflationRate)
-		amountWithReward, err := math.Add64(amount, reward)
-		if err != nil {
-			amountWithReward = amount
-			tx.vm.Ctx.Log.Error("error while calculating balance with reward: %s", err)
-		}
-
-		accountID := vdrTx.Destination
-		account, err := tx.vm.getAccount(db, accountID) // account receiving staked $AVA (and, if applicable, reward)
-		// Error is likely because the staked $AVA is being sent to a new
-		// account that isn't in the platform chain's state yet.
-		// Create the account
-		// TODO: We should have a keyNotFound error to distinguish this case from others
-		if err != nil {
-			account = newAccount(accountID, 0, 0)
-		}
-
-		accountWithReward := account // The state of the account if the validator earned a validating reward
-		accountNoReward := account   // The state of the account if the validator didn't earn a validating reward
-		if newAccount, err := account.Add(amountWithReward); err == nil {
-			accountWithReward = newAccount
-		} else {
-			tx.vm.Ctx.Log.Error("error while calculating account balance: %v", err)
-		}
-		if newAccount, err := account.Add(amount); err == nil {
-			accountNoReward = newAccount
-		} else {
-			tx.vm.Ctx.Log.Error("error while calculating account balance: %v", err)
-		}
-
-		if err := tx.vm.putAccount(onCommitDB, accountWithReward); err != nil {
-			return nil, nil, nil, nil, tempError{errDBPutAccount}
-		}
-		if err := tx.vm.putAccount(onAbortDB, accountNoReward); err != nil {
-			return nil, nil, nil, nil, tempError{errDBPutAccount}
-		}
+			duration := vdrTx.Duration()
+			stakedAmount := vdrTx.Wght
+			reward := reward(duration, stakedAmount, InflationRate)
+			amountWithReward, err := math.Add64(stakedAmount, reward)
+			if err != nil {
+				amountWithReward = stakedAmount
+				tx.vm.Ctx.Log.Error("error while calculating balance + reward: %s", err)
+			}
+			destination := vdrTx.Destination
+			// TODO create UTXO that rewards this validator
+			// It should probably be part of the tx itself
+		return nil, nil, nil, nil, tempError{errors.New("TODO")}
 	case *addDefaultSubnetDelegatorTx:
-		parentTx, err := currentEvents.getDefaultSubnetStaker(vdrTx.NodeID)
-		if err != nil {
-			return nil, nil, nil, nil, permError{err}
-		}
+			parentTx, err := defaultSubnetVdrHeap.getDefaultSubnetStaker(vdrTx.NodeID)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
 
-		duration := vdrTx.Duration()
-		amount := vdrTx.Wght
-		reward := reward(duration, amount, InflationRate)
+			duration := vdrTx.Duration()
+			amount := vdrTx.Wght
+			reward := reward(duration, amount, InflationRate)
 
-		// Because parentTx.Shares <= NumberOfShares this will never underflow
-		delegatorShares := NumberOfShares - uint64(parentTx.Shares)
-		// Because delegatorShares <= NumberOfShares this will never overflow
-		delegatorReward := delegatorShares * (reward / NumberOfShares)
-		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := math.Mul64(delegatorShares, reward); err == nil {
-			delegatorReward = optimisticReward / NumberOfShares
-		}
+			// Because parentTx.Shares <= NumberOfShares this will never underflow
+			delegatorShares := NumberOfShares - uint64(parentTx.Shares)
+			// Because delegatorShares <= NumberOfShares this will never overflow
+			delegatorReward := delegatorShares * (reward / NumberOfShares)
+			// Delay rounding as long as possible for small numbers
+			if optimisticReward, err := math.Mul64(delegatorShares, reward); err == nil {
+				delegatorReward = optimisticReward / NumberOfShares
+			}
 
-		// Because delegatorReward <= reward this will never underflow
-		validatorReward := reward - delegatorReward
+			// Because delegatorReward <= reward this will never underflow
+			//validatorReward := reward - delegatorReward
 
-		delegatorAmountWithReward, err := math.Add64(amount, delegatorReward)
-		if err != nil {
-			delegatorAmountWithReward = amount
-			tx.vm.Ctx.Log.Error("error while calculating balance with reward: %s", err)
-		}
-
-		/* TODO replace
-		delegatorAccountID := vdrTx.Destination
-		delegatorAccount, err := tx.vm.getAccount(db, delegatorAccountID) // account receiving staked $AVA (and, if applicable, reward)
-		// Error is likely because the staked $AVA is being sent to a new
-		// account that isn't in the platform chain's state yet.
-		// Create the account
-		// TODO: We should have a keyNotFound error to distinguish this case from others
-		if err != nil {
-			delegatorAccount = newAccount(delegatorAccountID, 0, 0)
-		}
-
-		delegatorAccountWithReward := delegatorAccount // The state of the account if the validator earned a validating reward
-		delegatorAccountNoReward := delegatorAccount   // The state of the account if the validator didn't earn a validating reward
-		if newAccount, err := delegatorAccount.Add(delegatorAmountWithReward); err == nil {
-			delegatorAccountWithReward = newAccount
-		} else {
-			tx.vm.Ctx.Log.Error("error while calculating account balance: %v", err)
-		}
-		if newAccount, err := delegatorAccount.Add(amount); err == nil {
-			delegatorAccountNoReward = newAccount
-		} else {
-			tx.vm.Ctx.Log.Error("error while calculating account balance: %v", err)
-		}
-
-		if err := tx.vm.putAccount(onCommitDB, delegatorAccountWithReward); err != nil {
-			return nil, nil, nil, nil, tempError{errDBPutAccount}
-		}
-		if err := tx.vm.putAccount(onAbortDB, delegatorAccountNoReward); err != nil {
-			return nil, nil, nil, nil, tempError{errDBPutAccount}
-		}
-
-		validatorAccountID := parentTx.Destination
-		validatorAccount, err := tx.vm.getAccount(onCommitDB, validatorAccountID) // account receiving staked $AVA (and, if applicable, reward)
-		// Error is likely because the staked $AVA is being sent to a new
-		// account that isn't in the platform chain's state yet.
-		// Create the account
-		// TODO: We should have a keyNotFound error to distinguish this case from others
-		if err != nil {
-			validatorAccount = newAccount(validatorAccountID, 0, 0)
-		}
-
-		validatorAccountWithReward := validatorAccount // The state of the account if the validator earned a validating reward
-		if newAccount, err := validatorAccount.Add(validatorReward); err == nil {
-			validatorAccountWithReward = newAccount
-		} else {
-			tx.vm.Ctx.Log.Error("error while calculating account balance: %v", err)
-		}
-
-		if err := tx.vm.putAccount(onCommitDB, validatorAccountWithReward); err != nil {
-			return nil, nil, nil, nil, permError{errDBPutAccount}
-		}
+			// TODO 		// TODO create UTXO that rewards this validator
+			// It should probably be part of the tx itself
 		return nil, nil, nil, nil, tempError{errors.New("TODO")}
 	default:
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
