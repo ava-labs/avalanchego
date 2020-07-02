@@ -28,11 +28,6 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 	Destination ids.ShortID `serialize:"true"`
 }
 
-// UnsignedBytes returns the byte representation of this unsigned tx
-func (tx *UnsignedAddDefaultSubnetDelegatorTx) UnsignedBytes() []byte {
-	return tx.unsignedBytes
-}
-
 // addDefaultSubnetDelegatorTx is a transaction that, if it is in a
 // ProposalBlock that is accepted and followed by a Commit block, adds a
 // delegator to the pending validator set of the default subnet. (That is, the
@@ -61,8 +56,6 @@ func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return nil
 }
-
-func (tx *addDefaultSubnetDelegatorTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]

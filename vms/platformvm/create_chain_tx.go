@@ -43,11 +43,6 @@ type UnsignedCreateChainTx struct {
 	GenesisData []byte `serialize:"true"`
 }
 
-// UnsignedBytes returns the byte representation of this unsigned tx
-func (tx *UnsignedCreateChainTx) UnsignedBytes() []byte {
-	return tx.unsignedBytes
-}
-
 // CreateChainTx is a proposal to create a chain
 type CreateChainTx struct {
 	UnsignedCreateChainTx `serialize:"true"`
@@ -76,12 +71,6 @@ func (tx *CreateChainTx) initialize(vm *VM) error {
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
-
-// ID of this transaction
-func (tx *CreateChainTx) ID() ids.ID { return tx.id }
-
-// Bytes returns the byte representation of a CreateChainTx
-func (tx *CreateChainTx) Bytes() []byte { return tx.bytes }
 
 // SyntacticVerify this transaction is well-formed
 // Also populates [tx.Key] with the public key that signed this transaction

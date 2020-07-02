@@ -36,11 +36,6 @@ type UnsignedImportTx struct {
 	Account ids.ShortID `serialize:"true"`
 }
 
-// UnsignedBytes returns the byte representation of this unsigned tx
-func (tx *UnsignedImportTx) UnsignedBytes() []byte {
-	return tx.unsignedBytes
-}
-
 // ImportTx imports funds from the AVM
 type ImportTx struct {
 	UnsignedImportTx `serialize:"true"`
@@ -63,15 +58,6 @@ func (tx *ImportTx) initialize(vm *VM) error {
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
-
-// ID of this transaction
-func (tx *ImportTx) ID() ids.ID { return tx.id }
-
-// UnsignedBytes returns the unsigned byte representation of an ImportTx
-func (tx *ImportTx) UnsignedBytes() []byte { return tx.unsignedBytes }
-
-// Bytes returns the byte representation of an ImportTx
-func (tx *ImportTx) Bytes() []byte { return tx.bytes }
 
 // InputUTXOs returns an empty set
 func (tx *ImportTx) InputUTXOs() ids.Set {

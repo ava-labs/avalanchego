@@ -41,11 +41,6 @@ type UnsignedAddDefaultSubnetValidatorTx struct {
 	Shares uint32 `serialize:"true"`
 }
 
-// UnsignedBytes returns the byte representation of this unsigned tx
-func (tx *UnsignedAddDefaultSubnetValidatorTx) UnsignedBytes() []byte {
-	return tx.unsignedBytes
-}
-
 // addDefaultSubnetValidatorTx is a transaction that, if it is in a ProposeAddValidator block that
 // is accepted and followed by a Commit block, adds a validator to the pending validator set of the default subnet.
 // (That is, the validator in the tx will validate at some point in the future.)
@@ -71,8 +66,6 @@ func (tx *addDefaultSubnetValidatorTx) initialize(vm *VM) error {
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
-
-func (tx *addDefaultSubnetValidatorTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify that this transaction is well formed
 // If [tx] is valid, this method also populates [tx.accountID]

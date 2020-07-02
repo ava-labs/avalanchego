@@ -26,3 +26,16 @@ type CommonTx struct {
 	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
 }
+
+// UnsignedBytes returns the byte representation of this unsigned tx
+func (tx CommonTx) UnsignedBytes() []byte {
+	return tx.unsignedBytes
+}
+
+// Bytes returns the byte representation of this tx
+func (tx CommonTx) Bytes() []byte {
+	return tx.bytes
+}
+
+// ID returns this transaction's ID
+func (tx CommonTx) ID() ids.ID { return tx.id }

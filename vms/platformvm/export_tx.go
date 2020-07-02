@@ -29,11 +29,6 @@ type UnsignedExportTx struct {
 	CommonTx `serialize:"true"`
 }
 
-// UnsignedBytes returns the byte representation of this unsigned tx
-func (tx *UnsignedExportTx) UnsignedBytes() []byte {
-	return tx.unsignedBytes
-}
-
 // ExportTx exports funds to the AVM
 type ExportTx struct {
 	UnsignedExportTx `serialize:"true"`
@@ -58,13 +53,6 @@ func (tx *ExportTx) initialize(vm *VM) error {
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
-
-// ID of this transaction
-func (tx *ExportTx) ID() ids.ID { return tx.id }
-
-// Bytes returns the byte representation of an ExportTx
-// Should only be called after initialize
-func (tx *ExportTx) Bytes() []byte { return tx.bytes }
 
 // InputUTXOs returns an empty set
 func (tx *ExportTx) InputUTXOs() ids.Set { return ids.Set{} }

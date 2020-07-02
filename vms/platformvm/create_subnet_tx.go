@@ -39,11 +39,6 @@ type UnsignedCreateSubnetTx struct {
 	Threshold uint16 `serialize:"true"`
 }
 
-// UnsignedBytes returns the byte representation of this unsigned tx
-func (tx *UnsignedCreateSubnetTx) UnsignedBytes() []byte {
-	return tx.unsignedBytes
-}
-
 // CreateSubnetTx is a proposal to create a new subnet
 type CreateSubnetTx struct {
 	UnsignedCreateSubnetTx `serialize:"true"`
@@ -68,9 +63,6 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return err
 }
-
-// ID returns the ID of this transaction
-func (tx *CreateSubnetTx) ID() ids.ID { return tx.id }
 
 // SyntacticVerify nil iff [tx] is syntactically valid.
 // If [tx] is valid, this method sets [tx.key]
@@ -131,10 +123,6 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	}
 	return onAccept, nil
 }
-
-// Bytes returns the byte representation of [tx]
-// Should only be called after initialize
-func (tx *CreateSubnetTx) Bytes() []byte { return tx.bytes }
 
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
