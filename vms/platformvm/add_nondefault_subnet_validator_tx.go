@@ -96,28 +96,26 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	}
 
 	// Ensure staking length is not too short or long
-	stakingDuration := tx.Duration()
-	if stakingDuration < MinimumStakingDuration {
+	if stakingDuration := tx.Duration(); stakingDuration < MinimumStakingDuration {
 		return permError{errStakeTooShort}
 	} else if stakingDuration > MaximumStakingDuration {
 		return permError{errStakeTooLong}
 	}
 
-	// Byte representation of the unsigned transaction
-	unsignedBytesHash := hashing.ComputeHash256(tx.unsignedBytes)
+	// Verify tx inputs and outputs are valid
+	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	}
 
-	tx.controlIDs = make([]ids.ShortID, len(tx.ControlSigs))
 	// recover control signatures
+	tx.controlIDs = make([]ids.ShortID, len(tx.ControlSigs))
+	unsignedBytesHash := hashing.ComputeHash256(tx.unsignedBytes)
 	for i, sig := range tx.ControlSigs {
 		key, err := tx.vm.factory.RecoverHashPublicKey(unsignedBytesHash, sig[:])
 		if err != nil {
 			return permError{err}
 		}
 		tx.controlIDs[i] = key.Address()
-	}
-
-	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
-		return err
 	}
 	return nil
 }
@@ -129,7 +127,6 @@ func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*addDefaultSubnetVal
 		if !ok {
 			continue
 		}
-
 		if id.Equals(tx.NodeID) {
 			return tx, nil
 		}
@@ -138,11 +135,11 @@ func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*addDefaultSubnetVal
 }
 
 // SemanticVerify this transaction is valid.
-// TODO make sure the ins and outs are semantically valid
 func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
-	// Ensure tx is syntactically valid
-	if err := tx.SyntacticVerify(); err != nil {
+	if err := tx.SyntacticVerify(); err != nil { // Ensure tx is syntactically valid
 		return nil, nil, nil, nil, permError{err}
+	} else if err := tx.vm.semanticVerifySpend(db, tx); err != nil { // Validate/update UTXOs
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
 	}
 
 	// Get info about the subnet we're adding a validator to
@@ -157,18 +154,16 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 			break
 		}
 	}
+
 	if subnet == nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("subnet %s does not exist", tx.SubnetID())}
-	}
-
-	// Ensure the sigs on [tx] are valid
-	if len(tx.ControlSigs) != int(subnet.Threshold) {
+	} else if len(tx.ControlSigs) != int(subnet.Threshold) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("expected tx to have %d control sigs but has %d", subnet.Threshold, len(tx.ControlSigs))}
-	}
-	if !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs) {
+	} else if !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs) {
 		return nil, nil, nil, nil, permError{errors.New("control signatures aren't sorted")}
 	}
 
+	// Ensure the sigs on [tx] are valid
 	controlKeys := ids.ShortSet{}
 	controlKeys.Add(subnet.ControlKeys...)
 	for _, controlID := range tx.controlIDs {
@@ -183,7 +178,6 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	if err != nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
 	}
-
 	if dsValidator, err := currentDSValidators.getDefaultSubnetStaker(tx.NodeID); err == nil {
 		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
 			return nil, nil, nil, nil,
@@ -245,13 +239,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 				tx.Subnet)}
 		}
 	}
-
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
-
-	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
-	}
 
 	// If this proposal is committed, update the pending validator set to include the validator
 	onCommitDB := versiondb.New(db)
@@ -261,7 +249,6 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 
 	// If this proposal is aborted, chain state doesn't change
 	onAbortDB := versiondb.New(db)
-
 	return onCommitDB, onAbortDB, nil, nil, nil
 }
 
