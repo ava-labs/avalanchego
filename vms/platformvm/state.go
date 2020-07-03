@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -112,32 +113,53 @@ func (vm *VM) getUTXO(db database.Database, utxoID *ava.UTXOID) (*ava.UTXO, erro
 }
 
 // putUTXO persists the given UTXO
+// TODO: This is a hillariously naive and inefficient way of doing this. Fix it.
 func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
-	/*
-		txID, outputIndex := utxo.InputSource()
-		key := txID.Prefix(uint64(outputIndex))
-		if err := vm.State.Put(db, utxoTypeID, key, utxo); err != nil {
-			return err
+	txID, outputIndex := utxo.InputSource()
+	key := txID.Prefix(uint64(outputIndex))
+	if err := vm.State.Put(db, utxoTypeID, key, utxo); err != nil {
+		return err
+	}
+	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+	if !ok {
+		vm.Ctx.Log.Warn("expected output to be type *secp256k1fx.TransferOutput but is %T", out)
+	}
+	// For each owner of this UTXO, add to list of UTXOs owned by that addr
+	for _, addrBytes := range out.OutputOwners.Addresses() {
+		var addrBytesArr [20]byte
+		copy(addrBytesArr[:], addrBytes)
+		addr := ids.NewShortID(addrBytesArr)
+		addrUTXOs, err := vm.getReferencingUTXOs(db, addr)
+		if err != nil {
+			return fmt.Errorf("couldn't get UTXOs that reference %s", addr)
 		}
-		// TODO: Map addr --> UTXOs that ref it
-	*/
-	return errors.New("TODO")
+		addrUTXOs = append(addrUTXOs, utxo)
+		if err := vm.State.Put(db, utxoSetTypeID, key, addrUTXOs); err != nil {
+			return fmt.Errorf("couldn't write %s's UTXOs to db: %w", addr, err)
+		}
+	}
+	return nil
 }
 
 // removeUTXO removes the UTXO with the given ID
+// TODO: For each owner of this UTXO, remove this UTXO from the list of UTXOs owned by that addr
 func (vm *VM) removeUTXO(db database.Database, utxoID *ava.UTXOID) error {
-	// TODO
-	return errors.New("TODO")
+	txID, outputIndex := utxoID.InputSource()
+	key := txID.Prefix(uint64(outputIndex))
+	if err := vm.State.Put(db, utxoTypeID, key, nil); err != nil {
+		return err
+	}
+	return errors.New("TODO finish this method")
 }
 
-// return the IDs of UTXOs that reference [addr]
-func (vm *VM) getRefedBy(db database.Database, addr ids.ShortID) ([]ids.ID, error) {
+// return the set of UTXOs that reference [addr]
+func (vm *VM) getReferencingUTXOs(db database.Database, addr ids.ShortID) ([]*ava.UTXO, error) {
 	// TODO
 	return nil, errors.New("TODO")
 }
 
 // each element of [utxoIDs] is the ID of a UTXO that references [addr]
-func (vm *VM) putRefedBy(db database.Database, addr ids.ShortID, utxoIDs []ids.ID) error {
+func (vm *VM) putReferencingUTXOs(db database.Database, addr ids.ShortID, utxoIDs []ids.ID) error {
 	// TODO
 	return errors.New("TODO")
 }
@@ -320,7 +342,7 @@ func (vm *VM) registerDBTypes() {
 		} else if utxo, ok := utxoIntf.(ava.UTXO); ok {
 			return Codec.Marshal(utxo)
 		}
-		return nil, errors.New("expected *ava.UTXO but got unexpected type")
+		return nil, fmt.Errorf("expected ava.UTXO but got unexpected type %T", utxoIntf)
 	}
 	unmarshalUTXOFunc := func(bytes []byte) (interface{}, error) {
 		var utxo ava.UTXO
