@@ -25,18 +25,8 @@ import (
 
 var (
 	errMissingDecisionBlock  = errors.New("should have a decision block within the past two blocks")
-	errParsingID             = errors.New("error parsing ID")
-	errGetAccount            = errors.New("error retrieving account information")
-	errGetAccounts           = errors.New("error getting accounts controlled by specified user")
-	errGetUser               = errors.New("error while getting user. Does user exist?")
-	errNoMethodWithGenesis   = errors.New("no method was provided but genesis data was provided")
 	errCreatingTransaction   = errors.New("problem while creating transaction")
-	errNoDestination         = errors.New("call is missing field 'stakeDestination'")
-	errNoSource              = errors.New("call is missing field 'stakeSource'")
-	errGetStakeSource        = errors.New("couldn't get account specified in 'stakeSource'")
-	errNoBlockchainWithAlias = errors.New("there is no blockchain with the specified alias")
 	errDSCantValidate        = errors.New("new blockchain can't be validated by default Subnet")
-	errNonDSUsesDS           = errors.New("add non default subnet validator attempts to use default Subnet ID")
 	errNilSigner             = errors.New("nil ShortID 'signer' is not valid")
 	errNilTo                 = errors.New("nil ShortID 'to' is not valid")
 	errNoFunds               = errors.New("no spendable funds were found")
@@ -694,7 +684,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	}
 
 	if subnetID.Equals(DefaultSubnetID) {
-		return errNonDSUsesDS
+		return errors.New("non-default subnet validator attempts to validate default subnet")
 	}
 
 	tx := addNonDefaultSubnetValidatorTx{
@@ -1080,7 +1070,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 
 	switch {
 	case args.To == "":
-		return errNilTo
+		return errors.New("argument 'to' not given")
 	case args.PayerNonce == 0:
 		return fmt.Errorf("sender's next nonce not specified")
 	}
