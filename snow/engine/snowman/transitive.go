@@ -647,3 +647,8 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.numBlockedBlk.Set(float64(t.pending.Len()))
 	return t.errs.Err
 }
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (t *Transitive) IsBootstrapped() bool {
+	return t.bootstrapped
+}

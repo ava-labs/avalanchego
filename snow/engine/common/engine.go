@@ -14,6 +14,9 @@ type Engine interface {
 
 	// Return the context of the chain this engine is working on
 	Context() *snow.Context
+
+	// Returns true iff the chain is done bootstrapping
+	IsBootstrapped() bool
 }
 
 // Handler defines the functions that are acted on the node
