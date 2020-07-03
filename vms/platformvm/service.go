@@ -1070,7 +1070,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 
 	switch {
 	case args.To == "":
-		return errors.New("argument 'to' not given")
+		return errors.New("argument 'to' not")
 	case args.PayerNonce == 0:
 		return fmt.Errorf("sender's next nonce not specified")
 	}

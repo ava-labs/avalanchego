@@ -19,7 +19,6 @@ import (
 
 var (
 	errEmptyAccountAddress = errors.New("account has empty address")
-	errNoSuchBlockchain    = errors.New("there is no blockchain with the specified ID")
 )
 
 // TODO: Cache prefixed IDs or use different way of keying into database
@@ -48,7 +47,7 @@ func (vm *VM) getCurrentValidators(db database.Database, subnetID ids.ID) (*Even
 	}
 	currentValidators, ok := currentValidatorsInterface.(*EventHeap)
 	if !ok {
-		vm.Ctx.Log.Warn("expected to retrieve *AddStakerHeap from database but got different type")
+		vm.Ctx.Log.Error("expected to retrieve *AddStakerHeap from database but got different type")
 		return nil, err
 	}
 	for _, validator := range currentValidators.Txs {
@@ -107,7 +106,7 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 }
 
 // getUTXO returns the UTXO with the specified ID
-func (vm *VM) getUTXO(db database.Database, utxoID *ava.UTXOID) (*ava.TransferableOutput, error) {
+func (vm *VM) getUTXO(db database.Database, utxoID *ava.UTXOID) (*ava.UTXO, error) {
 	// TODO
 	return nil, errors.New("TODO")
 }
@@ -172,7 +171,7 @@ func (vm *VM) getChain(db database.Database, ID ids.ID) (*CreateChainTx, error) 
 			return chain, nil
 		}
 	}
-	return nil, errNoSuchBlockchain
+	return nil, fmt.Errorf("blockchain %s doesn't exist", ID)
 }
 
 // put the list of blockchains that exist to database
