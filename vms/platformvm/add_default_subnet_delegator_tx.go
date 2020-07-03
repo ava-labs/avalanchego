@@ -13,7 +13,9 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 // UnsignedAddDefaultSubnetDelegatorTx is an unsigned addDefaultSubnetDelegatorTx
@@ -184,48 +186,69 @@ func (tx *addDefaultSubnetDelegatorTx) InitiallyPrefersCommit() bool {
 	return tx.StartTime().After(tx.vm.clock.Time())
 }
 
-// TODO: Implement
-/*
+// TODO: Comment
 func (vm *VM) newAddDefaultSubnetDelegatorTx(
-	nonce,
-	weight,
+	stakeAmt,
 	startTime,
 	endTime uint64,
 	nodeID ids.ShortID,
 	destination ids.ShortID,
 	networkID uint32,
-	key *crypto.PrivateKeySECP256K1R,
+	keys []*crypto.PrivateKeySECP256K1R,
 ) (*addDefaultSubnetDelegatorTx, error) {
-	// Get UTXOs of sender
-	addr := key.PublicKey().Address()
 
+	// Calculate amount to be spent in this transaction
+	toSpend, err := safemath.Add64(stakeAmt, vm.txFee)
+	if err != nil {
+		return nil, fmt.Errorf("overflow while calculating amount to spend")
+	}
+
+	// Calculate inputs, outputs, and keys used to sign this tx
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, toSpend, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	// Create the tx
 	tx := &addDefaultSubnetDelegatorTx{
 		UnsignedAddDefaultSubnetDelegatorTx: UnsignedAddDefaultSubnetDelegatorTx{
+			CommonTx: CommonTx{
+				NetworkID: networkID,
+				Inputs:    inputs,
+				Outputs:   outputs,
+			},
 			DurationValidator: DurationValidator{
 				Validator: Validator{
 					NodeID: nodeID,
-					Wght:   weight,
+					Wght:   stakeAmt,
 				},
 				Start: startTime,
 				End:   endTime,
 			},
-			NetworkID:   networkID,
 			Destination: destination,
 		},
 	}
-
-	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetDelegatorTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr. of unsigned tx
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddDefaultSubnetDelegatorTx))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't marshal UnsignedAddDefaultSubnetDelegatorTx: %w", err)
 	}
+	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		return nil, err
+	// Attach credentials
+	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{}
+		for _, key := range inputKeys {
+			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
+			if err != nil {
+				return nil, fmt.Errorf("problem generating credential: %w", err)
+			}
+			sigArr := [crypto.SECP256K1RSigLen]byte{}
+			copy(sigArr[:], sig)
+			cred.Sigs = append(cred.Sigs, sigArr)
+		}
+		tx.Credentials = append(tx.Credentials, cred) // Attach credntial to tx
 	}
-	copy(tx.Sig[:], sig)
 
 	return tx, tx.initialize(vm)
+
 }
-*/

@@ -32,8 +32,9 @@ type UnsignedImportTx struct {
 	// Metadata, inputs and outputs
 	CommonTx `serialize:"true"`
 
-	// Account that this transaction is being sent by. This is needed to ensure the Credentials are replay safe.
-	Account ids.ShortID `serialize:"true"`
+	// Address that this transaction is being sent by.
+	// This is needed to ensure the Credentials are replay safe.
+	Address ids.ShortID `serialize:"true"`
 }
 
 // ImportTx imports funds from the AVM
@@ -106,7 +107,6 @@ func (tx *ImportTx) SyntacticVerify() error {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -169,23 +169,37 @@ func (tx *ImportTx) Accept(batch database.Batch) error {
 }
 
 /* TODO implement
-func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.TransferableInput, from [][]*crypto.PrivateKeySECP256K1R, to *crypto.PrivateKeySECP256K1R) (*ImportTx, error) {
+func (vm *VM) newImportTx(
+	networkID uint32,
+	ins []*ava.TransferableInput,
+	from [][]*crypto.PrivateKeySECP256K1R,
+	to *crypto.PrivateKeySECP256K1R,
+) (*ImportTx, error) {
+
+	// Calculate inputs, outputs, and keys used to sign this tx
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, from)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	ins = append(ins, inputs...)
+
+	tx := &ImportTx{
+		UnsignedImportTx: UnsignedImportTx{
+			CommonTx: CommonTx{
+				NetworkID: networkID,
+				Inputs:    inputs,
+				Outputs:   outputs,
+			},
+			Address: to.PublicKey().Address(),
+		}}
+
 	ava.SortTransferableInputsWithSigners(ins, from)
 
-	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
-		NetworkID: networkID,
-		Nonce:     nonce,
-		Account:   to.PublicKey().Address(),
-		Ins:       ins,
-	}}
-
-	unsignedIntf := interface{}(&tx.UnsignedImportTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction
-	if err != nil {
-		return nil, err
+	// Generate byte repr. of unsigned tx
+	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedImportTx)); err != nil {
+		return nil, fmt.Errorf("couldn't marshal UnsignedImportTx: %w", err)
 	}
-
-	hash := hashing.ComputeHash256(unsignedBytes)
+	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
 	for _, credKeys := range from {
 		cred := &secp256k1fx.Credential{}
@@ -194,19 +208,12 @@ func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.Transferabl
 			if err != nil {
 				return nil, fmt.Errorf("problem creating transaction: %w", err)
 			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
+			sigArr := [crypto.SECP256K1RSigLen]byte{}
+			copy(sigArr[:], sig)
+			cred.Sigs = append(cred.Sigs, sigArr)
 		}
-		tx.Creds = append(tx.Creds, cred)
+		tx.Credentials = append(tx.Credentials, cred)
 	}
-
-	sig, err := to.SignHash(hash)
-	if err != nil {
-		return nil, err
-	}
-	copy(tx.Sig[:], sig)
 
 	return tx, tx.initialize(vm)
 }

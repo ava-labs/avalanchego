@@ -11,9 +11,11 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -136,28 +138,52 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 	return atomic.WriteAll(batch, sharedBatch)
 }
 
-/* TODO implement
-func (vm *VM) newExportTx(nonce uint64, networkID uint32, outs []*ava.TransferableOutput, from *crypto.PrivateKeySECP256K1R) (*ExportTx, error) {
+// TODO comment
+func (vm *VM) newExportTx(
+	networkID uint32,
+	outs []*ava.TransferableOutput,
+	keys []*crypto.PrivateKeySECP256K1R,
+) (*ExportTx, error) {
+
+	// Calculate inputs, outputs, and keys used to sign this tx
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	outputs = append(outputs, outs...)
+
+	// Create the tx
+	tx := &ExportTx{
+		UnsignedExportTx: UnsignedExportTx{
+			CommonTx: CommonTx{
+				NetworkID: networkID,
+				Inputs:    inputs,
+				Outputs:   outs,
+			},
+		},
+	}
 	ava.SortTransferableOutputs(outs, Codec)
 
-	tx := &ExportTx{UnsignedExportTx: UnsignedExportTx{
-		NetworkID: networkID,
-		Nonce:     nonce,
-		Outs:      outs,
-	}}
-
-	unsignedIntf := interface{}(&tx.UnsignedExportTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction
-	if err != nil {
-		return nil, err
+	// Generate byte repr. of unsigned tx
+	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedExportTx)); err != nil {
+		return nil, fmt.Errorf("couldn't marshal UnsignedExportTx: %w", err)
 	}
+	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
-	sig, err := from.Sign(unsignedBytes)
-	if err != nil {
-		return nil, err
+	// Attach credentials that allow the inputs to be spent
+	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{}
+		for _, key := range inputKeys {
+			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
+			if err != nil {
+				return nil, fmt.Errorf("problem generating credential: %w", err)
+			}
+			sigArr := [crypto.SECP256K1RSigLen]byte{}
+			copy(sigArr[:], sig)
+			cred.Sigs = append(cred.Sigs, sigArr)
+		}
+		tx.Credentials = append(tx.Credentials, cred) // Attach credential to tx
 	}
-	copy(tx.Sig[:], sig)
 
 	return tx, tx.initialize(vm)
 }
-*/

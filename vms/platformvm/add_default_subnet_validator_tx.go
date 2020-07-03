@@ -196,8 +196,11 @@ func (tx *addDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 }
 
 // NewAddDefaultSubnetValidatorTx returns a new NewAddDefaultSubnetValidatorTx
-func (vm *VM) newAddDefaultSubnetValidatorTx(stakeAmt, startTime, endTime uint64, nodeID,
-	destination ids.ShortID, shares, networkID uint32, keys []*crypto.PrivateKeySECP256K1R,
+func (vm *VM) newAddDefaultSubnetValidatorTx(
+	stakeAmt, startTime, endTime uint64,
+	nodeID, destination ids.ShortID,
+	shares, networkID uint32,
+	keys []*crypto.PrivateKeySECP256K1R,
 ) (*addDefaultSubnetValidatorTx, error) {
 
 	toSpend, err := safemath.Add64(stakeAmt, vm.txFee)
@@ -205,11 +208,13 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(stakeAmt, startTime, endTime uint64
 		return nil, fmt.Errorf("overflow while calculating amount to spend")
 	}
 
-	inputs, outputs, err := vm.spend(vm.DB, toSpend, keys)
+	// Calculate inputs, outputs, and keys used to sign this tx
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, toSpend, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
+	// Create the tx
 	tx := &addDefaultSubnetValidatorTx{
 		UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
 			CommonTx: CommonTx{
@@ -228,6 +233,26 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(stakeAmt, startTime, endTime uint64
 			Destination: destination,
 			Shares:      shares,
 		},
+	}
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddDefaultSubnetValidatorTx))
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal UnsignedAddDefaultSubnetValidatorTx: %w", err)
+	}
+	hash := hashing.ComputeHash256(tx.unsignedBytes)
+
+	// Attach credentials
+	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{}
+		for _, key := range inputKeys {
+			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
+			if err != nil {
+				return nil, fmt.Errorf("problem generating credential: %w", err)
+			}
+			sigArr := [crypto.SECP256K1RSigLen]byte{}
+			copy(sigArr[:], sig)
+			cred.Sigs = append(cred.Sigs, sigArr)
+		}
+		tx.Credentials = append(tx.Credentials, cred) // Attach credntial to tx
 	}
 
 	return tx, tx.initialize(vm)

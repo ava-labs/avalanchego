@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -97,12 +98,7 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
 		return errControlSigsNotSortedAndUnique
 	}
-
-	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
-		return err
-	}
-
-	return nil
+	return syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID)
 }
 
 // SemanticVerify this transaction is valid.
@@ -184,16 +180,34 @@ func (chains createChainList) Bytes() []byte {
 	return bytes
 }
 
-/* TODO implement
-func (vm *VM) newCreateChainTx(nonce uint64, subnetID ids.ID, genesisData []byte,
-	vmID ids.ID, fxIDs []ids.ID, chainName string, networkID uint32,
+// TODO comment
+func (vm *VM) newCreateChainTx(
+	nonce uint64,
+	subnetID ids.ID,
+	genesisData []byte,
+	vmID ids.ID,
+	fxIDs []ids.ID,
+	chainName string,
+	networkID uint32,
 	controlKeys []*crypto.PrivateKeySECP256K1R,
-	payerKey *crypto.PrivateKeySECP256K1R) (*CreateChainTx, error) {
+	keys []*crypto.PrivateKeySECP256K1R,
+) (*CreateChainTx, error) {
+
+	// Calculate inputs, outputs, and keys used to sign this tx
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	// Create the tx
 	tx := &CreateChainTx{
 		UnsignedCreateChainTx: UnsignedCreateChainTx{
-			NetworkID:   networkID,
+			CommonTx: CommonTx{
+				NetworkID: networkID,
+				Inputs:    inputs,
+				Outputs:   outputs,
+			},
 			SubnetID:    subnetID,
-			Nonce:       nonce,
 			GenesisData: genesisData,
 			VMID:        vmID,
 			FxIDs:       fxIDs,
@@ -202,33 +216,36 @@ func (vm *VM) newCreateChainTx(nonce uint64, subnetID ids.ID, genesisData []byte
 	}
 
 	// Generate byte repr. of unsigned transaction
-	unsignedIntf := interface{}(&tx.UnsignedCreateChainTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
-	if err != nil {
-		return nil, err
+	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateChainTx)); err != nil {
+		return nil, fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
 	}
-	unsignedBytesHash := hashing.ComputeHash256(unsignedBytes)
+	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
 	// Sign the tx with control keys
 	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(controlKeys))
 	for i, key := range controlKeys {
-		sig, err := key.SignHash(unsignedBytesHash)
+		sig, err := key.SignHash(hash)
 		if err != nil {
 			return nil, err
 		}
 		copy(tx.ControlSigs[i][:], sig)
 	}
+	crypto.SortSECP2561RSigs(tx.ControlSigs) // Sort the control signatures
 
-	// Sort the control signatures
-	crypto.SortSECP2561RSigs(tx.ControlSigs)
-
-	// Sign with the payer key
-	payerSig, err := payerKey.Sign(unsignedBytes)
-	if err != nil {
-		return nil, err
+	// Attach credentials that allow the inputs to be spent
+	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{}
+		for _, key := range inputKeys {
+			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
+			if err != nil {
+				return nil, fmt.Errorf("problem generating credential: %w", err)
+			}
+			sigArr := [crypto.SECP256K1RSigLen]byte{}
+			copy(sigArr[:], sig)
+			cred.Sigs = append(cred.Sigs, sigArr)
+		}
+		tx.Credentials = append(tx.Credentials, cred) // Attach credential to tx
 	}
-	copy(tx.PayerSig[:], payerSig)
 
 	return tx, tx.initialize(vm)
 }
-*/

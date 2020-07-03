@@ -10,8 +10,10 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 const maxThreshold = 25
@@ -123,43 +125,65 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
-/* TODO implement
-func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []ids.ShortID,
-	threshold uint16, payerKey *crypto.PrivateKeySECP256K1R,
+func (vm *VM) newCreateSubnetTx(
+	networkID uint32,
+	controlKeys []ids.ShortID,
+	threshold uint16,
+	keys []*crypto.PrivateKeySECP256K1R,
 ) (*CreateSubnetTx, error) {
-	tx := &CreateSubnetTx{UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
-		NetworkID:   networkID,
-		Nonce:       nonce,
-		ControlKeys: controlKeys,
-		Threshold:   threshold,
-	}}
 
-	if threshold == 0 && len(tx.ControlKeys) > 0 {
-		return nil, errUnneededKeys
+	if int(threshold) != len(controlKeys) {
+		return nil, fmt.Errorf("expected %d (threshold) controlKeys but got %d", threshold, len(controlKeys))
 	}
 
+	// Calculate inputs, outputs, and keys used to sign this tx
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	// Create the tx
+	tx := &CreateSubnetTx{
+		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
+			CommonTx: CommonTx{
+				NetworkID: networkID,
+				Inputs:    inputs,
+				Outputs:   outputs,
+			},
+			ControlKeys: controlKeys,
+			Threshold:   threshold,
+		},
+	}
 	// Sort control keys
 	ids.SortShortIDs(tx.ControlKeys)
-	// Ensure control keys are unique
+	// Ensure control keys are unique and sorted
 	if !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys) {
 		return nil, errControlKeysNotSortedAndUnique
 	}
 
-	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
-	if err != nil {
-		return nil, err
+	// Generate byte repr. of unsigned tx
+	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateSubnetTx)); err != nil {
+		return nil, fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
 	}
+	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
-	sig, err := payerKey.Sign(unsignedBytes)
-	if err != nil {
-		return nil, err
+	// Attach credentials that allow the inputs to be spent
+	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{}
+		for _, key := range inputKeys {
+			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
+			if err != nil {
+				return nil, fmt.Errorf("problem generating credential: %w", err)
+			}
+			sigArr := [crypto.SECP256K1RSigLen]byte{}
+			copy(sigArr[:], sig)
+			cred.Sigs = append(cred.Sigs, sigArr)
+		}
+		tx.Credentials = append(tx.Credentials, cred) // Attach credential to tx
 	}
-	copy(tx.Sig[:], sig)
 
 	return tx, tx.initialize(vm)
 }
-*/
 
 // CreateSubnetTxList is a list of *CreateSubnetTx
 type CreateSubnetTxList []*CreateSubnetTx

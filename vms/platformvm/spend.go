@@ -17,9 +17,14 @@ var (
 )
 
 // return the inputs and outputs resulting from [keys] paying spending [toSpend]
-func (vm *VM) spend(db database.Database, toSpend uint64, keys []*crypto.PrivateKeySECP256K1R) ([]*ava.TransferableInput, []*ava.TransferableOutput, error) {
+// TODO comment better
+func (vm *VM) spend(
+	db database.Database,
+	toSpend uint64,
+	keys []*crypto.PrivateKeySECP256K1R,
+) ([]*ava.TransferableInput, []*ava.TransferableOutput, [][]*crypto.PrivateKeySECP256K1R, error) {
 	if len(keys) == 0 {
-		return nil, nil, fmt.Errorf("no keys provided")
+		return nil, nil, nil, fmt.Errorf("no keys provided")
 	}
 	addrs := ids.ShortSet{} // The addresses controlled by [keys]
 	for _, key := range keys {
@@ -27,7 +32,7 @@ func (vm *VM) spend(db database.Database, toSpend uint64, keys []*crypto.Private
 	}
 	utxos, err := vm.getUTXOs(db, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
+		return nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
 	kc := secp256k1fx.NewKeychain() // Keychain spends UTXOs and creates outputs
 	for _, key := range keys {
@@ -53,7 +58,7 @@ func (vm *VM) spend(db database.Database, toSpend uint64, keys []*crypto.Private
 		}
 		amountSpent, err = safemath.Add64(amountSpent, input.Amount())
 		if err != nil { // Should never happen
-			return nil, nil, fmt.Errorf("overflow while calculating amount spent")
+			return nil, nil, nil, fmt.Errorf("overflow while calculating amount spent")
 		}
 		ins = append(ins, &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
@@ -66,7 +71,7 @@ func (vm *VM) spend(db database.Database, toSpend uint64, keys []*crypto.Private
 		}
 	}
 	if amountSpent < toSpend {
-		return nil, nil, fmt.Errorf("provided keys don't have %d AVAX", toSpend)
+		return nil, nil, nil, fmt.Errorf("provided keys don't have %d AVAX", toSpend)
 	}
 	ava.SortTransferableInputsWithSigners(ins, txSigners) // sort inputs
 
@@ -89,7 +94,7 @@ func (vm *VM) spend(db database.Database, toSpend uint64, keys []*crypto.Private
 	}
 	ava.SortTransferableOutputs(outs, vm.codec) //sort outputs
 
-	return ins, outs, nil
+	return ins, outs, txSigners, nil
 }
 
 // Verify that:

@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -244,7 +245,7 @@ func (tx *addNonDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 	return tx.StartTime().After(tx.vm.clock.Time())
 }
 
-/* TODO: Implement this
+// TODO: Comment
 func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	nonce,
 	weight,
@@ -254,10 +255,23 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	subnetID ids.ID,
 	networkID uint32,
 	controlKeys []*crypto.PrivateKeySECP256K1R,
-	payerKey *crypto.PrivateKeySECP256K1R,
+	keys []*crypto.PrivateKeySECP256K1R,
 ) (*addNonDefaultSubnetValidatorTx, error) {
+
+	// Calculate inputs, outputs, and keys used to sign this tx
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	// Create the tx
 	tx := &addNonDefaultSubnetValidatorTx{
 		UnsignedAddNonDefaultSubnetValidatorTx: UnsignedAddNonDefaultSubnetValidatorTx{
+			CommonTx: CommonTx{
+				NetworkID: networkID,
+				Inputs:    inputs,
+				Outputs:   outputs,
+			},
 			SubnetValidator: SubnetValidator{
 				DurationValidator: DurationValidator{
 					Validator: Validator{
@@ -269,37 +283,28 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 				},
 				Subnet: subnetID,
 			},
-			NetworkID: networkID,
 		},
 	}
-
-	unsignedIntf := interface{}(&tx.UnsignedAddNonDefaultSubnetValidatorTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr. of unsigned tx
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddNonDefaultSubnetValidatorTx))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
 	}
-	unsignedHash := hashing.ComputeHash256(unsignedBytes)
+	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
-	// Sign this tx with each control key
-	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(controlKeys))
-	for i, key := range controlKeys {
-		sig, err := key.SignHash(unsignedHash)
-		if err != nil {
-			return nil, err
+	// Attach credentials
+	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{}
+		for _, key := range inputKeys {
+			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
+			if err != nil {
+				return nil, fmt.Errorf("problem generating credential: %w", err)
+			}
+			sigArr := [crypto.SECP256K1RSigLen]byte{}
+			copy(sigArr[:], sig)
+			cred.Sigs = append(cred.Sigs, sigArr)
 		}
-		// tx.ControlSigs[i] is type [65]byte but sig is type []byte
-		// so we have to do the below
-		copy(tx.ControlSigs[i][:], sig)
+		tx.Credentials = append(tx.Credentials, cred) // Attach credntial to tx
 	}
-	crypto.SortSECP2561RSigs(tx.ControlSigs)
-
-	// Sign this tx with the key of the tx fee payer
-	sig, err := payerKey.SignHash(unsignedHash)
-	if err != nil {
-		return nil, err
-	}
-	copy(tx.PayerSig[:], sig)
 
 	return tx, tx.initialize(vm)
 }
-*/
