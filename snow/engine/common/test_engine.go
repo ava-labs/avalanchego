@@ -363,11 +363,9 @@ func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerI
 func (e *EngineTest) IsBootstrapped() bool {
 	if e.IsBootstrappedF != nil {
 		return e.IsBootstrappedF()
-	} else if e.CantIsBootstrapped {
-		if e.T != nil {
-			e.T.Fatalf("Unexpectedly called IsBootstrapped")
-		}
-		return false
+	}
+	if e.CantIsBootstrapped && e.T != nil {
+		e.T.Fatalf("Unexpectedly called IsBootstrapped")
 	}
 	return false
 }
