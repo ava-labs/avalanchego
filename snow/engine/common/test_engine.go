@@ -367,7 +367,7 @@ func (e *EngineTest) IsBootstrapped() bool {
 		if e.T != nil {
 			e.T.Fatalf("Unexpectedly called IsBootstrapped")
 		}
-		panic("Unexpectedly called IsBootstrapped")
+		return false
 	}
-	return e.IsBootstrappedF()
+	return false
 }
