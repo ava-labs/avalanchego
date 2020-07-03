@@ -101,8 +101,8 @@ func (vm *VM) payFee(db database.Database, key *crypto.PrivateKeySECP256K1R) (in
 // Verify that:
 // * inputs and outputs are sorted
 // * inputs and outputs are all AVAX
-// * sum(inputs) >= sum(outputs) + txFee
-func syntacticVerifySpend(tx SpendTx, txFee uint64, avaxAssetID ids.ID) error {
+// * sum(inputs) >= sum(outputs) + burnAmount
+func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) error {
 	ins := tx.Ins()
 	outs := tx.Outs()
 	creds := tx.Creds()
@@ -121,18 +121,19 @@ func syntacticVerifySpend(tx SpendTx, txFee uint64, avaxAssetID ids.ID) error {
 			return errors.New("inputs overflowed uint64")
 		}
 	}
-	avaxProduced := uint64(txFee) // AVAX produced in this tx, plus the txFee
+	avaxProducedAndBurnt := uint64(burnAmount) // AVAX produced in this tx, plus the burned amount
 	for _, out := range outs {
 		if !out.AssetID().Equals(avaxAssetID) { // all outputs must be AVAX
 			return fmt.Errorf("output has unexpected asset ID %s", out.AssetID())
 		} else if err = out.Verify(); err != nil {
 			return err
-		} else if avaxProduced, err = safemath.Add64(avaxProduced, out.Output().Amount()); err != nil {
+		} else if avaxProducedAndBurnt, err = safemath.Add64(avaxProducedAndBurnt, out.Output().Amount()); err != nil {
 			return errors.New("outputs overflowed uint64")
 		}
 	}
-	if avaxProduced > avaxConsumed {
-		return fmt.Errorf("tx outputs (%d) + txFee (%d) > inputs (%d)", avaxProduced-txFee, txFee, avaxConsumed)
+	if avaxProducedAndBurnt > avaxConsumed {
+		return fmt.Errorf("tx outputs (%d) + burn amount (%d) > inputs (%d)",
+			avaxProducedAndBurnt-burnAmount, burnAmount, avaxConsumed)
 	} else if !ava.IsSortedTransferableOutputs(outs, Codec) {
 		return errOutputsNotSorted
 	} else if !ava.IsSortedAndUniqueTransferableInputs(ins) {
