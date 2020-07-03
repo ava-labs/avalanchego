@@ -13,7 +13,9 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -194,12 +196,27 @@ func (tx *addDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 }
 
 // NewAddDefaultSubnetValidatorTx returns a new NewAddDefaultSubnetValidatorTx
-/* TODO: Implement
-func (vm *VM) newAddDefaultSubnetValidatorTx(nonce, stakeAmt, startTime, endTime uint64, nodeID, destination ids.ShortID, shares, networkID uint32, key *crypto.PrivateKeySECP256K1R,
+func (vm *VM) newAddDefaultSubnetValidatorTx(stakeAmt, startTime, endTime uint64, nodeID,
+	destination ids.ShortID, shares, networkID uint32, keys []*crypto.PrivateKeySECP256K1R,
 ) (*addDefaultSubnetValidatorTx, error) {
+
+	toSpend, err := safemath.Add64(stakeAmt, vm.txFee)
+	if err != nil {
+		return nil, fmt.Errorf("overflow while calculating amount to spend")
+	}
+
+	inputs, outputs, err := vm.spend(vm.DB, toSpend, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
 	tx := &addDefaultSubnetValidatorTx{
 		UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
-			NetworkID: networkID,
+			CommonTx: CommonTx{
+				NetworkID: networkID,
+				Inputs:    inputs,
+				Outputs:   outputs,
+			},
 			DurationValidator: DurationValidator{
 				Validator: Validator{
 					NodeID: nodeID,
@@ -213,18 +230,5 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(nonce, stakeAmt, startTime, endTime
 		},
 	}
 
-	unsignedIntf := interface{}(&tx.UnsignedAddDefaultSubnetValidatorTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr. of unsigned tx
-	if err != nil {
-		return nil, err
-	}
-
-	sig, err := key.Sign(unsignedBytes) // Sign the transaction
-	if err != nil {
-		return nil, err
-	}
-	copy(tx.Sig[:], sig) // have to do this because sig has type []byte but tx.Sig has type [65]byte
-
 	return tx, tx.initialize(vm)
 }
-*/
