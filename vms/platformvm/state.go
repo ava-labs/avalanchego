@@ -113,8 +113,14 @@ func (vm *VM) getUTXO(db database.Database, utxoID *ava.UTXOID) (*ava.UTXO, erro
 
 // putUTXO persists the given UTXO
 func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
-	// TODO
-	// TODO: Map addr --> UTXOs that ref it
+	/*
+		txID, outputIndex := utxo.InputSource()
+		key := txID.Prefix(uint64(outputIndex))
+		if err := vm.State.Put(db, utxoTypeID, key, utxo); err != nil {
+			return err
+		}
+		// TODO: Map addr --> UTXOs that ref it
+	*/
 	return errors.New("TODO")
 }
 
@@ -287,6 +293,17 @@ func (vm *VM) registerDBTypes() {
 		return subnets, nil
 	}
 	if err := vm.State.RegisterType(subnetsTypeID, unmarshalSubnetsFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
+	}
+
+	unmarshalUTXOFunc := func(bytes []byte) (interface{}, error) {
+		var utxo ava.UTXO
+		if err := Codec.Unmarshal(bytes, &utxo); err != nil {
+			return nil, err
+		}
+		return &utxo, nil
+	}
+	if err := vm.State.RegisterType(utxoTypeID, unmarshalUTXOFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 }

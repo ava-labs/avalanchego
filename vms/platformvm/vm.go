@@ -36,6 +36,7 @@ const (
 	chainsTypeID
 	blockTypeID
 	subnetsTypeID
+	utxoTypeID
 
 	platformAlias = "P"
 	addressSep    = "-"
