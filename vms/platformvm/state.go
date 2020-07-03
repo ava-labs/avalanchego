@@ -181,7 +181,7 @@ func (vm *VM) getChain(db database.Database, ID ids.ID) (*CreateChainTx, error) 
 }
 
 // put the list of blockchains that exist to database
-func (vm *VM) putChains(db database.Database, chains createChainList) error {
+func (vm *VM) putChains(db database.Database, chains []*CreateChainTx) error {
 	if err := vm.State.Put(db, chainsTypeID, chainsKey, chains); err != nil {
 		return errDBPutChains
 	}
@@ -206,7 +206,7 @@ func (vm *VM) putTimestamp(db database.Database, timestamp time.Time) error {
 }
 
 // put the subnets that exist to [db]
-func (vm *VM) putSubnets(db database.Database, subnets CreateSubnetTxList) error {
+func (vm *VM) putSubnets(db database.Database, subnets []*CreateSubnetTx) error {
 	if err := vm.State.Put(db, subnetsTypeID, subnetsKey, subnets); err != nil {
 		return err
 	}
@@ -248,6 +248,12 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error
 // register each type that we'll be storing in the database
 // so that [vm.State] knows how to unmarshal these types from bytes
 func (vm *VM) registerDBTypes() {
+	marshalValidatorsFunc := func(vdrsIntf interface{}) ([]byte, error) {
+		if vdrs, ok := vdrsIntf.(*EventHeap); ok {
+			return vdrs.Bytes()
+		}
+		return nil, errors.New("expected *EventHeap but got unexpected type")
+	}
 	unmarshalValidatorsFunc := func(bytes []byte) (interface{}, error) {
 		stakers := EventHeap{}
 		if err := Codec.Unmarshal(bytes, &stakers); err != nil {
@@ -260,10 +266,16 @@ func (vm *VM) registerDBTypes() {
 		}
 		return &stakers, nil
 	}
-	if err := vm.State.RegisterType(validatorsTypeID, unmarshalValidatorsFunc); err != nil {
+	if err := vm.State.RegisterType(validatorsTypeID, marshalValidatorsFunc, unmarshalValidatorsFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 
+	marshalChainsFunc := func(chainsIntf interface{}) ([]byte, error) {
+		if chains, ok := chainsIntf.([]*CreateChainTx); ok {
+			return Codec.Marshal(chains)
+		}
+		return nil, errors.New("expected []*CreateChainTx but got unexpected type")
+	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
 		var chains []*CreateChainTx
 		if err := Codec.Unmarshal(bytes, &chains); err != nil {
@@ -276,10 +288,16 @@ func (vm *VM) registerDBTypes() {
 		}
 		return chains, nil
 	}
-	if err := vm.State.RegisterType(chainsTypeID, unmarshalChainsFunc); err != nil {
+	if err := vm.State.RegisterType(chainsTypeID, marshalChainsFunc, unmarshalChainsFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 
+	marshalSubnetsFunc := func(subnetsIntf interface{}) ([]byte, error) {
+		if subnets, ok := subnetsIntf.([]*CreateSubnetTx); ok {
+			return Codec.Marshal(subnets)
+		}
+		return nil, errors.New("expected []*CreateSubnetTx but got unexpected type")
+	}
 	unmarshalSubnetsFunc := func(bytes []byte) (interface{}, error) {
 		var subnets []*CreateSubnetTx
 		if err := Codec.Unmarshal(bytes, &subnets); err != nil {
@@ -292,10 +310,18 @@ func (vm *VM) registerDBTypes() {
 		}
 		return subnets, nil
 	}
-	if err := vm.State.RegisterType(subnetsTypeID, unmarshalSubnetsFunc); err != nil {
+	if err := vm.State.RegisterType(subnetsTypeID, marshalSubnetsFunc, unmarshalSubnetsFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 
+	marshalUTXOFunc := func(utxoIntf interface{}) ([]byte, error) {
+		if utxo, ok := utxoIntf.(*ava.UTXO); ok {
+			return Codec.Marshal(utxo)
+		} else if utxo, ok := utxoIntf.(ava.UTXO); ok {
+			return Codec.Marshal(utxo)
+		}
+		return nil, errors.New("expected *ava.UTXO but got unexpected type")
+	}
 	unmarshalUTXOFunc := func(bytes []byte) (interface{}, error) {
 		var utxo ava.UTXO
 		if err := Codec.Unmarshal(bytes, &utxo); err != nil {
@@ -303,7 +329,7 @@ func (vm *VM) registerDBTypes() {
 		}
 		return &utxo, nil
 	}
-	if err := vm.State.RegisterType(utxoTypeID, unmarshalUTXOFunc); err != nil {
+	if err := vm.State.RegisterType(utxoTypeID, marshalUTXOFunc, unmarshalUTXOFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 }

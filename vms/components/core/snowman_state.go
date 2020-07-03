@@ -70,7 +70,14 @@ func (s *snowmanState) PutLastAccepted(db database.Database, lastAccepted ids.ID
 func NewSnowmanState(unmarshalBlockFunc func([]byte) (snowman.Block, error)) (SnowmanState, error) {
 	rawState := state.NewState()
 	snowmanState := &snowmanState{State: rawState}
-	return snowmanState, rawState.RegisterType(state.BlockTypeID,
+	return snowmanState, rawState.RegisterType(
+		state.BlockTypeID,
+		func(b interface{}) ([]byte, error) {
+			if block, ok := b.(snowman.Block); ok {
+				return block.Bytes(), nil
+			}
+			return nil, errors.New("expected snowman.Block but got unexpected type")
+		},
 		func(bytes []byte) (interface{}, error) {
 			return unmarshalBlockFunc(bytes)
 		},

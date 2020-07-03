@@ -184,13 +184,3 @@ func (vm *VM) newCreateSubnetTx(
 
 	return tx, tx.initialize(vm)
 }
-
-// CreateSubnetTxList is a list of *CreateSubnetTx
-type CreateSubnetTxList []*CreateSubnetTx
-
-// Bytes returns the binary representation of [lst]
-// TODO handle error here
-func (lst CreateSubnetTxList) Bytes() []byte {
-	bytes, _ := Codec.Marshal(lst)
-	return bytes
-}

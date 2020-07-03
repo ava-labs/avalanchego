@@ -170,16 +170,6 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	return onAccept, nil
 }
 
-// We use this type so we can serialize a list of *CreateChainTx
-// by defining a Bytes method on it
-type createChainList []*CreateChainTx
-
-// Bytes returns the byte representation of a list of *CreateChainTx
-func (chains createChainList) Bytes() []byte {
-	bytes, _ := Codec.Marshal(chains)
-	return bytes
-}
-
 // TODO comment
 func (vm *VM) newCreateChainTx(
 	nonce uint64,
