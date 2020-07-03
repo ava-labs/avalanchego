@@ -461,18 +461,16 @@ func (n *Node) initKeystoreAPI() error {
 // initMetricsAPI initializes the Metrics API
 // Assumes n.APIServer is already set
 func (n *Node) initMetricsAPI() error {
-	n.Log.Info("initializing metrics")
 	registry, handler := metrics.NewService()
-	if n.Config.MetricsAPIEnabled {
-		n.Log.Info("initializing metrics API")
-		if err := n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog); err != nil {
-			return err
-		}
-	} else {
-		n.Log.Info("skipping metrics API initialization because it has been disabled")
-	}
+	// It is assumed by components of the system that the Metrics interface is
+	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
-	return nil
+	if !n.Config.MetricsAPIEnabled {
+		n.Log.Info("skipping metrics API initialization because it has been disabled")
+		return nil
+	}
+	n.Log.Info("initializing metrics API")
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
 
 // initAdminAPI initializes the Admin API service
@@ -529,7 +527,7 @@ func (n *Node) initHealthAPI() error {
 		return nil, nil
 	}
 	// Passes if the P, X and C chains are finished bootstrapping
-	if err := service.RegisterMonotonicCheckFunc("defaultChainsBootstrapped", isBootstrappedFunc); err != nil {
+	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
 		return err
 	}
 	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)

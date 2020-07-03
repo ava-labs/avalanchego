@@ -15,7 +15,7 @@ import (
 type EngineTest struct {
 	T *testing.T
 
-	Bootstrapped,
+	CantIsBootstrapped,
 	CantStartup,
 	CantGossip,
 	CantShutdown,
@@ -44,6 +44,7 @@ type EngineTest struct {
 	CantQueryFailed,
 	CantChits bool
 
+	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
 	StartupF, GossipF, ShutdownF                       func() error
 	NotifyF                                            func(Message) error
@@ -59,7 +60,7 @@ var _ Engine = &EngineTest{}
 
 // Default ...
 func (e *EngineTest) Default(cant bool) {
-	e.Bootstrapped = cant
+	e.CantIsBootstrapped = cant
 
 	e.CantStartup = cant
 	e.CantGossip = cant
@@ -360,5 +361,13 @@ func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerI
 
 // IsBootstrapped ...
 func (e *EngineTest) IsBootstrapped() bool {
-	return e.Bootstrapped
+	if e.IsBootstrappedF != nil {
+		return e.IsBootstrappedF()
+	} else if e.CantIsBootstrapped {
+		if e.T != nil {
+			e.T.Fatalf("Unexpectedly called IsBootstrapped")
+		}
+		panic("Unexpectedly called IsBootstrapped")
+	}
+	return e.IsBootstrappedF()
 }
