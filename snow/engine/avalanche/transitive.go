@@ -521,3 +521,8 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len())) // Tracks performance statistics
 }
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (t *Transitive) IsBootstrapped() bool {
+	return t.bootstrapped
+}

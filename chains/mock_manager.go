@@ -35,3 +35,6 @@ func (mm MockManager) Alias(ids.ID, string) error { return nil }
 
 // Shutdown ...
 func (mm MockManager) Shutdown() {}
+
+// IsBootstrapped ...
+func (mm MockManager) IsBootstrapped(ids.ID) bool { return false }
