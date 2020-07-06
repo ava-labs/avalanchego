@@ -172,7 +172,6 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 
 // TODO comment
 func (vm *VM) newCreateChainTx(
-	nonce uint64,
 	subnetID ids.ID,
 	genesisData []byte,
 	vmID ids.ID,

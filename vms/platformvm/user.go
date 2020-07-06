@@ -12,8 +12,8 @@ import (
 )
 
 // Key in the database whose corresponding value is the list of
-// account IDs this user controls
-var accountIDsKey = ids.Empty.Bytes()
+// addresses this user controls
+var addressesKey = ids.Empty.Bytes()
 
 var (
 	errDBNil  = errors.New("db uninitialized")
@@ -25,98 +25,95 @@ type user struct {
 	db database.Database
 }
 
-// Get the IDs of the accounts controlled by this user
-func (u *user) getAccountIDs() ([]ids.ShortID, error) {
+// Get the addresses controlled by this user
+func (u *user) getAddresses() ([]ids.ShortID, error) {
 	if u.db == nil {
 		return nil, errDBNil
 	}
 
-	// If user has no accounts, return empty list
-	hasAccounts, err := u.db.Has(accountIDsKey)
+	// If user has no addresses, return empty list
+	hasAddresses, err := u.db.Has(addressesKey)
 	if err != nil {
 		return nil, errDB
 	}
-	if !hasAccounts {
+	if !hasAddresses {
 		return nil, nil
 	}
 
-	// User has accounts. Get them.
-	bytes, err := u.db.Get(accountIDsKey)
+	// User has addresses. Get them.
+	bytes, err := u.db.Get(addressesKey)
 	if err != nil {
 		return nil, errDB
 	}
-	accountIDs := []ids.ShortID{}
-	if err := Codec.Unmarshal(bytes, &accountIDs); err != nil {
+	addresses := []ids.ShortID{}
+	if err := Codec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
-	return accountIDs, nil
+	return addresses, nil
 }
 
-// controlsAccount returns true iff this user controls the account
-// with the specified ID
-func (u *user) controlsAccount(accountID ids.ShortID) (bool, error) {
+// controlsAddress returns true iff this user controls the given address
+func (u *user) controlsAddress(address ids.ShortID) (bool, error) {
 	if u.db == nil {
 		return false, errDBNil
 	}
-	if accountID.IsZero() {
+	if address.IsZero() {
 		return false, errEmptyAccountAddress
 	}
-	return u.db.Has(accountID.Bytes())
+	return u.db.Has(address.Bytes())
 }
 
-// putAccount persists that this user controls the account whose ID is
-// [privKey].PublicKey().Address()
-func (u *user) putAccount(privKey *crypto.PrivateKeySECP256K1R) error {
+// putAddress persists that this user controls address controlled by [privKey]
+func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 	if privKey == nil {
 		return errKeyNil
 	}
 
-	newAccountID := privKey.PublicKey().Address() // Account the privKey controls
-	controlsAccount, err := u.controlsAccount(newAccountID)
+	address := privKey.PublicKey().Address() // address the privKey controls
+	controlsAddress, err := u.controlsAddress(address)
 	if err != nil {
 		return err
 	}
-	if controlsAccount { // user already controls this account. Do nothing.
+	if controlsAddress { // user already controls this address. Do nothing.
 		return nil
 	}
 
-	err = u.db.Put(newAccountID.Bytes(), privKey.Bytes()) // Account ID --> private key
-	if err != nil {
+	if err := u.db.Put(address.Bytes(), privKey.Bytes()); err != nil { // Address --> private key
 		return errDB
 	}
 
-	accountIDs := make([]ids.ShortID, 0) // Add account to list of accounts user controls
-	userHasAccounts, err := u.db.Has(accountIDsKey)
+	addresses := make([]ids.ShortID, 0) // Add address to list of addresses user controls
+	userHasAddresses, err := u.db.Has(addressesKey)
 	if err != nil {
 		return errDB
 	}
-	if userHasAccounts { // Get accountIDs this user already controls, if they exist
-		if accountIDs, err = u.getAccountIDs(); err != nil {
+	if userHasAddresses { // Get addresses this user already controls, if they exist
+		if addresses, err = u.getAddresses(); err != nil {
 			return errDB
 		}
 	}
-	accountIDs = append(accountIDs, newAccountID)
-	bytes, err := Codec.Marshal(accountIDs)
+	addresses = append(addresses, address)
+	bytes, err := Codec.Marshal(addresses)
 	if err != nil {
 		return err
 	}
-	if err := u.db.Put(accountIDsKey, bytes); err != nil {
+	if err := u.db.Put(addressesKey, bytes); err != nil {
 		return errDB
 	}
 	return nil
 }
 
-// Key returns the private key that controls the account with the specified ID
-func (u *user) getKey(accountID ids.ShortID) (*crypto.PrivateKeySECP256K1R, error) {
+// Key returns the private key that controls the given address
+func (u *user) getKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error) {
 	if u.db == nil {
 		return nil, errDBNil
 	}
-	if accountID.IsZero() {
+	if address.IsZero() {
 		return nil, errEmptyAccountAddress
 	}
 
 	factory := crypto.FactorySECP256K1R{}
-	bytes, err := u.db.Get(accountID.Bytes())
+	bytes, err := u.db.Get(address.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -128,4 +125,21 @@ func (u *user) getKey(accountID ids.ShortID) (*crypto.PrivateKeySECP256K1R, erro
 		return sk, nil
 	}
 	return nil, errDB
+}
+
+// Return all private keys controlled by this user
+func (u *user) getKeys() ([]*crypto.PrivateKeySECP256K1R, error) {
+	addrs, err := u.getAddresses()
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]*crypto.PrivateKeySECP256K1R, len(addrs), len(addrs))
+	for i, addr := range addrs {
+		key, err := u.getKey(addr)
+		if err != nil {
+			return nil, err
+		}
+		keys[i] = key
+	}
+	return keys, nil
 }

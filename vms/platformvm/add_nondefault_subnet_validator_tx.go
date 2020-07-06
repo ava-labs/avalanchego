@@ -247,7 +247,6 @@ func (tx *addNonDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 
 // TODO: Comment
 func (vm *VM) newAddNonDefaultSubnetValidatorTx(
-	nonce,
 	weight,
 	startTime,
 	endTime uint64,
