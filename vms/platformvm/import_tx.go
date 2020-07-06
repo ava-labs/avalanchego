@@ -11,9 +11,12 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -31,10 +34,6 @@ type UnsignedImportTx struct {
 
 	// Metadata, inputs and outputs
 	CommonTx `serialize:"true"`
-
-	// Address that this transaction is being sent by.
-	// This is needed to ensure the Credentials are replay safe.
-	Address ids.ShortID `serialize:"true"`
 }
 
 // ImportTx imports funds from the AVM
@@ -168,40 +167,97 @@ func (tx *ImportTx) Accept(batch database.Batch) error {
 	return atomic.WriteAll(batch, sharedBatch)
 }
 
-/* TODO implement
+// TODO comment
 func (vm *VM) newImportTx(
 	networkID uint32,
-	ins []*ava.TransferableInput,
-	from [][]*crypto.PrivateKeySECP256K1R,
-	to *crypto.PrivateKeySECP256K1R,
+	feeKeys []*crypto.PrivateKeySECP256K1R,
+	recipientKey *crypto.PrivateKeySECP256K1R,
 ) (*ImportTx, error) {
 
 	// Calculate inputs, outputs, and keys used to sign this tx
-	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, from)
+	feeInputs, feeOutputs, feeCredKeys, err := vm.spend(vm.DB, vm.txFee, feeKeys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
-	ins = append(ins, inputs...)
 
-	tx := &ImportTx{
-		UnsignedImportTx: UnsignedImportTx{
-			CommonTx: CommonTx{
-				NetworkID: networkID,
-				Inputs:    inputs,
-				Outputs:   outputs,
+	// Address receiving the imported AVAX
+	recipientAddr := recipientKey.PublicKey().Address()
+
+	kc := secp256k1fx.NewKeychain()
+	kc.Add(recipientKey)
+
+	addrSet := ids.Set{}
+	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(recipientAddr.Bytes())))
+
+	utxos, err := vm.GetAtomicUTXOs(addrSet)
+	if err != nil {
+		return nil, fmt.Errorf("problem retrieving  atomic UTXOs: %w", err)
+	}
+
+	amount := uint64(0)
+	now := vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		if !utxo.AssetID().Equals(vm.avaxAssetID) {
+			continue
+		}
+		inputIntf, signers, err := kc.Spend(utxo.Out, now)
+		if err != nil {
+			continue
+		}
+		input, ok := inputIntf.(ava.Transferable)
+		if !ok {
+			continue
+		}
+		amount, err = math.Add64(amount, input.Amount())
+		if err != nil {
+			return nil, err
+		}
+		ins = append(ins, &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: vm.avaxAssetID},
+			In:     input,
+		})
+		keys = append(keys, signers)
+	}
+	if amount == 0 {
+		return nil, errNoFunds
+	}
+	ins = append(ins, feeInputs...)
+	keys = append(keys, feeCredKeys...)
+	ava.SortTransferableInputsWithSigners(ins, keys)
+
+	outs := append(feeOutputs, &ava.TransferableOutput{
+		Asset: ava.Asset{ID: vm.avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      amount,
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{recipientAddr},
 			},
-			Address: to.PublicKey().Address(),
-		}}
+		},
+	})
+	ava.SortTransferableOutputs(outs, vm.codec) //sort outputs
 
-	ava.SortTransferableInputsWithSigners(ins, from)
+	// Create the transaction
+	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
+		CommonTx: CommonTx{
+			NetworkID: vm.Ctx.NetworkID,
+			Inputs:    ins,
+			Outputs:   outs,
+		},
+	}}
 
-	// Generate byte repr. of unsigned tx
+	// Generate byte repr. of unsigned transaction
 	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedImportTx)); err != nil {
 		return nil, fmt.Errorf("couldn't marshal UnsignedImportTx: %w", err)
 	}
 	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
-	for _, credKeys := range from {
+	for _, credKeys := range keys {
 		cred := &secp256k1fx.Credential{}
 		for _, key := range credKeys {
 			sig, err := key.SignHash(hash)
@@ -214,7 +270,5 @@ func (vm *VM) newImportTx(
 		}
 		tx.Credentials = append(tx.Credentials, cred)
 	}
-
 	return tx, tx.initialize(vm)
 }
-*/

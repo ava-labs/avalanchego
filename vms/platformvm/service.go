@@ -653,136 +653,45 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 // ImportAVAArgs are the arguments to ImportAVA
 type ImportAVAArgs struct {
 	api.UserPass
-	// ID of the account that will receive the imported funds, and pay the transaction fee
-	To string `json:"to"`
+	// The address that will receive the imported funds
+	To ids.ShortID `json:"to"`
 }
 
-/* TODO move to newImportAVA
 // ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
 // The AVA must have already been exported from the X-Chain.
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
 	switch {
-	case args.To == "":
-		return errors.New("argument 'to' not given")
 	case args.Username == "":
 		return errNoUsername
 	case args.Password == "":
 		return errNoPassword
 	}
 
-	toID, err := service.vm.ParseAddress(args.To)
-	if err != nil {
-		return fmt.Errorf("problem parsing '%s' to address: %w", args.To, err)
-	}
-
-	// Get the key of the Signer
+	// Get the keys controlled by this user.
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user: %w", err)
+		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-
-	kc := secp256k1fx.NewKeychain()
-	key, err := user.getKey(toID)
+	privKeys, err := user.getKeys()
 	if err != nil {
-		return errDB
+		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
 	}
-	kc.Add(key)
-
-	addrSet := ids.Set{}
-	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(toID.Bytes())))
-
-	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
+	recipientKey, err := user.getKey(args.To)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
+		return fmt.Errorf("user does not have the key that controls address %s", args.To)
 	}
 
-	amount := uint64(0)
-	time := service.vm.clock.Unix()
+	tx, err := service.vm.newImportTx(
+		service.vm.Ctx.NetworkID,
+		privKeys,
+		recipientKey,
+	)
 
-	ins := []*ava.TransferableInput{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
-	for _, utxo := range utxos {
-		if !utxo.AssetID().Equals(service.vm.ava) {
-			continue
-		}
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
-		if err != nil {
-			continue
-		}
-		input, ok := inputIntf.(ava.Transferable)
-		if !ok {
-			continue
-		}
-		spent, err := math.Add64(amount, input.Amount())
-		if err != nil {
-			return err
-		}
-		amount = spent
-
-		in := &ava.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  ava.Asset{ID: service.vm.ava},
-			In:     input,
-		}
-
-		ins = append(ins, in)
-		keys = append(keys, signers)
-	}
-
-	if amount == 0 {
-		return errNoFunds
-	}
-
-	ava.SortTransferableInputsWithSigners(ins, keys)
-
-	// Create the transaction
-	tx := ImportTx{UnsignedImportTx: UnsignedImportTx{
-		NetworkID: service.vm.Ctx.NetworkID,
-		Nonce:     uint64(args.PayerNonce),
-		Account:   toID,
-		Ins:       ins,
-	}}
-
-	// TODO: Should we check if tx is already signed?
-	unsignedIntf := interface{}(&tx.UnsignedImportTx)
-	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
-	if err != nil {
-		return fmt.Errorf("error serializing unsigned tx: %w", err)
-	}
-	hash := hashing.ComputeHash256(unsignedTxBytes)
-
-	sig, err := key.SignHash(hash)
-	if err != nil {
-		return errors.New("error while signing")
-	}
-	copy(tx.Sig[:], sig)
-
-	for _, credKeys := range keys {
-		cred := &secp256k1fx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return fmt.Errorf("problem creating transaction: %w", err)
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
-	}
-
-	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
-	if err != nil {
-		return errCreatingTransaction
-	}
-
-	response.Tx.Bytes = txBytes
-	return nil
+	response.TxID = tx.ID()
+	return errors.New("TODO issue the tx")
 }
-*/
 
 /* TODO remove
 // IssueTx issues the transaction [args.Tx] to the network
