@@ -20,9 +20,6 @@ import (
 
 var (
 	errMissingDecisionBlock = errors.New("should have a decision block within the past two blocks")
-	errCreatingTransaction  = errors.New("problem while creating transaction")
-	errNilSigner            = errors.New("nil ShortID 'signer' is not valid")
-	errNilTo                = errors.New("nil ShortID 'to' is not valid")
 	errNoFunds              = errors.New("no spendable funds were found")
 	errNoUsername           = errors.New("argument 'username' not provided")
 	errNoPassword           = errors.New("argument 'password' not provided")
@@ -35,9 +32,8 @@ type Service struct{ vm *VM }
 
 // ExportKeyArgs are arguments for ExportKey
 type ExportKeyArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Address  string `json:"address"`
+	api.UserPass
+	Address ids.ShortID `json:"address"`
 }
 
 // ExportKeyReply is the response for ExportKey
@@ -48,13 +44,7 @@ type ExportKeyReply struct {
 
 // ExportKey returns a private key from the provided user
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
-	service.vm.SnowmanVM.Ctx.Log.Verbo("ExportKey called for user '%s'", args.Username)
-
-	addr, err := service.vm.ParseAddress(args.Address)
-	if err != nil {
-		return fmt.Errorf("problem parsing address: %w", err)
-	}
-
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ExportKey called")
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user: %w", err)
@@ -62,7 +52,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	user := user{db: db}
 
-	sk, err := user.getKey(addr)
+	sk, err := user.getKey(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
@@ -86,8 +76,7 @@ type ImportKeyReply struct {
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ImportKeyReply) error {
-	service.vm.SnowmanVM.Ctx.Log.Verbo("ImportKey called for user '%s'", args.Username)
-
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("problem retrieving data: %w", err)
@@ -145,6 +134,7 @@ type GetSubnetsResponse struct {
 // GetSubnets returns the subnets whose ID are in [args.IDs]
 // The response will include the default subnet
 func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *GetSubnetsResponse) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetSubnets called")
 	subnets, err := service.vm.getSubnets(service.vm.DB) // all subnets
 	if err != nil {
 		return fmt.Errorf("error getting subnets from database: %w", err)
@@ -224,7 +214,6 @@ type GetCurrentValidatorsReply struct {
 // GetCurrentValidators returns the list of current validators
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
-
 	if args.SubnetID.IsZero() {
 		args.SubnetID = DefaultSubnetID
 	}
@@ -288,7 +277,6 @@ type GetPendingValidatorsReply struct {
 // GetPendingValidators returns the list of current validators
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
-
 	if args.SubnetID.IsZero() {
 		args.SubnetID = DefaultSubnetID
 	}
@@ -349,8 +337,7 @@ type SampleValidatorsReply struct {
 
 // SampleValidators returns a sampling of the list of current validators
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
-	service.vm.Ctx.Log.Info("Platform: SampleValidators called with {Size = %d}", args.Size)
-
+	service.vm.Ctx.Log.Info("Platform: SampleValidators called with Size = %d", args.Size)
 	if args.SubnetID.IsZero() {
 		args.SubnetID = DefaultSubnetID
 	}
@@ -395,7 +382,6 @@ type AddDefaultSubnetValidatorArgs struct {
 // The returned unsigned transaction should be signed using Sign()
 func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
-
 	switch {
 	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
 		args.ID = service.vm.Ctx.NodeID
@@ -456,7 +442,6 @@ type AddDefaultSubnetDelegatorArgs struct {
 // The returned unsigned transaction should be signed using Sign()
 func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
-
 	switch {
 	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
 		args.ID = service.vm.Ctx.NodeID
@@ -515,6 +500,7 @@ type AddNonDefaultSubnetValidatorArgs struct {
 // AddNonDefaultSubnetValidator adds a validator to a subnet other than the default subnet
 // Returns the unsigned transaction, which must be signed using Sign
 func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *api.TxIDResponse) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddNonDefaultSubnetValidator called")
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
