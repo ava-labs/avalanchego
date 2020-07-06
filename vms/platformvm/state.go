@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -107,13 +108,13 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 }
 
 // getUTXO returns the UTXO with the specified ID
-func (vm *VM) getUTXO(db database.Database, utxoID *ava.UTXOID) (*ava.UTXO, error) {
+func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
 	// TODO
 	return nil, errors.New("TODO")
 }
 
 // putUTXO persists the given UTXO
-// TODO: This is a hillariously naive and inefficient way of doing this. Fix it.
+// TODO: This is a naive and inefficient way of doing this. Fix this.
 func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 	txID, outputIndex := utxo.InputSource()
 	key := txID.Prefix(uint64(outputIndex))
@@ -129,49 +130,86 @@ func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 		var addrBytesArr [20]byte
 		copy(addrBytesArr[:], addrBytes)
 		addr := ids.NewShortID(addrBytesArr)
-		addrUTXOs, err := vm.getReferencingUTXOs(db, addr)
-		if err != nil {
-			return fmt.Errorf("couldn't get UTXOs that reference %s", addr)
-		}
-		addrUTXOs = append(addrUTXOs, utxo)
-		if err := vm.State.Put(db, utxoSetTypeID, key, addrUTXOs); err != nil {
-			return fmt.Errorf("couldn't write %s's UTXOs to db: %w", addr, err)
+		if err := vm.putReferencingUTXO(db, addr, utxo.InputID()); err != nil {
+			return fmt.Errorf("couldn't update UTXO set of address %s", addr)
 		}
 	}
 	return nil
 }
 
 // removeUTXO removes the UTXO with the given ID
-// TODO: For each owner of this UTXO, remove this UTXO from the list of UTXOs owned by that addr
-func (vm *VM) removeUTXO(db database.Database, utxoID *ava.UTXOID) error {
-	txID, outputIndex := utxoID.InputSource()
-	key := txID.Prefix(uint64(outputIndex))
-	if err := vm.State.Put(db, utxoTypeID, key, nil); err != nil {
+// If the utxo doesn't exist, returns nil
+func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
+	utxo, err := vm.getUTXO(db, ID) // Get the UTXO
+	if err != nil {
+		return nil
+	}
+	if err := vm.State.Put(db, utxoTypeID, ID, nil); err != nil { // remove the UTXO
 		return err
 	}
-	return errors.New("TODO finish this method")
+	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+	if !ok {
+		vm.Ctx.Log.Warn("expected output to be type *secp256k1fx.TransferOutput but is %T", out)
+	}
+	for _, addrBytes := range out.OutputOwners.Addresses() { // Update UTXO set of each address referenced in utxo
+		var addrBytesArr [20]byte
+		copy(addrBytesArr[:], addrBytes)
+		addr := ids.NewShortID(addrBytesArr)
+		if err := vm.removeReferencingUTXO(db, addr, ID); err != nil {
+			return fmt.Errorf("couldn't update UTXO set of address %s", addr)
+		}
+	}
+	return nil
 }
 
-// return the set of UTXOs that reference [addr]
-func (vm *VM) getReferencingUTXOs(db database.Database, addr ids.ShortID) ([]*ava.UTXO, error) {
-	// TODO
-	return nil, errors.New("TODO")
+// return the IDs of UTXOs that reference [addr]
+// Returns nil if no UTXOs reference [addr]
+func (vm *VM) getReferencingUTXOs(db database.Database, addr ids.ShortID) (ids.Set, error) {
+	utxoIDs := ids.Set{}
+	iter := prefixdb.NewNested(addr.Bytes(), db).NewIterator()
+	defer iter.Release()
+
+	for iter.Next() {
+		utxoID, err := ids.ToID(iter.Key())
+		if err != nil {
+			return nil, err
+		}
+		utxoIDs.Add(utxoID)
+	}
+	return utxoIDs, nil
 }
 
-// each element of [utxoIDs] is the ID of a UTXO that references [addr]
-func (vm *VM) putReferencingUTXOs(db database.Database, addr ids.ShortID, utxoIDs []ids.ID) error {
-	// TODO
-	return errors.New("TODO")
+// Persist that the UTXO with ID [utxoID] references [addr]
+func (vm *VM) putReferencingUTXO(db database.Database, addr ids.ShortID, utxoID ids.ID) error {
+	prefixedDB := prefixdb.NewNested(addr.Bytes(), db)
+	return prefixedDB.Put(utxoID.Bytes(), nil)
+}
+
+// Remove the UTXO with ID [utxoID] from the set of UTXOs that reference [addr]
+func (vm *VM) removeReferencingUTXO(db database.Database, addr ids.ShortID, utxoID ids.ID) error {
+	prefixedDB := prefixdb.NewNested(addr.Bytes(), db)
+	return prefixedDB.Delete(utxoID.Bytes())
 }
 
 // getUTXOs returns UTXOs that reference at least one of the addresses in [addrs]
 func (vm *VM) getUTXOs(db database.Database, addrs ids.ShortSet) ([]*ava.UTXO, error) {
-	/* TODO
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
+		addrUTXOs, err := vm.getReferencingUTXOs(db, addr)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+		}
+		utxoIDs.Union(addrUTXOs)
 	}
-	*/
-	return nil, errors.New("TODO")
+	utxos := make([]*ava.UTXO, utxoIDs.Len(), utxoIDs.Len())
+	for i, utxoID := range utxoIDs.List() {
+		utxo, err := vm.getUTXO(db, utxoID)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+		}
+		utxos[i] = utxo
+	}
+	return utxos, nil
 }
 
 // get all the blockchains that exist

@@ -149,11 +149,11 @@ func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) err
 func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) error {
 	creds := tx.Creds()
 	for index, in := range tx.Ins() {
-		if utxo, err := vm.getUTXO(db, &in.UTXOID); err != nil {
+		if utxo, err := vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
 			return err
 		} else if err := vm.fx.VerifyTransfer(tx, in.In, creds[index], utxo.Out); err != nil {
 			return err
-		} else if err := vm.removeUTXO(db, &in.UTXOID); err != nil {
+		} else if err := vm.removeUTXO(db, in.UTXOID.InputID()); err != nil {
 			return err
 		}
 	}
