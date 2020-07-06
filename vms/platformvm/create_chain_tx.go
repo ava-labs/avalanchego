@@ -110,7 +110,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 
 	currentChains, err := tx.vm.getChains(db) // chains that currently exist
 	if err != nil {
-		return nil, errDBChains
+		return nil, fmt.Errorf("couldn't get list of blockchains: %w", err)
 	}
 	for _, chain := range currentChains {
 		if chain.ID().Equals(tx.ID()) {

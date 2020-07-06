@@ -70,7 +70,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 
 	defaultSubnetVdrHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{errDBCurrentValidators}
+		return nil, nil, nil, nil, permError{err}
 	} else if defaultSubnetVdrHeap.Len() == 0 { // there is no validator to remove
 		return nil, nil, nil, nil, permError{errEmptyValidatingSet}
 	}
@@ -98,14 +98,14 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	// If this tx's proposal is committed, remove the validator from the validator set and update the
 	// account balance to reflect the return of staked AVAX and their reward.
 	if err := tx.vm.putCurrentValidators(onCommitDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, tempError{errDBPutCurrentValidators}
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	onAbortDB := versiondb.New(db)
 	// If this tx's proposal is aborted, remove the validator from the validator set and update the
 	// account balance to reflect the return of staked AVAX
 	if err := tx.vm.putCurrentValidators(onAbortDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, tempError{errDBPutCurrentValidators}
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	utxo := ava.UTXO{ // Will be copied, modified, added to UTXO set. Cleaner than re-declaring same struct many places.

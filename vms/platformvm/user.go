@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -34,7 +35,7 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 	// If user has no addresses, return empty list
 	hasAddresses, err := u.db.Has(addressesKey)
 	if err != nil {
-		return nil, errDB
+		return nil, err
 	}
 	if !hasAddresses {
 		return nil, nil
@@ -43,7 +44,7 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 	// User has addresses. Get them.
 	bytes, err := u.db.Get(addressesKey)
 	if err != nil {
-		return nil, errDB
+		return nil, err
 	}
 	addresses := []ids.ShortID{}
 	if err := Codec.Unmarshal(bytes, &addresses); err != nil {
@@ -79,17 +80,17 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 	}
 
 	if err := u.db.Put(address.Bytes(), privKey.Bytes()); err != nil { // Address --> private key
-		return errDB
+		return err
 	}
 
 	addresses := make([]ids.ShortID, 0) // Add address to list of addresses user controls
 	userHasAddresses, err := u.db.Has(addressesKey)
 	if err != nil {
-		return errDB
+		return err
 	}
 	if userHasAddresses { // Get addresses this user already controls, if they exist
 		if addresses, err = u.getAddresses(); err != nil {
-			return errDB
+			return err
 		}
 	}
 	addresses = append(addresses, address)
@@ -98,7 +99,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		return err
 	}
 	if err := u.db.Put(addressesKey, bytes); err != nil {
-		return errDB
+		return err
 	}
 	return nil
 }
@@ -124,7 +125,7 @@ func (u *user) getKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error)
 	if sk, ok := sk.(*crypto.PrivateKeySECP256K1R); ok {
 		return sk, nil
 	}
-	return nil, errDB
+	return nil, fmt.Errorf("expected private key to be type *crypto.PrivateKeySECP256K1R but is type %T", sk)
 }
 
 // Return all private keys controlled by this user

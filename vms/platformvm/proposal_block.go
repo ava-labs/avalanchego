@@ -147,10 +147,10 @@ func (pb *ProposalBlock) Options() [2]snowman.Block {
 	abort := pb.vm.newAbortBlock(blockID)
 
 	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
+		pb.vm.Ctx.Log.Warn(err.Error())
 	}
 	if err := pb.vm.State.PutBlock(pb.vm.DB, abort); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
+		pb.vm.Ctx.Log.Warn(err.Error())
 	}
 	pb.vm.DB.Commit()
 

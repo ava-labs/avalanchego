@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"math"
@@ -91,16 +92,6 @@ var (
 	errTimeTooAdvanced          = errors.New("this is proposing a time too far in the future")
 	errNoPendingBlocks          = errors.New("no pending blocks")
 	errUnsupportedFXs           = errors.New("unsupported feature extensions")
-	errDB                       = errors.New("problem retrieving/putting value from/in database")
-	errDBCurrentValidators      = errors.New("couldn't retrieve current validators from database")
-	errDBPutCurrentValidators   = errors.New("couldn't put current validators in database")
-	errDBPendingValidators      = errors.New("couldn't retrieve pending validators from database")
-	errDBPutPendingValidators   = errors.New("couldn't put pending validators in database")
-	errDBAccount                = errors.New("couldn't retrieve account from database")
-	errDBPutAccount             = errors.New("couldn't put account in database")
-	errDBChains                 = errors.New("couldn't retrieve chain list from database")
-	errDBPutChains              = errors.New("couldn't put chain list in database")
-	errDBPutBlock               = errors.New("couldn't put block in database")
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
@@ -508,7 +499,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	// then we create a block that removes the validator and proposes they receive a validator reward
 	currentValidators, err := vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, errDBCurrentValidators
+		return nil, fmt.Errorf("couldn't get validator set: %w", err)
 	}
 	nextValidatorEndtime := maxTime
 	if currentValidators.Len() > 0 {

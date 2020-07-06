@@ -64,7 +64,7 @@ func (vm *VM) getCurrentValidators(db database.Database, subnetID ids.ID) (*Even
 func (vm *VM) putCurrentValidators(db database.Database, validators *EventHeap, subnetID ids.ID) error {
 	err := vm.State.Put(db, validatorsTypeID, subnetID.Prefix(currentValidatorsPrefix), validators)
 	if err != nil {
-		return errDBPutCurrentValidators
+		return fmt.Errorf("couldn't put current validator set: %w", err)
 	}
 	return nil
 }
@@ -85,12 +85,12 @@ func (vm *VM) getPendingValidators(db database.Database, subnetID ids.ID) (*Even
 	}
 	pendingValidatorHeapInterface, err := vm.State.Get(db, validatorsTypeID, key)
 	if err != nil {
-		return nil, errDBPendingValidators
+		return nil, fmt.Errorf("couldn't get pending validators: %w", err)
 	}
 	pendingValidatorHeap, ok := pendingValidatorHeapInterface.(*EventHeap)
 	if !ok {
 		vm.Ctx.Log.Error("expected to retrieve *EventHeap from database but got different type")
-		return nil, errDBPendingValidators
+		return nil, errors.New("expected to retrieve *EventHeap from database but got different type")
 	}
 	return pendingValidatorHeap, nil
 }
@@ -102,7 +102,7 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 	}
 	err := vm.State.Put(db, validatorsTypeID, subnetID.Prefix(pendingValidatorsPrefix), validators)
 	if err != nil {
-		return errDBPutPendingValidators
+		return fmt.Errorf("couldn't put pending validator set: %w", err)
 	}
 	return nil
 }
@@ -221,7 +221,7 @@ func (vm *VM) getChains(db database.Database) ([]*CreateChainTx, error) {
 	chains, ok := chainsInterface.([]*CreateChainTx)
 	if !ok {
 		vm.Ctx.Log.Error("expected to retrieve []*CreateChainTx from database but got different type")
-		return nil, errDBChains
+		return nil, errors.New("expected to retrieve []*CreateChainTx from database but got different type")
 	}
 	return chains, nil
 }
@@ -243,7 +243,7 @@ func (vm *VM) getChain(db database.Database, ID ids.ID) (*CreateChainTx, error) 
 // put the list of blockchains that exist to database
 func (vm *VM) putChains(db database.Database, chains []*CreateChainTx) error {
 	if err := vm.State.Put(db, chainsTypeID, chainsKey, chains); err != nil {
-		return errDBPutChains
+		return err
 	}
 	return nil
 }
@@ -282,7 +282,7 @@ func (vm *VM) getSubnets(db database.Database) ([]*CreateSubnetTx, error) {
 	subnets, ok := subnetsIntf.([]*CreateSubnetTx)
 	if !ok {
 		vm.Ctx.Log.Warn("expected to retrieve []*CreateSubnetTx from database but got different type")
-		return nil, errDB
+		return nil, errors.New("expected to retrieve []*CreateSubnetTx from database but got different type")
 	}
 	for _, subnet := range subnets {
 		subnet.vm = vm
