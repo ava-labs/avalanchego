@@ -109,16 +109,22 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 
 // getUTXO returns the UTXO with the specified ID
 func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
-	// TODO
-	return nil, errors.New("TODO")
+	utxoIntf, err := vm.State.Get(db, utxoTypeID, ID)
+	if err != nil {
+		return nil, err
+	}
+	utxo, ok := utxoIntf.(*ava.UTXO)
+	if !ok {
+		vm.Ctx.Log.Warn("expected UTXO from database but got %T", utxoIntf)
+		return nil, fmt.Errorf("expected UTXO from database but got %T", utxoIntf)
+	}
+	return utxo, nil
 }
 
 // putUTXO persists the given UTXO
 // TODO: This is a naive and inefficient way of doing this. Fix this.
 func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
-	txID, outputIndex := utxo.InputSource()
-	key := txID.Prefix(uint64(outputIndex))
-	if err := vm.State.Put(db, utxoTypeID, key, utxo); err != nil {
+	if err := vm.State.Put(db, utxoTypeID, utxo.InputID(), utxo); err != nil {
 		return err
 	}
 	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
