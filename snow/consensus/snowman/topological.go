@@ -257,7 +257,7 @@ func (ts *Topological) calculateInDegree(
 // votes
 func (ts *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode, leaves []ids.ID) []votes {
-	voteStack := []votes(nil)
+	voteStack := make([]votes, 0, len(leaves))
 	for len(leaves) > 0 {
 		// pop a leaf off the stack
 		newLeavesSize := len(leaves) - 1
@@ -446,7 +446,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.
 
-	rejects := []ids.ID(nil)
+	rejects := make([]ids.ID, 0, len(n.children))
 	for childIDKey, child := range n.children {
 		childID := ids.NewID(childIDKey)
 		if childID.Equals(pref) {

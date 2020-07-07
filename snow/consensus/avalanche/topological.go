@@ -192,7 +192,7 @@ func (ta *Topological) markAncestorInDegrees(
 	kahns map[[32]byte]kahnNode,
 	leaves ids.Set,
 	deps []Vertex) (map[[32]byte]kahnNode, ids.Set) {
-	frontier := []Vertex{}
+	frontier := make([]Vertex, 0, len(deps))
 	for _, vtx := range deps {
 		// The vertex may have been decided, no need to vote in that case
 		if !vtx.Status().Decided() {

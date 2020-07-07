@@ -274,7 +274,7 @@ func (dg *Directed) Finalized() bool {
 }
 
 func (dg *Directed) String() string {
-	nodes := []*flatNode{}
+	nodes := make([]*flatNode, 0, len(dg.nodes))
 	for _, fn := range dg.nodes {
 		nodes = append(nodes, fn)
 	}
