@@ -139,6 +139,9 @@ func (ta *Topological) Preferences() ids.Set { return ta.preferred }
 
 // RecordPoll implements the Avalanche interface
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
+	// If it isn't possible to have alpha votes for any transaction, then we can
+	// just reset the confidence values in the conflict graph and not perform
+	// any traversals.
 	partialVotes := ids.BitSet(0)
 	for _, vote := range responses.List() {
 		votes := responses.GetSet(vote)
@@ -148,6 +151,7 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 		}
 	}
 	if partialVotes.Len() < ta.params.Alpha {
+		// Skip the traversals.
 		_, err := ta.cg.RecordPoll(ids.Bag{})
 		return err
 	}
