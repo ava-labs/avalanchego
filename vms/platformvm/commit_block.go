@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -42,7 +44,7 @@ func (c *Commit) Verify() error {
 
 // newCommitBlock returns a new *Commit block where the block's parent, a
 // proposal block, has ID [parentID].
-func (vm *VM) newCommitBlock(parentID ids.ID) *Commit {
+func (vm *VM) newCommitBlock(parentID ids.ID) (*Commit, error) {
 	commit := &Commit{DoubleDecisionBlock: DoubleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
 		Block: core.NewBlock(parentID),
 		vm:    vm,
@@ -53,8 +55,8 @@ func (vm *VM) newCommitBlock(parentID ids.ID) *Commit {
 	blk := Block(commit)
 	bytes, err := Codec.Marshal(&blk)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("could not marshal commit block: %s", err)
 	}
 	commit.Block.Initialize(bytes, vm.SnowmanVM)
-	return commit
+	return commit, nil
 }

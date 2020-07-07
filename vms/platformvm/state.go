@@ -107,6 +107,7 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 // get the account with the specified Address
 // If account does not exist in database, return new account
 func (vm *VM) getAccount(db database.Database, address ids.ShortID) (Account, error) {
+	// ensure getAccount never returns an Account that is unsafe to marshal
 	if address.IsZero() {
 		return Account{}, errEmptyAccountAddress
 	}

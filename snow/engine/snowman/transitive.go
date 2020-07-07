@@ -96,7 +96,11 @@ func (t *Transitive) finishBootstrapping() error {
 
 	switch blk := tail.(type) {
 	case OracleBlock:
-		for _, blk := range blk.Options() {
+		options, err := blk.Options()
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
 			// note that deliver will set the VM's preference
 			if err := t.deliver(blk); err != nil {
 				return err
@@ -609,7 +613,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	dropped := []snowman.Block{}
 	switch blk := blk.(type) {
 	case OracleBlock:
-		for _, blk := range blk.Options() {
+		options, err := blk.Options()
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
 			if err := blk.Verify(); err != nil {
 				t.Config.Context.Log.Debug("block failed verification due to %s, dropping block", err)
 				dropped = append(dropped, blk)

@@ -119,7 +119,9 @@ func (a Account) Verify() error {
 }
 
 // Bytes returns the byte representation of this account
+// Only safe to call on verified Accounts (where address has been confirmed to be non-nil)
 func (a Account) Bytes() []byte {
+	// If the address is non-nil, Marshal will not error
 	bytes, _ := Codec.Marshal(a)
 	return bytes
 }
