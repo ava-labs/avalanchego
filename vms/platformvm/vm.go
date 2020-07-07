@@ -187,7 +187,8 @@ type VM struct {
 	unissuedDecisionTxs []DecisionTx
 	unissuedAtomicTxs   []AtomicTx
 
-	txFee uint64 // TODO: Where should this be managed? Probably stored in the database, not here.
+	// Tx fee burned by a transaction
+	txFee uint64
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
@@ -643,24 +644,18 @@ func (vm *VM) SetPreference(blkID ids.ID) {
 // * values are API handlers
 // See API documentation for more information
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
-	/* TODO put this back
 	// Create a service with name "platform"
 	handler := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
 	return map[string]*common.HTTPHandler{"": handler}
-	*/
-	return map[string]*common.HTTPHandler{"TODO": nil}
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
-	/* TODO put this back
 	// Static service's name is platform
 	handler := vm.SnowmanVM.NewHandler("platform", &StaticService{})
 	return map[string]*common.HTTPHandler{
 		"": handler,
 	}
-	*/
-	return map[string]*common.HTTPHandler{"TODO": nil}
 }
 
 // Check if there is a block ready to be added to consensus
