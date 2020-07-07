@@ -30,17 +30,12 @@ var (
 
 // UnsignedAddDefaultSubnetValidatorTx is an unsigned addDefaultSubnetValidatorTx
 type UnsignedAddDefaultSubnetValidatorTx struct {
-	vm *VM
-
 	// Metadata, inputs and outputs
 	CommonTx `serialize:"true"`
-
 	// Describes the validator
 	DurationValidator `serialize:"true"`
-
 	// Address to send staked AVA (and possibly reward) to when staker is done staking
 	Destination ids.ShortID `serialize:"true"`
-
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
 	Shares uint32 `serialize:"true"`
@@ -61,8 +56,11 @@ func (tx *addDefaultSubnetValidatorTx) Creds() []verify.Verifiable {
 	return tx.Credentials
 }
 
-// initialize [tx]
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *addDefaultSubnetValidatorTx) initialize(vm *VM) error {
+	if tx.vm != nil { // Already been initialized
+		return nil
+	}
 	tx.vm = vm
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddDefaultSubnetValidatorTx))

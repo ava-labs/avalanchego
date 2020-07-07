@@ -20,14 +20,10 @@ import (
 
 // UnsignedAddDefaultSubnetDelegatorTx is an unsigned addDefaultSubnetDelegatorTx
 type UnsignedAddDefaultSubnetDelegatorTx struct {
-	vm *VM
-
 	// Metadata, inputs and outputs
 	CommonTx `serialize:"true"`
-
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
-
 	// Where to send staked AVA after done validating
 	Destination ids.ShortID `serialize:"true"`
 }
@@ -35,11 +31,9 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 // addDefaultSubnetDelegatorTx is a transaction that, if it is in a
 // ProposalBlock that is accepted and followed by a Commit block, adds a
 // delegator to the pending validator set of the default subnet. (That is, the
-// validator in the tx will have their weight increase at some point in the
-// future.)
+// validator in the tx will have their weight increase.)
 type addDefaultSubnetDelegatorTx struct {
 	UnsignedAddDefaultSubnetDelegatorTx `serialize:"true"`
-
 	// Credentials that authorize the inputs to be spent
 	Credentials []verify.Verifiable `serialize:"true"`
 }
@@ -49,8 +43,11 @@ func (tx *addDefaultSubnetDelegatorTx) Creds() []verify.Verifiable {
 	return tx.Credentials
 }
 
-// initialize [tx]
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
+	if tx.vm != nil { // already been initialized
+		return nil
+	}
 	tx.vm = vm
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddDefaultSubnetDelegatorTx))

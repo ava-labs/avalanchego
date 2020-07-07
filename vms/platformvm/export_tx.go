@@ -27,7 +27,6 @@ var (
 
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
-	vm *VM
 	// Metadata, inputs and outputs
 	// The outputs in CommonTx are non-exported
 	CommonTx `serialize:"true"`
@@ -58,9 +57,11 @@ func (tx *ExportTx) Creds() []verify.Verifiable {
 	return tx.Credentials
 }
 
-// initialize [tx]
-// set tx.vm, tx.unsignedBytes, tx.bytes, tx.id
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *ExportTx) initialize(vm *VM) error {
+	if tx.vm != nil { // already been initialized
+		return nil
+	}
 	tx.vm = vm
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedExportTx))

@@ -8,21 +8,17 @@ import (
 // CommonTx contains fields common to many transaction types
 // Should be embedded in transaction implementations
 type CommonTx struct {
+	vm *VM
 	// ID of this tx
 	id ids.ID
-
 	// Byte representation of this unsigned tx
 	unsignedBytes []byte
-
 	// Byte representation of the signed transaction (ie with credentials)
 	bytes []byte
-
 	// ID of the network on which this tx was issued
 	NetworkID uint32 `serialize:"true"`
-
 	// Input UTXOs
 	Inputs []*ava.TransferableInput `serialize:"true"`
-
 	// Output UTXOs
 	Outputs []*ava.TransferableOutput `serialize:"true"`
 }

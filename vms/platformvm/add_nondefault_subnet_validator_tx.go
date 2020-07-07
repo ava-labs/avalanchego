@@ -24,14 +24,10 @@ var (
 
 // UnsignedAddNonDefaultSubnetValidatorTx is an unsigned addNonDefaultSubnetValidatorTx
 type UnsignedAddNonDefaultSubnetValidatorTx struct {
-	vm *VM
-
 	// Metadata, inputs and outputs
 	CommonTx `serialize:"true"`
-
 	// IDs of control keys
 	controlIDs []ids.ShortID
-
 	// The validator
 	SubnetValidator `serialize:"true"`
 }
@@ -59,8 +55,12 @@ func (tx *addNonDefaultSubnetValidatorTx) Creds() []verify.Verifiable {
 	return tx.Credentials
 }
 
-// initialize [tx]
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
+	if tx.vm != nil { // already been initialized
+		return nil
+	}
+	tx.vm = vm
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedAddNonDefaultSubnetValidatorTx))
 	if err != nil {
@@ -70,7 +70,6 @@ func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
 	if err != nil {
 		return fmt.Errorf("couldn't marshal addNonDefaultSubnetValidatorTx: %w", err)
 	}
-	tx.vm = vm
 	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
 	return nil
 }

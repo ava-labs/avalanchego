@@ -27,16 +27,12 @@ var (
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
-	vm *VM
-
 	// Metadata, inputs and outputs
 	CommonTx `serialize:"true"`
-
 	// Each element in ControlKeys is the address of a public key
 	// In order to add a validator to this subnet, a tx must be signed
 	// with Threshold of these keys
 	ControlKeys []ids.ShortID `serialize:"true"`
-
 	// See ControlKeys
 	Threshold uint16 `serialize:"true"`
 }
@@ -44,7 +40,6 @@ type UnsignedCreateSubnetTx struct {
 // CreateSubnetTx is a proposal to create a new subnet
 type CreateSubnetTx struct {
 	UnsignedCreateSubnetTx `serialize:"true"`
-
 	// Credentials that authorize the inputs to spend the corresponding outputs
 	Credentials []verify.Verifiable `serialize:"true"`
 }
@@ -54,9 +49,11 @@ func (tx *CreateSubnetTx) Creds() []verify.Verifiable {
 	return tx.Credentials
 }
 
-// initialize [tx]
-// Set [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *CreateSubnetTx) initialize(vm *VM) error {
+	if tx.vm != nil { // already been initialized
+		return nil
+	}
 	tx.vm = vm
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateSubnetTx))

@@ -30,7 +30,6 @@ var (
 
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
-	vm *VM
 	// Metadata, inputs and outputs
 	// The inputs in CommonTx all consume non-imported UTXOs
 	CommonTx `serialize:"true"`
@@ -58,7 +57,11 @@ func (tx *ImportTx) Creds() []verify.Verifiable {
 	return tx.Credentials
 }
 
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *ImportTx) initialize(vm *VM) error {
+	if tx.vm != nil { // already been initialized
+		return nil
+	}
 	tx.vm = vm
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedImportTx))

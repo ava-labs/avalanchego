@@ -38,6 +38,7 @@ type rewardValidatorTx struct {
 	vm   *VM
 }
 
+// initialize this tx
 func (tx *rewardValidatorTx) initialize(vm *VM) error {
 	tx.vm = vm
 	return nil

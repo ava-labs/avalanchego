@@ -61,9 +61,11 @@ func (tx *CreateChainTx) Creds() []verify.Verifiable {
 	return tx.Credentials
 }
 
-// initialize [tx]
-// set tx.vm, tx.unsignedBytes, tx.bytes, tx.id
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
 func (tx *CreateChainTx) initialize(vm *VM) error {
+	if tx.vm != nil { // already been initialized
+		return nil
+	}
 	tx.vm = vm
 	var err error
 	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateChainTx))

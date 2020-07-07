@@ -23,10 +23,10 @@ import (
 type advanceTimeTx struct {
 	// Unix time this block proposes increasing the timestamp to
 	Time uint64 `serialize:"true"`
-
-	vm *VM
+	vm   *VM
 }
 
+// initialize this tx
 func (tx *advanceTimeTx) initialize(vm *VM) error {
 	tx.vm = vm
 	return nil
