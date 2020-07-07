@@ -610,10 +610,8 @@ type ExportAVAArgs struct {
 	Amount json.Uint64 `json:"amount"`
 }
 
-// ExportAVA returns an unsigned transaction to export AVA from the P-Chain to the X-Chain.
-// After this tx is accepted, the AVA must be imported on the X-Chain side.
-// The unsigned transaction must be signed with the key of the account exporting the AVA
-// and paying the transaction fee
+// ExportAVA exports AVAX from the P-Chain to the X-Chain
+// It must be imported on the X-Chain to complete the transfer
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
 	switch {
@@ -639,7 +637,8 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		service.vm.Ctx.NetworkID, // Network ID
-		nil,                      // Outputs. // TODO: Fill this in
+		uint64(args.Amount),      // Amount
+		args.To,                  // X-Chain address
 		privKeys,                 // Private keys
 	)
 	if err != nil {

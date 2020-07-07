@@ -108,6 +108,11 @@ func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) err
 	if len(ins) != len(creds) {
 		return fmt.Errorf("there are %d inputs but %d credentials. Should be same number", len(ins), len(outs))
 	}
+	for _, cred := range creds {
+		if err := cred.Verify(); err != nil {
+			return err
+		}
+	}
 
 	var err error
 	avaxConsumed := uint64(0) // AVAX consumed in this tx
@@ -144,7 +149,7 @@ func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) err
 // Verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
 // Adds/removes the new/old UTXOs
 // [db] should not be committed if an error is returned
-// Precondition: [tx] has already been semantically verified
+// Precondition: [tx] has already been syntactically verified
 // TODO: Is this right?
 func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) error {
 	creds := tx.Creds()
