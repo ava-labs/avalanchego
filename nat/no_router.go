@@ -31,7 +31,7 @@ func (r noRouter) ExternalIP() (net.IP, error) {
 }
 
 func (noRouter) GetPortMappingEntry(uint16, string) (string, uint16, string, error) {
-	return "", 0, "", nil
+	return "", 0, "", fmt.Errorf("port mapping not found")
 }
 
 func getOutboundIP() (net.IP, error) {
