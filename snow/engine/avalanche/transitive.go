@@ -426,7 +426,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 }
 
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
-	batch := []snowstorm.Tx(nil)
+	batch := make([]snowstorm.Tx, 0, t.Params.BatchSize)
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
@@ -436,7 +436,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 		overlaps := consumed.Overlaps(inputs)
 		if len(batch) >= t.Params.BatchSize || (force && overlaps) {
 			t.issueBatch(batch)
-			batch = nil
+			batch = make([]snowstorm.Tx, 0, t.Params.BatchSize)
 			consumed.Clear()
 			issued = true
 			overlaps = false
