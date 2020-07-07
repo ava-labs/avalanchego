@@ -74,7 +74,6 @@ func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
 
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]
-// TODO: only verify once
 func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
@@ -303,6 +302,17 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 		}
 		tx.Credentials = append(tx.Credentials, cred) // Attach credntial to tx
 	}
+	// Attach control key signatures
+	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(controlKeys))
+	for i, key := range controlKeys {
+		sig, err := key.SignHash(hash)
+		if err != nil {
+			return nil, err
+		}
+		// tx.ControlSigs[i] is type [65]byte but sig is type []byte do the below
+		copy(tx.ControlSigs[i][:], sig)
+	}
+	crypto.SortSECP2561RSigs(tx.ControlSigs)
 
 	return tx, tx.initialize(vm)
 }
