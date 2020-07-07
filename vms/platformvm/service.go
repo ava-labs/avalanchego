@@ -520,7 +520,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	privKeys, err := user.getKeys()
+	keys, err := user.getKeys()
 	if err != nil {
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
@@ -532,8 +532,8 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 		uint64(args.EndTime),   // End time
 		args.ID,                // Node ID
 		subnetID,               // Subnet ID
-		nil,                    // TODO how to get control keys?
-		privKeys,               // Private keys
+		keys,                   // Control keys
+		keys,                   // Keys for paying the fee
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -541,7 +541,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 
 	response.TxID = tx.ID()
 	service.vm.issueTx(tx)
-	return errors.New("add control keys")
+	return nil
 }
 
 // CreateSubnetArgs are the arguments to CreateSubnet
@@ -695,7 +695,6 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
  */
 
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
-// TODO: add control keys
 type CreateBlockchainArgs struct {
 	api.UserPass
 	// ID of Subnet that validates the new blockchain
@@ -756,7 +755,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	privKeys, err := user.getKeys()
+	keys, err := user.getKeys()
 	if err != nil {
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
@@ -768,8 +767,8 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		vmID,
 		fxIDs,
 		args.Name,
-		nil,      // Control Keys. // TODO: Fill this in
-		privKeys, // Private keys
+		keys, // Control Keys
+		keys, // Keys to pay fee
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -777,7 +776,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 
 	response.TxID = tx.ID()
 	service.vm.issueTx(tx)
-	return errors.New("fill in the control keys field")
+	return nil
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus

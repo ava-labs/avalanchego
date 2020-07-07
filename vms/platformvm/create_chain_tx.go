@@ -175,11 +175,35 @@ func (vm *VM) newCreateChainTx(
 	fxIDs []ids.ID, // fxs this chain supports
 	chainName string, // Name of the chain
 	controlKeys []*crypto.PrivateKeySECP256K1R, // Control keys for the subnet
-	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee
+	feeKeys []*crypto.PrivateKeySECP256K1R, // Pay the fee
 ) (*CreateChainTx, error) {
 
+	// Get information about the subnet we're adding a chain to
+	subnetInfo, err := vm.getSubnet(vm.DB, subnetID)
+	if err != nil {
+		return nil, fmt.Errorf("subnet %s doesn't exist", subnetID)
+	}
+	// Make sure we have enough of this subnet's control keys
+	subnetControlKeys := ids.ShortSet{} // Subnet's
+	for _, key := range subnetInfo.ControlKeys {
+		subnetControlKeys.Add(key)
+	}
+	// [usableKeys] are the control keys that will sign this transaction
+	usableKeys := make([]*crypto.PrivateKeySECP256K1R, 0, subnetInfo.Threshold)
+	for _, key := range controlKeys {
+		if subnetControlKeys.Contains(key.PublicKey().Address()) {
+			usableKeys = append(usableKeys, key) // This key is useful
+		}
+		if len(usableKeys) > int(subnetInfo.Threshold) {
+			break
+		}
+	}
+	if len(usableKeys) != int(subnetInfo.Threshold) {
+		return nil, fmt.Errorf("don't have enough control keys for subnet %s", subnetID)
+	}
+
 	// Calculate inputs, outputs, and keys used to sign this tx
-	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, keys)
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, feeKeys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -208,7 +232,7 @@ func (vm *VM) newCreateChainTx(
 
 	// Sign the tx with control keys
 	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(controlKeys))
-	for i, key := range controlKeys {
+	for i, key := range usableKeys {
 		sig, err := key.SignHash(hash)
 		if err != nil {
 			return nil, err
@@ -217,7 +241,7 @@ func (vm *VM) newCreateChainTx(
 	}
 	crypto.SortSECP2561RSigs(tx.ControlSigs) // Sort the control signatures
 
-	// Attach credentials that allow the inputs to be spent
+	// Attach credentials that allow input UTXOs to be spent
 	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
 		cred := &secp256k1fx.Credential{}
 		for _, key := range inputKeys {
