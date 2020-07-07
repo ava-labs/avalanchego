@@ -189,7 +189,7 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if err := graph.RecordPoll(r); err != nil {
+	if _, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
@@ -230,7 +230,7 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if err := graph.RecordPoll(r); err != nil {
+	if _, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
 		t.Fatalf("Wrong number of preferences.")
@@ -273,7 +273,7 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if err := graph.RecordPoll(r); err != nil {
+	if _, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
 		t.Fatalf("Wrong number of preferences.")
@@ -313,7 +313,7 @@ func IndependentTest(t *testing.T, factory Factory) {
 	ra.SetThreshold(2)
 	ra.AddCount(Red.ID(), 2)
 	ra.AddCount(Alpha.ID(), 2)
-	if err := graph.RecordPoll(ra); err != nil {
+	if _, err := graph.RecordPoll(ra); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
@@ -323,7 +323,7 @@ func IndependentTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if err := graph.RecordPoll(ra); err != nil {
+	} else if _, err := graph.RecordPoll(ra); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
@@ -474,7 +474,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	g := ids.Bag{}
 	g.Add(Green.ID())
-	if err := graph.RecordPoll(g); err != nil {
+	if _, err := graph.RecordPoll(g); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
@@ -492,7 +492,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	rp := ids.Bag{}
 	rp.Add(Red.ID(), purple.ID())
-	if err := graph.RecordPoll(rp); err != nil {
+	if _, err := graph.RecordPoll(rp); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
@@ -510,7 +510,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	r := ids.Bag{}
 	r.Add(Red.ID())
-	if err := graph.RecordPoll(r); err != nil {
+	if _, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
@@ -567,7 +567,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 
 	gp := ids.Bag{}
 	gp.Add(Green.ID(), purple.ID())
-	if err := graph.RecordPoll(gp); err != nil {
+	if _, err := graph.RecordPoll(gp); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
@@ -583,7 +583,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", Blue.ID(), choices.Processing)
 	} else if purple.Status() != choices.Processing {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
-	} else if err := graph.RecordPoll(gp); err != nil {
+	} else if _, err := graph.RecordPoll(gp); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
@@ -713,7 +713,7 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 	votes := ids.Bag{}
 	votes.Add(rogue1.ID())
 	votes.Add(virtuous.ID())
-	if err := graph.RecordPoll(votes); err != nil {
+	if _, err := graph.RecordPoll(votes); err != nil {
 		t.Fatal(err)
 	} else if status := rogue1.Status(); status != choices.Processing {
 		t.Fatalf("Rogue Tx is %s expected %s", status, choices.Processing)
@@ -772,7 +772,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 
 	votes := ids.Bag{}
 	votes.Add(purple.ID())
-	if err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on accepting an invalid tx")
 	}
 }
@@ -811,7 +811,7 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	votes := ids.Bag{}
 	votes.Add(purple.ID())
-	if err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
 	}
 }
@@ -850,7 +850,7 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	votes := ids.Bag{}
 	votes.Add(purple.ID())
-	if err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
 	}
 }
@@ -886,7 +886,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	rb.SetThreshold(2)
 	rb.AddCount(Red.ID(), 2)
 	rb.AddCount(Blue.ID(), 2)
-	if err := graph.RecordPoll(rb); err != nil {
+	if _, err := graph.RecordPoll(rb); err != nil {
 		t.Fatal(err)
 	} else if err := graph.Add(Blue); err != nil {
 		t.Fatal(err)
@@ -918,7 +918,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	ga.SetThreshold(2)
 	ga.AddCount(Green.ID(), 2)
 	ga.AddCount(Alpha.ID(), 2)
-	if err := graph.RecordPoll(ga); err != nil {
+	if _, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
 	}
 
@@ -945,7 +945,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	}
 
 	empty := ids.Bag{}
-	if err := graph.RecordPoll(empty); err != nil {
+	if _, err := graph.RecordPoll(empty); err != nil {
 		t.Fatal(err)
 	}
 
@@ -969,7 +969,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Wrong preference. Expected %s", Blue.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if err := graph.RecordPoll(ga); err != nil {
+	} else if _, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
 	}
 
@@ -993,7 +993,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if err := graph.RecordPoll(ga); err != nil {
+	} else if _, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1016,7 +1016,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("%s should have been rejected", Red.ID())
 	} else if Blue.Status() != choices.Rejected {
 		t.Fatalf("%s should have been rejected", Blue.ID())
-	} else if err := graph.RecordPoll(rb); err != nil {
+	} else if _, err := graph.RecordPoll(rb); err != nil {
 		t.Fatal(err)
 	}
 

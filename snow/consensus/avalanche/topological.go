@@ -139,13 +139,32 @@ func (ta *Topological) Preferences() ids.Set { return ta.preferred }
 
 // RecordPoll implements the Avalanche interface
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
+	// If it isn't possible to have alpha votes for any transaction, then we can
+	// just reset the confidence values in the conflict graph and not perform
+	// any traversals.
+	partialVotes := ids.BitSet(0)
+	for _, vote := range responses.List() {
+		votes := responses.GetSet(vote)
+		partialVotes.Union(votes)
+		if partialVotes.Len() >= ta.params.Alpha {
+			break
+		}
+	}
+	if partialVotes.Len() < ta.params.Alpha {
+		// Skip the traversals.
+		_, err := ta.cg.RecordPoll(ids.Bag{})
+		return err
+	}
+
 	// Set up the topological sort: O(|Live Set|)
 	kahns, leaves := ta.calculateInDegree(responses)
 	// Collect the votes for each transaction: O(|Live Set|)
 	votes := ta.pushVotes(kahns, leaves)
 	// Update the conflict graph: O(|Transactions|)
 	ta.ctx.Log.Verbo("Updating consumer confidences based on:\n%s", &votes)
-	if err := ta.cg.RecordPoll(votes); err != nil {
+	if updated, err := ta.cg.RecordPoll(votes); !updated || err != nil {
+		// If the transaction statuses weren't changed, there is no need to
+		// perform a traversal.
 		return err
 	}
 	// Update the dag: O(|Live Set|)
