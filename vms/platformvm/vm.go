@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
@@ -202,7 +203,6 @@ func (vm *VM) Initialize(
 	msgs chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
-	/* TODO replace
 	ctx.Log.Verbo("initializing platform chain")
 
 	if len(fxs) != 0 {
@@ -236,15 +236,15 @@ func (vm *VM) Initialize(
 		}
 
 		// Persist accounts that exist at genesis
-		for _, account := range genesis.Accounts {
-			if err := vm.putAccount(vm.DB, account); err != nil {
-				return errDBPutAccount
+		for _, utxo := range genesis.UTXOs {
+			if err := vm.putUTXO(vm.DB, utxo); err != nil {
+				return err
 			}
 		}
 
 		// Persist default subnet validator set at genesis
 		if err := vm.putCurrentValidators(vm.DB, genesis.Validators, DefaultSubnetID); err != nil {
-			return errDBPutCurrentValidators
+			return err
 		}
 
 		// Persist the subnets that exist at genesis (none do)
@@ -265,18 +265,18 @@ func (vm *VM) Initialize(
 
 		// Persist the chains that exist at genesis
 		if err := vm.putChains(vm.DB, filteredChains); err != nil {
-			return errDBPutChains
+			return err
 		}
 
 		// Persist the platform chain's timestamp at genesis
 		time := time.Unix(int64(genesis.Timestamp), 0)
 		if err := vm.State.PutTime(vm.DB, timestampKey, time); err != nil {
-			return errDB
+			return err
 		}
 
 		// There are no pending stakers at genesis
 		if err := vm.putPendingValidators(vm.DB, &EventHeap{SortByStartTime: true}, DefaultSubnetID); err != nil {
-			return errDBPutPendingValidators
+			return err
 		}
 
 		// Create the genesis block and save it as being accepted
@@ -284,7 +284,7 @@ func (vm *VM) Initialize(
 		// non-existent parent)
 		genesisBlock := vm.newCommitBlock(ids.Empty)
 		if err := vm.State.PutBlock(vm.DB, genesisBlock); err != nil {
-			return errDB
+			return err
 		}
 		genesisBlock.onAcceptDB = versiondb.New(vm.DB)
 		genesisBlock.CommonBlock.Accept()
@@ -292,7 +292,7 @@ func (vm *VM) Initialize(
 		vm.SetDBInitialized()
 
 		if err := vm.DB.Commit(); err != nil {
-			return errDB
+			return err
 		}
 	}
 
@@ -338,8 +338,6 @@ func (vm *VM) Initialize(
 	}
 
 	return nil
-	*/
-	return errors.New("TODO")
 }
 
 // Queue [tx] to be put into a block

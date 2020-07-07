@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 // Note that since an AVA network has exactly one Platform Chain,
@@ -127,6 +128,7 @@ type APIChain struct {
 // [Validators] are the validators of the default subnet at genesis.
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
+// TODO replace Accounts with UTXOs
 type BuildGenesisArgs struct {
 	NetworkID  json.Uint32                 `json:"address"`
 	Accounts   []APIAccount                `json:"accounts"`
@@ -142,7 +144,7 @@ type BuildGenesisReply struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	//Accounts   []Account        `serialize:"true"`
+	UTXOs      []*ava.UTXO      `serialize:"true"`
 	Validators *EventHeap       `serialize:"true"`
 	Chains     []*CreateChainTx `serialize:"true"`
 	Timestamp  uint64           `serialize:"true"`
