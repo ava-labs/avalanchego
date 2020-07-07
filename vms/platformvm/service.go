@@ -419,7 +419,6 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		args.ID,                        // Node ID
 		destination,                    // Destination
 		uint32(args.DelegationFeeRate), // Shares
-		service.vm.Ctx.NetworkID,       // Network ID
 		privKeys,                       // Private keys
 	)
 	if err != nil {
@@ -473,13 +472,12 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 
 	// Create the transaction
 	tx, err := service.vm.newAddDefaultSubnetDelegatorTx(
-		uint64(args.weight()),    // Stake amount
-		uint64(args.StartTime),   // Start time
-		uint64(args.EndTime),     // End time
-		args.ID,                  // Node ID
-		destination,              // Destination
-		service.vm.Ctx.NetworkID, // Network ID
-		privKeys,                 // Private keys
+		uint64(args.weight()),  // Stake amount
+		uint64(args.StartTime), // Start time
+		uint64(args.EndTime),   // End time
+		args.ID,                // Node ID
+		destination,            // Destination
+		privKeys,               // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -531,14 +529,13 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 
 	// Create the transaction
 	tx, err := service.vm.newAddNonDefaultSubnetValidatorTx(
-		uint64(args.weight()),    // Stake amount
-		uint64(args.StartTime),   // Start time
-		uint64(args.EndTime),     // End time
-		args.ID,                  // Node ID
-		subnetID,                 // Subnet ID
-		service.vm.Ctx.NetworkID, // Network ID
-		nil,                      // TODO how to get control keys?
-		privKeys,                 // Private keys
+		uint64(args.weight()),  // Stake amount
+		uint64(args.StartTime), // Start time
+		uint64(args.EndTime),   // End time
+		args.ID,                // Node ID
+		subnetID,               // Subnet ID
+		nil,                    // TODO how to get control keys?
+		privKeys,               // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -588,10 +585,9 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newCreateSubnetTx(
-		service.vm.Ctx.NetworkID, // Network ID
-		controlKeys,              // Control Keys
-		uint16(args.Threshold),   // Threshold
-		privKeys,                 // Private keys
+		controlKeys,            // Control Keys
+		uint16(args.Threshold), // Threshold
+		privKeys,               // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -636,10 +632,9 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
-		service.vm.Ctx.NetworkID, // Network ID
-		uint64(args.Amount),      // Amount
-		args.To,                  // X-Chain address
-		privKeys,                 // Private keys
+		uint64(args.Amount), // Amount
+		args.To,             // X-Chain address
+		privKeys,            // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -683,7 +678,6 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	}
 
 	tx, err := service.vm.newImportTx(
-		service.vm.Ctx.NetworkID,
 		privKeys,
 		recipientKey,
 	)
@@ -810,9 +804,8 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		vmID,
 		fxIDs,
 		args.Name,
-		service.vm.Ctx.NetworkID, // Network ID
-		nil,                      // Control Keys. // TODO: Fill this in
-		privKeys,                 // Private keys
+		nil,      // Control Keys. // TODO: Fill this in
+		privKeys, // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)

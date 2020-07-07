@@ -64,7 +64,6 @@ func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 
 // SyntacticVerify return nil iff [tx] is valid
 // If [tx] is valid, sets [tx.accountID]
-// TODO: Only do syntactic Verify once
 func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
@@ -186,15 +185,14 @@ func (tx *addDefaultSubnetDelegatorTx) InitiallyPrefersCommit() bool {
 	return tx.StartTime().After(tx.vm.clock.Time())
 }
 
-// TODO: Comment
+// Creates a new transaction
 func (vm *VM) newAddDefaultSubnetDelegatorTx(
-	stakeAmt,
-	startTime,
-	endTime uint64,
-	nodeID ids.ShortID,
-	destination ids.ShortID,
-	networkID uint32,
-	keys []*crypto.PrivateKeySECP256K1R,
+	stakeAmt, // Amount the delegator stakes
+	startTime, // Unix time they start delegating
+	endTime uint64, // Unix time they stop delegating
+	nodeID ids.ShortID, // ID of the node we are delegating to
+	destination ids.ShortID, // Address to returned staked tokens (and maybe reward) to
+	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
 ) (*addDefaultSubnetDelegatorTx, error) {
 
 	// Calculate amount to be spent in this transaction
@@ -213,7 +211,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	tx := &addDefaultSubnetDelegatorTx{
 		UnsignedAddDefaultSubnetDelegatorTx: UnsignedAddDefaultSubnetDelegatorTx{
 			CommonTx: CommonTx{
-				NetworkID: networkID,
+				NetworkID: vm.Ctx.NetworkID,
 				Inputs:    inputs,
 				Outputs:   outputs,
 			},

@@ -167,16 +167,15 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	return onAccept, nil
 }
 
-// TODO comment
+// Create a new transaction
 func (vm *VM) newCreateChainTx(
-	subnetID ids.ID,
-	genesisData []byte,
-	vmID ids.ID,
-	fxIDs []ids.ID,
-	chainName string,
-	networkID uint32,
-	controlKeys []*crypto.PrivateKeySECP256K1R,
-	keys []*crypto.PrivateKeySECP256K1R,
+	subnetID ids.ID, // ID of the subnet that validates the new chain
+	genesisData []byte, // Byte repr. of genesis state of the new chain
+	vmID ids.ID, // VM this chain runs
+	fxIDs []ids.ID, // fxs this chain supports
+	chainName string, // Name of the chain
+	controlKeys []*crypto.PrivateKeySECP256K1R, // Control keys for the subnet
+	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee
 ) (*CreateChainTx, error) {
 
 	// Calculate inputs, outputs, and keys used to sign this tx
@@ -189,7 +188,7 @@ func (vm *VM) newCreateChainTx(
 	tx := &CreateChainTx{
 		UnsignedCreateChainTx: UnsignedCreateChainTx{
 			CommonTx: CommonTx{
-				NetworkID: networkID,
+				NetworkID: vm.Ctx.NetworkID,
 				Inputs:    inputs,
 				Outputs:   outputs,
 			},

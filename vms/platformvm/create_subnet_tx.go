@@ -127,10 +127,9 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
 func (vm *VM) newCreateSubnetTx(
-	networkID uint32,
-	controlKeys []ids.ShortID,
-	threshold uint16,
-	keys []*crypto.PrivateKeySECP256K1R,
+	controlKeys []ids.ShortID, // Control keys for the new subnet
+	threshold uint16, // [threshold] of [controlKeys] signatures needed to add validator to this subnet
+	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee
 ) (*CreateSubnetTx, error) {
 
 	if int(threshold) != len(controlKeys) {
@@ -147,7 +146,7 @@ func (vm *VM) newCreateSubnetTx(
 	tx := &CreateSubnetTx{
 		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
 			CommonTx: CommonTx{
-				NetworkID: networkID,
+				NetworkID: vm.Ctx.NetworkID,
 				Inputs:    inputs,
 				Outputs:   outputs,
 			},

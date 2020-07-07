@@ -77,7 +77,6 @@ func (tx *addDefaultSubnetValidatorTx) initialize(vm *VM) error {
 
 // SyntacticVerify that this transaction is well formed
 // If [tx] is valid, this method also populates [tx.accountID]
-// TODO: Only do syntactic Verify once
 func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
@@ -113,7 +112,6 @@ func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 }
 
 // SemanticVerify this transaction is valid.
-// TODO make sure the ins and outs are semantically valid
 func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, permError{err}
@@ -197,10 +195,13 @@ func (tx *addDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 
 // NewAddDefaultSubnetValidatorTx returns a new NewAddDefaultSubnetValidatorTx
 func (vm *VM) newAddDefaultSubnetValidatorTx(
-	stakeAmt, startTime, endTime uint64,
-	nodeID, destination ids.ShortID,
-	shares, networkID uint32,
-	keys []*crypto.PrivateKeySECP256K1R,
+	stakeAmt uint64, // Amount being staked
+	startTime uint64, // Unix time they start validating
+	endTime uint64, // Unix time they stop validating
+	nodeID ids.ShortID, // ID of node that will validate
+	destination ids.ShortID, // Address to returned staked tokens (and maybe reward) to
+	shares uint32, // 10,000 times percentage of reward taken from delegators
+	keys []*crypto.PrivateKeySECP256K1R, // // Keys providing the staked tokens + fee
 ) (*addDefaultSubnetValidatorTx, error) {
 
 	toSpend, err := safemath.Add64(stakeAmt, vm.txFee)
@@ -218,7 +219,7 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 	tx := &addDefaultSubnetValidatorTx{
 		UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
 			CommonTx: CommonTx{
-				NetworkID: networkID,
+				NetworkID: vm.Ctx.NetworkID,
 				Inputs:    inputs,
 				Outputs:   outputs,
 			},

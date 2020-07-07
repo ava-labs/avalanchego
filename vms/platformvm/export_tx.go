@@ -76,7 +76,6 @@ func (tx *ExportTx) initialize(vm *VM) error {
 }
 
 // SyntacticVerify this transaction is well-formed
-// TODO only syntacticVerify once
 func (tx *ExportTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
@@ -105,7 +104,6 @@ func (tx *ExportTx) SyntacticVerify() error {
 }
 
 // SemanticVerify this transaction is valid.
-// TODO make sure the ins and outs are semantically valid
 func (tx *ExportTx) SemanticVerify(db database.Database) error {
 	if err := tx.SyntacticVerify(); err != nil {
 		return err
@@ -165,12 +163,11 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 	return atomic.WriteAll(batch, sharedBatch)
 }
 
-// TODO comment
+// Create a new transaction
 func (vm *VM) newExportTx(
-	networkID uint32,
-	amount uint64,
-	to ids.ShortID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	amount uint64, // Amount of tokens to export
+	to ids.ShortID, // Address of X-Chain recipient
+	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*ExportTx, error) {
 
 	var err error

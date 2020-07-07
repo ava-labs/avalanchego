@@ -245,16 +245,15 @@ func (tx *addNonDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
 	return tx.StartTime().After(tx.vm.clock.Time())
 }
 
-// TODO: Comment
+// Create a new transaction
 func (vm *VM) newAddNonDefaultSubnetValidatorTx(
-	weight,
-	startTime,
-	endTime uint64,
-	nodeID ids.ShortID,
-	subnetID ids.ID,
-	networkID uint32,
-	controlKeys []*crypto.PrivateKeySECP256K1R,
-	keys []*crypto.PrivateKeySECP256K1R,
+	weight, // Sampling weight of the new validator
+	startTime, // Unix time they start delegating
+	endTime uint64, // Unix time they top delegating
+	nodeID ids.ShortID, // ID of the node validating
+	subnetID ids.ID, // ID of the subnet the validator will validate
+	controlKeys []*crypto.PrivateKeySECP256K1R, // Control keys for the subnet ID
+	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee
 ) (*addNonDefaultSubnetValidatorTx, error) {
 
 	// Calculate inputs, outputs, and keys used to sign this tx
@@ -267,7 +266,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	tx := &addNonDefaultSubnetValidatorTx{
 		UnsignedAddNonDefaultSubnetValidatorTx: UnsignedAddNonDefaultSubnetValidatorTx{
 			CommonTx: CommonTx{
-				NetworkID: networkID,
+				NetworkID: vm.Ctx.NetworkID,
 				Inputs:    inputs,
 				Outputs:   outputs,
 			},
