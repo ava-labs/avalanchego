@@ -46,10 +46,10 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	engine.Default(false)
 	engine.ContextF = snow.DefaultContextTest
 
-	called := new(bool)
+	called := make(chan struct{}, 1)
 
 	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
-		*called = true
+		called <- struct{}{}
 		return nil
 	}
 
@@ -65,10 +65,11 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1)
 	go handler.Dispatch()
 
-	// Ensure handler has time to process the message
-	time.Sleep(50 * time.Millisecond)
-
-	if !*called {
-		t.Fatalf("Handler never called engine method, should not have dropped the message")
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	select {
+	case _, _ = <-ticker.C:
+		t.Fatalf("Calling engine function timed out")
+	case _, _ = <-called:
 	}
 }
