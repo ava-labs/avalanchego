@@ -46,7 +46,7 @@ type message struct {
 	containers   [][]byte
 	containerIDs ids.Set
 	notification common.Message
-	received     time.Time
+	received     time.Time // Time this message was received by the handler
 }
 
 func (m message) String() string {

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/snow/networking/timeout"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -15,30 +17,46 @@ import (
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	engine := common.EngineTest{T: t}
-	// Message should be dropped, so if an engine function is called
-	// the test should fail
 	engine.Default(true)
 	engine.ContextF = snow.DefaultContextTest
+	called := make(chan struct{})
+
+	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+		t.Fatalf("GetAcceptedFrontier message should have timed out")
+		return nil
+	}
+
+	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+		called <- struct{}{}
+		return nil
+	}
 
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
 		nil,
-		1,
+		2,
 		"",
 		prometheus.NewRegistry(),
 	)
 
-	handler.dropMessageTimeout = time.Millisecond
+	receiveTime := time.Now()
+	handler.clock.Set(receiveTime)
 
 	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1)
-	// Sleep past the message timeout
-	time.Sleep(4 * time.Millisecond)
+	// Set the clock to simulate message timeout
+	handler.clock.Set(receiveTime.Add(2 * timeout.DefaultRequestTimeout))
+	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, ids.Set{})
+
 	go handler.Dispatch()
 
-	// Ensure handler has time to process the message and trigger
-	// failure if the message was not dropped
-	time.Sleep(50 * time.Millisecond)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	select {
+	case _, _ = <-ticker.C:
+		t.Fatalf("Calling engine function timed out")
+	case _, _ = <-called:
+	}
 }
 
 func TestHandlerDoesntDrop(t *testing.T) {
