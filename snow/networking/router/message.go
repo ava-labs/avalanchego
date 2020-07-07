@@ -6,6 +6,7 @@ package router
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
@@ -45,6 +46,7 @@ type message struct {
 	containers   [][]byte
 	containerIDs ids.Set
 	notification common.Message
+	received     time.Time
 }
 
 func (m message) String() string {

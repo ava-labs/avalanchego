@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/snow/networking/timeout"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
@@ -25,6 +27,8 @@ type Handler struct {
 	reliableMsgs     []message
 	closed           chan struct{}
 	msgChan          <-chan common.Message
+
+	dropMessageTimeout time.Duration
 
 	ctx    *snow.Context
 	engine common.Engine
@@ -46,6 +50,7 @@ func (h *Handler) Initialize(
 	h.reliableMsgsSema = make(chan struct{}, 1)
 	h.closed = make(chan struct{})
 	h.msgChan = msgChan
+	h.dropMessageTimeout = timeout.DefaultRequestTimeout
 
 	h.ctx = engine.Context()
 	h.engine = engine
@@ -74,6 +79,13 @@ func (h *Handler) Dispatch() {
 			if !ok {
 				// the msgs channel has been closed, so this dispatcher should exit
 				return
+			}
+
+			if time.Since(msg.received) > h.dropMessageTimeout {
+				h.ctx.Log.Verbo("Dropping message due to likely timeout: %s", msg)
+				h.metrics.pending.Dec()
+				h.metrics.dropped.Inc()
+				continue
 			}
 
 			h.metrics.pending.Dec()
@@ -195,6 +207,7 @@ func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32)
 		messageType: getAcceptedFrontierMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+		received:    time.Now(),
 	})
 }
 
@@ -206,6 +219,7 @@ func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, co
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
+		received:     time.Now(),
 	})
 }
 
@@ -227,6 +241,7 @@ func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, contain
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
+		received:     time.Now(),
 	})
 }
 
@@ -238,6 +253,7 @@ func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerI
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
+		received:     time.Now(),
 	})
 }
 
@@ -258,6 +274,7 @@ func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, contai
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
+		received:    time.Now(),
 	})
 }
 
@@ -268,6 +285,7 @@ func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers
 		validatorID: validatorID,
 		requestID:   requestID,
 		containers:  containers,
+		received:    time.Now(),
 	})
 }
 
@@ -287,6 +305,7 @@ func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
+		received:    time.Now(),
 	})
 }
 
@@ -298,6 +317,7 @@ func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids
 		requestID:   requestID,
 		containerID: containerID,
 		container:   container,
+		received:    time.Now(),
 	})
 }
 
@@ -318,6 +338,7 @@ func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, blockID i
 		requestID:   requestID,
 		containerID: blockID,
 		container:   block,
+		received:    time.Now(),
 	})
 }
 
@@ -328,6 +349,7 @@ func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, blockID i
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: blockID,
+		received:    time.Now(),
 	})
 }
 
@@ -338,6 +360,7 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: votes,
+		received:     time.Now(),
 	})
 }
 
@@ -352,7 +375,10 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() bool {
-	return h.sendMsg(message{messageType: gossipMsg})
+	return h.sendMsg(message{
+		messageType: gossipMsg,
+		received:    time.Now(),
+	})
 }
 
 // Notify ...
@@ -360,6 +386,7 @@ func (h *Handler) Notify(msg common.Message) bool {
 	return h.sendMsg(message{
 		messageType:  notifyMsg,
 		notification: msg,
+		received:     time.Now(),
 	})
 }
 
