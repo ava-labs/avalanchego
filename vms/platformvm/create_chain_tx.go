@@ -23,23 +23,16 @@ var (
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx
 type UnsignedCreateChainTx struct {
-	vm *VM
-
 	// Metadata, inputs and outputs
 	CommonTx `serialize:"true"`
-
 	// ID of the Subnet that validates this blockchain
 	SubnetID ids.ID `serialize:"true"`
-
 	// A human readable name for the chain; need not be unique
 	ChainName string `serialize:"true"`
-
 	// ID of the VM running on the new chain
 	VMID ids.ID `serialize:"true"`
-
 	// IDs of the feature extensions running on the new chain
 	FxIDs []ids.ID `serialize:"true"`
-
 	// Byte representation of genesis state of the new chain
 	GenesisData []byte `serialize:"true"`
 }
@@ -47,10 +40,8 @@ type UnsignedCreateChainTx struct {
 // CreateChainTx is a proposal to create a chain
 type CreateChainTx struct {
 	UnsignedCreateChainTx `serialize:"true"`
-
 	// Credentials that authorize the inputs to spend the corresponding outputs
 	Credentials []verify.Verifiable `serialize:"true"`
-
 	// Signatures from Subnet's control keys
 	// Should not empty slice, not nil, if there are no control sigs
 	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
@@ -82,11 +73,12 @@ func (tx *CreateChainTx) initialize(vm *VM) error {
 
 // SyntacticVerify this transaction is well-formed
 // Also populates [tx.Key] with the public key that signed this transaction
-// TODO: Verify only once
 func (tx *CreateChainTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
 	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
 		return errWrongNetworkID
 	case tx.id.IsZero():
@@ -100,11 +92,14 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
 		return errControlSigsNotSortedAndUnique
 	}
-	return syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID)
+	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	}
+	tx.syntacticallyVerified = true
+	return nil
 }
 
 // SemanticVerify this transaction is valid.
-// TODO make sure the ins and outs are semantically valid
 func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, err

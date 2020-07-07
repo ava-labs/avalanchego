@@ -40,7 +40,6 @@ type UnsignedImportTx struct {
 // ImportTx imports funds from the AVM
 type ImportTx struct {
 	UnsignedImportTx `serialize:"true"`
-
 	// Credentials that authorize the inputs to spend the corresponding outputs
 	Credentials []verify.Verifiable `serialize:"true"`
 }
@@ -82,6 +81,8 @@ func (tx *ImportTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
 		return errWrongNetworkID
 	case tx.id.IsZero():
@@ -91,7 +92,11 @@ func (tx *ImportTx) SyntacticVerify() error {
 	case len(tx.Inputs) != len(tx.Credentials):
 		return errWrongNumberOfCredentials
 	}
-	return syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID)
+	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	}
+	tx.syntacticallyVerified = true
+	return nil
 }
 
 // SemanticVerify this transaction is valid.

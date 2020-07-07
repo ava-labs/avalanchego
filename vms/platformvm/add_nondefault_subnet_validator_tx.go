@@ -39,10 +39,8 @@ type UnsignedAddNonDefaultSubnetValidatorTx struct {
 // The transaction fee will be paid from the account whose ID is [Sigs[0].Address()]
 type addNonDefaultSubnetValidatorTx struct {
 	UnsignedAddNonDefaultSubnetValidatorTx `serialize:"true"`
-
 	// Credentials that authorize the inputs to spend the corresponding outputs
 	Credentials []verify.Verifiable `serialize:"true"`
-
 	// When a subnet is created, it specifies a set of public keys ("control keys") such
 	// that in order to add a validator to the subnet, a tx must be signed with
 	// a certain threshold of those keys
@@ -81,6 +79,8 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return tempError{errNilTx}
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
 	case tx.id.IsZero():
 		return tempError{errInvalidID}
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
@@ -117,6 +117,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 		}
 		tx.controlIDs[i] = key.Address()
 	}
+	tx.syntacticallyVerified = true
 	return nil
 }
 

@@ -9,6 +9,8 @@ import (
 // Should be embedded in transaction implementations
 type CommonTx struct {
 	vm *VM
+	// true iff this transaction has already passed syntactic verification
+	syntacticallyVerified bool
 	// ID of this tx
 	id ids.ID
 	// Byte representation of this unsigned tx

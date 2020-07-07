@@ -40,7 +40,6 @@ type UnsignedExportTx struct {
 // ExportTx exports funds to the AVM
 type ExportTx struct {
 	UnsignedExportTx `serialize:"true"`
-
 	// Credentials that authorize the inputs to spend the corresponding outputs
 	Credentials []verify.Verifiable `serialize:"true"`
 }
@@ -82,6 +81,8 @@ func (tx *ExportTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
 		return errWrongNetworkID
 	case tx.id.IsZero():
@@ -96,7 +97,11 @@ func (tx *ExportTx) SyntacticVerify() error {
 	if err != nil {
 		return errOverflowExport
 	}
-	return syntacticVerifySpend(tx, toSpend, tx.vm.avaxAssetID)
+	if err := syntacticVerifySpend(tx, toSpend, tx.vm.avaxAssetID); err != nil {
+		return err
+	}
+	tx.syntacticallyVerified = true
+	return nil
 }
 
 // SemanticVerify this transaction is valid.

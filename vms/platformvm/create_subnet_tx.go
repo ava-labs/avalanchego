@@ -70,11 +70,12 @@ func (tx *CreateSubnetTx) initialize(vm *VM) error {
 
 // SyntacticVerify nil iff [tx] is syntactically valid.
 // If [tx] is valid, this method sets [tx.key]
-// TODO: Only verify once
 func (tx *CreateSubnetTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
 	case tx.id.IsZero():
 		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
@@ -88,11 +89,14 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 	case !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys):
 		return errControlKeysNotSortedAndUnique
 	}
-	return syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID)
+	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	}
+	tx.syntacticallyVerified = true
+	return nil
 }
 
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
-// TODO make sure the ins and outs are semantically valid
 func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, err

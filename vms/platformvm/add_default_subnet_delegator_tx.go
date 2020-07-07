@@ -69,6 +69,8 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
 		return tempError{errNilTx}
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
 	case tx.id.IsZero():
 		return tempError{errInvalidID}
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
@@ -90,6 +92,7 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return permError{err}
 	}
+	tx.syntacticallyVerified = true
 	return nil
 }
 
