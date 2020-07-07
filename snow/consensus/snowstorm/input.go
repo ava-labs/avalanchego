@@ -193,8 +193,9 @@ func (ig *Input) Conflicts(tx Tx) ids.Set {
 }
 
 // RecordPoll implements the ConflictGraph interface
-func (ig *Input) RecordPoll(votes ids.Bag) error {
+func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 	ig.currentVote++
+	changed := false
 
 	votes.SetThreshold(ig.params.Alpha)
 	threshold := votes.Threshold()
@@ -238,7 +239,10 @@ func (ig *Input) RecordPoll(votes ids.Bag) error {
 			if tx.bias > input.bias {
 				// if the previous preference lost it's preference in this
 				// input, it can't be preferred in all the inputs
-				ig.preferences.Remove(input.preference)
+				if ig.preferences.Contains(input.preference) {
+					ig.preferences.Remove(input.preference)
+					changed = true
+				}
 
 				input.bias = tx.bias
 				input.preference = toInc
@@ -260,22 +264,24 @@ func (ig *Input) RecordPoll(votes ids.Bag) error {
 
 		// If the node wasn't accepted, but was preferred, make sure it is
 		// marked as preferred
-		if preferred {
+		if preferred && !ig.preferences.Contains(toInc) {
 			ig.preferences.Add(toInc)
+			changed = true
 		}
 
 		if (!rogue && confidence >= ig.params.BetaVirtuous) ||
 			confidence >= ig.params.BetaRogue {
 			ig.deferAcceptance(tx)
 			if ig.errs.Errored() {
-				return ig.errs.Err
+				return changed, ig.errs.Err
 			}
+			changed = true
 			continue
 		}
 
 		ig.txs[incKey] = tx
 	}
-	return ig.errs.Err
+	return changed, ig.errs.Err
 }
 
 func (ig *Input) deferAcceptance(tn txNode) {

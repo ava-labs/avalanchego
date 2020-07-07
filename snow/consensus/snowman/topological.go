@@ -161,12 +161,18 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // The complexity of this function is:
 // - Runtime = 3 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
-func (ts *Topological) RecordPoll(votes ids.Bag) error {
-	// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
-	kahnGraph, leaves := ts.calculateInDegree(votes)
+func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
+	var voteStack []votes
+	if voteBag.Len() >= ts.params.Alpha {
+		// If there is no way for an alpha majority to occur, there is no need
+		// to perform any traversals.
 
-	// Runtime = |live set| ; Space = |live set|
-	voteStack := ts.pushVotes(kahnGraph, leaves)
+		// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
+		kahnGraph, leaves := ts.calculateInDegree(voteBag)
+
+		// Runtime = |live set| ; Space = |live set|
+		voteStack = ts.pushVotes(kahnGraph, leaves)
+	}
 
 	// Runtime = |live set| ; Space = Constant
 	preferred, err := ts.vote(voteStack)
