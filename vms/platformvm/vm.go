@@ -342,6 +342,31 @@ func (vm *VM) Initialize(
 	return errors.New("TODO")
 }
 
+// Queue [tx] to be put into a block
+func (vm *VM) issueTx(tx interface{}) error {
+	switch tx := tx.(type) {
+	case TimedTx:
+		if err := tx.initialize(vm); err != nil {
+			return fmt.Errorf("error initializing tx: %s", err)
+		}
+		vm.unissuedEvents.Add(tx)
+	case DecisionTx:
+		if err := tx.initialize(vm); err != nil {
+			return fmt.Errorf("error initializing tx: %s", err)
+		}
+		vm.unissuedDecisionTxs = append(vm.unissuedDecisionTxs, tx)
+	case AtomicTx:
+		if err := tx.initialize(vm); err != nil {
+			return fmt.Errorf("error initializing tx: %s", err)
+		}
+		vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
+	default:
+		return errors.New("Could not parse given tx. Provided tx needs to be a TimedTx, DecisionTx, or AtomicTx")
+	}
+	vm.resetTimer()
+	return nil
+}
+
 // Create all chains that exist that this node validates
 // Can only be called after initSubnets()
 func (vm *VM) initBlockchains() error {

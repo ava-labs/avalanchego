@@ -361,10 +361,6 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 	return nil
 }
 
-type genericTx struct {
-	Tx interface{} `serialize:"true"`
-}
-
 /*
  ******************************************************
  ************ Add Validators to Subnets ***************
@@ -426,7 +422,8 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	}
 
 	reply.TxID = tx.ID()
-	return errors.New("TODO issue the tx")
+	service.vm.issueTx(tx)
+	return nil
 }
 
 // AddDefaultSubnetDelegatorArgs are the arguments to AddDefaultSubnetDelegator
@@ -484,7 +481,8 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 	}
 
 	reply.TxID = tx.ID()
-	return errors.New("TODO issue the tx")
+	service.vm.issueTx(tx)
+	return nil
 }
 
 // AddNonDefaultSubnetValidatorArgs are the arguments to AddNonDefaultSubnetValidator
@@ -542,7 +540,8 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	}
 
 	response.TxID = tx.ID()
-	return errors.New("TODO issue the tx and add control keys")
+	service.vm.issueTx(tx)
+	return errors.New("add control keys")
 }
 
 // CreateSubnetArgs are the arguments to CreateSubnet
@@ -594,7 +593,8 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	}
 
 	response.TxID = tx.ID()
-	return errors.New("TODO issue the tx")
+	service.vm.issueTx(tx)
+	return nil
 }
 
 // ExportAVAArgs are the arguments to ExportAVA
@@ -641,7 +641,8 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	}
 
 	response.TxID = tx.ID()
-	return errors.New("TODO issue the tx and fill in the output field")
+	service.vm.issueTx(tx)
+	return nil
 }
 
 // ImportAVAArgs are the arguments to ImportAVA
@@ -683,46 +684,9 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	)
 
 	response.TxID = tx.ID()
-	return errors.New("TODO issue the tx")
-}
-
-/* TODO remove
-// IssueTx issues the transaction [args.Tx] to the network
-func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *IssueTxResponse) error {
-	service.vm.Ctx.Log.Info("Platform: IssueTx called")
-
-	genTx := genericTx{}
-	if err := Codec.Unmarshal(args.Tx.Bytes, &genTx); err != nil {
-		return err
-	}
-
-	switch tx := genTx.Tx.(type) {
-	case TimedTx:
-		if err := tx.initialize(service.vm); err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		service.vm.unissuedEvents.Add(tx)
-		response.TxID = tx.ID()
-	case DecisionTx:
-		if err := tx.initialize(service.vm); err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		service.vm.unissuedDecisionTxs = append(service.vm.unissuedDecisionTxs, tx)
-		response.TxID = tx.ID()
-	case AtomicTx:
-		if err := tx.initialize(service.vm); err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		service.vm.unissuedAtomicTxs = append(service.vm.unissuedAtomicTxs, tx)
-		response.TxID = tx.ID()
-	default:
-		return errors.New("Could not parse given tx. Provided tx needs to be a TimedTx, DecisionTx, or AtomicTx")
-	}
-
-	service.vm.resetTimer()
+	service.vm.issueTx(tx)
 	return nil
 }
-*/
 
 /*
  ******************************************************
@@ -812,7 +776,8 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	response.TxID = tx.ID()
-	return errors.New("TODO issue the tx and fill in the control keys field")
+	service.vm.issueTx(tx)
+	return errors.New("fill in the control keys field")
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
