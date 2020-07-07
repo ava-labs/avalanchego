@@ -181,11 +181,10 @@ func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescr
 	service.vm.ctx.Log.Info("AVM: GetAssetDescription called with %s", args.AssetID)
 
 	assetID, err := service.vm.Lookup(args.AssetID)
-	var innerErr error
 	if err != nil {
-		assetID, innerErr = ids.FromString(args.AssetID)
-		if innerErr != nil {
-			return err
+		assetID, err = ids.FromString(args.AssetID)
+		if err != nil {
+			return fmt.Errorf("couldn't find asset with ID: %s", args.AssetID)
 		}
 	}
 
