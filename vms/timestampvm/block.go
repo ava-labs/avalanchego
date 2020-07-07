@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	errTimestampTooEarly = errors.New("block's timestamp is later than its parent's timestamp")
+	errTimestampTooEarly = errors.New("block's timestamp is earlier than its parent's timestamp")
 	errDatabase          = errors.New("error while retrieving data from database")
 	errTimestampTooLate  = errors.New("block's timestamp is more than 1 hour ahead of local time")
 )
