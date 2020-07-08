@@ -22,7 +22,8 @@ import (
 var (
 	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
 	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
-	errNoImportInputs             = errors.New("no import inputs")
+	errNoInputs                   = errors.New("tx has no inputs")
+	errNoImportInputs             = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
 	errUnknownAsset               = errors.New("unknown asset ID")
@@ -75,6 +76,15 @@ func (tx *ImportTx) initialize(vm *VM) error {
 	return err
 }
 
+// InputUTXOs returns an empty set
+func (tx *ImportTx) InputUTXOs() ids.Set {
+	set := ids.Set{}
+	for _, in := range tx.Ins() {
+		set.Add(in.InputID())
+	}
+	return set
+}
+
 // SyntacticVerify this transaction is well-formed
 func (tx *ImportTx) SyntacticVerify() error {
 	switch {
@@ -86,9 +96,11 @@ func (tx *ImportTx) SyntacticVerify() error {
 		return errWrongNetworkID
 	case tx.id.IsZero():
 		return errInvalidID
-	case len(tx.Inputs) == 0:
+	case len(tx.Ins()) == 0:
+		return errNoInputs
+	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
-	case len(tx.Inputs) != len(tx.Credentials):
+	case len(tx.Ins()) != len(tx.Credentials):
 		return errWrongNumberOfCredentials
 	}
 	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
@@ -194,9 +206,10 @@ func (vm *VM) newImportTx(
 	// Create the transaction
 	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
 		CommonTx: CommonTx{
-			NetworkID: vm.Ctx.NetworkID,
-			Inputs:    ins, // These pay the tx fee
-			Outputs:   outs,
+			NetworkID:    vm.Ctx.NetworkID,
+			BlockchainID: ids.Empty,
+			Inputs:       ins, // These pay the tx fee
+			Outputs:      outs,
 		},
 	}}
 
@@ -246,7 +259,7 @@ func (vm *VM) newImportTx(
 	ava.SortTransferableInputsWithSigners(importedIns, importedInsSigners)
 	tx.ImportedInputs = importedIns
 
-	outs = append(outs, &ava.TransferableOutput{
+	tx.Outputs = append(tx.Outputs, &ava.TransferableOutput{
 		Asset: ava.Asset{ID: vm.avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt:      amount, // All the value from imported UTXOs
@@ -257,9 +270,10 @@ func (vm *VM) newImportTx(
 			},
 		},
 	})
-	ava.SortTransferableOutputs(outs, vm.codec) //sort outputs
+	ava.SortTransferableOutputs(tx.Outputs, vm.codec) //sort outputs
 
 	// Generate byte repr. of unsigned transaction
+	vm.Ctx.Log.Info("tx: %+v", tx) // TODO delete
 	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedImportTx)); err != nil {
 		return nil, fmt.Errorf("couldn't marshal UnsignedImportTx: %w", err)
 	}

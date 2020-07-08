@@ -127,12 +127,16 @@ func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 	if err := vm.State.Put(db, utxoTypeID, utxo.InputID(), utxo); err != nil {
 		return err
 	}
-	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+	out, ok := utxo.Out.(*ava.TransferableOutput)
 	if !ok {
-		vm.Ctx.Log.Warn("expected output to be type *secp256k1fx.TransferOutput but is %T", out)
+		return fmt.Errorf("expected output to be type *ava.TransferableOutput but is %T", utxo.Out)
+	}
+	secpOut, ok := out.Output().(*secp256k1fx.TransferOutput)
+	if !ok {
+		return fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
 	}
 	// For each owner of this UTXO, add to list of UTXOs owned by that addr
-	for _, addrBytes := range out.OutputOwners.Addresses() {
+	for _, addrBytes := range secpOut.OutputOwners.Addresses() {
 		var addrBytesArr [20]byte
 		copy(addrBytesArr[:], addrBytes)
 		addr := ids.NewShortID(addrBytesArr)
@@ -154,11 +158,15 @@ func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
 	if err := vm.State.Put(db, utxoTypeID, ID, nil); err != nil { // remove the UTXO
 		return err
 	}
-	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+	out, ok := utxo.Out.(*ava.TransferableOutput)
 	if !ok {
-		vm.Ctx.Log.Warn("expected output to be type *secp256k1fx.TransferOutput but is %T", out)
+		return fmt.Errorf("expected output to be type *ava.TransferableOutput but is %T", utxo.Out)
 	}
-	for _, addrBytes := range out.OutputOwners.Addresses() { // Update UTXO set of each address referenced in utxo
+	secpOut, ok := out.Output().(*secp256k1fx.TransferOutput)
+	if !ok {
+		return fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+	}
+	for _, addrBytes := range secpOut.OutputOwners.Addresses() { // Update UTXO set of each address referenced in utxo
 		var addrBytesArr [20]byte
 		copy(addrBytesArr[:], addrBytes)
 		addr := ids.NewShortID(addrBytesArr)

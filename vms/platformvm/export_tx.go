@@ -51,6 +51,15 @@ func (tx *ExportTx) Outs() []*ava.TransferableOutput {
 	return outs
 }
 
+// InputUTXOs returns the IDs of the UTXOs this tx consumes
+func (tx *ExportTx) InputUTXOs() ids.Set {
+	set := ids.Set{}
+	for _, in := range tx.Ins() {
+		set.Add(in.InputID())
+	}
+	return set
+}
+
 // Creds returns this transactions credentials
 func (tx *ExportTx) Creds() []verify.Verifiable {
 	return tx.Credentials
@@ -187,9 +196,10 @@ func (vm *VM) newExportTx(
 	tx := &ExportTx{
 		UnsignedExportTx: UnsignedExportTx{
 			CommonTx: CommonTx{
-				Inputs:    ins,
-				Outputs:   outs, // Non-exported outputs
-				NetworkID: vm.Ctx.NetworkID,
+				NetworkID:    vm.Ctx.NetworkID,
+				BlockchainID: ids.Empty,
+				Inputs:       ins,
+				Outputs:      outs, // Non-exported outputs
 			},
 			ExportedOutputs: []*ava.TransferableOutput{ // Exported to X-Chain
 				&ava.TransferableOutput{
