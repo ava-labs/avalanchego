@@ -14,17 +14,21 @@ import (
 
 var (
 	errSpendOverflow = errors.New("spent amount overflows uint64")
+	errNoKeys        = errors.New("no keys provided")
+	errOverflow      = errors.New("overflow while calculating amount spent")
 )
 
-// return the inputs and outputs resulting from [keys] paying spending [toSpend]
-// TODO comment better
+// Return the inputs and outputs resulting from [keys] burning [toSpend],
+// as well as the keys used to spend each input
+// Any change is sent to the first key in [keys]
 func (vm *VM) spend(
 	db database.Database,
 	toSpend uint64,
 	keys []*crypto.PrivateKeySECP256K1R,
-) ([]*ava.TransferableInput, []*ava.TransferableOutput, [][]*crypto.PrivateKeySECP256K1R, error) {
+) (ins []*ava.TransferableInput, outs []*ava.TransferableOutput, signerKeys [][]*crypto.PrivateKeySECP256K1R, err error) {
 	if len(keys) == 0 {
-		return nil, nil, nil, fmt.Errorf("no keys provided")
+		err = errNoKeys
+		return
 	}
 	addrs := ids.ShortSet{} // The addresses controlled by [keys]
 	for _, key := range keys {
@@ -32,23 +36,22 @@ func (vm *VM) spend(
 	}
 	utxos, err := vm.getUTXOs(db, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
+		err = fmt.Errorf("couldn't get UTXOs: %w", err)
+		return
 	}
 	kc := secp256k1fx.NewKeychain() // Keychain spends UTXOs and creates outputs
 	for _, key := range keys {
 		kc.Add(key)
 	}
 	now := uint64(vm.clock.Time().Unix())
-	txSigners := [][]*crypto.PrivateKeySECP256K1R{} // Element i is set of keys to spend input i
 	amountSpent := uint64(0)
-	ins := []*ava.TransferableInput{}
 	for _, utxo := range utxos { // Calculate inputs to this tx
 		if assetID := utxo.AssetID(); !assetID.Equals(vm.avaxAssetID) {
 			vm.Ctx.Log.Warn("UTXO has unexpected asset ID %s", assetID) // should never happen
 			continue
 		}
-		inputIntf, signers, err := kc.Spend(utxo.Out, now)
-		if err != nil {
+		inputIntf, signers, err2 := kc.Spend(utxo.Out, now)
+		if err2 != nil {
 			continue
 		}
 		input, ok := inputIntf.(ava.Transferable)
@@ -58,27 +61,28 @@ func (vm *VM) spend(
 		}
 		amountSpent, err = safemath.Add64(amountSpent, input.Amount())
 		if err != nil { // Should never happen
-			return nil, nil, nil, fmt.Errorf("overflow while calculating amount spent")
+			err = errOverflow
+			return
 		}
 		ins = append(ins, &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  ava.Asset{ID: vm.avaxAssetID},
 			In:     input,
 		})
-		txSigners = append(txSigners, signers)
+		signerKeys = append(signerKeys, signers)
 		if amountSpent >= toSpend { // We have enough AVAX; stop.
 			break
 		}
 	}
 	if amountSpent < toSpend {
-		return nil, nil, nil, fmt.Errorf("provided keys don't have %d AVAX", toSpend)
+		err = fmt.Errorf("provided keys don't have %d AVAX", toSpend)
+		return
 	}
-	ava.SortTransferableInputsWithSigners(ins, txSigners) // sort inputs
+	ava.SortTransferableInputsWithSigners(ins, signerKeys) // sort inputs
 
 	// This transaction has at most one output, which, if necessary, gives change back to the 1st key
 	// You may be wondering, "what about the stake amount and transaction fee?"
 	// Those are burned. When the staker gets their staked AVAX back, it will be in the form of a new UTXO.
-	outs := make([]*ava.TransferableOutput, 0, 1)
 	if amountSpent > toSpend {
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: vm.avaxAssetID},
@@ -93,8 +97,7 @@ func (vm *VM) spend(
 		})
 	}
 	ava.SortTransferableOutputs(outs, vm.codec) //sort outputs
-
-	return ins, outs, txSigners, nil
+	return
 }
 
 // Verify that:
