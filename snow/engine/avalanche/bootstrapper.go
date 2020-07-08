@@ -224,11 +224,11 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	vtx, err := b.State.ParseVertex(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
-			b.BootstrapConfig.Context.Log.Debug("Failed to parse unrequested vertex from %s with ID %d: %w", vdr, requestID, err)
+			b.BootstrapConfig.Context.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
 			return nil
 		}
 
-		b.BootstrapConfig.Context.Log.Debug("Failed to parse requested vertex %s: %w", requestedVtxID, err)
+		b.BootstrapConfig.Context.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
 		b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
 		return b.fetch(requestedVtxID)
 	}
@@ -236,11 +236,11 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	vtxID := vtx.ID()
 	// If the vertex is neither the requested vertex nor a needed vertex, return early and re-fetch if necessary
 	if requested && !requestedVtxID.Equals(vtxID) {
-		b.BootstrapConfig.Context.Log.Debug("received incorrect vertex from request, %s with ID %d", vdr, requestID)
+		b.BootstrapConfig.Context.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
 		return b.fetch(requestedVtxID)
 	}
 	if !requested && !b.outstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
-		b.BootstrapConfig.Context.Log.Debug("received un-needed vertex from %s with ID %d", vdr, requestID)
+		b.BootstrapConfig.Context.Log.Debug("received un-needed vertex from %s with vertexID %s", vdr, vtxID)
 		return nil
 	}
 
@@ -260,13 +260,13 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
 		vtx, err := b.State.ParseVertex(vtxBytes) // Persists the vtx
 		if err != nil {
-			b.BootstrapConfig.Context.Log.Debug("Failed to parse vertex: %w", err)
+			b.BootstrapConfig.Context.Log.Debug("failed to parse vertex: %s", err)
 			b.BootstrapConfig.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
 			break
 		}
 		vtxID := vtx.ID()
 		if !eligibleVertices.Contains(vtxID) {
-			b.BootstrapConfig.Context.Log.Debug("received vertex that should not have been included in MultiPut from request, %s with ID %d", vdr, requestID)
+			b.BootstrapConfig.Context.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
 			break
 		}
 		eligibleVertices.Remove(vtxID)
