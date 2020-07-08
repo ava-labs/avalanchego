@@ -70,9 +70,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 
 	ts.head = rootID
 	ts.blocks = map[[32]byte]*snowmanBlock{
-		rootID.Key(): &snowmanBlock{
-			sm: ts,
-		},
+		rootID.Key(): {sm: ts},
 	}
 	ts.tail = rootID
 }
