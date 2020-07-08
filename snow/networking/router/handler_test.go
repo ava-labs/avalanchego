@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/snow/networking/timeout"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/ava-labs/gecko/snow/networking/timeout"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
