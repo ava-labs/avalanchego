@@ -16,7 +16,6 @@ import (
 
 var (
 	errLockedFunds = errors.New("funds currently locked")
-	errCantSpend   = errors.New("utxo couldn't be spent")
 )
 
 // Keychain is a collection of keys that can be used to spend outputs
@@ -95,7 +94,7 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 			}, keys, nil
 		}
 	}
-	return nil, nil, errCantSpend
+	return nil, nil, fmt.Errorf("can't spend UTXO because it is unexpected type %T", out)
 }
 
 // Match attempts to match a list of addresses up to the provided threshold

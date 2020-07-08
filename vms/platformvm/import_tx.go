@@ -157,7 +157,7 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 				OutputIndex: uint32(index),
 			},
 			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-			Out:   out,
+			Out:   out.Output(),
 		}); err != nil {
 			return err
 		}
@@ -273,7 +273,6 @@ func (vm *VM) newImportTx(
 	ava.SortTransferableOutputs(tx.Outputs, vm.codec) //sort outputs
 
 	// Generate byte repr. of unsigned transaction
-	vm.Ctx.Log.Info("tx: %+v", tx) // TODO delete
 	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedImportTx)); err != nil {
 		return nil, fmt.Errorf("couldn't marshal UnsignedImportTx: %w", err)
 	}

@@ -170,15 +170,12 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-		Out: &ava.TransferableOutput{
-			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:      tx.Validator.Wght, // Returned AVAX
-				Locktime: 0,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{tx.Destination}, // Spendable by destination address
-				},
+		Out: &secp256k1fx.TransferOutput{
+			Amt:      tx.Validator.Wght, // Returned AVAX
+			Locktime: 0,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{tx.Destination}, // Spendable by destination address
 			},
 		},
 	}); err != nil {

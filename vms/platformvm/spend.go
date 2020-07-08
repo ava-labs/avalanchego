@@ -52,6 +52,7 @@ func (vm *VM) spend(
 		}
 		inputIntf, signers, err2 := kc.Spend(utxo.Out, now)
 		if err2 != nil {
+			vm.Ctx.Log.Warn("coudn't spend UTXO %s: %s", utxo.InputID(), err2) // shouldn't happen
 			continue
 		}
 		input, ok := inputIntf.(ava.Transferable)
@@ -75,7 +76,7 @@ func (vm *VM) spend(
 		}
 	}
 	if amountSpent < toSpend {
-		err = fmt.Errorf("provided keys don't have %d AVAX", toSpend)
+		err = fmt.Errorf("provided keys have %d nAVAX but need %d", amountSpent, toSpend)
 		return
 	}
 	ava.SortTransferableInputsWithSigners(ins, signerKeys) // sort inputs
@@ -173,7 +174,7 @@ func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) error {
 				OutputIndex: uint32(index),
 			},
 			Asset: ava.Asset{ID: vm.avaxAssetID},
-			Out:   out,
+			Out:   out.Output(),
 		}); err != nil {
 			return err
 		}

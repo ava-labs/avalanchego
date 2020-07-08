@@ -115,10 +115,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-		Out: &ava.TransferableOutput{
-			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-			Out:   nil, // Will be modified
-		},
+		Out:   nil, // Will be modified
 	}
 	out := secp256k1fx.TransferOutput{ // Also a boilerplate, like [utxo]
 		Amt:      0, // Will be modified

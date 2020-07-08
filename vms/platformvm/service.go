@@ -125,25 +125,20 @@ type GetBalanceResponse struct {
 func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, response *GetBalanceResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetSubnets called for address %s", args.Address)
 
-	utxoSet, err := service.vm.getReferencingUTXOs(service.vm.DB, args.Address)
+	addrSet := ids.ShortSet{}
+	addrSet.Add(args.Address)
+	utxos, err := service.vm.getUTXOs(service.vm.DB, addrSet)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %s: %w", args.Address, err)
 	}
 	balance := uint64(0)
-	for _, utxoID := range utxoSet.List() {
-		utxo, err := service.vm.getUTXO(service.vm.DB, utxoID)
-		if err != nil {
-			return fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
-		}
-		out, ok := utxo.Out.(*ava.TransferableOutput)
+	for _, utxo := range utxos {
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			return fmt.Errorf("couldn't get UTXO %s from database", utxoID)
+			service.vm.Ctx.Log.Warn("expected UTXO output to be type *secp256k1fx.TransferOutput but is type %T", utxo.Out)
+			continue
 		}
-		secpOut, ok := out.Output().(*secp256k1fx.TransferOutput)
-		if !ok {
-			return fmt.Errorf("couldn't get UTXO %s from database", utxoID)
-		}
-		balance, err = math.Add64(balance, secpOut.Amount())
+		balance, err = math.Add64(balance, out.Amount())
 		if err != nil {
 			return errors.New("overflow while calculating balance")
 		}

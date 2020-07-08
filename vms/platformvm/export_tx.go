@@ -136,7 +136,7 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 				OutputIndex: uint32(index),
 			},
 			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-			Out:   out,
+			Out:   out.Output(),
 		}); err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 			OutputIndex: uint32(len(tx.CommonTx.Outputs)),
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-		Out:   tx.ExportedOutputs[0], // SyntacticVerify guarantees len(ExportedOutput) == 1
+		Out:   tx.ExportedOutputs[0].Output(), // SyntacticVerify guarantees len(ExportedOutput) == 1
 	}
 	if err := state.FundPlatformUTXO(utxo); err != nil {
 		return err
