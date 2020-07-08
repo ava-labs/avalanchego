@@ -7,14 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/snow/networking/timeout"
-	"github.com/ava-labs/gecko/utils/timer"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/timeout"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 // Handler passes incoming messages from the network to the consensus engine
@@ -83,7 +82,7 @@ func (h *Handler) Dispatch() {
 				return
 			}
 
-			if h.clock.Time().Sub(msg.received) > h.dropMessageTimeout {
+			if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
 				h.ctx.Log.Verbo("Dropping message due to likely timeout: %s", msg)
 				h.metrics.pending.Dec()
 				h.metrics.dropped.Inc()
@@ -209,7 +208,7 @@ func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32)
 		messageType: getAcceptedFrontierMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-		received:    h.clock.Time(),
+		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -221,7 +220,6 @@ func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, co
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
-		received:     h.clock.Time(),
 	})
 }
 
@@ -243,7 +241,7 @@ func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, contain
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
-		received:     h.clock.Time(),
+		deadline:     h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -255,7 +253,6 @@ func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerI
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: containerIDs,
-		received:     h.clock.Time(),
 	})
 }
 
@@ -276,7 +273,7 @@ func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, contai
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
-		received:    h.clock.Time(),
+		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -287,7 +284,6 @@ func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers
 		validatorID: validatorID,
 		requestID:   requestID,
 		containers:  containers,
-		received:    h.clock.Time(),
 	})
 }
 
@@ -307,7 +303,7 @@ func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
-		received:    h.clock.Time(),
+		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -319,7 +315,6 @@ func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids
 		requestID:   requestID,
 		containerID: containerID,
 		container:   container,
-		received:    h.clock.Time(),
 	})
 }
 
@@ -340,7 +335,7 @@ func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, blockID i
 		requestID:   requestID,
 		containerID: blockID,
 		container:   block,
-		received:    h.clock.Time(),
+		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -351,7 +346,7 @@ func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, blockID i
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: blockID,
-		received:    h.clock.Time(),
+		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -362,7 +357,6 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set
 		validatorID:  validatorID,
 		requestID:    requestID,
 		containerIDs: votes,
-		received:     h.clock.Time(),
 	})
 }
 
@@ -379,7 +373,6 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 func (h *Handler) Gossip() bool {
 	return h.sendMsg(message{
 		messageType: gossipMsg,
-		received:    h.clock.Time(),
 	})
 }
 
@@ -388,7 +381,6 @@ func (h *Handler) Notify(msg common.Message) bool {
 	return h.sendMsg(message{
 		messageType:  notifyMsg,
 		notification: msg,
-		received:     h.clock.Time(),
 	})
 }
 
