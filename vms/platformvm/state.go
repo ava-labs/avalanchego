@@ -122,7 +122,7 @@ func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
 }
 
 // putUTXO persists the given UTXO
-// TODO: This is a naive and inefficient way of doing this. Fix this.
+// TODO: Optimize this
 func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 	if err := vm.State.Put(db, utxoTypeID, utxo.InputID(), utxo); err != nil {
 		return err
@@ -145,6 +145,7 @@ func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 
 // removeUTXO removes the UTXO with the given ID
 // If the utxo doesn't exist, returns nil
+// TODO: Optimize this
 func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
 	utxo, err := vm.getUTXO(db, ID) // Get the UTXO
 	if err != nil {
