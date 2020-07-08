@@ -9,11 +9,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ava-labs/gecko/vms/components/ava"
+
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -96,6 +99,57 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	}
 
 	reply.Address = service.vm.FormatAddress(sk.PublicKey().Address())
+	return nil
+}
+
+/*
+ ******************************************************
+ *********** Get Balances / Addresses *****************
+ ******************************************************
+ */
+
+// GetBalanceArgs ...
+type GetBalanceArgs struct {
+	// Address to get the balance of
+	Address ids.ShortID `json:"address"`
+}
+
+// GetBalanceResponse ...
+type GetBalanceResponse struct {
+	// Balance, in nAVAX, of the address
+	Balance json.Uint64   `json:"balance"`
+	UTXOIDs []*ava.UTXOID `json:"utxoIDs"`
+}
+
+// GetBalance gets the balance of an address
+func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, response *GetBalanceResponse) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetSubnets called for address %s", args.Address)
+
+	utxoSet, err := service.vm.getReferencingUTXOs(service.vm.DB, args.Address)
+	if err != nil {
+		return fmt.Errorf("couldn't get UTXO set of %s: %w", args.Address, err)
+	}
+	balance := uint64(0)
+	for _, utxoID := range utxoSet.List() {
+		utxo, err := service.vm.getUTXO(service.vm.DB, utxoID)
+		if err != nil {
+			return fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+		}
+		out, ok := utxo.Out.(*ava.TransferableOutput)
+		if !ok {
+			return fmt.Errorf("couldn't get UTXO %s from database", utxoID)
+		}
+		secpOut, ok := out.Output().(*secp256k1fx.TransferOutput)
+		if !ok {
+			return fmt.Errorf("couldn't get UTXO %s from database", utxoID)
+		}
+		balance, err = math.Add64(balance, secpOut.Amount())
+		if err != nil {
+			return errors.New("overflow while calculating balance")
+		}
+		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
+	}
+	response.Balance = json.Uint64(balance)
 	return nil
 }
 
@@ -422,8 +476,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	}
 
 	reply.TxID = tx.ID()
-	service.vm.issueTx(tx)
-	return nil
+	return service.vm.issueTx(tx)
 }
 
 // AddDefaultSubnetDelegatorArgs are the arguments to AddDefaultSubnetDelegator
@@ -481,8 +534,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 	}
 
 	reply.TxID = tx.ID()
-	service.vm.issueTx(tx)
-	return nil
+	return service.vm.issueTx(tx)
 }
 
 // AddNonDefaultSubnetValidatorArgs are the arguments to AddNonDefaultSubnetValidator
@@ -540,8 +592,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	}
 
 	response.TxID = tx.ID()
-	service.vm.issueTx(tx)
-	return nil
+	return service.vm.issueTx(tx)
 }
 
 // CreateSubnetArgs are the arguments to CreateSubnet
@@ -593,8 +644,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	}
 
 	response.TxID = tx.ID()
-	service.vm.issueTx(tx)
-	return nil
+	return service.vm.issueTx(tx)
 }
 
 // ExportAVAArgs are the arguments to ExportAVA
@@ -641,8 +691,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	}
 
 	response.TxID = tx.ID()
-	service.vm.issueTx(tx)
-	return nil
+	return service.vm.issueTx(tx)
 }
 
 // ImportAVAArgs are the arguments to ImportAVA
@@ -668,11 +717,13 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	if err != nil {
 		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
 	}
+
 	user := user{db: db}
 	privKeys, err := user.getKeys()
 	if err != nil {
 		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
 	}
+
 	recipientKey, err := user.getKey(args.To)
 	if err != nil {
 		return fmt.Errorf("user does not have the key that controls address %s", args.To)
@@ -682,10 +733,11 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		privKeys,
 		recipientKey,
 	)
-
+	if err != nil {
+		return err
+	}
 	response.TxID = tx.ID()
-	service.vm.issueTx(tx)
-	return nil
+	return service.vm.issueTx(tx)
 }
 
 /*
