@@ -289,9 +289,10 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	tx := &addNonDefaultSubnetValidatorTx{
 		UnsignedAddNonDefaultSubnetValidatorTx: UnsignedAddNonDefaultSubnetValidatorTx{
 			CommonTx: CommonTx{
-				NetworkID: vm.Ctx.NetworkID,
-				Inputs:    inputs,
-				Outputs:   outputs,
+				NetworkID:    vm.Ctx.NetworkID,
+				BlockchainID: ids.Empty,
+				Inputs:       inputs,
+				Outputs:      outputs,
 			},
 			SubnetValidator: SubnetValidator{
 				DurationValidator: DurationValidator{

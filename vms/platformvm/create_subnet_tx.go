@@ -146,9 +146,10 @@ func (vm *VM) newCreateSubnetTx(
 	tx := &CreateSubnetTx{
 		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
 			CommonTx: CommonTx{
-				NetworkID: vm.Ctx.NetworkID,
-				Inputs:    inputs,
-				Outputs:   outputs,
+				NetworkID:    vm.Ctx.NetworkID,
+				BlockchainID: ids.Empty,
+				Inputs:       inputs,
+				Outputs:      outputs,
 			},
 			ControlKeys: controlKeys,
 			Threshold:   threshold,

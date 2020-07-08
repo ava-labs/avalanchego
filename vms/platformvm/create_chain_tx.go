@@ -212,9 +212,10 @@ func (vm *VM) newCreateChainTx(
 	tx := &CreateChainTx{
 		UnsignedCreateChainTx: UnsignedCreateChainTx{
 			CommonTx: CommonTx{
-				NetworkID: vm.Ctx.NetworkID,
-				Inputs:    inputs,
-				Outputs:   outputs,
+				NetworkID:    vm.Ctx.NetworkID,
+				BlockchainID: ids.Empty,
+				Inputs:       inputs,
+				Outputs:      outputs,
 			},
 			SubnetID:    subnetID,
 			GenesisData: genesisData,
