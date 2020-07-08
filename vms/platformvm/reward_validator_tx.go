@@ -19,6 +19,7 @@ import (
 
 var (
 	errShouldBeDSValidator = errors.New("expected validator to be in the default subnet")
+	errOverflowReward      = errors.New("overflow while calculating validator reward")
 )
 
 // rewardValidatorTx is a transaction that represents a proposal to remove a
@@ -31,7 +32,6 @@ var (
 // If this transaction is accepted and the next block accepted is an Abort
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX but no reward.
-// TODO: Add parent field for uniqueness?
 type rewardValidatorTx struct {
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true"`
@@ -95,23 +95,23 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 
 	heap.Pop(defaultSubnetVdrHeap) // Remove validator from the validator set
 
+	// If this tx's proposal is committed, remove the validator from the validator set
 	onCommitDB := versiondb.New(db)
-	// If this tx's proposal is committed, remove the validator from the validator set and update the
-	// account balance to reflect the return of staked AVAX and their reward.
 	if err := tx.vm.putCurrentValidators(onCommitDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
+	// If this tx's proposal is aborted, remove the validator from the validator set
 	onAbortDB := versiondb.New(db)
-	// If this tx's proposal is aborted, remove the validator from the validator set and update the
-	// account balance to reflect the return of staked AVAX
 	if err := tx.vm.putCurrentValidators(onAbortDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	utxo := ava.UTXO{ // Will be copied, modified, added to UTXO set. Cleaner than re-declaring same struct many places.
+	// [utxo] will be copied and modified below. It's a boilerplate.
+	// Cleaner than re-declaring this struct many times.
+	utxo := ava.UTXO{
 		UTXOID: ava.UTXOID{
-			TxID:        vdrTx.ID(),         // Produced UTXO points to the tx that added the validator
+			TxID:        vdrTx.ID(),         // Points to the tx that added the validator
 			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
@@ -120,7 +120,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 			Out:   nil, // Will be modified
 		},
 	}
-	out := secp256k1fx.TransferOutput{ // Will be copied, modified, added as output of [utxo]
+	out := secp256k1fx.TransferOutput{ // Also a boilerplate, like [utxo]
 		Amt:      0, // Will be modified
 		Locktime: 0,
 		OutputOwners: secp256k1fx.OutputOwners{
@@ -130,14 +130,18 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	}
 
 	switch vdrTx := vdrTx.(type) {
-	case *addDefaultSubnetValidatorTx: // We're removing a default subnet validator
+	case *addDefaultSubnetValidatorTx:
+		// We're removing a default subnet validator
+		// Calculate the reward
 		reward := reward(vdrTx.Duration(), vdrTx.Wght, InflationRate)
-		amountWithReward, err := safemath.Add64(vdrTx.Wght, reward) // overflow...should never happen
+		amountWithReward, err := safemath.Add64(vdrTx.Wght, reward) // overflow should never happen
 		if err != nil {
 			amountWithReward = math.MaxUint64
-			tx.vm.Ctx.Log.Error("overflow while calculating validator reward")
+			tx.vm.Ctx.Log.Error(errOverflowReward.Error())
+			return nil, nil, nil, nil, permError{errOverflowReward}
 		}
 
+		// If this proposal is committed, they get the reward
 		commitUTXO := utxo // Copies the struct (_not_ a reference)
 		commitOut := out   // Copies the struct (_not_ a reference)
 		commitOut.Amt = amountWithReward
@@ -146,6 +150,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 			return nil, nil, nil, nil, tempError{err}
 		}
 
+		// If this proposal is rejected, they just get back staked tokens
 		abortUTXO := utxo         // Copies the struct (_not_ a reference)
 		abortOut := out           // Copies the struct (_not_ a reference)
 		abortOut.Amt = vdrTx.Wght // No reward --> just get staked AVAX back
@@ -153,7 +158,8 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		if err := tx.vm.putUTXO(onAbortDB, &commitUTXO); err != nil {
 			return nil, nil, nil, nil, tempError{err}
 		}
-	case *addDefaultSubnetDelegatorTx: // We're removing a delegator
+	case *addDefaultSubnetDelegatorTx:
+		// We're removing a delegator
 		parentTx, err := defaultSubnetVdrHeap.getDefaultSubnetStaker(vdrTx.NodeID)
 		if err != nil {
 			return nil, nil, nil, nil, permError{err}

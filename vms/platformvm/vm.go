@@ -54,7 +54,12 @@ const (
 	// rewarded
 	NumberOfShares = 1000000
 
-	// TODO: Document this
+	// When one stakes, the the staked tokens are burned. The staking transaction has no output
+	// that sends the staked tokens to the destination address. Instead, new tokens
+	// are minted when the staker finishes staking. The UTXO that mints those tokens
+	// has to point to an existing UTXO, which is a (txID, outputIndex) pair.
+	// The txID is that of the staking transaction. The output index is [virtualOutputIndex],
+	// since there is no _actual_ output in the staking transaction to point to.
 	virtualOutputIndex = math.MaxUint32
 
 	// TODO: Turn these constants into governable parameters
