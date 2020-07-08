@@ -8,9 +8,11 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 // Note that since an AVA network has exactly one Platform Chain,
@@ -20,19 +22,17 @@ import (
 // state of the network.
 
 var (
-	errAccountHasNoValue    = errors.New("account has no value")
+	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
 	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
 )
 
 // StaticService defines the static API methods exposed by the platform VM
 type StaticService struct{}
 
-// APIAccount is an account on the Platform Chain
-// that exists at the chain's genesis.
-type APIAccount struct {
+// APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
+type APIUTXO struct {
+	Amount  json.Uint64 `json:"amount"`
 	Address ids.ShortID `json:"address"`
-	Nonce   json.Uint64 `json:"nonce"`
-	Balance json.Uint64 `json:"balance"`
 }
 
 // FormattedAPIAccount is an APIAccount but allows for a formatted Address
@@ -123,18 +123,18 @@ type APIChain struct {
 // BuildGenesisArgs are the arguments used to create
 // the genesis data of the Platform Chain.
 // [NetworkID] is the ID of the network
-// [Accounts] are the accounts on the Platform Chain
-// that exists at genesis.
+// [UTXOs] are the UTXOs on the Platform Chain that exist at genesis.
 // [Validators] are the validators of the default subnet at genesis.
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 // TODO replace Accounts with UTXOs
 type BuildGenesisArgs struct {
-	NetworkID  json.Uint32                 `json:"address"`
-	Accounts   []APIAccount                `json:"accounts"`
-	Validators []APIDefaultSubnetValidator `json:"defaultSubnetValidators"`
-	Chains     []APIChain                  `json:"chains"`
-	Time       json.Uint64                 `json:"time"`
+	AvaxAssetID ids.ID                      `json:"avaxAssetID"`
+	NetworkID   json.Uint32                 `json:"address"`
+	UTXOs       []APIUTXO                   `json:"utxos"`
+	Validators  []APIDefaultSubnetValidator `json:"defaultSubnetValidators"`
+	Chains      []APIChain                  `json:"chains"`
+	Time        json.Uint64                 `json:"time"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -166,91 +166,105 @@ func (g *Genesis) Initialize() error {
 }
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the AVA network.)
-func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	/*
-		// Specify the accounts on the Platform chain that exist at genesis.
-		accounts := []Account(nil)
-		for _, account := range args.Accounts {
-			if account.Balance == 0 {
-				return errAccountHasNoValue
-			}
-			accounts = append(accounts, newAccount(
-				account.Address,         // ID
-				0,                       // nonce
-				uint64(account.Balance), // balance
-			))
+func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+	// Specify the accounts on the Platform chain that exist at genesis.
+	utxos := make([]*ava.UTXO, 0, len(args.UTXOs))
+	for _, utxo := range args.UTXOs {
+		if utxo.Amount == 0 {
+			return errUTXOHasNoValue
 		}
-
-		// Specify the validators that are validating the default subnet at genesis.
-		validators := &EventHeap{}
-		for _, validator := range args.Validators {
-			weight := validator.weight()
-			if weight == 0 {
-				return errValidatorAddsNoValue
-			}
-			if uint64(validator.EndTime) <= uint64(args.Time) {
-				return errValidatorAddsNoValue
-			}
-
-			tx := &addDefaultSubnetValidatorTx{
-				UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
-					DurationValidator: DurationValidator{
-						Validator: Validator{
-							NodeID: validator.ID,
-							Wght:   weight,
-						},
-						Start: uint64(args.Time),
-						End:   uint64(validator.EndTime),
+		utxos = append(utxos, &ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID:        ids.Empty,
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: args.AvaxAssetID},
+			Out: &ava.TransferableOutput{
+				Asset: ava.Asset{ID: args.AvaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt:      uint64(utxo.Amount),
+					Locktime: 0,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{utxo.Address},
 					},
-					NetworkID:   uint32(args.NetworkID),
-					Nonce:       0,
-					Destination: validator.Destination,
 				},
-			}
-			if err := tx.initialize(nil); err != nil {
-				return err
-			}
+			},
+		})
+	}
 
-			validators.Add(tx)
+	// Specify the validators that are validating the default subnet at genesis.
+	validators := &EventHeap{}
+	for _, validator := range args.Validators {
+		weight := validator.weight()
+		if weight == 0 {
+			return errValidatorAddsNoValue
+		}
+		if uint64(validator.EndTime) <= uint64(args.Time) {
+			return errValidatorAddsNoValue
 		}
 
-		// Specify the chains that exist at genesis.
-		chains := []*CreateChainTx{}
-		for _, chain := range args.Chains {
-			// Ordinarily we sign a createChainTx. For genesis, there is no key.
-			// We generate the ID of this tx by hashing the bytes of the unsigned transaction
-			// TODO: Should we just sign this tx with a private key that we share publicly?
-			tx := &CreateChainTx{
-				UnsignedCreateChainTx: UnsignedCreateChainTx{
-					NetworkID:   uint32(args.NetworkID),
-					SubnetID:    chain.SubnetID,
-					Nonce:       0,
-					ChainName:   chain.Name,
-					VMID:        chain.VMID,
-					FxIDs:       chain.FxIDs,
-					GenesisData: chain.GenesisData.Bytes,
+		tx := &addDefaultSubnetValidatorTx{
+			UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
+				CommonTx: CommonTx{
+					NetworkID:    uint32(args.NetworkID),
+					BlockchainID: ids.Empty,
 				},
-				ControlSigs: [][crypto.SECP256K1RSigLen]byte{},
-				PayerSig:    [crypto.SECP256K1RSigLen]byte{},
-			}
-			if err := tx.initialize(nil); err != nil {
-				return err
-			}
-
-			chains = append(chains, tx)
+				DurationValidator: DurationValidator{
+					Validator: Validator{
+						NodeID: validator.ID,
+						Wght:   weight,
+					},
+					Start: uint64(args.Time),
+					End:   uint64(validator.EndTime),
+				},
+				Destination: validator.Destination,
+			},
+		}
+		if err := tx.initialize(nil); err != nil {
+			return err
 		}
 
-		// genesis holds the genesis state
-		genesis := Genesis{
-			Accounts:   accounts,
-			Validators: validators,
-			Chains:     chains,
-			Timestamp:  uint64(args.Time),
+		validators.Add(tx)
+	}
+
+	// Specify the chains that exist at genesis.
+	chains := []*CreateChainTx{}
+	for _, chain := range args.Chains {
+		// Ordinarily we sign a createChainTx. For genesis, there is no key.
+		// We generate the ID of this tx by hashing the bytes of the unsigned transaction
+		// TODO: Should we just sign this tx with a private key that we share publicly?
+		tx := &CreateChainTx{
+			UnsignedCreateChainTx: UnsignedCreateChainTx{
+				CommonTx: CommonTx{
+					NetworkID:    uint32(args.NetworkID),
+					BlockchainID: ids.Empty,
+				},
+				SubnetID:    chain.SubnetID,
+				ChainName:   chain.Name,
+				VMID:        chain.VMID,
+				FxIDs:       chain.FxIDs,
+				GenesisData: chain.GenesisData.Bytes,
+			},
+			ControlSigs: [][crypto.SECP256K1RSigLen]byte{},
 		}
-		// Marshal genesis to bytes
-		bytes, err := Codec.Marshal(genesis)
-		reply.Bytes.Bytes = bytes
-		return err
-	*/
-	return errors.New("TODO")
+		if err := tx.initialize(nil); err != nil {
+			return err
+		}
+
+		chains = append(chains, tx)
+	}
+
+	// genesis holds the genesis state
+	genesis := Genesis{
+		UTXOs:      utxos,
+		Validators: validators,
+		Chains:     chains,
+		Timestamp:  uint64(args.Time),
+	}
+
+	// Marshal genesis to bytes
+	bytes, err := Codec.Marshal(genesis)
+	reply.Bytes.Bytes = bytes
+	return err
 }

@@ -148,6 +148,9 @@ func init() {
 
 		Codec.RegisterType(&advanceTimeTx{}),
 		Codec.RegisterType(&rewardValidatorTx{}),
+
+		Codec.RegisterType(&ava.TransferableInput{}),
+		Codec.RegisterType(&ava.TransferableOutput{}),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

@@ -223,7 +223,7 @@ func (n *Node) Dispatch() error {
 func (n *Node) initDatabase() error {
 	n.DB = n.Config.DB
 
-	expectedGenesis, err := genesis.Genesis(n.Config.NetworkID)
+	expectedGenesis, _, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return err
 	}
@@ -292,20 +292,15 @@ func (n *Node) initBeacons() {
 
 // Create the vmManager and register the following vms:
 // AVM, Simple Payments DAG, Simple Payments Chain
-// The Platform VM is registered in initStaking because
+// The Platform VM is registered in initChains because
 // its factory needs to reference n.chainManager, which is nil right now
-func (n *Node) initVMManager() error {
-	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
-
+func (n *Node) initVMManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVA:      avaAssetID,
+			AVA:      avaxAssetID,
 			Platform: ids.Empty,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
@@ -334,7 +329,7 @@ func (n *Node) initEventDispatcher() {
 // Initializes the Platform chain.
 // Its genesis data specifies the other chains that should
 // be created.
-func (n *Node) initChains() error {
+func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	n.Log.Info("initializing chains")
 
 	vdrs := n.vdrs
@@ -349,31 +344,21 @@ func (n *Node) initChains() error {
 		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 	}
 
-	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
 	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
 	if err != nil {
 		return err
 	}
 
-	err = n.vmManager.RegisterVMFactory(
+	if err := n.vmManager.RegisterVMFactory(
 		/*vmID=*/ platformvm.ID,
 		/*vmFactory=*/ &platformvm.Factory{
 			ChainManager:   n.chainManager,
 			Validators:     vdrs,
 			StakingEnabled: n.Config.EnableStaking,
-			AVA:            avaAssetID,
+			AVA:            avaxAssetID,
 			AVM:            createAVMTx.ID(),
 		},
-	)
-	if err != nil {
-		return err
-	}
-
-	genesisBytes, err := genesis.Genesis(n.Config.NetworkID)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -565,19 +550,23 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.initKeystoreAPI() // Start the Keystore API
 	n.initMetricsAPI()  // Start the Metrics API
 
-	// initialize shared memory
-	n.initSharedMemory()
+	n.initSharedMemory() // Initialize shared memory
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
-	if err := n.initVMManager(); err != nil { // Set up the vm manager
-		return fmt.Errorf("problem initializing the VM manager: %w", err)
+	n.initEventDispatcher() // Set up the event dipatcher
+
+	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
+	if err != nil {
+		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}
 
-	n.initEventDispatcher() // Set up the event dipatcher
-	n.initChainManager()    // Set up the chain manager
+	if err := n.initVMManager(avaxAssetID); err != nil { // Set up the VM manager
+		return fmt.Errorf("problem initializing the VM manager: %w", err)
+	}
+	n.initChainManager() // Set up the chain manager
 
 	n.initAdminAPI()  // Start the Admin API
 	n.initInfoAPI()   // Start the Info API
@@ -587,7 +576,8 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initAliases(); err != nil { // Set up aliases
 		return err
 	}
-	return n.initChains() // Start the Platform chain
+
+	return n.initChains(genesisBytes, avaxAssetID) // Start the blockchains
 }
 
 // Shutdown this node
