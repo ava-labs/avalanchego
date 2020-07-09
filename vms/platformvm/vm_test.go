@@ -3,62 +3,52 @@
 
 package platformvm
 
-/*
 import (
-	"bytes"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/sender"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/ava-labs/gecko/vms/timestampvm"
-
-	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
-	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
 )
 
 var (
+	// AVAX asset ID in tests
+	avaxAssetID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
+
 	// chain timestamp at genesis
 	defaultGenesisTime = time.Now().Round(time.Second)
 
 	// time that genesis validators start validating
-	defaultValidateStartTime = defaultGenesisTime.Add(1 * time.Second)
+	defaultValidateStartTime = defaultGenesisTime
 
 	// time that genesis validators stop validating
 	defaultValidateEndTime = defaultValidateStartTime.Add(10 * MinimumStakingDuration)
 
-	// each key corresponds to an account that has $AVA and a genesis validator
+	// each key controls an address that has AVAX at genesis
 	keys []*crypto.PrivateKeySECP256K1R
 
-	// amount all genesis validators stake in defaultVM
-	defaultStakeAmount uint64
-
-	// balance of accounts that exist at genesis in defaultVM
+	// balance of addresses that exist at genesis in defaultVM
 	defaultBalance = 100 * MinimumStakeAmount
 
+	// amount all genesis validators stake in defaultVM
+	defaultStakeAmount uint64 = 100 * MinimumStakeAmount
+
 	// At genesis this account has AVA and is validating the default subnet
-	defaultKey *crypto.PrivateKeySECP256K1R
+	// defaultKey *crypto.PrivateKeySECP256K1R
 
 	// non-default Subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -74,8 +64,6 @@ var (
 
 const (
 	testNetworkID = 10 // To be used in tests
-
-	defaultNonce  = 1
 	defaultWeight = 1
 )
 
@@ -83,7 +71,6 @@ func init() {
 	ctx := defaultContext()
 	byteFormatter := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
-
 	for _, key := range []string{
 		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
@@ -96,11 +83,7 @@ func init() {
 		ctx.Log.AssertNoError(err)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 	}
-
-	defaultStakeAmount = defaultBalance - txFee
-
-	defaultKey = keys[0]
-
+	//defaultKey = keys[0]
 	testSubnet1ControlKeys = keys[0:3]
 
 }
@@ -111,29 +94,113 @@ func defaultContext() *snow.Context {
 	return ctx
 }
 
+// The UTXOs that exist at genesis in the default VM
+func defaultGenesisUTXOs() []*ava.UTXO {
+	utxos := []*ava.UTXO(nil)
+	for i, key := range keys {
+		utxos = append(utxos,
+			&ava.UTXO{
+				UTXOID: ava.UTXOID{
+					TxID:        ids.Empty,
+					OutputIndex: uint32(i),
+				},
+				Asset: ava.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt:      defaultBalance,
+					Locktime: 0,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
+					},
+				},
+			},
+		)
+	}
+	return utxos
+}
+
+/*
+// Returns the validators validating at genesis in tests
+func defaultGenesisValidators() *EventHeap {
+	vm := &VM{}
+	validators := &EventHeap{SortByStartTime: false}
+	for _, key := range keys {
+		tx := addDefaultSubnetValidatorTx{
+			UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
+
+			}
+		}
+		validator, err := vm.newAddDefaultSubnetValidatorTx(
+			defaultStakeAmount,                      // weight
+			uint64(defaultValidateStartTime.Unix()), // start time
+			uint64(defaultValidateEndTime.Unix()),   // end time
+			key.PublicKey().Address(),               // nodeID
+			key.PublicKey().Address(),               // destination
+			NumberOfShares,                          // shares
+			[]*crypto.PrivateKeySECP256K1R{key},     // key paying tx fee and stake
+		)
+		if err != nil {
+			panic(fmt.Errorf("couldn't create genesis validators: %w", err))
+		}
+		validators.Add(validator)
+	}
+	return validators
+}
+*/
+
+// Returns:
+// 1) The genesis state
+// 2) The byte representation of the default genesis for tests
+func defaultGenesis() (*BuildGenesisArgs, []byte) {
+	genesisUTXOs := make([]APIUTXO, len(keys))
+	for i, key := range keys {
+		genesisUTXOs[i] = APIUTXO{
+			Amount:  json.Uint64(defaultStakeAmount),
+			Address: key.PublicKey().Address(),
+		}
+	}
+
+	genesisValidators := make([]APIDefaultSubnetValidator, len(keys))
+	for i, key := range keys {
+		weight := json.Uint64(defaultWeight)
+		address := key.PublicKey().Address()
+		genesisValidators[i] = APIDefaultSubnetValidator{
+			APIValidator: APIValidator{
+				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				Weight:    &weight,
+				Address:   &address,
+				ID:        address,
+			},
+			Destination:       address,
+			DelegationFeeRate: NumberOfShares,
+		}
+	}
+
+	buildGenesisArgs := BuildGenesisArgs{
+		NetworkID:   json.Uint32(testNetworkID),
+		AvaxAssetID: avaxAssetID,
+		UTXOs:       genesisUTXOs,
+		Validators:  genesisValidators,
+		Chains:      nil,
+		Time:        json.Uint64(defaultGenesisTime.Unix()),
+	}
+
+	buildGenesisResponse := BuildGenesisReply{}
+	platformvmSS := StaticService{}
+	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
+		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
+	}
+	return &buildGenesisArgs, buildGenesisResponse.Bytes.Bytes
+}
+
 func defaultVM() *VM {
-	genesisAccounts := GenesisAccounts()
-	genesisValidators := GenesisCurrentValidators()
-	genesisChains := make([]*CreateChainTx, 0)
-
-	genesisState := Genesis{
-		Accounts:   genesisAccounts,
-		Validators: genesisValidators,
-		Chains:     genesisChains,
-		Timestamp:  uint64(defaultGenesisTime.Unix()),
-	}
-
-	genesisBytes, err := Codec.Marshal(genesisState)
-	if err != nil {
-		panic(err)
-	}
-
 	vm := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
 	}
 
-	defaultSubnet := validators.NewSet()
+	defaultSubnet := validators.NewSet() // TODO do we need this?
 	vm.validators = validators.NewManager()
 	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
 
@@ -143,17 +210,19 @@ func defaultVM() *VM {
 	ctx := defaultContext()
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+	_, genesisBytes := defaultGenesis()
 	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
 		panic(err)
 	}
 
-	// Create 1 non-default subnet and store it in testSubnet1
+	/* TODO re-add this?
+	// Create a non-default subnet and store it in testSubnet1
 	tx, err := vm.newCreateSubnetTx(
-		testNetworkID,
-		0,
-		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()}, // control keys are keys[0], keys[1], keys[2]
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		keys[0],
+		// control keys are keys[0], keys[1], keys[2]
+		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
+		// threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
+		2,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
 	)
 	if err != nil {
 		panic(err)
@@ -164,73 +233,9 @@ func defaultVM() *VM {
 	if err := vm.putSubnets(vm.DB, []*CreateSubnetTx{tx}); err != nil {
 		panic(err)
 	}
-	err = vm.putCurrentValidators(
-		vm.DB,
-		&EventHeap{
-			SortByStartTime: false,
-		},
-		tx.id,
-	)
-	if err != nil {
-		panic(err)
-	}
-	err = vm.putPendingValidators(
-		vm.DB,
-		&EventHeap{
-			SortByStartTime: true,
-		},
-		tx.id,
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	subnets, err := vm.getSubnets(vm.DB)
-	if err != nil {
-		panic(err)
-	}
-	if len(subnets) == 0 {
-		panic("no subnets found")
-	} // end delete
-
 	vm.registerDBTypes()
-
+	*/
 	return vm
-}
-
-// The returned accounts have nil for their vm field
-func GenesisAccounts() []Account {
-	accounts := []Account(nil)
-	for _, key := range keys {
-		accounts = append(accounts,
-			newAccount(
-				key.PublicKey().Address(), // address
-				defaultNonce,              // nonce
-				defaultBalance,            // balance
-			))
-	}
-	return accounts
-}
-
-// Returns the validators validating at genesis in tests
-func GenesisCurrentValidators() *EventHeap {
-	vm := &VM{}
-	validators := &EventHeap{SortByStartTime: false}
-	for _, key := range keys {
-		validator, _ := vm.newAddDefaultSubnetValidatorTx(
-			defaultNonce,                            // nonce
-			defaultStakeAmount,                      // weight
-			uint64(defaultValidateStartTime.Unix()), // start time
-			uint64(defaultValidateEndTime.Unix()),   // end time
-			key.PublicKey().Address(),               // nodeID
-			key.PublicKey().Address(),               // destination
-			NumberOfShares,                          // shares
-			testNetworkID,                           // network ID
-			key,                                     // key paying tx fee and stake
-		)
-		validators.Add(validator)
-	}
-	return validators
 }
 
 // Ensure genesis state is parsed from bytes and stored correctly
@@ -244,28 +249,26 @@ func TestGenesis(t *testing.T) {
 
 	// Ensure the genesis block has been accepted and stored
 	genesisBlockID := vm.LastAccepted() // lastAccepted should be ID of genesis block
-	genesisBlock, err := vm.getBlock(genesisBlockID)
-	if err != nil {
+	if genesisBlock, err := vm.getBlock(genesisBlockID); err != nil {
 		t.Fatalf("couldn't get genesis block: %v", err)
-	}
-	if genesisBlock.Status() != choices.Accepted {
+	} else if genesisBlock.Status() != choices.Accepted {
 		t.Fatal("genesis block should be accepted")
 	}
 
-	// Ensure all the genesis accounts are stored
-	for _, account := range GenesisAccounts() {
-		vmAccount, err := vm.getAccount(vm.DB, account.Address)
+	genesisState, _ := defaultGenesis()
+	// Ensure all the genesis UTXOs are there
+	for _, utxo := range genesisState.UTXOs {
+		addrSet := ids.ShortSet{}
+		addrSet.Add(utxo.Address)
+		utxos, err := vm.getUTXOs(vm.DB, addrSet)
 		if err != nil {
-			t.Fatal("couldn't find account in vm's db")
-		}
-		if !vmAccount.Address.Equals(account.Address) {
-			t.Fatal("account IDs should match")
-		}
-		if vmAccount.Balance != account.Balance {
-			t.Fatal("balances should match")
-		}
-		if vmAccount.Nonce != account.Nonce {
-			t.Fatal("nonces should match")
+			t.Fatal("couldn't find UTXO")
+		} else if len(utxos) != 1 {
+			t.Fatal("expected each address to have one UTXO")
+		} else if out, ok := utxos[0].Out.(*secp256k1fx.TransferOutput); !ok {
+			t.Fatal("expected utxo output to be type *secp256k1fx.TransferOutput")
+		} else if out.Amount() != uint64(utxo.Amount) {
+			t.Fatalf("expected UTXO to have value %d but has value %d", out.Amount(), uint64(utxo.Amount))
 		}
 	}
 
@@ -273,11 +276,9 @@ func TestGenesis(t *testing.T) {
 	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(currentValidators.Txs) != len(keys) {
+	} else if len(currentValidators.Txs) != len(genesisState.Validators) {
 		t.Fatal("vm's current validator set is wrong")
-	}
-	if currentValidators.SortByStartTime == true {
+	} else if currentValidators.SortByStartTime == true {
 		t.Fatal("vm's current validators should be sorted by end time")
 	}
 	currentSampler := validators.NewSet()
@@ -289,24 +290,21 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure pending validator set is correct (empty)
-	pendingValidators, err := vm.getPendingValidators(vm.DB, DefaultSubnetID)
-	if err != nil {
+	if pendingValidators, err := vm.getPendingValidators(vm.DB, DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	}
-	if pendingValidators.Len() != 0 {
+	} else if pendingValidators.Len() != 0 {
 		t.Fatal("vm's pending validator set should be empty")
 	}
 
 	// Ensure genesis timestamp is correct
-	time, err := vm.getTimestamp(vm.DB)
-	if err != nil {
+	if timestamp, err := vm.getTimestamp(vm.DB); err != nil {
 		t.Fatal(err)
-	}
-	if !time.Equal(defaultGenesisTime) {
-		t.Fatalf("vm's time is incorrect. Expected %s got %s", defaultGenesisTime, time)
+	} else if timestamp.Unix() != int64(genesisState.Time) {
+		t.Fatalf("vm's time is incorrect. Expected %v got %v", genesisState.Time, timestamp)
 	}
 }
 
+/*
 // accept proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	vm := defaultVM()
@@ -1337,7 +1335,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	genesisAccounts := GenesisAccounts()
-	genesisValidators := GenesisCurrentValidators()
+	genesisValidators := defaultGenesisValidators()
 	genesisChains := make([]*CreateChainTx, 0)
 
 	genesisState := Genesis{
@@ -1446,7 +1444,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	genesisAccounts := GenesisAccounts()
-	genesisValidators := GenesisCurrentValidators()
+	genesisValidators := defaultGenesisValidators()
 	genesisChains := make([]*CreateChainTx, 0)
 
 	genesisState := Genesis{
@@ -1555,7 +1553,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	genesisAccounts := GenesisAccounts()
-	genesisValidators := GenesisCurrentValidators()
+	genesisValidators := defaultGenesisValidators()
 	genesisChains := make([]*CreateChainTx, 0)
 
 	genesisState := Genesis{
@@ -1718,7 +1716,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	genesisAccounts := GenesisAccounts()
-	genesisValidators := GenesisCurrentValidators()
+	genesisValidators := defaultGenesisValidators()
 	genesisChains := make([]*CreateChainTx, 0)
 
 	genesisState := Genesis{

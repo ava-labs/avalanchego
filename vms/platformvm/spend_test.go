@@ -390,3 +390,4 @@ func TestSyntacticVerifySpend(t *testing.T) {
 		}
 	}
 }
+
