@@ -149,7 +149,7 @@ func New(
 ) (Manager, error) {
 	timeoutManager := timeout.Manager{}
 	err := timeoutManager.Initialize(
-		consensusParams.Namespace,
+		"gecko",
 		consensusParams.Metrics,
 	)
 	if err != nil {
