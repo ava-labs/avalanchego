@@ -104,7 +104,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 
 /*
  ******************************************************
- *********** Get Balances / Addresses *****************
+ *************  Balances / Addresses ******************
  ******************************************************
  */
 
@@ -145,6 +145,86 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
 	}
 	response.Balance = json.Uint64(balance)
+	return nil
+}
+
+// CreateAddress creates an address controlled by [args.Username]
+// Returns the newly created address
+func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.AddressResponse) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
+
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving data: %w", err)
+	}
+	user := user{db: db}
+	factory := crypto.FactorySECP256K1R{}
+	key, err := factory.NewPrivateKey()
+	if err != nil {
+		return fmt.Errorf("couldn't create key: %w", err)
+	} else if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
+		return fmt.Errorf("problem saving key %w", err)
+	}
+	response.Address = service.vm.FormatAddress(key.PublicKey().Address())
+	return nil
+}
+
+// ListAddresses returns the addresses controlled by [args.Username]
+func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.AddressesResponse) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
+
+	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving data: %w", err)
+	}
+	user := user{db: db}
+	addresses, err := user.getAddresses()
+	if err != nil {
+		return fmt.Errorf("couldn't get addresses: %w", err)
+	}
+	response.Addresses = make([]string, len(addresses), len(addresses))
+	for i, addr := range addresses {
+		response.Addresses[i] = service.vm.FormatAddress(addr)
+	}
+	return nil
+}
+
+// GetUTXOsArgs ...
+type GetUTXOsArgs struct {
+	Addresses []string `json:"addresses"`
+}
+
+// GetUTXOsResponse ...
+type GetUTXOsResponse struct {
+	UTXOs []formatting.CB58 `json:"utxos"`
+}
+
+// GetUTXOs returns the UTXOs controlled by the given addresses
+func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *GetUTXOsResponse) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
+
+	addrSet := ids.ShortSet{}
+	for _, addrStr := range args.Addresses {
+		addr, err := service.vm.ParseAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("can't parse %s to address: %w", addr, err)
+		}
+		addrSet.Add(addr)
+	}
+
+	utxos, err := service.vm.getUTXOs(service.vm.DB, addrSet)
+	if err != nil {
+		return fmt.Errorf("couldn't get UTXOs: %w", err)
+	}
+
+	response.UTXOs = make([]formatting.CB58, len(utxos), len(utxos))
+	for i, utxo := range utxos {
+		bytes, err := service.vm.codec.Marshal(utxo)
+		if err != nil {
+			return fmt.Errorf("couldn't serialize UTXO %s: %w", utxo.InputID(), err)
+		}
+		response.UTXOs[i] = formatting.CB58{Bytes: bytes}
+	}
 	return nil
 }
 

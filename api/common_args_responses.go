@@ -19,3 +19,13 @@ type UserPass struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+// AddressResponse contains an address
+type AddressResponse struct {
+	Address string `json:"address"`
+}
+
+// AddressesResponse contains a list of address
+type AddressesResponse struct {
+	Addresses []string `json:"addresses"`
+}
