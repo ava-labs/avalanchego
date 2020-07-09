@@ -17,6 +17,7 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	tm := AdaptiveTimeoutManager{}
 	tm.Initialize(
 		time.Millisecond,         // initialDuration
+		time.Millisecond,         // minimumDuration
 		2,                        // increaseRatio
 		time.Microsecond,         // decreaseValue
 		"gecko",                  // namespace

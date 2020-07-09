@@ -51,8 +51,9 @@ func (tq *timeoutQueue) Pop() interface{} {
 type AdaptiveTimeoutManager struct {
 	currentDurationMetric prometheus.Gauge
 
-	increaseRatio float64
-	decreaseValue time.Duration
+	minimumDuration time.Duration
+	increaseRatio   float64
+	decreaseValue   time.Duration
 
 	lock            sync.Mutex
 	currentDuration time.Duration // Amount of time before a timeout
@@ -64,6 +65,7 @@ type AdaptiveTimeoutManager struct {
 // Initialize is a constructor b/c Golang, in its wisdom, doesn't ... have them?
 func (tm *AdaptiveTimeoutManager) Initialize(
 	initialDuration time.Duration,
+	minimumDuration time.Duration,
 	increaseRatio float64,
 	decreaseValue time.Duration,
 	namespace string,
@@ -74,6 +76,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(
 		Name:      "network_timeout",
 		Help:      "Duration of current network timeouts in nanoseconds",
 	})
+	tm.minimumDuration = minimumDuration
 	tm.increaseRatio = increaseRatio
 	tm.decreaseValue = decreaseValue
 	tm.currentDuration = initialDuration
@@ -169,9 +172,9 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 			// timeout that was fullfilled, reduce future timeouts.
 			tm.currentDuration -= tm.decreaseValue
 
-			if tm.currentDuration < time.Nanosecond {
+			if tm.currentDuration < tm.minimumDuration {
 				// Make sure that we never get stuck in a bad situation
-				tm.currentDuration = time.Nanosecond
+				tm.currentDuration = tm.minimumDuration
 			}
 		}
 	}

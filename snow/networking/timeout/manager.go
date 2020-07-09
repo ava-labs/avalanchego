@@ -23,6 +23,7 @@ func (m *Manager) Initialize(
 ) error {
 	return m.tm.Initialize(
 		time.Second,
+		500*time.Millisecond,
 		2,
 		time.Millisecond,
 		namespace,
