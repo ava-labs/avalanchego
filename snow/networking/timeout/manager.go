@@ -12,6 +12,10 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
+const (
+	DefaultRequestTimeout = 4 * time.Second
+)
+
 // Manager registers and fires timeouts for the snow API.
 type Manager struct{ tm timer.TimeoutManager }
 
