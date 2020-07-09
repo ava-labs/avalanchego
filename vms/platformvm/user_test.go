@@ -16,20 +16,23 @@ import (
 func TestUserNilDB(t *testing.T) {
 	u := user{}
 
-	_, err := u.getAccountIDs()
+	_, err := u.getAddresses()
 	assert.Error(t, err, "nil db should have caused an error")
 
-	_, err = u.controlsAccount(ids.ShortEmpty)
+	_, err = u.controlsAddress(ids.ShortEmpty)
 	assert.Error(t, err, "nil db should have caused an error")
 
 	_, err = u.getKey(ids.ShortEmpty)
+	assert.Error(t, err, "nil db should have caused an error")
+
+	_, err = u.getKeys()
 	assert.Error(t, err, "nil db should have caused an error")
 
 	factory := crypto.FactorySECP256K1R{}
 	sk, err := factory.NewPrivateKey()
 	assert.NoError(t, err)
 
-	err = u.putAccount(sk.(*crypto.PrivateKeySECP256K1R))
+	err = u.putAddress(sk.(*crypto.PrivateKeySECP256K1R))
 	assert.Error(t, err, "nil db should have caused an error")
 }
 
@@ -38,36 +41,39 @@ func TestUserClosedDB(t *testing.T) {
 	err := db.Close()
 	assert.NoError(t, err)
 
-	u := user{db: db}
+	u := user{db}
 
-	_, err = u.getAccountIDs()
+	_, err = u.getAddresses()
 	assert.Error(t, err, "closed db should have caused an error")
 
-	_, err = u.controlsAccount(ids.ShortEmpty)
+	_, err = u.controlsAddress(ids.ShortEmpty)
 	assert.Error(t, err, "closed db should have caused an error")
 
 	_, err = u.getKey(ids.ShortEmpty)
+	assert.Error(t, err, "closed db should have caused an error")
+
+	_, err = u.getKeys()
 	assert.Error(t, err, "closed db should have caused an error")
 
 	factory := crypto.FactorySECP256K1R{}
 	sk, err := factory.NewPrivateKey()
 	assert.NoError(t, err)
 
-	err = u.putAccount(sk.(*crypto.PrivateKeySECP256K1R))
+	err = u.putAddress(sk.(*crypto.PrivateKeySECP256K1R))
 	assert.Error(t, err, "closed db should have caused an error")
 }
 
 func TestUserNilSK(t *testing.T) {
 	u := user{db: memdb.New()}
 
-	err := u.putAccount(nil)
+	err := u.putAddress(nil)
 	assert.Error(t, err, "nil key should have caused an error")
 }
 
 func TestUserNilAccount(t *testing.T) {
 	u := user{db: memdb.New()}
 
-	_, err := u.controlsAccount(ids.ShortID{})
+	_, err := u.controlsAddress(ids.ShortID{})
 	assert.Error(t, err, "nil accountID should have caused an error")
 
 	_, err = u.getKey(ids.ShortID{})
@@ -77,7 +83,7 @@ func TestUserNilAccount(t *testing.T) {
 func TestUser(t *testing.T) {
 	u := user{db: memdb.New()}
 
-	accountIDs, err := u.getAccountIDs()
+	accountIDs, err := u.getAddresses()
 	assert.NoError(t, err)
 	assert.Empty(t, accountIDs, "new user shouldn't have accounts")
 
@@ -85,12 +91,12 @@ func TestUser(t *testing.T) {
 	sk, err := factory.NewPrivateKey()
 	assert.NoError(t, err)
 
-	err = u.putAccount(sk.(*crypto.PrivateKeySECP256K1R))
+	err = u.putAddress(sk.(*crypto.PrivateKeySECP256K1R))
 	assert.NoError(t, err)
 
 	addr := sk.PublicKey().Address()
 
-	ok, err := u.controlsAccount(addr)
+	ok, err := u.controlsAddress(addr)
 	assert.NoError(t, err)
 	assert.True(t, ok, "added account should have been marked as controlled")
 
@@ -98,7 +104,7 @@ func TestUser(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, sk.Bytes(), savedSk.Bytes(), "wrong key returned")
 
-	accountIDs, err = u.getAccountIDs()
+	accountIDs, err = u.getAddresses()
 	assert.NoError(t, err)
 	assert.Len(t, accountIDs, 1, "account should have been added")
 
