@@ -132,8 +132,8 @@ func (vm *VM) newCreateSubnetTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee
 ) (*CreateSubnetTx, error) {
 
-	if int(threshold) != len(controlKeys) {
-		return nil, fmt.Errorf("expected %d (threshold) controlKeys but got %d", threshold, len(controlKeys))
+	if int(threshold) > len(controlKeys) {
+		return nil, fmt.Errorf("threshold (%d) > len(controlKeys) (%d)", threshold, len(controlKeys))
 	}
 
 	// Calculate inputs, outputs, and keys used to sign this tx
