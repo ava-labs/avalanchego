@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/database/prefixdb"
+	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -217,6 +218,23 @@ func (vm *VM) getUTXOs(db database.Database, addrs ids.ShortSet) ([]*ava.UTXO, e
 		utxos[i] = utxo
 	}
 	return utxos, nil
+}
+
+// getBalance returns the balance of [addrs]
+func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, error) {
+	utxos, err := vm.getUTXOs(db, addrs)
+	if err != nil {
+		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
+	}
+	balance := uint64(0)
+	for _, utxo := range utxos {
+		if out, ok := utxo.Out.(*secp256k1fx.TransferOutput); !ok {
+			return 0, fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+		} else if balance, err = safemath.Add64(out.Amount(), balance); err != nil {
+			return 0, errors.New("overflow while calculating balance")
+		}
+	}
+	return balance, nil
 }
 
 // get all the blockchains that exist
