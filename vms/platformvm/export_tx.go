@@ -28,8 +28,8 @@ var (
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
 	// Metadata, inputs and outputs
-	// The outputs in CommonTx are non-exported
-	CommonTx `serialize:"true"`
+	// The outputs in BaseTx are non-exported
+	BaseTx `serialize:"true"`
 	// Amount of nAVAX being exported to the X-Chain
 	Amount uint64 `serialize:"true"`
 	// Outputs that are exported to the X-Chain
@@ -46,7 +46,7 @@ type ExportTx struct {
 
 // Outs returns this transaction's outputs
 func (tx *ExportTx) Outs() []*ava.TransferableOutput {
-	outs := tx.CommonTx.Outs()
+	outs := tx.BaseTx.Outs()
 	outs = append(outs, tx.ExportedOutputs...)
 	return outs
 }
@@ -129,7 +129,7 @@ func (tx *ExportTx) SemanticVerify(db database.Database) error {
 	}
 	// Produce non-exported UTXOs
 	txID := tx.ID()
-	for index, out := range tx.CommonTx.Outputs {
+	for index, out := range tx.BaseTx.Outputs {
 		if err := tx.vm.putUTXO(db, &ava.UTXO{
 			UTXOID: ava.UTXOID{
 				TxID:        txID,
@@ -156,7 +156,7 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{
 			TxID:        tx.ID(),
-			OutputIndex: uint32(len(tx.CommonTx.Outputs)),
+			OutputIndex: uint32(len(tx.BaseTx.Outputs)),
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 		Out:   tx.ExportedOutputs[0].Output(), // SyntacticVerify guarantees len(ExportedOutput) == 1
@@ -195,7 +195,7 @@ func (vm *VM) newExportTx(
 	// Create the transaction
 	tx := &ExportTx{
 		UnsignedExportTx: UnsignedExportTx{
-			CommonTx: CommonTx{
+			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: ids.Empty,
 				Inputs:       ins,

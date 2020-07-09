@@ -21,7 +21,7 @@ import (
 // UnsignedAddDefaultSubnetDelegatorTx is an unsigned addDefaultSubnetDelegatorTx
 type UnsignedAddDefaultSubnetDelegatorTx struct {
 	// Metadata, inputs and outputs
-	CommonTx `serialize:"true"`
+	BaseTx `serialize:"true"`
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
 	// Where to send staked AVA after done validating
@@ -207,7 +207,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	// Create the tx
 	tx := &addDefaultSubnetDelegatorTx{
 		UnsignedAddDefaultSubnetDelegatorTx: UnsignedAddDefaultSubnetDelegatorTx{
-			CommonTx: CommonTx{
+			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: ids.Empty,
 				Inputs:       inputs,

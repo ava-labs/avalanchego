@@ -32,8 +32,8 @@ var (
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
 	// Metadata, inputs and outputs
-	// The inputs in CommonTx all consume non-imported UTXOs
-	CommonTx `serialize:"true"`
+	// The inputs in BaseTx all consume non-imported UTXOs
+	BaseTx `serialize:"true"`
 	// Inputs that consume UTXOs produced on the X-Chain
 	ImportedInputs []*ava.TransferableInput `serialize:"true"`
 }
@@ -47,7 +47,7 @@ type ImportTx struct {
 
 // Ins returns this transaction's inputs
 func (tx *ImportTx) Ins() []*ava.TransferableInput {
-	ins := tx.CommonTx.Ins()
+	ins := tx.BaseTx.Ins()
 	ins = append(ins, tx.ImportedInputs...)
 	return ins
 }
@@ -117,7 +117,7 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 	}
 
 	// Spend ordinary inputs (those not consuming UTXOs from X-Chain)
-	for index, in := range tx.CommonTx.Inputs {
+	for index, in := range tx.BaseTx.Inputs {
 		if utxo, err := tx.vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
 			return err
 		} else if err := tx.vm.fx.VerifyTransfer(tx, in.In, tx.Credentials[index], utxo.Out); err != nil {
@@ -131,7 +131,7 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
 	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
 	state := ava.NewPrefixedState(smDB, Codec)
-	numOrdinaryInputs := len(tx.CommonTx.Inputs)
+	numOrdinaryInputs := len(tx.BaseTx.Inputs)
 	for index, in := range tx.ImportedInputs {
 		cred := tx.Credentials[index+numOrdinaryInputs]
 		utxoID := in.UTXOID.InputID()
@@ -205,7 +205,7 @@ func (vm *VM) newImportTx(
 
 	// Create the transaction
 	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
-		CommonTx: CommonTx{
+		BaseTx: BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: ids.Empty,
 			Inputs:       ins, // These pay the tx fee

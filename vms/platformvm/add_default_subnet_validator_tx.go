@@ -31,7 +31,7 @@ var (
 // UnsignedAddDefaultSubnetValidatorTx is an unsigned addDefaultSubnetValidatorTx
 type UnsignedAddDefaultSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
-	CommonTx `serialize:"true"`
+	BaseTx `serialize:"true"`
 	// Describes the validator
 	DurationValidator `serialize:"true"`
 	// Address to send staked AVA (and possibly reward) to when staker is done staking
@@ -215,7 +215,7 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 	// Create the tx
 	tx := &addDefaultSubnetValidatorTx{
 		UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
-			CommonTx: CommonTx{
+			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: ids.Empty,
 				Inputs:       inputs,

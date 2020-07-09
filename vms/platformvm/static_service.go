@@ -203,7 +203,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 		tx := &addDefaultSubnetValidatorTx{
 			UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
-				CommonTx: CommonTx{
+				BaseTx: BaseTx{
 					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
 				},
@@ -233,7 +233,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		// TODO: Should we just sign this tx with a private key that we share publicly?
 		tx := &CreateChainTx{
 			UnsignedCreateChainTx: UnsignedCreateChainTx{
-				CommonTx: CommonTx{
+				BaseTx: BaseTx{
 					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
 				},

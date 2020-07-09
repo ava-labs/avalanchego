@@ -28,7 +28,7 @@ var (
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
 	// Metadata, inputs and outputs
-	CommonTx `serialize:"true"`
+	BaseTx `serialize:"true"`
 	// Each element in ControlKeys is the address of a public key
 	// In order to add a validator to this subnet, a tx must be signed
 	// with Threshold of these keys
@@ -145,7 +145,7 @@ func (vm *VM) newCreateSubnetTx(
 	// Create the tx
 	tx := &CreateSubnetTx{
 		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
-			CommonTx: CommonTx{
+			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: ids.Empty,
 				Inputs:       inputs,

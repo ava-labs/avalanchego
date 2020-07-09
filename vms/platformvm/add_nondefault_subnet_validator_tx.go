@@ -25,7 +25,7 @@ var (
 // UnsignedAddNonDefaultSubnetValidatorTx is an unsigned addNonDefaultSubnetValidatorTx
 type UnsignedAddNonDefaultSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
-	CommonTx `serialize:"true"`
+	BaseTx `serialize:"true"`
 	// IDs of control keys
 	controlIDs []ids.ShortID
 	// The validator
@@ -288,7 +288,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	// Create the tx
 	tx := &addNonDefaultSubnetValidatorTx{
 		UnsignedAddNonDefaultSubnetValidatorTx: UnsignedAddNonDefaultSubnetValidatorTx{
-			CommonTx: CommonTx{
+			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: ids.Empty,
 				Inputs:       inputs,

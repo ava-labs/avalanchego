@@ -5,12 +5,12 @@ import (
 	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
-// CommonTx contains fields common to many transaction types
+// BaseTx contains fields common to many transaction types
 // Should be embedded in transaction implementations
 // The serialized fields of this struct should be exactly the same as those of avm.BaseTx
 // Do not change this struct's serialized fields without doing the same on avm.BaseTx
 // TODO: Factor out this and avm.BaseTX
-type CommonTx struct {
+type BaseTx struct {
 	vm *VM
 	// true iff this transaction has already passed syntactic verification
 	syntacticallyVerified bool
@@ -31,20 +31,20 @@ type CommonTx struct {
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx
-func (tx CommonTx) UnsignedBytes() []byte {
+func (tx BaseTx) UnsignedBytes() []byte {
 	return tx.unsignedBytes
 }
 
 // Bytes returns the byte representation of this tx
-func (tx CommonTx) Bytes() []byte {
+func (tx BaseTx) Bytes() []byte {
 	return tx.bytes
 }
 
 // ID returns this transaction's ID
-func (tx CommonTx) ID() ids.ID { return tx.id }
+func (tx BaseTx) ID() ids.ID { return tx.id }
 
 // Ins returns this transaction's inputs
-func (tx CommonTx) Ins() []*ava.TransferableInput { return tx.Inputs }
+func (tx BaseTx) Ins() []*ava.TransferableInput { return tx.Inputs }
 
 // Outs returns this transaction's outputs
-func (tx CommonTx) Outs() []*ava.TransferableOutput { return tx.Outputs }
+func (tx BaseTx) Outs() []*ava.TransferableOutput { return tx.Outputs }

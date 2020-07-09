@@ -24,7 +24,7 @@ var (
 // UnsignedCreateChainTx is an unsigned CreateChainTx
 type UnsignedCreateChainTx struct {
 	// Metadata, inputs and outputs
-	CommonTx `serialize:"true"`
+	BaseTx `serialize:"true"`
 	// ID of the Subnet that validates this blockchain
 	SubnetID ids.ID `serialize:"true"`
 	// A human readable name for the chain; need not be unique
@@ -211,7 +211,7 @@ func (vm *VM) newCreateChainTx(
 	// Create the tx
 	tx := &CreateChainTx{
 		UnsignedCreateChainTx: UnsignedCreateChainTx{
-			CommonTx: CommonTx{
+			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: ids.Empty,
 				Inputs:       inputs,
