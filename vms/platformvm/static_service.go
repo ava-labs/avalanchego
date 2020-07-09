@@ -169,14 +169,14 @@ func (g *Genesis) Initialize() error {
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the accounts on the Platform chain that exist at genesis.
 	utxos := make([]*ava.UTXO, 0, len(args.UTXOs))
-	for _, utxo := range args.UTXOs {
+	for i, utxo := range args.UTXOs {
 		if utxo.Amount == 0 {
 			return errUTXOHasNoValue
 		}
 		utxos = append(utxos, &ava.UTXO{
 			UTXOID: ava.UTXOID{
 				TxID:        ids.Empty,
-				OutputIndex: 0,
+				OutputIndex: uint32(i),
 			},
 			Asset: ava.Asset{ID: args.AvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
