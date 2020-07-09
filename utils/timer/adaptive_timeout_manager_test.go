@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/gecko/ids"
 )
 
 func TestAdaptiveTimeoutManager(t *testing.T) {
@@ -35,7 +36,6 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 		lock.Lock()
 		defer lock.Unlock()
 
-		t.Logf("Current timeout: %s", tm.currentDuration)
 		numSuccessful--
 		if numSuccessful > 0 {
 			tm.Put(ids.NewID([32]byte{byte(numSuccessful)}), *callback)

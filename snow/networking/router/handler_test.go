@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -41,12 +40,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 
 	receiveTime := time.Now()
-	handler.clock.Set(receiveTime)
+	handler.clock.Set(receiveTime.Add(time.Second))
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1)
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, receiveTime)
 	// Set the clock to simulate message timeout
-	handler.clock.Set(receiveTime.Add(2 * timeout.DefaultRequestTimeout))
-	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, ids.Set{})
+	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, receiveTime.Add(2*time.Second), ids.Set{})
 
 	go handler.Dispatch()
 
@@ -80,7 +78,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		prometheus.NewRegistry(),
 	)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1)
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Time{})
 	go handler.Dispatch()
 
 	ticker := time.NewTicker(20 * time.Millisecond)
