@@ -137,14 +137,8 @@ func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) err
 func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *TransferOutput) error {
 	if err := verify.All(utxo, in, cred); err != nil {
 		return err
-	}
-
-	clock := fx.VM.Clock()
-	switch {
-	case utxo.Amt != in.Amt:
+	} else if utxo.Amt != in.Amt {
 		return errWrongAmounts
-	case utxo.Locktime > clock.Unix():
-		return errTimelocked
 	}
 
 	return fx.VerifyCredentials(tx, &in.Input, cred, &utxo.OutputOwners)
@@ -153,8 +147,11 @@ func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *Tran
 // VerifyCredentials ensures that the output can be spent by the input with the
 // credential. A nil return values means the output can be spent.
 func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputOwners) error {
+	clock := fx.VM.Clock()
 	numSigs := len(in.SigIndices)
 	switch {
+	case out.Locktime > clock.Unix():
+		return errTimelocked
 	case out.Threshold < uint32(numSigs):
 		return errTooManySigners
 	case out.Threshold > uint32(numSigs):
