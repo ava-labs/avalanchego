@@ -76,7 +76,7 @@ var (
 
 const (
 	testNetworkID = 10 // To be used in tests
-	defaultWeight = 1
+	defaultWeight = 10000
 )
 
 func init() {

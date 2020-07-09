@@ -3,7 +3,6 @@
 
 package platformvm
 
-/*
 import (
 	"errors"
 	"testing"
@@ -19,7 +18,7 @@ func TestValidatorBoundedBy(t *testing.T) {
 	aEndTIme := uint64(1)
 	a := &DurationValidator{
 		Validator: Validator{
-			NodeID: defaultKey.PublicKey().Address(),
+			NodeID: keys[0].PublicKey().Address(),
 			Wght:   defaultWeight,
 		},
 		Start: aStartTime,
@@ -30,7 +29,7 @@ func TestValidatorBoundedBy(t *testing.T) {
 	bEndTime := uint64(3)
 	b := &DurationValidator{
 		Validator: Validator{
-			NodeID: defaultKey.PublicKey().Address(),
+			NodeID: keys[0].PublicKey().Address(),
 			Wght:   defaultWeight,
 		},
 		Start: bStartTime,
@@ -95,4 +94,3 @@ func TestValidatorBoundedBy(t *testing.T) {
 		t.Fatal(errCalculatedSubsetWrong)
 	}
 }
-*/

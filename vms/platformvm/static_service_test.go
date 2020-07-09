@@ -3,7 +3,6 @@
 
 package platformvm
 
-/*
 import (
 	"testing"
 
@@ -11,11 +10,11 @@ import (
 	"github.com/ava-labs/gecko/utils/json"
 )
 
-func TestBuildGenesisInvalidAccountBalance(t *testing.T) {
+func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-	account := APIAccount{
+	utxo := APIUTXO{
 		Address: id,
-		Balance: 0,
+		Amount:  0,
 	}
 	weight := json.Uint64(987654321)
 	validator := APIDefaultSubnetValidator{
@@ -28,8 +27,8 @@ func TestBuildGenesisInvalidAccountBalance(t *testing.T) {
 	}
 
 	args := BuildGenesisArgs{
-		Accounts: []APIAccount{
-			account,
+		UTXOs: []APIUTXO{
+			utxo,
 		},
 		Validators: []APIDefaultSubnetValidator{
 			validator,
@@ -46,9 +45,9 @@ func TestBuildGenesisInvalidAccountBalance(t *testing.T) {
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-	account := APIAccount{
+	utxo := APIUTXO{
 		Address: id,
-		Balance: 123456789,
+		Amount:  123456789,
 	}
 	weight := json.Uint64(0)
 	validator := APIDefaultSubnetValidator{
@@ -62,8 +61,8 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 	}
 
 	args := BuildGenesisArgs{
-		Accounts: []APIAccount{
-			account,
+		UTXOs: []APIUTXO{
+			utxo,
 		},
 		Validators: []APIDefaultSubnetValidator{
 			validator,
@@ -80,9 +79,9 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-	account := APIAccount{
+	utxo := APIUTXO{
 		Address: id,
-		Balance: 123456789,
+		Amount:  123456789,
 	}
 
 	weight := json.Uint64(987654321)
@@ -97,8 +96,8 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 
 	args := BuildGenesisArgs{
-		Accounts: []APIAccount{
-			account,
+		UTXOs: []APIUTXO{
+			utxo,
 		},
 		Validators: []APIDefaultSubnetValidator{
 			validator,
@@ -115,9 +114,9 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	id := ids.NewShortID([20]byte{1})
-	account := APIAccount{
+	utxo := APIUTXO{
 		Address: id,
-		Balance: 123456789,
+		Amount:  123456789,
 	}
 
 	weight := json.Uint64(987654321)
@@ -152,8 +151,9 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	args := BuildGenesisArgs{
-		Accounts: []APIAccount{
-			account,
+		AvaxAssetID: ids.NewID([32]byte{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}),
+		UTXOs: []APIUTXO{
+			utxo,
 		},
 		Validators: []APIDefaultSubnetValidator{
 			validator1,
@@ -166,7 +166,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 
 	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
-		t.Fatalf("BuildGenesis should not have errored")
+		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
 	}
 
 	genesis := &Genesis{}
@@ -186,4 +186,3 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		currentValidator = nextValidator
 	}
 }
-*/

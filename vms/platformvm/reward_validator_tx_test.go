@@ -3,13 +3,15 @@
 
 package platformvm
 
-/*
 import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	"github.com/ava-labs/gecko/ids"
 )
 
 func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
@@ -76,68 +78,79 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 	nextToRemove = currentValidators.Peek().(*addDefaultSubnetValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := vm.newRewardValidatorTx(nextToRemove.ID())
-	if err != nil {
+	if tx, err := vm.newRewardValidatorTx(nextToRemove.ID()); err != nil {
 		t.Fatal(err)
-	}
-	_, _, _, _, err = tx.SemanticVerify(vm.DB)
-	t.Log(err)
-	if err == nil {
+	} else if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
 	// Case 2: Wrong validator
-	tx, err = vm.newRewardValidatorTx(ids.Empty)
-	if err != nil {
+	if tx, err := vm.newRewardValidatorTx(ids.Empty); err != nil {
 		t.Fatal(err)
-	}
-	_, _, _, _, err = tx.SemanticVerify(vm.DB)
-	t.Log(err)
-	if err == nil {
+	} else if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
 	// Case 3: Happy path
-	// Advance chain timestamp to time that genesis validators leave
-	if err := vm.putTimestamp(vm.DB, defaultValidateEndTime); err != nil {
+	// Advance chain timestamp to time that next validator leaves
+	if err := vm.putTimestamp(vm.DB, nextToRemove.EndTime()); err != nil {
 		t.Fatal(err)
 	}
-	tx, err = vm.newRewardValidatorTx(nextToRemove.ID())
+	tx, err := vm.newRewardValidatorTx(nextToRemove.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 	onCommitDB, onAbortDB, _, _, err := tx.SemanticVerify(vm.DB)
-	t.Log(err)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// there should be no validators of default subnet in [onCommitDB] or [onAbortDB]
 	// (as specified in defaultVM's init)
-	currentValidators, err = vm.getCurrentValidators(onCommitDB, DefaultSubnetID)
-	t.Log(currentValidators)
-	if err != nil {
+	if currentValidators, err := vm.getCurrentValidators(onCommitDB, DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	}
-	if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
+	} else if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
 		t.Fatalf("Should be %d validators but are %d", len(keys)-1, numValidators)
-	}
-
-	currentValidators, err = vm.getCurrentValidators(onAbortDB, DefaultSubnetID)
-	if err != nil {
+	} else if currentValidators, err = vm.getCurrentValidators(onAbortDB, DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	}
-	if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
+	} else if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
 		t.Fatalf("Should be %d validators but there are %d", len(keys)-1, numValidators)
 	}
 
-	// account should have gotten validator reward
-	account, err := vm.getAccount(onCommitDB, nextToRemove.Destination)
+	// check that address got validator reward
+	addrSet := ids.ShortSet{}
+	addrSet.Add(nextToRemove.Destination)
+	oldBalance := uint64(nextToRemove.Weight())
+	utxos, err := vm.getUTXOs(vm.DB, addrSet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if account.Balance <= defaultBalance-txFee {
-		t.Fatal("expected account balance to have increased due to receiving validator reward")
+	for _, utxo := range utxos {
+		oldBalance += utxo.Out.(*secp256k1fx.TransferOutput).Amount()
+	}
+
+	commitBalance := uint64(0)
+	utxos, err = vm.getUTXOs(onCommitDB, addrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, utxo := range utxos {
+		commitBalance += utxo.Out.(*secp256k1fx.TransferOutput).Amount()
+	}
+	if commitBalance <= oldBalance {
+		t.Fatal("expected address balance to have increased due to receiving validator reward")
+	}
+
+	abortBalance := uint64(0)
+	utxos, err = vm.getUTXOs(onAbortDB, addrSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, utxo := range utxos {
+		abortBalance += utxo.Out.(*secp256k1fx.TransferOutput).Amount()
+	}
+	if abortBalance != oldBalance {
+		t.Fatal("expected address balance to have remained same due to not receiving validator reward")
 	}
 }
 
@@ -161,30 +174,32 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	}
 	key2 := keyIntf2.(*crypto.PrivateKeySECP256K1R)
 
+	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
+	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
+	vdrDestination := key1.PublicKey().Address()
 	vdrTx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,     // nonce
 		defaultStakeAmount, // stakeAmt
-		uint64(defaultValidateEndTime.Add(-365*24*time.Hour).Unix())-1,
-		uint64(defaultValidateEndTime.Unix())-1,
-		key1.PublicKey().Address(), // node ID
-		key1.PublicKey().Address(), // destination
+		vdrStartTime,
+		vdrEndTime,
+		vdrDestination, // node ID
+		vdrDestination, // destination
 		NumberOfShares/4,
-		testNetworkID,
-		key1,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	delStartTime := vdrStartTime + 1
+	delEndTime := vdrEndTime - 1
+	delDestination := key2.PublicKey().Address()
 	delTx, err := vm.newAddDefaultSubnetDelegatorTx(
-		defaultNonce+1,     // nonce
 		defaultStakeAmount, // stakeAmt
-		uint64(defaultValidateEndTime.Add(-365*24*time.Hour).Unix())-1,
-		uint64(defaultValidateEndTime.Unix())-1,
-		key1.PublicKey().Address(), // node ID
-		key2.PublicKey().Address(), // destination
-		testNetworkID,
-		key2,
+		delStartTime,
+		delEndTime,
+		vdrDestination,                          // node ID
+		delDestination,                          // destination
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -196,9 +211,10 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	}
 	currentValidators.Add(vdrTx)
 	currentValidators.Add(delTx)
-	vm.putCurrentValidators(vm.DB, currentValidators, DefaultSubnetID)
-
-	if err := vm.putTimestamp(vm.DB, defaultValidateEndTime.Add(-time.Second)); err != nil {
+	if err := vm.putCurrentValidators(vm.DB, currentValidators, DefaultSubnetID); err != nil {
+		t.Fatal(err)
+		// Advance timestamp to when delegator should leave validator set
+	} else if err := vm.putTimestamp(vm.DB, time.Unix(int64(delEndTime), 0)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -206,47 +222,48 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommitDB, _, _, _, err := tx.SemanticVerify(vm.DB)
-	t.Log(err)
+	onCommitDB, onAbortDB, _, _, err := tx.SemanticVerify(vm.DB)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// account should have gotten validator reward
-	account, err := vm.getAccount(onCommitDB, vdrTx.Destination)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if expectedBalance := defaultStakeAmount / 100; account.Balance != expectedBalance {
-		t.Fatalf("expected account balance to be %d was %d", expectedBalance, account.Balance)
-	}
+	vdrDestSet := ids.ShortSet{}
+	vdrDestSet.Add(vdrDestination) // vdr destination as a set
+	delDestSet := ids.ShortSet{}
+	delDestSet.Add(delDestination)
 
-	// account should have gotten validator reward
-	account, err = vm.getAccount(onCommitDB, delTx.Destination)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if expectedBalance := (defaultStakeAmount * 103) / 100; account.Balance != expectedBalance {
-		t.Fatalf("expected account balance to be %d was %d", expectedBalance, account.Balance)
-	}
+	expectedReward := reward(
+		time.Unix(int64(delEndTime), 0).Sub(time.Unix(int64(delStartTime), 0)), // duration
+		delTx.Weight(), // amount
+		InflationRate)  // inflation rate
 
-	tx, err = vm.newRewardValidatorTx(vdrTx.ID())
-	if err != nil {
+	// If tx is committed, delegator and delegatee should get reward
+	// and the delegator's reward should be greater because the delegatee's share is 25%
+	if oldVdrBalance, err := vm.getBalance(vm.DB, vdrDestSet); err != nil {
 		t.Fatal(err)
-	}
-	onCommitDB, _, _, _, err = tx.SemanticVerify(onCommitDB)
-	t.Log(err)
-	if err != nil {
+	} else if commitVdrBalance, err := vm.getBalance(onCommitDB, vdrDestSet); err != nil {
 		t.Fatal(err)
-	}
-
-	// account should have gotten validator reward
-	account, err = vm.getAccount(onCommitDB, vdrTx.Destination)
-	if err != nil {
+	} else if vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance); err != nil || vdrReward == 0 {
+		t.Fatal("expected delgatee balance to increase because of reward")
+	} else if oldDelBalance, err := vm.getBalance(vm.DB, delDestSet); err != nil {
 		t.Fatal(err)
-	}
-	if expectedBalance := (defaultStakeAmount * 21) / 20; account.Balance != expectedBalance {
-		t.Fatalf("expected account balance to be %d was %d", expectedBalance, account.Balance)
+	} else if commitDelBalance, err := vm.getBalance(onCommitDB, delDestSet); err != nil {
+		t.Fatal(err)
+	} else if delBalanceChange, err := math.Sub64(commitDelBalance, oldDelBalance); err != nil || delBalanceChange == 0 {
+		t.Fatal("expected delgator balance to increase upon commit")
+	} else if delReward, err := math.Sub64(delBalanceChange, vdrTx.Weight()); err != nil || delReward == 0 {
+		t.Fatal("expected delegator reward to be non-zero")
+	} else if delReward < vdrReward {
+		t.Fatal("the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
+	} else if delReward+vdrReward != expectedReward {
+		t.Fatalf("expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
+	} else if abortVdrBalance, err := vm.getBalance(onAbortDB, vdrDestSet); err != nil {
+		t.Fatal(err)
+	} else if vdrReward, err = math.Sub64(abortVdrBalance, oldVdrBalance); err != nil || vdrReward != 0 {
+		t.Fatal("expected delgatee balance to stay the same upon abort")
+	} else if abortDelBalance, err := vm.getBalance(onAbortDB, delDestSet); err != nil {
+		t.Fatal(err)
+	} else if delReward, err = math.Sub64(abortDelBalance, oldDelBalance); err != nil || delReward != delTx.Weight() {
+		t.Fatal("expected delgator balance to just increase by stake amount upon abort")
 	}
 }
-*/
