@@ -412,8 +412,9 @@ func (n *Node) initAPIServer() {
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
-func (n *Node) initChainManager() {
-	n.chainManager = chains.New(
+func (n *Node) initChainManager() error {
+	var err error
+	n.chainManager, err = chains.New(
 		n.Config.EnableStaking,
 		n.Log,
 		n.LogFactory,
@@ -431,8 +432,12 @@ func (n *Node) initChainManager() {
 		&n.keystoreServer,
 		&n.sharedMemory,
 	)
+	if err != nil {
+		return err
+	}
 
 	n.chainManager.AddRegistrant(&n.APIServer)
+	return nil
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
@@ -620,8 +625,10 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
 	}
 
-	n.initEventDispatcher() // Set up the event dipatcher
-	n.initChainManager()    // Set up the chain manager
+	n.initEventDispatcher()                      // Set up the event dipatcher
+	if err := n.initChainManager(); err != nil { // Set up the chain manager
+		return fmt.Errorf("couldn't initialize chain manager: %w", err)
+	}
 
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
 		return fmt.Errorf("couldn't initialize admin API: %w", err)

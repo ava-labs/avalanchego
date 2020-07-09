@@ -146,9 +146,15 @@ func New(
 	server *api.Server,
 	keystore *keystore.Keystore,
 	sharedMemory *atomic.SharedMemory,
-) Manager {
+) (Manager, error) {
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize(timeout.DefaultRequestTimeout)
+	err := timeoutManager.Initialize(
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	)
+	if err != nil {
+		return nil, err
+	}
 	go log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
@@ -174,7 +180,7 @@ func New(
 		chains:          make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
-	return m
+	return m, nil
 }
 
 // Router that this chain manager is using to route consensus messages to chains

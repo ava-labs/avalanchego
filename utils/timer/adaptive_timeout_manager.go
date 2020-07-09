@@ -51,6 +51,9 @@ func (tq *timeoutQueue) Pop() interface{} {
 type AdaptiveTimeoutManager struct {
 	currentDurationMetric prometheus.Gauge
 
+	increaseRatio float64
+	decreaseValue time.Duration
+
 	lock            sync.Mutex
 	currentDuration time.Duration // Amount of time before a timeout
 	timeoutMap      map[[32]byte]*adaptiveTimeout
@@ -59,10 +62,24 @@ type AdaptiveTimeoutManager struct {
 }
 
 // Initialize is a constructor b/c Golang, in its wisdom, doesn't ... have them?
-func (tm *AdaptiveTimeoutManager) Initialize(initialDuration time.Duration) {
+func (tm *AdaptiveTimeoutManager) Initialize(
+	initialDuration time.Duration,
+	increaseRatio float64,
+	decreaseValue time.Duration,
+	namespace string,
+	registerer prometheus.Registerer,
+) error {
+	tm.currentDurationMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "network_timeout",
+		Help:      "Duration of current network timeouts in nanoseconds",
+	})
+	tm.increaseRatio = increaseRatio
+	tm.decreaseValue = decreaseValue
 	tm.currentDuration = initialDuration
 	tm.timeoutMap = make(map[[32]byte]*adaptiveTimeout)
 	tm.timer = NewTimer(tm.Timeout)
+	return registerer.Register(tm.currentDurationMetric)
 }
 
 // Dispatch ...
@@ -72,11 +89,11 @@ func (tm *AdaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
 func (tm *AdaptiveTimeoutManager) Stop() { tm.timer.Stop() }
 
 // Put puts hash into the hash map
-func (tm *AdaptiveTimeoutManager) Put(id ids.ID, handler func()) {
+func (tm *AdaptiveTimeoutManager) Put(id ids.ID, handler func()) time.Time {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 
-	tm.put(id, handler)
+	return tm.put(id, handler)
 }
 
 // Remove the item that no longer needs to be there.
@@ -114,7 +131,7 @@ func (tm *AdaptiveTimeoutManager) timeout() {
 	tm.registerTimeout()
 }
 
-func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler timeoutHandler) {
+func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler func()) time.Time {
 	currentTime := time.Now()
 	tm.remove(id, currentTime)
 
@@ -128,6 +145,7 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler timeoutHandler) {
 	heap.Push(&tm.timeoutQueue, timeout)
 
 	tm.registerTimeout()
+	return timeout.deadline
 }
 
 func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
@@ -136,21 +154,31 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 	if !exists {
 		return
 	}
-	if timeout.deadline.After(currentTime) {
+
+	if timeout.deadline.Before(currentTime) {
 		// This request is being removed because it timed out.
 		if timeout.duration >= tm.currentDuration {
 			// If the current timeout duration is less than or equal to the
 			// timeout that was triggered, double the duration.
-			tm.currentDuration *= 2
+			tm.currentDuration = time.Duration(float64(tm.currentDuration) * tm.increaseRatio)
 		}
 	} else {
 		// This request is being removed because it finished successfully.
 		if timeout.duration <= tm.currentDuration {
 			// If the current timeout duration is greater than or equal to the
 			// timeout that was fullfilled, reduce future timeouts.
-			tm.currentDuration -= time.Millisecond
+			tm.currentDuration -= tm.decreaseValue
+
+			if tm.currentDuration < time.Nanosecond {
+				// Make sure that we never get stuck in a bad situation
+				tm.currentDuration = time.Nanosecond
+			}
 		}
 	}
+
+	// Make sure the metrics report the current timeouts
+	tm.currentDurationMetric.Set(float64(tm.currentDuration))
+
 	// Remove the timeout from the map
 	delete(tm.timeoutMap, key)
 
@@ -160,7 +188,7 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 
 // Returns true if the head was removed, false otherwise
 func (tm *AdaptiveTimeoutManager) removeExpiredHead(currentTime time.Time) func() {
-	if tm.timeoutList.Len() == 0 {
+	if tm.timeoutQueue.Len() == 0 {
 		return nil
 	}
 

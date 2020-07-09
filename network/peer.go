@@ -558,8 +558,9 @@ func (p *peer) getAcceptedFrontier(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := msg.Get(Deadline).(time.Time)
 
-	p.net.router.GetAcceptedFrontier(p.id, chainID, requestID)
+	p.net.router.GetAcceptedFrontier(p.id, chainID, requestID, deadline)
 }
 
 // assumes the stateLock is not held
@@ -586,6 +587,7 @@ func (p *peer) getAccepted(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := msg.Get(Deadline).(time.Time)
 
 	containerIDs := ids.Set{}
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
@@ -597,7 +599,7 @@ func (p *peer) getAccepted(msg Msg) {
 		containerIDs.Add(containerID)
 	}
 
-	p.net.router.GetAccepted(p.id, chainID, requestID, containerIDs)
+	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
 }
 
 // assumes the stateLock is not held
@@ -624,20 +626,22 @@ func (p *peer) get(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := msg.Get(Deadline).(time.Time)
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	p.net.router.Get(p.id, chainID, requestID, containerID)
+	p.net.router.Get(p.id, chainID, requestID, deadline, containerID)
 }
 
 func (p *peer) getAncestors(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := msg.Get(Deadline).(time.Time)
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	p.net.router.GetAncestors(p.id, chainID, requestID, containerID)
+	p.net.router.GetAncestors(p.id, chainID, requestID, deadline, containerID)
 }
 
 // assumes the stateLock is not held
@@ -667,11 +671,12 @@ func (p *peer) pushQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := msg.Get(Deadline).(time.Time)
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 	container := msg.Get(ContainerBytes).([]byte)
 
-	p.net.router.PushQuery(p.id, chainID, requestID, containerID, container)
+	p.net.router.PushQuery(p.id, chainID, requestID, deadline, containerID, container)
 }
 
 // assumes the stateLock is not held
@@ -679,10 +684,11 @@ func (p *peer) pullQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := msg.Get(Deadline).(time.Time)
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	p.net.router.PullQuery(p.id, chainID, requestID, containerID)
+	p.net.router.PullQuery(p.id, chainID, requestID, deadline, containerID)
 }
 
 // assumes the stateLock is not held

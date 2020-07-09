@@ -31,16 +31,16 @@ type Router interface {
 // ExternalRouter routes messages from the network to the
 // Handler of the consensus engine that the message is intended for
 type ExternalRouter interface {
-	GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
+	GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time)
 	AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
-	GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
+	GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set)
 	Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
-	Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
-	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
-	Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
 	MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
-	PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
-	PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
+	Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
+	Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte)
+	PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
 }
 
