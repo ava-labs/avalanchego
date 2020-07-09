@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+	"time"
 )
 
 const (
@@ -397,6 +398,28 @@ func TestPackerString(t *testing.T) {
 	}
 
 	expected := []byte{0x00, 0x03, 0x41, 0x76, 0x61}
+	if !bytes.Equal(p.Bytes, expected) {
+		t.Fatalf("Packer.PackStr wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
+	}
+}
+
+func TestPackerTime(t *testing.T) {
+	p := Packer{MaxSize: 8}
+
+	timestamp := time.Unix(15, 30)
+	p.PackTime(timestamp)
+
+	if p.Errored() {
+		t.Fatal(p.Err)
+	}
+
+	if size := len(p.Bytes); size != 8 {
+		t.Fatalf("Packer.PackStr wrote %d byte(s) but expected %d byte(s)", size, 16)
+	}
+
+	expected := []byte{
+		0x00, 0x00, 0x00, 0x03, 0x7e, 0x11, 0xd6, 0x1e,
+	}
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackStr wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
 	}

@@ -290,14 +290,15 @@ func (p *Packer) UnpackStr() string {
 
 // PackTime packs a time to the byte array
 func (p *Packer) PackTime(t time.Time) {
-	p.PackLong(uint64(t.Unix()))
 	p.PackLong(uint64(t.UnixNano()))
 }
 
 // UnpackTime unpacks a time from the byte array
 func (p *Packer) UnpackTime() time.Time {
-	sec := int64(p.UnpackLong())
 	nsec := int64(p.UnpackLong())
+
+	sec := nsec / int64(time.Second)
+	nsec = nsec % int64(time.Second)
 	return time.Unix(sec, nsec)
 }
 
