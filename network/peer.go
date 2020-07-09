@@ -560,7 +560,7 @@ func (p *peer) getAcceptedFrontier(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	deadline := msg.Get(Deadline).(time.Time)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 
 	p.net.router.GetAcceptedFrontier(p.id, chainID, requestID, deadline)
 }
@@ -589,7 +589,7 @@ func (p *peer) getAccepted(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	deadline := msg.Get(Deadline).(time.Time)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 
 	containerIDs := ids.Set{}
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
@@ -628,7 +628,7 @@ func (p *peer) get(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	deadline := msg.Get(Deadline).(time.Time)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
@@ -639,7 +639,7 @@ func (p *peer) getAncestors(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	deadline := msg.Get(Deadline).(time.Time)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
@@ -673,7 +673,7 @@ func (p *peer) pushQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	deadline := msg.Get(Deadline).(time.Time)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 	container := msg.Get(ContainerBytes).([]byte)
@@ -686,7 +686,7 @@ func (p *peer) pullQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	deadline := msg.Get(Deadline).(time.Time)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 

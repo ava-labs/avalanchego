@@ -47,7 +47,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 	case RequestID:
 		return wrappers.TryPackInt
 	case Deadline:
-		return wrappers.TryPackTime
+		return wrappers.TryPackLong
 	case ContainerID:
 		return wrappers.TryPackHash
 	case ContainerBytes:
@@ -81,7 +81,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 	case RequestID:
 		return wrappers.TryUnpackInt
 	case Deadline:
-		return wrappers.TryUnpackTime
+		return wrappers.TryUnpackLong
 	case ContainerID:
 		return wrappers.TryUnpackHash
 	case ContainerBytes:

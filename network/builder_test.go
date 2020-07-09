@@ -6,7 +6,6 @@ package network
 import (
 	"net"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils"
@@ -100,7 +99,7 @@ func TestBuildPeerList(t *testing.T) {
 func TestBuildGetAcceptedFrontier(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
-	deadline := time.Unix(15, 20)
+	deadline := uint64(15)
 
 	msg, err := TestBuilder.GetAcceptedFrontier(chainID, requestID, deadline)
 	assert.NoError(t, err)
@@ -147,7 +146,7 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 func TestBuildGetAccepted(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
-	deadline := time.Unix(15, 20)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 	containerIDSet := ids.Set{}
 	containerIDSet.Add(containerID)
@@ -200,7 +199,7 @@ func TestBuildAccepted(t *testing.T) {
 func TestBuildGet(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
-	deadline := time.Unix(15, 20)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
 	msg, err := TestBuilder.Get(chainID, requestID, deadline, containerID)
@@ -250,7 +249,7 @@ func TestBuildPut(t *testing.T) {
 func TestBuildPushQuery(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
-	deadline := time.Unix(15, 20)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 	container := []byte{2}
 
@@ -278,7 +277,7 @@ func TestBuildPushQuery(t *testing.T) {
 func TestBuildPullQuery(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
-	deadline := time.Unix(15, 20)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
 	msg, err := TestBuilder.PullQuery(chainID, requestID, deadline, containerID)

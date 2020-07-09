@@ -4,8 +4,6 @@
 package network
 
 import (
-	"time"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils"
 )
@@ -42,7 +40,7 @@ func (m Builder) Ping() (Msg, error) { return m.Pack(Ping, nil) }
 func (m Builder) Pong() (Msg, error) { return m.Pack(Pong, nil) }
 
 // GetAcceptedFrontier message
-func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline time.Time) (Msg, error) {
+func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline uint64) (Msg, error) {
 	return m.Pack(GetAcceptedFrontier, map[Field]interface{}{
 		ChainID:   chainID.Bytes(),
 		RequestID: requestID,
@@ -64,7 +62,7 @@ func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs
 }
 
 // GetAccepted message
-func (m Builder) GetAccepted(chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set) (Msg, error) {
+func (m Builder) GetAccepted(chainID ids.ID, requestID uint32, deadline uint64, containerIDs ids.Set) (Msg, error) {
 	containerIDBytes := make([][]byte, containerIDs.Len())
 	for i, containerID := range containerIDs.List() {
 		containerIDBytes[i] = containerID.Bytes()
@@ -91,7 +89,7 @@ func (m Builder) Accepted(chainID ids.ID, requestID uint32, containerIDs ids.Set
 }
 
 // GetAncestors message
-func (m Builder) GetAncestors(chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) (Msg, error) {
+func (m Builder) GetAncestors(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
 	return m.Pack(GetAncestors, map[Field]interface{}{
 		ChainID:     chainID.Bytes(),
 		RequestID:   requestID,
@@ -110,7 +108,7 @@ func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte)
 }
 
 // Get message
-func (m Builder) Get(chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) (Msg, error) {
+func (m Builder) Get(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
 	return m.Pack(Get, map[Field]interface{}{
 		ChainID:     chainID.Bytes(),
 		RequestID:   requestID,
@@ -130,7 +128,7 @@ func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, conta
 }
 
 // PushQuery message
-func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) (Msg, error) {
+func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID, container []byte) (Msg, error) {
 	return m.Pack(PushQuery, map[Field]interface{}{
 		ChainID:        chainID.Bytes(),
 		RequestID:      requestID,
@@ -141,7 +139,7 @@ func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline time.Time,
 }
 
 // PullQuery message
-func (m Builder) PullQuery(chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) (Msg, error) {
+func (m Builder) PullQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
 	return m.Pack(PullQuery, map[Field]interface{}{
 		ChainID:     chainID.Bytes(),
 		RequestID:   requestID,

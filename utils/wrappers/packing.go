@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
-	"time"
 
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -288,20 +287,6 @@ func (p *Packer) UnpackStr() string {
 	return string(p.UnpackFixedBytes(int(strSize)))
 }
 
-// PackTime packs a time to the byte array
-func (p *Packer) PackTime(t time.Time) {
-	p.PackLong(uint64(t.UnixNano()))
-}
-
-// UnpackTime unpacks a time from the byte array
-func (p *Packer) UnpackTime() time.Time {
-	nsec := int64(p.UnpackLong())
-
-	sec := nsec / int64(time.Second)
-	nsec = nsec % int64(time.Second)
-	return time.Unix(sec, nsec)
-}
-
 // PackIP packs an ip port pair to the byte array
 func (p *Packer) PackIP(ip utils.IPDesc) {
 	p.PackFixedBytes(ip.IP.To16())
@@ -488,20 +473,6 @@ func TryPackStr(packer *Packer, valIntf interface{}) {
 // TryUnpackStr attempts to unpack the value as a string
 func TryUnpackStr(packer *Packer) interface{} {
 	return packer.UnpackStr()
-}
-
-// TryPackTime attempts to pack the value as a time
-func TryPackTime(packer *Packer, valIntf interface{}) {
-	if val, ok := valIntf.(time.Time); ok {
-		packer.PackTime(val)
-	} else {
-		packer.Add(errBadType)
-	}
-}
-
-// TryUnpackTime attempts to unpack the value as a time
-func TryUnpackTime(packer *Packer) interface{} {
-	return packer.UnpackTime()
 }
 
 // TryPackIP attempts to pack the value as an ip port pair
