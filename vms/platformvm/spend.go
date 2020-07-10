@@ -110,7 +110,7 @@ func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) err
 	outs := tx.Outs()
 	creds := tx.Creds()
 	if len(ins) != len(creds) {
-		return fmt.Errorf("there are %d inputs but %d credentials. Should be same number", len(ins), len(outs))
+		return fmt.Errorf("there are %d inputs but %d credentials. Should be same number", len(ins), len(creds))
 	}
 	for _, cred := range creds {
 		if err := cred.Verify(); err != nil {

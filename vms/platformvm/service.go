@@ -123,7 +123,7 @@ type GetBalanceResponse struct {
 
 // GetBalance gets the balance of an address
 func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, response *GetBalanceResponse) error {
-	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetSubnets called for address %s", args.Address)
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
 
 	addrSet := ids.ShortSet{}
 	addrSet.Add(args.Address)

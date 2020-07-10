@@ -48,6 +48,8 @@ type ExportTx struct {
 func (tx *ExportTx) Outs() []*ava.TransferableOutput {
 	outs := tx.BaseTx.Outs()
 	outs = append(outs, tx.ExportedOutputs...)
+	// Sort since syntactic verify assumes Outs() is sorted
+	ava.SortTransferableOutputs(outs, tx.vm.codec)
 	return outs
 }
 
@@ -100,12 +102,7 @@ func (tx *ExportTx) SyntacticVerify() error {
 	}
 	if exportedAmt := tx.ExportedOutputs[0].Output().Amount(); exportedAmt != tx.Amount {
 		return fmt.Errorf("exported output has amount %d but should be %d", exportedAmt, tx.Amount)
-	}
-	toSpend, err := safemath.Add64(tx.Amount, tx.vm.txFee)
-	if err != nil {
-		return errOverflowExport
-	}
-	if err := syntacticVerifySpend(tx, toSpend, tx.vm.avaxAssetID); err != nil {
+	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	tx.syntacticallyVerified = true
@@ -179,15 +176,17 @@ func (vm *VM) newExportTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*ExportTx, error) {
 
+	// burn [amount] + [txFee] tokens
+	// ([amount] of the tokens are moved to the X-Chain, so they're not _really_ burnt)
 	var err error
-	amount, err = safemath.Add64(amount, vm.txFee)
+	amountWithFee, err := safemath.Add64(amount, vm.txFee)
 	if err != nil {
 		return nil, errOverflowExport
 	}
 
 	// Calculate inputs, outputs, and keys used to sign this tx
 	// Burn the tx fee and the amount being sent to the X-Chain
-	ins, outs, credKeys, err := vm.spend(vm.DB, amount, keys)
+	ins, outs, credKeys, err := vm.spend(vm.DB, amountWithFee, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -201,6 +200,7 @@ func (vm *VM) newExportTx(
 				Inputs:       ins,
 				Outputs:      outs, // Non-exported outputs
 			},
+			Amount: amount, // amount of tokens being exported
 			ExportedOutputs: []*ava.TransferableOutput{ // Exported to X-Chain
 				&ava.TransferableOutput{
 					Asset: ava.Asset{ID: vm.avaxAssetID},

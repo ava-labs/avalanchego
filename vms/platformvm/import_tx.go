@@ -49,6 +49,8 @@ type ImportTx struct {
 func (tx *ImportTx) Ins() []*ava.TransferableInput {
 	ins := tx.BaseTx.Ins()
 	ins = append(ins, tx.ImportedInputs...)
+	// Sort since syntactic verify expects sorted inputs
+	ava.SortTransferableInputs(ins)
 	return ins
 }
 
