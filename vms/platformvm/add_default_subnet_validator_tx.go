@@ -166,8 +166,8 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	onAbortDB := versiondb.New(db)
 	if err := tx.vm.putUTXO(onAbortDB, &ava.UTXO{
 		UTXOID: ava.UTXOID{
-			TxID:        tx.ID(),            // Produced UTXO points to this transaction
-			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
+			TxID:        tx.ID(), // Produced UTXO points to this transaction
+			OutputIndex: uint32(len(tx.Outs())),
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{

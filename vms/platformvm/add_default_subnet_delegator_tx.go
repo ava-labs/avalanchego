@@ -118,10 +118,11 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	// Ensure that the period this validator validates the specified subnet is a subnet of the time they validate the default subnet
 	// First, see if they're currently validating the default subnet
 	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	var dsValidator *addDefaultSubnetValidatorTx // default subnet validator
 	if err != nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
 	}
-	if dsValidator, err := currentValidatorHeap.getDefaultSubnetStaker(tx.NodeID); err == nil {
+	if dsValidator, err = currentValidatorHeap.getDefaultSubnetStaker(tx.NodeID); err == nil {
 		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
@@ -132,7 +133,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		if err != nil {
 			return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
 		}
-		dsValidator, err := pendingDSValidators.getDefaultSubnetStaker(tx.NodeID)
+		dsValidator, err = pendingDSValidators.getDefaultSubnetStaker(tx.NodeID)
 		if err != nil {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
@@ -157,8 +158,8 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	onAbortDB := versiondb.New(db)
 	if err := tx.vm.putUTXO(onAbortDB, &ava.UTXO{
 		UTXOID: ava.UTXOID{
-			TxID:        tx.ID(),            // Produced UTXO points to this transaction
-			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
+			TxID:        dsValidator.ID(), // Produced UTXO points to the default subnet validator tx
+			OutputIndex: uint32(len(dsValidator.Outs())),
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{

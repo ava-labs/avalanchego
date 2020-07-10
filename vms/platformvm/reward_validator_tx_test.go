@@ -264,6 +264,6 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	} else if abortDelBalance, err := vm.getBalance(onAbortDB, delDestSet); err != nil {
 		t.Fatal(err)
 	} else if delReward, err = math.Sub64(abortDelBalance, oldDelBalance); err != nil || delReward != delTx.Weight() {
-		t.Fatal("expected delgator balance to just increase by stake amount upon abort")
+		t.Fatal("expected delgator balance to increase by stake amount upon abort")
 	}
 }

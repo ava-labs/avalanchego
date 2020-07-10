@@ -111,8 +111,8 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	// Cleaner than re-declaring this struct many times.
 	utxo := ava.UTXO{
 		UTXOID: ava.UTXOID{
-			TxID:        vdrTx.ID(),         // Points to the tx that added the validator
-			OutputIndex: virtualOutputIndex, // See [virtualOutputIndex comment]
+			TxID:        vdrTx.ID(), // Points to the tx that added the validator
+			OutputIndex: 0,          // Will be modified
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 		Out:   nil, // Will be modified
@@ -140,7 +140,9 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 
 		// If this proposal is committed, they get the reward
 		commitUTXO := utxo // Copies the struct (_not_ a reference)
-		commitOut := out   // Copies the struct (_not_ a reference)
+		commitUTXO.OutputIndex = uint32(len(vdrTx.Outs()))
+		commitOut := out // Copies the struct (_not_ a reference)
+		commitOut.Addrs = []ids.ShortID{vdrTx.Destination}
 		commitOut.Amt = amountWithReward
 		commitUTXO.Out = &commitOut
 		if err := tx.vm.putUTXO(onCommitDB, &commitUTXO); err != nil {
@@ -148,11 +150,13 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		}
 
 		// If this proposal is rejected, they just get back staked tokens
-		abortUTXO := utxo         // Copies the struct (_not_ a reference)
-		abortOut := out           // Copies the struct (_not_ a reference)
+		abortUTXO := utxo // Copies the struct (_not_ a reference)
+		abortUTXO.OutputIndex = uint32(len(vdrTx.Outs()))
+		abortOut := out // Copies the struct (_not_ a reference)
+		abortOut.Addrs = []ids.ShortID{vdrTx.Destination}
 		abortOut.Amt = vdrTx.Wght // No reward --> just get staked AVAX back
 		abortUTXO.Out = &abortOut
-		if err := tx.vm.putUTXO(onAbortDB, &commitUTXO); err != nil {
+		if err := tx.vm.putUTXO(onAbortDB, &abortUTXO); err != nil {
 			return nil, nil, nil, nil, tempError{err}
 		}
 	case *addDefaultSubnetDelegatorTx:
@@ -164,8 +168,8 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 
 		// If reward given, it will be this amount
 		reward := reward(vdrTx.Duration(), vdrTx.Wght, InflationRate)
-
 		// Calculate split of reward between delegator/delegatee
+		// The delegator gives stake to the validatee
 		delegatorShares := NumberOfShares - uint64(parentTx.Shares)    // parentTx.Shares <= NumberOfShares so no underflow
 		delegatorReward := delegatorShares * (reward / NumberOfShares) // delegatorShares <= NumberOfShares so no overflow
 		// Delay rounding as long as possible for small numbers
@@ -175,16 +179,27 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		delegateeReward := reward - delegatorReward // delegatorReward <= reward so no underflow
 
 		// Record the amount the delegator/delegatee receive if a reward is given
+		delegatorAmtWithReward, err := safemath.Add64(vdrTx.Wght, delegatorReward) // overflow should never happen
+		if err != nil {
+			delegatorAmtWithReward = math.MaxUint64
+			tx.vm.Ctx.Log.Error(errOverflowReward.Error())
+			return nil, nil, nil, nil, permError{errOverflowReward}
+		}
 		delegatorCommitUTXO := utxo // Copies the struct (_not_ a reference)
-		delegatorCommitOut := out   // Copies the struct (_not_ a reference)
-		delegatorCommitOut.Amt = delegatorReward
+		delegatorCommitUTXO.OutputIndex = uint32(len(vdrTx.Outs()))
+		delegatorCommitOut := out // Copies the struct (_not_ a reference)
+		delegatorCommitOut.Addrs = []ids.ShortID{vdrTx.Destination}
+		delegatorCommitOut.Amt = delegatorAmtWithReward // Delegator gets back their stake plus reward
 		delegatorCommitUTXO.Out = &delegatorCommitOut
 		if err := tx.vm.putUTXO(onCommitDB, &delegatorCommitUTXO); err != nil {
 			return nil, nil, nil, nil, tempError{err}
 		}
+
 		delegateeCommitUTXO := utxo // Copies the struct (_not_ a reference)
-		delegateeCommitOut := out   // Copies the struct (_not_ a reference)
-		delegateeCommitOut.Amt = delegateeReward
+		delegateeCommitUTXO.OutputIndex = delegatorCommitUTXO.OutputIndex + 1
+		delegateeCommitOut := out // Copies the struct (_not_ a reference)
+		delegateeCommitOut.Addrs = []ids.ShortID{parentTx.Destination}
+		delegateeCommitOut.Amt = delegateeReward // Delegatee gets their reward share
 		delegateeCommitUTXO.Out = &delegateeCommitOut
 		if err := tx.vm.putUTXO(onCommitDB, &delegateeCommitUTXO); err != nil {
 			return nil, nil, nil, nil, tempError{err}
@@ -192,7 +207,9 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 
 		// If no reward is given, just give delegatee their AVAX back
 		abortUTXO := utxo // Copies the struct (_not_ a reference)
+		abortUTXO.OutputIndex = uint32(len(vdrTx.Outs()))
 		abortOut := out
+		abortOut.Addrs = []ids.ShortID{vdrTx.Destination}
 		abortOut.Amt = vdrTx.Wght // No reward --> just get staked AVAX back
 		abortUTXO.Out = &abortOut
 		if err := tx.vm.putUTXO(onAbortDB, &abortUTXO); err != nil {
