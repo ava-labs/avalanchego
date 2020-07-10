@@ -271,7 +271,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 		if subnetControlKeys.Contains(key.PublicKey().Address()) {
 			usableKeys = append(usableKeys, key) // This key is useful
 		}
-		if len(usableKeys) > int(subnetInfo.Threshold) {
+		if len(usableKeys) == int(subnetInfo.Threshold) {
 			break
 		}
 	}
