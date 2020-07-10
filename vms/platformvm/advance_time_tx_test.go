@@ -3,20 +3,21 @@
 
 package platformvm
 
-/*
 import (
 	"testing"
 	"time"
+
+	"github.com/ava-labs/gecko/utils/crypto"
 )
 
 func TestAdvanceTimeTxSyntacticVerify(t *testing.T) {
-	// Case 1: Tx is nil
+	// Case: Tx is nil
 	var tx *advanceTimeTx
 	if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have failed verification because tx is nil")
 	}
 
-	// Case 2: Timestamp is ahead of synchrony bound
+	// Case: Timestamp is ahead of synchrony bound
 	vm := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -66,22 +67,20 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm := defaultVM()
 	vm.Ctx.Lock.Lock()
 
-	// Case 1: Timestamp is after next validator start time
+	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(MinimumStakingDuration)
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
 	addPendingValidatorTx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
 		defaultStakeAmount,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
 		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +109,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm.Shutdown()
 	vm.Ctx.Lock.Unlock()
 
-	// Case 2: Timestamp is after next validator end time
+	// Case: Timestamp is after next validator end time
 	vm = defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -126,7 +125,6 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		Time: uint64(defaultValidateEndTime.Add(1 * time.Second).Unix()),
 		vm:   vm,
 	}
-
 	_, _, _, _, err = tx.SemanticVerify(vm.DB)
 	t.Log(err)
 	if err == nil {
@@ -143,36 +141,33 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	// Case 1: Timestamp is after next validator start time
+	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(MinimumStakingDuration)
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
 	addPendingValidatorTx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
 		defaultStakeAmount,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
 		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.putPendingValidators(
+	if err := vm.putPendingValidators(
 		vm.DB,
 		&EventHeap{
 			SortByStartTime: true,
 			Txs:             []TimedTx{addPendingValidatorTx},
 		},
 		DefaultSubnetID,
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -185,35 +180,27 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, DefaultSubnetID)
-	if err != nil {
+	if onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	}
-	if onCommitCurrentEvents.Len() != len(keys)+1 { // Each key in [keys] is a validator to start with...then we added a validator
+	} else if onCommitCurrentEvents.Len() != len(keys)+1 { // Each key in [keys] is a validator to start with...then we added a validator
 		t.Fatalf("Should have added the validator to the validator set")
 	}
 
-	onCommitPendingEvents, err := vm.getPendingValidators(onCommit, DefaultSubnetID)
-	if err != nil {
+	if onCommitPendingEvents, err := vm.getPendingValidators(onCommit, DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	}
-	if onCommitPendingEvents.Len() != 0 {
+	} else if onCommitPendingEvents.Len() != 0 {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
-	onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, DefaultSubnetID)
-	if err != nil {
+	if onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	}
-	if onAbortCurrentEvents.Len() != len(keys) {
+	} else if onAbortCurrentEvents.Len() != len(keys) {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	onAbortPendingEvents, err := vm.getPendingValidators(onAbort, DefaultSubnetID)
-	if err != nil {
+	if onAbortPendingEvents, err := vm.getPendingValidators(onAbort, DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	}
-	if onAbortPendingEvents.Len() != 1 {
+	} else if onAbortPendingEvents.Len() != 1 {
 		t.Fatalf("Shouldn't have removed the validator from the pending validator set")
 	}
 }
@@ -264,13 +251,9 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	}
 
 	var unmarshaledTx advanceTimeTx
-	err = Codec.Unmarshal(bytes, &unmarshaledTx)
-	if err != nil {
+	if err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
-	}
-
-	if tx.Time != unmarshaledTx.Time {
+	} else if tx.Time != unmarshaledTx.Time {
 		t.Fatal("should have same timestamp")
 	}
 }
-*/

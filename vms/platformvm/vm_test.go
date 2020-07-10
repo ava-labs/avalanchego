@@ -95,9 +95,7 @@ func init() {
 		ctx.Log.AssertNoError(err)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 	}
-	//defaultKey = keys[0]
 	testSubnet1ControlKeys = keys[0:3]
-
 }
 
 func defaultContext() *snow.Context {
@@ -130,35 +128,6 @@ func defaultGenesisUTXOs() []*ava.UTXO {
 	}
 	return utxos
 }
-
-/*
-// Returns the validators validating at genesis in tests
-func defaultGenesisValidators() *EventHeap {
-	vm := &VM{}
-	validators := &EventHeap{SortByStartTime: false}
-	for _, key := range keys {
-		tx := addDefaultSubnetValidatorTx{
-			UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
-
-			}
-		}
-		validator, err := vm.newAddDefaultSubnetValidatorTx(
-			defaultStakeAmount,                      // weight
-			uint64(defaultValidateStartTime.Unix()), // start time
-			uint64(defaultValidateEndTime.Unix()),   // end time
-			key.PublicKey().Address(),               // nodeID
-			key.PublicKey().Address(),               // destination
-			NumberOfShares,                          // shares
-			[]*crypto.PrivateKeySECP256K1R{key},     // key paying tx fee and stake
-		)
-		if err != nil {
-			panic(fmt.Errorf("couldn't create genesis validators: %w", err))
-		}
-		validators.Add(validator)
-	}
-	return validators
-}
-*/
 
 // Returns:
 // 1) The genesis state
