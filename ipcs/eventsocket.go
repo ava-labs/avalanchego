@@ -14,6 +14,11 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
+type chainEventDipatcher struct {
+	chainID ids.ID
+	events  *triggers.EventDispatcher
+}
+
 // eventSockets is a set of named eventSockets
 type eventSockets struct {
 	consensusSocket *eventSocket
@@ -21,13 +26,13 @@ type eventSockets struct {
 }
 
 // newEventSockets creates a *ChainIPCs with both consensus and decisions IPCs
-func newEventSockets(log logging.Logger, networkID uint32, chainID ids.ID, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher) (*eventSockets, error) {
-	consensusIPC, err := newEventIPCSocket(log, networkID, chainID, ipcConsensusIdentifier, consensusEvents)
+func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher) (*eventSockets, error) {
+	consensusIPC, err := newEventIPCSocket(ctx, chainID, ipcConsensusIdentifier, consensusEvents)
 	if err != nil {
 		return nil, err
 	}
 
-	decisionsIPC, err := newEventIPCSocket(log, networkID, chainID, ipcDecisionsIdentifier, decisionEvents)
+	decisionsIPC, err := newEventIPCSocket(ctx, chainID, ipcDecisionsIdentifier, decisionEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +95,7 @@ type eventSocket struct {
 
 // newEventIPCSocket creates a *eventSocket for the given chain and
 // EventDispatcher that writes to a local IPC socket
-func newEventIPCSocket(log logging.Logger, networkID uint32, chainID ids.ID, name string, events *triggers.EventDispatcher) (*eventSocket, error) {
+func newEventIPCSocket(ctx context, chainID ids.ID, name string, events *triggers.EventDispatcher) (*eventSocket, error) {
 	sock, err := pub.NewSocket()
 	if err != nil {
 		return nil, err
@@ -99,9 +104,9 @@ func newEventIPCSocket(log logging.Logger, networkID uint32, chainID ids.ID, nam
 	ipcName := ipcIdentifierPrefix + "-" + name
 
 	eis := &eventSocket{
-		log:    log,
+		log:    ctx.log,
 		socket: sock,
-		url:    ipcURL(defaultBaseURL, networkID, chainID, name),
+		url:    ipcURL(ctx, chainID, name),
 		unregisterFn: func() error {
 			return events.DeregisterChain(chainID, ipcName)
 		},

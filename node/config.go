@@ -72,6 +72,7 @@ type Config struct {
 
 	// IPC configuration
 	IPCAPIEnabled      bool
+	IPCPath            string
 	IPCDefaultChainIDs []string
 
 	// Router that is used to handle incoming consensus messages

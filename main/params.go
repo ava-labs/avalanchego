@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/snow/networking/router"
@@ -240,6 +241,7 @@ func init() {
 
 	// IPC
 	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
+	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	ferr := fs.Parse(os.Args[1:])
 

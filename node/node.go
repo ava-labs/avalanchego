@@ -346,7 +346,7 @@ func (n *Node) initIPCs() error {
 	}
 
 	var err error
-	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
+	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
 	return err
 }
 

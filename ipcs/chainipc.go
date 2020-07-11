@@ -13,17 +13,22 @@ import (
 )
 
 const (
-	defaultBaseURL = "/tmp"
+	DefaultBaseURL = "/tmp"
 
 	ipcIdentifierPrefix    = "ipc"
 	ipcConsensusIdentifier = "consensus"
 	ipcDecisionsIdentifier = "decisions"
 )
 
+type context struct {
+	log       logging.Logger
+	networkID uint32
+	path      string
+}
+
 // ChainIPCs maintains IPCs for a set of chains
 type ChainIPCs struct {
-	log             logging.Logger
-	networkID       uint32
+	context
 	chains          map[[32]byte]*eventSockets
 	consensusEvents *triggers.EventDispatcher
 	decisionEvents  *triggers.EventDispatcher
@@ -31,10 +36,13 @@ type ChainIPCs struct {
 
 // NewChainIPCs creates a new *ChainIPCs that writes consensus and decision
 // events to IPC sockets
-func NewChainIPCs(log logging.Logger, networkID uint32, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher, defaultChainIDs []ids.ID) (*ChainIPCs, error) {
+func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher, defaultChainIDs []ids.ID) (*ChainIPCs, error) {
 	cipcs := &ChainIPCs{
-		log:             log,
-		networkID:       networkID,
+		context: context{
+			log:       log,
+			networkID: networkID,
+			path:      path,
+		},
 		chains:          make(map[[32]byte]*eventSockets),
 		consensusEvents: consensusEvents,
 		decisionEvents:  decisionEvents,
@@ -56,7 +64,7 @@ func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*eventSockets, error) {
 		return es, nil
 	}
 
-	es, err := newEventSockets(cipcs.log, cipcs.networkID, chainID, cipcs.consensusEvents, cipcs.decisionEvents)
+	es, err := newEventSockets(cipcs.context, chainID, cipcs.consensusEvents, cipcs.decisionEvents)
 	if err != nil {
 		cipcs.log.Error("can't create ipcs: %s", err)
 		return nil, err
@@ -77,6 +85,6 @@ func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
 	return true, chainIPCs.stop()
 }
 
-func ipcURL(base string, networkID uint32, chainID ids.ID, eventType string) string {
-	return path.Join(base, fmt.Sprintf("%d-%s-%s", networkID, chainID.String(), eventType))
+func ipcURL(ctx context, chainID ids.ID, eventType string) string {
+	return path.Join(ctx.path, fmt.Sprintf("%d-%s-%s", ctx.networkID, chainID.String(), eventType))
 }
