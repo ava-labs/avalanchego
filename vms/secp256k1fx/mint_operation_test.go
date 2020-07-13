@@ -30,9 +30,9 @@ func TestMintOperationOuts(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 			},
 		},

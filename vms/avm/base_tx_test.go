@@ -1127,9 +1127,9 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      50000,
-				Locktime: 0,
+				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
@@ -1261,9 +1261,9 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      50000,
-				Locktime: 0,
+				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
@@ -1439,9 +1439,9 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      50000,
-				Locktime: 0,
+				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},
@@ -1601,9 +1601,9 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      50000,
-				Locktime: 0,
+				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 				},

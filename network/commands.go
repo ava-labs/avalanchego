@@ -20,6 +20,7 @@ const (
 	Peers                            // Used in handshake
 	ChainID                          // Used for dispatching
 	RequestID                        // Used for all messages
+	Deadline                         // Used for request messages
 	ContainerID                      // Used for querying
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
@@ -45,6 +46,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHash
 	case RequestID:
 		return wrappers.TryPackInt
+	case Deadline:
+		return wrappers.TryPackLong
 	case ContainerID:
 		return wrappers.TryPackHash
 	case ContainerBytes:
@@ -77,6 +80,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHash
 	case RequestID:
 		return wrappers.TryUnpackInt
+	case Deadline:
+		return wrappers.TryUnpackLong
 	case ContainerID:
 		return wrappers.TryUnpackHash
 	case ContainerBytes:
@@ -106,6 +111,10 @@ func (f Field) String() string {
 		return "Peers"
 	case ChainID:
 		return "ChainID"
+	case RequestID:
+		return "RequestID"
+	case Deadline:
+		return "Deadline"
 	case ContainerID:
 		return "ContainerID"
 	case ContainerBytes:
@@ -170,23 +179,21 @@ const (
 	Version
 	GetPeerList
 	PeerList
+	Ping
+	Pong
 	// Bootstrapping:
 	GetAcceptedFrontier
 	AcceptedFrontier
 	GetAccepted
 	Accepted
+	GetAncestors
+	MultiPut
 	// Consensus:
 	Get
 	Put
 	PushQuery
 	PullQuery
 	Chits
-
-	// TODO: Reorder these messages when we transition to everest
-	GetAncestors
-	MultiPut
-	Ping
-	Pong
 )
 
 // Defines the messages that can be sent/received with this network
@@ -200,17 +207,17 @@ var (
 		Ping:        {},
 		Pong:        {},
 		// Bootstrapping:
-		GetAcceptedFrontier: {ChainID, RequestID},
+		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
 		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
-		GetAccepted:         {ChainID, RequestID, ContainerIDs},
+		GetAccepted:         {ChainID, RequestID, Deadline, ContainerIDs},
 		Accepted:            {ChainID, RequestID, ContainerIDs},
-		GetAncestors:        {ChainID, RequestID, ContainerID},
+		GetAncestors:        {ChainID, RequestID, Deadline, ContainerID},
 		MultiPut:            {ChainID, RequestID, MultiContainerBytes},
 		// Consensus:
-		Get:       {ChainID, RequestID, ContainerID},
+		Get:       {ChainID, RequestID, Deadline, ContainerID},
 		Put:       {ChainID, RequestID, ContainerID, ContainerBytes},
-		PushQuery: {ChainID, RequestID, ContainerID, ContainerBytes},
-		PullQuery: {ChainID, RequestID, ContainerID},
+		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
+		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
 	}
 )

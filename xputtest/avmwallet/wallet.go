@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -19,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -181,9 +181,9 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
 		Asset: ava.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      amount,
-			Locktime: 0,
+			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{destAddr},
 			},
@@ -198,9 +198,9 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      amountSpent - amount,
-				Locktime: 0,
+				Amt: amountSpent - amount,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
 				},
