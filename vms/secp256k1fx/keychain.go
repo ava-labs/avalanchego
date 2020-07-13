@@ -102,8 +102,8 @@ func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*crypt
 	if time < owners.Locktime {
 		return nil, nil, false
 	}
-	sigs := []uint32{}
-	keys := []*crypto.PrivateKeySECP256K1R{}
+	sigs := make([]uint32, 0, owners.Threshold)
+	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 	for i := uint32(0); i < uint32(len(owners.Addrs)) && uint32(len(keys)) < owners.Threshold; i++ {
 		if key, exists := kc.Get(owners.Addrs[i]); exists {
 			sigs = append(sigs, i)
