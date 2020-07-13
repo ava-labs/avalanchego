@@ -5,7 +5,6 @@ import (
 	cryptorand "crypto/rand"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -19,10 +18,6 @@ const (
 	maxOutsPerUTXO  = 1000
 	maxOwnersPerOut = 100
 	maxOutAmt       = 1000 * 1000 * 1000 * 1000 // One trillion
-)
-
-var (
-	maxTestRunTime = 1 * time.Second
 )
 
 // Generates a new, random ID
