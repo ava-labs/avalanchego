@@ -42,11 +42,17 @@ func (a *Abort) Verify() error {
 
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
 // block, has ID [parentID].
-func (vm *VM) newAbortBlock(parentID ids.ID) *Abort {
-	abort := &Abort{DoubleDecisionBlock: DoubleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-		Block: core.NewBlock(parentID),
-		vm:    vm,
-	}}}}
+func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) *Abort {
+	abort := &Abort{
+		DoubleDecisionBlock: DoubleDecisionBlock{
+			CommonDecisionBlock: CommonDecisionBlock{
+				CommonBlock: CommonBlock{
+					Block: core.NewBlock(parentID, height),
+					vm:    vm,
+				},
+			},
+		},
+	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block

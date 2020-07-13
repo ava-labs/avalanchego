@@ -134,12 +134,14 @@ func (ab *AtomicBlock) Accept() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, tx AtomicTx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx AtomicTx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
-		CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-			Block: core.NewBlock(parentID),
-			vm:    vm,
-		}},
+		CommonDecisionBlock: CommonDecisionBlock{
+			CommonBlock: CommonBlock{
+				Block: core.NewBlock(parentID, height),
+				vm:    vm,
+			},
+		},
 		Tx: tx,
 	}
 

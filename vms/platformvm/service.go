@@ -33,6 +33,21 @@ var (
 // Service defines the API calls that can be made to the platform chain
 type Service struct{ vm *VM }
 
+// GetHeightResponse ...
+type GetHeightResponse struct {
+	Height json.Uint64 `json:"height"`
+}
+
+// GetHeight returns the height of the last accepted block
+func (service *Service) GetHeight(r *http.Request, args *struct{}, response *GetHeightResponse) error {
+	lastAccepted, err := service.vm.getBlock(service.vm.LastAccepted())
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block: %w", err)
+	}
+	response.Height = json.Uint64(lastAccepted.Height())
+	return nil
+}
+
 // ExportKeyArgs are arguments for ExportKey
 type ExportKeyArgs struct {
 	api.UserPass
@@ -66,8 +81,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
-	Username   string          `json:"username"`
-	Password   string          `json:"password"`
+	api.UserPass
 	PrivateKey formatting.CB58 `json:"privateKey"`
 }
 

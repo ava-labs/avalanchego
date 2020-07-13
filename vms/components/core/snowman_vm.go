@@ -73,9 +73,7 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 	block, err := svm.State.Get(svm.DB, state.BlockTypeID, ID)
 	if err != nil {
 		return nil, err
-	}
-
-	if block, ok := block.(snowman.Block); ok {
+	} else if block, ok := block.(snowman.Block); ok {
 		return block, nil
 	}
 	return nil, errBadData // Should never happen

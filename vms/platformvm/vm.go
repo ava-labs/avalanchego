@@ -285,7 +285,7 @@ func (vm *VM) Initialize(
 		// Create the genesis block and save it as being accepted
 		// (We don't just do genesisBlock.Accept() because then it'd look for genesisBlock's
 		// non-existent parent)
-		genesisBlock := vm.newCommitBlock(ids.Empty)
+		genesisBlock := vm.newCommitBlock(ids.Empty, 0)
 		if err := vm.State.PutBlock(vm.DB, genesisBlock); err != nil {
 			return err
 		}
@@ -458,6 +458,12 @@ func (vm *VM) Shutdown() error {
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.Ctx.Log.Debug("in BuildBlock")
 	preferredID := vm.Preferred()
+	// TODO: Add PreferredHeight() to core.snowmanVM
+	preferredIntf, err := vm.getBlock(preferredID)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get preferred block: %w", err)
+	}
+	preferredHeight := preferredIntf.(Block).Height()
 
 	// If there are pending decision txs, build a block with a batch of them
 	if len(vm.unissuedDecisionTxs) > 0 {
@@ -467,7 +473,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		}
 		var txs []DecisionTx
 		txs, vm.unissuedDecisionTxs = vm.unissuedDecisionTxs[:numTxs], vm.unissuedDecisionTxs[numTxs:]
-		blk, err := vm.newStandardBlock(preferredID, txs)
+		blk, err := vm.newStandardBlock(preferredID, preferredHeight+1, txs)
 		if err != nil {
 			return nil, err
 		}
@@ -485,7 +491,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if len(vm.unissuedAtomicTxs) > 0 {
 		tx := vm.unissuedAtomicTxs[0]
 		vm.unissuedAtomicTxs = vm.unissuedAtomicTxs[1:]
-		blk, err := vm.newAtomicBlock(preferredID, tx)
+		blk, err := vm.newAtomicBlock(preferredID, preferredHeight+1, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -537,7 +543,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := vm.newProposalBlock(preferredID, rewardValidatorTx)
+		blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, rewardValidatorTx)
 		if err != nil {
 			return nil, err
 		}
@@ -563,7 +569,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		blk, err := vm.newProposalBlock(preferredID, advanceTimeTx)
+		blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
@@ -579,7 +585,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	for vm.unissuedEvents.Len() > 0 {
 		tx := vm.unissuedEvents.Remove()
 		if !syncTime.After(tx.StartTime()) {
-			blk, err := vm.newProposalBlock(preferredID, tx)
+			blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, tx)
 			if err != nil {
 				return nil, err
 			}
@@ -732,7 +738,7 @@ func (vm *VM) resetTimer() {
 	}
 
 	waitTime := nextValidatorSetChangeTime.Sub(localTime)
-	vm.Ctx.Log.Info("next scheduled event is at %s (%s in the future)", nextValidatorSetChangeTime, waitTime)
+	vm.Ctx.Log.Debug("next scheduled event is at %s (%s in the future)", nextValidatorSetChangeTime, waitTime)
 
 	// Wake up when it's time to add/remove the next validator
 	vm.timer.SetTimeoutIn(waitTime)

@@ -143,8 +143,8 @@ func (pb *ProposalBlock) Verify() error {
 func (pb *ProposalBlock) Options() [2]snowman.Block {
 	blockID := pb.ID()
 
-	commit := pb.vm.newCommitBlock(blockID)
-	abort := pb.vm.newAbortBlock(blockID)
+	commit := pb.vm.newCommitBlock(blockID, pb.Height()+1)
+	abort := pb.vm.newAbortBlock(blockID, pb.Height()+1)
 
 	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
 		pb.vm.Ctx.Log.Warn(err.Error())
@@ -163,10 +163,10 @@ func (pb *ProposalBlock) Options() [2]snowman.Block {
 // newProposalBlock creates a new block that proposes to issue a transaction.
 // The parent of this block has ID [parentID]. The parent must be a decision block.
 // Returns nil if there's an error while creating this block
-func (vm *VM) newProposalBlock(parentID ids.ID, tx ProposalTx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx ProposalTx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
-			Block: core.NewBlock(parentID),
+			Block: core.NewBlock(parentID, height),
 			vm:    vm,
 		},
 		Tx: tx,
