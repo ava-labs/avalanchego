@@ -341,11 +341,11 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Case 7: Account that pays tx fee doesn't have enough $AVA to pay tx fee
+	// Case 7: address that pays tx fee doesn't have enough tokens to pay tx fee
 	txFeeSaved := vm.txFee
 	vm.txFee = 1 // Do this so test works even when txFee is 0
 
-	// Create new key whose account has no $AVA
+	// Create new key whose address has no tokens
 	factory := crypto.FactorySECP256K1R{}
 	newAcctKey, err := factory.NewPrivateKey()
 	if err != nil {
@@ -361,7 +361,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{newAcctKey.(*crypto.PrivateKeySECP256K1R)}, // tx fee payer
 	)
 	if err == nil {
-		t.Fatal("should have failed verification because payer account has no $AVA to pay fee")
+		t.Fatal("should have failed verification because payer address has no tokens to pay fee")
 	}
 
 	vm.txFee = txFeeSaved // Reset tx fee

@@ -76,7 +76,6 @@ func (tx *addDefaultSubnetValidatorTx) initialize(vm *VM) error {
 }
 
 // SyntacticVerify that this transaction is well formed
-// If [tx] is valid, this method also populates [tx.accountID]
 func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:

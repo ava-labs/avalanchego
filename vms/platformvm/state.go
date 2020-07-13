@@ -20,10 +20,6 @@ import (
 
 // This file contains methods of VM that deal with getting/putting values from database
 
-var (
-	errEmptyAccountAddress = errors.New("account has empty address")
-)
-
 // TODO: Cache prefixed IDs or use different way of keying into database
 const (
 	currentValidatorsPrefix uint64 = iota

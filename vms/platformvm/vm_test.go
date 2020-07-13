@@ -61,9 +61,6 @@ var (
 	// amount all genesis validators stake in defaultVM
 	defaultStakeAmount uint64 = 100 * MinimumStakeAmount
 
-	// At genesis this account has AVA and is validating the default subnet
-	// defaultKey *crypto.PrivateKeySECP256K1R
-
 	// non-default Subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	testSubnet1            *CreateSubnetTx

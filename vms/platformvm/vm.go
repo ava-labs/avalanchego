@@ -33,8 +33,7 @@ import (
 
 const (
 	// For putting/getting values from state
-	accountTypeID uint64 = iota
-	validatorsTypeID
+	validatorsTypeID uint64 = iota
 	chainsTypeID
 	blockTypeID
 	subnetsTypeID
@@ -59,7 +58,7 @@ const (
 	// InflationRate is the maximum inflation rate of AVA from staking
 	InflationRate = 1.04
 
-	// MinimumStakeAmount is the minimum amount of $AVA one must bond to be a staker
+	// MinimumStakeAmount is the minimum amount of tokens one must bond to be a staker
 	MinimumStakeAmount = 10 * units.MicroAva
 
 	// MinimumStakingDuration is the shortest amount of time a staker can bond
@@ -117,6 +116,8 @@ func init() {
 		Codec.RegisterType(&secp256k1fx.MintOperation{}),
 		Codec.RegisterType(&secp256k1fx.Credential{}),
 
+		Codec.RegisterType(&BaseTx{}),
+
 		Codec.RegisterType(&UnsignedAddDefaultSubnetValidatorTx{}),
 		Codec.RegisterType(&addDefaultSubnetValidatorTx{}),
 
@@ -154,7 +155,7 @@ type VM struct {
 	*core.SnowmanVM
 
 	// Node's validator manager
-	// Maps Subnets --> nodes in the Subnet HEAD
+	// Maps Subnets --> nodes in the Subnet
 	validators validators.Manager
 
 	// true if the node is being run with staking enabled
@@ -236,7 +237,7 @@ func (vm *VM) Initialize(
 			return err
 		}
 
-		// Persist accounts that exist at genesis
+		// Persist UTXOs that exist at genesis
 		for _, utxo := range genesis.UTXOs {
 			if err := vm.putUTXO(vm.DB, utxo); err != nil {
 				return err

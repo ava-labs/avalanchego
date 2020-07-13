@@ -70,22 +70,22 @@ func TestUserNilSK(t *testing.T) {
 	assert.Error(t, err, "nil key should have caused an error")
 }
 
-func TestUserNilAccount(t *testing.T) {
+func TestUserNilAddress(t *testing.T) {
 	u := user{db: memdb.New()}
 
 	_, err := u.controlsAddress(ids.ShortID{})
-	assert.Error(t, err, "nil accountID should have caused an error")
+	assert.Error(t, err, "nil address should have caused an error")
 
 	_, err = u.getKey(ids.ShortID{})
-	assert.Error(t, err, "nil accountID should have caused an error")
+	assert.Error(t, err, "nil address should have caused an error")
 }
 
 func TestUser(t *testing.T) {
 	u := user{db: memdb.New()}
 
-	accountIDs, err := u.getAddresses()
+	addresses, err := u.getAddresses()
 	assert.NoError(t, err)
-	assert.Empty(t, accountIDs, "new user shouldn't have accounts")
+	assert.Empty(t, addresses, "new user shouldn't have address")
 
 	factory := crypto.FactorySECP256K1R{}
 	sk, err := factory.NewPrivateKey()
@@ -98,17 +98,17 @@ func TestUser(t *testing.T) {
 
 	ok, err := u.controlsAddress(addr)
 	assert.NoError(t, err)
-	assert.True(t, ok, "added account should have been marked as controlled")
+	assert.True(t, ok, "added address should have been marked as controlled")
 
 	savedSk, err := u.getKey(addr)
 	assert.NoError(t, err)
 	assert.Equal(t, sk.Bytes(), savedSk.Bytes(), "wrong key returned")
 
-	accountIDs, err = u.getAddresses()
+	addresses, err = u.getAddresses()
 	assert.NoError(t, err)
-	assert.Len(t, accountIDs, 1, "account should have been added")
+	assert.Len(t, addresses, 1, "address should have been added")
 
-	savedAddr := accountIDs[0]
+	savedAddr := addresses[0]
 	equals := addr.Equals(savedAddr)
 	assert.True(t, equals, "saved address should match provided address")
 }

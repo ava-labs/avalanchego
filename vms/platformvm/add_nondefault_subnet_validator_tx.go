@@ -36,7 +36,7 @@ type UnsignedAddNonDefaultSubnetValidatorTx struct {
 // is accepted and followed by a Commit block, adds a validator to the pending validator set of a subnet
 // other than the default subnet.
 // (That is, the validator in the tx will validate at some point in the future.)
-// The transaction fee will be paid from the account whose ID is [Sigs[0].Address()]
+// The transaction fee will be paid from the address whose ID is [Sigs[0].Address()]
 type addNonDefaultSubnetValidatorTx struct {
 	UnsignedAddNonDefaultSubnetValidatorTx `serialize:"true"`
 	// Credentials that authorize the inputs to spend the corresponding outputs
@@ -73,7 +73,6 @@ func (tx *addNonDefaultSubnetValidatorTx) initialize(vm *VM) error {
 }
 
 // SyntacticVerify return nil iff [tx] is valid
-// If [tx] is valid, sets [tx.accountID]
 func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:

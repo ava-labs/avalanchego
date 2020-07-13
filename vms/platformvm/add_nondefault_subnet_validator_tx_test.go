@@ -370,7 +370,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		[]*crypto.PrivateKeySECP256K1R{newAcctKey.(*crypto.PrivateKeySECP256K1R)}, // tx fee payer
 	); err == nil {
-		t.Fatal("should have failed verification because payer account has no tokens to pay fee")
+		t.Fatal("should have failed verification because payer address has no tokens to pay fee")
 	}
 
 	// Case: Proposed validator already validating the non-default subnet

@@ -63,7 +63,6 @@ func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 }
 
 // SyntacticVerify return nil iff [tx] is valid
-// If [tx] is valid, sets [tx.accountID]
 func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:

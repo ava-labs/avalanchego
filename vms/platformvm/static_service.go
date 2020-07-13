@@ -35,15 +35,8 @@ type APIUTXO struct {
 	Address ids.ShortID `json:"address"`
 }
 
-// FormattedAPIAccount is an APIAccount but allows for a formatted Address
-type FormattedAPIAccount struct {
-	Address string      `json:"address"`
-	Nonce   json.Uint64 `json:"nonce"`
-	Balance json.Uint64 `json:"balance"`
-}
-
 // APIValidator is a validator.
-// [Amount] is the amount of $AVA being staked.
+// [Amount] is the amount of tokens being staked.
 // [Endtime] is the Unix time repr. of when they are done staking
 // [ID] is the node ID of the staker
 // [Address] is the address where the staked AVA (and, if applicable, reward)
@@ -127,7 +120,6 @@ type APIChain struct {
 // [Validators] are the validators of the default subnet at genesis.
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
-// TODO replace Accounts with UTXOs
 type BuildGenesisArgs struct {
 	AvaxAssetID ids.ID                      `json:"avaxAssetID"`
 	NetworkID   json.Uint32                 `json:"address"`
@@ -167,7 +159,7 @@ func (g *Genesis) Initialize() error {
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the AVA network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	// Specify the accounts on the Platform chain that exist at genesis.
+	// Specify the UTXOs on the Platform chain that exist at genesis.
 	utxos := make([]*ava.UTXO, 0, len(args.UTXOs))
 	for i, utxo := range args.UTXOs {
 		if utxo.Amount == 0 {
