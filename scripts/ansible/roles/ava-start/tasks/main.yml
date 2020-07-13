@@ -10,6 +10,7 @@
       --signature-verification-enabled="{{ signature_verification_enabled }}"
       --db-enabled="{{ db_enabled }}"
       --db-dir="{{ db_dir }}"
+      --http-host=""
       --http-port="{{ http_port }}"
       --http-tls-enabled="{{ http_tls_enabled }}"
       --http-tls-key-file="{{ http_tls_key_file }}"

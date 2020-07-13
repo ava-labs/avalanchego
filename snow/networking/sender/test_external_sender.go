@@ -5,6 +5,7 @@ package sender
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/gecko/ids"
 )
@@ -16,45 +17,57 @@ type ExternalSenderTest struct {
 
 	CantGetAcceptedFrontier, CantAcceptedFrontier,
 	CantGetAccepted, CantAccepted,
-	CantGet, CantGetAncestors, CantPut, CantMultiPut,
+	CantGetAncestors, CantMultiPut,
+	CantGet, CantPut,
 	CantPullQuery, CantPushQuery, CantChits,
 	CantGossip bool
 
-	GetAcceptedFrontierF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32)
+	GetAcceptedFrontierF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time)
 	AcceptedFrontierF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
-	GetAcceptedF         func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerIDs ids.Set)
-	AcceptedF            func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
-	GetF, GetAncestorsF  func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID)
-	PutF                 func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
-	MultiPutF            func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
-	PushQueryF           func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
-	PullQueryF           func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerID ids.ID)
-	ChitsF               func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
-	GossipF              func(chainID ids.ID, containerID ids.ID, container []byte)
+
+	GetAcceptedF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set)
+	AcceptedF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs ids.Set)
+
+	GetAncestorsF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
+	MultiPutF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
+
+	GetF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
+	PutF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+
+	PushQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte)
+	PullQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
+	ChitsF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set)
+
+	GossipF func(chainID ids.ID, containerID ids.ID, container []byte)
 }
 
 // Default set the default callable value to [cant]
 func (s *ExternalSenderTest) Default(cant bool) {
 	s.CantGetAcceptedFrontier = cant
 	s.CantAcceptedFrontier = cant
+
 	s.CantGetAccepted = cant
 	s.CantAccepted = cant
-	s.CantGet = cant
+
 	s.CantGetAncestors = cant
-	s.CantPut = cant
 	s.CantMultiPut = cant
+
+	s.CantGet = cant
+	s.CantPut = cant
+
 	s.CantPullQuery = cant
 	s.CantPushQuery = cant
 	s.CantChits = cant
+
 	s.CantGossip = cant
 }
 
 // GetAcceptedFrontier calls GetAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32) {
+func (s *ExternalSenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time) {
 	if s.GetAcceptedFrontierF != nil {
-		s.GetAcceptedFrontierF(validatorIDs, chainID, requestID)
+		s.GetAcceptedFrontierF(validatorIDs, chainID, requestID, deadline)
 	} else if s.CantGetAcceptedFrontier && s.T != nil {
 		s.T.Fatalf("Unexpectedly called GetAcceptedFrontier")
 	} else if s.CantGetAcceptedFrontier && s.B != nil {
@@ -78,9 +91,9 @@ func (s *ExternalSenderTest) AcceptedFrontier(validatorID ids.ShortID, chainID i
 // GetAccepted calls GetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, containerIDs ids.Set) {
+func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs ids.Set) {
 	if s.GetAcceptedF != nil {
-		s.GetAcceptedF(validatorIDs, chainID, requestID, containerIDs)
+		s.GetAcceptedF(validatorIDs, chainID, requestID, deadline, containerIDs)
 	} else if s.CantGetAccepted && s.T != nil {
 		s.T.Fatalf("Unexpectedly called GetAccepted")
 	} else if s.CantGetAccepted && s.B != nil {
@@ -101,42 +114,16 @@ func (s *ExternalSenderTest) Accepted(validatorID ids.ShortID, chainID ids.ID, r
 	}
 }
 
-// Get calls GetF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
-func (s *ExternalSenderTest) Get(vdr ids.ShortID, chainID ids.ID, requestID uint32, vtxID ids.ID) {
-	if s.GetF != nil {
-		s.GetF(vdr, chainID, requestID, vtxID)
-	} else if s.CantGet && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Get")
-	} else if s.CantGet && s.B != nil {
-		s.B.Fatalf("Unexpectedly called Get")
-	}
-}
-
 // GetAncestors calls GetAncestorsF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) GetAncestors(vdr ids.ShortID, chainID ids.ID, requestID uint32, vtxID ids.ID) {
+func (s *ExternalSenderTest) GetAncestors(vdr ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID) {
 	if s.GetAncestorsF != nil {
-		s.GetAncestorsF(vdr, chainID, requestID, vtxID)
+		s.GetAncestorsF(vdr, chainID, requestID, deadline, vtxID)
 	} else if s.CantGetAncestors && s.T != nil {
 		s.T.Fatalf("Unexpectedly called GetAncestors")
 	} else if s.CantGetAncestors && s.B != nil {
 		s.B.Fatalf("Unexpectedly called GetAncestors")
-	}
-}
-
-// Put calls PutF if it was initialized. If it wasn't initialized and this
-// function shouldn't be called and testing was initialized, then testing will
-// fail.
-func (s *ExternalSenderTest) Put(vdr ids.ShortID, chainID ids.ID, requestID uint32, vtxID ids.ID, vtx []byte) {
-	if s.PutF != nil {
-		s.PutF(vdr, chainID, requestID, vtxID, vtx)
-	} else if s.CantPut && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Put")
-	} else if s.CantPut && s.B != nil {
-		s.B.Fatalf("Unexpectedly called Put")
 	}
 }
 
@@ -153,12 +140,38 @@ func (s *ExternalSenderTest) MultiPut(vdr ids.ShortID, chainID ids.ID, requestID
 	}
 }
 
+// Get calls GetF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *ExternalSenderTest) Get(vdr ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID) {
+	if s.GetF != nil {
+		s.GetF(vdr, chainID, requestID, deadline, vtxID)
+	} else if s.CantGet && s.T != nil {
+		s.T.Fatalf("Unexpectedly called Get")
+	} else if s.CantGet && s.B != nil {
+		s.B.Fatalf("Unexpectedly called Get")
+	}
+}
+
+// Put calls PutF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
+func (s *ExternalSenderTest) Put(vdr ids.ShortID, chainID ids.ID, requestID uint32, vtxID ids.ID, vtx []byte) {
+	if s.PutF != nil {
+		s.PutF(vdr, chainID, requestID, vtxID, vtx)
+	} else if s.CantPut && s.T != nil {
+		s.T.Fatalf("Unexpectedly called Put")
+	} else if s.CantPut && s.B != nil {
+		s.B.Fatalf("Unexpectedly called Put")
+	}
+}
+
 // PushQuery calls PushQueryF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *ExternalSenderTest) PushQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, vtxID ids.ID, vtx []byte) {
+func (s *ExternalSenderTest) PushQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID, vtx []byte) {
 	if s.PushQueryF != nil {
-		s.PushQueryF(vdrs, chainID, requestID, vtxID, vtx)
+		s.PushQueryF(vdrs, chainID, requestID, deadline, vtxID, vtx)
 	} else if s.CantPushQuery && s.T != nil {
 		s.T.Fatalf("Unexpectedly called PushQuery")
 	} else if s.CantPushQuery && s.B != nil {
@@ -169,9 +182,9 @@ func (s *ExternalSenderTest) PushQuery(vdrs ids.ShortSet, chainID ids.ID, reques
 // PullQuery calls PullQueryF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *ExternalSenderTest) PullQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, vtxID ids.ID) {
+func (s *ExternalSenderTest) PullQuery(vdrs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time, vtxID ids.ID) {
 	if s.PullQueryF != nil {
-		s.PullQueryF(vdrs, chainID, requestID, vtxID)
+		s.PullQueryF(vdrs, chainID, requestID, deadline, vtxID)
 	} else if s.CantPullQuery && s.T != nil {
 		s.T.Fatalf("Unexpectedly called PullQuery")
 	} else if s.CantPullQuery && s.B != nil {

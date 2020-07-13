@@ -1617,7 +1617,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize(2 * time.Second)
+	timeoutManager.Initialize("", prometheus.NewRegistry())
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
@@ -1671,14 +1671,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32) {
+	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
 		*reqID = requestID
 	}
 
 	engine.Startup()
 
 	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ ids.Set) {
+	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ ids.Set) {
 		*reqID = requestID
 	}
 
@@ -1687,7 +1687,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	engine.AcceptedFrontier(peerID, *reqID, frontier)
 
 	externalSender.GetAcceptedF = nil
-	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, containerID ids.ID) {
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Time, containerID ids.ID) {
 		*reqID = requestID
 		if !containerID.Equals(advanceTimeBlkID) {
 			t.Fatalf("wrong block requested")

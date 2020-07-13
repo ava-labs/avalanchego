@@ -65,7 +65,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 		"",
 		prometheus.NewRegistry(),
 	)
-	timeouts.Initialize(0)
+	timeouts.Initialize("", prometheus.NewRegistry())
 	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
 	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
