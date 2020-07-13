@@ -55,8 +55,9 @@ const (
 
 	// TODO: Turn these constants into governable parameters
 
-	// InflationRate is the maximum inflation rate of AVA from staking
-	InflationRate = 1.04
+	// InflationRate is the inflation rate from staking
+	// TODO: make inflation rate non-zero
+	InflationRate = 1.00
 
 	// MinimumStakeAmount is the minimum amount of tokens one must bond to be a staker
 	MinimumStakeAmount = 10 * units.MicroAva
