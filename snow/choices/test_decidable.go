@@ -34,7 +34,7 @@ func (d *TestDecidable) Accept() error {
 // Reject implements the Decidable interface
 func (d *TestDecidable) Reject() error {
 	switch d.StatusV {
-	case Unknown, Rejected:
+	case Unknown, Accepted:
 		return fmt.Errorf("Invalid state transaition from %s to %s",
 			d.StatusV, Rejected)
 	default:
