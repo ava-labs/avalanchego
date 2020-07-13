@@ -26,8 +26,8 @@ func TestNetworkName(t *testing.T) {
 	if name := NetworkName(EverestID); name != EverestName {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, EverestName)
 	}
-	if name := NetworkName(DenaliID); name != DenaliName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, DenaliName)
+	if name := NetworkName(TestnetID); name != EverestName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, EverestName)
 	}
 	if name := NetworkName(4294967295); name != "network-4294967295" {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, "network-4294967295")
@@ -145,14 +145,34 @@ func TestVMGenesis(t *testing.T) {
 		expectedID string
 	}{
 		{
+			networkID:  EverestID,
+			vmID:       avm.ID,
+			expectedID: "2Bp1Re3JqrJYUG1Dxy8tEa7e7nCBaCQ4m9sbN5xhknK9rtL94q",
+		},
+		{
+			networkID:  DenaliID,
+			vmID:       avm.ID,
+			expectedID: "2JS1yvaaSmUCt7kcNX1cgfFFmyLCwn9Cn5qKnH2FxTvQvqETSe",
+		},
+		{
 			networkID:  CascadeID,
 			vmID:       avm.ID,
-			expectedID: "2MAsZHkTD5diKDiok34XASk1GMsLEMJQmCCGsWqVseDMwgZpoz",
+			expectedID: "2WBZpeGrBpy4RHFkaUQazQdL2teCPd3WqejVzHoHbfhNWqippH",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       avm.ID,
 			expectedID: "2nvFvaf8zjxKAeoWVnSj8H216dYussYsTNzS4ym7FYpPaMPUdp",
+		},
+		{
+			networkID:  EverestID,
+			vmID:       EVMID,
+			expectedID: "SmQ8LvasSgPrPtUhQ6MaL2JNdeTp1otZ6G9pDM3a78jqzhzs6",
+		},
+		{
+			networkID:  DenaliID,
+			vmID:       EVMID,
+			expectedID: "eZamFmqytbwyF3bTWXDTfV5uRS2Q1y28ETMLa4yULYviLumDm",
 		},
 		{
 			networkID:  CascadeID,
@@ -187,8 +207,16 @@ func TestAVAXAssetID(t *testing.T) {
 		expectedID string
 	}{
 		{
+			networkID:  EverestID,
+			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
+		},
+		{
+			networkID:  DenaliID,
+			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
+		},
+		{
 			networkID:  CascadeID,
-			expectedID: "21d7KVtPrubc5fHr6CGNcgbUb4seUjmZKr35ZX7BZb5iP8pXWA",
+			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
 		},
 		{
 			networkID:  LocalID,

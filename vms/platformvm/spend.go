@@ -88,9 +88,9 @@ func (vm *VM) spend(
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: vm.avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      amountSpent - toSpend,
-				Locktime: 0,
+				Amt: amountSpent - toSpend,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{addrs.CappedList(1)[0]}, // Change goes to 1st key
 				},

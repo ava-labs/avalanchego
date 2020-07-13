@@ -62,9 +62,9 @@ func TestNewImportTx(t *testing.T) {
 				},
 				Asset: ava.Asset{ID: avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt:      50000,
-					Locktime: 0,
+					Amt: 50000,
 					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
 						Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
 						Threshold: 1,
 					},

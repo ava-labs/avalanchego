@@ -172,9 +172,9 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			},
 			Asset: ava.Asset{ID: args.AvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      uint64(utxo.Amount),
-				Locktime: 0,
+				Amt: uint64(utxo.Amount),
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{utxo.Address},
 				},

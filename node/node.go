@@ -58,7 +58,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 5, 7)
+	Version       = version.NewDefaultVersion("avalanche", 0, 6, 0)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -397,8 +397,9 @@ func (n *Node) initAPIServer() {
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
-func (n *Node) initChainManager() {
-	n.chainManager = chains.New(
+func (n *Node) initChainManager() error {
+	var err error
+	n.chainManager, err = chains.New(
 		n.Config.EnableStaking,
 		n.Log,
 		n.LogFactory,
@@ -416,8 +417,12 @@ func (n *Node) initChainManager() {
 		&n.keystoreServer,
 		&n.sharedMemory,
 	)
+	if err != nil {
+		return err
+	}
 
 	n.chainManager.AddRegistrant(&n.APIServer)
+	return nil
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation

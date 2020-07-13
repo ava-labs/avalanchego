@@ -75,7 +75,7 @@ func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
 func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error) {
 	switch out := out.(type) {
 	case *MintOutput:
-		if sigIndices, keys, able := kc.Match(&out.OutputOwners); able {
+		if sigIndices, keys, able := kc.Match(&out.OutputOwners, time); able {
 			return &MintInput{
 				Input: Input{
 					SigIndices: sigIndices,
@@ -84,10 +84,7 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 		}
 		return nil, nil, errCantSpend
 	case *TransferOutput:
-		if time < out.Locktime {
-			return nil, nil, errLockedFunds
-		}
-		if sigIndices, keys, able := kc.Match(&out.OutputOwners); able {
+		if sigIndices, keys, able := kc.Match(&out.OutputOwners, time); able {
 			return &TransferInput{
 				Amt: out.Amt,
 				Input: Input{
@@ -101,7 +98,10 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 }
 
 // Match attempts to match a list of addresses up to the provided threshold
-func (kc *Keychain) Match(owners *OutputOwners) ([]uint32, []*crypto.PrivateKeySECP256K1R, bool) {
+func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*crypto.PrivateKeySECP256K1R, bool) {
+	if time < owners.Locktime {
+		return nil, nil, false
+	}
 	sigs := []uint32{}
 	keys := []*crypto.PrivateKeySECP256K1R{}
 	for i := uint32(0); i < uint32(len(owners.Addrs)) && uint32(len(keys)) < owners.Threshold; i++ {

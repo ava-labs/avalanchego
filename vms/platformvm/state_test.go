@@ -62,9 +62,9 @@ func generateRandomUTXOs(n int) []*ava.UTXO {
 			},
 			Asset: ava.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      uint64(rand.Int63n(maxOutAmt)),
-				Locktime: 0,
+				Amt: uint64(rand.Int63n(maxOutAmt)),
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Addrs:     owners,
 					Threshold: uint32(len(owners)),
 				},

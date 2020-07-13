@@ -338,8 +338,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "SscTvpQFCZPNiRXyueDc7LdHT9EstHiva3AK6kuTgHTMd7DsU" {
-		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
+	if reply.AssetID.String() != "2jpMDuqSgSo73JzAmVcnoJiP4G5TBQPPvFcCtbjKN8b5eH9RKH" {
+		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 }
 

@@ -523,7 +523,7 @@ func TestPacker2DByteSlice(t *testing.T) {
 	// Case: Array has one element
 	p = Packer{MaxSize: 1024}
 	arr = [][]byte{
-		[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 	}
 	p.Pack2DByteSlice(arr)
 	if p.Errored() {
@@ -544,8 +544,8 @@ func TestPacker2DByteSlice(t *testing.T) {
 	// Case: Array has multiple elements
 	p = Packer{MaxSize: 1024}
 	arr = [][]byte{
-		[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-		[]byte{11, 12, 3, 4, 5, 6, 7, 8, 9, 10},
+		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		{11, 12, 3, 4, 5, 6, 7, 8, 9, 10},
 	}
 	p.Pack2DByteSlice(arr)
 	if p.Errored() {

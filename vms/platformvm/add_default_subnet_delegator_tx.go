@@ -162,9 +162,9 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      tx.Validator.Wght, // Returned AVAX
-			Locktime: 0,
+			Amt: tx.Validator.Wght, // Returned AVAX
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{tx.Destination}, // Spendable by destination address
 			},

@@ -123,9 +123,9 @@ func TestTransferableOutputSerialization(t *testing.T) {
 			}),
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      12345,
-			Locktime: 54321,
+			Amt: 12345,
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  54321,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID([20]byte{

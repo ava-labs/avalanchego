@@ -118,9 +118,9 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		Out:   nil, // Will be modified
 	}
 	out := secp256k1fx.TransferOutput{ // Also a boilerplate, like [utxo]
-		Amt:      0, // Will be modified
-		Locktime: 0,
+		Amt: 0, // Will be modified
 		OutputOwners: secp256k1fx.OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs:     nil, // Will be modified
 		},

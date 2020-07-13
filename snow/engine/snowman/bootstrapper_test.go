@@ -59,7 +59,7 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 		"",
 		prometheus.NewRegistry(),
 	)
-	timeouts.Initialize(0)
+	timeouts.Initialize("", prometheus.NewRegistry())
 	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
 	blocker, _ := queue.New(db)

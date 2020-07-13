@@ -205,9 +205,9 @@ func (vm *VM) newExportTx(
 				&ava.TransferableOutput{
 					Asset: ava.Asset{ID: vm.avaxAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt:      amount,
-						Locktime: 0,
+						Amt: amount,
 						OutputOwners: secp256k1fx.OutputOwners{
+							Locktime:  0,
 							Threshold: 1,
 							Addrs:     []ids.ShortID{to},
 						},

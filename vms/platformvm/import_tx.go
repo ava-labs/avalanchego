@@ -267,9 +267,9 @@ func (vm *VM) newImportTx(
 	tx.Outputs = append(tx.Outputs, &ava.TransferableOutput{
 		Asset: ava.Asset{ID: vm.avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      amount, // All the value from imported UTXOs
-			Locktime: 0,
+			Amt: amount, // All the value from imported UTXOs
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{recipientAddr},
 			},

@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/utils/codec"
 )
 
 var (
@@ -86,9 +86,9 @@ func TestFxVerifyTransfer(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -121,9 +121,9 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -187,9 +187,9 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -219,9 +219,9 @@ func TestFxVerifyTransferNilCredential(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -252,9 +252,9 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 0,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -290,9 +290,9 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -328,9 +328,9 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: uint64(date.Add(time.Second).Unix()),
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  uint64(date.Add(time.Second).Unix()),
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -366,9 +366,9 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -405,9 +405,9 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -441,9 +441,9 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -483,9 +483,9 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID(addrBytes),
@@ -532,9 +532,9 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 		bytes: txBytes,
 	}
 	out := &TransferOutput{
-		Amt:      1,
-		Locktime: 0,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  0,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.ShortEmpty,
@@ -598,9 +598,9 @@ func TestFxVerifyOperation(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID(addrBytes),
@@ -650,9 +650,9 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID(addrBytes),
@@ -737,9 +737,9 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID(addrBytes),
@@ -787,9 +787,9 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID(addrBytes),
@@ -834,9 +834,9 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID(addrBytes),
@@ -889,9 +889,9 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 			},
 		},
@@ -936,9 +936,9 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 			OutputOwners: OutputOwners{},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID(addrBytes),

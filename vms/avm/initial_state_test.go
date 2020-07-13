@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -113,9 +113,9 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 		FxID: 0,
 		Outs: []verify.Verifiable{
 			&secp256k1fx.TransferOutput{
-				Amt:      12345,
-				Locktime: 54321,
+				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  54321,
 					Threshold: 1,
 					Addrs: []ids.ShortID{
 						ids.NewShortID([20]byte{
