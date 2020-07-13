@@ -6,14 +6,15 @@ package leveldb
 import (
 	"bytes"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
+
+	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/utils"
 )
 
 const (

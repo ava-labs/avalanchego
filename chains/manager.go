@@ -76,6 +76,9 @@ type Manager interface {
 	// Add an alias to a chain
 	Alias(ids.ID, string) error
 
+	// Returns true iff the chain with the given ID exists and is finished bootstrapping
+	IsBootstrapped(ids.ID) bool
+
 	Shutdown()
 }
 
@@ -114,6 +117,10 @@ type manager struct {
 	keystore        *keystore.Keystore
 	sharedMemory    *atomic.SharedMemory
 
+	// Key: Chain's ID
+	// Value: The chain
+	chains map[[32]byte]*router.Handler
+
 	unblocked     bool
 	blockedChains []ChainParameters
 }
@@ -131,7 +138,7 @@ func New(
 	decisionEvents *triggers.EventDispatcher,
 	consensusEvents *triggers.EventDispatcher,
 	db database.Database,
-	router router.Router,
+	rtr router.Router,
 	net network.Network,
 	consensusParams avacon.Parameters,
 	validators validators.Manager,
@@ -145,7 +152,7 @@ func New(
 	timeoutManager.Initialize(requestTimeout)
 	go log.RecoverAndPanic(timeoutManager.Dispatch)
 
-	router.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
+	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
 
 	m := &manager{
 		stakingEnabled:  stakingEnabled,
@@ -155,7 +162,7 @@ func New(
 		decisionEvents:  decisionEvents,
 		consensusEvents: consensusEvents,
 		db:              db,
-		chainRouter:     router,
+		chainRouter:     rtr,
 		net:             net,
 		timeoutManager:  &timeoutManager,
 		consensusParams: consensusParams,
@@ -165,6 +172,7 @@ func New(
 		server:          server,
 		keystore:        keystore,
 		sharedMemory:    sharedMemory,
+		chains:          make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
 	return m
@@ -454,7 +462,7 @@ func (m *manager) createAvalancheChain(
 			eng:       &engine,
 		})
 	}
-
+	m.chains[ctx.ChainID.Key()] = handler
 	return nil
 }
 
@@ -546,7 +554,18 @@ func (m *manager) createSnowmanChain(
 			eng:       &engine,
 		})
 	}
+	m.chains[ctx.ChainID.Key()] = handler
 	return nil
+}
+
+func (m *manager) IsBootstrapped(id ids.ID) bool {
+	chain, exists := m.chains[id.Key()]
+	if !exists {
+		return false
+	}
+	chain.Context().Lock.Lock()
+	defer chain.Context().Lock.Unlock()
+	return chain.Engine().IsBootstrapped()
 }
 
 // Shutdown stops all the chains

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 )
 
 func TestCredentialVerify(t *testing.T) {

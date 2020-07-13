@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"bytes"
-	"container/heap"
 	"errors"
 	"testing"
 	"time"
@@ -138,7 +137,7 @@ func defaultVM() *VM {
 	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
-	db := memdb.New()
+	db := prefixdb.New([]byte{0}, memdb.New())
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
@@ -193,6 +192,8 @@ func defaultVM() *VM {
 		panic("no subnets found")
 	} // end delete
 
+	vm.registerDBTypes()
+
 	return vm
 }
 
@@ -226,7 +227,7 @@ func GenesisCurrentValidators() *EventHeap {
 			testNetworkID,                           // network ID
 			key,                                     // key paying tx fee and stake
 		)
-		heap.Push(validators, validator)
+		validators.Add(validator)
 	}
 	return validators
 }
@@ -1011,7 +1012,7 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.unissuedEvents.Push(addValidatorTx)
+	vm.unissuedEvents.Add(addValidatorTx)
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	if err != nil {
 		t.Fatal(err)
@@ -1188,7 +1189,7 @@ func TestAtomicImport(t *testing.T) {
 	key := keys[0]
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
 
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
@@ -1281,7 +1282,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	key := keys[0]
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
 
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 

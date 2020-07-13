@@ -9,14 +9,15 @@ import (
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -68,7 +69,7 @@ func TestExportTxSerialization(t *testing.T) {
 			0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
 			0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 		}),
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -117,9 +118,10 @@ func TestIssueExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
+	baseDB := memdb.New()
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
@@ -138,10 +140,10 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{&common.Fx{
+		[]*common.Fx{{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
@@ -167,7 +169,7 @@ func TestIssueExportTx(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			Ins: []*ava.TransferableInput{{
 				UTXOID: ava.UTXOID{
 					TxID:        avaID,
 					OutputIndex: 1,
@@ -179,7 +181,7 @@ func TestIssueExportTx(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
+		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
@@ -273,9 +275,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
+	baseDB := memdb.New()
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
@@ -294,10 +297,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{&common.Fx{
+		[]*common.Fx{{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
@@ -323,7 +326,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			Ins: []*ava.TransferableInput{{
 				UTXOID: ava.UTXOID{
 					TxID:        avaID,
 					OutputIndex: 1,
@@ -335,7 +338,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{&ava.TransferableOutput{
+		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,

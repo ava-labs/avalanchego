@@ -35,21 +35,25 @@ const (
 
 // Results of parsing the CLI
 var (
-	Config                 = node.Config{}
-	Err                    error
-	defaultDbDir           = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "db"))
-	defaultStakingKeyPath  = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.key"))
-	defaultStakingCertPath = os.ExpandEnv(filepath.Join("$HOME", ".gecko", "staking", "staker.crt"))
+	Config             = node.Config{}
+	Err                error
+	defaultNetworkName = genesis.TestnetName
 
-	defaultPluginDirs = []string{
-		"./build/plugins",
-		"./plugins",
-		os.ExpandEnv(filepath.Join("$HOME", ".gecko", "plugins")),
+	homeDir                = os.ExpandEnv("$HOME")
+	defaultDbDir           = filepath.Join(homeDir, ".gecko", "db")
+	defaultStakingKeyPath  = filepath.Join(homeDir, ".gecko", "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(homeDir, ".gecko", "staking", "staker.crt")
+	defaultPluginDirs      = []string{
+		filepath.Join(".", "build", "plugins"),
+		filepath.Join(".", "plugins"),
+		filepath.Join("/", "usr", "local", "lib", "gecko"),
+		filepath.Join(homeDir, ".gecko", "plugins"),
 	}
 )
 
 var (
-	errBootstrapMismatch = errors.New("more bootstrap IDs provided than bootstrap IPs")
+	errBootstrapMismatch  = errors.New("more bootstrap IDs provided than bootstrap IPs")
+	errStakingRequiresTLS = errors.New("if staking is enabled, network TLS must also be enabled")
 )
 
 // GetIPs returns the default IPs for each network
@@ -169,7 +173,7 @@ func init() {
 	version := fs.Bool("version", false, "If true, print version and quit")
 
 	// NetworkID:
-	networkName := fs.String("network-id", genesis.TestnetName, "Network ID this node will connect to")
+	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
 	// Ava fees:
 	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
@@ -188,7 +192,7 @@ func init() {
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
 
 	// HTTP Server:
-	httpHost := fs.String("http-host", "", "Address of the HTTP server")
+	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
 	fs.BoolVar(&Config.EnableHTTPS, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
@@ -200,7 +204,9 @@ func init() {
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
-	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Require TLS to authenticate staking connections")
+	// TODO - keeping same flag for backwards compatibility, should be changed to "staking-enabled"
+	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Enable staking. If enabled, Network TLS is required.")
+	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
@@ -221,7 +227,8 @@ func init() {
 	fs.IntVar(&Config.ConsensusParams.ConcurrentRepolls, "snow-concurrent-repolls", 1, "Minimum number of concurrent polls for finalizing consensus")
 
 	// Enable/Disable APIs:
-	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", true, "If true, this node exposes the Admin API")
+	fs.BoolVar(&Config.AdminAPIEnabled, "api-admin-enabled", false, "If true, this node exposes the Admin API")
+	fs.BoolVar(&Config.InfoAPIEnabled, "api-info-enabled", true, "If true, this node exposes the Info API")
 	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
 	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
@@ -234,7 +241,15 @@ func init() {
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
-		fmt.Println(node.Version.String())
+		networkID, err := genesis.NetworkID(defaultNetworkName)
+		if errs.Add(err); err != nil {
+			return
+		}
+		networkGeneration := genesis.NetworkName(networkID)
+		fmt.Printf(
+			"%s [database=%s, network=%s/%s]\n",
+			node.Version, dbVersion, defaultNetworkName, networkGeneration,
+		)
 		os.Exit(0)
 	}
 
@@ -269,16 +284,16 @@ func init() {
 		Config.DB = memdb.New()
 	}
 
-	Config.Nat = nat.NewRouter()
-
 	var ip net.IP
 	// If public IP is not specified, get it using shell command dig
 	if *consensusIP == "" {
-		ip, err = Config.Nat.IP()
+		Config.Nat = nat.GetRouter()
+		ip, err = Config.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
 	} else {
+		Config.Nat = nat.NewNoRouter()
 		ip = net.ParseIP(*consensusIP)
 	}
 
@@ -291,6 +306,7 @@ func init() {
 		IP:   ip,
 		Port: uint16(*consensusPort),
 	}
+	Config.StakingLocalPort = uint16(*consensusPort)
 
 	defaultBootstrapIPs, defaultBootstrapIDs := GetDefaultBootstraps(networkID, 5)
 
@@ -318,7 +334,13 @@ func init() {
 			*bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
 		}
 	}
-	if Config.EnableStaking {
+
+	if Config.EnableStaking && !Config.EnableP2PTLS {
+		errs.Add(errStakingRequiresTLS)
+		return
+	}
+
+	if Config.EnableP2PTLS {
 		i := 0
 		cb58 := formatting.CB58{}
 		for _, id := range strings.Split(*bootstrapIDs, ",") {

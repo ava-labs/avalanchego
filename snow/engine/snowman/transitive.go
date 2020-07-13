@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/snowman/poll"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -30,7 +31,7 @@ type Transitive struct {
 	bootstrapper
 
 	// track outstanding preference requests
-	polls polls
+	polls poll.Set
 
 	// blocks that have outstanding get requests
 	blkReqs common.Requests
@@ -64,10 +65,12 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.onFinished = t.finishBootstrapping
 
-	t.polls.log = config.Context.Log
-	t.polls.numPolls = t.numPolls
-	t.polls.alpha = t.Params.Alpha
-	t.polls.m = make(map[uint32]poll)
+	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
+	t.polls = poll.NewSet(factory,
+		config.Context.Log,
+		config.Params.Namespace,
+		config.Params.Metrics,
+	)
 
 	return t.bootstrapper.Initialize(config.BootstrapConfig)
 }
@@ -185,7 +188,11 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
 	if !t.bootstrapped {
-		t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+		if requestID == network.GossipMsgRequestID {
+			t.Config.Context.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+		} else {
+			t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
+		}
 		return nil
 	}
 
@@ -405,7 +412,7 @@ func (t *Transitive) repoll() {
 	// propagate the most likely branch as quickly as possible
 	prefID := t.Consensus.Preference()
 
-	for i := len(t.polls.m); i < t.Params.ConcurrentRepolls; i++ {
+	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
 		t.pullSample(prefID)
 	}
 }
@@ -542,18 +549,15 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 		vdrSet.Add(vdr.ID())
 	}
 
-	if numVdrs := len(vdrs); numVdrs != p.K {
-		t.Config.Context.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
-		return
-	}
+	toSample := ids.ShortSet{}
+	toSample.Union(vdrSet)
 
 	t.RequestID++
-	if !t.polls.Add(t.RequestID, vdrSet.Len()) {
-		t.Config.Context.Log.Error("query for %s was dropped due to use of a duplicated requestID", blkID)
-		return
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
+		t.Config.Sender.PullQuery(toSample, t.RequestID, blkID)
+	} else if numVdrs < p.K {
+		t.Config.Context.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
-
-	t.Config.Sender.PullQuery(vdrSet, t.RequestID, blkID)
 }
 
 // send a push request for this block
@@ -566,20 +570,15 @@ func (t *Transitive) pushSample(blk snowman.Block) {
 		vdrSet.Add(vdr.ID())
 	}
 
-	blkID := blk.ID()
-	if numVdrs := len(vdrs); numVdrs != p.K {
-		t.Config.Context.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
-		return
-	}
+	toSample := ids.ShortSet{}
+	toSample.Union(vdrSet)
 
 	t.RequestID++
-	if !t.polls.Add(t.RequestID, vdrSet.Len()) {
-		t.Config.Context.Log.Error("query for %s was dropped due to use of a duplicated requestID", blkID)
-		return
+	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
+		t.Config.Sender.PushQuery(toSample, t.RequestID, blk.ID(), blk.Bytes())
+	} else if numVdrs < p.K {
+		t.Config.Context.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
-
-	t.Config.Sender.PushQuery(vdrSet, t.RequestID, blkID, blk.Bytes())
-	return
 }
 
 func (t *Transitive) deliver(blk snowman.Block) error {
@@ -647,4 +646,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.numBlkRequests.Set(float64(t.blkReqs.Len()))
 	t.numBlockedBlk.Set(float64(t.pending.Len()))
 	return t.errs.Err
+}
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (t *Transitive) IsBootstrapped() bool {
+	return t.bootstrapped
 }

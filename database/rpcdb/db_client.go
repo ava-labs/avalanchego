@@ -27,7 +27,7 @@ func NewClient(client rpcdbproto.DatabaseClient) *DatabaseClient {
 	return &DatabaseClient{client: client}
 }
 
-// Has returns false, nil
+// Has attempts to return if the database has a key with the provided value.
 func (db *DatabaseClient) Has(key []byte) (bool, error) {
 	resp, err := db.client.Has(context.Background(), &rpcdbproto.HasRequest{
 		Key: key,
@@ -38,7 +38,7 @@ func (db *DatabaseClient) Has(key []byte) (bool, error) {
 	return resp.Has, nil
 }
 
-// Get returns nil, error
+// Get attempts to return the value that was mapped to the key that was provided
 func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 	resp, err := db.client.Get(context.Background(), &rpcdbproto.GetRequest{
 		Key: key,
@@ -49,7 +49,7 @@ func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 	return resp.Value, nil
 }
 
-// Put returns nil
+// Put attempts to set the value this key maps to
 func (db *DatabaseClient) Put(key, value []byte) error {
 	_, err := db.client.Put(context.Background(), &rpcdbproto.PutRequest{
 		Key:   key,
@@ -58,7 +58,7 @@ func (db *DatabaseClient) Put(key, value []byte) error {
 	return updateError(err)
 }
 
-// Delete returns nil
+// Delete attempts to remove any mapping from the key
 func (db *DatabaseClient) Delete(key []byte) error {
 	_, err := db.client.Delete(context.Background(), &rpcdbproto.DeleteRequest{
 		Key: key,
@@ -99,7 +99,7 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 	}
 }
 
-// Stat returns an error
+// Stat attempts to return the statistic of this database
 func (db *DatabaseClient) Stat(property string) (string, error) {
 	resp, err := db.client.Stat(context.Background(), &rpcdbproto.StatRequest{
 		Property: property,
@@ -110,7 +110,7 @@ func (db *DatabaseClient) Stat(property string) (string, error) {
 	return resp.Stat, nil
 }
 
-// Compact returns nil
+// Compact attempts to optimize the space utilization in the provided range
 func (db *DatabaseClient) Compact(start, limit []byte) error {
 	_, err := db.client.Compact(context.Background(), &rpcdbproto.CompactRequest{
 		Start: start,
@@ -119,7 +119,7 @@ func (db *DatabaseClient) Compact(start, limit []byte) error {
 	return updateError(err)
 }
 
-// Close returns nil
+// Close attempts to close the database
 func (db *DatabaseClient) Close() error {
 	_, err := db.client.Close(context.Background(), &rpcdbproto.CloseRequest{})
 	return updateError(err)
@@ -180,7 +180,11 @@ func (b *batch) Write() error {
 }
 
 func (b *batch) Reset() {
-	b.writes = b.writes[:0]
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.size = 0
 }
 
@@ -207,7 +211,8 @@ type iterator struct {
 	err   error
 }
 
-// Next returns false
+// Next attempts to move the iterator to the next element and returns if this
+// succeeded
 func (it *iterator) Next() bool {
 	resp, err := it.db.client.IteratorNext(context.Background(), &rpcdbproto.IteratorNextRequest{
 		Id: it.id,
@@ -221,7 +226,7 @@ func (it *iterator) Next() bool {
 	return resp.FoundNext
 }
 
-// Error returns any errors
+// Error returns any that occurred while iterating
 func (it *iterator) Error() error {
 	if it.err != nil {
 		return it.err
@@ -234,19 +239,21 @@ func (it *iterator) Error() error {
 	return it.err
 }
 
-// Key returns nil
+// Key returns the key of the current element
 func (it *iterator) Key() []byte { return it.key }
 
-// Value returns nil
+// Value returns the value of the current element
 func (it *iterator) Value() []byte { return it.value }
 
-// Release does nothing
+// Release frees any resources held by the iterator
 func (it *iterator) Release() {
 	it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
 		Id: it.id,
 	})
 }
 
+// updateError sets the error value to the errors required by the Database
+// interface
 func updateError(err error) error {
 	if err == nil {
 		return nil

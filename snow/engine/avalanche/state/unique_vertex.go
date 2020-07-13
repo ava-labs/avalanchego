@@ -54,6 +54,8 @@ func (vtx *uniqueVertex) refresh() {
 func (vtx *uniqueVertex) Evict() {
 	if vtx.v != nil {
 		vtx.v.unique = false
+		// make sure the parents are able to be garbage collected
+		vtx.v.parents = nil
 	}
 }
 

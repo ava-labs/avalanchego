@@ -4,12 +4,14 @@
 package router
 
 import (
+	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Handler passes incoming messages from the network to the consensus engine
@@ -17,12 +19,18 @@ import (
 type Handler struct {
 	metrics
 
-	msgs    chan message
-	closed  chan struct{}
-	engine  common.Engine
-	msgChan <-chan common.Message
+	msgs             chan message
+	reliableMsgsSema chan struct{}
+	reliableMsgsLock sync.Mutex
+	reliableMsgs     []message
+	closed           chan struct{}
+	msgChan          <-chan common.Message
+
+	ctx    *snow.Context
+	engine common.Engine
 
 	toClose func()
+	closing bool
 }
 
 // Initialize this consensus handler
@@ -35,48 +43,58 @@ func (h *Handler) Initialize(
 ) {
 	h.metrics.Initialize(namespace, metrics)
 	h.msgs = make(chan message, bufferSize)
+	h.reliableMsgsSema = make(chan struct{}, 1)
 	h.closed = make(chan struct{})
-	h.engine = engine
 	h.msgChan = msgChan
+
+	h.ctx = engine.Context()
+	h.engine = engine
 }
 
 // Context of this Handler
 func (h *Handler) Context() *snow.Context { return h.engine.Context() }
 
+// Engine returns the engine this handler dispatches to
+func (h *Handler) Engine() common.Engine { return h.engine }
+
+// SetEngine sets the engine this handler dispatches to
+func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
+
 // Dispatch waits for incoming messages from the network
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
-	log := h.Context().Log
 	defer func() {
-		log.Info("finished shutting down chain")
+		h.ctx.Log.Info("finished shutting down chain")
 		close(h.closed)
 	}()
 
-	closing := false
 	for {
 		select {
 		case msg, ok := <-h.msgs:
 			if !ok {
+				// the msgs channel has been closed, so this dispatcher should exit
 				return
 			}
+
 			h.metrics.pending.Dec()
-			if closing {
-				log.Debug("dropping message due to closing:\n%s", msg)
-				continue
-			}
-			if h.dispatchMsg(msg) {
-				closing = true
+			h.dispatchMsg(msg)
+		case <-h.reliableMsgsSema:
+			// get all the reliable messages
+			h.reliableMsgsLock.Lock()
+			msgs := h.reliableMsgs
+			h.reliableMsgs = nil
+			h.reliableMsgsLock.Unlock()
+
+			// fire all the reliable messages
+			for _, msg := range msgs {
+				h.metrics.pending.Dec()
+				h.dispatchMsg(msg)
 			}
 		case msg := <-h.msgChan:
-			if closing {
-				log.Debug("dropping internal message due to closing:\n%s", msg)
-				continue
-			}
-			if h.dispatchMsg(message{messageType: notifyMsg, notification: msg}) {
-				closing = true
-			}
+			// handle a message from the VM
+			h.dispatchMsg(message{messageType: notifyMsg, notification: msg})
 		}
-		if closing && h.toClose != nil {
+		if h.closing && h.toClose != nil {
 			go h.toClose()
 		}
 	}
@@ -85,14 +103,19 @@ func (h *Handler) Dispatch() {
 // Dispatch a message to the consensus engine.
 // Returns true iff this consensus handler (and its associated engine) should shutdown
 // (due to receipt of a shutdown message)
-func (h *Handler) dispatchMsg(msg message) bool {
+func (h *Handler) dispatchMsg(msg message) {
+	if h.closing {
+		h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
+		h.metrics.dropped.Inc()
+		return
+	}
+
 	startTime := time.Now()
-	ctx := h.engine.Context()
 
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
+	h.ctx.Lock.Lock()
+	defer h.ctx.Lock.Unlock()
 
-	ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
+	h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
 	var (
 		err  error
 		done bool
@@ -159,9 +182,10 @@ func (h *Handler) dispatchMsg(msg message) bool {
 	}
 
 	if err != nil {
-		ctx.Log.Fatal("forcing chain to shutdown due to %s", err)
+		h.ctx.Log.Fatal("forcing chain to shutdown due to %s", err)
 	}
-	return done || err != nil
+
+	h.closing = done || err != nil
 }
 
 // GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
@@ -187,8 +211,8 @@ func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, co
 
 // GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
 // from the network to the consensus engine.
-func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) bool {
-	return h.sendMsg(message{
+func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) {
+	h.sendReliableMsg(message{
 		messageType: getAcceptedFrontierFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
@@ -219,9 +243,38 @@ func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerI
 
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
 // network to the consensus engine.
-func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) bool {
-	return h.sendMsg(message{
+func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) {
+	h.sendReliableMsg(message{
 		messageType: getAcceptedFailedMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+	})
+}
+
+// GetAncestors passes a GetAncestors message received from the network to the consensus engine.
+func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) bool {
+	return h.sendMsg(message{
+		messageType: getAncestorsMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+		containerID: containerID,
+	})
+}
+
+// MultiPut passes a MultiPut message received from the network to the consensus engine.
+func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) bool {
+	return h.sendMsg(message{
+		messageType: multiPutMsg,
+		validatorID: validatorID,
+		requestID:   requestID,
+		containers:  containers,
+	})
+}
+
+// GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
+func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
+	h.sendReliableMsg(message{
+		messageType: getAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 	})
@@ -231,16 +284,6 @@ func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) b
 func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) bool {
 	return h.sendMsg(message{
 		messageType: getMsg,
-		validatorID: validatorID,
-		requestID:   requestID,
-		containerID: containerID,
-	})
-}
-
-// GetAncestors passes a GetAncestors message received from the network to the consensus engine.
-func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) bool {
-	return h.sendMsg(message{
-		messageType: getAncestorsMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		containerID: containerID,
@@ -258,29 +301,10 @@ func (h *Handler) Put(validatorID ids.ShortID, requestID uint32, containerID ids
 	})
 }
 
-// MultiPut passes a MultiPut message received from the network to the consensus engine.
-func (h *Handler) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) bool {
-	return h.sendMsg(message{
-		messageType: multiPutMsg,
-		validatorID: validatorID,
-		requestID:   requestID,
-		containers:  containers,
-	})
-}
-
 // GetFailed passes a GetFailed message to the consensus engine.
-func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) bool {
-	return h.sendMsg(message{
+func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
+	h.sendReliableMsg(message{
 		messageType: getFailedMsg,
-		validatorID: validatorID,
-		requestID:   requestID,
-	})
-}
-
-// GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
-func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) bool {
-	return h.sendMsg(message{
-		messageType: getAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 	})
@@ -318,8 +342,8 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set
 }
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.
-func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) bool {
-	return h.sendMsg(message{
+func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
+	h.sendReliableMsg(message{
 		messageType: queryFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
@@ -341,8 +365,9 @@ func (h *Handler) Notify(msg common.Message) bool {
 
 // Shutdown shuts down the dispatcher
 func (h *Handler) Shutdown() {
-	h.metrics.pending.Inc()
-	h.msgs <- message{messageType: shutdownMsg}
+	h.sendReliableMsg(message{
+		messageType: shutdownMsg,
+	})
 }
 
 func (h *Handler) sendMsg(msg message) bool {
@@ -353,5 +378,17 @@ func (h *Handler) sendMsg(msg message) bool {
 	default:
 		h.metrics.dropped.Inc()
 		return false
+	}
+}
+
+func (h *Handler) sendReliableMsg(msg message) {
+	h.reliableMsgsLock.Lock()
+	defer h.reliableMsgsLock.Unlock()
+
+	h.metrics.pending.Inc()
+	h.reliableMsgs = append(h.reliableMsgs, msg)
+	select {
+	case h.reliableMsgsSema <- struct{}{}:
+	default:
 	}
 }

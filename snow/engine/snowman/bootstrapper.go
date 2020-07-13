@@ -115,6 +115,9 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
+		if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+			return b.finish()
+		}
 		return nil
 	}
 
@@ -224,7 +227,8 @@ func (b *bootstrapper) finish() error {
 	if b.finished {
 		return nil
 	}
-	b.BootstrapConfig.Context.Log.Info("bootstrapping finished fetching blocks. executing state transitions...")
+	b.BootstrapConfig.Context.Log.Info("bootstrapping finished fetching %d blocks. executing state transitions...",
+		b.numFetched)
 
 	if err := b.executeAll(b.Blocked, b.numBlocked); err != nil {
 		return err
@@ -262,5 +266,6 @@ func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge)
 			b.BootstrapConfig.Context.Log.Info("executed %d blocks", numExecuted)
 		}
 	}
+	b.BootstrapConfig.Context.Log.Info("executed %d blocks", numExecuted)
 	return nil
 }

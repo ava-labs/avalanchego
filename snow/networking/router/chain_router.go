@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/formatting"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -67,7 +69,7 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 	sr.lock.RLock()
 	chain, exists := sr.chains[chainID.Key()]
 	if !exists {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("can't remove unknown chain %s", chainID)
 		sr.lock.RUnlock()
 		return
 	}
@@ -95,7 +97,7 @@ func (sr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAcceptedFrontier(validatorID, requestID)
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("GetAcceptedFrontier(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -111,7 +113,7 @@ func (sr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
 	}
 }
 
@@ -122,19 +124,12 @@ func (sr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetAcceptedFrontierFailed(validatorID, requestID) {
-			sr.log.Debug("deferring GetAcceptedFrontier timeout due to a full queue on %s", chainID)
-			// Defer this call to later
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.GetAcceptedFrontierFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.GetAcceptedFrontierFailed(validatorID, requestID)
+	} else {
+		sr.log.Error("GetAcceptedFrontierFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+	}
 }
 
 // GetAccepted routes an incoming GetAccepted request from the
@@ -147,7 +142,7 @@ func (sr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAccepted(validatorID, requestID, containerIDs)
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("GetAccepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
 	}
 }
 
@@ -163,7 +158,7 @@ func (sr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("Accepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
 	}
 }
 
@@ -174,18 +169,12 @@ func (sr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetAcceptedFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring GetAccepted timeout due to a full queue on %s", chainID)
-				sr.GetAcceptedFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.GetAcceptedFailed(validatorID, requestID)
+	} else {
+		sr.log.Error("GetAcceptedFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+	}
 }
 
 // GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
@@ -198,7 +187,7 @@ func (sr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAncestors(validatorID, requestID, containerID)
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("GetAncestors(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -215,7 +204,7 @@ func (sr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
 	}
 }
 
@@ -225,18 +214,12 @@ func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetAncestorsFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring GetAncestors timeout due to a full queue on %s", chainID)
-				sr.GetAncestorsFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.GetAncestorsFailed(validatorID, requestID)
+	} else {
+		sr.log.Error("GetAncestorsFailed(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+	}
 }
 
 // Get routes an incoming Get request from the validator with ID [validatorID]
@@ -248,7 +231,7 @@ func (sr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.Get(validatorID, requestID, containerID)
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("Get(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 	}
 }
 
@@ -265,7 +248,8 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+		sr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
 }
 
@@ -275,18 +259,12 @@ func (sr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.GetFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring Get timeout due to a full queue on %s", chainID)
-				sr.GetFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.GetFailed(validatorID, requestID)
+	} else {
+		sr.log.Error("GetFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+	}
 }
 
 // PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
@@ -298,7 +276,8 @@ func (sr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.PushQuery(validatorID, requestID, containerID, container)
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("PushQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+		sr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
 }
 
@@ -311,7 +290,7 @@ func (sr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.PullQuery(validatorID, requestID, containerID)
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("PullQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 	}
 }
 
@@ -327,7 +306,7 @@ func (sr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
 	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
+		sr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
 	}
 }
 
@@ -337,18 +316,12 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
-	if chain, exists := sr.chains[chainID.Key()]; exists {
-		if !chain.QueryFailed(validatorID, requestID) {
-			sr.timeouts.Register(validatorID, chainID, requestID, func() {
-				sr.log.Debug("deferring Query timeout due to a full queue on %s", chainID)
-				sr.QueryFailed(validatorID, chainID, requestID)
-			})
-			return
-		}
-	} else {
-		sr.log.Debug("message referenced a chain, %s, this node doesn't validate", chainID)
-	}
 	sr.timeouts.Cancel(validatorID, chainID, requestID)
+	if chain, exists := sr.chains[chainID.Key()]; exists {
+		chain.QueryFailed(validatorID, requestID)
+	} else {
+		sr.log.Error("QueryFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+	}
 }
 
 // Shutdown shuts down this router
