@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -428,66 +429,105 @@ func (n *Node) initSharedMemory() {
 
 // initKeystoreAPI initializes the keystore service
 // Assumes n.APIServer is already set
-func (n *Node) initKeystoreAPI() {
-	n.Log.Info("initializing Keystore API")
+func (n *Node) initKeystoreAPI() error {
+	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
 	n.keystoreServer.Initialize(n.Log, keystoreDB)
 	keystoreHandler := n.keystoreServer.CreateHandler()
-	if n.Config.KeystoreAPIEnabled {
-		n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	if !n.Config.KeystoreAPIEnabled {
+		n.Log.Info("skipping keystore API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing keystore API")
+	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+
 }
 
 // initMetricsAPI initializes the Metrics API
 // Assumes n.APIServer is already set
-func (n *Node) initMetricsAPI() {
-	n.Log.Info("initializing Metrics API")
+func (n *Node) initMetricsAPI() error {
 	registry, handler := metrics.NewService()
-	if n.Config.MetricsAPIEnabled {
-		n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
-	}
+	// It is assumed by components of the system that the Metrics interface is
+	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
+	if !n.Config.MetricsAPIEnabled {
+		n.Log.Info("skipping metrics API initialization because it has been disabled")
+		return nil
+	}
+	n.Log.Info("initializing metrics API")
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
 
 // initAdminAPI initializes the Admin API service
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
-func (n *Node) initAdminAPI() {
-	if n.Config.AdminAPIEnabled {
-		n.Log.Info("initializing Admin API")
-		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
-		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+func (n *Node) initAdminAPI() error {
+	if !n.Config.AdminAPIEnabled {
+		n.Log.Info("skipping admin API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing admin API")
+	service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 }
 
-func (n *Node) initInfoAPI() {
-	if n.Config.InfoAPIEnabled {
-		n.Log.Info("initializing Info API")
-		service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
-		n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+func (n *Node) initInfoAPI() error {
+	if !n.Config.InfoAPIEnabled {
+		n.Log.Info("skipping info API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing info API")
+	service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+
 }
 
 // initHealthAPI initializes the Health API service
-// Assumes n.Log, n.ConsensusAPI, and n.ValidatorAPI already initialized
-func (n *Node) initHealthAPI() {
+// Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
+func (n *Node) initHealthAPI() error {
 	if !n.Config.HealthAPIEnabled {
-		return
+		n.Log.Info("skipping health API initializaion because it has been disabled")
+		return nil
 	}
-
 	n.Log.Info("initializing Health API")
 	service := health.NewService(n.Log)
-	service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute)
-	n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
+	if err := service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute); err != nil {
+		return fmt.Errorf("couldn't register heartbeat health check: %w", err)
+	}
+	isBootstrappedFunc := func() (interface{}, error) {
+		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
+			return nil, errors.New("P-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(pChainID) {
+			return nil, errors.New("P-Chain not bootstrapped")
+		}
+		if xChainID, err := n.chainManager.Lookup("X"); err != nil {
+			return nil, errors.New("X-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(xChainID) {
+			return nil, errors.New("X-Chain not bootstrapped")
+		}
+		if cChainID, err := n.chainManager.Lookup("C"); err != nil {
+			return nil, errors.New("C-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(cChainID) {
+			return nil, errors.New("C-Chain not bootstrapped")
+		}
+		return nil, nil
+	}
+	// Passes if the P, X and C chains are finished bootstrapping
+	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
+		return err
+	}
+	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
 // initIPCAPI initializes the IPC API service
 // Assumes n.log and n.chainManager already initialized
-func (n *Node) initIPCAPI() {
-	if n.Config.IPCEnabled {
-		n.Log.Info("initializing IPC API")
-		service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
-		n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
+func (n *Node) initIPCAPI() error {
+	if !n.Config.IPCEnabled {
+		n.Log.Info("skipping ipc API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing ipc API")
+	service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
 // Give chains and VMs aliases as specified by the genesis information
@@ -546,9 +586,13 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.initBeacons()
 
 	// Start HTTP APIs
-	n.initAPIServer()   // Start the API Server
-	n.initKeystoreAPI() // Start the Keystore API
-	n.initMetricsAPI()  // Start the Metrics API
+	n.initAPIServer()                           // Start the API Server
+	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
+		return fmt.Errorf("couldn't initialize keystore API: %w", err)
+	}
+	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
+		return fmt.Errorf("couldn't initialize metrics API: %w", err)
+	}
 
 	n.initSharedMemory() // Initialize shared memory
 
@@ -568,16 +612,25 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 	n.initChainManager() // Set up the chain manager
 
-	n.initAdminAPI()  // Start the Admin API
-	n.initInfoAPI()   // Start the Info API
-	n.initHealthAPI() // Start the Health API
-	n.initIPCAPI()    // Start the IPC API
-
-	if err := n.initAliases(); err != nil { // Set up aliases
-		return err
+	if err := n.initAdminAPI(); err != nil { // Start the Admin API
+		return fmt.Errorf("couldn't initialize admin API: %w", err)
 	}
-
-	return n.initChains(genesisBytes, avaxAssetID) // Start the blockchains
+	if err := n.initInfoAPI(); err != nil { // Start the Info API
+		return fmt.Errorf("couldn't initialize info API: %w", err)
+	}
+	if err := n.initHealthAPI(); err != nil { // Start the Health API
+		return fmt.Errorf("couldn't initialize health API: %w", err)
+	}
+	if err := n.initIPCAPI(); err != nil { // Start the IPC API
+		return fmt.Errorf("couldn't initialize ipc API: %w", err)
+	}
+	if err := n.initAliases(); err != nil { // Set up aliases
+		return fmt.Errorf("couldn't initialize aliases: %w", err)
+	}
+	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
+		return fmt.Errorf("couldn't initialize chains: %w", err)
+	}
+	return nil
 }
 
 // Shutdown this node
