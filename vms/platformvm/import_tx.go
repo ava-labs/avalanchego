@@ -198,6 +198,9 @@ func (vm *VM) newImportTx(
 	feeKeys []*crypto.PrivateKeySECP256K1R, // Pay the fee
 	recipientKey *crypto.PrivateKeySECP256K1R, // Keys that control the UTXOs being imported
 ) (*ImportTx, error) {
+	if recipientKey == nil {
+		return nil, errors.New("recipient key not provided")
+	}
 	// Calculate some of the inputs, outputs, and keys used to sign this tx
 	// These inputs/outputs pay the tx fee
 	ins, outs, credKeys, err := vm.spend(vm.DB, vm.txFee, feeKeys)

@@ -41,6 +41,8 @@ var (
 	// AVAX asset ID in tests
 	avaxAssetID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
 
+	defaultTxFee = 1
+
 	// chain timestamp at genesis
 	defaultGenesisTime = time.Now().Round(time.Second)
 
@@ -180,6 +182,7 @@ func defaultVM() *VM {
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
 		avaxAssetID:  avaxAssetID,
+		txFee:        1,
 	}
 
 	defaultSubnet := validators.NewSet() // TODO do we need this?
@@ -251,7 +254,13 @@ func TestGenesis(t *testing.T) {
 		} else if out, ok := utxos[0].Out.(*secp256k1fx.TransferOutput); !ok {
 			t.Fatal("expected utxo output to be type *secp256k1fx.TransferOutput")
 		} else if out.Amount() != uint64(utxo.Amount) {
-			t.Fatalf("expected UTXO to have value %d but has value %d", out.Amount(), uint64(utxo.Amount))
+			if utxo.Address.Equals(keys[0].PublicKey().Address()) { // Address that paid tx fee to create testSubnet1 has less tokens
+				if out.Amount() != uint64(utxo.Amount)-vm.txFee {
+					t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount)-vm.txFee, out.Amount())
+				}
+			} else {
+				t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount), out.Amount())
+			}
 		}
 	}
 
@@ -316,7 +325,7 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -389,7 +398,7 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 	// create invalid tx
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -438,7 +447,7 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,

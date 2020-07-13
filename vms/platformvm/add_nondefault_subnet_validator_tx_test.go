@@ -239,7 +239,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	DSEndTime := DSStartTime.Add(5 * MinimumStakingDuration)
 
 	addDSTx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,                      // stake amount
+		MinimumStakeAmount,                      // stake amount
 		uint64(DSStartTime.Unix()),              // start time
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
@@ -354,25 +354,23 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create new key whose account has no $AVA
+	// Create new key with no tokens
 	factory := crypto.FactorySECP256K1R{}
 	newAcctKey, err := factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                           // weight
+	if _, err := vm.newAddNonDefaultSubnetValidatorTx(
+		MinimumStakeAmount,                      // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
 		nodeID,                                  // node ID
 		testSubnet1.id,                          // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		[]*crypto.PrivateKeySECP256K1R{newAcctKey.(*crypto.PrivateKeySECP256K1R)}, // tx fee payer
-	); err != nil {
-		t.Fatal(err)
-	} else if _, _, _, _, err = tx.SemanticVerify(vm.DB); err == nil {
-		t.Fatal("should have failed verification because payer account has no $AVA to pay fee")
+	); err == nil {
+		t.Fatal("should have failed verification because payer account has no tokens to pay fee")
 	}
 
 	// Case: Proposed validator already validating the non-default subnet

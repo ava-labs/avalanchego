@@ -31,7 +31,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 2: Tx ID is nil
 	tx, err := vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -48,7 +48,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 3: Wrong network ID
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -65,7 +65,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 4: Missing Node ID
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -98,7 +98,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 6: Validation length is too short
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix())-1,
 		nodeID,
@@ -115,7 +115,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 7: Validation length is too long
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix())+1,
 		nodeID,
@@ -132,7 +132,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 8: Valid
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -162,7 +162,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	// but stops validating non-default subnet after stops validating default subnet
 	// (note that defaultKey is a genesis validator)
 	tx, err := vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix())+1,
 		nodeID,
@@ -183,7 +183,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	// default subnet validation period
 	// (note that keys[0] is a genesis validator)
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix())+1,
 		nodeID,
@@ -211,7 +211,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	DSEndTime := DSStartTime.Add(5 * MinimumStakingDuration)
 
 	addDSTx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,                      // stake amount
+		MinimumStakeAmount,                      // stake amount
 		uint64(DSStartTime.Unix()),              // start time
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
@@ -225,7 +225,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 
 	// Case 3: Proposed validator isn't in pending or current validator sets
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(DSStartTime.Unix()),
 		uint64(DSEndTime.Unix()),
 		pendingDSValidatorID,
@@ -256,7 +256,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	// Case 4: Proposed validator is pending validator of default subnet
 	// but starts validating non-default subnet before default subnet
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(DSStartTime.Unix())-1, // start validating non-default subnet before default subnet
 		uint64(DSEndTime.Unix()),
 		pendingDSValidatorID,
@@ -276,7 +276,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	// Case 5: Proposed validator is pending validator of default subnet
 	// but stops validating non-default subnet after default subnet
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(DSStartTime.Unix()),
 		uint64(DSEndTime.Unix())+1, // stop validating non-default subnet after stopping validating default subnet
 		pendingDSValidatorID,
@@ -296,7 +296,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	// Case 6: Proposed validator is pending validator of default subnet
 	// and period validating non-default subnet is subset of time validating default subnet
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(DSStartTime.Unix()), // same start time as for default subnet
 		uint64(DSEndTime.Unix()),   // same end time as for default subnet
 		pendingDSValidatorID,
@@ -320,7 +320,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,                                      // weight
+		MinimumStakeAmount,                                      // weight
 		uint64(newTimestamp.Unix()),                             // start time
 		uint64(newTimestamp.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,                                  // node ID
@@ -353,7 +353,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		defaultStakeAmount,                      // weight
+		MinimumStakeAmount,                      // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
 		nodeID,                                  // node ID

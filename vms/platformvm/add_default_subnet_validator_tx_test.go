@@ -35,7 +35,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 2: ID is nil
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -53,7 +53,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 3: Wrong Network ID
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -61,17 +61,17 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
-	tx.NetworkID = tx.NetworkID + 1
 	if err != nil {
 		t.Fatal(err)
 	}
+	tx.NetworkID = tx.NetworkID + 1
 	if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
 	// Case 4: Node ID is nil
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -89,7 +89,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 5: Destination ID is nil
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -124,7 +124,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 7: Too many shares
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -141,7 +141,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 8.1: Validation length is too short
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix())-1,
 		nodeID,
@@ -158,7 +158,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 8.2: Validation length is negative
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Unix())-1,
 		nodeID,
@@ -175,7 +175,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 9: Validation length is too long
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix())+1,
 		nodeID,
@@ -192,7 +192,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case 10: Valid
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -226,7 +226,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Validator's start time too early
 	if tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix())-1,
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -256,7 +256,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Validator already validating default subnet
 	if tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID, // node ID
@@ -277,7 +277,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultStakeAmount,       // stake amount
+		MinimumStakeAmount,       // stake amount
 		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
 		key2.PublicKey().Address(),                           // node ID
