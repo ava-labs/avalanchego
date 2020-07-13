@@ -407,7 +407,7 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blk, err := vm.newProposalBlock(vm.LastAccepted(), tx)
+	blk, err := vm.newProposalBlock(vm.LastAccepted(), vm.preferredHeight()+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	} else if err := vm.State.PutBlock(vm.DB, blk); err != nil {
@@ -1233,12 +1233,12 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstVM.preferredHeight()+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	firstVM.clock.Set(defaultGenesisTime.Add(2 * time.Second))
+	firstVM.clock.Set(defaultGenesisTime.Add(3 * time.Second))
 	if err := firstAdvanceTimeBlk.Verify(); err != nil {
 		t.Fatal(err)
 	}
@@ -1255,15 +1255,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	firstVM.clock.Set(defaultGenesisTime.Add(4 * time.Second))
-
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{
-		0, 0, 0, 0, 173, 100, 52, 73, 165, 5, 216,
-		218, 198, 209, 184, 44, 92, 230, 6, 129,
-		243, 84, 191, 15, 247, 196, 177, 194, 169,
-		110, 146, 193, 216, 216, 240, 206, 0, 0, 0,
-		25, 0, 0, 0, 0, 95, 12, 121, 85,
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
+		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
+		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
+		0, 95, 12, 157, 133,
 	}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
@@ -1327,38 +1323,44 @@ func TestRestartFullyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstVM.preferredHeight()+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	firstVM.clock.Set(defaultGenesisTime.Add(2 * time.Second))
+	firstVM.clock.Set(defaultGenesisTime.Add(3 * time.Second))
 	if err := firstAdvanceTimeBlk.Verify(); err != nil {
 		t.Fatal(err)
 	}
-
 	options := firstAdvanceTimeBlk.Options()
-	firstOption := options[0]
-	secondOption := options[1]
-
-	if err := firstOption.Verify(); err != nil {
+	if err := options[0].Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := options[1].Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := firstAdvanceTimeBlk.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := options[0].Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := options[1].Reject(); err != nil {
 		t.Fatal(err)
 	}
-	if err := secondOption.Verify(); err != nil {
+
+	/* This code, when uncommented, prints [secondAdvanceTimeBlkBytes]
+	secondAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(2*time.Second))
+	if err != nil {
 		t.Fatal(err)
 	}
-
-	firstAdvanceTimeBlk.Accept()
-	firstOption.Accept()
-	secondOption.Reject()
+	secondAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstVM.preferredHeight()+1, secondAdvanceTimeTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Fatal(secondAdvanceTimeBlk.Bytes())
+	*/
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{
-		0, 0, 0, 0, 173, 100, 52, 73, 165, 5, 216,
-		218, 198, 209, 184, 44, 92, 230, 6, 129,
-		243, 84, 191, 15, 247, 196, 177, 194, 169,
-		110, 146, 193, 216, 216, 240, 206, 0, 0, 0,
-		25, 0, 0, 0, 0, 95, 12, 121, 85,
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
+		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
+		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
+		0, 95, 12, 157, 133,
 	}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
@@ -1387,9 +1389,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
-	}
-
-	if lastAccepted := secondVM.LastAccepted(); !firstOption.ID().Equals(lastAccepted) {
+	} else if lastAccepted := secondVM.LastAccepted(); !options[0].ID().Equals(lastAccepted) {
 		t.Fatalf("Should have changed the genesis")
 	}
 }
@@ -1431,7 +1431,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), advanceTimeTx)
+	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), vm.preferredHeight()+1, advanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1575,7 +1575,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), vm.preferredHeight()+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1593,7 +1593,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), secondAdvanceTimeTx)
+	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, secondAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}

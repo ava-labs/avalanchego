@@ -128,7 +128,7 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes, err := Genesis(LocalID)
+	genesisBytes, _, err := Genesis(LocalID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,22 +147,22 @@ func TestVMGenesis(t *testing.T) {
 		{
 			networkID:  CascadeID,
 			vmID:       avm.ID,
-			expectedID: "4ktRjsAKxgMr2aEzv9SWmrU7Xk5FniHUrVCX4P1TZSfTLZWFM",
+			expectedID: "2MAsZHkTD5diKDiok34XASk1GMsLEMJQmCCGsWqVseDMwgZpoz",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       avm.ID,
-			expectedID: "4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH",
+			expectedID: "2nvFvaf8zjxKAeoWVnSj8H216dYussYsTNzS4ym7FYpPaMPUdp",
 		},
 		{
 			networkID:  CascadeID,
 			vmID:       EVMID,
-			expectedID: "2mUYSXfLrDtigwbzj1LxKVsHwELghc5sisoXrzJwLqAAQHF4i",
+			expectedID: "21CSKU23JjT1XEDUAP8X4qPwMn5U287SV47UyXyWT2cmyq2vVk",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       EVMID,
-			expectedID: "tZGm6RCkeGpVETUTp11DW3UYFZmm69zfqxchpHrSF7wgy8rmw",
+			expectedID: "wq1BBr15MMmwTCJ2Q2ggUeWFbeuecHzxdTKuAyyftKgLRrc3q",
 		},
 	}
 
@@ -181,7 +181,7 @@ func TestVMGenesis(t *testing.T) {
 	}
 }
 
-func TestAVAAssetID(t *testing.T) {
+func TestAVAXAssetID(t *testing.T) {
 	tests := []struct {
 		networkID  uint32
 		expectedID string
@@ -197,11 +197,11 @@ func TestAVAAssetID(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		avaID, err := AVAAssetID(test.networkID)
+		_, avaxAssetID, err := Genesis(test.networkID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if result := avaID.String(); test.expectedID != result {
+		if result := avaxAssetID.String(); test.expectedID != result {
 			t.Fatalf("AVA assetID with networkID %d was expected to be %s but was %s",
 				test.networkID,
 				test.expectedID,

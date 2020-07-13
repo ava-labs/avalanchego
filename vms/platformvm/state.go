@@ -326,6 +326,13 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error
 	return nil, fmt.Errorf("couldn't find subnet with ID %s", id)
 }
 
+// Returns the height of the preferred block
+func (vm *VM) preferredHeight() uint64 {
+	preferred, err := vm.getBlock(vm.Preferred())
+	vm.Ctx.Log.AssertNoError(err)
+	return preferred.Height()
+}
+
 // register each type that we'll be storing in the database
 // so that [vm.State] knows how to unmarshal these types from bytes
 func (vm *VM) registerDBTypes() {
