@@ -1249,20 +1249,21 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	if err := firstOption.Verify(); err != nil {
 		t.Fatal(err)
-	}
-	if err := secondOption.Verify(); err != nil {
+	} else if err := secondOption.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := firstAdvanceTimeBlk.Accept(); err != nil { // time advances to defaultGenesisTime.Add(time.Second)
 		t.Fatal(err)
 	}
 
-	firstAdvanceTimeBlk.Accept()
+	firstVM.clock.Set(defaultGenesisTime.Add(4 * time.Second))
 
+	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
 	secondAdvanceTimeBlkBytes := []byte{
-		0x00, 0x00, 0x00, 0x00, 0xad, 0x64, 0x34, 0x49,
-		0xa5, 0x05, 0xd8, 0xda, 0xc6, 0xd1, 0xb8, 0x2c,
-		0x5c, 0xe6, 0x06, 0x81, 0xf3, 0x54, 0xbf, 0x0f,
-		0xf7, 0xc4, 0xb1, 0xc2, 0xa9, 0x6e, 0x92, 0xc1,
-		0xd8, 0xd8, 0xf0, 0xce, 0x00, 0x00, 0x00, 0x18,
-		0x00, 0x00, 0x00, 0x00, 0x5e, 0xa7, 0xbc, 0x7c,
+		0, 0, 0, 0, 173, 100, 52, 73, 165, 5, 216,
+		218, 198, 209, 184, 44, 92, 230, 6, 129,
+		243, 84, 191, 15, 247, 196, 177, 194, 169,
+		110, 146, 193, 216, 216, 240, 206, 0, 0, 0,
+		25, 0, 0, 0, 0, 95, 12, 121, 85,
 	}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
@@ -1351,13 +1352,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstOption.Accept()
 	secondOption.Reject()
 
+	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
 	secondAdvanceTimeBlkBytes := []byte{
-		0x00, 0x00, 0x00, 0x00, 0xad, 0x64, 0x34, 0x49,
-		0xa5, 0x05, 0xd8, 0xda, 0xc6, 0xd1, 0xb8, 0x2c,
-		0x5c, 0xe6, 0x06, 0x81, 0xf3, 0x54, 0xbf, 0x0f,
-		0xf7, 0xc4, 0xb1, 0xc2, 0xa9, 0x6e, 0x92, 0xc1,
-		0xd8, 0xd8, 0xf0, 0xce, 0x00, 0x00, 0x00, 0x18,
-		0x00, 0x00, 0x00, 0x00, 0x5e, 0xa7, 0xbc, 0x7c,
+		0, 0, 0, 0, 173, 100, 52, 73, 165, 5, 216,
+		218, 198, 209, 184, 44, 92, 230, 6, 129,
+		243, 84, 191, 15, 247, 196, 177, 194, 169,
+		110, 146, 193, 216, 216, 240, 206, 0, 0, 0,
+		25, 0, 0, 0, 0, 95, 12, 121, 85,
 	}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
