@@ -160,7 +160,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 
 // Process the vertices in [vtxs].
 func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
-	// Vertices that we need to process. Store them in a heap for de-deduplication
+	// Vertices that we need to process. Store them in a heap for deduplication
 	// and so we always process vertices further down in the DAG first. This helps
 	// to reduce the number of repeated DAG traversals.
 	toProcess := vertex.NewHeap()
@@ -241,34 +241,61 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
 
-	// Make sure this is in response to a request we made
-	neededVtxID, needed := b.outstandingRequests.Remove(vdr, requestID)
-	if !needed { // this message isn't in response to a request we made, or is in response to a request that timed out
-		b.Context.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
+	requestedVtxID, requested := b.outstandingRequests.Remove(vdr, requestID)
+	vtx, err := b.Manager.ParseVertex(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
+	if err != nil {
+		if !requested {
+			b.Context.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
+			return nil
+		}
+
+		b.Context.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
+		b.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
+		return b.fetch(requestedVtxID)
+	}
+
+	vtxID := vtx.ID()
+	// If the vertex is neither the requested vertex nor a needed vertex, return early and re-fetch if necessary
+	if requested && !requestedVtxID.Equals(vtxID) {
+		b.Context.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
+		return b.fetch(requestedVtxID)
+	}
+	if !requested && !b.outstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
+		b.Context.Log.Debug("received un-needed vertex from %s with vertexID %s", vdr, vtxID)
 		return nil
 	}
 
-	neededVtx, err := b.Manager.ParseVertex(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
-	if err != nil {
-		b.Context.Log.Debug("Failed to parse requested vertex %s: %w", neededVtxID, err)
-		b.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
-		return b.fetch(neededVtxID)
-	} else if actualID := neededVtx.ID(); !actualID.Equals(neededVtxID) {
-		b.Context.Log.Debug("expected the first block to be the requested block, %s, but is %s", neededVtxID, actualID)
-		return b.fetch(neededVtxID)
+	// Do not remove from outstanding requests if this did not answer a specific outstanding request
+	// to ensure that real responses are not dropped in favor of potentially byzantine MultiPut messages that
+	// could force the node to bootstrap 1 vertex at a time.
+	b.needToFetch.Remove(vtxID)
+
+	// All vertices added to [processVertices] have received transitive votes from the accepted frontier
+	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the valid vertices in this message
+	processVertices[0] = vtx
+	eligibleVertices := ids.Set{}
+	for _, parent := range vtx.Parents() {
+		eligibleVertices.Add(parent.ID())
 	}
 
-	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the vertices in this message
-	processVertices[0] = neededVtx
-
 	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
-		if vtx, err := b.Manager.ParseVertex(vtxBytes); err != nil { // Persists the vtx
-			b.Context.Log.Debug("Failed to parse vertex: %w", err)
+		vtx, err := b.Manager.ParseVertex(vtxBytes) // Persists the vtx
+		if err != nil {
+			b.Context.Log.Debug("failed to parse vertex: %s", err)
 			b.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
-		} else {
-			processVertices = append(processVertices, vtx)
-			b.needToFetch.Remove(vtx.ID()) // No need to fetch this vertex since we have it now
+			break
 		}
+		vtxID := vtx.ID()
+		if !eligibleVertices.Contains(vtxID) {
+			b.Context.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
+			break
+		}
+		eligibleVertices.Remove(vtxID)
+		for _, parent := range vtx.Parents() {
+			eligibleVertices.Add(parent.ID())
+		}
+		processVertices = append(processVertices, vtx)
+		b.needToFetch.Remove(vtxID) // No need to fetch this vertex since we have it now
 	}
 
 	return b.process(processVertices...)

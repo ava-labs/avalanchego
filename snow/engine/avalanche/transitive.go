@@ -12,9 +12,9 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/consensus/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
@@ -439,7 +439,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 }
 
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
-	batch := []snowstorm.Tx(nil)
+	batch := make([]snowstorm.Tx, 0, t.params.BatchSize)
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
@@ -449,7 +449,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 		overlaps := consumed.Overlaps(inputs)
 		if len(batch) >= t.params.BatchSize || (force && overlaps) {
 			t.issueBatch(batch)
-			batch = nil
+			batch = make([]snowstorm.Tx, 0, t.params.BatchSize)
 			consumed.Clear()
 			issued = true
 			overlaps = false
@@ -533,4 +533,9 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.Config.Sender.Get(vdr, t.RequestID, vtxID)
 
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len())) // Tracks performance statistics
+}
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (t *Transitive) IsBootstrapped() bool {
+	return t.bootstrapped
 }

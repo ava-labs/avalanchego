@@ -27,6 +27,7 @@ var (
 		VertexIssuedTest,
 		TxIssuedTest,
 		VirtuousTest,
+		VirtuousSkippedUpdateTest,
 		VotingTest,
 		IgnoreInvalidVotingTest,
 		TransitiveVotingTest,
@@ -365,8 +366,8 @@ func VirtuousTest(t *testing.T, factory Factory) {
 			Metrics:           prometheus.NewRegistry(),
 			K:                 2,
 			Alpha:             2,
-			BetaVirtuous:      1,
-			BetaRogue:         2,
+			BetaVirtuous:      10,
+			BetaRogue:         20,
 			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
@@ -454,7 +455,13 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong number of virtuous.")
 	} else if !virtuous.Contains(vtx0.IDV) {
 		t.Fatalf("Wrong virtuous")
-	} else if err := avl.RecordPoll(ids.UniqueBag{}); err != nil {
+	}
+
+	votes := ids.UniqueBag{}
+	votes.Add(0, vtx1.ID())
+	votes.Add(1, vtx1.ID())
+
+	if err := avl.RecordPoll(votes); err != nil {
 		t.Fatal(err)
 	} else if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
 		t.Fatalf("Wrong number of virtuous.")
@@ -470,13 +477,106 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong virtuous")
 	} else if !virtuous.Contains(vts[1].ID()) {
 		t.Fatalf("Wrong virtuous")
-	} else if err := avl.RecordPoll(ids.UniqueBag{}); err != nil {
+	} else if err := avl.RecordPoll(votes); err != nil {
 		t.Fatal(err)
 	} else if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
 		t.Fatalf("Wrong number of virtuous.")
 	} else if !virtuous.Contains(vts[0].ID()) {
 		t.Fatalf("Wrong virtuous")
 	} else if !virtuous.Contains(vts[1].ID()) {
+		t.Fatalf("Wrong virtuous")
+	}
+}
+
+func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
+	avl := factory.New()
+
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      10,
+			BetaRogue:         20,
+			ConcurrentRepolls: 1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+	vts := []Vertex{
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+	}
+	utxos := []ids.ID{
+		ids.GenerateTestID(),
+		ids.GenerateTestID(),
+	}
+
+	avl.Initialize(snow.DefaultContextTest(), params, vts)
+
+	if virtuous := avl.Virtuous(); virtuous.Len() != 2 {
+		t.Fatalf("Wrong number of virtuous.")
+	} else if !virtuous.Contains(vts[0].ID()) {
+		t.Fatalf("Wrong virtuous")
+	} else if !virtuous.Contains(vts[1].ID()) {
+		t.Fatalf("Wrong virtuous")
+	}
+
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	vtx0 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+	}
+
+	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx1.InputIDsV.Add(utxos[0])
+
+	vtx1 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx1},
+	}
+
+	if err := avl.Add(vtx0); err != nil {
+		t.Fatal(err)
+	} else if virtuous := avl.Virtuous(); virtuous.Len() != 1 {
+		t.Fatalf("Wrong number of virtuous.")
+	} else if !virtuous.Contains(vtx0.IDV) {
+		t.Fatalf("Wrong virtuous")
+	} else if err := avl.Add(vtx1); err != nil {
+		t.Fatal(err)
+	} else if virtuous := avl.Virtuous(); virtuous.Len() != 1 {
+		t.Fatalf("Wrong number of virtuous.")
+	} else if !virtuous.Contains(vtx0.IDV) {
+		t.Fatalf("Wrong virtuous")
+	} else if err := avl.RecordPoll(ids.UniqueBag{}); err != nil {
+		t.Fatal(err)
+	} else if virtuous := avl.Virtuous(); virtuous.Len() != 1 {
+		t.Fatalf("Wrong number of virtuous.")
+	} else if !virtuous.Contains(vtx0.IDV) {
 		t.Fatalf("Wrong virtuous")
 	}
 }

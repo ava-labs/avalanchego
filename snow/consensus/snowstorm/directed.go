@@ -180,8 +180,9 @@ func (dg *Directed) Issued(tx Tx) bool {
 }
 
 // RecordPoll implements the Consensus interface
-func (dg *Directed) RecordPoll(votes ids.Bag) error {
+func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	dg.currentVote++
+	changed := false
 
 	votes.SetThreshold(dg.params.Alpha)
 	threshold := votes.Threshold() // Each element is ID of transaction preferred by >= Alpha poll respondents
@@ -209,20 +210,22 @@ func (dg *Directed) RecordPoll(votes ids.Bag) error {
 				fn.confidence >= dg.params.BetaRogue) {
 			dg.deferAcceptance(fn)
 			if dg.errs.Errored() {
-				return dg.errs.Err
+				return changed, dg.errs.Err
 			}
 		}
 		if !fn.accepted {
-			dg.redirectEdges(fn)
+			changed = dg.redirectEdges(fn) || changed
+		} else {
+			changed = true
 		}
 	}
-	return dg.errs.Err
+	return changed, dg.errs.Err
 }
 
 func (dg *Directed) String() string {
-	nodes := []*directedTx{}
-	for _, fn := range dg.txs {
-		nodes = append(nodes, fn)
+	nodes := make([]*directedTx, 0, len(dg.txs))
+	for _, tx := range dg.txs {
+		nodes = append(nodes, tx)
 	}
 	sortFlatNodes(nodes)
 
@@ -294,31 +297,39 @@ func (dg *Directed) reject(ids ...ids.ID) error {
 	return nil
 }
 
-func (dg *Directed) redirectEdges(fn *directedTx) {
-	for _, conflictID := range fn.outs.List() {
-		dg.redirectEdge(fn, conflictID)
+func (dg *Directed) redirectEdges(tx *directedTx) bool {
+	changed := false
+	for _, conflictID := range tx.outs.List() {
+		changed = dg.redirectEdge(tx, conflictID) || changed
 	}
+	return changed
 }
 
 // Set the confidence of all conflicts to 0
 // Change the direction of edges if needed
-func (dg *Directed) redirectEdge(fn *directedTx, conflictID ids.ID) {
+func (dg *Directed) redirectEdge(fn *directedTx, conflictID ids.ID) bool {
 	nodeID := fn.tx.ID()
-	if conflict := dg.txs[conflictID.Key()]; fn.bias > conflict.bias {
-		conflict.confidence = 0
-
-		// Change the edge direction
-		conflict.ins.Remove(nodeID)
-		conflict.outs.Add(nodeID)
-		dg.preferences.Remove(conflictID) // This consumer now has an out edge
-
-		fn.ins.Add(conflictID)
-		fn.outs.Remove(conflictID)
-		if fn.outs.Len() == 0 {
-			// If I don't have out edges, I'm preferred
-			dg.preferences.Add(nodeID)
-		}
+	conflict := dg.txs[conflictID.Key()]
+	if fn.bias <= conflict.bias {
+		return false
 	}
+
+	// TODO: why is this confidence reset here? It should already be reset
+	// implicitly by the lack of a timestamp increase.
+	conflict.confidence = 0
+
+	// Change the edge direction
+	conflict.ins.Remove(nodeID)
+	conflict.outs.Add(nodeID)
+	dg.preferences.Remove(conflictID) // This consumer now has an out edge
+
+	fn.ins.Add(conflictID)
+	fn.outs.Remove(conflictID)
+	if fn.outs.Len() == 0 {
+		// If I don't have out edges, I'm preferred
+		dg.preferences.Add(nodeID)
+	}
+	return true
 }
 
 func (dg *Directed) removeConflict(id ids.ID, ids ...ids.ID) {

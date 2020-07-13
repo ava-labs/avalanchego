@@ -45,8 +45,9 @@ type Consensus interface {
 	Conflicts(Tx) ids.Set
 
 	// Collects the results of a network poll. Assumes all transactions
-	// have been previously added. Returns if a critical error has occurred.
-	RecordPoll(ids.Bag) error
+	// have been previously added. Returns true is any statuses or preferences
+	// changed. Returns if a critical error has occurred.
+	RecordPoll(ids.Bag) (bool, error)
 
 	// Returns true iff all remaining transactions are rogue. Note, it is
 	// possible that after returning quiesce, a new decision may be added such

@@ -168,10 +168,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 }
 
 // Accepted frontier has one vertex, which has one vertex as a dependency.
-// Requests the unknown vertex and gets back an unexpected request ID.
-// Requests again and gets response from unexpected peer.
 // Requests again and gets an unexpected vertex.
-// Requests again and gets the expected vertex.
+// Requests again and gets the expected vertex and an additional vertex that should not be accepted.
 func TestBootstrapperByzantineResponses(t *testing.T) {
 	config, peerID, sender, manager, vm := newConfig(t)
 
@@ -200,6 +198,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		HeightV:  1,
 		BytesV:   vtxBytes1,
 	}
+	// Should not receive transitive votes from [vtx1]
 	vtx2 := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     vtxID2,
@@ -271,22 +270,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		t.Fatal(err)
 	} else if !reqVtxID.Equals(vtxID0) {
 		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
-	} else if err := bs.MultiPut(peerID, *requestID+1, [][]byte{vtxBytes0}); err != nil { // send response with wrong request ID
-		t.Fatal(err)
-	} else if !reqVtxID.Equals(vtxID0) {
-		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
 	}
 
 	oldReqID := *requestID
-	if err := bs.MultiPut(ids.NewShortID([20]byte{1, 2, 3}), *requestID, [][]byte{vtxBytes0}); err != nil { // send response from wrong peer
-		t.Fatal(err)
-	} else if *requestID != oldReqID {
-		t.Fatal("should not have issued new request")
-	} else if !reqVtxID.Equals(vtxID0) {
-		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
-	}
-
-	oldReqID = *requestID
 	if err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes2}); err != nil { // send unexpected vertex
 		t.Fatal(err)
 	} else if *requestID == oldReqID {
@@ -310,7 +296,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	vm.CantBootstrapped = false
 
-	if err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes0}); err != nil { // send expected vertex
+	if err := bs.MultiPut(peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2}); err != nil { // send expected vertex and vertex that should not be accepted
 		t.Fatal(err)
 	}
 
@@ -323,6 +309,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		t.Fatalf("Vertex should be accepted")
 	case vtx1.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
+	}
+	if vtx2.Status() == choices.Accepted {
+		t.Fatalf("Vertex should not have been accepted")
 	}
 }
 
@@ -967,6 +956,140 @@ func TestBootstrapperFinalized(t *testing.T) {
 	} else if vtx0.Status() != choices.Accepted {
 		t.Fatalf("Vertex should be accepted")
 	} else if vtx1.Status() != choices.Accepted {
+		t.Fatalf("Vertex should be accepted")
+	}
+}
+
+// Test that MultiPut accepts the parents of the first vertex returned
+func TestBootstrapperAcceptsMultiPutParents(t *testing.T) {
+	config, peerID, sender, manager, vm := newConfig(t)
+
+	vtxID0 := ids.Empty.Prefix(0)
+	vtxID1 := ids.Empty.Prefix(1)
+	vtxID2 := ids.Empty.Prefix(2)
+
+	vtxBytes0 := []byte{0}
+	vtxBytes1 := []byte{1}
+	vtxBytes2 := []byte{2}
+
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID0,
+			StatusV: choices.Unknown,
+		},
+		HeightV: 0,
+		BytesV:  vtxBytes0,
+	}
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID1,
+			StatusV: choices.Unknown,
+		},
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  1,
+		BytesV:   vtxBytes1,
+	}
+	vtx2 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID2,
+			StatusV: choices.Unknown,
+		},
+		ParentsV: []avalanche.Vertex{vtx1},
+		HeightV:  2,
+		BytesV:   vtxBytes2,
+	}
+
+	bs := Bootstrapper{}
+	finished := new(bool)
+	err := bs.Initialize(
+		config,
+		func() error { *finished = true; return nil },
+		fmt.Sprintf("gecko_%s_bs", config.Context.ChainID),
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	acceptedIDs := ids.Set{}
+	acceptedIDs.Add(vtxID2)
+
+	parsedVtx0 := false
+	parsedVtx1 := false
+	parsedVtx2 := false
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case vtxID.Equals(vtxID0):
+			if parsedVtx0 {
+				return vtx0, nil
+			}
+			return nil, errUnknownVertex
+		case vtxID.Equals(vtxID1):
+			if parsedVtx1 {
+				return vtx1, nil
+			}
+			return nil, errUnknownVertex
+		case vtxID.Equals(vtxID2):
+			if parsedVtx2 {
+				return vtx2, nil
+			}
+		default:
+			t.Fatal(errUnknownVertex)
+			panic(errUnknownVertex)
+		}
+		return nil, errUnknownVertex
+	}
+	manager.ParseVertexF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+		switch {
+		case bytes.Equal(vtxBytes, vtxBytes0):
+			vtx0.StatusV = choices.Processing
+			parsedVtx0 = true
+			return vtx0, nil
+		case bytes.Equal(vtxBytes, vtxBytes1):
+			vtx1.StatusV = choices.Processing
+			parsedVtx1 = true
+			return vtx1, nil
+		case bytes.Equal(vtxBytes, vtxBytes2):
+			vtx2.StatusV = choices.Processing
+			parsedVtx2 = true
+			return vtx2, nil
+		}
+		t.Fatal(errUnknownVertex)
+		return nil, errUnknownVertex
+	}
+
+	requestIDs := map[[32]byte]uint32{}
+	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+		if !vdr.Equals(peerID) {
+			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
+		}
+		requestIDs[vtxID.Key()] = reqID
+	}
+
+	vm.CantBootstrapping = false
+
+	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx2
+		t.Fatal(err)
+	}
+
+	reqID, ok := requestIDs[vtxID2.Key()]
+	if !ok {
+		t.Fatalf("should have requested vtx2")
+	}
+
+	vm.CantBootstrapped = false
+
+	if err := bs.MultiPut(peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !*finished {
+		t.Fatalf("Bootstrapping should have finished")
+	} else if vtx0.Status() != choices.Accepted {
+		t.Fatalf("Vertex should be accepted")
+	} else if vtx1.Status() != choices.Accepted {
+		t.Fatalf("Vertex should be accepted")
+	} else if vtx2.Status() != choices.Accepted {
 		t.Fatalf("Vertex should be accepted")
 	}
 }

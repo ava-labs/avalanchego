@@ -13,9 +13,9 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/snow/consensus/snowman/poll"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
-	"github.com/ava-labs/gecko/snow/engine/snowman/poll"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -655,4 +655,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.numRequests.Set(float64(t.blkReqs.Len()))
 	t.numBlocked.Set(float64(t.pending.Len()))
 	return t.errs.Err
+}
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (t *Transitive) IsBootstrapped() bool {
+	return t.bootstrapped
 }
