@@ -23,6 +23,8 @@ import (
 
 func TestExportTxSerialization(t *testing.T) {
 	expected := []byte{
+		// Codec version:
+		0x00, 0x00,
 		// txID:
 		0x00, 0x00, 0x00, 0x04,
 		// networkID:

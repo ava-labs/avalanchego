@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
@@ -46,8 +45,9 @@ type Consensus interface {
 	Conflicts(Tx) ids.Set
 
 	// Collects the results of a network poll. Assumes all transactions
-	// have been previously added. Returns if a critical error has occurred.
-	RecordPoll(ids.Bag) error
+	// have been previously added. Returns true is any statuses or preferences
+	// changed. Returns if a critical error has occurred.
+	RecordPoll(ids.Bag) (bool, error)
 
 	// Returns true iff all remaining transactions are rogue. Note, it is
 	// possible that after returning quiesce, a new decision may be added such
@@ -58,38 +58,4 @@ type Consensus interface {
 	// possible that after returning finalized, a new decision may be added such
 	// that this instance is no longer finalized.
 	Finalized() bool
-}
-
-// Tx consumes state.
-type Tx interface {
-	choices.Decidable
-
-	// Dependencies is a list of transactions upon which this transaction
-	// depends. Each element of Dependencies must be verified before Verify is
-	// called on this transaction.
-	//
-	// Similarly, each element of Dependencies must be accepted before this
-	// transaction is accepted.
-	Dependencies() []Tx
-
-	// InputIDs is a set where each element is the ID of a piece of state that
-	// will be consumed if this transaction is accepted.
-	//
-	// In the context of a UTXO-based payments system, for example, this would
-	// be the IDs of the UTXOs consumed by this transaction
-	InputIDs() ids.Set
-
-	// Verify that the state transition this transaction would make if it were
-	// accepted is valid. If the state transition is invalid, a non-nil error
-	// should be returned.
-	//
-	// It is guaranteed that when Verify is called, all the dependencies of
-	// this transaction have already been successfully verified.
-	Verify() error
-
-	// Bytes returns the binary representation of this transaction.
-	//
-	// This is used for sending transactions to peers. Another node should be
-	// able to parse these bytes to the same transaction.
-	Bytes() []byte
 }

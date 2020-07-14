@@ -41,7 +41,7 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 		propertyfx.ID.Key():  {"propertyfx"},
 	}
 
-	genesisBytes, err := Genesis(networkID)
+	genesisBytes, _, err := Genesis(networkID)
 	if err != nil {
 		return nil, nil, nil, err
 	}

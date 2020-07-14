@@ -445,7 +445,7 @@ type CreateVariableCapAssetReply struct {
 
 // CreateVariableCapAsset returns ID of the newly created asset
 func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *CreateVariableCapAssetReply) error {
-	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Info("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.MinterSets),
@@ -795,9 +795,9 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 	outs := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      uint64(args.Amount),
-			Locktime: 0,
+			Amt: uint64(args.Amount),
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{to},
 			},
@@ -809,9 +809,9 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      amountSpent - uint64(args.Amount),
-				Locktime: 0,
+				Amt: amountSpent - uint64(args.Amount),
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
 				},
@@ -1200,9 +1200,9 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 	outs := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: service.vm.ava},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      amount,
-			Locktime: 0,
+			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{to},
 			},
@@ -1355,9 +1355,9 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 	exportOuts := []*ava.TransferableOutput{{
 		Asset: ava.Asset{ID: service.vm.ava},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      uint64(args.Amount),
-			Locktime: 0,
+			Amt: uint64(args.Amount),
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{args.To},
 			},
@@ -1370,9 +1370,9 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: service.vm.ava},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      amountSpent - uint64(args.Amount),
-				Locktime: 0,
+				Amt: amountSpent - uint64(args.Amount),
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
 				},

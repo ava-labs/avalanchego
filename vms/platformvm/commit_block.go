@@ -42,11 +42,17 @@ func (c *Commit) Verify() error {
 
 // newCommitBlock returns a new *Commit block where the block's parent, a
 // proposal block, has ID [parentID].
-func (vm *VM) newCommitBlock(parentID ids.ID) *Commit {
-	commit := &Commit{DoubleDecisionBlock: DoubleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-		Block: core.NewBlock(parentID),
-		vm:    vm,
-	}}}}
+func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) *Commit {
+	commit := &Commit{
+		DoubleDecisionBlock: DoubleDecisionBlock{
+			CommonDecisionBlock: CommonDecisionBlock{
+				CommonBlock: CommonBlock{
+					Block: core.NewBlock(parentID, height),
+					vm:    vm,
+				},
+			},
+		},
+	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block

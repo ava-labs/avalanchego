@@ -71,9 +71,11 @@ func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id.Key()) }
 
 // List ...
 func (b *UniqueBag) List() []ID {
-	idList := []ID(nil)
+	idList := make([]ID, len(*b), len(*b))
+	i := 0
 	for id := range *b {
-		idList = append(idList, NewID(id))
+		idList[i] = NewID(id)
+		i++
 	}
 	return idList
 }

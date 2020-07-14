@@ -287,7 +287,7 @@ func (p *Packer) UnpackStr() string {
 	return string(p.UnpackFixedBytes(int(strSize)))
 }
 
-// PackIP unpacks an ip port pair from the byte array
+// PackIP packs an ip port pair to the byte array
 func (p *Packer) PackIP(ip utils.IPDesc) {
 	p.PackFixedBytes(ip.IP.To16())
 	p.PackShort(ip.Port)

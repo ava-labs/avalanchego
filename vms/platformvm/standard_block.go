@@ -102,12 +102,16 @@ func (sb *StandardBlock) Verify() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, txs []DecisionTx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []DecisionTx) (*StandardBlock, error) {
 	sb := &StandardBlock{
-		SingleDecisionBlock: SingleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-			Block: core.NewBlock(parentID),
-			vm:    vm,
-		}}},
+		SingleDecisionBlock: SingleDecisionBlock{
+			CommonDecisionBlock: CommonDecisionBlock{
+				CommonBlock: CommonBlock{
+					Block: core.NewBlock(parentID, height),
+					vm:    vm,
+				},
+			},
+		},
 		Txs: txs,
 	}
 

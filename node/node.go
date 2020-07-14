@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -57,7 +58,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 5, 7)
+	Version       = version.NewDefaultVersion("avalanche", 0, 6, 0)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -202,6 +203,21 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	// Start the HTTP endpoint
+	go n.Log.RecoverAndPanic(func() {
+		if n.Config.EnableHTTPS {
+			n.Log.Debug("Initializing API server with TLS Enabled")
+			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
+		}
+
+		n.Log.Debug("Initializing API server")
+		err := n.APIServer.Dispatch()
+
+		n.Log.Fatal("API server initialization failed with %s", err)
+		n.Net.Close() // If the server isn't up, shut down the node.
+	})
+
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
@@ -223,7 +239,7 @@ func (n *Node) Dispatch() error {
 func (n *Node) initDatabase() error {
 	n.DB = n.Config.DB
 
-	expectedGenesis, err := genesis.Genesis(n.Config.NetworkID)
+	expectedGenesis, _, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return err
 	}
@@ -292,20 +308,15 @@ func (n *Node) initBeacons() {
 
 // Create the vmManager and register the following vms:
 // AVM, Simple Payments DAG, Simple Payments Chain
-// The Platform VM is registered in initStaking because
+// The Platform VM is registered in initChains because
 // its factory needs to reference n.chainManager, which is nil right now
-func (n *Node) initVMManager() error {
-	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
-
+func (n *Node) initVMManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVA:      avaAssetID,
+			AVA:      avaxAssetID,
 			Platform: ids.Empty,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
@@ -334,7 +345,7 @@ func (n *Node) initEventDispatcher() {
 // Initializes the Platform chain.
 // Its genesis data specifies the other chains that should
 // be created.
-func (n *Node) initChains() error {
+func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	n.Log.Info("initializing chains")
 
 	vdrs := n.vdrs
@@ -349,31 +360,21 @@ func (n *Node) initChains() error {
 		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 	}
 
-	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
 	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
 	if err != nil {
 		return err
 	}
 
-	err = n.vmManager.RegisterVMFactory(
+	if err := n.vmManager.RegisterVMFactory(
 		/*vmID=*/ platformvm.ID,
 		/*vmFactory=*/ &platformvm.Factory{
 			ChainManager:   n.chainManager,
 			Validators:     vdrs,
 			StakingEnabled: n.Config.EnableStaking,
-			AVA:            avaAssetID,
+			AVA:            avaxAssetID,
 			AVM:            createAVMTx.ID(),
 		},
-	)
-	if err != nil {
-		return err
-	}
-
-	genesisBytes, err := genesis.Genesis(n.Config.NetworkID)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -394,25 +395,12 @@ func (n *Node) initAPIServer() {
 	n.Log.Info("Initializing API server")
 
 	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
-
-	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
-			n.Log.Debug("Initializing API server with TLS Enabled")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
-		}
-
-		n.Log.Debug("Initializing API server")
-		err := n.APIServer.Dispatch()
-
-		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close()
-	})
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
-func (n *Node) initChainManager() {
-	n.chainManager = chains.New(
+func (n *Node) initChainManager() error {
+	var err error
+	n.chainManager, err = chains.New(
 		n.Config.EnableStaking,
 		n.Log,
 		n.LogFactory,
@@ -430,8 +418,12 @@ func (n *Node) initChainManager() {
 		&n.keystoreServer,
 		&n.sharedMemory,
 	)
+	if err != nil {
+		return err
+	}
 
 	n.chainManager.AddRegistrant(&n.APIServer)
+	return nil
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
@@ -443,66 +435,105 @@ func (n *Node) initSharedMemory() {
 
 // initKeystoreAPI initializes the keystore service
 // Assumes n.APIServer is already set
-func (n *Node) initKeystoreAPI() {
-	n.Log.Info("initializing Keystore API")
+func (n *Node) initKeystoreAPI() error {
+	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
 	n.keystoreServer.Initialize(n.Log, keystoreDB)
 	keystoreHandler := n.keystoreServer.CreateHandler()
-	if n.Config.KeystoreAPIEnabled {
-		n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+	if !n.Config.KeystoreAPIEnabled {
+		n.Log.Info("skipping keystore API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing keystore API")
+	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
+
 }
 
 // initMetricsAPI initializes the Metrics API
 // Assumes n.APIServer is already set
-func (n *Node) initMetricsAPI() {
-	n.Log.Info("initializing Metrics API")
+func (n *Node) initMetricsAPI() error {
 	registry, handler := metrics.NewService()
-	if n.Config.MetricsAPIEnabled {
-		n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
-	}
+	// It is assumed by components of the system that the Metrics interface is
+	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
+	if !n.Config.MetricsAPIEnabled {
+		n.Log.Info("skipping metrics API initialization because it has been disabled")
+		return nil
+	}
+	n.Log.Info("initializing metrics API")
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
 
 // initAdminAPI initializes the Admin API service
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
-func (n *Node) initAdminAPI() {
-	if n.Config.AdminAPIEnabled {
-		n.Log.Info("initializing Admin API")
-		service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
-		n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+func (n *Node) initAdminAPI() error {
+	if !n.Config.AdminAPIEnabled {
+		n.Log.Info("skipping admin API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing admin API")
+	service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 }
 
-func (n *Node) initInfoAPI() {
-	if n.Config.InfoAPIEnabled {
-		n.Log.Info("initializing Info API")
-		service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
-		n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+func (n *Node) initInfoAPI() error {
+	if !n.Config.InfoAPIEnabled {
+		n.Log.Info("skipping info API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing info API")
+	service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
+
 }
 
 // initHealthAPI initializes the Health API service
-// Assumes n.Log, n.ConsensusAPI, and n.ValidatorAPI already initialized
-func (n *Node) initHealthAPI() {
+// Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
+func (n *Node) initHealthAPI() error {
 	if !n.Config.HealthAPIEnabled {
-		return
+		n.Log.Info("skipping health API initializaion because it has been disabled")
+		return nil
 	}
-
 	n.Log.Info("initializing Health API")
 	service := health.NewService(n.Log)
-	service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute)
-	n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
+	if err := service.RegisterHeartbeat("network.validators.heartbeat", n.Net, 5*time.Minute); err != nil {
+		return fmt.Errorf("couldn't register heartbeat health check: %w", err)
+	}
+	isBootstrappedFunc := func() (interface{}, error) {
+		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
+			return nil, errors.New("P-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(pChainID) {
+			return nil, errors.New("P-Chain not bootstrapped")
+		}
+		if xChainID, err := n.chainManager.Lookup("X"); err != nil {
+			return nil, errors.New("X-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(xChainID) {
+			return nil, errors.New("X-Chain not bootstrapped")
+		}
+		if cChainID, err := n.chainManager.Lookup("C"); err != nil {
+			return nil, errors.New("C-Chain not created")
+		} else if !n.chainManager.IsBootstrapped(cChainID) {
+			return nil, errors.New("C-Chain not bootstrapped")
+		}
+		return nil, nil
+	}
+	// Passes if the P, X and C chains are finished bootstrapping
+	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
+		return err
+	}
+	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
 // initIPCAPI initializes the IPC API service
 // Assumes n.log and n.chainManager already initialized
-func (n *Node) initIPCAPI() {
-	if n.Config.IPCEnabled {
-		n.Log.Info("initializing IPC API")
-		service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
-		n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
+func (n *Node) initIPCAPI() error {
+	if !n.Config.IPCEnabled {
+		n.Log.Info("skipping ipc API initializaion because it has been disabled")
+		return nil
 	}
+	n.Log.Info("initializing ipc API")
+	service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
 // Give chains and VMs aliases as specified by the genesis information
@@ -561,33 +592,51 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.initBeacons()
 
 	// Start HTTP APIs
-	n.initAPIServer()   // Start the API Server
-	n.initKeystoreAPI() // Start the Keystore API
-	n.initMetricsAPI()  // Start the Metrics API
+	n.initAPIServer()                           // Start the API Server
+	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
+		return fmt.Errorf("couldn't initialize keystore API: %w", err)
+	}
+	if err := n.initMetricsAPI(); err != nil { // Start the Metrics API
+		return fmt.Errorf("couldn't initialize metrics API: %w", err)
+	}
 
-	// initialize shared memory
-	n.initSharedMemory()
+	n.initSharedMemory() // Initialize shared memory
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
-	if err := n.initVMManager(); err != nil { // Set up the vm manager
+	n.initEventDispatcher() // Set up the event dipatcher
+
+	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
+	if err != nil {
+		return fmt.Errorf("couldn't create genesis bytes: %w", err)
+	}
+
+	if err := n.initVMManager(avaxAssetID); err != nil { // Set up the VM manager
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
 	}
+	n.initChainManager() // Set up the chain manager
 
-	n.initEventDispatcher() // Set up the event dipatcher
-	n.initChainManager()    // Set up the chain manager
-
-	n.initAdminAPI()  // Start the Admin API
-	n.initInfoAPI()   // Start the Info API
-	n.initHealthAPI() // Start the Health API
-	n.initIPCAPI()    // Start the IPC API
-
-	if err := n.initAliases(); err != nil { // Set up aliases
-		return err
+	if err := n.initAdminAPI(); err != nil { // Start the Admin API
+		return fmt.Errorf("couldn't initialize admin API: %w", err)
 	}
-	return n.initChains() // Start the Platform chain
+	if err := n.initInfoAPI(); err != nil { // Start the Info API
+		return fmt.Errorf("couldn't initialize info API: %w", err)
+	}
+	if err := n.initHealthAPI(); err != nil { // Start the Health API
+		return fmt.Errorf("couldn't initialize health API: %w", err)
+	}
+	if err := n.initIPCAPI(); err != nil { // Start the IPC API
+		return fmt.Errorf("couldn't initialize ipc API: %w", err)
+	}
+	if err := n.initAliases(); err != nil { // Set up aliases
+		return fmt.Errorf("couldn't initialize aliases: %w", err)
+	}
+	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
+		return fmt.Errorf("couldn't initialize chains: %w", err)
+	}
+	return nil
 }
 
 // Shutdown this node

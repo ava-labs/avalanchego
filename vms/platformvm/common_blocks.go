@@ -29,8 +29,8 @@ import (
 //
 // When one is done staking:
 // * The staking set decides whether the staker should receive either:
-//   ** Only the $AVA that the staker put up as a bond
-//	 ** The $AVA the staker put up as a bond, and also a reward for staking
+//   ** Only the tokens that the staker put up as a bond
+//	 ** The tokens the staker put up as a bond, and also a reward for staking
 //
 // This chain has three types of blocks:
 // 1. A proposal block
@@ -88,6 +88,9 @@ type Block interface {
 	// [vm] is the vm the block exists in
 	// [bytes] is the byte representation of this block
 	initialize(vm *VM, bytes []byte) error
+
+	// This block's height
+	Height() uint64
 
 	conflicts(ids.Set) bool
 

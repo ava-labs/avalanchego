@@ -309,7 +309,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "wWBk78PGAU4VkXhESr3jiYyMCEzzPPcnVYeEnNr9g4JuvYs2x" {
+	if reply.AssetID.String() != "2VX3kYPmF573RJhJuJenwwc5AY5eQqv5axb1rFoF2vmMeFogj5" {
 		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
 	}
 }
@@ -338,8 +338,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "SscTvpQFCZPNiRXyueDc7LdHT9EstHiva3AK6kuTgHTMd7DsU" {
-		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
+	if reply.AssetID.String() != "41h44DAgzGJCJhbWcu5tpjJu9Eco1Gp5uS4SBN7sdFhDVSrE9" {
+		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 }
 

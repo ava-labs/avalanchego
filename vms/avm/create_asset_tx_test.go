@@ -16,6 +16,8 @@ import (
 
 func TestCreateAssetTxSerialization(t *testing.T) {
 	expected := []byte{
+		// Codec version:
+		0x00, 0x00,
 		// txID:
 		0x00, 0x00, 0x00, 0x01,
 		// networkID:
@@ -103,9 +105,9 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 					}),
 				},
 				Out: &secp256k1fx.TransferOutput{
-					Amt:      12345,
-					Locktime: 54321,
+					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  54321,
 						Threshold: 1,
 						Addrs: []ids.ShortID{
 							ids.NewShortID([20]byte{
@@ -156,9 +158,9 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 				FxID: 0,
 				Outs: []verify.Verifiable{
 					&secp256k1fx.TransferOutput{
-						Amt:      12345,
-						Locktime: 54321,
+						Amt: 12345,
 						OutputOwners: secp256k1fx.OutputOwners{
+							Locktime:  54321,
 							Threshold: 1,
 							Addrs: []ids.ShortID{
 								ids.NewShortID([20]byte{

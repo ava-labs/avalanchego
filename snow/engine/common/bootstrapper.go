@@ -12,18 +12,20 @@ import (
 )
 
 const (
-	// MaxContainersPerMultiPut is the maximum number of containers that can be sent in a MultiPut
+	// MaxContainersPerMultiPut is the maximum number of containers that can be
+	// sent in a MultiPut message
 	MaxContainersPerMultiPut = 2000
 
-	// StatusUpdateFrequency ... bootstrapper logs "processed X blocks/vertices" every [statusUpdateFrequency] blocks/vertices
+	// StatusUpdateFrequency is how many containers should be processed between
+	// logs
 	StatusUpdateFrequency = 2500
 
-	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not responsded to/failed
+	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not
+	// responded to/failed
 	MaxOutstandingRequests = 8
-)
 
-var (
-	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching vertices during a call to GetAncestors
+	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
+	// vertices during a call to GetAncestors
 	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 

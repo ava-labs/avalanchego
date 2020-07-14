@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/avm"
 )
 
@@ -20,43 +21,21 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	// Case 1: tx is nil
+	// Case: tx is nil
 	var tx *CreateChainTx
 	if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have failed because tx is nil")
 	}
 
-	// Case 2: network ID is wrong
+	// case: tx ID is empty
 	tx, err := vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID+1,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = tx.SyntacticVerify()
-	if err == nil {
-		t.Fatal("should've errored because network ID is wrong")
-	}
-
-	// case 3: tx ID is empty
-	tx, err = vm.newCreateChainTx(
-		defaultNonce+1,
-		testSubnet1.id,
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		testNetworkID,
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -66,17 +45,15 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should've errored because tx ID is empty")
 	}
 
-	// Case 4: vm ID is empty
+	// Case: vm ID is empty
 	tx, err = vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -86,17 +63,15 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should've errored because tx ID is empty")
 	}
 
-	// Case 5: Control sigs not sorted
+	// Case: Control sigs not sorted
 	tx, err = vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -107,17 +82,15 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should've errored because control sigs not sorted")
 	}
 
-	// Case 6: Control sigs not unique
+	// Case: Control sigs not unique
 	tx, err = vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -127,17 +100,15 @@ func TestCreateChainTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should've errored because control sigs not unique")
 	}
 
-	// Case 7: Valid tx passes syntactic verification
+	// Case: Valid tx passes syntactic verification
 	tx, err = vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatalf("should have passed verification but got %v", err)
@@ -153,45 +124,39 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	// Case 1: No control sigs (2 are needed)
+	// Case: No control sigs (2 are needed)
 	tx, err := vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
-		nil,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	_, err = tx.SemanticVerify(vm.DB)
-	if err == nil {
+	tx.ControlSigs = [][65]byte{} // remove control sigs
+	if _, err := tx.SemanticVerify(vm.DB); err == nil {
 		t.Fatal("should have errored because there are no control sigs")
 	}
 
-	// Case 2: 1 control sig (2 are needed)
+	// Case: 1 control sig (2 are needed)
 	tx, err = vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	_, err = tx.SemanticVerify(vm.DB)
-	if err == nil {
+	tx.ControlSigs = tx.ControlSigs[0:1] // remove one control sig
+	if _, err := tx.SemanticVerify(vm.DB); err == nil {
 		t.Fatal("should have errored because there are no control sigs")
 	}
 }
@@ -212,24 +177,27 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.newCreateChainTx(
-		defaultNonce+1,
+	tx, err := vm.newCreateChainTx( // create a tx
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], key.(*crypto.PrivateKeySECP256K1R)},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	_, err = tx.SemanticVerify(vm.DB)
-	if err == nil {
-		t.Fatal("should have errored because incorrect control sig given")
+	// Replace a valid signature with one from another key
+	sig, err := key.SignHash(hashing.ComputeHash256(tx.unsignedBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy(tx.ControlSigs[0][:], sig)
+	crypto.SortSECP2561RSigs(tx.ControlSigs)
+	if _, err = tx.SemanticVerify(vm.DB); err == nil {
+		t.Fatal("should have failed verification because a control sig is invalid")
 	}
 }
 
@@ -243,22 +211,15 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	tx, err := vm.newCreateChainTx(
-		defaultNonce+1,
+	if _, err := vm.newCreateChainTx(
 		ids.NewID([32]byte{1, 9, 124, 11, 20}), // pick some random ID for subnet
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = tx.SemanticVerify(vm.DB)
-	if err == nil {
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	); err == nil {
 		t.Fatal("should have errored because Subnet doesn't exist")
 	}
 }
@@ -273,15 +234,13 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 
 	// create a tx
 	tx, err := vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -309,15 +268,13 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	// create a valid tx
 	tx, err := vm.newCreateChainTx(
-		defaultNonce+1,
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		testNetworkID,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)

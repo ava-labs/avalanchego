@@ -20,11 +20,15 @@ type block struct {
 
 const blockSize = 40 // hashing.HashLen (32) + length of uin64 (8)
 
-func (b *block) Bytes() []byte {
+func (b *block) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, blockSize)}
 	p.PackFixedBytes(b.parentID.Bytes())
 	p.PackLong(b.value)
-	return p.Bytes
+	return p.Bytes, p.Err
+}
+
+func marshalBlock(blk interface{}) ([]byte, error) {
+	return blk.(*block).Bytes()
 }
 
 func unmarshalBlock(bytes []byte) (interface{}, error) {
@@ -56,12 +60,16 @@ type account struct {
 
 const accountSize = 32 + 8 + 8
 
-func (acc *account) Bytes() []byte {
+func (acc *account) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, accountSize)}
 	p.PackFixedBytes(acc.id.Bytes())
 	p.PackLong(acc.balance)
 	p.PackLong(acc.nonce)
-	return p.Bytes
+	return p.Bytes, p.Err
+}
+
+func marshalAccount(acct interface{}) ([]byte, error) {
+	return acct.(*account).Bytes()
 }
 
 func unmarshalAccount(bytes []byte) (interface{}, error) {
@@ -105,7 +113,7 @@ func TestPutUnregistered(t *testing.T) {
 	}
 
 	// register type
-	if err := state.RegisterType(1, unmarshalAccount); err != nil {
+	if err := state.RegisterType(1, marshalAccount, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -129,7 +137,7 @@ func TestKeyDoesNotExist(t *testing.T) {
 
 	// register type with ID 1
 	typeID := uint64(1)
-	if err := state.RegisterType(typeID, unmarshalAccount); err != nil {
+	if err := state.RegisterType(typeID, marshalAccount, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -148,12 +156,12 @@ func TestRegisterExistingTypeID(t *testing.T) {
 
 	// register type with ID 1
 	typeID := uint64(1)
-	if err := state.RegisterType(typeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(typeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
 	// try to register the same type ID
-	if err := state.RegisterType(typeID, unmarshalAccount); err == nil {
+	if err := state.RegisterType(typeID, marshalAccount, unmarshalAccount); err == nil {
 		t.Fatal("Should have errored because typeID already registered")
 	}
 
@@ -168,7 +176,7 @@ func TestGetWrongTypeID(t *testing.T) {
 
 	// register type with ID 1
 	blockTypeID := uint64(1)
-	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -199,13 +207,13 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 
 	// register block type with ID 1
 	blockTypeID := uint64(1)
-	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
 	// register account type with ID 2
 	accountTypeID := uint64(2)
-	if err := state.RegisterType(accountTypeID, unmarshalAccount); err != nil {
+	if err := state.RegisterType(accountTypeID, marshalAccount, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -270,7 +278,7 @@ func TestOverwrite(t *testing.T) {
 
 	// register block type with ID 1
 	blockTypeID := uint64(1)
-	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -323,7 +331,7 @@ func TestHappyPath(t *testing.T) {
 	accountTypeID := uint64(1)
 
 	// register type account
-	err := state.RegisterType(accountTypeID, unmarshalAccount)
+	err := state.RegisterType(accountTypeID, marshalAccount, unmarshalAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,7 +390,7 @@ func TestHappyPath(t *testing.T) {
 
 	// register type block
 	blockTypeID := uint64(2)
-	err = state.RegisterType(blockTypeID, unmarshalBlock)
+	err = state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock)
 	if err != nil {
 		t.Fatal(err)
 	}

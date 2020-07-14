@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/avalanche"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -27,7 +27,7 @@ var (
 	errNoTxs          = errors.New("vertex contains no transactions")
 )
 
-type vertex struct {
+type innerVertex struct {
 	id ids.ID
 
 	chainID ids.ID
@@ -39,10 +39,10 @@ type vertex struct {
 	bytes []byte
 }
 
-func (vtx *vertex) ID() ids.ID    { return vtx.id }
-func (vtx *vertex) Bytes() []byte { return vtx.bytes }
+func (vtx *innerVertex) ID() ids.ID    { return vtx.id }
+func (vtx *innerVertex) Bytes() []byte { return vtx.bytes }
 
-func (vtx *vertex) Verify() error {
+func (vtx *innerVertex) Verify() error {
 	switch {
 	case !ids.IsSortedAndUniqueIDs(vtx.parentIDs):
 		return errInvalidParents
@@ -70,7 +70,7 @@ func (vtx *vertex) Verify() error {
  */
 
 // Marshal creates the byte representation of the vertex
-func (vtx *vertex) Marshal() ([]byte, error) {
+func (vtx *innerVertex) Marshal() ([]byte, error) {
 	p := wrappers.Packer{MaxSize: maxSize}
 
 	p.PackInt(uint32(CustomID))
@@ -91,7 +91,7 @@ func (vtx *vertex) Marshal() ([]byte, error) {
 
 // Unmarshal attempts to set the contents of this vertex to the value encoded in
 // the stream of bytes.
-func (vtx *vertex) Unmarshal(b []byte, vm avalanche.DAGVM) error {
+func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 	p := wrappers.Packer{Bytes: b}
 
 	if codecID := ID(p.UnpackInt()); codecID != CustomID {
@@ -122,7 +122,7 @@ func (vtx *vertex) Unmarshal(b []byte, vm avalanche.DAGVM) error {
 		return p.Err
 	}
 
-	*vtx = vertex{
+	*vtx = innerVertex{
 		id:        ids.NewID(hashing.ComputeHash256Array(b)),
 		parentIDs: parentIDs,
 		chainID:   chainID,

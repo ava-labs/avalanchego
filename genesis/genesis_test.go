@@ -26,8 +26,8 @@ func TestNetworkName(t *testing.T) {
 	if name := NetworkName(EverestID); name != EverestName {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, EverestName)
 	}
-	if name := NetworkName(DenaliID); name != DenaliName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, DenaliName)
+	if name := NetworkName(TestnetID); name != EverestName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, EverestName)
 	}
 	if name := NetworkName(4294967295); name != "network-4294967295" {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, "network-4294967295")
@@ -128,7 +128,7 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes, err := Genesis(LocalID)
+	genesisBytes, _, err := Genesis(LocalID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,24 +145,44 @@ func TestVMGenesis(t *testing.T) {
 		expectedID string
 	}{
 		{
+			networkID:  EverestID,
+			vmID:       avm.ID,
+			expectedID: "wiJaPpeE3BUZG6pJrWsrcXJsMZwyb7teQW4SAgTfUwmF6gkUL",
+		},
+		{
+			networkID:  DenaliID,
+			vmID:       avm.ID,
+			expectedID: "2E39Us3YjxrxLPyQT1p3EwQyAdLvTWBR8Krd7UcVMmo632waLD",
+		},
+		{
 			networkID:  CascadeID,
 			vmID:       avm.ID,
-			expectedID: "4ktRjsAKxgMr2aEzv9SWmrU7Xk5FniHUrVCX4P1TZSfTLZWFM",
+			expectedID: "2FfU8b6HQ9KgJ6QSqFatWQcbQqa8pEpFM19iD4ZJtDaXYWNgMf",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       avm.ID,
-			expectedID: "4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH",
+			expectedID: "2RMhdJxs474ET37mhnfW8SmEDBLDYyJE8DXqQqgcF5AJKbYU3N",
+		},
+		{
+			networkID:  EverestID,
+			vmID:       EVMID,
+			expectedID: "fQdpesu7D3KYzaJsRqpMZS11bu1dztj1hiXGycvF4imJRG4uA",
+		},
+		{
+			networkID:  DenaliID,
+			vmID:       EVMID,
+			expectedID: "2DC1iWRQWaNHUCv4bmEVGUBzsqfeN64XQc4FFz4cXsHT736oQ4",
 		},
 		{
 			networkID:  CascadeID,
 			vmID:       EVMID,
-			expectedID: "2mUYSXfLrDtigwbzj1LxKVsHwELghc5sisoXrzJwLqAAQHF4i",
+			expectedID: "VGuSPbSfiTSmFq6Xf7Vu1iGYvFo8maB9wF4NpwoLo6nbuGYDz",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       EVMID,
-			expectedID: "tZGm6RCkeGpVETUTp11DW3UYFZmm69zfqxchpHrSF7wgy8rmw",
+			expectedID: "2nrfmHke2q7xcpi487AHTX7edx69MaDKBCssGkDYE6oX9G8zeF",
 		},
 	}
 
@@ -181,27 +201,35 @@ func TestVMGenesis(t *testing.T) {
 	}
 }
 
-func TestAVAAssetID(t *testing.T) {
+func TestAVAXAssetID(t *testing.T) {
 	tests := []struct {
 		networkID  uint32
 		expectedID string
 	}{
 		{
+			networkID:  EverestID,
+			expectedID: "2Yjb4rtHTqpCxCv8jbm1pSyMj3rnzrperW7USYTn8kfmmr2JKU",
+		},
+		{
+			networkID:  DenaliID,
+			expectedID: "2Yjb4rtHTqpCxCv8jbm1pSyMj3rnzrperW7USYTn8kfmmr2JKU",
+		},
+		{
 			networkID:  CascadeID,
-			expectedID: "21d7KVtPrubc5fHr6CGNcgbUb4seUjmZKr35ZX7BZb5iP8pXWA",
+			expectedID: "2Yjb4rtHTqpCxCv8jbm1pSyMj3rnzrperW7USYTn8kfmmr2JKU",
 		},
 		{
 			networkID:  LocalID,
-			expectedID: "n8XH5JY1EX5VYqDeAhB4Zd4GKxi9UNQy6oPpMsCAj1Q6xkiiL",
+			expectedID: "23X9aFiCbfT8ekmkvwQe9LtQ1Jm9AkTqLQ2AkzZ1EZYijX2ead",
 		},
 	}
 
 	for _, test := range tests {
-		avaID, err := AVAAssetID(test.networkID)
+		_, avaxAssetID, err := Genesis(test.networkID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if result := avaID.String(); test.expectedID != result {
+		if result := avaxAssetID.String(); test.expectedID != result {
 			t.Fatalf("AVA assetID with networkID %d was expected to be %s but was %s",
 				test.networkID,
 				test.expectedID,

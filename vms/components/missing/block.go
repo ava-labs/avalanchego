@@ -21,6 +21,9 @@ type Block struct{ BlkID ids.ID }
 // ID ...
 func (mb *Block) ID() ids.ID { return mb.BlkID }
 
+// Height ...
+func (mb *Block) Height() uint64 { return 0 }
+
 // Accept ...
 func (*Block) Accept() error { return errMissingBlock }
 

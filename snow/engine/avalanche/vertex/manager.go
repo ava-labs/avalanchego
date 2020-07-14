@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avalanche
+package vertex
 
 import (
 	"github.com/ava-labs/gecko/ids"
@@ -9,8 +9,9 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
-// State defines the persistant storage that is required by the consensus engine
-type State interface {
+// Manager defines the persistant storage that is required by the consensus
+// engine
+type Manager interface {
 	// Create a new vertex from the contents of a vertex
 	BuildVertex(parentIDs ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error)
 
