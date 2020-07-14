@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	errSigsNotSorted           = errors.New("control signatures not sorted")
-	errWrongNumberOfSignatures = errors.New("wrong number of signatures")
-	errDSValidatorSubset       = errors.New("all subnets must be a subset of the default subnet")
+	errSigsNotUniqueOrNotSorted = errors.New("control signatures not unique or not sorted")
+	errWrongNumberOfSignatures  = errors.New("wrong number of signatures")
+	errDSValidatorSubset        = errors.New("all subnets must be a subset of the default subnet")
 )
 
 // UnsignedAddNonDefaultSubnetValidatorTx is an unsigned addNonDefaultSubnetValidatorTx
@@ -90,7 +90,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	case tx.Wght == 0: // Ensure the validator has some weight
 		return permError{errWeightTooSmall}
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
-		return permError{errSigsNotSorted}
+		return permError{errSigsNotUniqueOrNotSorted}
 	}
 
 	// Ensure staking length is not too short or long
