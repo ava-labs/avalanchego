@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avalanche
+package bootstrap
 
 import (
 	"errors"
@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
 	"github.com/ava-labs/gecko/utils/logging"
 )
@@ -19,11 +20,11 @@ import (
 type vtxParser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
-	state                   State
+	manager                 vertex.Manager
 }
 
 func (p *vtxParser) Parse(vtxBytes []byte) (queue.Job, error) {
-	vtx, err := p.state.ParseVertex(vtxBytes)
+	vtx, err := p.manager.ParseVertex(vtxBytes)
 	if err != nil {
 		return nil, err
 	}

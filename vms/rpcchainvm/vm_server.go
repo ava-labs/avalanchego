@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/snowman"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
@@ -27,7 +27,7 @@ import (
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
-	vm     snowman.ChainVM
+	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 
 	lock    sync.Mutex
@@ -39,7 +39,7 @@ type VMServer struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm snowman.ChainVM, broker *plugin.GRPCBroker) *VMServer {
+func NewServer(vm block.ChainVM, broker *plugin.GRPCBroker) *VMServer {
 	return &VMServer{
 		vm:     vm,
 		broker: broker,

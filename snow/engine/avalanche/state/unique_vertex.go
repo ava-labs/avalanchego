@@ -59,7 +59,7 @@ func (vtx *uniqueVertex) Evict() {
 	}
 }
 
-func (vtx *uniqueVertex) setVertex(innerVtx *vertex) {
+func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) {
 	vtx.refresh()
 	if vtx.v.vtx == nil {
 		vtx.v.vtx = innerVtx
@@ -178,7 +178,7 @@ func (vtx *uniqueVertex) String() string {
 type vertexState struct {
 	unique bool
 
-	vtx    *vertex
+	vtx    *innerVertex
 	status choices.Status
 
 	parents []avalanche.Vertex
