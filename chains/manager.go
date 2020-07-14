@@ -563,8 +563,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 	if !exists {
 		return false
 	}
-	chain.Context().Lock.Lock()
-	defer chain.Context().Lock.Unlock()
+
 	return chain.Engine().IsBootstrapped()
 }
 

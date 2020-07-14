@@ -4,6 +4,7 @@
 package avalanche
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -44,7 +45,8 @@ type Transitive struct {
 	// txBlocked tracks operations that are blocked on transactions
 	vtxBlocked, txBlocked events.Blocker
 
-	bootstrapped bool
+	bootstrapped       bool
+	atomicBootstrapped *uint32
 
 	errs wrappers.Errs
 }
@@ -57,6 +59,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.metrics.Initialize(config.Context.Log, config.Params.Namespace, config.Params.Metrics)
 
 	t.onFinished = t.finishBootstrapping
+	t.atomicBootstrapped = new(uint32)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
@@ -80,6 +83,7 @@ func (t *Transitive) finishBootstrapping() error {
 	}
 	t.Consensus.Initialize(t.Config.Context, t.Params, frontier)
 	t.bootstrapped = true
+	atomic.StoreUint32(t.atomicBootstrapped, 1)
 
 	t.Config.Context.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
 	return nil
@@ -524,5 +528,5 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
-	return t.bootstrapped
+	return atomic.LoadUint32(t.atomicBootstrapped) > 0
 }
