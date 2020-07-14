@@ -40,7 +40,6 @@ const (
 	defaultChannelSize = 1000
 	gossipFrequency    = 10 * time.Second
 	shutdownTimeout    = 1 * time.Second
-	requestTimeout     = 4 * time.Second
 )
 
 // Manager manages the chains running on this node.
