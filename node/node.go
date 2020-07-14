@@ -390,7 +390,7 @@ func (n *Node) initChains() error {
 
 	bootstrapWeight, err := n.beacons.Weight()
 	if err != nil {
-		return err
+		return fmt.Errorf("Error calculating bootstrap weight of beacons: %s", err)
 	}
 	reqWeight := (3*bootstrapWeight + 3) / 4
 
