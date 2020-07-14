@@ -5,6 +5,7 @@ package ids
 
 import (
 	"fmt"
+	"sync"
 )
 
 // Aliaser allows one to give an ID aliases and lookup the aliases given to an
@@ -13,6 +14,8 @@ import (
 type Aliaser struct {
 	dealias map[string]ID
 	aliases map[[32]byte][]string
+
+	lock sync.RWMutex
 }
 
 // Initialize the aliaser to have no aliases
@@ -23,6 +26,9 @@ func (a *Aliaser) Initialize() {
 
 // Lookup returns the ID associated with alias
 func (a *Aliaser) Lookup(alias string) (ID, error) {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
 	if ID, ok := a.dealias[alias]; ok {
 		return ID, nil
 	}
@@ -30,10 +36,18 @@ func (a *Aliaser) Lookup(alias string) (ID, error) {
 }
 
 // Aliases returns the aliases of an ID
-func (a Aliaser) Aliases(id ID) []string { return a.aliases[id.Key()] }
+func (a *Aliaser) Aliases(id ID) []string {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	return a.aliases[id.Key()]
+}
 
 // PrimaryAlias returns the first alias of [id]
-func (a Aliaser) PrimaryAlias(id ID) (string, error) {
+func (a *Aliaser) PrimaryAlias(id ID) (string, error) {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
 	aliases, exists := a.aliases[id.Key()]
 	if !exists || len(aliases) == 0 {
 		return "", fmt.Errorf("there is no alias for ID %s", id)
@@ -42,7 +56,10 @@ func (a Aliaser) PrimaryAlias(id ID) (string, error) {
 }
 
 // Alias gives [id] the alias [alias]
-func (a Aliaser) Alias(id ID, alias string) error {
+func (a *Aliaser) Alias(id ID, alias string) error {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
 	if _, exists := a.dealias[alias]; exists {
 		return fmt.Errorf("%s is already used as an alias for an ID", alias)
 	}
@@ -50,5 +67,20 @@ func (a Aliaser) Alias(id ID, alias string) error {
 
 	a.dealias[alias] = id
 	a.aliases[key] = append(a.aliases[key], alias)
+	return nil
+}
+
+func (a *Aliaser) RemoveAliases(id ID) error {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	aliases, exists := a.aliases[id.Key()]
+	if !exists {
+		return fmt.Errorf("%s is not aliased, could not remove", id)
+	}
+	delete(a.aliases, id.Key())
+	for _, alias := range aliases {
+		delete(a.dealias, alias)
+	}
 	return nil
 }

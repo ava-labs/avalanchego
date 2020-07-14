@@ -9,15 +9,15 @@ import (
 )
 
 func TestAliaserLookupError(t *testing.T) {
-	emptyAliaser := Aliaser{}
+	emptyAliaser := &Aliaser{}
 	emptyAliaser.Initialize()
 	tests := []struct {
 		label   string
-		aliaser Aliaser
+		aliaser *Aliaser
 		alias   string
 		res     ID
 	}{
-		{"Unitialized", Aliaser{}, "Batwoman", ID{}},
+		{"Unitialized", &Aliaser{}, "Batwoman", ID{}},
 		{"Empty", emptyAliaser, "Batman", ID{}},
 	}
 	for _, tt := range tests {
@@ -109,5 +109,39 @@ func TestAliaserAliasClash(t *testing.T) {
 	err := aliaser.Alias(id2, "Batman")
 	if err == nil {
 		t.Fatalf("Expected an error, due to an existing alias")
+	}
+}
+
+func TestAliaserRemoveAlias(t *testing.T) {
+	id1 := NewID([32]byte{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'})
+	id2 := NewID([32]byte{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'})
+	aliaser := Aliaser{}
+	aliaser.Initialize()
+	aliaser.Alias(id1, "Batman")
+	aliaser.Alias(id1, "Dark Knight")
+
+	err := aliaser.RemoveAliases(id1)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s while removing aliases", err)
+	}
+
+	_, err = aliaser.PrimaryAlias(id1)
+	if err == nil {
+		t.Fatalf("PrimaryAlias should have errored while getting primary alias for removed ID")
+	}
+
+	err = aliaser.Alias(id2, "Batman")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s when re-assigning removed alias", err)
+	}
+
+	err = aliaser.Alias(id2, "Dark Knight")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s when re-assigning removed alias", err)
+	}
+
+	err = aliaser.Alias(id1, "Dark Night Rises")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s when re-assigning removed ID in aliaser", err)
 	}
 }
