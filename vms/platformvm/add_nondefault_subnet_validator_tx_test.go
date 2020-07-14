@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/hashing"
 )
 
 func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
@@ -433,29 +434,45 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	// Case: Too few signatures
-	if _, err := vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
 		defaultWeight,                     // weight
 		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,         // node ID
 		testSubnet1.id, // subnet ID
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[2]},
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // tx fee payer
-	); err == nil {
-		t.Fatal("should have failed because 1 key given but 2 needed")
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx.ControlSigs = tx.ControlSigs[0:1] // remove a control sig
+	if _, _, _, _, err = tx.SemanticVerify(vm.DB); err == nil {
+		t.Fatal("should have failed verification because not enough control sigs")
 	}
 
 	// Case: Control Signature from invalid key (keys[3] is not a control key)
-	if _, err := vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
 		defaultWeight,                     // weight
 		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,         // node ID
 		testSubnet1.id, // subnet ID
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], keys[3]},
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], keys[1]},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // tx fee payer
-	); err == nil {
-		t.Fatal("should have failed verification because tx has control sig from non-control key")
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Replace a valid signature with one from keys[3]
+	sig, err := keys[3].SignHash(hashing.ComputeHash256(tx.unsignedBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy(tx.ControlSigs[0][:], sig)
+	crypto.SortSECP2561RSigs(tx.ControlSigs)
+	if _, _, _, _, err = tx.SemanticVerify(vm.DB); err == nil {
+		t.Fatal("should have failed verification because a control sig is invalid")
 	}
 
 	// Case: Proposed validator in pending validator set for subnet

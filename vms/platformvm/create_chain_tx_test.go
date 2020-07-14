@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/avm"
 )
 
@@ -124,28 +125,38 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	}()
 
 	// Case: No control sigs (2 are needed)
-	if _, err := vm.newCreateChainTx(
+	tx, err := vm.newCreateChainTx(
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		nil,
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	); err == nil {
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx.ControlSigs = [][65]byte{} // remove control sigs
+	if _, err := tx.SemanticVerify(vm.DB); err == nil {
 		t.Fatal("should have errored because there are no control sigs")
 	}
 
 	// Case: 1 control sig (2 are needed)
-	if _, err := vm.newCreateChainTx(
+	tx, err = vm.newCreateChainTx(
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0]},
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	); err == nil {
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx.ControlSigs = tx.ControlSigs[0:1] // remove one control sig
+	if _, err := tx.SemanticVerify(vm.DB); err == nil {
 		t.Fatal("should have errored because there are no control sigs")
 	}
 }
@@ -166,16 +177,27 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := vm.newCreateChainTx(
+	tx, err := vm.newCreateChainTx( // create a tx
 		testSubnet1.id,
 		nil,
 		avm.ID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], key.(*crypto.PrivateKeySECP256K1R)},
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	); err == nil {
-		t.Fatal("should have errored because incorrect control sig given")
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Replace a valid signature with one from another key
+	sig, err := key.SignHash(hashing.ComputeHash256(tx.unsignedBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy(tx.ControlSigs[0][:], sig)
+	crypto.SortSECP2561RSigs(tx.ControlSigs)
+	if _, err = tx.SemanticVerify(vm.DB); err == nil {
+		t.Fatal("should have failed verification because a control sig is invalid")
 	}
 }
 

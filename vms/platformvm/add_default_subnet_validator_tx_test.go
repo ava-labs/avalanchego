@@ -106,7 +106,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case 6: Stake amount too small
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount-1,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -114,16 +114,14 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-	if err := tx.SyntacticVerify(); err == nil {
+	} else if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have errored because stake amount too small")
 	}
 
 	// Case 7: Too many shares
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -131,16 +129,14 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		NumberOfShares+1,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-	if err := tx.SyntacticVerify(); err == nil {
+	} else if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
 
 	// Case 8.1: Validation length is too short
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
+	if tx, err = vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix())-1,
@@ -148,16 +144,14 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-	if err := tx.SyntacticVerify(); err == nil {
+	} else if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
 	// Case 8.2: Validation length is negative
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Unix())-1,
@@ -165,16 +159,14 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-	if err := tx.SyntacticVerify(); err == nil {
+	} else if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
 	// Case 9: Validation length is too long
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
+	if tx, err = vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix())+1,
@@ -182,16 +174,14 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-	if err := tx.SyntacticVerify(); err == nil {
+	} else if err := tx.SyntacticVerify(); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
 	// Case 10: Valid
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -199,11 +189,9 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-	if err := tx.SyntacticVerify(); err != nil {
+	} else if err := tx.SyntacticVerify(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -240,20 +228,6 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	vDB.Abort()
 
-	// Case: Validator doesn't have enough tokens to cover stake amount
-	if _, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultBalance-vm.txFee+1,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		nodeID,
-		NumberOfShares,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	); err == nil {
-		t.Fatal("should've errored because validator doesn't have enough tokens to cover stake")
-	}
-	vDB.Abort()
-
 	// Case: Validator already validating default subnet
 	if tx, err := vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount,
@@ -287,10 +261,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// Put validator in pending validator set
-	if err := vm.putPendingValidators(vDB,
+	} else if err := vm.putPendingValidators(vDB, // Put validator in pending validator set
 		&EventHeap{
 			SortByStartTime: true,
 			Txs:             []TimedTx{tx},
@@ -301,4 +272,33 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	} else if _, _, _, _, err := tx.SemanticVerify(vDB); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")
 	}
+	vDB.Abort()
+
+	// Case: Validator doesn't have enough tokens to cover stake amount
+	if _, err := vm.newAddDefaultSubnetValidatorTx( // create the tx
+		MinimumStakeAmount,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		nodeID,
+		nodeID,
+		NumberOfShares,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	); err != nil {
+		t.Fatal(err)
+	}
+	// Remove all UTXOs owned by keys[0]
+	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, utxoID := range utxoIDs.List() {
+		if err := vm.removeUTXO(vDB, utxoID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Now keys[0] has no funds
+	if _, _, _, _, err := tx.SemanticVerify(vDB); err == nil {
+		t.Fatal("should have failed because tx fee paying key has no funds")
+	}
+	vDB.Abort()
 }
