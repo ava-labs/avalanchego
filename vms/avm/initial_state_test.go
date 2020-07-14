@@ -93,6 +93,8 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 	c.RegisterType(&secp256k1fx.TransferOutput{})
 
 	expected := []byte{
+		// Codec version:
+		0x00, 0x00,
 		// fxID:
 		0x00, 0x00, 0x00, 0x00,
 		// num outputs:

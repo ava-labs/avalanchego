@@ -894,7 +894,7 @@ func TestCreateSubnet(t *testing.T) {
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		1, // threshold
+		1,                                       // threshold
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
 	)
 	if err != nil {
@@ -1259,7 +1259,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
 		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
 		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
 		0, 95, 12, 157, 133,
@@ -1360,7 +1360,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	*/
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
 		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
 		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
 		0, 95, 12, 157, 133,

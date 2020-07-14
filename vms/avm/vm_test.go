@@ -241,6 +241,8 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 
 func TestTxSerialization(t *testing.T) {
 	expected := []byte{
+		// Codec version:
+		0x00, 0x00,
 		// txID:
 		0x00, 0x00, 0x00, 0x01,
 		// networkID:

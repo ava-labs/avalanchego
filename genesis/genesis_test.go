@@ -147,42 +147,42 @@ func TestVMGenesis(t *testing.T) {
 		{
 			networkID:  EverestID,
 			vmID:       avm.ID,
-			expectedID: "2Bp1Re3JqrJYUG1Dxy8tEa7e7nCBaCQ4m9sbN5xhknK9rtL94q",
+			expectedID: "wiJaPpeE3BUZG6pJrWsrcXJsMZwyb7teQW4SAgTfUwmF6gkUL",
 		},
 		{
 			networkID:  DenaliID,
 			vmID:       avm.ID,
-			expectedID: "2JS1yvaaSmUCt7kcNX1cgfFFmyLCwn9Cn5qKnH2FxTvQvqETSe",
+			expectedID: "2E39Us3YjxrxLPyQT1p3EwQyAdLvTWBR8Krd7UcVMmo632waLD",
 		},
 		{
 			networkID:  CascadeID,
 			vmID:       avm.ID,
-			expectedID: "2WBZpeGrBpy4RHFkaUQazQdL2teCPd3WqejVzHoHbfhNWqippH",
+			expectedID: "2FfU8b6HQ9KgJ6QSqFatWQcbQqa8pEpFM19iD4ZJtDaXYWNgMf",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       avm.ID,
-			expectedID: "2nvFvaf8zjxKAeoWVnSj8H216dYussYsTNzS4ym7FYpPaMPUdp",
+			expectedID: "2RMhdJxs474ET37mhnfW8SmEDBLDYyJE8DXqQqgcF5AJKbYU3N",
 		},
 		{
 			networkID:  EverestID,
 			vmID:       EVMID,
-			expectedID: "SmQ8LvasSgPrPtUhQ6MaL2JNdeTp1otZ6G9pDM3a78jqzhzs6",
+			expectedID: "fQdpesu7D3KYzaJsRqpMZS11bu1dztj1hiXGycvF4imJRG4uA",
 		},
 		{
 			networkID:  DenaliID,
 			vmID:       EVMID,
-			expectedID: "eZamFmqytbwyF3bTWXDTfV5uRS2Q1y28ETMLa4yULYviLumDm",
+			expectedID: "2DC1iWRQWaNHUCv4bmEVGUBzsqfeN64XQc4FFz4cXsHT736oQ4",
 		},
 		{
 			networkID:  CascadeID,
 			vmID:       EVMID,
-			expectedID: "21CSKU23JjT1XEDUAP8X4qPwMn5U287SV47UyXyWT2cmyq2vVk",
+			expectedID: "VGuSPbSfiTSmFq6Xf7Vu1iGYvFo8maB9wF4NpwoLo6nbuGYDz",
 		},
 		{
 			networkID:  LocalID,
 			vmID:       EVMID,
-			expectedID: "wq1BBr15MMmwTCJ2Q2ggUeWFbeuecHzxdTKuAyyftKgLRrc3q",
+			expectedID: "2nrfmHke2q7xcpi487AHTX7edx69MaDKBCssGkDYE6oX9G8zeF",
 		},
 	}
 
@@ -208,19 +208,19 @@ func TestAVAXAssetID(t *testing.T) {
 	}{
 		{
 			networkID:  EverestID,
-			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
+			expectedID: "2Yjb4rtHTqpCxCv8jbm1pSyMj3rnzrperW7USYTn8kfmmr2JKU",
 		},
 		{
 			networkID:  DenaliID,
-			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
+			expectedID: "2Yjb4rtHTqpCxCv8jbm1pSyMj3rnzrperW7USYTn8kfmmr2JKU",
 		},
 		{
 			networkID:  CascadeID,
-			expectedID: "2CUYXeGx3cXXA91NRHzDhNKQXqPB8TnDDQPg75zRAXUgTmaoRx",
+			expectedID: "2Yjb4rtHTqpCxCv8jbm1pSyMj3rnzrperW7USYTn8kfmmr2JKU",
 		},
 		{
 			networkID:  LocalID,
-			expectedID: "n8XH5JY1EX5VYqDeAhB4Zd4GKxi9UNQy6oPpMsCAj1Q6xkiiL",
+			expectedID: "23X9aFiCbfT8ekmkvwQe9LtQ1Jm9AkTqLQ2AkzZ1EZYijX2ead",
 		},
 	}
 

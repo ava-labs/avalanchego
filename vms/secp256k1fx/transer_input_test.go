@@ -86,6 +86,8 @@ func TestTransferInputSerialize(t *testing.T) {
 	c := codec.NewDefault()
 
 	expected := []byte{
+		// Codec version
+		0x00, 0x00,
 		// amount:
 		0x00, 0x00, 0x00, 0x00, 0x07, 0x5b, 0xcd, 0x15,
 		// length:

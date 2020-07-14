@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/crypto"
 )
 
 func TestCredentialVerify(t *testing.T) {
@@ -31,6 +31,8 @@ func TestCredentialSerialize(t *testing.T) {
 	c := codec.NewDefault()
 
 	expected := []byte{
+		// Codec version
+		0x00, 0x00,
 		// length:
 		0x00, 0x00, 0x00, 0x02,
 		// sig[0]
