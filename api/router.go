@@ -87,7 +87,12 @@ func (r *router) forceAddRouter(base, endpoint string, handler http.Handler) err
 
 	endpoints[endpoint] = handler
 	r.routes[base] = endpoints
-	r.router.Handle(url, handler)
+	// Name routes based on their URL for easy retrieval in the future
+	if route := r.router.Handle(url, handler); route != nil {
+		route.Name(url)
+	} else {
+		return fmt.Errorf("failed to create new route for %s", url)
+	}
 
 	var err error
 	if aliases, exists := r.aliases[base]; exists {
@@ -129,4 +134,52 @@ func (r *router) AddAlias(base string, aliases ...string) error {
 		}
 	}
 	return err
+}
+
+func (r *router) ReplaceRouter(base, endpoint string, handler http.Handler) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.routeLock.Lock()
+	defer r.routeLock.Unlock()
+
+	// Gather the bases/aliases to be replaced
+	bases := make([]string, 1)
+	bases[0] = base
+
+	stringSet := make(map[string]bool)
+	stringSet[base] = true
+
+	aliases, exists := r.aliases[base]
+	if exists {
+		for len(aliases) > 0 {
+			base, aliases = aliases[0], aliases[1:]
+			if !stringSet[base] {
+				stringSet[base] = true
+				bases = append(bases, base)
+				secondaryAliases, exists := r.aliases[base]
+				if exists {
+					aliases = append(aliases, secondaryAliases...)
+				}
+			}
+		}
+	}
+
+	// Replace the endpoint for each base/alias
+	for _, base := range bases {
+		endpoints, exists := r.routes[base]
+		if !exists {
+			endpoints := make(map[string]http.Handler)
+			r.routes[base] = endpoints
+		}
+
+		endpoints[endpoint] = handler
+		url := base + endpoint
+		if route := r.router.Get(url); route != nil {
+			route.Handler(handler)
+		} else {
+			r.router.Handle(url, handler)
+		}
+	}
+
+	return nil
 }

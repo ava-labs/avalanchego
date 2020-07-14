@@ -58,3 +58,49 @@ func TestCall(t *testing.T) {
 		t.Fatalf("Should have been called")
 	}
 }
+
+func TestReplaceRoute(t *testing.T) {
+	s := Server{}
+	s.Initialize(logging.NoLog{}, logging.NoFactory{}, "localhost", 8080)
+
+	originalService := &Service{}
+
+	originalServer := rpc.NewServer()
+	originalServer.RegisterCodec(json2.NewCodec(), "application/json")
+	originalServer.RegisterCodec(json2.NewCodec(), "application/json;charset=UTF-8")
+	originalServer.RegisterService(originalService, "test")
+
+	replacementServer := rpc.NewServer()
+	replacementService := &Service{}
+	replacementServer.RegisterCodec(json2.NewCodec(), "application/json")
+	replacementServer.RegisterCodec(json2.NewCodec(), "application/json;charset=UTF-8")
+	replacementServer.RegisterService(replacementService, "test")
+
+	if err := s.AddRoute(&common.HTTPHandler{Handler: originalServer}, new(sync.RWMutex), "vm/lol", "", logging.NoLog{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.ReplaceRoute(&common.HTTPHandler{Handler: replacementServer}, new(sync.RWMutex), "vm/lol", "", logging.NoLog{}); err != nil {
+		t.Fatal(err)
+	}
+
+	buf, err := json2.EncodeClientRequest("test.Call", &Args{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	writer := httptest.NewRecorder()
+	body := bytes.NewBuffer(buf)
+	headers := map[string]string{
+		"Content-Type": "application/json",
+	}
+	s.Call(writer, "POST", "lol", "", body, headers)
+
+	if !replacementService.called {
+		t.Fatalf("Replacement service should have been called")
+	}
+
+	if originalService.called {
+		t.Fatalf("Original service never should have been called")
+	}
+}
