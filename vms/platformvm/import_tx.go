@@ -47,7 +47,11 @@ type ImportTx struct {
 
 // Ins returns this transaction's inputs
 func (tx *ImportTx) Ins() []*ava.TransferableInput {
-	ins := tx.BaseTx.Ins()
+	// We copy tx.BaseTx.Ins() to a new slice so that
+	// when we sort the inputs, we don't modify tx.BaseTx.Inputs
+	unimportedIns := tx.BaseTx.Ins()
+	ins := make([]*ava.TransferableInput, len(unimportedIns), len(unimportedIns)+len(tx.ImportedInputs))
+	copy(ins, unimportedIns)
 	ins = append(ins, tx.ImportedInputs...)
 	// Sort since syntactic verify expects sorted inputs
 	ava.SortTransferableInputs(ins)
@@ -81,7 +85,7 @@ func (tx *ImportTx) initialize(vm *VM) error {
 // InputUTXOs returns an empty set
 func (tx *ImportTx) InputUTXOs() ids.Set {
 	set := ids.Set{}
-	for _, in := range tx.Ins() {
+	for _, in := range tx.ImportedInputs {
 		set.Add(in.InputID())
 	}
 	return set
