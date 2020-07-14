@@ -32,6 +32,7 @@ type Config struct {
 // Bootstrapper ...
 type Bootstrapper struct {
 	common.Bootstrapper
+	common.Fetcher
 	metrics
 
 	// Blocked tracks operations that are blocked on blocks
@@ -43,18 +44,6 @@ type Bootstrapper struct {
 
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
-
-	// Number of blocks fetched
-	numFetched uint32
-
-	// tracks which validators were asked for which containers in which requests
-	outstandingRequests common.Requests
-
-	// true if bootstrapping is done
-	finished bool
-
-	// Called when bootstrapping is done
-	onFinished func() error
 }
 
 // Initialize this engine.
@@ -67,7 +56,7 @@ func (b *Bootstrapper) Initialize(
 	b.Blocked = config.Blocked
 	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
-	b.onFinished = onFinished
+	b.OnFinished = onFinished
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -121,7 +110,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 	}
 
 	b.processedStartingAcceptedFrontier = true
-	if numPending := b.outstandingRequests.Len(); numPending == 0 {
+	if numPending := b.OutstandingRequests.Len(); numPending == 0 {
 		return b.finish()
 	}
 	return nil
@@ -130,13 +119,13 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 // Get block [blkID] and its ancestors from a validator
 func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	// Make sure we haven't already requested this block
-	if b.outstandingRequests.Contains(blkID) {
+	if b.OutstandingRequests.Contains(blkID) {
 		return nil
 	}
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
-		if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+		if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
 			return b.finish()
 		}
 		return nil
@@ -149,7 +138,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	validatorID := validators[0].ID()
 	b.RequestID++
 
-	b.outstandingRequests.Add(validatorID, b.RequestID, blkID)
+	b.OutstandingRequests.Add(validatorID, b.RequestID, blkID)
 	b.Config.Sender.GetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
 	return nil
 }
@@ -166,7 +155,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 	}
 
 	// Make sure this is in response to a request we made
-	wantedBlkID, ok := b.outstandingRequests.Remove(vdr, requestID)
+	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok { // this message isn't in response to a request we made
 		b.Config.Context.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
 		return nil
@@ -193,7 +182,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
 func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
-	blkID, ok := b.outstandingRequests.Remove(vdr, requestID)
+	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
 		b.Config.Context.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
 		return nil
@@ -212,10 +201,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			numDropped:  b.numDropped,
 			blk:         blk,
 		}); err == nil {
-			b.metrics.numFetched.Inc()
-			b.numFetched++                                      // Progress tracker
-			if b.numFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				b.Config.Context.Log.Info("fetched %d blocks", b.numFetched)
+			b.numFetched.Inc()
+			b.NumFetched++                                      // Progress tracker
+			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+				b.Config.Context.Log.Info("fetched %d blocks", b.NumFetched)
 			}
 		}
 
@@ -238,18 +227,18 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", blkID)
 	}
 
-	if numPending := b.outstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+	if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
 		return b.finish()
 	}
 	return nil
 }
 
 func (b *Bootstrapper) finish() error {
-	if b.finished {
+	if b.Finished {
 		return nil
 	}
 	b.Config.Context.Log.Info("bootstrapping finished fetching %d blocks. executing state transitions...",
-		b.numFetched)
+		b.NumFetched)
 
 	if err := b.executeAll(b.Blocked); err != nil {
 		return err
@@ -261,10 +250,10 @@ func (b *Bootstrapper) finish() error {
 	}
 
 	// Start consensus
-	if err := b.onFinished(); err != nil {
+	if err := b.OnFinished(); err != nil {
 		return err
 	}
-	b.finished = true
+	b.Finished = true
 
 	if b.Bootstrapped != nil {
 		b.Bootstrapped()

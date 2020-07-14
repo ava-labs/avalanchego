@@ -41,6 +41,7 @@ type Config struct {
 // Bootstrapper ...
 type Bootstrapper struct {
 	common.Bootstrapper
+	common.Fetcher
 	metrics
 
 	// VtxBlocked tracks operations that are blocked on vertices
@@ -50,24 +51,12 @@ type Bootstrapper struct {
 	Manager vertex.Manager
 	VM      vertex.DAGVM
 
-	// number of vertices fetched so far
-	numFetched uint32
-
-	// tracks which validators were asked for which containers in which requests
-	outstandingRequests common.Requests
-
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
 	needToFetch ids.Set
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU
-
-	// true if bootstrapping is done
-	finished bool
-
-	// Called when bootstrapping is done
-	onFinished func() error
 }
 
 // Initialize this engine.
@@ -82,7 +71,7 @@ func (b *Bootstrapper) Initialize(
 	b.Manager = config.Manager
 	b.VM = config.VM
 	b.processedCache = &cache.LRU{Size: cacheSize}
-	b.onFinished = onFinished
+	b.OnFinished = onFinished
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -131,12 +120,12 @@ func (b *Bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() < common.MaxOutstandingRequests {
+	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 
 		// Make sure we haven't already requested this vertex
-		if b.outstandingRequests.Contains(vtxID) {
+		if b.OutstandingRequests.Contains(vtxID) {
 			continue
 		}
 
@@ -152,7 +141,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		validatorID := validators[0].ID()
 		b.RequestID++
 
-		b.outstandingRequests.Add(validatorID, b.RequestID, vtxID)
+		b.OutstandingRequests.Add(validatorID, b.RequestID, vtxID)
 		b.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.finish()
@@ -190,9 +179,9 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 				vtx:         vtx,
 			}); err == nil {
 				b.numFetchedVts.Inc()
-				b.numFetched++ // Progress tracker
-				if b.numFetched%common.StatusUpdateFrequency == 0 {
-					b.Context.Log.Info("fetched %d vertices", b.numFetched)
+				b.NumFetched++ // Progress tracker
+				if b.NumFetched%common.StatusUpdateFrequency == 0 {
+					b.Context.Log.Info("fetched %d vertices", b.NumFetched)
 				}
 			} else {
 				b.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
@@ -241,7 +230,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
 
-	requestedVtxID, requested := b.outstandingRequests.Remove(vdr, requestID)
+	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
 	vtx, err := b.Manager.ParseVertex(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
@@ -260,7 +249,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		b.Context.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
 		return b.fetch(requestedVtxID)
 	}
-	if !requested && !b.outstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
+	if !requested && !b.OutstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
 		b.Context.Log.Debug("received un-needed vertex from %s with vertexID %s", vdr, vtxID)
 		return nil
 	}
@@ -303,7 +292,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
 func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
-	vtxID, ok := b.outstandingRequests.Remove(vdr, requestID)
+	vtxID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
 		b.Context.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
 		return nil
@@ -333,12 +322,12 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 // Finish bootstrapping
 func (b *Bootstrapper) finish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	if b.finished || b.outstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
+	if b.Finished || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
 		return nil
 	}
 
 	b.Context.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
-		b.numFetched)
+		b.NumFetched)
 	if err := b.executeAll(b.TxBlocked); err != nil {
 		return err
 	}
@@ -354,10 +343,10 @@ func (b *Bootstrapper) finish() error {
 	}
 
 	// Start consensus
-	if err := b.onFinished(); err != nil {
+	if err := b.OnFinished(); err != nil {
 		return err
 	}
-	b.finished = true
+	b.Finished = true
 	return nil
 }
 
