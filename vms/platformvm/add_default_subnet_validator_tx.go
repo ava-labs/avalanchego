@@ -95,6 +95,9 @@ func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 	case tx.Shares > NumberOfShares: // Ensure delegators shares are in the allowed amount
 		return permError{errTooManyShares}
 	}
+	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	// Ensure staking length is not too short or long,
 	// and that the inputs/outputs of this tx are syntactically valid

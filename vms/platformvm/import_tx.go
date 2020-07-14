@@ -105,7 +105,9 @@ func (tx *ImportTx) SyntacticVerify() error {
 	case len(tx.Ins()) != len(tx.Credentials):
 		return errWrongNumberOfCredentials
 	}
-	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+		return err
+	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	tx.syntacticallyVerified = true

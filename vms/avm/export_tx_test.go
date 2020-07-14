@@ -59,6 +59,10 @@ func TestExportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01,
 		// sig index[0]:
 		0x00, 0x00, 0x00, 0x00,
+		// Memo length:
+		0x00, 0x00, 0x00, 0x04,
+		// Memo:
+		0x00, 0x01, 0x02, 0x03,
 		// number of exported outs:
 		0x00, 0x00, 0x00, 0x00,
 	}
@@ -89,6 +93,7 @@ func TestExportTxSerialization(t *testing.T) {
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		}},
+		Memo: []byte{0x00, 0x01, 0x02, 0x03},
 	}}}
 
 	c := codec.NewDefault()

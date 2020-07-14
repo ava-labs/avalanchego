@@ -1,9 +1,15 @@
 package platformvm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/ava"
 )
+
+// Max size of memo field
+// Don't change without also changing avm.maxMemoSize
+const maxMemoSize = 256
 
 // BaseTx contains fields common to many transaction types
 // Should be embedded in transaction implementations
@@ -28,6 +34,8 @@ type BaseTx struct {
 	Outputs      []*ava.TransferableOutput `serialize:"true"`
 	// Input UTXOs
 	Inputs []*ava.TransferableInput `serialize:"true"`
+	// Memo field contains arbitrary bytes, up to maxMemoSize
+	Memo []byte `serialize:"true"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx
@@ -48,3 +56,11 @@ func (tx BaseTx) Ins() []*ava.TransferableInput { return tx.Inputs }
 
 // Outs returns this transaction's outputs
 func (tx BaseTx) Outs() []*ava.TransferableOutput { return tx.Outputs }
+
+// SyntacticVerify returns nil iff this tx is well formed
+func (tx BaseTx) SyntacticVerify() error {
+	if len(tx.Memo) <= maxMemoSize {
+		return nil
+	}
+	return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(tx.Memo), maxMemoSize)
+}

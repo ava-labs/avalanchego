@@ -319,6 +319,10 @@ func TestTxSerialization(t *testing.T) {
 		0x92, 0xf0, 0xee, 0x31,
 		// number of inputs:
 		0x00, 0x00, 0x00, 0x00,
+		// Memo length:
+		0x00, 0x00, 0x00, 0x04,
+		// Memo:
+		0x00, 0x01, 0x02, 0x03,
 		// name length:
 		0x00, 0x04,
 		// name:
@@ -356,6 +360,7 @@ func TestTxSerialization(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
+			Memo:  []byte{0x00, 0x01, 0x02, 0x03},
 		},
 		Name:         "name",
 		Symbol:       "symb",

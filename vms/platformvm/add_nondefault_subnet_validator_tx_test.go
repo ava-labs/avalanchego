@@ -528,7 +528,9 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal(err)
 	} else if err := unmarshaledTx.initialize(vm); err != nil {
 		t.Fatal(err)
-	} else if !reflect.DeepEqual(tx, &unmarshaledTx) {
+		// reflect.DeepEqual considers []byte{} and nil to be different so change nil to []byte{}
+	} else if tx.Memo = []byte{}; false {
+	} else if !reflect.DeepEqual(*tx, unmarshaledTx) {
 		t.Fatal("should be equal")
 	}
 }
