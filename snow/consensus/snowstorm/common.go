@@ -51,7 +51,7 @@ func (c *common) Initialize(ctx *snow.Context, params snowball.Parameters) {
 	c.params = params
 
 	if err := c.metrics.Initialize(params.Namespace, params.Metrics); err != nil {
-		ctx.Log.Error("%s", err)
+		ctx.Log.Error("failed to initialize metrics: %s", err)
 	}
 }
 

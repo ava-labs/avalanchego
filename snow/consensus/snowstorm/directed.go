@@ -109,10 +109,8 @@ func (dg *Directed) Add(tx Tx) error {
 		return nil
 	}
 
-	fn := &directedTx{tx: tx}
+	txNode := &directedTx{tx: tx}
 
-	// Note: Below, for readability, we sometimes say "transaction" when we actually mean
-	// "the flatNode representing a transaction."
 	// For each UTXO input to Tx:
 	// * Get all transactions that consume that UTXO
 	// * Add edges from Tx to those transactions in the conflict graph
@@ -122,7 +120,7 @@ func (dg *Directed) Add(tx Tx) error {
 		spends := dg.utxos[inputKey] // Transactions spending this UTXO
 
 		// Add edges to conflict graph
-		fn.outs.Union(spends)
+		txNode.outs.Union(spends)
 
 		// Mark transactions conflicting with Tx as rogue
 		for _, conflictID := range spends.List() {
@@ -141,11 +139,11 @@ func (dg *Directed) Add(tx Tx) error {
 		spends.Add(txID)
 		dg.utxos[inputKey] = spends
 	}
-	fn.rogue = fn.outs.Len() != 0 // Mark this transaction as rogue if it has conflicts
+	txNode.rogue = txNode.outs.Len() != 0 // Mark this transaction as rogue if it has conflicts
 
 	// Add the node representing Tx to the node set
-	dg.txs[txID.Key()] = fn
-	if !fn.rogue {
+	dg.txs[txID.Key()] = txNode
+	if !txNode.rogue {
 		// I'm not rogue
 		dg.virtuous.Add(txID)
 		dg.virtuousVoting.Add(txID)
@@ -158,8 +156,8 @@ func (dg *Directed) Add(tx Tx) error {
 	// Tx can be accepted only if the transactions it depends on are also accepted
 	// If any transactions that Tx depends on are rejected, reject Tx
 	toReject := &directedRejector{
-		dg: dg,
-		fn: fn,
+		dg:     dg,
+		txNode: txNode,
 	}
 	for _, dependency := range tx.Dependencies() {
 		if !dependency.Status().Decided() {
@@ -188,33 +186,33 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	threshold := votes.Threshold() // Each element is ID of transaction preferred by >= Alpha poll respondents
 	for _, toInc := range threshold.List() {
 		incKey := toInc.Key()
-		fn, exist := dg.txs[incKey]
+		txNode, exist := dg.txs[incKey]
 		if !exist {
 			// Votes for decided consumers are ignored
 			continue
 		}
 
-		if fn.lastVote+1 != dg.currentVote {
-			fn.confidence = 0
+		if txNode.lastVote+1 != dg.currentVote {
+			txNode.confidence = 0
 		}
-		fn.lastVote = dg.currentVote
+		txNode.lastVote = dg.currentVote
 
 		dg.ctx.Log.Verbo("Increasing (bias, confidence) of %s from (%d, %d) to (%d, %d)",
-			toInc, fn.bias, fn.confidence, fn.bias+1, fn.confidence+1)
+			toInc, txNode.bias, txNode.confidence, txNode.bias+1, txNode.confidence+1)
 
-		fn.bias++
-		fn.confidence++
+		txNode.bias++
+		txNode.confidence++
 
-		if !fn.pendingAccept &&
-			((!fn.rogue && fn.confidence >= dg.params.BetaVirtuous) ||
-				fn.confidence >= dg.params.BetaRogue) {
-			dg.deferAcceptance(fn)
+		if !txNode.pendingAccept &&
+			((!txNode.rogue && txNode.confidence >= dg.params.BetaVirtuous) ||
+				txNode.confidence >= dg.params.BetaRogue) {
+			dg.deferAcceptance(txNode)
 			if dg.errs.Errored() {
 				return changed, dg.errs.Err
 			}
 		}
-		if !fn.accepted {
-			changed = dg.redirectEdges(fn) || changed
+		if !txNode.accepted {
+			changed = dg.redirectEdges(txNode) || changed
 		} else {
 			changed = true
 		}
@@ -227,7 +225,7 @@ func (dg *Directed) String() string {
 	for _, tx := range dg.txs {
 		nodes = append(nodes, tx)
 	}
-	sortFlatNodes(nodes)
+	sortTxNodes(nodes)
 
 	sb := strings.Builder{}
 
@@ -238,13 +236,13 @@ func (dg *Directed) String() string {
 		formatting.IntFormat(len(dg.txs)-1),
 		formatting.IntFormat(dg.params.BetaRogue-1))
 
-	for i, fn := range nodes {
-		confidence := fn.confidence
-		if fn.lastVote != dg.currentVote {
+	for i, txNode := range nodes {
+		confidence := txNode.confidence
+		if txNode.lastVote != dg.currentVote {
 			confidence = 0
 		}
 		sb.WriteString(fmt.Sprintf(format,
-			i, fn.tx.ID(), confidence, fn.bias))
+			i, txNode.tx.ID(), confidence, txNode.bias))
 	}
 
 	if len(nodes) > 0 {
@@ -255,20 +253,20 @@ func (dg *Directed) String() string {
 	return sb.String()
 }
 
-func (dg *Directed) deferAcceptance(fn *directedTx) {
-	fn.pendingAccept = true
+func (dg *Directed) deferAcceptance(txNode *directedTx) {
+	txNode.pendingAccept = true
 
 	toAccept := &directedAccepter{
-		dg: dg,
-		fn: fn,
+		dg:     dg,
+		txNode: txNode,
 	}
-	for _, dependency := range fn.tx.Dependencies() {
+	for _, dependency := range txNode.tx.Dependencies() {
 		if !dependency.Status().Decided() {
 			toAccept.deps.Add(dependency.ID())
 		}
 	}
 
-	dg.virtuousVoting.Remove(fn.tx.ID())
+	dg.virtuousVoting.Remove(txNode.tx.ID())
 	dg.pendingAccept.Register(toAccept)
 }
 
@@ -307,10 +305,10 @@ func (dg *Directed) redirectEdges(tx *directedTx) bool {
 
 // Set the confidence of all conflicts to 0
 // Change the direction of edges if needed
-func (dg *Directed) redirectEdge(fn *directedTx, conflictID ids.ID) bool {
-	nodeID := fn.tx.ID()
+func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
+	nodeID := txNode.tx.ID()
 	conflict := dg.txs[conflictID.Key()]
-	if fn.bias <= conflict.bias {
+	if txNode.bias <= conflict.bias {
 		return false
 	}
 
@@ -323,9 +321,9 @@ func (dg *Directed) redirectEdge(fn *directedTx, conflictID ids.ID) bool {
 	conflict.outs.Add(nodeID)
 	dg.preferences.Remove(conflictID) // This consumer now has an out edge
 
-	fn.ins.Add(conflictID)
-	fn.outs.Remove(conflictID)
-	if fn.outs.Len() == 0 {
+	txNode.ins.Add(conflictID)
+	txNode.outs.Remove(conflictID)
+	if txNode.outs.Len() == 0 {
 		// If I don't have out edges, I'm preferred
 		dg.preferences.Add(nodeID)
 	}
@@ -354,7 +352,7 @@ type directedAccepter struct {
 	dg       *Directed
 	deps     ids.Set
 	rejected bool
-	fn       *directedTx
+	txNode   *directedTx
 }
 
 func (a *directedAccepter) Dependencies() ids.Set { return a.deps }
@@ -373,33 +371,33 @@ func (a *directedAccepter) Update() {
 		return
 	}
 
-	id := a.fn.tx.ID()
+	id := a.txNode.tx.ID()
 	delete(a.dg.txs, id.Key())
 
-	for _, inputID := range a.fn.tx.InputIDs().List() {
+	for _, inputID := range a.txNode.tx.InputIDs().List() {
 		delete(a.dg.utxos, inputID.Key())
 	}
 	a.dg.virtuous.Remove(id)
 	a.dg.preferences.Remove(id)
 
 	// Reject the conflicts
-	if err := a.dg.reject(a.fn.ins.List()...); err != nil {
+	if err := a.dg.reject(a.txNode.ins.List()...); err != nil {
 		a.dg.errs.Add(err)
 		return
 	}
 	// Should normally be empty
-	if err := a.dg.reject(a.fn.outs.List()...); err != nil {
+	if err := a.dg.reject(a.txNode.outs.List()...); err != nil {
 		a.dg.errs.Add(err)
 		return
 	}
 
 	// Mark it as accepted
-	if err := a.fn.tx.Accept(); err != nil {
+	if err := a.txNode.tx.Accept(); err != nil {
 		a.dg.errs.Add(err)
 		return
 	}
-	a.fn.accepted = true
-	a.dg.ctx.DecisionDispatcher.Accept(a.dg.ctx.ChainID, id, a.fn.tx.Bytes())
+	a.txNode.accepted = true
+	a.dg.ctx.DecisionDispatcher.Accept(a.dg.ctx.ChainID, id, a.txNode.tx.Bytes())
 	a.dg.metrics.Accepted(id)
 
 	a.dg.pendingAccept.Fulfill(id)
@@ -410,8 +408,8 @@ func (a *directedAccepter) Update() {
 type directedRejector struct {
 	dg       *Directed
 	deps     ids.Set
-	rejected bool // true if the transaction represented by fn has been rejected
-	fn       *directedTx
+	rejected bool // true if the transaction has been rejected
+	txNode   *directedTx
 }
 
 func (r *directedRejector) Dependencies() ids.Set { return r.deps }
@@ -421,21 +419,21 @@ func (r *directedRejector) Fulfill(id ids.ID) {
 		return
 	}
 	r.rejected = true
-	r.dg.errs.Add(r.dg.reject(r.fn.tx.ID()))
+	r.dg.errs.Add(r.dg.reject(r.txNode.tx.ID()))
 }
 
 func (*directedRejector) Abandon(id ids.ID) {}
 
 func (*directedRejector) Update() {}
 
-type sortFlatNodeData []*directedTx
+type sortTxNodeData []*directedTx
 
-func (fnd sortFlatNodeData) Less(i, j int) bool {
+func (tnd sortTxNodeData) Less(i, j int) bool {
 	return bytes.Compare(
-		fnd[i].tx.ID().Bytes(),
-		fnd[j].tx.ID().Bytes()) == -1
+		tnd[i].tx.ID().Bytes(),
+		tnd[j].tx.ID().Bytes()) == -1
 }
-func (fnd sortFlatNodeData) Len() int      { return len(fnd) }
-func (fnd sortFlatNodeData) Swap(i, j int) { fnd[j], fnd[i] = fnd[i], fnd[j] }
+func (tnd sortTxNodeData) Len() int      { return len(tnd) }
+func (tnd sortTxNodeData) Swap(i, j int) { tnd[j], tnd[i] = tnd[i], tnd[j] }
 
-func sortFlatNodes(nodes []*directedTx) { sort.Sort(sortFlatNodeData(nodes)) }
+func sortTxNodes(nodes []*directedTx) { sort.Sort(sortTxNodeData(nodes)) }
