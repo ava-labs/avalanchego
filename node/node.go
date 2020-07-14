@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/version"
 	"github.com/ava-labs/gecko/vms"
@@ -386,6 +387,30 @@ func (n *Node) initChains() error {
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: n.beacons,
 	})
+
+	bootstrapWeight, err := n.beacons.Weight()
+	if err != nil {
+		return err
+	}
+	reqWeight := (3*bootstrapWeight + 3) / 4
+
+	if reqWeight == 0 {
+		return nil
+	}
+
+	connectToBootstrapsTimeout := timer.NewTimer(func() {
+		n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
+		go n.Net.Close()
+	})
+
+	awaiter := chains.NewAwaiter(n.beacons, reqWeight, func() {
+		n.Log.Info("Connected to required bootstrap nodes. Starting Platform Chain...")
+		connectToBootstrapsTimeout.Cancel()
+	})
+
+	go connectToBootstrapsTimeout.Dispatch()
+	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
+	go n.Net.RegisterHandler(awaiter)
 
 	return nil
 }
