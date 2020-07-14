@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
@@ -18,10 +20,9 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -34,7 +35,9 @@ import (
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/timestampvm"
-	"github.com/prometheus/client_golang/prometheus"
+
+	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
+	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
 )
 
 var (
@@ -891,7 +894,7 @@ func TestCreateSubnet(t *testing.T) {
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		1,                                       // threshold
+		1, // threshold
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
 	)
 	if err != nil {
@@ -1463,7 +1466,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	engine.Initialize(smeng.Config{
-		BootstrapConfig: smeng.BootstrapConfig{
+		Config: bootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: vdrs,

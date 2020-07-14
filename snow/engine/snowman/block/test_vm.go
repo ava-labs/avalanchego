@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package snowman
+package block
 
 import (
 	"errors"
@@ -17,9 +17,9 @@ var (
 	errGetBlock   = errors.New("unexpectedly called GetBlock")
 )
 
-// VMTest ...
-type VMTest struct {
-	common.VMTest
+// TestVM ...
+type TestVM struct {
+	common.TestVM
 
 	CantBuildBlock,
 	CantParseBlock,
@@ -35,8 +35,8 @@ type VMTest struct {
 }
 
 // Default ...
-func (vm *VMTest) Default(cant bool) {
-	vm.VMTest.Default(cant)
+func (vm *TestVM) Default(cant bool) {
+	vm.TestVM.Default(cant)
 
 	vm.CantBuildBlock = cant
 	vm.CantParseBlock = cant
@@ -46,7 +46,7 @@ func (vm *VMTest) Default(cant bool) {
 }
 
 // BuildBlock ...
-func (vm *VMTest) BuildBlock() (snowman.Block, error) {
+func (vm *TestVM) BuildBlock() (snowman.Block, error) {
 	if vm.BuildBlockF != nil {
 		return vm.BuildBlockF()
 	}
@@ -57,7 +57,7 @@ func (vm *VMTest) BuildBlock() (snowman.Block, error) {
 }
 
 // ParseBlock ...
-func (vm *VMTest) ParseBlock(b []byte) (snowman.Block, error) {
+func (vm *TestVM) ParseBlock(b []byte) (snowman.Block, error) {
 	if vm.ParseBlockF != nil {
 		return vm.ParseBlockF(b)
 	}
@@ -68,7 +68,7 @@ func (vm *VMTest) ParseBlock(b []byte) (snowman.Block, error) {
 }
 
 // GetBlock ...
-func (vm *VMTest) GetBlock(id ids.ID) (snowman.Block, error) {
+func (vm *TestVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	if vm.GetBlockF != nil {
 		return vm.GetBlockF(id)
 	}
@@ -79,7 +79,7 @@ func (vm *VMTest) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 // SetPreference ...
-func (vm *VMTest) SetPreference(id ids.ID) {
+func (vm *TestVM) SetPreference(id ids.ID) {
 	if vm.SetPreferenceF != nil {
 		vm.SetPreferenceF(id)
 	} else if vm.CantSetPreference && vm.T != nil {
@@ -88,7 +88,7 @@ func (vm *VMTest) SetPreference(id ids.ID) {
 }
 
 // LastAccepted ...
-func (vm *VMTest) LastAccepted() ids.ID {
+func (vm *TestVM) LastAccepted() ids.ID {
 	if vm.LastAcceptedF != nil {
 		return vm.LastAcceptedF()
 	}

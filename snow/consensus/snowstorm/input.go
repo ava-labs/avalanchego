@@ -12,9 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
 // InputFactory implements Factory by returning an input struct
@@ -26,66 +24,47 @@ func (InputFactory) New() Consensus { return &Input{} }
 // Input is an implementation of a multi-color, non-transitive, snowball
 // instance
 type Input struct {
-	metrics
+	common
 
-	ctx    *snow.Context
-	params snowball.Parameters
+	// Key: Transaction ID
+	// Value: Node that represents this transaction in the conflict graph
+	txs map[[32]byte]inputTx
 
-	// preferences is the set of consumerIDs that have only in edges
-	// virtuous is the set of consumerIDs that have no edges
-	preferences, virtuous, virtuousVoting ids.Set
-
-	txs    map[[32]byte]txNode    // Map consumerID -> consumerNode
-	inputs map[[32]byte]inputNode // Map inputID -> inputNode
-
-	pendingAccept, pendingReject events.Blocker
-
-	time uint64
-
-	// Number of times RecordPoll has been called
-	currentVote int
-
-	errs wrappers.Errs
+	// Key: UTXO ID
+	// Value: Node that represents the status of the transactions consuming this
+	//        input
+	utxos map[[32]byte]inputUtxo
 }
 
-type txNode struct {
+type inputTx struct {
 	bias int
 	tx   Tx
 
-	timestamp uint64
+	lastVote int
 }
 
-type inputNode struct {
+type inputUtxo struct {
 	bias, confidence, lastVote int
 	rogue                      bool
-	preference                 ids.ID
-	color                      ids.ID
-	conflicts                  ids.Set
+
+	preference ids.ID
+	color      ids.ID
+	conflicts  ids.Set
 }
 
 // Initialize implements the ConflictGraph interface
 func (ig *Input) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	ctx.Log.AssertDeferredNoError(params.Valid)
+	ig.common.Initialize(ctx, params)
 
-	ig.ctx = ctx
-	ig.params = params
-
-	if err := ig.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
-		ig.ctx.Log.Error("%s", err)
-	}
-
-	ig.txs = make(map[[32]byte]txNode)
-	ig.inputs = make(map[[32]byte]inputNode)
+	ig.txs = make(map[[32]byte]inputTx)
+	ig.utxos = make(map[[32]byte]inputUtxo)
 }
-
-// Parameters implements the Snowstorm interface
-func (ig *Input) Parameters() snowball.Parameters { return ig.params }
 
 // IsVirtuous implements the ConflictGraph interface
 func (ig *Input) IsVirtuous(tx Tx) bool {
 	id := tx.ID()
 	for _, consumption := range tx.InputIDs().List() {
-		input := ig.inputs[consumption.Key()]
+		input := ig.utxos[consumption.Key()]
 		if input.rogue ||
 			(input.conflicts.Len() > 0 && !input.conflicts.Contains(id)) {
 			return false
@@ -116,12 +95,12 @@ func (ig *Input) Add(tx Tx) error {
 		return nil
 	}
 
-	cn := txNode{tx: tx}
+	cn := inputTx{tx: tx}
 	virtuous := true
 	// If there are inputs, they must be voted on
 	for _, consumption := range inputs.List() {
 		consumptionKey := consumption.Key()
-		input, exists := ig.inputs[consumptionKey]
+		input, exists := ig.utxos[consumptionKey]
 		input.rogue = exists // If the input exists for a conflict
 		if exists {
 			for _, conflictID := range input.conflicts.List() {
@@ -132,7 +111,7 @@ func (ig *Input) Add(tx Tx) error {
 			input.preference = txID // If there isn't a conflict, I'm preferred
 		}
 		input.conflicts.Add(txID)
-		ig.inputs[consumptionKey] = input
+		ig.utxos[consumptionKey] = input
 
 		virtuous = virtuous && !exists
 	}
@@ -172,19 +151,13 @@ func (ig *Input) Issued(tx Tx) bool {
 	return ok
 }
 
-// Virtuous implements the ConflictGraph interface
-func (ig *Input) Virtuous() ids.Set { return ig.virtuous }
-
-// Preferences implements the ConflictGraph interface
-func (ig *Input) Preferences() ids.Set { return ig.preferences }
-
 // Conflicts implements the ConflictGraph interface
 func (ig *Input) Conflicts(tx Tx) ids.Set {
 	id := tx.ID()
 	conflicts := ids.Set{}
 
 	for _, input := range tx.InputIDs().List() {
-		inputNode := ig.inputs[input.Key()]
+		inputNode := ig.utxos[input.Key()]
 		conflicts.Union(inputNode.conflicts)
 	}
 
@@ -213,8 +186,7 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 		// consumer was rejected from a conflict set, when it was preferred in
 		// this conflict set, when there is a tie for the second highest
 		// confidence.
-		ig.time++
-		tx.timestamp = ig.time
+		tx.lastVote = ig.currentVote
 
 		preferred := true
 		rogue := false
@@ -223,7 +195,7 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 		consumptions := tx.tx.InputIDs().List()
 		for _, inputID := range consumptions {
 			inputKey := inputID.Key()
-			input := ig.inputs[inputKey]
+			input := ig.utxos[inputKey]
 
 			// If I did not receive a vote in the last vote, reset my confidence to 0
 			if input.lastVote+1 != ig.currentVote {
@@ -252,7 +224,7 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 			input.color = toInc
 			input.confidence++
 
-			ig.inputs[inputKey] = input
+			ig.utxos[inputKey] = input
 
 			// track cumulative statistics
 			preferred = preferred && toInc.Equals(input.preference)
@@ -284,7 +256,7 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 	return changed, ig.errs.Err
 }
 
-func (ig *Input) deferAcceptance(tn txNode) {
+func (ig *Input) deferAcceptance(tn inputTx) {
 	toAccept := &inputAccepter{
 		ig: ig,
 		tn: tn,
@@ -328,13 +300,13 @@ func (ig *Input) removeConflict(id ids.ID, inputIDs ...ids.ID) {
 	for _, inputID := range inputIDs {
 		inputKey := inputID.Key()
 		// if the input doesn't exists, it was already decided
-		if input, exists := ig.inputs[inputKey]; exists {
+		if input, exists := ig.utxos[inputKey]; exists {
 			input.conflicts.Remove(id)
 
 			// If there is nothing attempting to consume the input, remove it
 			// from memory
 			if input.conflicts.Len() == 0 {
-				delete(ig.inputs, inputKey)
+				delete(ig.utxos, inputKey)
 				continue
 			}
 
@@ -344,17 +316,17 @@ func (ig *Input) removeConflict(id ids.ID, inputIDs ...ids.ID) {
 			if input.preference.Equals(id) {
 				newPreference := ids.ID{}
 				newBias := -1
-				newBiasTime := uint64(0)
+				newBiasTime := 0
 
 				// Find the highest bias conflict
 				for _, spend := range input.conflicts.List() {
 					tx := ig.txs[spend.Key()]
 					if tx.bias > newBias ||
 						(tx.bias == newBias &&
-							newBiasTime < tx.timestamp) {
+							newBiasTime < tx.lastVote) {
 						newPreference = spend
 						newBias = tx.bias
-						newBiasTime = tx.timestamp
+						newBiasTime = tx.lastVote
 					}
 				}
 
@@ -362,7 +334,7 @@ func (ig *Input) removeConflict(id ids.ID, inputIDs ...ids.ID) {
 				input.preference = newPreference
 				input.bias = newBias
 
-				ig.inputs[inputKey] = input
+				ig.utxos[inputKey] = input
 
 				// We need to check if this node is now preferred
 				preferenceNode, exist := ig.txs[newPreference.Key()]
@@ -371,7 +343,7 @@ func (ig *Input) removeConflict(id ids.ID, inputIDs ...ids.ID) {
 					inputIDs := preferenceNode.tx.InputIDs().List()
 					for _, inputID := range inputIDs {
 						inputKey := inputID.Key()
-						input := ig.inputs[inputKey]
+						input := ig.utxos[inputKey]
 
 						if !newPreference.Equals(input.preference) {
 							// If this preference isn't the preferred color, it
@@ -389,24 +361,10 @@ func (ig *Input) removeConflict(id ids.ID, inputIDs ...ids.ID) {
 				}
 			} else {
 				// If i'm rejecting the non-preference, do nothing
-				ig.inputs[inputKey] = input
+				ig.utxos[inputKey] = input
 			}
 		}
 	}
-}
-
-// Quiesce implements the ConflictGraph interface
-func (ig *Input) Quiesce() bool {
-	numVirtuous := ig.virtuousVoting.Len()
-	ig.ctx.Log.Verbo("Conflict graph has %d voting virtuous transactions and %d transactions", numVirtuous, len(ig.txs))
-	return numVirtuous == 0
-}
-
-// Finalized implements the ConflictGraph interface
-func (ig *Input) Finalized() bool {
-	numTxs := len(ig.txs)
-	ig.ctx.Log.Verbo("Conflict graph has %d pending transactions", numTxs)
-	return numTxs == 0
 }
 
 func (ig *Input) String() string {
@@ -416,7 +374,7 @@ func (ig *Input) String() string {
 
 		confidence := ig.params.BetaRogue
 		for _, inputID := range tx.tx.InputIDs().List() {
-			input := ig.inputs[inputID.Key()]
+			input := ig.utxos[inputID.Key()]
 			if input.lastVote != ig.currentVote {
 				confidence = 0
 				break
@@ -464,7 +422,7 @@ type inputAccepter struct {
 	ig       *Input
 	deps     ids.Set
 	rejected bool
-	tn       txNode
+	tn       inputTx
 }
 
 func (a *inputAccepter) Dependencies() ids.Set { return a.deps }
@@ -495,7 +453,7 @@ func (a *inputAccepter) Update() {
 	conflicts := ids.Set{}
 	for inputKey, exists := range inputIDs {
 		if exists {
-			inputNode := a.ig.inputs[inputKey]
+			inputNode := a.ig.utxos[inputKey]
 			conflicts.Union(inputNode.conflicts)
 		}
 	}
@@ -521,7 +479,7 @@ type inputRejector struct {
 	ig       *Input
 	deps     ids.Set
 	rejected bool // true if the transaction represented by fn has been rejected
-	tn       txNode
+	tn       inputTx
 }
 
 func (r *inputRejector) Dependencies() ids.Set { return r.deps }

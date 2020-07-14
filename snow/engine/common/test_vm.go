@@ -15,8 +15,8 @@ var (
 	errInitialize = errors.New("unexpectedly called Initialize")
 )
 
-// VMTest is a test vm
-type VMTest struct {
+// TestVM is a test vm
+type TestVM struct {
 	T *testing.T
 
 	CantInitialize, CantBootstrapping, CantBootstrapped, CantShutdown, CantCreateHandlers, CantCreateStaticHandlers bool
@@ -28,7 +28,7 @@ type VMTest struct {
 }
 
 // Default ...
-func (vm *VMTest) Default(cant bool) {
+func (vm *TestVM) Default(cant bool) {
 	vm.CantInitialize = cant
 	vm.CantBootstrapping = cant
 	vm.CantBootstrapped = cant
@@ -38,7 +38,7 @@ func (vm *VMTest) Default(cant bool) {
 }
 
 // Initialize ...
-func (vm *VMTest) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
+func (vm *TestVM) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
 	if vm.InitializeF != nil {
 		return vm.InitializeF(ctx, db, initState, msgChan, fxs)
 	}
@@ -49,7 +49,7 @@ func (vm *VMTest) Initialize(ctx *snow.Context, db database.Database, initState 
 }
 
 // Bootstrapping ...
-func (vm *VMTest) Bootstrapping() error {
+func (vm *TestVM) Bootstrapping() error {
 	if vm.BootstrappingF != nil {
 		return vm.BootstrappingF()
 	} else if vm.CantBootstrapping {
@@ -62,7 +62,7 @@ func (vm *VMTest) Bootstrapping() error {
 }
 
 // Bootstrapped ...
-func (vm *VMTest) Bootstrapped() error {
+func (vm *TestVM) Bootstrapped() error {
 	if vm.BootstrappedF != nil {
 		return vm.BootstrappedF()
 	} else if vm.CantBootstrapped {
@@ -75,7 +75,7 @@ func (vm *VMTest) Bootstrapped() error {
 }
 
 // Shutdown ...
-func (vm *VMTest) Shutdown() error {
+func (vm *TestVM) Shutdown() error {
 	if vm.ShutdownF != nil {
 		return vm.ShutdownF()
 	} else if vm.CantShutdown {
@@ -88,7 +88,7 @@ func (vm *VMTest) Shutdown() error {
 }
 
 // CreateHandlers ...
-func (vm *VMTest) CreateHandlers() map[string]*HTTPHandler {
+func (vm *TestVM) CreateHandlers() map[string]*HTTPHandler {
 	if vm.CreateHandlersF != nil {
 		return vm.CreateHandlersF()
 	}
@@ -99,7 +99,7 @@ func (vm *VMTest) CreateHandlers() map[string]*HTTPHandler {
 }
 
 // CreateStaticHandlers ...
-func (vm *VMTest) CreateStaticHandlers() map[string]*HTTPHandler {
+func (vm *TestVM) CreateStaticHandlers() map[string]*HTTPHandler {
 	if vm.CreateStaticHandlersF != nil {
 		return vm.CreateStaticHandlersF()
 	}
