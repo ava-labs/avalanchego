@@ -26,24 +26,29 @@ func (n *Network) shuffleColors() {
 		colors = append(colors, n.colors[s.Sample()])
 	}
 	n.colors = colors
-	SortVts(n.colors)
+	SortTestBlocks(n.colors)
 }
 
 func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 	n.params = params
 	n.colors = append(n.colors, &TestBlock{
-		parent: Genesis,
-		id:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
-		status: choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis,
+		HeightV: 0,
 	})
 
 	for i := 1; i < numColors; i++ {
 		dependency := n.colors[random.Rand(0, len(n.colors))]
 		n.colors = append(n.colors, &TestBlock{
-			parent: dependency,
-			id:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
-			height: dependency.height + 1,
-			status: choices.Processing,
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
+				StatusV: choices.Processing,
+			},
+			ParentV: dependency,
+			HeightV: dependency.HeightV + 1,
 		})
 	}
 }
@@ -54,15 +59,19 @@ func (n *Network) AddNode(sm Consensus) {
 	n.shuffleColors()
 	deps := map[[32]byte]Block{}
 	for _, blk := range n.colors {
-		myDep, found := deps[blk.parent.ID().Key()]
+		myDep, found := deps[blk.ParentV.ID().Key()]
 		if !found {
-			myDep = blk.parent
+			myDep = blk.Parent()
 		}
 		myVtx := &TestBlock{
-			parent: myDep,
-			id:     blk.id,
-			height: blk.height,
-			status: blk.status,
+			TestDecidable: choices.TestDecidable{
+				IDV:     blk.ID(),
+				StatusV: blk.Status(),
+			},
+			ParentV: myDep,
+			HeightV: blk.Height(),
+			VerifyV: blk.Verify(),
+			BytesV:  blk.Bytes(),
 		}
 		sm.Add(myVtx)
 		deps[myVtx.ID().Key()] = myDep

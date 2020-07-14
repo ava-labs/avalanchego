@@ -290,6 +290,10 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal slice: %s", p.Err)
 		}
+		if numElts > c.maxSliceLen {
+			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
+				numElts, c.maxSliceLen)
+		}
 		// set [value] to be a slice of the appropriate type/capacity (right now it is nil)
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
 		// Unmarshal each element into the appropriate index of the slice

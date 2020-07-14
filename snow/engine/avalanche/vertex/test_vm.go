@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avalanche
+package vertex
 
 import (
 	"errors"
@@ -18,9 +18,9 @@ var (
 	errGetTx   = errors.New("unexpectedly called GetTx")
 )
 
-// VMTest ...
-type VMTest struct {
-	common.VMTest
+// TestVM ...
+type TestVM struct {
+	common.TestVM
 
 	CantPendingTxs, CantParseTx, CantIssueTx, CantGetTx bool
 
@@ -31,8 +31,8 @@ type VMTest struct {
 }
 
 // Default ...
-func (vm *VMTest) Default(cant bool) {
-	vm.VMTest.Default(cant)
+func (vm *TestVM) Default(cant bool) {
+	vm.TestVM.Default(cant)
 
 	vm.CantPendingTxs = cant
 	vm.CantParseTx = cant
@@ -41,7 +41,7 @@ func (vm *VMTest) Default(cant bool) {
 }
 
 // PendingTxs ...
-func (vm *VMTest) PendingTxs() []snowstorm.Tx {
+func (vm *TestVM) PendingTxs() []snowstorm.Tx {
 	if vm.PendingTxsF != nil {
 		return vm.PendingTxsF()
 	}
@@ -52,7 +52,7 @@ func (vm *VMTest) PendingTxs() []snowstorm.Tx {
 }
 
 // ParseTx ...
-func (vm *VMTest) ParseTx(b []byte) (snowstorm.Tx, error) {
+func (vm *TestVM) ParseTx(b []byte) (snowstorm.Tx, error) {
 	if vm.ParseTxF != nil {
 		return vm.ParseTxF(b)
 	}
@@ -63,7 +63,7 @@ func (vm *VMTest) ParseTx(b []byte) (snowstorm.Tx, error) {
 }
 
 // IssueTx ...
-func (vm *VMTest) IssueTx(b []byte, issued, finalized func(choices.Status)) (ids.ID, error) {
+func (vm *TestVM) IssueTx(b []byte, issued, finalized func(choices.Status)) (ids.ID, error) {
 	if vm.IssueTxF != nil {
 		return vm.IssueTxF(b, issued, finalized)
 	}
@@ -74,7 +74,7 @@ func (vm *VMTest) IssueTx(b []byte, issued, finalized func(choices.Status)) (ids
 }
 
 // GetTx ...
-func (vm *VMTest) GetTx(txID ids.ID) (snowstorm.Tx, error) {
+func (vm *TestVM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	if vm.GetTxF != nil {
 		return vm.GetTxF(txID)
 	}

@@ -18,7 +18,7 @@ func TestTxVerify(t *testing.T) {
 func TestTxBytes(t *testing.T) {
 	Setup()
 
-	if Red.Bytes() != nil {
-		t.Fatalf("Expected nil bytes")
+	if Red.Bytes() == nil {
+		t.Fatalf("Expected non-nil bytes")
 	}
 }

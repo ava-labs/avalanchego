@@ -1,4 +1,4 @@
-package avalanche
+package vertex
 
 import (
 	"container/heap"
@@ -60,30 +60,36 @@ func (pq *priorityQueue) Pop() interface{} {
 	return item
 }
 
-// vertexHeap defines the functionality of a heap of vertices
-// with unique VertexIDs ordered by height
-type vertexHeap interface {
+// Heap defines the functionality of a heap of vertices with unique VertexIDs
+// ordered by height
+type Heap interface {
+	// Empty the heap.
 	Clear()
-	Push(avalanche.Vertex)
-	Pop() avalanche.Vertex // Requires that there be at least one element
-	Contains(avalanche.Vertex) bool
+
+	// Add the provided vertex to the heap. Vertices are de-duplicated, returns
+	// true if the vertex was added, false if it was dropped.
+	Push(avalanche.Vertex) bool
+
+	// Remove the top vertex. Assumes that there is at least one element.
+	Pop() avalanche.Vertex
+
+	// Returns if a vertex with the provided ID is currently in the heap.
+	Contains(ids.ID) bool
+
+	// Returns the number of vertices in the heap.
 	Len() int
 }
 
+// NewHeap returns an empty Heap
+func NewHeap() Heap { return &maxHeightVertexHeap{} }
+
 type maxHeightVertexHeap struct {
-	heap       *priorityQueue
+	heap       priorityQueue
 	elementIDs ids.Set
 }
 
-func newMaxVertexHeap() *maxHeightVertexHeap {
-	return &maxHeightVertexHeap{
-		heap:       &priorityQueue{},
-		elementIDs: ids.Set{},
-	}
-}
-
 func (vh *maxHeightVertexHeap) Clear() {
-	vh.heap = &priorityQueue{}
+	vh.heap = priorityQueue{}
 	vh.elementIDs.Clear()
 }
 
@@ -99,7 +105,7 @@ func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 	item := &vertexItem{
 		vertex: vtx,
 	}
-	heap.Push(vh.heap, item)
+	heap.Push(&vh.heap, item)
 	return true
 }
 
@@ -107,7 +113,7 @@ func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 // vertex and returns it. Otherwise, removes and returns the vertex in this heap
 // with the greatest height.
 func (vh *maxHeightVertexHeap) Pop() avalanche.Vertex {
-	vtx := heap.Pop(vh.heap).(*vertexItem).vertex
+	vtx := heap.Pop(&vh.heap).(*vertexItem).vertex
 	vh.elementIDs.Remove(vtx.ID())
 	return vtx
 }
