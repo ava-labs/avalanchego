@@ -203,6 +203,21 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	// Start the HTTP endpoint
+	go n.Log.RecoverAndPanic(func() {
+		if n.Config.EnableHTTPS {
+			n.Log.Debug("Initializing API server with TLS Enabled")
+			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
+		}
+
+		n.Log.Debug("Initializing API server")
+		err := n.APIServer.Dispatch()
+
+		n.Log.Fatal("API server initialization failed with %s", err)
+		n.Net.Close() // If the server isn't up, shut down the node.
+	})
+
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
@@ -395,20 +410,6 @@ func (n *Node) initAPIServer() {
 	n.Log.Info("Initializing API server")
 
 	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
-
-	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
-			n.Log.Debug("Initializing API server with TLS Enabled")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
-		}
-
-		n.Log.Debug("Initializing API server")
-		err := n.APIServer.Dispatch()
-
-		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close()
-	})
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
