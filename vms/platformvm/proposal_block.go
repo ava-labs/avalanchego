@@ -153,14 +153,14 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	}
 
 	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
 		return [2]snowman.Block{}, err
 	}
 	if err := pb.vm.State.PutBlock(pb.vm.DB, abort); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
 		return [2]snowman.Block{}, err
 	}
-	pb.vm.DB.Commit()
+	if err := pb.vm.DB.Commit(); err != nil {
+		return [2]snowman.Block{}, err
+	}
 
 	if pb.Tx.InitiallyPrefersCommit() {
 		return [2]snowman.Block{commit, abort}, nil
