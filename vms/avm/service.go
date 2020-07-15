@@ -250,7 +250,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		if !utxo.AssetID().Equals(assetID) {
 			continue
 		}
-		transferable, ok := utxo.Out.(ava.Transferable)
+		transferable, ok := utxo.Out.(ava.TransferableOut)
 		if !ok {
 			continue
 		}
@@ -304,7 +304,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	assetIDs := ids.Set{}                    // IDs of assets the address has a non-zero balance of
 	balances := make(map[[32]byte]uint64, 0) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
-		transferable, ok := utxo.Out.(ava.Transferable)
+		transferable, ok := utxo.Out.(ava.TransferableOut)
 		if !ok {
 			continue
 		}
@@ -372,7 +372,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: []verify.Verifiable{},
+		Outs: []verify.State{},
 	}
 
 	tx := &Tx{UnsignedTx: &CreateAssetTx{
@@ -457,7 +457,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: []verify.Verifiable{},
+		Outs: []verify.State{},
 	}
 
 	tx := &Tx{UnsignedTx: &CreateAssetTx{
@@ -762,7 +762,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			continue
 		}
@@ -1175,7 +1175,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			continue
 		}
@@ -1322,7 +1322,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			continue
 		}

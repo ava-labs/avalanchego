@@ -3,6 +3,7 @@ package propertyfx
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -19,5 +20,12 @@ func TestBurnOperationNumberOfOutput(t *testing.T) {
 	op := BurnOperation{}
 	if outs := op.Outs(); len(outs) != 0 {
 		t.Fatalf("wrong number of outputs")
+	}
+}
+
+func TestBurnOperationState(t *testing.T) {
+	intf := interface{}(&BurnOperation{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

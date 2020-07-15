@@ -361,7 +361,7 @@ func TestTxSerialization(t *testing.T) {
 		States: []*InitialState{
 			{
 				FxID: 0,
-				Outs: []verify.Verifiable{
+				Outs: []verify.State{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -708,7 +708,7 @@ func TestIssueNFT(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{{
 			FxID: 1,
-			Outs: []verify.Verifiable{
+			Outs: []verify.State{
 				&nftfx.MintOutput{
 					GroupID: 1,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -879,7 +879,7 @@ func TestIssueProperty(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{{
 			FxID: 2,
-			Outs: []verify.Verifiable{
+			Outs: []verify.State{
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,

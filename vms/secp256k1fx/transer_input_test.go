@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestTransferInputAmount(t *testing.T) {
@@ -113,5 +114,12 @@ func TestTransferInputSerialize(t *testing.T) {
 
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+}
+
+func TestTransferInputNotState(t *testing.T) {
+	intf := interface{}(&TransferInput{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

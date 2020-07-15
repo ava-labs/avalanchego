@@ -9,8 +9,8 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -22,10 +22,20 @@ var (
 	errNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
 )
 
-// Transferable is the interface a feature extension must provide to transfer
+// TransferableIn is the interface a feature extension must provide to transfer
 // value between features extensions.
-type Transferable interface {
+type TransferableIn interface {
 	verify.Verifiable
+
+	// Amount returns how much value this output consumes of the asset in its
+	// transaction.
+	Amount() uint64
+}
+
+// TransferableOut is the interface a feature extension must provide to transfer
+// value between features extensions.
+type TransferableOut interface {
+	verify.State
 
 	// Amount returns how much value this output consumes of the asset in its
 	// transaction.
@@ -36,11 +46,11 @@ type Transferable interface {
 type TransferableOutput struct {
 	Asset `serialize:"true"`
 
-	Out Transferable `serialize:"true" json:"output"`
+	Out TransferableOut `serialize:"true" json:"output"`
 }
 
 // Output returns the feature extension output that this Output is using.
-func (out *TransferableOutput) Output() Transferable { return out.Out }
+func (out *TransferableOutput) Output() TransferableOut { return out.Out }
 
 // Verify implements the verify.Verifiable interface
 func (out *TransferableOutput) Verify() error {
@@ -101,11 +111,11 @@ type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
 
-	In Transferable `serialize:"true" json:"input"`
+	In TransferableIn `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.
-func (in *TransferableInput) Input() Transferable { return in.In }
+func (in *TransferableInput) Input() TransferableIn { return in.In }
 
 // Verify implements the verify.Verifiable interface
 func (in *TransferableInput) Verify() error {

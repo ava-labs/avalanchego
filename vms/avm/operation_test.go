@@ -15,10 +15,10 @@ import (
 type testOperable struct {
 	ava.TestTransferable `serialize:"true"`
 
-	Outputs []verify.Verifiable `serialize:"true"`
+	Outputs []verify.State `serialize:"true"`
 }
 
-func (o *testOperable) Outs() []verify.Verifiable { return o.Outputs }
+func (o *testOperable) Outs() []verify.State { return o.Outputs }
 
 func TestOperationVerifyNil(t *testing.T) {
 	c := codec.NewDefault()
@@ -121,5 +121,12 @@ func TestOperationSorting(t *testing.T) {
 	})
 	if isSortedAndUniqueOperations(ops, c) {
 		t.Fatalf("Shouldn't be unique")
+	}
+}
+
+func TestOperationTxNotState(t *testing.T) {
+	intf := interface{}(&OperationTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

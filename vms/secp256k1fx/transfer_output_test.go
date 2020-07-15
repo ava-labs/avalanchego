@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestOutputAmount(t *testing.T) {
@@ -229,5 +230,12 @@ func TestOutputAddresses(t *testing.T) {
 	}
 	if addr := addrs[1]; !bytes.Equal(addr, out.Addrs[1].Bytes()) {
 		t.Fatalf("Wrong address returned")
+	}
+}
+
+func TestTransferOutputState(t *testing.T) {
+	intf := interface{}(&TransferOutput{})
+	if _, ok := intf.(verify.State); !ok {
+		t.Fatalf("should be marked as state")
 	}
 }
