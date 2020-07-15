@@ -29,6 +29,8 @@ type TimedTx interface {
 // the first element is the tx with earliest endTime. The default value of this
 // struct will order transactions by endTime. This struct implements the heap
 // interface.
+// Transactions must be syntactically verified before adding to EventHeap to
+// ensure that EventHeap can always by marshalled.
 type EventHeap struct {
 	SortByStartTime bool      `serialize:"true"`
 	Txs             []TimedTx `serialize:"true"`
@@ -93,6 +95,8 @@ func (h *EventHeap) Pop() interface{} {
 
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() []byte {
+	// Assumes the individual transactions have been syntactically verified
+	// so that it can be safely marshalled.
 	bytes, _ := Codec.Marshal(h)
 	return bytes
 }

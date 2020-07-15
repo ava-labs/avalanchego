@@ -346,8 +346,11 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	options := block.Options()
-	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -476,8 +479,11 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	options := block.Options()
-	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -551,8 +557,11 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	options := block.Options()
-	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -628,8 +637,11 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	options := block.Options()
-	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -683,8 +695,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	options := block.Options()
-	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -723,8 +738,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
-	options = block.Options()
-	commit, ok = blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err = block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok = options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -776,8 +794,11 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	options := block.Options()
-	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -816,8 +837,11 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
-	options = block.Options()
-	commit, ok = blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err = block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok = options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -1022,8 +1046,11 @@ func TestCreateSubnet(t *testing.T) {
 	// Assert preferences are correct
 	// and accept the proposal/commit
 	block := blk.(*ProposalBlock)
-	options := block.Options()
-	commit, ok := blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -1073,8 +1100,11 @@ func TestCreateSubnet(t *testing.T) {
 	// Assert preferences are correct
 	// and accept the proposal/commit
 	block = blk.(*ProposalBlock)
-	options = block.Options()
-	commit, ok = blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err = block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok = options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -1131,8 +1161,15 @@ func TestCreateSubnet(t *testing.T) {
 	// Assert preferences are correct
 	// and accept the proposal/commit
 	block = blk.(*ProposalBlock)
-	options = block.Options()
-	commit, ok = blk.(*ProposalBlock).Options()[0].(*Commit)
+	options, err = block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	options, err = blk.(*ProposalBlock).Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok = options[0].(*Commit)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -1388,7 +1425,10 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	options := firstAdvanceTimeBlk.Options()
+	options, err := firstAdvanceTimeBlk.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
 	firstOption := options[0]
 	secondOption := options[1]
 
@@ -1495,7 +1535,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	options := firstAdvanceTimeBlk.Options()
+	options, err := firstAdvanceTimeBlk.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
 	firstOption := options[0]
 	secondOption := options[1]
 
@@ -1610,7 +1653,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkID := advanceTimeBlk.ID()
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
-	advanceTimePreference := advanceTimeBlk.Options()[0]
+	options, err := advanceTimeBlk.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceTimePreference := options[0]
 
 	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	vdrs := validators.NewSet()
@@ -1771,7 +1818,10 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	options := firstAdvanceTimeBlk.Options()
+	options, err := firstAdvanceTimeBlk.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
 	firstOption := options[0]
 	secondOption := options[1]
 
