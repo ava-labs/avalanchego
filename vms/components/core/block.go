@@ -24,8 +24,8 @@ var (
 // Block's methods can be over-written by structs that embed this struct.
 type Block struct {
 	Metadata
-	Hght   uint64 `serialize:"true"` // This block's height. The genesis block is at height 0.
 	PrntID ids.ID `serialize:"true"` // parent's ID
+	Hght   uint64 `serialize:"true"` // This block's height. The genesis block is at height 0.
 	VM     *SnowmanVM
 }
 
