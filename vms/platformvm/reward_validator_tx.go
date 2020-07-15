@@ -71,7 +71,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 
 	defaultSubnetVdrHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	} else if defaultSubnetVdrHeap.Len() == 0 { // there is no validator to remove
 		return nil, nil, nil, nil, permError{errEmptyValidatingSet}
 	}
@@ -182,7 +182,6 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		if err != nil {
 			delegatorAmtWithReward = math.MaxUint64
 			tx.vm.Ctx.Log.Error(errOverflowReward.Error())
-			return nil, nil, nil, nil, permError{errOverflowReward}
 		}
 		delegatorCommitUTXO := utxo // Copies the struct (_not_ a reference)
 		delegatorCommitUTXO.OutputIndex = uint32(len(vdrTx.Outs()))

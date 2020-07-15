@@ -81,16 +81,16 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 	// Specify what the state of the chain will be if this proposal is committed
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putTimestamp(onCommitDB, tx.Timestamp()); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	current, pending, _, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	} else if err := tx.vm.putCurrentValidators(onCommitDB, current, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	} else if err := tx.vm.putPendingValidators(onCommitDB, pending, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// For each Subnet, calculate what current and pending validator sets should be
@@ -102,15 +102,15 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 	startedValidating := make(map[[32]byte]ids.ShortSet, 0)
 	subnets, err := tx.vm.getSubnets(db)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 	for _, subnet := range subnets {
 		if current, pending, started, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), subnet.id); err != nil {
-			return nil, nil, nil, nil, permError{err}
+			return nil, nil, nil, nil, tempError{err}
 		} else if err := tx.vm.putCurrentValidators(onCommitDB, current, subnet.id); err != nil {
-			return nil, nil, nil, nil, permError{err}
+			return nil, nil, nil, nil, tempError{err}
 		} else if err := tx.vm.putPendingValidators(onCommitDB, pending, subnet.id); err != nil {
-			return nil, nil, nil, nil, permError{err}
+			return nil, nil, nil, nil, tempError{err}
 		} else {
 			startedValidating[subnet.ID().Key()] = started
 		}

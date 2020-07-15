@@ -82,22 +82,22 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	case tx.id.IsZero():
 		return tempError{errInvalidID}
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
-		return permError{errWrongNetworkID}
+		return errWrongNetworkID
 	case tx.NodeID.IsZero():
 		return tempError{errInvalidID}
 	case tx.Subnet.IsZero():
 		return tempError{errInvalidID}
 	case tx.Wght == 0: // Ensure the validator has some weight
-		return permError{errWeightTooSmall}
+		return errWeightTooSmall
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
-		return permError{errSigsNotUniqueOrNotSorted}
+		return errSigsNotUniqueOrNotSorted
 	}
 
 	// Ensure staking length is not too short or long
 	if stakingDuration := tx.Duration(); stakingDuration < MinimumStakingDuration {
-		return permError{errStakeTooShort}
+		return errStakeTooShort
 	} else if stakingDuration > MaximumStakingDuration {
-		return permError{errStakeTooLong}
+		return errStakeTooLong
 	}
 
 	// Verify tx inputs and outputs are valid
@@ -130,7 +130,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	// Get info about the subnet we're adding a validator to
 	subnets, err := tx.vm.getSubnets(db)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 	var subnet *CreateSubnetTx
 	for _, sn := range subnets {
@@ -161,7 +161,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	// First, see if they're currently validating the default subnet
 	currentDSValidators, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
 	}
 	if dsValidator, err := currentDSValidators.getDefaultSubnetStaker(tx.NodeID); err == nil {
 		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
@@ -175,7 +175,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 		// See if they will validate the default subnet in the future.
 		pendingDSValidators, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 		if err != nil {
-			return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
+			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
 		}
 		dsValidator, err := pendingDSValidators.getDefaultSubnetStaker(tx.NodeID)
 		if err != nil {
@@ -215,7 +215,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
 	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, tx.Subnet)
 	if err != nil {
-		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of subnet %s: %v", tx.Subnet, err)}
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of subnet %s: %v", tx.Subnet, err)}
 	}
 	for _, pendingVdr := range tx.vm.getValidators(pendingValidatorHeap) {
 		if pendingVdr.ID().Equals(tx.NodeID) {
@@ -229,7 +229,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	// If this proposal is committed, update the pending validator set to include the validator
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, tx.Subnet); err != nil {
-		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't put current validators: %v", err)}
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't put current validators: %v", err)}
 	}
 
 	// If this proposal is aborted, chain state doesn't change

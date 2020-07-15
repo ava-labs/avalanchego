@@ -79,30 +79,30 @@ func (tx *addDefaultSubnetValidatorTx) initialize(vm *VM) error {
 func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
-		return tempError{errNilTx}
+		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.id.IsZero():
-		return tempError{errInvalidID}
+		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
-		return permError{errWrongNetworkID}
+		return errWrongNetworkID
 	case tx.NodeID.IsZero():
-		return tempError{errInvalidID}
+		return errInvalidID
 	case tx.Destination.IsZero():
-		return tempError{errInvalidID}
+		return errInvalidID
 	case tx.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
-		return permError{errWeightTooSmall}
+		return errWeightTooSmall
 	case tx.Shares > NumberOfShares: // Ensure delegators shares are in the allowed amount
-		return permError{errTooManyShares}
+		return errTooManyShares
 	}
 
 	// Ensure staking length is not too short or long,
 	// and that the inputs/outputs of this tx are syntactically valid
 	stakingDuration := tx.Duration()
 	if stakingDuration < MinimumStakingDuration {
-		return permError{errStakeTooShort}
+		return errStakeTooShort
 	} else if stakingDuration > MaximumStakingDuration {
-		return permError{errStakeTooLong}
+		return errStakeTooLong
 	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
@@ -145,11 +145,11 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
 	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 	for _, pendingVdr := range tx.vm.getValidators(pendingValidatorHeap) {
 		if pendingVdr.ID().Equals(tx.NodeID) {
-			return nil, nil, nil, nil, permError{fmt.Errorf("validator %s is already a pending Default Subnet validator",
+			return nil, nil, nil, nil, tempError{fmt.Errorf("validator %s is already a pending Default Subnet validator",
 				tx.NodeID)}
 		}
 	}

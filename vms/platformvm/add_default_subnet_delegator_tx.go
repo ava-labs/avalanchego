@@ -128,7 +128,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		// See if they will validate the default subnet in the future.
 		pendingDSValidators, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 		if err != nil {
-			return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
+			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
 		}
 		dsValidator, err = pendingDSValidators.getDefaultSubnetStaker(tx.NodeID)
 		if err != nil {
@@ -141,14 +141,14 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 
 	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
 	// If this proposal is committed, update the pending validator set to include the validator
 	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// If this proposal is aborted, return the AVAX (but not the tx fee)
