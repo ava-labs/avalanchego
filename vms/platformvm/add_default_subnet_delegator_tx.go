@@ -99,15 +99,13 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-
 	// Verify inputs/outputs and update the UTXO set
 	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
 		return nil, nil, nil, nil, err
 	}
-
 	// Ensure the proposed validator starts after the current timestamp
 	if currentTimestamp, err := tx.vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	} else if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,

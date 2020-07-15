@@ -55,7 +55,7 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 	}
 
 	if currentTimestamp, err := tx.vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	} else if tx.Time <= uint64(currentTimestamp.Unix()) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s), not after current timestamp (%s)",
 			tx.Timestamp(), currentTimestamp)}

@@ -123,7 +123,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 
 	// Ensure the proposed validator starts after the current time
 	if currentTime, err := tx.vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
 			currentTime,
@@ -133,7 +133,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// Ensure the proposed validator is not already a validator of the specified subnet
 	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	}
 	for _, currentVdr := range tx.vm.getValidators(currentValidatorHeap) {
 		if currentVdr.ID().Equals(tx.NodeID) {
