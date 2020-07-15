@@ -363,7 +363,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*Chain, error) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
-			ctx.Log.Fatal("Chain shutdown due to panic")
+			ctx.Log.Fatal("Chain with ID: %s was shutdown due to panic", chainParams.ID)
 		})
 	}
 
