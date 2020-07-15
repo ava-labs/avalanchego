@@ -568,6 +568,9 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	reply.TxID = tx.ID()
 	return service.vm.issueTx(tx)
@@ -625,6 +628,9 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
+	}
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
 	}
 
 	reply.TxID = tx.ID()
@@ -684,6 +690,9 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	response.TxID = tx.ID()
 	return service.vm.issueTx(tx)
@@ -736,6 +745,9 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	response.TxID = tx.ID()
 	return service.vm.issueTx(tx)
@@ -778,6 +790,8 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 		privKeys,            // Private keys
 	); err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
+	} else if err := tx.SyntacticVerify(); err != nil {
+		return err
 	} else {
 		response.TxID = tx.ID()
 		return service.vm.issueTx(tx)
@@ -816,6 +830,8 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	} else if recipientKey, err := user.getKey(to); err != nil {
 		return fmt.Errorf("user does not have the key that controls address %s", service.vm.FormatAddress(to))
 	} else if tx, err := service.vm.newImportTx(privKeys, recipientKey); err != nil {
+		return err
+	} else if err := tx.SyntacticVerify(); err != nil {
 		return err
 	} else {
 		response.TxID = tx.ID()
@@ -902,6 +918,8 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		keys, // Keys to pay fee
 	); err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
+	} else if err := tx.SyntacticVerify(); err != nil {
+		return err
 	} else {
 		response.TxID = tx.ID()
 		return service.vm.issueTx(tx)
