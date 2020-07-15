@@ -100,38 +100,6 @@ func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 	}
 }
 
-func (s *Server) RestartChain(ctx *snow.Context, vmIntf interface{}) {
-	vm, ok := vmIntf.(common.VM)
-	if !ok {
-		return
-	}
-
-	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	chainID := ctx.ChainID.String()
-	defaultEndpoint := "bc/" + chainID
-	httpLogger, err := s.factory.MakeChain(chainID, "http")
-	if err != nil {
-		s.log.Error("Failed to create new http logger: %s", err)
-		return
-	}
-	s.log.Verbo("About to replace API endpoints for chain with ID %s", ctx.ChainID)
-
-	// Register each endpoint
-	for extension, service := range vm.CreateHandlers() {
-		// Validate that the route being added is valid
-		// e.g. "/foo" and "" are ok but "\n" is not
-		_, err := url.ParseRequestURI(extension)
-		if extension != "" && err != nil {
-			s.log.Warn("could not add route to chain's API handler because route is malformed: %s", extension)
-			continue
-		}
-		s.log.Info("replacing API endpoint: %s", defaultEndpoint+extension)
-		if err := s.ReplaceRoute(service, &ctx.Lock, defaultEndpoint, extension, httpLogger); err != nil {
-			s.log.Error("error replacing route: %s", err)
-		}
-	}
-}
-
 // AddRoute registers the appropriate endpoint for the vm given an endpoint
 func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, log logging.Logger) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
@@ -142,17 +110,6 @@ func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base,
 	}
 
 	return s.router.AddRouter(url, endpoint, h)
-}
-
-func (s *Server) ReplaceRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, log logging.Logger) error {
-	url := fmt.Sprintf("%s/%s", baseURL, base)
-	s.log.Info("replacing route %s%s", url, endpoint)
-	h, err := s.createMiddlewareHandler(handler, lock, log)
-	if err != nil {
-		return err
-	}
-
-	return s.router.ReplaceRouter(url, endpoint, h)
 }
 
 func (s *Server) createMiddlewareHandler(handler *common.HTTPHandler, lock *sync.RWMutex, log logging.Logger) (http.Handler, error) {
