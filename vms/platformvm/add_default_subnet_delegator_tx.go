@@ -209,7 +209,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 		UnsignedAddDefaultSubnetDelegatorTx: UnsignedAddDefaultSubnetDelegatorTx{
 			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
-				BlockchainID: ids.Empty,
+				BlockchainID: vm.Ctx.ChainID,
 				Inputs:       inputs,
 				Outputs:      outputs,
 			},

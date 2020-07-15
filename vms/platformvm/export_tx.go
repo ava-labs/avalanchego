@@ -197,7 +197,7 @@ func (vm *VM) newExportTx(
 		UnsignedExportTx: UnsignedExportTx{
 			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
-				BlockchainID: ids.Empty,
+				BlockchainID: vm.Ctx.ChainID,
 				Inputs:       ins,
 				Outputs:      outs, // Non-exported outputs
 			},

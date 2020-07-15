@@ -147,7 +147,7 @@ func (vm *VM) newCreateSubnetTx(
 		UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
 			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
-				BlockchainID: ids.Empty,
+				BlockchainID: vm.Ctx.ChainID,
 				Inputs:       inputs,
 				Outputs:      outputs,
 			},

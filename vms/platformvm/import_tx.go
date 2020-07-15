@@ -216,7 +216,7 @@ func (vm *VM) newImportTx(
 	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
 		BaseTx: BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: ids.Empty,
+			BlockchainID: vm.Ctx.ChainID,
 			Inputs:       ins, // These pay the tx fee
 			Outputs:      outs,
 		},

@@ -85,7 +85,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	// Case 2: Wrong validator
-	if tx, err := vm.newRewardValidatorTx(ids.Empty); err != nil {
+	if tx, err := vm.newRewardValidatorTx(vm.Ctx.ChainID); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
