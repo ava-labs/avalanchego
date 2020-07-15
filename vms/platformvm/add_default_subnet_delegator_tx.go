@@ -66,29 +66,29 @@ func (tx *addDefaultSubnetDelegatorTx) initialize(vm *VM) error {
 func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	switch {
 	case tx == nil:
-		return tempError{errNilTx}
+		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.id.IsZero():
-		return tempError{errInvalidID}
+		return errInvalidID
 	case tx.NetworkID != tx.vm.Ctx.NetworkID:
-		return permError{errWrongNetworkID}
+		return errWrongNetworkID
 	case tx.NodeID.IsZero():
-		return tempError{errInvalidID}
+		return errInvalidID
 	case tx.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
-		return permError{errWeightTooSmall}
+		return errWeightTooSmall
 	}
 	// Ensure staking length is not too short or long,
 	// and that the inputs/outputs of this tx are syntactically valid
 	stakingDuration := tx.Duration()
 	switch {
 	case stakingDuration < MinimumStakingDuration:
-		return permError{errStakeTooShort}
+		return errStakeTooShort
 	case stakingDuration > MaximumStakingDuration:
-		return permError{errStakeTooLong}
+		return errStakeTooLong
 	}
 	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
-		return permError{err}
+		return err
 	}
 	tx.syntacticallyVerified = true
 	return nil
@@ -102,7 +102,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 
 	// Verify inputs/outputs and update the UTXO set
 	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
+		return nil, nil, nil, nil, err
 	}
 
 	// Ensure the proposed validator starts after the current timestamp

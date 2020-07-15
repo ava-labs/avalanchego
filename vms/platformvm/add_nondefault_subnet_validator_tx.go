@@ -124,7 +124,7 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	if err := tx.SyntacticVerify(); err != nil { // Ensure tx is syntactically valid
 		return nil, nil, nil, nil, permError{err}
 	} else if err := tx.vm.semanticVerifySpend(db, tx); err != nil { // Validate/update UTXOs
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
+		return nil, nil, nil, nil, err
 	}
 
 	// Get info about the subnet we're adding a validator to

@@ -118,7 +118,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 
 	// Verify inputs/outputs and update the UTXO set
 	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
+		return nil, nil, nil, nil, err
 	}
 
 	// Ensure the proposed validator starts after the current time

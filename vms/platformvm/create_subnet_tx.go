@@ -114,7 +114,7 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 
 	// Verify inputs/outputs and update the UTXO set
 	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
-		return nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
+		return nil, err
 	}
 
 	// Register new subnet in validator manager

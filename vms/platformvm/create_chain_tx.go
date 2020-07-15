@@ -121,7 +121,7 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 
 	// Verify inputs/outputs and update the UTXO set
 	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
-		return nil, tempError{fmt.Errorf("couldn't verify tx: %w", err)}
+		return nil, err
 	}
 
 	// Verify that this transaction has sufficient control signatures

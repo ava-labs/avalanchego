@@ -155,15 +155,15 @@ func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) err
 // [db] should not be committed if an error is returned
 // Precondition: [tx] has already been syntactically verified
 // TODO: Is this right?
-func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) error {
+func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) TxError {
 	creds := tx.Creds()
 	for index, in := range tx.Ins() {
 		if utxo, err := vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
-			return err
+			return tempError{err}
 		} else if err := vm.fx.VerifyTransfer(tx, in.In, creds[index], utxo.Out); err != nil {
-			return err
+			return permError{err}
 		} else if err := vm.removeUTXO(db, in.UTXOID.InputID()); err != nil {
-			return err
+			return tempError{err}
 		}
 	}
 	txID := tx.ID()
@@ -176,7 +176,7 @@ func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) error {
 			Asset: ava.Asset{ID: vm.avaxAssetID},
 			Out:   out.Output(),
 		}); err != nil {
-			return err
+			return tempError{err}
 		}
 	}
 	return nil
