@@ -17,7 +17,10 @@ import (
 )
 
 // defaultCheckOpts is a Check whose properties represent a default Check
-var defaultCheckOpts = check{executionPeriod: time.Minute}
+var defaultCheckOpts = check{
+	executionPeriod: time.Minute,
+	initialDelay:    10 * time.Second,
+}
 
 // Health observes a set of vital signs and makes them available through an HTTP
 // API.
