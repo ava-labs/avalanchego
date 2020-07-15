@@ -612,12 +612,12 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}
-
 	if err := n.initVMManager(avaxAssetID); err != nil { // Set up the VM manager
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
 	}
-	n.initChainManager() // Set up the chain manager
-
+	if err := n.initChainManager(); err != nil { // Set up the chain manager
+		return fmt.Errorf("couldn't initialize chain manager: %w", err)
+	}
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
 		return fmt.Errorf("couldn't initialize admin API: %w", err)
 	}
