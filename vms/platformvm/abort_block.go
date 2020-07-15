@@ -55,7 +55,7 @@ func (vm *VM) newAbortBlock(parentID ids.ID) (*Abort, error) {
 	blk := Block(abort)
 	bytes, err := Codec.Marshal(&blk)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal abort block: %s", err)
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
 	abort.Block.Initialize(bytes, vm.SnowmanVM)
