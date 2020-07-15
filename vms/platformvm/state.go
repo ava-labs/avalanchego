@@ -46,7 +46,8 @@ func (vm *VM) getCurrentValidators(db database.Database, subnetID ids.ID) (*Even
 	}
 	currentValidators, ok := currentValidatorsInterface.(*EventHeap)
 	if !ok {
-		vm.Ctx.Log.Error("expected to retrieve *AddStakerHeap from database but got different type")
+		err := fmt.Errorf("expected to retrieve *EventHeap from database but got type %T", currentValidatorsInterface)
+		vm.Ctx.Log.Error(err.Error())
 		return nil, err
 	}
 	for _, validator := range currentValidators.Txs {
@@ -86,8 +87,9 @@ func (vm *VM) getPendingValidators(db database.Database, subnetID ids.ID) (*Even
 	}
 	pendingValidatorHeap, ok := pendingValidatorHeapInterface.(*EventHeap)
 	if !ok {
-		vm.Ctx.Log.Error("expected to retrieve *EventHeap from database but got different type")
-		return nil, errors.New("expected to retrieve *EventHeap from database but got different type")
+		err := fmt.Errorf("expected to retrieve *EventHeap from database but got type %T", pendingValidatorHeapInterface)
+		vm.Ctx.Log.Error(err.Error())
+		return nil, err
 	}
 	return pendingValidatorHeap, nil
 }
@@ -112,8 +114,9 @@ func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
 	}
 	utxo, ok := utxoIntf.(*ava.UTXO)
 	if !ok {
-		vm.Ctx.Log.Warn("expected UTXO from database but got %T", utxoIntf)
-		return nil, fmt.Errorf("expected UTXO from database but got %T", utxoIntf)
+		err := fmt.Errorf("expected UTXO from database but got %T", utxoIntf)
+		vm.Ctx.Log.Error(err.Error())
+		return nil, err
 	}
 	return utxo, nil
 }
@@ -126,7 +129,9 @@ func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 	}
 	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 	if !ok {
-		return fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+		err := fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+		vm.Ctx.Log.Error(err.Error())
+		return err
 	}
 	// For each owner of this UTXO, add to list of UTXOs owned by that addr
 	for _, addrBytes := range out.OutputOwners.Addresses() {
@@ -153,7 +158,9 @@ func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
 	}
 	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 	if !ok {
-		return fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+		err := fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+		vm.Ctx.Log.Error(err.Error())
+		return err
 	}
 	for _, addrBytes := range out.OutputOwners.Addresses() { // Update UTXO set of each address referenced in utxo
 		var addrBytesArr [20]byte
@@ -225,7 +232,9 @@ func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, erro
 	balance := uint64(0)
 	for _, utxo := range utxos {
 		if out, ok := utxo.Out.(*secp256k1fx.TransferOutput); !ok {
-			return 0, fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+			err := fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
+			vm.Ctx.Log.Error(err.Error())
+			return 0, err
 		} else if balance, err = safemath.Add64(out.Amount(), balance); err != nil {
 			return 0, errors.New("overflow while calculating balance")
 		}
@@ -241,8 +250,9 @@ func (vm *VM) getChains(db database.Database) ([]*CreateChainTx, error) {
 	}
 	chains, ok := chainsInterface.([]*CreateChainTx)
 	if !ok {
-		vm.Ctx.Log.Error("expected to retrieve []*CreateChainTx from database but got different type")
-		return nil, errors.New("expected to retrieve []*CreateChainTx from database but got different type")
+		err := fmt.Errorf("expected to retrieve []*CreateChainTx from database but got type %T", chainsInterface)
+		vm.Ctx.Log.Error(err.Error())
+		return nil, err
 	}
 	return chains, nil
 }
@@ -302,8 +312,9 @@ func (vm *VM) getSubnets(db database.Database) ([]*CreateSubnetTx, error) {
 	}
 	subnets, ok := subnetsIntf.([]*CreateSubnetTx)
 	if !ok {
-		vm.Ctx.Log.Warn("expected to retrieve []*CreateSubnetTx from database but got different type")
-		return nil, errors.New("expected to retrieve []*CreateSubnetTx from database but got different type")
+		err := fmt.Errorf("expected to retrieve []*CreateSubnetTx from database but got type %T", subnetsIntf)
+		vm.Ctx.Log.Error(err.Error())
+		return nil, err
 	}
 	for _, subnet := range subnets {
 		subnet.vm = vm
@@ -340,7 +351,7 @@ func (vm *VM) registerDBTypes() {
 		if vdrs, ok := vdrsIntf.(*EventHeap); ok {
 			return vdrs.Bytes()
 		}
-		return nil, errors.New("expected *EventHeap but got unexpected type")
+		return nil, fmt.Errorf("expected *EventHeap but got type %T", vdrsIntf)
 	}
 	unmarshalValidatorsFunc := func(bytes []byte) (interface{}, error) {
 		stakers := EventHeap{}
@@ -362,7 +373,7 @@ func (vm *VM) registerDBTypes() {
 		if chains, ok := chainsIntf.([]*CreateChainTx); ok {
 			return Codec.Marshal(chains)
 		}
-		return nil, errors.New("expected []*CreateChainTx but got unexpected type")
+		return nil, fmt.Errorf("expected []*CreateChainTx but got type %T", chainsIntf)
 	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
 		var chains []*CreateChainTx
@@ -384,7 +395,7 @@ func (vm *VM) registerDBTypes() {
 		if subnets, ok := subnetsIntf.([]*CreateSubnetTx); ok {
 			return Codec.Marshal(subnets)
 		}
-		return nil, errors.New("expected []*CreateSubnetTx but got unexpected type")
+		return nil, fmt.Errorf("expected []*CreateSubnetTx but got type %T", subnetsIntf)
 	}
 	unmarshalSubnetsFunc := func(bytes []byte) (interface{}, error) {
 		var subnets []*CreateSubnetTx
@@ -408,7 +419,7 @@ func (vm *VM) registerDBTypes() {
 		} else if utxo, ok := utxoIntf.(ava.UTXO); ok {
 			return Codec.Marshal(utxo)
 		}
-		return nil, fmt.Errorf("expected ava.UTXO but got unexpected type %T", utxoIntf)
+		return nil, fmt.Errorf("expected *ava.UTXO but got type %T", utxoIntf)
 	}
 	unmarshalUTXOFunc := func(bytes []byte) (interface{}, error) {
 		var utxo ava.UTXO
