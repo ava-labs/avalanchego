@@ -327,7 +327,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 		tx.Credentials = append(tx.Credentials, cred) // Attach credntial to tx
 	}
 	// Attach control key signatures
-	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(controlKeys))
+	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(usableKeys))
 	for i, key := range usableKeys {
 		sig, err := key.SignHash(hash)
 		if err != nil {

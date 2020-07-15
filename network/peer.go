@@ -438,9 +438,17 @@ func (p *peer) version(msg Msg) {
 
 	myTime := float64(p.net.clock.Unix())
 	if peerTime := float64(msg.Get(MyTime).(uint64)); math.Abs(peerTime-myTime) > p.net.maxClockDifference.Seconds() {
-		p.net.log.Debug("peer's clock is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
-			uint64(peerTime),
-			uint64(myTime))
+		if p.net.beacons.Contains(p.id) {
+			p.net.log.Warn("beacon %s has a clock that is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
+				p.id,
+				uint64(peerTime),
+				uint64(myTime))
+		} else {
+			p.net.log.Debug("peer %s has a clock that is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
+				p.id,
+				uint64(peerTime),
+				uint64(myTime))
+		}
 
 		// By clearing the IP, we will not attempt to reconnect to this peer
 		if !p.ip.IsZero() {

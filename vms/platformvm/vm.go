@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"math"
@@ -93,6 +94,12 @@ var (
 	errRegisteringType          = errors.New("error registering type with database")
 	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
+	errInvalidAddress           = errors.New("invalid address")
+	errInvalidAddressSeperator  = errors.New("invalid address seperator")
+	errInvalidAddressPrefix     = errors.New("invalid address prefix")
+	errInvalidAddressSuffix     = errors.New("invalid address suffix")
+	errEmptyAddressPrefix       = errors.New("empty address prefix")
+	errEmptyAddressSuffix       = errors.New("empty address suffix")
 	errInvalidID                = errors.New("invalid ID")
 	errDSCantValidate           = errors.New("new blockchain can't be validated by default Subnet")
 )
@@ -285,7 +292,10 @@ func (vm *VM) Initialize(
 		// Create the genesis block and save it as being accepted
 		// (We don't just do genesisBlock.Accept() because then it'd look for genesisBlock's
 		// non-existent parent)
-		genesisBlock := vm.newCommitBlock(ids.Empty, 0)
+		genesisBlock, err := vm.newCommitBlock(ids.Empty, 0)
+		if err != nil {
+			return err
+		}
 		if err := vm.State.PutBlock(vm.DB, genesisBlock); err != nil {
 			return err
 		}
@@ -899,18 +909,45 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	return utxos, nil
 }
 
-// ParseAddress ...
+func splitAddress(addrStr string) (string, string, error) {
+	if count := strings.Count(addrStr, addressSep); count != 1 {
+		return "", "", errInvalidAddressSeperator
+	}
+	addrParts := strings.SplitN(addrStr, addressSep, 2)
+	prefix := addrParts[0]
+	if prefix == "" {
+		return "", "", errEmptyAddressPrefix
+	}
+	suffix := addrParts[1]
+	if suffix == "" {
+		return "", "", errEmptyAddressSuffix
+	}
+	return prefix, suffix, nil
+}
+
+// ParseAddress returns a decoded Platform Chain address.
+// addrStr is an encoded address, of the form "P-<CB58 encoded bytes>".
 func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
-	cb58 := formatting.CB58{}
-	err := cb58.FromString(addrStr)
+	if addrStr == "" {
+		return ids.ShortID{}, errEmptyAddress
+	}
+	prefix, suffix, err := splitAddress(addrStr)
 	if err != nil {
 		return ids.ShortID{}, err
+	}
+	if prefix != platformAlias {
+		return ids.ShortID{}, errInvalidAddressPrefix
+	}
+	cb58 := formatting.CB58{}
+	err = cb58.FromString(suffix)
+	if err != nil {
+		return ids.ShortID{}, fmt.Errorf("%w: %v", errInvalidAddress, err)
 	}
 	return ids.ToShortID(cb58.Bytes)
 }
 
-// FormatAddress ...
-// Assumes addrID is not empty
+// FormatAddress returns an encoded Platform Chain address, of the form
+// "P-<CB58 encoded bytes>".
 func (vm *VM) FormatAddress(addrID ids.ShortID) string {
-	return addrID.String()
+	return fmt.Sprintf("%s%s%s", platformAlias, addressSep, addrID.String())
 }

@@ -30,6 +30,8 @@ type TimedTx interface {
 // the first element is the tx with earliest endTime. The default value of this
 // struct will order transactions by endTime. This struct implements the heap
 // interface.
+// Transactions must be syntactically verified before adding to EventHeap to
+// ensure that EventHeap can always by marshalled.
 type EventHeap struct {
 	SortByStartTime bool      `serialize:"true"`
 	Txs             []TimedTx `serialize:"true"`

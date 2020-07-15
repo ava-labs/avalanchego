@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
@@ -94,6 +95,11 @@ func (b *Bootstrapper) Initialize(
 	config.Bootstrapable = b
 	b.Bootstrapper.Initialize(config.Config)
 	return nil
+}
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (b *Bootstrapper) IsBootstrapped() bool {
+	return atomic.LoadUint32(&b.AtomicBootstrapped) > 0
 }
 
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
@@ -347,6 +353,8 @@ func (b *Bootstrapper) finish() error {
 		return err
 	}
 	b.Finished = true
+	atomic.StoreUint32(&b.AtomicBootstrapped, 1)
+
 	return nil
 }
 

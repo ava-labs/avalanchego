@@ -39,6 +39,7 @@ func TestEngineShutdown(t *testing.T) {
 
 	transitive.Initialize(config)
 	transitive.finishBootstrapping()
+	transitive.Finished = true
 	transitive.Shutdown()
 	if !vmShutdownCalled {
 		t.Fatal("Shutting down the Transitive did not shutdown the VM")
@@ -72,6 +73,7 @@ func TestEngineAdd(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	if !te.Context().ChainID.Equals(ids.Empty) {
 		t.Fatalf("Wrong chain ID")
@@ -204,6 +206,7 @@ func TestEngineQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	vertexed := new(bool)
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
@@ -465,6 +468,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
@@ -610,6 +614,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	te.insert(vtx1)
 
@@ -673,6 +678,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	reqID := new(uint32)
 	sender.GetF = func(vID ids.ShortID, requestID uint32, vtxID ids.ID) {
@@ -741,6 +747,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	requestID := new(uint32)
 	sender.PushQueryF = func(_ ids.ShortSet, reqID uint32, _ ids.ID, _ []byte) {
@@ -857,6 +864,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	sender.CantPushQuery = false
 
@@ -943,6 +951,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 		return &avalanche.TestVertex{
@@ -1014,6 +1023,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	sender.PullQueryF = func(vdrs ids.ShortSet, _ uint32, vtxID ids.ID) {
 		vdrSet := ids.ShortSet{}
@@ -1140,6 +1150,7 @@ func TestEngineReissue(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
@@ -1272,6 +1283,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
@@ -1339,6 +1351,7 @@ func TestEngineGetVertex(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	sender.PutF = func(v ids.ShortID, _ uint32, vtxID ids.ID, vtx []byte) {
 		if !v.Equals(vdr.ID()) {
@@ -1406,6 +1419,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	queried := new(bool)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, _ uint32, vtxID ids.ID, vtx []byte) {
@@ -1477,6 +1491,7 @@ func TestEnginePushGossip(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	requested := new(bool)
 	sender.GetF = func(vdr ids.ShortID, _ uint32, vtxID ids.ID) {
@@ -1558,6 +1573,7 @@ func TestEngineSingleQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	sender.CantPushQuery = false
 	sender.CantPullQuery = false
@@ -1641,6 +1657,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	te.insert(parentVtx)
 	te.insert(blockingVtx)
@@ -1735,6 +1752,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	te.insert(parentVtx)
 
@@ -1848,6 +1866,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	te.insert(blockingVtx)
 
@@ -1971,6 +1990,7 @@ func TestEngineMissingTx(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	te.insert(blockingVtx)
 
@@ -2067,6 +2087,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	te.insert(vtx)
 
@@ -2146,6 +2167,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	manager.EdgeF = nil
 	manager.GetVertexF = nil
@@ -2508,6 +2530,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -2594,6 +2617,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	expectedVtxID := ids.GenerateTestID()
 	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
@@ -2642,6 +2666,7 @@ func TestEngineGossip(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID()} }
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
@@ -2739,6 +2764,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	parsed := new(bool)
 	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
@@ -2878,6 +2904,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	parsed := new(bool)
 	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
@@ -3009,6 +3036,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	parsed := new(bool)
 	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
@@ -3119,6 +3147,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	lastVtx := new(avalanche.TestVertex)
 	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
@@ -3221,6 +3250,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Finished = true
 
 	reqID := new(uint32)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, _ []byte) {

@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -72,6 +73,11 @@ func (b *Bootstrapper) Initialize(
 	config.Bootstrapable = b
 	b.Bootstrapper.Initialize(config.Config)
 	return nil
+}
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (b *Bootstrapper) IsBootstrapped() bool {
+	return atomic.LoadUint32(&b.AtomicBootstrapped) > 0
 }
 
 // CurrentAcceptedFrontier returns the last accepted block
@@ -254,6 +260,7 @@ func (b *Bootstrapper) finish() error {
 		return err
 	}
 	b.Finished = true
+	atomic.StoreUint32(&b.AtomicBootstrapped, 1)
 
 	if b.Bootstrapped != nil {
 		b.Bootstrapped()

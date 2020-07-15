@@ -184,7 +184,7 @@ func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescr
 	if err != nil {
 		assetID, err = ids.FromString(args.AssetID)
 		if err != nil {
-			return err
+			return fmt.Errorf("couldn't find asset with ID: %s", args.AssetID)
 		}
 	}
 
