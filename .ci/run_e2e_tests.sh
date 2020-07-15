@@ -5,9 +5,9 @@ bash "${SRC_PATH}"/scripts/build_image.sh
 GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
 # login to AWS for byzantine images
-AWS_ACCESS_KEY_ID="${BYZ_REG_AWS_ID}"
-AWS_SECRET_ACCESS_KEY="${BYZ_REG_AWS_KEY}"
-AWS_DEFAULT_REGION="${BYZ_REG_AWS_REGION}"
+export AWS_ACCESS_KEY_ID="${BYZ_REG_AWS_ID}"
+export AWS_SECRET_ACCESS_KEY="${BYZ_REG_AWS_KEY}"
+export AWS_DEFAULT_REGION="${BYZ_REG_AWS_REGION}"
 aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin 964377072876.dkr.ecr.us-east-1.amazonaws.com
 CHIT_SPAMMER_IMAGE="964377072876.dkr.ecr.us-east-1.amazonaws.com/gecko-byzantine:latest"
 
