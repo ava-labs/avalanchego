@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/consensus/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -430,7 +430,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 }
 
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
-	batch := []snowstorm.Tx(nil)
+	batch := make([]snowstorm.Tx, 0, t.Params.BatchSize)
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
@@ -440,7 +440,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 		overlaps := consumed.Overlaps(inputs)
 		if len(batch) >= t.Params.BatchSize || (force && overlaps) {
 			t.issueBatch(batch)
-			batch = nil
+			batch = make([]snowstorm.Tx, 0, t.Params.BatchSize)
 			consumed.Clear()
 			issued = true
 			overlaps = false

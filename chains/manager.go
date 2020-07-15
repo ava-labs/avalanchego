@@ -38,7 +38,6 @@ import (
 
 const (
 	defaultChannelSize = 1000
-	requestTimeout     = 4 * time.Second
 	gossipFrequency    = 10 * time.Second
 	shutdownTimeout    = 1 * time.Second
 )
@@ -149,7 +148,7 @@ func New(
 	sharedMemory *atomic.SharedMemory,
 ) Manager {
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize(requestTimeout)
+	timeoutManager.Initialize(timeout.DefaultRequestTimeout)
 	go log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
