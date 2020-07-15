@@ -50,8 +50,6 @@ type Transitive struct {
 	// txBlocked tracks operations that are blocked on transactions
 	vtxBlocked, txBlocked events.Blocker
 
-	bootstrapped bool
-
 	errs wrappers.Errs
 }
 
@@ -62,16 +60,16 @@ func (t *Transitive) Initialize(config Config) error {
 	t.params = config.Params
 	t.consensus = config.Consensus
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
-		return err
-	}
-
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
 		config.Context.Log,
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
+
+	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+		return err
+	}
 
 	return t.Bootstrapper.Initialize(
 		config.Config,
@@ -92,7 +90,6 @@ func (t *Transitive) finishBootstrapping() error {
 		}
 	}
 	t.consensus.Initialize(t.Config.Context, t.params, frontier)
-	t.bootstrapped = true
 
 	t.Config.Context.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
 	return nil
@@ -185,7 +182,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
 	t.Config.Context.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
 
-	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
+	if !t.Finished { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
 		if requestID == network.GossipMsgRequestID {
 			t.Config.Context.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
 		} else {
@@ -206,7 +203,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
+	if !t.Finished { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
 		t.Config.Context.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
@@ -234,7 +231,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 // PullQuery implements the Engine interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
 		return nil
 	}
@@ -262,7 +259,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 // PushQuery implements the Engine interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
 		return nil
 	}
@@ -283,7 +280,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 
 // Chits implements the Engine interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) error {
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
@@ -314,7 +311,7 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 
 // Notify implements the Engine interface
 func (t *Transitive) Notify(msg common.Message) error {
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping Notify due to bootstrapping")
 		return nil
 	}
@@ -533,9 +530,4 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.Config.Sender.Get(vdr, t.RequestID, vtxID)
 
 	t.numVtxRequests.Set(float64(t.vtxReqs.Len())) // Tracks performance statistics
-}
-
-// IsBootstrapped returns true iff this chain is done bootstrapping
-func (t *Transitive) IsBootstrapped() bool {
-	return t.bootstrapped
 }

@@ -51,9 +51,6 @@ type Transitive struct {
 	// consensus
 	blocked events.Blocker
 
-	// mark for if the engine has been bootstrapped or not
-	bootstrapped bool
-
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
 }
@@ -65,16 +62,16 @@ func (t *Transitive) Initialize(config Config) error {
 	t.params = config.Params
 	t.consensus = config.Consensus
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
-		return err
-	}
-
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
 		config.Context.Log,
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
+
+	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+		return err
+	}
 
 	return t.Bootstrapper.Initialize(
 		config.Config,
@@ -87,9 +84,6 @@ func (t *Transitive) Initialize(config Config) error {
 // when bootstrapping is finished, this will be called. This initializes the
 // consensus engine with the last accepted block.
 func (t *Transitive) finishBootstrapping() error {
-	// set the bootstrapped mark to switch consensus modes
-	t.bootstrapped = true
-
 	// initialize consensus to the last accepted blockID
 	tailID := t.VM.LastAccepted()
 	t.consensus.Initialize(t.Config.Context, t.params, tailID)
@@ -105,7 +99,11 @@ func (t *Transitive) finishBootstrapping() error {
 
 	switch blk := tail.(type) {
 	case OracleBlock:
-		for _, blk := range blk.Options() {
+		options, err := blk.Options()
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
 			// note that deliver will set the VM's preference
 			if err := t.deliver(blk); err != nil {
 				return err
@@ -196,7 +194,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 // Put implements the Engine interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	// bootstrapping isn't done --> we didn't send any gets --> this put is invalid
-	if !t.bootstrapped {
+	if !t.Finished {
 		if requestID == network.GossipMsgRequestID {
 			t.Config.Context.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
 		} else {
@@ -227,7 +225,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	// not done bootstrapping --> didn't send a get --> this message is invalid
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping")
 		return nil
 	}
@@ -251,7 +249,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	// if the engine hasn't been bootstrapped, we aren't ready to respond to
 	// queries
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
 		return nil
 	}
@@ -283,7 +281,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
 	// if the engine hasn't been bootstrapped, we aren't ready to respond to
 	// queries
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
 		return nil
 	}
@@ -312,7 +310,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 // Chits implements the Engine interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) error {
 	// if the engine hasn't been bootstrapped, we shouldn't be receiving chits
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
@@ -354,7 +352,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	// if the engine hasn't been bootstrapped, we won't have sent a query
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Warn("dropping QueryFailed(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
@@ -370,7 +368,7 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 // Notify implements the Engine interface
 func (t *Transitive) Notify(msg common.Message) error {
 	// if the engine hasn't been bootstrapped, we shouldn't issuing blocks
-	if !t.bootstrapped {
+	if !t.Finished {
 		t.Config.Context.Log.Debug("dropping Notify due to bootstrapping")
 		return nil
 	}
@@ -618,7 +616,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	dropped := []snowman.Block{}
 	switch blk := blk.(type) {
 	case OracleBlock:
-		for _, blk := range blk.Options() {
+		options, err := blk.Options()
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
 			if err := blk.Verify(); err != nil {
 				t.Config.Context.Log.Debug("block failed verification due to %s, dropping block", err)
 				dropped = append(dropped, blk)
@@ -655,9 +657,4 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.numRequests.Set(float64(t.blkReqs.Len()))
 	t.numBlocked.Set(float64(t.pending.Len()))
 	return t.errs.Err
-}
-
-// IsBootstrapped returns true iff this chain is done bootstrapping
-func (t *Transitive) IsBootstrapped() bool {
-	return t.bootstrapped
 }

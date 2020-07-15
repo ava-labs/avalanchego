@@ -292,7 +292,10 @@ func (vm *VM) Initialize(
 		// Create the genesis block and save it as being accepted
 		// (We don't just do genesisBlock.Accept() because then it'd look for genesisBlock's
 		// non-existent parent)
-		genesisBlock := vm.newCommitBlock(ids.Empty, 0)
+		genesisBlock, err := vm.newCommitBlock(ids.Empty, 0)
+		if err != nil {
+			return err
+		}
 		if err := vm.State.PutBlock(vm.DB, genesisBlock); err != nil {
 			return err
 		}
