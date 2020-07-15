@@ -86,7 +86,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	// Verify that the chain's timestamp is the validator's end time
 	currentTime, err := tx.vm.getTimestamp(db)
 	if err != nil {
-		return nil, nil, nil, nil, permError{err}
+		return nil, nil, nil, nil, tempError{err}
 	} else if endTime := vdrTx.EndTime(); !endTime.Equal(currentTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s before their end time %s",
 			tx.TxID,
@@ -134,8 +134,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		amountWithReward, err := safemath.Add64(vdrTx.Wght, reward) // overflow should never happen
 		if err != nil {
 			amountWithReward = math.MaxUint64
-			tx.vm.Ctx.Log.Error(errOverflowReward.Error())
-			return nil, nil, nil, nil, permError{errOverflowReward}
+			tx.vm.Ctx.Log.Error(errOverflowReward.Error()) // This should never happen
 		}
 
 		// If this proposal is committed, they get the reward
