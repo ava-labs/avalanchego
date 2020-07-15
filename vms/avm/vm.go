@@ -33,9 +33,9 @@ import (
 const (
 	batchTimeout   = time.Second
 	batchSize      = 30
-	stateCacheSize = 10000
-	idCacheSize    = 10000
-	txCacheSize    = 10000
+	stateCacheSize = 30000
+	idCacheSize    = 30000
+	txCacheSize    = 30000
 	addressSep     = "-"
 )
 

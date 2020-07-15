@@ -70,9 +70,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 
 	ts.head = rootID
 	ts.blocks = map[[32]byte]*snowmanBlock{
-		rootID.Key(): &snowmanBlock{
-			sm: ts,
-		},
+		rootID.Key(): {sm: ts},
 	}
 	ts.tail = rootID
 }
@@ -161,12 +159,18 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // The complexity of this function is:
 // - Runtime = 3 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
-func (ts *Topological) RecordPoll(votes ids.Bag) error {
-	// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
-	kahnGraph, leaves := ts.calculateInDegree(votes)
+func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
+	var voteStack []votes
+	if voteBag.Len() >= ts.params.Alpha {
+		// If there is no way for an alpha majority to occur, there is no need
+		// to perform any traversals.
 
-	// Runtime = |live set| ; Space = |live set|
-	voteStack := ts.pushVotes(kahnGraph, leaves)
+		// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
+		kahnGraph, leaves := ts.calculateInDegree(voteBag)
+
+		// Runtime = |live set| ; Space = |live set|
+		voteStack = ts.pushVotes(kahnGraph, leaves)
+	}
 
 	// Runtime = |live set| ; Space = Constant
 	preferred, err := ts.vote(voteStack)
@@ -257,7 +261,7 @@ func (ts *Topological) calculateInDegree(
 // votes
 func (ts *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode, leaves []ids.ID) []votes {
-	voteStack := []votes(nil)
+	voteStack := make([]votes, 0, len(kahnNodes))
 	for len(leaves) > 0 {
 		// pop a leaf off the stack
 		newLeavesSize := len(leaves) - 1
@@ -446,7 +450,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.
 
-	rejects := []ids.ID(nil)
+	rejects := make([]ids.ID, 0, len(n.children)-1)
 	for childIDKey, child := range n.children {
 		childID := ids.NewID(childIDKey)
 		if childID.Equals(pref) {
