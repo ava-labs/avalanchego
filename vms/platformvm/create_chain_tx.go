@@ -206,10 +206,14 @@ func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
 
 // We use this type so we can serialize a list of *CreateChainTx
 // by defining a Bytes method on it
+// Transactions must be syntactically verified before adding to createChainList
+// to ensure that [createChainList] can always be marshalled
 type createChainList []*CreateChainTx
 
 // Bytes returns the byte representation of a list of *CreateChainTx
 func (chains createChainList) Bytes() []byte {
+	// Assumes the individual transactions have been syntactically verified
+	// so that it can be safely marshalled.
 	bytes, _ := Codec.Marshal(chains)
 	return bytes
 }
