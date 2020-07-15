@@ -4,6 +4,7 @@
 package info
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -127,5 +128,33 @@ func (service *Info) Peers(_ *http.Request, _ *struct{}, reply *PeersReply) erro
 	service.log.Info("Info: Peers called")
 
 	reply.Peers = service.networking.Peers()
+	return nil
+}
+
+// IsBootstrappedArgs are the arguments for calling IsBootstrapped
+type IsBootstrappedArgs struct {
+	// Alias of the chain
+	// Can also be the string representation of the chain's ID
+	Chain string `json:"chain"`
+}
+
+// IsBootstrappedResponse are the results from calling IsBootstrapped
+type IsBootstrappedResponse struct {
+	// True iff the chain exists and is done bootstrapping
+	IsBootstrapped bool `json:"isBootstrapped"`
+}
+
+// IsBootstrapped returns nil and sets [reply.IsBootstrapped] == true iff [args.Chain] exists and is done bootstrapping
+// Returns an error if the chain doesn't exist
+func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *IsBootstrappedResponse) error {
+	service.log.Info("Info: IsBootstrapped called")
+	if args.Chain == "" {
+		return fmt.Errorf("argument 'chain' not given")
+	}
+	chainID, err := service.chainManager.Lookup(args.Chain)
+	if err != nil {
+		return fmt.Errorf("there is no chain with alias/ID '%s'", args.Chain)
+	}
+	reply.IsBootstrapped = service.chainManager.IsBootstrapped(chainID)
 	return nil
 }
