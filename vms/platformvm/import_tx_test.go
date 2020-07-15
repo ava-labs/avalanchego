@@ -50,7 +50,7 @@ func TestNewImportTx(t *testing.T) {
 	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	// Returns a shared memory where GetDatabase returns a database
-	// where [recipientKey] has a balance of 100,000
+	// where [recipientKey] has a balance of 50,000
 	fundedSharedMemory := MockSharedMemory{
 		GetDatabaseF: func(ids.ID) database.Database {
 			db := memdb.New()
@@ -134,5 +134,62 @@ func TestNewImportTx(t *testing.T) {
 			t.Fatal("should have same number of credentials as inputs")
 		}
 		vdb.Abort()
+	}
+}
+
+// Ensure that calling Ins() doesn't modify the tx
+func TestImportTxInsDoesntModify(t *testing.T) {
+	vm := defaultVM()
+	avmID := generateRandomID()
+	vm.avm = avmID
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	factory := crypto.FactorySECP256K1R{}
+	recipientKeyIntf, err := factory.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
+
+	// Returns a shared memory where GetDatabase returns a database
+	// where [recipientKey] has a balance of 50,000
+	vm.Ctx.SharedMemory = MockSharedMemory{
+		GetDatabaseF: func(ids.ID) database.Database {
+			db := memdb.New()
+			state := ava.NewPrefixedState(db, Codec)
+			if err := state.FundAVMUTXO(&ava.UTXO{
+				UTXOID: ava.UTXOID{
+					TxID:        generateRandomID(),
+					OutputIndex: rand.Uint32(),
+				},
+				Asset: ava.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 50000,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+						Threshold: 1,
+					},
+				},
+			}); err != nil {
+				panic(err)
+			}
+			return db
+		},
+	}
+
+	tx, err := vm.newImportTx(keys, recipientKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ins := tx.Ins()
+	// If ins points to tx.BaseTx.Inputs, then setting this to nil will do the same in tx.BaseTx.Inputs
+	ins[0] = nil
+	if tx.BaseTx.Inputs[0] == nil {
+		t.Fatal("Ins() shouldn't return the same underlying slice as tx.BaseTx.Inputs")
 	}
 }

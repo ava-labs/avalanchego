@@ -46,20 +46,21 @@ type ExportTx struct {
 
 // Outs returns this transaction's outputs
 func (tx *ExportTx) Outs() []*ava.TransferableOutput {
-	outs := tx.BaseTx.Outs()
+	// We copy tx.BaseTx.Outs() to a new slice so that
+	// when we sort the inputs, we don't modify tx.BaseTx.Outputs
+	baseTxOuts := tx.BaseTx.Outs()
+	outs := make([]*ava.TransferableOutput, len(baseTxOuts), len(baseTxOuts)+len(tx.ExportedOutputs))
+	copy(outs, baseTxOuts)
 	outs = append(outs, tx.ExportedOutputs...)
 	// Sort since syntactic verify assumes Outs() is sorted
 	ava.SortTransferableOutputs(outs, tx.vm.codec)
 	return outs
 }
 
-// InputUTXOs returns the IDs of the UTXOs this tx consumes
+// InputUTXOs returns the IDs of the imported UTXOs this tx consumes
+// Since this tx consumes no imported UTXOs, it returns an empty set
 func (tx *ExportTx) InputUTXOs() ids.Set {
-	set := ids.Set{}
-	for _, in := range tx.Ins() {
-		set.Add(in.InputID())
-	}
-	return set
+	return ids.Set{}
 }
 
 // Creds returns this transactions credentials
