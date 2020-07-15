@@ -338,10 +338,12 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error
 }
 
 // Returns the height of the preferred block
-func (vm *VM) preferredHeight() uint64 {
+func (vm *VM) preferredHeight() (uint64, error) {
 	preferred, err := vm.getBlock(vm.Preferred())
-	vm.Ctx.Log.AssertNoError(err)
-	return preferred.Height()
+	if err != nil {
+		return 0, err
+	}
+	return preferred.Height(), nil
 }
 
 // register each type that we'll be storing in the database

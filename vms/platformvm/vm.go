@@ -469,7 +469,10 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.Ctx.Log.Debug("in BuildBlock")
 	preferredID := vm.Preferred()
 	// TODO: Add PreferredHeight() to core.snowmanVM
-	preferredHeight := vm.preferredHeight()
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get preferred block's height: %w", err)
+	}
 
 	// If there are pending decision txs, build a block with a batch of them
 	if len(vm.unissuedDecisionTxs) > 0 {

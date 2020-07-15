@@ -413,7 +413,11 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blk, err := vm.newProposalBlock(vm.LastAccepted(), vm.preferredHeight()+1, tx)
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	blk, err := vm.newProposalBlock(vm.LastAccepted(), preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	} else if err := vm.State.PutBlock(vm.DB, blk); err != nil {
@@ -921,7 +925,7 @@ func TestCreateSubnet(t *testing.T) {
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		1, // threshold
+		1,                                       // threshold
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
 	)
 	if err != nil {
@@ -1274,7 +1278,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstVM.preferredHeight()+1, firstAdvanceTimeTx)
+	preferredHeight, err := firstVM.preferredHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1367,7 +1375,11 @@ func TestRestartFullyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstVM.preferredHeight()+1, firstAdvanceTimeTx)
+	preferredHeight, err := firstVM.preferredHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1478,7 +1490,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), vm.preferredHeight()+1, advanceTimeTx)
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, advanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1626,7 +1642,11 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), vm.preferredHeight()+1, firstAdvanceTimeTx)
+	preferredHeight, err := vm.preferredHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
