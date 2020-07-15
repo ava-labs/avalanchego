@@ -232,7 +232,7 @@ func (vm *VM) newCreateChainTx(
 	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
 	// Sign the tx with control keys
-	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(controlKeys))
+	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(usableKeys))
 	for i, key := range usableKeys {
 		sig, err := key.SignHash(hash)
 		if err != nil {
