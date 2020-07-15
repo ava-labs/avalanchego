@@ -51,7 +51,7 @@ func (service *Service) GetHeight(r *http.Request, args *struct{}, response *Get
 // ExportKeyArgs are arguments for ExportKey
 type ExportKeyArgs struct {
 	api.UserPass
-	Address ids.ShortID `json:"address"`
+	Address string `json:"address"`
 }
 
 // ExportKeyReply is the response for ExportKey
@@ -67,16 +67,15 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem retrieving user: %w", err)
 	}
-
 	user := user{db: db}
-
-	sk, err := user.getKey(args.Address)
-	if err != nil {
+	if address, err := service.vm.ParseAddress(args.Address); err != nil {
+		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
+	} else if sk, err := user.getKey(address); err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
+	} else {
+		reply.PrivateKey.Bytes = sk.Bytes()
+		return nil
 	}
-
-	reply.PrivateKey.Bytes = sk.Bytes()
-	return nil
 }
 
 // ImportKeyArgs are arguments for ImportKey
@@ -125,7 +124,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 // GetBalanceArgs ...
 type GetBalanceArgs struct {
 	// Address to get the balance of
-	Address ids.ShortID `json:"address"`
+	Address string `json:"address"`
 }
 
 // GetBalanceResponse ...
@@ -139,11 +138,17 @@ type GetBalanceResponse struct {
 func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, response *GetBalanceResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
 
+	// Parse to address
+	address, err := service.vm.ParseAddress(args.Address)
+	if err != nil {
+		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
+	}
+
 	addrSet := ids.ShortSet{}
-	addrSet.Add(args.Address)
+	addrSet.Add(address)
 	utxos, err := service.vm.getUTXOs(service.vm.DB, addrSet)
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXO set of %s: %w", args.Address, err)
+		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
 	}
 	balance := uint64(0)
 	for _, utxo := range utxos {
@@ -752,6 +757,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 type ExportAVAArgs struct {
 	api.UserPass
 	// X-Chain address (without prepended X-) that will receive the exported AVA
+	// TODO: Allow user to prepend X-
 	To ids.ShortID `json:"to"`
 	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
@@ -770,39 +776,33 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 		return errors.New("argument 'amount' must be > 0")
 	}
 
-	// Get the keys controlled by the user
+	// Get this user's data
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	privKeys, err := user.getKeys()
-	if err != nil {
+	if privKeys, err := user.getKeys(); err != nil {
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Create the transaction
-	tx, err := service.vm.newExportTx(
+	} else if tx, err := service.vm.newExportTx( // Create the transaction
 		uint64(args.Amount), // Amount
 		args.To,             // X-Chain address
 		privKeys,            // Private keys
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
-	}
-	if err := tx.SyntacticVerify(); err != nil {
+	} else if err := tx.SyntacticVerify(); err != nil {
 		return err
+	} else {
+		response.TxID = tx.ID()
+		return service.vm.issueTx(tx)
 	}
-
-	response.TxID = tx.ID()
-	return service.vm.issueTx(tx)
 }
 
 // ImportAVAArgs are the arguments to ImportAVA
 type ImportAVAArgs struct {
 	api.UserPass
 	// The address that will receive the imported funds
-	To ids.ShortID `json:"to"`
+	To string `json:"to"`
 }
 
 // ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
@@ -816,36 +816,27 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		return errNoPassword
 	}
 
-	// Get the keys controlled by this user.
+	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
 	}
-
 	user := user{db: db}
-	privKeys, err := user.getKeys()
-	if err != nil {
+
+	if to, err := service.vm.ParseAddress(args.To); err != nil { // Parse address
+		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
+	} else if privKeys, err := user.getKeys(); err != nil { // Get keys
 		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
-	}
-
-	recipientKey, err := user.getKey(args.To)
-	if err != nil {
-		return fmt.Errorf("user does not have the key that controls address %s", args.To)
-	}
-
-	tx, err := service.vm.newImportTx(
-		privKeys,
-		recipientKey,
-	)
-	if err != nil {
+	} else if recipientKey, err := user.getKey(to); err != nil {
+		return fmt.Errorf("user does not have the key that controls address %s", service.vm.FormatAddress(to))
+	} else if tx, err := service.vm.newImportTx(privKeys, recipientKey); err != nil {
 		return err
-	}
-	if err := tx.SyntacticVerify(); err != nil {
+	} else if err := tx.SyntacticVerify(); err != nil {
 		return err
+	} else {
+		response.TxID = tx.ID()
+		return service.vm.issueTx(tx)
 	}
-
-	response.TxID = tx.ID()
-	return service.vm.issueTx(tx)
 }
 
 /*
@@ -915,13 +906,9 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	keys, err := user.getKeys()
-	if err != nil {
+	if keys, err := user.getKeys(); err != nil {
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Create the transaction
-	tx, err := service.vm.newCreateChainTx(
+	} else if tx, err := service.vm.newCreateChainTx( // Create the transaction
 		args.SubnetID,
 		args.GenesisData.Bytes,
 		vmID,
@@ -929,17 +916,14 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		args.Name,
 		keys, // Control Keys
 		keys, // Keys to pay fee
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
-	}
-	if err := tx.SyntacticVerify(); err != nil {
+	} else if err := tx.SyntacticVerify(); err != nil {
 		return err
+	} else {
+		response.TxID = tx.ID()
+		return service.vm.issueTx(tx)
 	}
-
-	response.TxID = tx.ID()
-	service.vm.issueTx(tx)
-	return nil
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
@@ -962,33 +946,22 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return errors.New("argument 'blockchainID' not given")
 	}
 
-	_, err := service.vm.chainManager.Lookup(args.BlockchainID)
-	if err == nil {
+	if _, err := service.vm.chainManager.Lookup(args.BlockchainID); err == nil {
 		reply.Status = Validating
 		return nil
-	}
-
-	blockchainID, err := ids.FromString(args.BlockchainID)
-	if err != nil {
+	} else if blockchainID, err := ids.FromString(args.BlockchainID); err != nil {
 		return fmt.Errorf("problem parsing blockchainID '%s': %w", args.BlockchainID, err)
-	}
-
-	lastAcceptedID := service.vm.LastAccepted()
-	if exists, err := service.chainExists(lastAcceptedID, blockchainID); err != nil {
+	} else if exists, err := service.chainExists(service.vm.LastAccepted(), blockchainID); err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	} else if exists {
 		reply.Status = Created
 		return nil
-	}
-
-	preferred := service.vm.Preferred()
-	if exists, err := service.chainExists(preferred, blockchainID); err != nil {
+	} else if exists, err := service.chainExists(service.vm.Preferred(), blockchainID); err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	} else if exists {
 		reply.Status = Preferred
 		return nil
 	}
-
 	return nil
 }
 
