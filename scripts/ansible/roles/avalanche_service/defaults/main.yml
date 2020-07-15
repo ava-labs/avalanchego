@@ -1,2 +1,3 @@
 avalanche_daemon_http_host: localhost
+avalanche_daemon_public_ip: "{{ ansible_facts.default_ipv4.address }}"
 log_level: info
