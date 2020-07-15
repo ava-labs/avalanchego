@@ -512,7 +512,7 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 	var unmarshaledTx addNonDefaultSubnetValidatorTx
 
 	// valid tx
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -520,7 +520,8 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 		testSubnet1.id,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	} else if txBytes, err := Codec.Marshal(tx); err != nil {
 		t.Fatal(err)
@@ -528,9 +529,11 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal(err)
 	} else if err := unmarshaledTx.initialize(vm); err != nil {
 		t.Fatal(err)
-		// reflect.DeepEqual considers []byte{} and nil to be different so change nil to []byte{}
-	} else if tx.Memo = []byte{}; false {
-	} else if !reflect.DeepEqual(*tx, unmarshaledTx) {
+	}
+	if tx.Memo == nil { // reflect.DeepEqual considers []byte{} and nil to be different so change nil to []byte{}
+		tx.Memo = []byte{}
+	}
+	if !reflect.DeepEqual(*tx, unmarshaledTx) {
 		t.Fatal("should be equal")
 	}
 }

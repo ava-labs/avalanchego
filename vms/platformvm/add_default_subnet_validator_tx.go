@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	errNilTx          = errors.New("nil tx is invalid")
+	errNilTx          = errors.New("tx is nil")
 	errWrongNetworkID = errors.New("tx was issued with a different network ID")
 	errWeightTooSmall = errors.New("weight of this validator is too low")
 	errStakeTooShort  = errors.New("staking period is too short")
