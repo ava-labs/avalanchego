@@ -70,6 +70,8 @@ const (
 	// MaximumStakingDuration is the longest amount of time a staker can bond
 	// their funds for.
 	MaximumStakingDuration = 365 * 24 * time.Hour
+
+	txFee = uint64(500)
 )
 
 var (
@@ -230,6 +232,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.codec = Codec
+	vm.txFee = txFee
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()

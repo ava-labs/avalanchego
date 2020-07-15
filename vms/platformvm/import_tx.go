@@ -205,20 +205,14 @@ func (vm *VM) newImportTx(
 	if recipientKey == nil {
 		return nil, errors.New("recipient key not provided")
 	}
-	// Calculate some of the inputs, outputs, and keys used to sign this tx
-	// These inputs/outputs pay the tx fee
-	ins, outs, credKeys, err := vm.spend(vm.DB, vm.txFee, feeKeys)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
 
 	// Create the transaction
 	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
 		BaseTx: BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
-			Inputs:       ins, // These pay the tx fee
-			Outputs:      outs,
+			Inputs:       []*ava.TransferableInput{},
+			Outputs:      []*ava.TransferableOutput{},
 		},
 	}}
 
@@ -235,9 +229,8 @@ func (vm *VM) newImportTx(
 	// These will be spent, and their funds transferred to this chain
 	kc := secp256k1fx.NewKeychain()
 	kc.Add(recipientKey)
-	amount := uint64(0)
+	importedAmount := uint64(0)
 	now := vm.clock.Unix()
-	importedIns := []*ava.TransferableInput{}
 	importedInsSigners := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(vm.avaxAssetID) {
@@ -251,34 +244,42 @@ func (vm *VM) newImportTx(
 		if !ok {
 			continue
 		}
-		amount, err = math.Add64(amount, input.Amount())
+		importedAmount, err = math.Add64(importedAmount, input.Amount())
 		if err != nil {
 			return nil, err
 		}
-		importedIns = append(importedIns, &ava.TransferableInput{
+		tx.ImportedInputs = append(tx.ImportedInputs, &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  ava.Asset{ID: vm.avaxAssetID},
 			In:     input,
 		})
 		importedInsSigners = append(importedInsSigners, signers)
 	}
-	if amount == 0 {
+	ava.SortTransferableInputsWithSigners(tx.ImportedInputs, importedInsSigners)
+	if importedAmount == 0 {
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
-	ava.SortTransferableInputsWithSigners(importedIns, importedInsSigners)
-	tx.ImportedInputs = importedIns
 
-	tx.Outputs = append(tx.Outputs, &ava.TransferableOutput{
-		Asset: ava.Asset{ID: vm.avaxAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: amount, // All the value from imported UTXOs
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{recipientAddr},
+	var unimportedInsSigners [][]*crypto.PrivateKeySECP256K1R
+	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee; the rest is covered by [feeKeys]
+		tx.BaseTx.Inputs, tx.BaseTx.Outputs, unimportedInsSigners, err = vm.spend(vm.DB, vm.txFee-importedAmount, feeKeys)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't pay remainder of tx fee with unimported inputs: %w", err)
+		}
+		ava.SortTransferableInputsWithSigners(tx.BaseTx.Inputs, unimportedInsSigners)
+	} else { // The imported amount pays the entire tx fee
+		tx.Outputs = append(tx.Outputs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: vm.avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: importedAmount - vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{recipientAddr},
+				},
 			},
-		},
-	})
+		})
+	}
 	ava.SortTransferableOutputs(tx.Outputs, vm.codec) //sort outputs
 
 	// Generate byte repr. of unsigned transaction
@@ -288,7 +289,7 @@ func (vm *VM) newImportTx(
 	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
 	// First, append all the credentials used to spend non-imported inputs
-	for _, inputKeys := range credKeys {
+	for _, inputKeys := range unimportedInsSigners {
 		cred := &secp256k1fx.Credential{}
 		for _, key := range inputKeys {
 			sig, err := key.SignHash(hash)

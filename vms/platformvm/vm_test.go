@@ -44,7 +44,7 @@ var (
 	// AVAX asset ID in tests
 	avaxAssetID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
 
-	defaultTxFee = 1
+	defaultTxFee = uint64(100)
 
 	// chain timestamp at genesis
 	defaultGenesisTime = time.Now().Round(time.Second)
@@ -182,7 +182,7 @@ func defaultVM() *VM {
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
 		avaxAssetID:  avaxAssetID,
-		txFee:        1,
+		txFee:        defaultTxFee,
 	}
 
 	defaultSubnet := validators.NewSet() // TODO do we need this?
