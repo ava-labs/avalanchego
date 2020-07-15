@@ -529,10 +529,6 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	switch {
 	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
 		args.ID = service.vm.Ctx.NodeID
-	case args.Username == "":
-		return errNoUsername
-	case args.Password == "":
-		return errNoPassword
 	case args.Destination == "":
 		return errNoDestination
 	case int64(args.StartTime) < time.Now().Unix():
@@ -593,10 +589,6 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		args.ID = service.vm.Ctx.NodeID
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
-	case args.Username == "":
-		return errNoUsername
-	case args.Password == "":
-		return errNoPassword
 	case args.Destination == "":
 		return errNoDestination
 	}
@@ -652,10 +644,6 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
-	case args.Username == "":
-		return errNoUsername
-	case args.Password == "":
-		return errNoPassword
 	}
 
 	subnetID, err := ids.FromString(args.SubnetID)
@@ -709,12 +697,6 @@ type CreateSubnetArgs struct {
 // The unsigned transaction must be signed with the key of [args.Payer]
 func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
-	switch {
-	case args.Username == "":
-		return errNoUsername
-	case args.Password == "":
-		return errNoPassword
-	}
 
 	controlKeys := []ids.ShortID{}
 	for _, controlKey := range args.ControlKeys {
@@ -768,10 +750,6 @@ type ExportAVAArgs struct {
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
 	switch {
-	case args.Username == "":
-		return errNoUsername
-	case args.Password == "":
-		return errNoPassword
 	case uint64(args.Amount) == 0:
 		return errors.New("argument 'amount' must be > 0")
 	}
@@ -809,12 +787,6 @@ type ImportAVAArgs struct {
 // The AVA must have already been exported from the X-Chain.
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
-	switch {
-	case args.Username == "":
-		return errNoUsername
-	case args.Password == "":
-		return errNoPassword
-	}
 
 	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -865,10 +837,6 @@ type CreateBlockchainArgs struct {
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 	switch {
-	case args.Username == "":
-		return errNoUsername
-	case args.Password == "":
-		return errNoPassword
 	case args.Name == "":
 		return errors.New("argument 'name' not given")
 	case args.VMID == "":
