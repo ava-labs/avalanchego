@@ -119,3 +119,10 @@ func SortShortIDs(ids []ShortID) { sort.Sort(sortShortIDData(ids)) }
 func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
 	return utils.IsSortedAndUnique(sortShortIDData(ids))
 }
+
+// IsUniqueShortIDs returns true iff [ids] are unique
+func IsUniqueShortIDs(ids []ShortID) bool {
+	set := ShortSet{}
+	set.Add(ids...)
+	return set.Len() == len(ids)
+}
