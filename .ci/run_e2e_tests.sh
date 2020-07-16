@@ -14,9 +14,9 @@ CHIT_SPAMMER_IMAGE="964377072876.dkr.ecr.us-east-1.amazonaws.com/gecko-byzantine
 docker pull "${CHIT_SPAMMER_IMAGE}"
 
 # Turn off GO111MODULE to pull e2e test source code in order to get run script.
-GO111MODULE=off go get -t -v github.com/kurtosis-tech/ava-e2e-tests
-cd "${GOPATH}"/src/github.com/kurtosis-tech/ava-e2e-tests/ || exit
-GO111MODULE=on go get -t -v github.com/kurtosis-tech/ava-e2e-tests@43285f873e0f19029f0e9ed7fbd845a411d6de2b
+git clone https://github.com/kurtosis-tech/ava-e2e-tests.git
+cd ava-e2e-tests/ || exit
+git checkout 43285f873e0f19029f0e9ed7fbd845a411d6de2b
 
 bash "./scripts/rebuild_initializer_binary.sh"
 bash "./scripts/rebuild_controller_image.sh"
