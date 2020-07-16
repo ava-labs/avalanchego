@@ -410,8 +410,8 @@ func (n *Node) initChains() error {
 
 	go connectToBootstrapsTimeout.Dispatch()
 	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
-	go n.Net.RegisterHandler(awaiter)
 
+	n.Net.RegisterHandler(awaiter)
 	return nil
 }
 
