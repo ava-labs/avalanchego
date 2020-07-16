@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	errNilTx          = errors.New("nil tx is invalid")
+	errNilTx          = errors.New("tx is nil")
 	errWrongNetworkID = errors.New("tx was issued with a different network ID")
 	errWeightTooSmall = errors.New("weight of this validator is too low")
 	errStakeTooShort  = errors.New("staking period is too short")
@@ -94,6 +94,9 @@ func (tx *addDefaultSubnetValidatorTx) SyntacticVerify() error {
 		return errWeightTooSmall
 	case tx.Shares > NumberOfShares: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
+	}
+	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+		return err
 	}
 
 	// Ensure staking length is not too short or long,

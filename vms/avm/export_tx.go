@@ -4,12 +4,14 @@
 package avm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -29,6 +31,8 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) erro
 		return errWrongNetworkID
 	case !t.BCID.Equals(ctx.ChainID):
 		return errWrongChainID
+	case len(t.Memo) > maxMemoSize:
+		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	}
 
 	fc := ava.NewFlowChecker()

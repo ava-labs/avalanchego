@@ -92,6 +92,9 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
 		return errSigsNotUniqueOrNotSorted
 	}
+	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	// Ensure staking length is not too short or long
 	if stakingDuration := tx.Duration(); stakingDuration < MinimumStakingDuration {

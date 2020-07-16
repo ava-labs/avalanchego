@@ -101,7 +101,9 @@ func (tx *ExportTx) SyntacticVerify() error {
 	case len(tx.ExportedOutputs) != 1:
 		return fmt.Errorf("tx has %d exported outputs but should have 1", len(tx.ExportedOutputs))
 	}
-	if exportedAmt := tx.ExportedOutputs[0].Output().Amount(); exportedAmt != tx.Amount {
+	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+		return err
+	} else if exportedAmt := tx.ExportedOutputs[0].Output().Amount(); exportedAmt != tx.Amount {
 		return fmt.Errorf("exported output has amount %d but should be %d", exportedAmt, tx.Amount)
 	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
