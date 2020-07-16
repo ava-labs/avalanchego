@@ -41,7 +41,7 @@ type addNonDefaultSubnetValidatorTx struct {
 	UnsignedAddNonDefaultSubnetValidatorTx `serialize:"true"`
 	// Credentials that authorize the inputs to spend the corresponding outputs
 	Credentials []verify.Verifiable `serialize:"true"`
-	// When a subnet is created, it specifies a set of public keys ("control keys") such
+	// When a subnet is created, it specifies a set of keys ("control keys") such
 	// that in order to add a validator to the subnet, a tx must be signed with
 	// a certain threshold of those keys
 	// Each element of ControlSigs is the signature of one of those keys
@@ -94,17 +94,13 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 	}
 	if err := tx.BaseTx.SyntacticVerify(); err != nil {
 		return err
-	}
-
-	// Ensure staking length is not too short or long
-	if stakingDuration := tx.Duration(); stakingDuration < MinimumStakingDuration {
+	} else if stakingDuration := tx.Duration(); stakingDuration < MinimumStakingDuration {
+		// Ensure staking length is not too short or long
 		return errStakeTooShort
 	} else if stakingDuration > MaximumStakingDuration {
 		return errStakeTooLong
-	}
-
-	// Verify tx inputs and outputs are valid
-	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		// Verify tx inputs and outputs are valid
 		return err
 	}
 
@@ -142,13 +138,10 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 			break
 		}
 	}
-
 	if subnet == nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("subnet %s does not exist", tx.SubnetID())}
 	} else if len(tx.ControlSigs) != int(subnet.Threshold) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("expected tx to have %d control sigs but has %d", subnet.Threshold, len(tx.ControlSigs))}
-	} else if !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs) {
-		return nil, nil, nil, nil, permError{errors.New("control signatures aren't sorted")}
 	}
 
 	// Ensure the sigs on [tx] are valid
