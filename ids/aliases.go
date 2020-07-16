@@ -12,10 +12,9 @@ import (
 // ID. An ID can have arbitrarily many aliases; two IDs may not have the same
 // alias.
 type Aliaser struct {
+	lock    sync.RWMutex
 	dealias map[string]ID
 	aliases map[[32]byte][]string
-
-	lock sync.RWMutex
 }
 
 // Initialize the aliaser to have no aliases
@@ -70,17 +69,16 @@ func (a *Aliaser) Alias(id ID, alias string) error {
 	return nil
 }
 
-func (a *Aliaser) RemoveAliases(id ID) error {
+// RemoveAliases of the provided ID
+func (a *Aliaser) RemoveAliases(id ID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	aliases, exists := a.aliases[id.Key()]
-	if !exists {
-		return fmt.Errorf("%s is not aliased, could not remove", id)
-	}
-	delete(a.aliases, id.Key())
+	key := id.Key()
+
+	aliases := a.aliases[key]
+	delete(a.aliases, key)
 	for _, alias := range aliases {
 		delete(a.dealias, alias)
 	}
-	return nil
 }

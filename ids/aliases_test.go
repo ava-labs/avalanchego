@@ -17,7 +17,7 @@ func TestAliaserLookupError(t *testing.T) {
 		alias   string
 		res     ID
 	}{
-		{"Unitialized", &Aliaser{}, "Batwoman", ID{}},
+		{"Uninitialized", &Aliaser{}, "Batwoman", ID{}},
 		{"Empty", emptyAliaser, "Batman", ID{}},
 	}
 	for _, tt := range tests {
@@ -120,12 +120,9 @@ func TestAliaserRemoveAlias(t *testing.T) {
 	aliaser.Alias(id1, "Batman")
 	aliaser.Alias(id1, "Dark Knight")
 
-	err := aliaser.RemoveAliases(id1)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s while removing aliases", err)
-	}
+	aliaser.RemoveAliases(id1)
 
-	_, err = aliaser.PrimaryAlias(id1)
+	_, err := aliaser.PrimaryAlias(id1)
 	if err == nil {
 		t.Fatalf("PrimaryAlias should have errored while getting primary alias for removed ID")
 	}
