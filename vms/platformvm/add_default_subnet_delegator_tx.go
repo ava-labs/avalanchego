@@ -78,6 +78,9 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	case tx.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
+	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+		return err
+	}
 	// Ensure staking length is not too short or long,
 	// and that the inputs/outputs of this tx are syntactically valid
 	stakingDuration := tx.Duration()

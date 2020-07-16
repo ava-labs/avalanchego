@@ -92,7 +92,9 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
 		return errControlSigsNotSortedAndUnique
 	}
-	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+		return err
+	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	tx.syntacticallyVerified = true
