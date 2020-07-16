@@ -147,10 +147,9 @@ func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *Tran
 // VerifyCredentials ensures that the output can be spent by the input with the
 // credential. A nil return values means the output can be spent.
 func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputOwners) error {
-	clock := fx.VM.Clock()
 	numSigs := len(in.SigIndices)
 	switch {
-	case out.Locktime > clock.Unix():
+	case out.Locktime > fx.VM.Clock().Unix():
 		return errTimelocked
 	case out.Threshold < uint32(numSigs):
 		return errTooManySigners
@@ -158,26 +157,20 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 		return errTooFewSigners
 	case numSigs != len(cred.Sigs):
 		return errInputCredentialSignersMismatch
-	}
-
-	// disable signature verification during bootstrapping
-	if !fx.bootstrapped {
+	case !fx.bootstrapped: // disable signature verification during bootstrapping
 		return nil
 	}
 
-	txBytes := tx.UnsignedBytes()
-	txHash := hashing.ComputeHash256(txBytes)
-
+	txHash := hashing.ComputeHash256(tx.UnsignedBytes())
 	for i, index := range in.SigIndices {
+		// Make sure each signature in the signature list is from
+		// an owner of the output being consumed
 		sig := cred.Sigs[i]
-
 		pk, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:])
 		if err != nil {
 			return err
 		}
-
-		expectedAddress := out.Addrs[index]
-		if !expectedAddress.Equals(pk.Address()) {
+		if expectedAddress := out.Addrs[index]; !expectedAddress.Equals(pk.Address()) {
 			return errWrongSigner
 		}
 	}
