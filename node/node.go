@@ -322,10 +322,15 @@ func (n *Node) initVMManager() error {
 	errs.Add(
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			AVA:      avaAssetID,
+			Fee:      n.Config.AvaTxFee,
 			Platform: ids.Empty,
 		}),
-		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
-		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
+			Path: path.Join(n.Config.PluginDir, "evm"),
+		}),
+		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
+			TxFee: n.Config.AvaTxFee,
+		}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
