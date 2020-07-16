@@ -5,7 +5,9 @@ package secp256k1fx
 
 import (
 	"errors"
+	"fmt"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -20,6 +22,7 @@ var (
 	errWrongOutputType     = errors.New("wrong output type")
 	errWrongInputType      = errors.New("wrong input type")
 	errWrongCredentialType = errors.New("wrong credential type")
+	errWrongOwnerType      = errors.New("wrong owner type")
 
 	errWrongNumberOfUTXOs = errors.New("wrong number of utxos for the operation")
 
@@ -76,6 +79,46 @@ func (fx *Fx) Bootstrapping() error { return nil }
 // Bootstrapped ...
 func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
+// VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
+func (fx *Fx) VerifyPermission(txIntf, credIntf, controlGroup interface{}) error {
+	tx, ok := txIntf.(Tx)
+	if !ok {
+		return errWrongTxType
+	}
+	cred, ok := credIntf.(*Credential)
+	if !ok {
+		return errWrongCredentialType
+	}
+	owner, ok := controlGroup.(*ControlGroup)
+	if !ok {
+		return errWrongOwnerType
+	}
+	return fx.verifyPermission(tx, cred, owner)
+}
+
+func (fx *Fx) verifyPermission(tx Tx, cred *Credential, cg *ControlGroup) error {
+	if err := verify.All(cred, cg); err != nil { // Make sure cred and control group are well-formed
+		return err
+	} else if len(cred.Sigs) != int(cg.Threshold) {
+		return fmt.Errorf("credential has %d signatures but should have %d", len(cred.Sigs), cg.Threshold)
+	}
+	txHash := hashing.ComputeHash256(tx.UnsignedBytes())
+	controlAddrs := cg.AddressesSet()
+	seen := ids.ShortSet{} // addresses we've already seen sigs from
+	for _, sig := range cred.Sigs {
+		if pubKey, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:]); err != nil {
+			return err
+		} else if addr := pubKey.Address(); !controlAddrs.Contains(addr) {
+			return fmt.Errorf("credential has signature from %s, which is not in the control group", addr)
+		} else if seen.Contains(addr) {
+			return fmt.Errorf("signature from %s appears multiple times", addr)
+		} else {
+			seen.Add(addr)
+		}
+	}
+	return nil
+}
+
 // VerifyOperation ...
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
 	tx, ok := txIntf.(Tx)
@@ -104,11 +147,9 @@ func (fx *Fx) verifyOperation(tx Tx, op *MintOperation, cred *Credential, utxo *
 	if err := verify.All(op, cred, utxo); err != nil {
 		return err
 	}
-
 	if !utxo.Equals(&op.MintOutput.OutputOwners) {
 		return errWrongMintCreated
 	}
-
 	return fx.VerifyCredentials(tx, &op.MintInput, cred, &utxo.OutputOwners)
 }
 
