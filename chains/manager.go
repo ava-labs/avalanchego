@@ -92,7 +92,7 @@ type ChainParameters struct {
 	CustomBeacons validators.Set // Should only be set if the default beacons can't be used.
 }
 
-type Chain struct {
+type chain struct {
 	Engine  common.Engine
 	Handler *router.Handler
 	Ctx     *snow.Context
@@ -227,7 +227,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 }
 
 // Create a chain
-func (m *manager) buildChain(chainParams ChainParameters) (*Chain, error) {
+func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	vmID, err := m.vmManager.Lookup(chainParams.VMAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while looking up VM: %s", err)
@@ -320,9 +320,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*Chain, error) {
 		return nil, fmt.Errorf("Error calculating bootstrap weight: %s", err)
 	}
 
-	var (
-		chain *Chain
-	)
+	var chain *chain
 	switch vm := vm.(type) {
 	case avalanche.DAGVM:
 		chain, err = m.createAvalancheChain(
@@ -363,7 +361,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*Chain, error) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
-			ctx.Log.Fatal("Chain with ID: %s was shutdown due to panic", chainParams.ID)
+			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
 		})
 	}
 
@@ -404,7 +402,7 @@ func (m *manager) createAvalancheChain(
 	fxs []*common.Fx,
 	consensusParams avacon.Parameters,
 	bootstrapWeight uint64,
-) (*Chain, error) {
+) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
@@ -441,16 +439,7 @@ func (m *manager) createAvalancheChain(
 	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
 
 	// The engine handles consensus
-	engine := &avaeng.Transitive{
-		Config: avaeng.Config{
-			BootstrapConfig: avaeng.BootstrapConfig{
-				Config: common.Config{
-					Context: ctx,
-				},
-			},
-		},
-	}
-
+	engine := &avaeng.Transitive{}
 	engine.Initialize(avaeng.Config{
 		BootstrapConfig: avaeng.BootstrapConfig{
 			Config: common.Config{
@@ -479,7 +468,7 @@ func (m *manager) createAvalancheChain(
 		consensusParams.Metrics,
 	)
 
-	return &Chain{
+	return &chain{
 		Engine:  engine,
 		Handler: handler,
 		VM:      vm,
@@ -497,7 +486,7 @@ func (m *manager) createSnowmanChain(
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
 	bootstrapWeight uint64,
-) (*Chain, error) {
+) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
@@ -552,7 +541,7 @@ func (m *manager) createSnowmanChain(
 		consensusParams.Metrics,
 	)
 
-	return &Chain{
+	return &chain{
 		Engine:  engine,
 		Handler: handler,
 		VM:      vm,
