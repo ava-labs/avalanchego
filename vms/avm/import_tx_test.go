@@ -19,6 +19,95 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
+func TestImportTxSyntacticVerify(t *testing.T) {
+	c := setupCodec()
+
+	tx := &ImportTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+			Outs: []*ava.TransferableOutput{{
+				Asset: ava.Asset{ID: asset},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 12345,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			}},
+		},
+		Ins: []*ava.TransferableInput{{
+			UTXOID: ava.UTXOID{
+				TxID: ids.NewID([32]byte{
+					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
+					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
+					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
+				}),
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 54321,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{2},
+				},
+			},
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, 0); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
+	c := setupCodec()
+
+	tx := &ImportTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+			Outs: []*ava.TransferableOutput{{
+				Asset: ava.Asset{ID: asset},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 12345,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			}},
+			Memo: make([]byte, maxMemoSize+1),
+		},
+		Ins: []*ava.TransferableInput{{
+			UTXOID: ava.UTXOID{
+				TxID: ids.NewID([32]byte{
+					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
+					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
+					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
+				}),
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 54321,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{2},
+				},
+			},
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, 0); err == nil {
+		t.Fatalf("should have errored due to memo field being too long")
+	}
+}
+
 func TestImportTxSerialization(t *testing.T) {
 	expected := []byte{
 		// Codec version
