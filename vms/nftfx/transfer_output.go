@@ -34,3 +34,6 @@ func (out *TransferOutput) Verify() error {
 		return out.OutputOwners.Verify()
 	}
 }
+
+// VerifyState ...
+func (out *TransferOutput) VerifyState() error { return out.Verify() }

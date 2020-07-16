@@ -682,7 +682,7 @@ func (vm *VM) Spend(
 			// this utxo can't be spent with the current keys right now
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			// this input doesn't have an amount, so I don't care about it here
 			continue
@@ -814,7 +814,7 @@ func (vm *VM) SpendAll(
 			// this utxo can't be spent with the current keys right now
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			// this input doesn't have an amount, so I don't care about it here
 			continue

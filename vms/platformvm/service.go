@@ -1124,7 +1124,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			continue
 		}

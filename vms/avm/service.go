@@ -249,7 +249,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		if !utxo.AssetID().Equals(assetID) {
 			continue
 		}
-		transferable, ok := utxo.Out.(ava.Transferable)
+		transferable, ok := utxo.Out.(ava.TransferableOut)
 		if !ok {
 			continue
 		}
@@ -303,7 +303,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	assetIDs := ids.Set{}                    // IDs of assets the address has a non-zero balance of
 	balances := make(map[[32]byte]uint64, 0) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
-		transferable, ok := utxo.Out.(ava.Transferable)
+		transferable, ok := utxo.Out.(ava.TransferableOut)
 		if !ok {
 			continue
 		}
@@ -404,7 +404,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.Verifiable, 0, len(args.InitialHolders)),
+		Outs: make([]verify.State, 0, len(args.InitialHolders)),
 	}
 	for _, holder := range args.InitialHolders {
 		address, err := service.vm.Parse(holder.Address)
@@ -518,7 +518,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.Verifiable, 0, len(args.MinterSets)),
+		Outs: make([]verify.State, 0, len(args.MinterSets)),
 	}
 	for _, owner := range args.MinterSets {
 		minter := &secp256k1fx.MintOutput{

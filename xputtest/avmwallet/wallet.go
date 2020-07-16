@@ -96,7 +96,7 @@ func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keychain.Add(sk)
 // AddUTXO adds a new UTXO to this wallet if this wallet may spend it
 // The UTXO's output must be an OutputPayment
 func (w *Wallet) AddUTXO(utxo *ava.UTXO) {
-	out, ok := utxo.Out.(ava.Transferable)
+	out, ok := utxo.Out.(ava.TransferableOut)
 	if !ok {
 		return
 	}
@@ -116,7 +116,7 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 
 	assetID := utxo.AssetID()
 	assetKey := assetID.Key()
-	newBalance := w.balance[assetKey] - utxo.Out.(ava.Transferable).Amount()
+	newBalance := w.balance[assetKey] - utxo.Out.(ava.TransferableOut).Amount()
 	if newBalance == 0 {
 		delete(w.balance, assetKey)
 	} else {
@@ -148,7 +148,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			continue
 		}
