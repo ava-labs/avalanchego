@@ -279,7 +279,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	platformID := ids.Empty.Prefix(0)
 
-	vm := &VM{platform: platformID}
+	vm := &VM{
+		ava:      ids.Empty,
+		platform: platformID,
+	}
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

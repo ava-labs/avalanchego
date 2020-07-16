@@ -36,7 +36,7 @@ func TestUTXOSerialize(t *testing.T) {
 	c := codec.NewDefault()
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
+	c.RegisterType(&secp256k1fx.Input{})
 	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.Credential{})
 

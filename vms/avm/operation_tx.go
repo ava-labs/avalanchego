@@ -85,7 +85,13 @@ func (t *OperationTx) UTXOs() []*ava.UTXO {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *OperationTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -93,7 +99,7 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 		return errNoOperations
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
 		return err
 	}
 

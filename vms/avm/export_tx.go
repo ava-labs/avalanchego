@@ -7,9 +7,10 @@ import (
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -21,7 +22,13 @@ type ExportTx struct {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error {
+func (t *ExportTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	_ int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -32,6 +39,10 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) erro
 	}
 
 	fc := ava.NewFlowChecker()
+
+	// The txFee must be burned
+	fc.Produce(txFeeAssetID, txFee)
+
 	for _, out := range t.BaseTx.Outs {
 		if err := out.Verify(); err != nil {
 			return err
@@ -61,8 +72,6 @@ func (t *ExportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) erro
 	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
-
-	// TODO: Add the Tx fee to the produced side
 
 	if err := fc.Verify(); err != nil {
 		return err

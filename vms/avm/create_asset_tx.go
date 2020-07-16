@@ -9,9 +9,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 const (
@@ -67,7 +68,13 @@ func (t *CreateAssetTx) UTXOs() []*ava.UTXO {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *CreateAssetTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -96,7 +103,7 @@ func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
 		return err
 	}
 

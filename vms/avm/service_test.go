@@ -297,6 +297,8 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 	reply := CreateFixedCapAssetReply{}
 	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
+		Username:     username,
+		Password:     password,
 		Name:         "test asset",
 		Symbol:       "test",
 		Denomination: 1,
@@ -323,8 +325,10 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 	reply := CreateVariableCapAssetReply{}
 	err := s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
-		Name:   "test asset",
-		Symbol: "test",
+		Username: username,
+		Password: password,
+		Name:     "test asset",
+		Symbol:   "test",
 		MinterSets: []Owners{
 			{
 				Threshold: 1,
@@ -343,7 +347,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 }
 
-func TestImportAvmKey(t *testing.T) {
+func TestImportAVMKey(t *testing.T) {
 	_, vm, s := setup(t)
 	defer func() {
 		vm.Shutdown()
@@ -382,7 +386,7 @@ func TestImportAvmKey(t *testing.T) {
 	}
 }
 
-func TestImportAvmKeyNoDuplicates(t *testing.T) {
+func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	_, vm, s := setup(t)
 	defer func() {
 		vm.Shutdown()
