@@ -69,10 +69,7 @@ func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
 // Dispatch waits for incoming messages from the network
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
-	defer func() {
-		h.ctx.Log.Info("finished shutting down chain")
-		close(h.closed)
-	}()
+	defer h.shutdownDispatch()
 
 	for {
 		select {
@@ -107,15 +104,14 @@ func (h *Handler) Dispatch() {
 			// handle a message from the VM
 			h.dispatchMsg(message{messageType: notifyMsg, notification: msg})
 		}
-		if h.closing && h.toClose != nil {
-			go h.toClose()
+
+		if h.closing {
+			return
 		}
 	}
 }
 
 // Dispatch a message to the consensus engine.
-// Returns true iff this consensus handler (and its associated engine) should shutdown
-// (due to receipt of a shutdown message)
 func (h *Handler) dispatchMsg(msg message) {
 	if h.closing {
 		h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
@@ -130,8 +126,7 @@ func (h *Handler) dispatchMsg(msg message) {
 
 	h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
 	var (
-		err  error
-		done bool
+		err error
 	)
 	switch msg.messageType {
 	case getAcceptedFrontierMsg:
@@ -188,17 +183,13 @@ func (h *Handler) dispatchMsg(msg message) {
 	case gossipMsg:
 		err = h.engine.Gossip()
 		h.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
-	case shutdownMsg:
-		err = h.engine.Shutdown()
-		h.shutdown.Observe(float64(h.clock.Time().Sub(startTime)))
-		done = true
 	}
 
 	if err != nil {
-		h.ctx.Log.Fatal("forcing chain to shutdown due to %s", err)
+		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s", err)
 	}
 
-	h.closing = done || err != nil
+	h.closing = err != nil
 }
 
 // GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
@@ -384,11 +375,27 @@ func (h *Handler) Notify(msg common.Message) bool {
 	})
 }
 
-// Shutdown shuts down the dispatcher
+// Shutdown asynchronously shuts down the dispatcher.
+// The handler should never be invoked again after calling
+// Shutdown.
 func (h *Handler) Shutdown() {
-	h.sendReliableMsg(message{
-		messageType: shutdownMsg,
-	})
+	close(h.msgs)
+}
+
+func (h *Handler) shutdownDispatch() {
+	h.ctx.Lock.Lock()
+	defer h.ctx.Lock.Unlock()
+
+	startTime := time.Now()
+	if err := h.engine.Shutdown(); err != nil {
+		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
+	}
+	h.ctx.Log.Info("finished shutting down chain")
+	if h.toClose != nil {
+		go h.toClose()
+	}
+	h.shutdown.Observe(float64(time.Now().Sub(startTime)))
+	close(h.closed)
 }
 
 func (h *Handler) sendMsg(msg message) bool {
