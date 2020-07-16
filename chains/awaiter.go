@@ -17,6 +17,8 @@ type awaitConnected struct {
 	weight    uint64
 }
 
+// NewAwaiter returns a new handler that will await for a sufficient number of
+// validators to be connected.
 func NewAwaiter(vdrs validators.Set, reqWeight uint64, connected func()) network.Handler {
 	return &awaitConnected{
 		vdrs:      vdrs,
@@ -45,11 +47,13 @@ func (a *awaitConnected) Connected(vdrID ids.ShortID) bool {
 
 func (a *awaitConnected) Disconnected(vdrID ids.ShortID) bool {
 	if vdr, ok := a.vdrs.Get(vdrID); ok {
-		// Sub64 should never return an error since only validators
-		// that have added their weight can become disconnected.
-		// If an error somehow occurs, Sub64 returns 0, which would be
-		// the desired value to set weight to in the case of an overflow.
-		a.weight, _ = math.Sub64(vdr.Weight(), a.weight)
+		// TODO: Account for weight changes in a more robust manner.
+
+		// Sub64 should rarely error since only validators that have added their
+		// weight can become disconnected. Because it is possible that there are
+		// changes to the validators set, we utilize that Sub64 returns 0 on
+		// error.
+		a.weight, _ = math.Sub64(a.weight, vdr.Weight())
 	}
 	return false
 }
