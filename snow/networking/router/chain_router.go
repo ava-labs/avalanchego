@@ -66,17 +66,17 @@ func (sr *ChainRouter) AddChain(chain *Handler) {
 // RemoveChain removes the specified chain so that incoming
 // messages can't be routed to it
 func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
-	sr.lock.RLock()
+	sr.lock.Lock()
 	chain, exists := sr.chains[chainID.Key()]
 	if !exists {
 		sr.log.Debug("can't remove unknown chain %s", chainID)
-		sr.lock.RUnlock()
+		sr.lock.Unlock()
 		return
 	}
-	chain.Shutdown()
-	close(chain.msgs)
 	delete(sr.chains, chainID.Key())
-	sr.lock.RUnlock()
+	sr.lock.Unlock()
+
+	chain.Shutdown()
 
 	ticker := time.NewTicker(sr.closeTimeout)
 	select {
@@ -218,7 +218,7 @@ func (sr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 	if chain, exists := sr.chains[chainID.Key()]; exists {
 		chain.GetAncestorsFailed(validatorID, requestID)
 	} else {
-		sr.log.Error("GetAncestorsFailed(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID)
+		sr.log.Error("GetAncestorsFailed(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 	}
 }
 
@@ -333,7 +333,6 @@ func (sr *ChainRouter) Shutdown() {
 
 	for _, chain := range prevChains {
 		chain.Shutdown()
-		close(chain.msgs)
 	}
 
 	ticker := time.NewTicker(sr.closeTimeout)

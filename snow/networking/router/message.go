@@ -31,7 +31,6 @@ const (
 	queryFailedMsg
 	notifyMsg
 	gossipMsg
-	shutdownMsg
 	getAncestorsMsg
 	multiPutMsg
 	getAncestorsFailedMsg
@@ -103,8 +102,6 @@ func (t msgType) String() string {
 		return "Notify Message"
 	case gossipMsg:
 		return "Gossip Message"
-	case shutdownMsg:
-		return "Shutdown Message"
 	default:
 		return fmt.Sprintf("Unknown Message Type: %d", t)
 	}

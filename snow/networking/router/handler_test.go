@@ -4,6 +4,7 @@
 package router
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -87,5 +88,41 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	case _, _ = <-ticker.C:
 		t.Fatalf("Calling engine function timed out")
 	case _, _ = <-called:
+	}
+}
+
+func TestHandlerCallsToClose(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	closed := make(chan struct{}, 1)
+
+	engine.ContextF = snow.DefaultContextTest
+	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+		return errors.New("Engine error should cause handler to close")
+	}
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		nil,
+		1,
+		"",
+		prometheus.NewRegistry(),
+	)
+	handler.clock.Set(time.Now())
+
+	handler.toClose = func() {
+		closed <- struct{}{}
+	}
+	go handler.Dispatch()
+
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Now().Add(time.Second))
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	select {
+	case _, _ = <-ticker.C:
+		t.Fatalf("Handler shutdown timed out before calling toClose")
+	case _, _ = <-closed:
 	}
 }
