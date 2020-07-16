@@ -21,6 +21,7 @@ const maxSize = 1 << 20
 
 var (
 	errBadCodec       = errors.New("invalid codec")
+	errBadEpoch       = errors.New("invalid epoch")
 	errExtraSpace     = errors.New("trailing buffer space")
 	errInvalidParents = errors.New("vertex contains non-sorted or duplicated parentIDs")
 	errInvalidTxs     = errors.New("vertex contains non-sorted or duplicated transactions")
@@ -60,6 +61,7 @@ func (vtx *innerVertex) Verify() error {
  * Codec        | 04 Bytes
  * Chain        | 32 Bytes
  * Height       | 08 Bytes
+ * Epoch        | 04 Bytes
  * NumParents   | 04 Bytes
  * Repeated (NumParents):
  *     ParentID | 32 bytes
@@ -76,6 +78,7 @@ func (vtx *innerVertex) Marshal() ([]byte, error) {
 	p.PackInt(uint32(CustomID))
 	p.PackFixedBytes(vtx.chainID.Bytes())
 	p.PackLong(vtx.height)
+	p.PackInt(0)
 
 	p.PackInt(uint32(len(vtx.parentIDs)))
 	for _, parentID := range vtx.parentIDs {
@@ -100,6 +103,9 @@ func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 
 	chainID, _ := ids.ToID(p.UnpackFixedBytes(hashing.HashLen))
 	height := p.UnpackLong()
+	if epoch := p.UnpackInt(); epoch != 0 {
+		p.Add(errBadEpoch)
+	}
 
 	parentIDs := []ids.ID(nil)
 	for i := p.UnpackInt(); i > 0 && !p.Errored(); i-- {
