@@ -22,14 +22,18 @@ var (
 	errNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
 )
 
+// Amounter is a data structure that has an amount of something associated with it
+type Amounter interface {
+	Amount() uint64
+}
+
 // Transferable is the interface a feature extension must provide to transfer
 // value between features extensions.
 type Transferable interface {
 	verify.Verifiable
 
-	// Amount returns how much value this output consumes of the asset in its
-	// transaction.
-	Amount() uint64
+	// Returns how much value this output consumes of the asset in its transaction.
+	Amounter
 }
 
 // TransferableOutput ...

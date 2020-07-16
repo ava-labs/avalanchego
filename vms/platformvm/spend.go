@@ -30,9 +30,9 @@ func (vm *VM) spend(
 		err = errNoKeys
 		return
 	}
-	addrs := ids.ShortSet{} // The addresses controlled by [keys]
-	for _, key := range keys {
-		addrs.Add(key.PublicKey().Address())
+	addrs := make([][]byte, len(keys), len(keys)) // The addresses controlled by [keys]
+	for i, key := range keys {
+		addrs[i] = key.PublicKey().Address().Bytes()
 	}
 	utxos, err := vm.getUTXOs(db, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
@@ -85,6 +85,9 @@ func (vm *VM) spend(
 	// You may be wondering, "what about the stake amount and transaction fee?"
 	// Those are burned. When the staker gets their staked AVAX back, it will be in the form of a new UTXO.
 	if amountSpent > toSpend {
+		var changeAddrBytes [20]byte
+		copy(changeAddrBytes[:], addrs[0]) // Change goes to 1st key
+		changeAddr := ids.NewShortID(changeAddrBytes)
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: vm.avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -92,7 +95,7 @@ func (vm *VM) spend(
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
-					Addrs:     []ids.ShortID{addrs.CappedList(1)[0]}, // Change goes to 1st key
+					Addrs:     []ids.ShortID{changeAddr},
 				},
 			},
 		})

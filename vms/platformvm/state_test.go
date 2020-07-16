@@ -121,7 +121,7 @@ func TestStateUTXOs(t *testing.T) {
 			t.Fatal("should be the same")
 		}
 		// Make sure each address referenced by this UTXO knows it is referenced by this UTXO
-		referencedAddresses := utxo.Out.(*secp256k1fx.TransferOutput).Addrs
+		referencedAddresses := utxo.Out.(ava.Addressable).Addresses()
 		for _, addr := range referencedAddresses {
 			if utxos, err := vm.getReferencingUTXOs(vm.DB, addr); err != nil {
 				t.Fatal(err)

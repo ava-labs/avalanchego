@@ -287,7 +287,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove all UTXOs owned by keys[0]
-	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address())
+	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

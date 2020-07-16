@@ -288,7 +288,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			destination,                             // destination
 			[]*crypto.PrivateKeySECP256K1R{keys[1]}, // tx fee payer
 			func(db database.Database) { // Remove all UTXOs owned by keys[1]
-				utxoIDs, err := vm.getReferencingUTXOs(db, keys[1].PublicKey().Address())
+				utxoIDs, err := vm.getReferencingUTXOs(db, keys[1].PublicKey().Address().Bytes())
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -144,9 +144,8 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
 
-	addrSet := ids.ShortSet{}
-	addrSet.Add(address)
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrSet)
+	addrs := [][]byte{address.Bytes()}
+	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
 	}
@@ -222,16 +221,16 @@ type GetUTXOsResponse struct {
 func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *GetUTXOsResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
-	addrSet := ids.ShortSet{}
+	addrs := [][]byte{}
 	for _, addrStr := range args.Addresses {
 		addr, err := service.vm.ParseAddress(addrStr)
 		if err != nil {
 			return fmt.Errorf("can't parse %s to address: %w", addr, err)
 		}
-		addrSet.Add(addr)
+		addrs = append(addrs, addr.Bytes())
 	}
 
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrSet)
+	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXOs: %w", err)
 	}

@@ -180,7 +180,7 @@ type VM struct {
 	// AVM is the ID of the ava virtual machine
 	avm ids.ID
 
-	fx    secp256k1fx.Fx
+	fx    Fx
 	codec codec.Codec
 
 	// Used to create and use keys.
@@ -213,19 +213,15 @@ func (vm *VM) Initialize(
 	db database.Database,
 	genesisBytes []byte,
 	msgs chan<- common.Message,
-	fxs []*common.Fx,
+	_ []*common.Fx,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
-
-	if len(fxs) != 0 {
-		return errUnsupportedFXs
-	}
-
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
 		return err
 	}
+	vm.fx = &secp256k1fx.Fx{}
 
 	vm.codec = codec.NewDefault()
 	if err := vm.fx.Initialize(vm); err != nil {

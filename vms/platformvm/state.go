@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/database/prefixdb"
+	"github.com/ava-labs/gecko/utils/formatting"
 	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -122,24 +122,16 @@ func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
 }
 
 // putUTXO persists the given UTXO
-// TODO: Optimize this
 func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 	if err := vm.State.Put(db, utxoTypeID, utxo.InputID(), utxo); err != nil {
 		return err
 	}
-	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-	if !ok {
-		err := fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
-		vm.Ctx.Log.Error(err.Error())
-		return err
-	}
-	// For each owner of this UTXO, add to list of UTXOs owned by that addr
-	for _, addrBytes := range out.OutputOwners.Addresses() {
-		var addrBytesArr [20]byte
-		copy(addrBytesArr[:], addrBytes)
-		addr := ids.NewShortID(addrBytesArr)
-		if err := vm.putReferencingUTXO(db, addr, utxo.InputID()); err != nil {
-			return fmt.Errorf("couldn't update UTXO set of address %s", addr)
+	if addressable, ok := utxo.Out.(ava.Addressable); ok { // If this output lists addresses that it references
+		// For each owner of this UTXO, add to list of UTXOs owned by that addr
+		for _, addrBytes := range addressable.Addresses() {
+			if err := vm.putReferencingUTXO(db, addrBytes, utxo.InputID()); err != nil {
+				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
+			}
 		}
 	}
 	return nil
@@ -147,7 +139,6 @@ func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 
 // removeUTXO removes the UTXO with the given ID
 // If the utxo doesn't exist, returns nil
-// TODO: Optimize this
 func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
 	utxo, err := vm.getUTXO(db, ID) // Get the UTXO
 	if err != nil {
@@ -156,18 +147,12 @@ func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
 	if err := vm.State.Put(db, utxoTypeID, ID, nil); err != nil { // remove the UTXO
 		return err
 	}
-	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-	if !ok {
-		err := fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
-		vm.Ctx.Log.Error(err.Error())
-		return err
-	}
-	for _, addrBytes := range out.OutputOwners.Addresses() { // Update UTXO set of each address referenced in utxo
-		var addrBytesArr [20]byte
-		copy(addrBytesArr[:], addrBytes)
-		addr := ids.NewShortID(addrBytesArr)
-		if err := vm.removeReferencingUTXO(db, addr, ID); err != nil {
-			return fmt.Errorf("couldn't update UTXO set of address %s", addr)
+	if addressable, ok := utxo.Out.(ava.Addressable); ok { // If this output lists addresses that it references
+		// For each owner of this UTXO, add to list of UTXOs owned by that addr
+		for _, addrBytes := range addressable.Addresses() {
+			if err := vm.removeReferencingUTXO(db, addrBytes, utxo.InputID()); err != nil {
+				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
+			}
 		}
 	}
 	return nil
@@ -175,11 +160,10 @@ func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
 
 // return the IDs of UTXOs that reference [addr]
 // Returns nil if no UTXOs reference [addr]
-func (vm *VM) getReferencingUTXOs(db database.Database, addr ids.ShortID) (ids.Set, error) {
+func (vm *VM) getReferencingUTXOs(db database.Database, addrBytes []byte) (ids.Set, error) {
 	utxoIDs := ids.Set{}
-	iter := prefixdb.NewNested(addr.Bytes(), db).NewIterator()
+	iter := prefixdb.NewNested(addrBytes, db).NewIterator()
 	defer iter.Release()
-
 	for iter.Next() {
 		utxoID, err := ids.ToID(iter.Key())
 		if err != nil {
@@ -191,21 +175,21 @@ func (vm *VM) getReferencingUTXOs(db database.Database, addr ids.ShortID) (ids.S
 }
 
 // Persist that the UTXO with ID [utxoID] references [addr]
-func (vm *VM) putReferencingUTXO(db database.Database, addr ids.ShortID, utxoID ids.ID) error {
-	prefixedDB := prefixdb.NewNested(addr.Bytes(), db)
+func (vm *VM) putReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
+	prefixedDB := prefixdb.NewNested(addrBytes, db)
 	return prefixedDB.Put(utxoID.Bytes(), nil)
 }
 
 // Remove the UTXO with ID [utxoID] from the set of UTXOs that reference [addr]
-func (vm *VM) removeReferencingUTXO(db database.Database, addr ids.ShortID, utxoID ids.ID) error {
-	prefixedDB := prefixdb.NewNested(addr.Bytes(), db)
+func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxoID ids.ID) error {
+	prefixedDB := prefixdb.NewNested(addrBytes, db)
 	return prefixedDB.Delete(utxoID.Bytes())
 }
 
 // getUTXOs returns UTXOs that reference at least one of the addresses in [addrs]
-func (vm *VM) getUTXOs(db database.Database, addrs ids.ShortSet) ([]*ava.UTXO, error) {
+func (vm *VM) getUTXOs(db database.Database, addrs [][]byte) ([]*ava.UTXO, error) {
 	utxoIDs := ids.Set{}
-	for _, addr := range addrs.List() {
+	for _, addr := range addrs {
 		addrUTXOs, err := vm.getReferencingUTXOs(db, addr)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get UTXOs for address %s", addr)
@@ -224,19 +208,17 @@ func (vm *VM) getUTXOs(db database.Database, addrs ids.ShortSet) ([]*ava.UTXO, e
 }
 
 // getBalance returns the balance of [addrs]
-func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, error) {
+func (vm *VM) getBalance(db database.Database, addrs [][]byte) (uint64, error) {
 	utxos, err := vm.getUTXOs(db, addrs)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
 	balance := uint64(0)
 	for _, utxo := range utxos {
-		if out, ok := utxo.Out.(*secp256k1fx.TransferOutput); !ok {
-			err := fmt.Errorf("expected output to be type *secp256k1fx.TransferOutput but is %T", utxo.Out)
-			vm.Ctx.Log.Error(err.Error())
-			return 0, err
-		} else if balance, err = safemath.Add64(out.Amount(), balance); err != nil {
-			return 0, errors.New("overflow while calculating balance")
+		if out, ok := utxo.Out.(ava.Amounter); ok {
+			if balance, err = safemath.Add64(out.Amount(), balance); err != nil {
+				return 0, err
+			}
 		}
 	}
 	return balance, nil
