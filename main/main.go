@@ -68,7 +68,7 @@ func main() {
 	defer mapper.UnmapAllPorts()
 
 	port, err := mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking") // Open staking port
-	if err == nil {
+	if err == nil && !Config.StakingIP.IsPrivate() {
 		Config.StakingIP.Port = port
 	} else {
 		log.Warn("NAT traversal has failed. The node will be able to connect to less nodes.")
