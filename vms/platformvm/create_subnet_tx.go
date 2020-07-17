@@ -41,12 +41,7 @@ type UnsignedCreateSubnetTx struct {
 type CreateSubnetTx struct {
 	UnsignedCreateSubnetTx `serialize:"true"`
 	// Credentials that authorize the inputs to spend the corresponding outputs
-	Credentials []verify.Verifiable `serialize:"true"`
-}
-
-// Creds returns this transactions credentials
-func (tx *CreateSubnetTx) Creds() []verify.Verifiable {
-	return tx.Credentials
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -91,8 +86,8 @@ func (tx *CreateSubnetTx) SyntacticVerify() error {
 	}
 	if err := tx.BaseTx.SyntacticVerify(); err != nil {
 		return err
-	}
-	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs,
+		tx.Creds, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	tx.syntacticallyVerified = true
@@ -116,7 +111,7 @@ func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
 	}
 
 	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, tx.Creds); err != nil {
 		return nil, err
 	}
 
@@ -139,8 +134,12 @@ func (vm *VM) newCreateSubnetTx(
 		return nil, fmt.Errorf("threshold (%d) > len(controlKeys) (%d)", threshold, len(controlKeys))
 	}
 
-	// Calculate inputs, outputs, and keys used to sign this tx
-	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, keys)
+	changeSpend := &spend{
+		Threshold: 1,
+		Locktime:  0,
+		Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+	}
+	inputs, outputs, credKeys, err := vm.spend(vm.DB, keys, nil, changeSpend, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -151,8 +150,8 @@ func (vm *VM) newCreateSubnetTx(
 			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: vm.Ctx.ChainID,
-				Inputs:       inputs,
-				Outputs:      outputs,
+				Ins:          inputs,
+				Outs:         outputs,
 			},
 			ControlKeys: controlKeys,
 			Threshold:   threshold,
@@ -172,18 +171,17 @@ func (vm *VM) newCreateSubnetTx(
 	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
 	// Attach credentials that allow the inputs to be spent
-	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
-		cred := &secp256k1fx.Credential{}
-		for _, key := range inputKeys {
+	tx.Creds = make([]verify.Verifiable, len(credKeys))
+	for i, keys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys))}
+		for j, key := range keys {
 			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
 			if err != nil {
 				return nil, fmt.Errorf("problem generating credential: %w", err)
 			}
-			sigArr := [crypto.SECP256K1RSigLen]byte{}
-			copy(sigArr[:], sig)
-			cred.Sigs = append(cred.Sigs, sigArr)
+			copy(cred.Sigs[j][:], sig)
 		}
-		tx.Credentials = append(tx.Credentials, cred) // Attach credential to tx
+		tx.Creds[i] = cred // Attach credential to tx
 	}
 
 	return tx, tx.initialize(vm)

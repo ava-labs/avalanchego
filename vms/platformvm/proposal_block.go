@@ -12,20 +12,6 @@ import (
 	"github.com/ava-labs/gecko/vms/components/core"
 )
 
-// ProposalTx is an operation that can be proposed
-type ProposalTx interface {
-	initialize(vm *VM) error
-	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(database.Database) (
-		onCommitDB *versiondb.Database,
-		onAbortDB *versiondb.Database,
-		onCommitFunc func(),
-		onAbortFunc func(),
-		err TxError,
-	)
-	InitiallyPrefersCommit() bool
-}
-
 // ProposalBlock is a proposal to change the chain's state.
 // A proposal may be to:
 // 	1. Advance the chain's timestamp (*AdvanceTimeTx)

@@ -89,21 +89,21 @@ func (fx *Fx) VerifyPermission(txIntf, credIntf, controlGroup interface{}) error
 	if !ok {
 		return errWrongCredentialType
 	}
-	owner, ok := controlGroup.(*ControlGroup)
+	owner, ok := controlGroup.(*OutputOwners)
 	if !ok {
 		return errWrongOwnerType
 	}
 	return fx.verifyPermission(tx, cred, owner)
 }
 
-func (fx *Fx) verifyPermission(tx Tx, cred *Credential, cg *ControlGroup) error {
-	if err := verify.All(cred, cg); err != nil { // Make sure cred and control group are well-formed
+func (fx *Fx) verifyPermission(tx Tx, cred *Credential, owners *OutputOwners) error {
+	if err := verify.All(cred, owners); err != nil { // Make sure cred and control group are well-formed
 		return err
-	} else if len(cred.Sigs) != int(cg.Threshold) {
-		return fmt.Errorf("credential has %d signatures but should have %d", len(cred.Sigs), cg.Threshold)
+	} else if len(cred.Sigs) != int(owners.Threshold) {
+		return fmt.Errorf("credential has %d signatures but should have %d", len(cred.Sigs), owners.Threshold)
 	}
 	txHash := hashing.ComputeHash256(tx.UnsignedBytes())
-	controlAddrs := cg.AddressesSet()
+	controlAddrs := owners.AddressesSet()
 	seen := ids.ShortSet{} // addresses we've already seen sigs from
 	for _, sig := range cred.Sigs {
 		if pubKey, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:]); err != nil {

@@ -1,11 +1,6 @@
 package secp256k1fx
 
-import (
-	"testing"
-
-	"github.com/ava-labs/gecko/ids"
-)
-
+/*
 func TestControlGroup(t *testing.T) {
 	type test struct {
 		description      string
@@ -74,3 +69,4 @@ func TestControlGroup(t *testing.T) {
 		}
 	}
 }
+*/

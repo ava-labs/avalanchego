@@ -37,9 +37,9 @@ type BaseTx struct {
 	// ID of this blockchain. In practice is always the empty ID.
 	// This is only here to match avm.BaseTx's format
 	BlockchainID ids.ID                    `serialize:"true"`
-	Outputs      []*ava.TransferableOutput `serialize:"true"`
+	Outs         []*ava.TransferableOutput `serialize:"true"`
 	// Input UTXOs
-	Inputs []*ava.TransferableInput `serialize:"true"`
+	Ins []*ava.TransferableInput `serialize:"true"`
 	// Memo field contains arbitrary bytes, up to maxMemoSize
 	Memo []byte `serialize:"true"`
 }
@@ -56,12 +56,6 @@ func (tx *BaseTx) Bytes() []byte {
 
 // ID returns this transaction's ID
 func (tx *BaseTx) ID() ids.ID { return tx.id }
-
-// Ins returns this transaction's inputs
-func (tx *BaseTx) Ins() []*ava.TransferableInput { return tx.Inputs }
-
-// Outs returns this transaction's outputs
-func (tx *BaseTx) Outs() []*ava.TransferableOutput { return tx.Outputs }
 
 // SyntacticVerify returns nil iff this tx is well formed
 func (tx *BaseTx) SyntacticVerify() error {

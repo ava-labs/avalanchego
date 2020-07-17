@@ -41,17 +41,16 @@ type UnsignedExportTx struct {
 type ExportTx struct {
 	UnsignedExportTx `serialize:"true"`
 	// Credentials that authorize the inputs to spend the corresponding outputs
-	Credentials []verify.Verifiable `serialize:"true"`
+	Creds []verify.Verifiable `serialize:"true"`
 }
 
 // Outs returns this transaction's outputs
 func (tx *ExportTx) Outs() []*ava.TransferableOutput {
-	// We copy tx.BaseTx.Outs() to a new slice so that
-	// when we sort the inputs, we don't modify tx.BaseTx.Outputs
-	baseTxOuts := tx.BaseTx.Outs()
-	outs := make([]*ava.TransferableOutput, len(baseTxOuts), len(baseTxOuts)+len(tx.ExportedOutputs))
-	copy(outs, baseTxOuts)
-	outs = append(outs, tx.ExportedOutputs...)
+	// We copy to a new slice so that
+	// when we sort the inputs, we don't modify underlying slices
+	outs := make([]*ava.TransferableOutput, len(tx.BaseTx.Outs), len(tx.BaseTx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.BaseTx.Outs)
+	copy(outs[len(tx.BaseTx.Outs):], tx.ExportedOutputs)
 	// Sort since syntactic verify assumes Outs() is sorted
 	ava.SortTransferableOutputs(outs, tx.vm.codec)
 	return outs
@@ -61,11 +60,6 @@ func (tx *ExportTx) Outs() []*ava.TransferableOutput {
 // Since this tx consumes no imported UTXOs, it returns an empty set
 func (tx *ExportTx) InputUTXOs() ids.Set {
 	return ids.Set{}
-}
-
-// Creds returns this transactions credentials
-func (tx *ExportTx) Creds() []verify.Verifiable {
-	return tx.Credentials
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -105,7 +99,8 @@ func (tx *ExportTx) SyntacticVerify() error {
 		return err
 	} else if exportedAmt := tx.ExportedOutputs[0].Output().Amount(); exportedAmt != tx.Amount {
 		return fmt.Errorf("exported output has amount %d but should be %d", exportedAmt, tx.Amount)
-	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs(),
+		tx.Creds, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	tx.syntacticallyVerified = true
@@ -116,31 +111,33 @@ func (tx *ExportTx) SyntacticVerify() error {
 func (tx *ExportTx) SemanticVerify(db database.Database) error {
 	if err := tx.SyntacticVerify(); err != nil {
 		return err
+	} else if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.BaseTx.Outs, tx.Creds); err != nil {
+		return err
 	}
-	// Spend inputs
-	for index, in := range tx.Inputs {
-		if utxo, err := tx.vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
-			return err
-		} else if err := tx.vm.fx.VerifyTransfer(tx, in.In, tx.Credentials[index], utxo.Out); err != nil {
-			return err
-		} else if err := tx.vm.removeUTXO(db, in.UTXOID.InputID()); err != nil {
-			return err
-		}
-	}
+	// // Spend inputs
+	// for index, in := range tx.Ins {
+	// 	if utxo, err := tx.vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
+	// 		return err
+	// 	} else if err := tx.vm.fx.VerifyTransfer(tx, in.In, tx.Creds[index], utxo.Out); err != nil {
+	// 		return err
+	// 	} else if err := tx.vm.removeUTXO(db, in.UTXOID.InputID()); err != nil {
+	// 		return err
+	// 	}
+	// }
 	// Produce non-exported UTXOs
-	txID := tx.ID()
-	for index, out := range tx.BaseTx.Outputs {
-		if err := tx.vm.putUTXO(db, &ava.UTXO{
-			UTXOID: ava.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(index),
-			},
-			Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-			Out:   out.Output(),
-		}); err != nil {
-			return err
-		}
-	}
+	// txID := tx.ID()
+	// for index, out := range tx.BaseTx.Outs {
+	// 	if err := tx.vm.putUTXO(db, &ava.UTXO{
+	// 		UTXOID: ava.UTXOID{
+	// 			TxID:        txID,
+	// 			OutputIndex: uint32(index),
+	// 		},
+	// 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+	// 		Out:   out.Output(),
+	// 	}); err != nil {
+	// 		return err
+	// 	}
+	// }
 	return nil
 }
 
@@ -156,7 +153,7 @@ func (tx *ExportTx) Accept(batch database.Batch) error {
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{
 			TxID:        tx.ID(),
-			OutputIndex: uint32(len(tx.BaseTx.Outputs)),
+			OutputIndex: uint32(len(tx.BaseTx.Outs)),
 		},
 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 		Out:   tx.ExportedOutputs[0].Output(), // SyntacticVerify guarantees len(ExportedOutput) == 1
@@ -178,18 +175,18 @@ func (vm *VM) newExportTx(
 	to ids.ShortID, // Address of X-Chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*ExportTx, error) {
-
-	// burn [amount] + [txFee] tokens
-	// ([amount] of the tokens are moved to the X-Chain, so they're not _really_ burnt)
-	var err error
-	amountWithFee, err := safemath.Add64(amount, vm.txFee)
+	burnAmt, err := safemath.Add64(amount, vm.txFee)
 	if err != nil {
-		return nil, errOverflowExport
+		return nil, err
 	}
 
-	// Calculate inputs, outputs, and keys used to sign this tx
-	// Burn the tx fee and the amount being sent to the X-Chain
-	ins, outs, credKeys, err := vm.spend(vm.DB, amountWithFee, keys)
+	// Calculate inputs and outputs
+	changeSpend := &spend{
+		Threshold: 1,
+		Locktime:  0,
+		Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+	}
+	ins, outs, credKeys, err := vm.spend(vm.DB, keys, nil, changeSpend, burnAmt)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -200,8 +197,8 @@ func (vm *VM) newExportTx(
 			BaseTx: BaseTx{
 				NetworkID:    vm.Ctx.NetworkID,
 				BlockchainID: vm.Ctx.ChainID,
-				Inputs:       ins,
-				Outputs:      outs, // Non-exported outputs
+				Ins:          ins,
+				Outs:         outs, // Non-exported outputs
 			},
 			Amount: amount, // amount of tokens being exported
 			ExportedOutputs: []*ava.TransferableOutput{ // Exported to X-Chain
@@ -227,18 +224,17 @@ func (vm *VM) newExportTx(
 	hash := hashing.ComputeHash256(tx.unsignedBytes)
 
 	// Attach credentials that allow the inputs to be spent
-	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
-		cred := &secp256k1fx.Credential{}
-		for _, key := range inputKeys {
+	tx.Creds = make([]verify.Verifiable, len(credKeys))
+	for i, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
+		cred := &secp256k1fx.Credential{Sigs: make([][crypto.SECP256K1RSigLen]byte, len(inputKeys))}
+		for j, key := range inputKeys {
 			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
 			if err != nil {
 				return nil, fmt.Errorf("problem generating credential: %w", err)
 			}
-			sigArr := [crypto.SECP256K1RSigLen]byte{}
-			copy(sigArr[:], sig)
-			cred.Sigs = append(cred.Sigs, sigArr)
+			copy(cred.Sigs[j][:], sig)
 		}
-		tx.Credentials = append(tx.Credentials, cred) // Attach credential to tx
+		tx.Creds[i] = cred // Attach credential to tx
 	}
 
 	return tx, tx.initialize(vm)

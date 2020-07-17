@@ -1,12 +1,6 @@
 package secp256k1fx
 
-import (
-	"errors"
-	"fmt"
-
-	"github.com/ava-labs/gecko/ids"
-)
-
+/*
 const maxAddressesSize = 256
 
 var errAddressesNotUnique = errors.New("addresses aren't unique")
@@ -40,3 +34,4 @@ func (cg *ControlGroup) AddressesSet() ids.ShortSet {
 	set.Add(cg.Addresses...)
 	return set
 }
+*/

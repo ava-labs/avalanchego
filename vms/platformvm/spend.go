@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/gecko/vms/components/verify"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
@@ -15,9 +17,19 @@ import (
 var (
 	errSpendOverflow = errors.New("spent amount overflows uint64")
 	errNoKeys        = errors.New("no keys provided")
-	errOverflow      = errors.New("overflow while calculating amount spent")
 )
 
+// spend spends [Amount] tokens.
+// [Threshold] signatures from [Addrs] are required to spend the output.
+// It can't be spent until [Locktime].
+type spend struct {
+	Amount    uint64
+	Threshold uint32
+	Locktime  uint64
+	Addrs     []ids.ShortID
+}
+
+/*
 // Return the inputs and outputs resulting from [keys] burning [toSpend],
 // as well as the keys used to spend each input
 // Any change is sent to the first key in [keys]
@@ -103,15 +115,124 @@ func (vm *VM) spend(
 	ava.SortTransferableOutputs(outs, vm.codec) //sort outputs
 	return
 }
+*/
+
+// Spends UTXOs controlled by [keys].
+// The outputs that are created by this method are defined by [spends].
+// Each element of [spends] describes an output.
+// Change is sent according to [changeSpend].
+func (vm *VM) spend(
+	db database.Database,
+	keys []*crypto.PrivateKeySECP256K1R,
+	spends []*spend,
+	changeSpend *spend,
+	burnAmt uint64,
+) (ins []*ava.TransferableInput, outs []*ava.TransferableOutput, credKeys [][]*crypto.PrivateKeySECP256K1R, err error) {
+	if len(keys) == 0 {
+		err = errNoKeys
+		return
+	}
+
+	toSpend := uint64(burnAmt) // Calculate the total amount we need to spend
+	for _, spend := range spends {
+		if toSpend, err = safemath.Add64(toSpend, spend.Amount); err != nil {
+			return
+		}
+	}
+	addrs := make([][]byte, len(keys), len(keys)) // The addresses controlled by [keys]
+	for i, key := range keys {
+		addrs[i] = key.PublicKey().Address().Bytes()
+	}
+	utxos, err := vm.getUTXOs(db, addrs) // The UTXOs controlled by [keys]
+	if err != nil {
+		err = fmt.Errorf("couldn't get UTXOs: %w", err)
+		return
+	}
+	kc := secp256k1fx.NewKeychain() // Keychain consumes UTXOs and creates new ones
+	for _, key := range keys {
+		kc.Add(key)
+	}
+
+	// Consume UTXOs
+	now := uint64(vm.clock.Time().Unix())
+	fundsAvailable := uint64(0)
+	for _, utxo := range utxos { // See which UTXOs we can spend
+		if assetID := utxo.AssetID(); !assetID.Equals(vm.avaxAssetID) {
+			vm.Ctx.Log.Warn("UTXO has unexpected asset ID %s", assetID) // should never happen
+			continue
+		} else if inputIntf, signers, err2 := kc.Spend(utxo.Out, now); err2 != nil {
+			continue
+		} else if input, ok := inputIntf.(ava.Transferable); !ok { // should never happen
+			vm.Ctx.Log.Warn("expected input to be ava.Transferable but is %T", inputIntf)
+			continue
+		} else if fundsAvailable, err = safemath.Add64(fundsAvailable, input.Amount()); err != nil { // Should never happen
+			return
+		} else {
+			ins = append(ins, &ava.TransferableInput{
+				UTXOID: utxo.UTXOID,
+				Asset:  ava.Asset{ID: vm.avaxAssetID},
+				In:     input,
+			})
+			credKeys = append(credKeys, signers)
+			if fundsAvailable >= toSpend { // We have enough AVAX; stop.
+				break
+			}
+		}
+	}
+	if fundsAvailable < toSpend {
+		err = fmt.Errorf("provided keys have balance %d but need %d", fundsAvailable, toSpend)
+		return
+	}
+	ava.SortTransferableInputsWithSigners(ins, credKeys) // sort inputs and keys
+
+	// We have enough tokens. Create the outputs.
+	for _, spend := range spends {
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: vm.avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: spend.Amount,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  spend.Locktime,
+					Threshold: spend.Threshold,
+					Addrs:     spend.Addrs,
+				},
+			},
+		})
+		fundsAvailable, err = safemath.Sub64(fundsAvailable, spend.Amount)
+		if err != nil {
+			return // Should never happen
+		}
+	}
+
+	// If there is change, send it to [changeAddr]
+	if fundsAvailable > 0 {
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: vm.avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: fundsAvailable, // Amount is ignored for [changeSpend]. Just send change.
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  changeSpend.Locktime,
+					Threshold: changeSpend.Threshold,
+					Addrs:     changeSpend.Addrs,
+				},
+			},
+		})
+	}
+	ava.SortTransferableOutputs(outs, vm.codec) //sort outputs
+	return
+}
 
 // Verify that:
 // * inputs and outputs are sorted
 // * inputs and outputs are all AVAX
 // * sum(inputs) >= sum(outputs) + burnAmount
-func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) error {
-	ins := tx.Ins()
-	outs := tx.Outs()
-	creds := tx.Creds()
+func syntacticVerifySpend(
+	ins []*ava.TransferableInput,
+	outs []*ava.TransferableOutput,
+	creds []verify.Verifiable,
+	burnAmount uint64,
+	avaxAssetID ids.ID,
+) error {
 	if len(ins) != len(creds) {
 		return fmt.Errorf("there are %d inputs but %d credentials. Should be same number", len(ins), len(creds))
 	}
@@ -157,10 +278,14 @@ func syntacticVerifySpend(tx SpendTx, burnAmount uint64, avaxAssetID ids.ID) err
 // Adds/removes the new/old UTXOs
 // [db] should not be committed if an error is returned
 // Precondition: [tx] has already been syntactically verified
-// TODO: Is this right?
-func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) TxError {
-	creds := tx.Creds()
-	for index, in := range tx.Ins() {
+func (vm *VM) semanticVerifySpend(
+	db database.Database,
+	tx SpendTx,
+	ins []*ava.TransferableInput,
+	outs []*ava.TransferableOutput,
+	creds []verify.Verifiable,
+) TxError {
+	for index, in := range ins {
 		if utxo, err := vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
 			return tempError{err}
 		} else if err := vm.fx.VerifyTransfer(tx, in.In, creds[index], utxo.Out); err != nil {
@@ -170,7 +295,7 @@ func (vm *VM) semanticVerifySpend(db database.Database, tx SpendTx) TxError {
 		}
 	}
 	txID := tx.ID()
-	for index, out := range tx.Outs() {
+	for index, out := range outs {
 		if err := vm.putUTXO(db, &ava.UTXO{
 			UTXOID: ava.UTXOID{
 				TxID:        txID,

@@ -985,7 +985,7 @@ func TestVerifyPermission(t *testing.T) {
 		description string
 		tx          Tx
 		cred        *Credential
-		cg          *ControlGroup
+		cg          *OutputOwners
 		shouldErr   bool
 	}
 	tests := []test{
@@ -993,9 +993,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 0, no sigs",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 0,
-				Addresses: []ids.ShortID{addr},
+				Addrs:     []ids.ShortID{addr},
 			},
 			false,
 		},
@@ -1003,9 +1003,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 1, 1 sig",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 1,
-				Addresses: []ids.ShortID{addr},
+				Addrs:     []ids.ShortID{addr},
 			},
 			false,
 		},
@@ -1013,9 +1013,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 0, 1 sig (too many sigs)",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 0,
-				Addresses: []ids.ShortID{addr},
+				Addrs:     []ids.ShortID{addr},
 			},
 			true,
 		},
@@ -1023,9 +1023,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 1, 0 sigs (too few sigs)",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 1,
-				Addresses: []ids.ShortID{addr},
+				Addrs:     []ids.ShortID{addr},
 			},
 			true,
 		},
@@ -1033,9 +1033,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 1, 1 incorrect sig",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 1,
-				Addresses: []ids.ShortID{ids.GenerateTestShortID()},
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			},
 			true,
 		},
@@ -1043,9 +1043,9 @@ func TestVerifyPermission(t *testing.T) {
 			"repeated sig",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 2,
-				Addresses: []ids.ShortID{addr, addr2},
+				Addrs:     []ids.ShortID{addr, addr2},
 			},
 			true,
 		},
@@ -1053,9 +1053,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 2, repeated address and repeated sig",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 2,
-				Addresses: []ids.ShortID{addr, addr},
+				Addrs:     []ids.ShortID{addr, addr},
 			},
 			true,
 		},
@@ -1063,9 +1063,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 2, 2 sigs",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 2,
-				Addresses: []ids.ShortID{addr, addr2},
+				Addrs:     []ids.ShortID{addr, addr2},
 			},
 			false,
 		},
@@ -1073,9 +1073,9 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 2, 2 sigs reversed",
 			&testTx{bytes: txBytes},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sig2Bytes, sigBytes}},
-			&ControlGroup{
+			&OutputOwners{
 				Threshold: 2,
-				Addresses: []ids.ShortID{addr, addr2},
+				Addrs:     []ids.ShortID{addr, addr2},
 			},
 			false,
 		},

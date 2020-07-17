@@ -6,7 +6,6 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -15,16 +14,15 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 // UnsignedAddDefaultSubnetDelegatorTx is an unsigned addDefaultSubnetDelegatorTx
 type UnsignedAddDefaultSubnetDelegatorTx struct {
 	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
+	BaseProposalTx `serialize:"true"`
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
-	// Where to send staked AVA after done validating
+	// Where to send staked tokens when done validating
 	Destination ids.ShortID `serialize:"true"`
 }
 
@@ -41,6 +39,11 @@ type addDefaultSubnetDelegatorTx struct {
 // Creds returns this transactions credentials
 func (tx *addDefaultSubnetDelegatorTx) Creds() []verify.Verifiable {
 	return tx.Credentials
+}
+
+// ID is this transaction's ID
+func (tx *addDefaultSubnetDelegatorTx) ID() ids.ID {
+	return tx.BaseProposalTx.BaseTx.ID()
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -90,7 +93,9 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 	case stakingDuration > MaximumStakingDuration:
 		return errStakeTooLong
 	}
-	if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.OnCommitIns, tx.OnCommitOuts, tx.OnCommitCreds, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	} else if err := syntacticVerifySpend(tx.OnAbortIns, tx.OnAbortOuts, tx.OnAbortCreds, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 	tx.syntacticallyVerified = true
@@ -99,13 +104,20 @@ func (tx *addDefaultSubnetDelegatorTx) SyntacticVerify() error {
 
 // SemanticVerify this transaction is valid.
 func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
+	// Verify the tx is well-formed
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
+	onCommitDB := versiondb.New(db)
+	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.OnCommitIns, tx.OnCommitOuts, tx.OnCommitCreds); err != nil {
 		return nil, nil, nil, nil, err
 	}
+	onAbortDB := versiondb.New(db)
+	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.OnAbortIns, tx.OnAbortOuts, tx.OnAbortCreds); err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	// Ensure the proposed validator starts after the current timestamp
 	if currentTimestamp, err := tx.vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{err}
@@ -142,35 +154,13 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		}
 	}
 
+	// If this proposal is committed, update the pending validator set to include the validator
 	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
-
-	// If this proposal is committed, update the pending validator set to include the validator
-	onCommitDB := versiondb.New(db)
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-
-	// If this proposal is aborted, return the AVAX (but not the tx fee)
-	onAbortDB := versiondb.New(db)
-	if err := tx.vm.putUTXO(onAbortDB, &ava.UTXO{
-		UTXOID: ava.UTXOID{
-			TxID:        dsValidator.ID(), // Produced UTXO points to the default subnet validator tx
-			OutputIndex: uint32(len(dsValidator.Outs())),
-		},
-		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: tx.Validator.Wght, // Returned AVAX
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{tx.Destination}, // Spendable by destination address
-			},
-		},
-	}); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
@@ -192,27 +182,41 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	destination ids.ShortID, // Address to returned staked tokens (and maybe reward) to
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
 ) (*addDefaultSubnetDelegatorTx, error) {
-
-	// Calculate amount to be spent in this transaction
-	toSpend, err := safemath.Add64(stakeAmt, vm.txFee)
-	if err != nil {
-		return nil, fmt.Errorf("overflow while calculating amount to spend")
+	// Calculate inputs and outputs
+	changeSpend := &spend{
+		Threshold: 1,
+		Locktime:  0,
+		Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
 	}
-
-	// Calculate inputs, outputs, and keys used to sign this tx
-	inputs, outputs, credKeys, err := vm.spend(vm.DB, toSpend, keys)
+	// On commit, lock stakeAmt until staking ends
+	onCommitSpends := []*spend{
+		{
+			Amount:   stakeAmt,
+			Addrs:    []ids.ShortID{destination},
+			Locktime: endTime,
+		},
+	}
+	onCommitIns, onCommitOuts, onCommitCredKeys, err := vm.spend(vm.DB, keys, onCommitSpends, changeSpend, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
-
+	// On abort, just pay tx fee
+	onAbortIns, onAbortOuts, onAbortCredKeys, err := vm.spend(vm.DB, keys, nil, changeSpend, vm.txFee)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
 	// Create the tx
 	tx := &addDefaultSubnetDelegatorTx{
 		UnsignedAddDefaultSubnetDelegatorTx: UnsignedAddDefaultSubnetDelegatorTx{
-			BaseTx: BaseTx{
-				NetworkID:    vm.Ctx.NetworkID,
-				BlockchainID: vm.Ctx.ChainID,
-				Inputs:       inputs,
-				Outputs:      outputs,
+			BaseProposalTx: BaseProposalTx{
+				BaseTx: &BaseTx{
+					NetworkID:    vm.Ctx.NetworkID,
+					BlockchainID: vm.Ctx.ChainID,
+					Ins:          onCommitIns,
+					Outs:         onCommitOuts,
+				},
+				OnCommitOuts: onCommitOuts,
+				OnAbortOuts:  onAbortOuts,
 			},
 			DurationValidator: DurationValidator{
 				Validator: Validator{
@@ -230,22 +234,31 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 		return nil, fmt.Errorf("couldn't marshal UnsignedAddDefaultSubnetDelegatorTx: %w", err)
 	}
 	hash := hashing.ComputeHash256(tx.unsignedBytes)
-
 	// Attach credentials
-	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
-		cred := &secp256k1fx.Credential{}
-		for _, key := range inputKeys {
-			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
+	tx.OnCommitCreds = make([]verify.Verifiable, len(onCommitCredKeys))
+	for i, credKeys := range onCommitCredKeys {
+		cred := &secp256k1fx.Credential{Sigs: make([][crypto.SECP256K1RSigLen]byte, len(credKeys))}
+		for j, key := range credKeys {
+			sig, err := key.SignHash(hash) // Sign hash
 			if err != nil {
 				return nil, fmt.Errorf("problem generating credential: %w", err)
 			}
-			sigArr := [crypto.SECP256K1RSigLen]byte{}
-			copy(sigArr[:], sig)
-			cred.Sigs = append(cred.Sigs, sigArr)
+			copy(cred.Sigs[j][:], sig)
 		}
-		tx.Credentials = append(tx.Credentials, cred) // Attach credntial to tx
+		tx.OnCommitCreds[i] = cred // Attach credential
 	}
-
+	tx.OnAbortCreds = make([]verify.Verifiable, len(onAbortCredKeys))
+	for i, credKeys := range onAbortCredKeys {
+		cred := &secp256k1fx.Credential{Sigs: make([][crypto.SECP256K1RSigLen]byte, len(credKeys))}
+		for j, key := range credKeys {
+			sig, err := key.SignHash(hash) // Sign hash
+			if err != nil {
+				return nil, fmt.Errorf("problem generating credential: %w", err)
+			}
+			copy(cred.Sigs[j][:], sig)
+		}
+		tx.OnAbortCreds[i] = cred // Attach credential
+	}
 	return tx, tx.initialize(vm)
 
 }

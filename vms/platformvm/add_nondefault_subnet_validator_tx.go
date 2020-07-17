@@ -25,7 +25,7 @@ var (
 // UnsignedAddNonDefaultSubnetValidatorTx is an unsigned addNonDefaultSubnetValidatorTx
 type UnsignedAddNonDefaultSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
+	*BaseProposalTx `serialize:"true"`
 	// IDs of control keys
 	controlIDs []ids.ShortID
 	// The validator
@@ -99,8 +99,11 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 		return errStakeTooShort
 	} else if stakingDuration > MaximumStakingDuration {
 		return errStakeTooLong
-	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
-		// Verify tx inputs and outputs are valid
+	} else if err := syntacticVerifySpend(tx.OnCommitIns, tx.OnCommitOuts,
+		tx.OnCommitCreds, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	} else if err := syntacticVerifySpend(tx.OnAbortIns, tx.OnAbortOuts,
+		tx.OnAbortCreds, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -120,10 +123,9 @@ func (tx *addNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 
 // SemanticVerify this transaction is valid.
 func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*versiondb.Database, *versiondb.Database, func(), func(), TxError) {
-	if err := tx.SyntacticVerify(); err != nil { // Ensure tx is syntactically valid
+	// Verify the tx is well-formed
+	if err := tx.SyntacticVerify(); err != nil {
 		return nil, nil, nil, nil, permError{err}
-	} else if err := tx.vm.semanticVerifySpend(db, tx); err != nil { // Validate/update UTXOs
-		return nil, nil, nil, nil, err
 	}
 
 	// Get info about the subnet we're adding a validator to
@@ -222,14 +224,22 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 	}
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
-	// If this proposal is committed, update the pending validator set to include the validator
+	// Verify inputs/outputs and update the UTXO set
 	onCommitDB := versiondb.New(db)
+	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.OnCommitIns, tx.OnCommitOuts, tx.OnCommitCreds); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	onAbortDB := versiondb.New(db)
+	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.OnAbortIns, tx.OnAbortOuts, tx.OnAbortCreds); err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	// If this proposal is committed, update the pending validator set to include the validator
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, tx.Subnet); err != nil {
 		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't put current validators: %v", err)}
 	}
 
 	// If this proposal is aborted, chain state doesn't change
-	onAbortDB := versiondb.New(db)
 	return onCommitDB, onAbortDB, nil, nil, nil
 }
 
@@ -249,7 +259,12 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	controlKeys []*crypto.PrivateKeySECP256K1R, // Control keys for the subnet ID
 	feeKeys []*crypto.PrivateKeySECP256K1R, // Pay the fee
 ) (*addNonDefaultSubnetValidatorTx, error) {
-
+	// Calculate inputs and outputs
+	changeSpend := &spend{
+		Threshold: 1,
+		Locktime:  0,
+		Addrs:     []ids.ShortID{feeKeys[0].PublicKey().Address()},
+	}
 	// Get information about the subnet we're adding a chain to
 	subnetInfo, err := vm.getSubnet(vm.DB, subnetID)
 	if err != nil {
@@ -274,8 +289,8 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 		return nil, fmt.Errorf("don't have enough control keys for subnet %s", subnetID)
 	}
 
-	// Calculate inputs, outputs, and keys used to sign this tx
-	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, feeKeys)
+	// Pay tx fee
+	ins, outs, credKeys, err := vm.spend(vm.DB, feeKeys, nil, changeSpend, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -283,11 +298,15 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	// Create the tx
 	tx := &addNonDefaultSubnetValidatorTx{
 		UnsignedAddNonDefaultSubnetValidatorTx: UnsignedAddNonDefaultSubnetValidatorTx{
-			BaseTx: BaseTx{
-				NetworkID:    vm.Ctx.NetworkID,
-				BlockchainID: vm.Ctx.ChainID,
-				Inputs:       inputs,
-				Outputs:      outputs,
+			BaseProposalTx: &BaseProposalTx{
+				BaseTx: &BaseTx{
+					NetworkID:    vm.Ctx.NetworkID,
+					BlockchainID: vm.Ctx.ChainID,
+				},
+				OnCommitIns:  ins,
+				OnCommitOuts: outs,
+				OnAbortIns:   ins,
+				OnAbortOuts:  outs,
 			},
 			SubnetValidator: SubnetValidator{
 				DurationValidator: DurationValidator{

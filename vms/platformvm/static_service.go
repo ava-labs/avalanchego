@@ -195,9 +195,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 		tx := &addDefaultSubnetValidatorTx{
 			UnsignedAddDefaultSubnetValidatorTx: UnsignedAddDefaultSubnetValidatorTx{
-				BaseTx: BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
+				BaseProposalTx: BaseProposalTx{
+					BaseTx: &BaseTx{
+						NetworkID:    uint32(args.NetworkID),
+						BlockchainID: ids.Empty,
+					},
 				},
 				DurationValidator: DurationValidator{
 					Validator: Validator{
