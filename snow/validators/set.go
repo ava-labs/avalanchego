@@ -238,6 +238,25 @@ func (s *set) sample(size int) []Validator {
 	return list
 }
 
+func (s *set) Weight() (uint64, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.weight()
+}
+
+func (s *set) weight() (uint64, error) {
+	weight := uint64(0)
+	for _, validator := range s.list() {
+		newWeight, err := math.Add64(weight, validator.Weight())
+		if err != nil {
+			return weight, err
+		}
+		weight = newWeight
+	}
+	return weight, nil
+}
+
 func (s *set) String() string {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -255,16 +274,4 @@ func (s *set) string() string {
 	}
 
 	return sb.String()
-}
-
-func (s *set) Weight() (uint64, error) {
-	weight := uint64(0)
-	for _, validator := range s.List() {
-		newWeight, err := math.Add64(weight, validator.Weight())
-		if err != nil {
-			return weight, err
-		}
-		weight = newWeight
-	}
-	return weight, nil
 }
