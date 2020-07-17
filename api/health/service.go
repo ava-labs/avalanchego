@@ -17,7 +17,10 @@ import (
 )
 
 // defaultCheckOpts is a Check whose properties represent a default Check
-var defaultCheckOpts = Check{ExecutionPeriod: time.Minute}
+var defaultCheckOpts = check{
+	executionPeriod: time.Minute,
+	initialDelay:    10 * time.Second,
+}
 
 // Health observes a set of vital signs and makes them available through an HTTP
 // API.
@@ -39,11 +42,11 @@ func (h *Health) Handler() *common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(h, "health")
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet { // GET request --> return 200 if getLiveness returns true, else 500
+		if r.Method == http.MethodGet { // GET request --> return 200 if getLiveness returns true, else 503
 			if _, healthy := h.health.Results(); healthy {
 				w.WriteHeader(http.StatusOK)
 			} else {
-				w.WriteHeader(http.StatusInternalServerError)
+				w.WriteHeader(http.StatusServiceUnavailable)
 			}
 		} else {
 			newServer.ServeHTTP(w, r) // Other request --> use JSON RPC
@@ -61,18 +64,27 @@ func (h *Health) RegisterHeartbeat(name string, hb Heartbeater, max time.Duratio
 // RegisterCheckFunc adds a Check with default options and the given CheckFn
 func (h *Health) RegisterCheckFunc(name string, checkFn CheckFn) error {
 	check := defaultCheckOpts
-	check.Name = name
-	check.CheckFn = checkFn
+	check.name = name
+	check.checkFn = checkFn
+	return h.RegisterCheck(check)
+}
+
+// RegisterMonotonicCheckFunc adds a Check with default options and the given CheckFn
+// After it passes once, its logic (checkFunc) is never run again; it just passes
+func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn CheckFn) error {
+	check := monotonicCheck{check: defaultCheckOpts}
+	check.name = name
+	check.checkFn = checkFn
 	return h.RegisterCheck(check)
 }
 
 // RegisterCheck adds the given Check
 func (h *Health) RegisterCheck(c Check) error {
 	return h.health.RegisterCheck(&health.Config{
-		InitialDelay:     c.InitialDelay,
-		ExecutionPeriod:  c.ExecutionPeriod,
-		InitiallyPassing: c.InitiallyPassing,
-		Check:            gosundheitCheck{c.Name, c.CheckFn},
+		InitialDelay:     c.InitialDelay(),
+		ExecutionPeriod:  c.ExecutionPeriod(),
+		InitiallyPassing: c.InitiallyPassing(),
+		Check:            c,
 	})
 }
 

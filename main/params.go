@@ -149,9 +149,9 @@ func GetDefaultBootstraps(networkID uint32, count int) ([]string, []string) {
 
 	sampler := random.Uniform{N: len(ips)}
 	for i := 0; i < count; i++ {
-		i := sampler.Sample()
-		sampledIPs = append(sampledIPs, ips[i])
-		sampledIDs = append(sampledIDs, ids[i])
+		s := sampler.Sample()
+		sampledIPs = append(sampledIPs, ips[s])
+		sampledIDs = append(sampledIDs, ids[s])
 	}
 
 	return sampledIPs, sampledIDs

@@ -214,7 +214,9 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.CreateChainTx, error)
 		return nil, err
 	}
 	genesis := platformvm.Genesis{}
-	platformvm.Codec.Unmarshal(genesisBytes, &genesis)
+	if err := platformvm.Codec.Unmarshal(genesisBytes, &genesis); err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
+	}
 	if err := genesis.Initialize(); err != nil {
 		return nil, err
 	}

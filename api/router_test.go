@@ -8,9 +8,11 @@ import (
 	"testing"
 )
 
-type testHandler struct{}
+type testHandler struct{ called bool }
 
-func (*testHandler) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {}
+func (t *testHandler) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {
+	t.called = true
+}
 
 func TestAliasing(t *testing.T) {
 	r := newRouter()
@@ -49,6 +51,12 @@ func TestAliasing(t *testing.T) {
 	}
 
 	if handler, exists := r.routes["7"][""]; !exists {
+		t.Fatalf("Should have added %s", "7")
+	} else if handler != handler1 {
+		t.Fatalf("Registered unknown handler")
+	}
+
+	if handler, err := r.GetHandler("7", ""); err != nil {
 		t.Fatalf("Should have added %s", "7")
 	} else if handler != handler1 {
 		t.Fatalf("Registered unknown handler")
