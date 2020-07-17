@@ -139,7 +139,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 
 	// Ensure that the period this validator validates the specified subnet is a subnet of the time they validate the default subnet
 	// First, see if they're currently validating the default subnet
-	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	currentEvents, err := tx.vm.getCurrentValidators(db, defaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
 	}
@@ -150,7 +150,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	} else {
 		// They aren't currently validating the default subnet.
 		// See if they will validate the default subnet in the future.
-		pendingDSValidators, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+		pendingDSValidators, err := tx.vm.getPendingValidators(db, defaultSubnetID)
 		if err != nil {
 			return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
 		}
@@ -163,7 +163,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 		}
 	}
 
-	pendingEvents, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+	pendingEvents, err := tx.vm.getPendingValidators(db, defaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -173,7 +173,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	// If this proposal is committed, update the pending validator set to include the validator,
 	// update the validator's account by removing the staked $AVA
 	onCommitDB := versiondb.New(db)
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, defaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {

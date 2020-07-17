@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/units"
@@ -158,7 +159,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 	platformvmArgs.Chains = []platformvm.APIChain{
 		{
 			GenesisData: avmReply.Bytes,
-			SubnetID:    platformvm.DefaultSubnetID,
+			SubnetID:    constants.DefaultSubnetID,
 			VMID:        avm.ID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
@@ -169,25 +170,25 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 		},
 		{
 			GenesisData: formatting.CB58{Bytes: config.EVMBytes},
-			SubnetID:    platformvm.DefaultSubnetID,
+			SubnetID:    constants.DefaultSubnetID,
 			VMID:        EVMID,
 			Name:        "C-Chain",
 		},
 		{
 			GenesisData: spdagvmReply.Bytes,
-			SubnetID:    platformvm.DefaultSubnetID,
+			SubnetID:    constants.DefaultSubnetID,
 			VMID:        spdagvm.ID,
 			Name:        "Simple DAG Payments",
 		},
 		{
 			GenesisData: spchainvmReply.Bytes,
-			SubnetID:    platformvm.DefaultSubnetID,
+			SubnetID:    constants.DefaultSubnetID,
 			VMID:        spchainvm.ID,
 			Name:        "Simple Chain Payments",
 		},
 		{
 			GenesisData: formatting.CB58{Bytes: []byte{}}, // There is no genesis data
-			SubnetID:    platformvm.DefaultSubnetID,
+			SubnetID:    constants.DefaultSubnetID,
 			VMID:        timestampvm.ID,
 			Name:        "Simple Timestamp Server",
 		},

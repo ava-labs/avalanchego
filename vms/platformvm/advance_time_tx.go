@@ -89,15 +89,15 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	current, pending, _, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), DefaultSubnetID)
+	current, pending, _, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), defaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	if err := tx.vm.putCurrentValidators(onCommitDB, current, DefaultSubnetID); err != nil {
+	if err := tx.vm.putCurrentValidators(onCommitDB, current, defaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-	if err := tx.vm.putPendingValidators(onCommitDB, pending, DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pending, defaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -140,7 +140,7 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 				tx.vm.Ctx.Log.Debug("failed to update Subnet %s: %s", subnet.id, err)
 			}
 		}
-		if err := tx.vm.updateValidators(DefaultSubnetID); err != nil {
+		if err := tx.vm.updateValidators(defaultSubnetID); err != nil {
 			tx.vm.Ctx.Log.Fatal("failed to update Default Subnet: %s", err)
 		}
 

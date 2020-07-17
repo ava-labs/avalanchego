@@ -319,7 +319,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addDSTx},
 		},
-		DefaultSubnetID,
+		defaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)

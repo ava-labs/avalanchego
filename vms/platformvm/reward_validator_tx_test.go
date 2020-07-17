@@ -67,7 +67,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 	}()
 
 	var nextToRemove *addDefaultSubnetValidatorTx
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, defaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 
 	// there should be no validators of default subnet in [onCommitDB] or [onAbortDB]
 	// (as specified in defaultVM's init)
-	currentValidators, err = vm.getCurrentValidators(onCommitDB, DefaultSubnetID)
+	currentValidators, err = vm.getCurrentValidators(onCommitDB, defaultSubnetID)
 	t.Log(currentValidators)
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +122,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatalf("Should be %d validators but are %d", len(keys)-1, numValidators)
 	}
 
-	currentValidators, err = vm.getCurrentValidators(onAbortDB, DefaultSubnetID)
+	currentValidators, err = vm.getCurrentValidators(onAbortDB, defaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,13 +189,13 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, defaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	currentValidators.Add(vdrTx)
 	currentValidators.Add(delTx)
-	vm.putCurrentValidators(vm.DB, currentValidators, DefaultSubnetID)
+	vm.putCurrentValidators(vm.DB, currentValidators, defaultSubnetID)
 
 	if err := vm.putTimestamp(vm.DB, defaultValidateEndTime.Add(-time.Second)); err != nil {
 		t.Fatal(err)

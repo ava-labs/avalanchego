@@ -146,7 +146,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
-	currentEvents, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	currentEvents, err := tx.vm.getCurrentValidators(db, defaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -158,7 +158,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
-	pendingEvents, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+	pendingEvents, err := tx.vm.getPendingValidators(db, defaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -174,7 +174,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// If this proposal is committed, update the pending validator set to include the validator,
 	// update the validator's account by removing the staked $AVA
 	onCommitDB := versiondb.New(db)
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, defaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {

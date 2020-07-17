@@ -92,7 +92,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addPendingValidatorTx},
 		},
-		DefaultSubnetID,
+		defaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addPendingValidatorTx},
 		},
-		DefaultSubnetID,
+		defaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +184,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, DefaultSubnetID)
+	onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, defaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatalf("Should have added the validator to the validator set")
 	}
 
-	onCommitPendingEvents, err := vm.getPendingValidators(onCommit, DefaultSubnetID)
+	onCommitPendingEvents, err := vm.getPendingValidators(onCommit, defaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
-	onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, DefaultSubnetID)
+	onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, defaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	onAbortPendingEvents, err := vm.getPendingValidators(onAbort, DefaultSubnetID)
+	onAbortPendingEvents, err := vm.getPendingValidators(onAbort, defaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}

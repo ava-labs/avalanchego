@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/version"
 
@@ -62,14 +63,14 @@ func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNode
 
 // GetNodeIDReply are the results from calling GetNodeID
 type GetNodeIDReply struct {
-	NodeID ids.ShortID `json:"nodeID"`
+	NodeID string `json:"nodeID"`
 }
 
 // GetNodeID returns the node ID of this node
 func (service *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
 	service.log.Info("Info: GetNodeID called")
 
-	reply.NodeID = service.nodeID
+	reply.NodeID = service.nodeID.PrefixedString(constants.NodeIDPrefix)
 	return nil
 }
 
