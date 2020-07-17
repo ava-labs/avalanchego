@@ -184,7 +184,7 @@ func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescr
 	if err != nil {
 		assetID, err = ids.FromString(args.AssetID)
 		if err != nil {
-			return err
+			return fmt.Errorf("couldn't find asset with ID: %s", args.AssetID)
 		}
 	}
 
@@ -445,7 +445,7 @@ type CreateVariableCapAssetReply struct {
 
 // CreateVariableCapAsset returns ID of the newly created asset
 func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *CreateVariableCapAssetReply) error {
-	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Info("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.MinterSets),

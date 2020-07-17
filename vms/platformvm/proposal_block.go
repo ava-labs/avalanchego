@@ -140,24 +140,32 @@ func (pb *ProposalBlock) Verify() error {
 }
 
 // Options returns the possible children of this block in preferential order.
-func (pb *ProposalBlock) Options() [2]snowman.Block {
+func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blockID := pb.ID()
 
-	commit := pb.vm.newCommitBlock(blockID)
-	abort := pb.vm.newAbortBlock(blockID)
+	commit, err := pb.vm.newCommitBlock(blockID)
+	if err != nil {
+		return [2]snowman.Block{}, err
+	}
+	abort, err := pb.vm.newAbortBlock(blockID)
+	if err != nil {
+		return [2]snowman.Block{}, err
+	}
 
 	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
+		return [2]snowman.Block{}, err
 	}
 	if err := pb.vm.State.PutBlock(pb.vm.DB, abort); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
+		return [2]snowman.Block{}, err
 	}
-	pb.vm.DB.Commit()
+	if err := pb.vm.DB.Commit(); err != nil {
+		return [2]snowman.Block{}, err
+	}
 
 	if pb.Tx.InitiallyPrefersCommit() {
-		return [2]snowman.Block{commit, abort}
+		return [2]snowman.Block{commit, abort}, nil
 	}
-	return [2]snowman.Block{abort, commit}
+	return [2]snowman.Block{abort, commit}, nil
 }
 
 // newProposalBlock creates a new block that proposes to issue a transaction.

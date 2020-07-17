@@ -59,7 +59,10 @@ func TestPayments(t *testing.T) {
 	genesisAccounts := GenesisAccounts()
 
 	codec := Codec{}
-	genesisData, _ := codec.MarshalGenesis(genesisAccounts)
+	genesisData, err := codec.MarshalGenesis(genesisAccounts)
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	bootstrappingDB := memdb.New()
 

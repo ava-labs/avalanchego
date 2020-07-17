@@ -409,47 +409,32 @@ func (p *peer) version(msg Msg) {
 			networkID,
 			p.net.networkID)
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
-		}
-		p.Close()
+		p.discardIP()
 		return
 	}
 
 	if nodeID := msg.Get(NodeID).(uint32); nodeID == p.net.nodeID {
 		p.net.log.Debug("peer's node ID matches our nodeID")
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			str := p.ip.String()
-			p.net.myIPs[str] = struct{}{}
-			delete(p.net.disconnectedIPs, str)
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
-		}
-		p.Close()
+		p.discardMyIP()
 		return
 	}
 
 	myTime := float64(p.net.clock.Unix())
 	if peerTime := float64(msg.Get(MyTime).(uint64)); math.Abs(peerTime-myTime) > p.net.maxClockDifference.Seconds() {
-		p.net.log.Debug("peer's clock is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
-			uint64(peerTime),
-			uint64(myTime))
-
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
+		if p.net.beacons.Contains(p.id) {
+			p.net.log.Warn("beacon %s has a clock that is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
+				p.id,
+				uint64(peerTime),
+				uint64(myTime))
+		} else {
+			p.net.log.Debug("peer %s has a clock that is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
+				p.id,
+				uint64(peerTime),
+				uint64(myTime))
 		}
-		p.Close()
+
+		p.discardIP()
 		return
 	}
 
@@ -458,14 +443,7 @@ func (p *peer) version(msg Msg) {
 	if err != nil {
 		p.net.log.Debug("peer version could not be parsed due to %s", err)
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
-		}
-		p.Close()
+		p.discardIP()
 		return
 	}
 
@@ -482,14 +460,7 @@ func (p *peer) version(msg Msg) {
 	if err := p.net.version.Compatible(peerVersion); err != nil {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
-		}
-		p.Close()
+		p.discardIP()
 		return
 	}
 
@@ -702,4 +673,30 @@ func (p *peer) chits(msg Msg) {
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)
+}
+
+// assumes the stateLock is not held
+func (p *peer) discardIP() {
+	// By clearing the IP, we will not attempt to reconnect to this peer
+	if !p.ip.IsZero() {
+		p.net.stateLock.Lock()
+		delete(p.net.disconnectedIPs, p.ip.String())
+		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
+	}
+	p.Close()
+}
+
+// assumes the stateLock is not held
+func (p *peer) discardMyIP() {
+	// By clearing the IP, we will not attempt to reconnect to this peer
+	if !p.ip.IsZero() {
+		p.net.stateLock.Lock()
+		str := p.ip.String()
+		p.net.myIPs[str] = struct{}{}
+		delete(p.net.disconnectedIPs, str)
+		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
+	}
+	p.Close()
 }
