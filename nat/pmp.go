@@ -33,7 +33,7 @@ func (pmp *pmpRouter) MapPort(
 	internalPort := int(newInternalPort)
 	externalPort := int(newExternalPort)
 	// go-nat-pmp uses seconds to denote their lifetime
-	lifetime := int(mappingDuration / time.Second)
+	lifetime := int(mappingDuration.Seconds())
 
 	_, err := pmp.client.AddPortMapping(protocol, internalPort, externalPort, lifetime)
 	return err
