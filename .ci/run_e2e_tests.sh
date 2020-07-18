@@ -16,7 +16,7 @@ docker pull "${CHIT_SPAMMER_IMAGE}"
 # Turn off GO111MODULE to pull e2e test source code in order to get run script.
 git clone https://github.com/kurtosis-tech/ava-e2e-tests.git
 cd ava-e2e-tests/ || exit
-git checkout eff530e205963da774dc82883291bb029af7ce71
+git checkout 72b7ccf5eec38d0adb0586e01e10905c9ebf5d64
 
 bash "./scripts/rebuild_initializer_binary.sh"
 bash "./scripts/rebuild_controller_image.sh"
