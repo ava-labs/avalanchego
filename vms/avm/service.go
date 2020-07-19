@@ -24,21 +24,16 @@ import (
 )
 
 var (
-	errUnknownAssetID            = errors.New("unknown asset ID")
-	errTxNotCreateAsset          = errors.New("transaction doesn't create an asset")
-	errNoHolders                 = errors.New("initialHolders must not be empty")
-	errNoMinters                 = errors.New("no minters provided")
-	errInvalidAmount             = errors.New("amount must be positive")
-	errSpendOverflow             = errors.New("spent amount overflows uint64")
-	errInvalidMintAmount         = errors.New("amount minted must be positive")
-	errAddressesCantMintAsset    = errors.New("provided addresses don't have the authority to mint the provided asset")
-	errCanOnlySignSingleInputTxs = errors.New("can only sign transactions with one input")
-	errUnknownUTXO               = errors.New("unknown utxo")
-	errInvalidUTXO               = errors.New("invalid utxo")
-	errUnknownOutputType         = errors.New("unknown output type")
-	errUnneededAddress           = errors.New("address not required to sign")
-	errUnknownCredentialType     = errors.New("unknown credential type")
-	errNilTxID                   = errors.New("nil transaction ID")
+	errUnknownAssetID         = errors.New("unknown asset ID")
+	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
+	errNoHolders              = errors.New("initialHolders must not be empty")
+	errNoMinters              = errors.New("no minters provided")
+	errInvalidAmount          = errors.New("amount must be positive")
+	errSpendOverflow          = errors.New("spent amount overflows uint64")
+	errInvalidMintAmount      = errors.New("amount minted must be positive")
+	errAddressesCantMintAsset = errors.New("provided addresses don't have the authority to mint the provided asset")
+	errInvalidUTXO            = errors.New("invalid utxo")
+	errNilTxID                = errors.New("nil transaction ID")
 )
 
 // Service defines the base service for the asset vm
@@ -438,7 +433,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		Denomination: args.Denomination,
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.Sign(&tx, keys); err != nil {
+	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
 	}
 
@@ -556,7 +551,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		Denomination: args.Denomination,
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.Sign(&tx, keys); err != nil {
+	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
 	}
 
@@ -585,7 +580,7 @@ type CreateNFTAssetReply struct {
 
 // CreateNFTAsset returns ID of the newly created asset
 func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs, reply *CreateNFTAssetReply) error {
-	service.vm.ctx.Log.Verbo("CreateNFTAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Info("AVM: CreateNFTAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.MinterSets),
@@ -595,23 +590,43 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return errNoMinters
 	}
 
-	initialState := &InitialState{
-		FxID: 1, // TODO: Should lookup nftfx FxID
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	if err != nil {
+		return err
 	}
 
-	tx := &Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
+	avaKey := service.vm.ava.Key()
+	amountsSpent, ins, keys, err := service.vm.Spend(
+		utxos,
+		kc,
+		map[[32]byte]uint64{
+			avaKey: service.vm.txFee,
 		},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: 0, // NFTs are non-fungible
-		States: []*InitialState{
-			initialState,
-		},
-	}}
+	)
+	if err != nil {
+		return err
+	}
 
+	outs := []*ava.TransferableOutput{}
+	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+		changeAddr := kc.Keys[0].PublicKey().Address()
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: service.vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - service.vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	initialState := &InitialState{
+		FxID: 1, // TODO: Should lookup nftfx FxID
+		Outs: make([]verify.State, 0, len(args.MinterSets)),
+	}
 	for i, owner := range args.MinterSets {
 		minter := &nftfx.MintOutput{
 			GroupID: uint32(i),
@@ -635,20 +650,28 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 	initialState.Sort(service.vm.codec)
 
-	b, err := service.vm.codec.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
+	tx := Tx{UnsignedTx: &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+			Outs:  outs,
+			Ins:   ins,
+		},
+		Name:         args.Name,
+		Symbol:       args.Symbol,
+		Denomination: 0, // NFTs are non-fungible
+		States:       []*InitialState{initialState},
+	}}
+	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+		return err
 	}
 
-	service.vm.ctx.Log.Fatal("\n%s", formatting.DumpBytes{Bytes: b})
-
-	assetID, err := service.vm.IssueTx(b, nil)
+	assetID, err := service.vm.IssueTx(tx.Bytes(), nil)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
 
 	reply.AssetID = assetID
-
 	return nil
 }
 
@@ -711,6 +734,8 @@ type ListAddressesResponse struct {
 
 // ListAddresses returns all of the addresses controlled by user [args.Username]
 func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, response *ListAddressesResponse) error {
+	service.vm.ctx.Log.Info("AVM: ListAddresses called for user '%s'", args.Username)
+
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user: %w", err)
@@ -857,11 +882,11 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 	to, err := ids.ToShortID(toBytes)
 	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
 	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
@@ -935,7 +960,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		Outs:  outs,
 		Ins:   ins,
 	}}
-	if err := service.vm.Sign(&tx, keys); err != nil {
+	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
 	}
 
@@ -964,7 +989,7 @@ type MintReply struct {
 
 // Mint issues a transaction that mints more of the asset
 func (service *Service) Mint(r *http.Request, args *MintArgs, reply *MintReply) error {
-	service.vm.ctx.Log.Info("AVM: Mint called")
+	service.vm.ctx.Log.Info("AVM: Mint called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidMintAmount
@@ -1042,7 +1067,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *MintReply) 
 		},
 		Ops: ops,
 	}}
-	if err := service.vm.Sign(&tx, keys); err != nil {
+	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
 	}
 
@@ -1052,238 +1077,6 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *MintReply) 
 	}
 
 	reply.TxID = txID
-	return nil
-}
-
-// CreateMintNFTTxArgs are arguments for passing into CreateMintNFTTx requests
-type CreateMintNFTTxArgs struct {
-	AssetID string          `json:"assetID"`
-	To      string          `json:"to"`
-	Payload formatting.CB58 `json:"payload"`
-	Minters []string        `json:"minters"`
-}
-
-// CreateMintNFTTxReply defines the CreateMintNFTTx replies returned from the API
-type CreateMintNFTTxReply struct {
-	Tx formatting.CB58 `json:"tx"`
-}
-
-// CreateMintNFTTx returns the newly created unsigned transaction
-func (service *Service) CreateMintNFTTx(r *http.Request, args *CreateMintNFTTxArgs, reply *CreateMintNFTTxReply) error {
-	service.vm.ctx.Log.Verbo("CreateMintNFTTx called")
-
-	assetID, err := service.vm.Lookup(args.AssetID)
-	if err != nil {
-		assetID, err = ids.FromString(args.AssetID)
-		if err != nil {
-			return fmt.Errorf("asset '%s' not found", args.AssetID)
-		}
-	}
-
-	toBytes, err := service.vm.Parse(args.To)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address '%s': %w", args.To, err)
-	}
-	to, err := ids.ToShortID(toBytes)
-	if err != nil {
-		return fmt.Errorf("problem parsing to address '%s': %w", args.To, err)
-	}
-
-	addrs := ids.Set{}
-	minters := ids.ShortSet{}
-	for _, minter := range args.Minters {
-		addrBytes, err := service.vm.Parse(minter)
-		if err != nil {
-			return fmt.Errorf("problem parsing minter address '%s': %w", minter, err)
-		}
-		addr, err := ids.ToShortID(addrBytes)
-		if err != nil {
-			return fmt.Errorf("problem parsing minter address '%s': %w", minter, err)
-		}
-		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
-		minters.Add(addr)
-	}
-
-	utxos, err := service.vm.GetUTXOs(addrs)
-	if err != nil {
-		return fmt.Errorf("problem getting user's UTXOs: %w", err)
-	}
-
-	for _, utxo := range utxos {
-		if !utxo.AssetID().Equals(assetID) {
-			continue
-		}
-
-		switch out := utxo.Out.(type) {
-		case *nftfx.MintOutput:
-			sigs := []uint32{}
-			for i := uint32(0); i < uint32(len(out.Addrs)) && uint32(len(sigs)) < out.Threshold; i++ {
-				if minters.Contains(out.Addrs[i]) {
-					sigs = append(sigs, i)
-				}
-			}
-
-			if uint32(len(sigs)) != out.Threshold {
-				continue
-			}
-
-			tx := Tx{UnsignedTx: &OperationTx{
-				BaseTx: BaseTx{
-					NetID: service.vm.ctx.NetworkID,
-					BCID:  service.vm.ctx.ChainID,
-				},
-				Ops: []*Operation{
-					&Operation{
-						Asset: ava.Asset{ID: assetID},
-						UTXOIDs: []*ava.UTXOID{
-							&utxo.UTXOID,
-						},
-						Op: &nftfx.MintOperation{
-							MintInput: secp256k1fx.Input{
-								SigIndices: sigs,
-							},
-							GroupID: out.GroupID,
-							Payload: args.Payload.Bytes,
-							Outputs: []*secp256k1fx.OutputOwners{&secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{to},
-							}},
-						},
-					},
-				},
-			}}
-
-			txBytes, err := service.vm.codec.Marshal(&tx)
-			if err != nil {
-				return fmt.Errorf("problem creating transaction: %w", err)
-			}
-			reply.Tx.Bytes = txBytes
-			return nil
-		}
-	}
-
-	return errAddressesCantMintAsset
-}
-
-// SignMintNFTTxArgs are arguments for passing into SignMintNFTTx requests
-type SignMintNFTTxArgs struct {
-	Username string          `json:"username"`
-	Password string          `json:"password"`
-	Minter   string          `json:"minter"`
-	Tx       formatting.CB58 `json:"tx"`
-}
-
-// SignMintNFTTxReply defines the SignMintNFTTx replies returned from the API
-type SignMintNFTTxReply struct {
-	Tx formatting.CB58 `json:"tx"`
-}
-
-// SignMintNFTTx returns the newly signed transaction
-func (service *Service) SignMintNFTTx(r *http.Request, args *SignMintNFTTxArgs, reply *SignMintNFTTxReply) error {
-	service.vm.ctx.Log.Verbo("SignMintNFTTx called")
-
-	minter, err := service.vm.Parse(args.Minter)
-	if err != nil {
-		return fmt.Errorf("problem parsing address '%s': %w", args.Minter, err)
-	}
-
-	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
-	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
-	}
-
-	user := userState{vm: service.vm}
-
-	addr, err := ids.ToShortID(minter)
-	sk, err := user.Key(db, addr)
-	if err != nil {
-		return fmt.Errorf("problem retriving private key: %w", err)
-	}
-
-	tx := Tx{}
-	if err := service.vm.codec.Unmarshal(args.Tx.Bytes, &tx); err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-
-	opTx, ok := tx.UnsignedTx.(*OperationTx)
-	if !ok {
-		return errors.New("transaction must be a mint transaction")
-	}
-	if len(opTx.Ins) != 0 {
-		return errCanOnlySignSingleInputTxs
-	}
-	if len(opTx.Ops) != 1 {
-		return errCanOnlySignSingleInputTxs
-	}
-	op := opTx.Ops[0]
-
-	if len(op.UTXOIDs) != 1 {
-		return errCanOnlySignSingleInputTxs
-	}
-	inputUTXO := op.UTXOIDs[0]
-
-	utxo, err := service.vm.getUTXO(inputUTXO)
-	if err != nil {
-		service.vm.ctx.Log.Fatal("%+v", utxo)
-		return err
-	}
-
-	out, ok := utxo.Out.(*nftfx.MintOutput)
-	if !ok {
-		service.vm.ctx.Log.Fatal("%+v", utxo)
-		return errUnknownOutputType
-	}
-
-	secpOp, ok := op.Op.(*nftfx.MintOperation)
-	if !ok {
-		service.vm.ctx.Log.Fatal("%+v", utxo)
-		return errors.New("unknown mint operation")
-	}
-
-	sigIndex := -1
-	size := int(out.Threshold)
-	for i, addrIndex := range secpOp.MintInput.SigIndices {
-		if addrIndex >= uint32(len(out.Addrs)) {
-			return errors.New("input output mismatch")
-		}
-		if bytes.Equal(out.Addrs[int(addrIndex)].Bytes(), minter) {
-			sigIndex = i
-			break
-		}
-	}
-	if sigIndex == -1 {
-		return errUnneededAddress
-	}
-
-	if len(tx.Creds) == 0 {
-		tx.Creds = append(tx.Creds, &nftfx.Credential{})
-	}
-
-	cred, ok := tx.Creds[0].(*nftfx.Credential)
-	if !ok {
-		return errUnknownCredentialType
-	}
-
-	if len(cred.Sigs) != size {
-		cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, size)
-	}
-
-	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-
-	sig, err := sk.Sign(unsignedBytes)
-	if err != nil {
-		return fmt.Errorf("problem signing transaction: %w", err)
-	}
-	copy(cred.Sigs[sigIndex][:], sig)
-
-	txBytes, err := service.vm.codec.Marshal(&tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	reply.Tx.Bytes = txBytes
 	return nil
 }
 
@@ -1303,7 +1096,7 @@ type SendNFTReply struct {
 
 // SendNFT sends an NFT
 func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *SendNFTReply) error {
-	service.vm.ctx.Log.Verbo("SendNFT called with username: %s", args.Username)
+	service.vm.ctx.Log.Info("AVM: SendNFT called with username: %s", args.Username)
 
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
@@ -1315,121 +1108,178 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *SendN
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 	to, err := ids.ToShortID(toBytes)
 	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return err
 	}
 
-	user := userState{vm: service.vm}
-
-	addresses, _ := user.Addresses(db)
-
-	addrs := ids.Set{}
-	for _, addr := range addresses {
-		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
-	}
-	utxos, err := service.vm.GetUTXOs(addrs)
-	if err != nil {
-		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
-	}
-
-	kc := secp256k1fx.NewKeychain()
-	for _, addr := range addresses {
-		sk, err := user.Key(db, addr)
-		if err != nil {
-			return fmt.Errorf("problem retrieving private key: %w", err)
-		}
-		kc.Add(sk)
-	}
-
-	var (
-		utxo    *ava.UTXO
-		out     *nftfx.TransferOutput
-		indices []uint32
-		signers []*crypto.PrivateKeySECP256K1R
-		ok      bool
+	avaKey := service.vm.ava.Key()
+	amountsSpent, ins, secpKeys, err := service.vm.Spend(
+		utxos,
+		kc,
+		map[[32]byte]uint64{
+			avaKey: service.vm.txFee,
+		},
 	)
-	for _, utxo = range utxos {
-		if !utxo.AssetID().Equals(assetID) {
-			service.vm.ctx.Log.Info("Skipping UTXO due to wrong AssetID")
-			continue
-		}
-		out, ok = utxo.Out.(*nftfx.TransferOutput)
-		if !ok {
-			service.vm.ctx.Log.Info("Skipping UTXO due to output type")
-			continue
-		}
-		if out.GroupID != uint32(args.GroupID) {
-			service.vm.ctx.Log.Info("Skipping UTXO due to groupID")
-			ok = false
-			continue
-		}
-		indices, signers, ok = kc.Match(&out.OutputOwners)
-		if ok {
-			service.vm.ctx.Log.Info("Skipping UTXO due to failed key matches")
-			break
-		}
+	if err != nil {
+		return err
 	}
-	if !ok {
-		return errInsufficientFunds
+
+	outs := []*ava.TransferableOutput{}
+	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+		changeAddr := kc.Keys[0].PublicKey().Address()
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: service.vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - service.vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
+				},
+			},
+		})
+	}
+
+	ops, nftKeys, err := service.vm.SpendNFT(
+		utxos,
+		kc,
+		assetID,
+		uint32(args.GroupID),
+		to,
+	)
+	if err != nil {
+		return err
 	}
 
 	tx := Tx{UnsignedTx: &OperationTx{
 		BaseTx: BaseTx{
 			NetID: service.vm.ctx.NetworkID,
 			BCID:  service.vm.ctx.ChainID,
+			Outs:  outs,
+			Ins:   ins,
 		},
-		Ops: []*Operation{&Operation{
-			Asset:   utxo.Asset,
-			UTXOIDs: []*ava.UTXOID{&utxo.UTXOID},
-			Op: &nftfx.TransferOperation{
-				Input: secp256k1fx.Input{
-					SigIndices: indices,
-				},
-				Output: nftfx.TransferOutput{
-					GroupID: out.GroupID,
-					Payload: out.Payload,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{to},
-					},
+		Ops: ops,
+	}}
+	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
+		return err
+	}
+	if err := service.vm.SignNFTFx(&tx, nftKeys); err != nil {
+		return err
+	}
+
+	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	if err != nil {
+		return fmt.Errorf("problem issuing transaction: %w", err)
+	}
+
+	reply.TxID = txID
+	return nil
+}
+
+// MintNFTArgs are arguments for passing into MintNFT requests
+type MintNFTArgs struct {
+	Username string          `json:"username"`
+	Password string          `json:"password"`
+	AssetID  string          `json:"assetID"`
+	Payload  formatting.CB58 `json:"payload"`
+	To       string          `json:"to"`
+}
+
+// MintNFTReply defines the MintNFT replies returned from the API
+type MintNFTReply struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// MintNFT returns the newly created unsigned transaction
+func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *MintNFTReply) error {
+	service.vm.ctx.Log.Info("AVM: MintNFT called with username: %s", args.Username)
+
+	assetID, err := service.vm.Lookup(args.AssetID)
+	if err != nil {
+		assetID, err = ids.FromString(args.AssetID)
+		if err != nil {
+			return fmt.Errorf("asset '%s' not found", args.AssetID)
+		}
+	}
+
+	toBytes, err := service.vm.Parse(args.To)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
+	}
+	to, err := ids.ToShortID(toBytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
+	}
+
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	if err != nil {
+		return err
+	}
+
+	avaKey := service.vm.ava.Key()
+	amountsSpent, ins, secpKeys, err := service.vm.Spend(
+		utxos,
+		kc,
+		map[[32]byte]uint64{
+			avaKey: service.vm.txFee,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	outs := []*ava.TransferableOutput{}
+	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+		changeAddr := kc.Keys[0].PublicKey().Address()
+		outs = append(outs, &ava.TransferableOutput{
+			Asset: ava.Asset{ID: service.vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amountSpent - service.vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
 				},
 			},
-		}},
+		})
+	}
+
+	ops, nftKeys, err := service.vm.MintNFT(
+		utxos,
+		kc,
+		assetID,
+		args.Payload.Bytes,
+		to,
+	)
+	if err != nil {
+		return err
+	}
+
+	tx := Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{
+			NetID: service.vm.ctx.NetworkID,
+			BCID:  service.vm.ctx.ChainID,
+			Outs:  outs,
+			Ins:   ins,
+		},
+		Ops: ops,
 	}}
-
-	unsignedBytes, err := service.vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
+	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
+		return err
 	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	cred := &nftfx.Credential{}
-	for _, signer := range signers {
-		sig, err := signer.SignHash(hash)
-		if err != nil {
-			return fmt.Errorf("problem creating transaction: %w", err)
-		}
-		fixedSig := [crypto.SECP256K1RSigLen]byte{}
-		copy(fixedSig[:], sig)
-
-		cred.Sigs = append(cred.Sigs, fixedSig)
-	}
-	tx.Creds = append(tx.Creds, cred)
-
-	b, err := service.vm.codec.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
+	if err := service.vm.SignNFTFx(&tx, nftKeys); err != nil {
+		return err
 	}
 
-	txID, err := service.vm.IssueTx(b, nil)
+	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1461,11 +1311,11 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 	to, err := ids.ToShortID(toBytes)
 	if err != nil {
-		return fmt.Errorf("problem parsing to address: %w", err)
+		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
 	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
@@ -1546,7 +1396,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 		},
 		Ins: importInputs,
 	}}
-	if err := service.vm.Sign(&tx, keys); err != nil {
+	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
 	}
 
@@ -1648,7 +1498,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 		},
 		Outs: exportOuts,
 	}}
-	if err := service.vm.Sign(&tx, keys); err != nil {
+	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
 	}
 

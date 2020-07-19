@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
@@ -714,6 +715,132 @@ func (vm *VM) Spend(
 	return amountsSpent, ins, keys, nil
 }
 
+// SpendNFT ...
+func (vm *VM) SpendNFT(
+	utxos []*ava.UTXO,
+	kc *secp256k1fx.Keychain,
+	assetID ids.ID,
+	groupID uint32,
+	to ids.ShortID,
+) (
+	[]*Operation,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	time := vm.clock.Unix()
+
+	ops := []*Operation{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+
+	for _, utxo := range utxos {
+		// makes sure that the variable isn't overwritten with the next iteration
+		utxo := utxo
+
+		if len(ops) > 0 {
+			// we have already been able to create the operation needed
+			break
+		}
+
+		if !utxo.AssetID().Equals(assetID) {
+			// wrong asset ID
+			continue
+		}
+		out, ok := utxo.Out.(*nftfx.TransferOutput)
+		if !ok {
+			// wrong output type
+			continue
+		}
+		if out.GroupID != groupID {
+			// wrong group id
+			continue
+		}
+		indices, signers, ok := kc.Match(&out.OutputOwners, time)
+		if !ok {
+			// unable to spend the output
+			continue
+		}
+
+		// add the new operation to the array
+		ops = append(ops, &Operation{
+			Asset:   utxo.Asset,
+			UTXOIDs: []*ava.UTXOID{&utxo.UTXOID},
+			Op: &nftfx.TransferOperation{
+				Input: secp256k1fx.Input{
+					SigIndices: indices,
+				},
+				Output: nftfx.TransferOutput{
+					GroupID: out.GroupID,
+					Payload: out.Payload,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{to},
+					},
+				},
+			},
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+	}
+
+	if len(ops) == 0 {
+		return nil, nil, errInsufficientFunds
+	}
+
+	sortOperationsWithSigners(ops, keys, vm.codec)
+	return ops, keys, nil
+}
+
+// SpendAll ...
+func (vm *VM) SpendAll(
+	utxos []*ava.UTXO,
+	kc *secp256k1fx.Keychain,
+) (
+	map[[32]byte]uint64,
+	[]*ava.TransferableInput,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	amountsSpent := make(map[[32]byte]uint64)
+	time := vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		assetID := utxo.AssetID()
+		assetKey := assetID.Key()
+		amountSpent := amountsSpent[assetKey]
+
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			// this utxo can't be spent with the current keys right now
+			continue
+		}
+		input, ok := inputIntf.(ava.TransferableIn)
+		if !ok {
+			// this input doesn't have an amount, so I don't care about it here
+			continue
+		}
+		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
+		if err != nil {
+			// there was an error calculating the consumed amount, just error
+			return nil, nil, nil, errSpendOverflow
+		}
+		amountsSpent[assetKey] = newAmountSpent
+
+		// add the new input to the array
+		ins = append(ins, &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: assetID},
+			In:     input,
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+	return amountsSpent, ins, keys, nil
+}
+
 // Mint ...
 func (vm *VM) Mint(
 	utxos []*ava.UTXO,
@@ -789,59 +916,80 @@ func (vm *VM) Mint(
 	return ops, keys, nil
 }
 
-// SpendAll ...
-func (vm *VM) SpendAll(
+// MintNFT ...
+func (vm *VM) MintNFT(
 	utxos []*ava.UTXO,
 	kc *secp256k1fx.Keychain,
+	assetID ids.ID,
+	payload []byte,
+	to ids.ShortID,
 ) (
-	map[[32]byte]uint64,
-	[]*ava.TransferableInput,
+	[]*Operation,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64)
 	time := vm.clock.Unix()
 
-	ins := []*ava.TransferableInput{}
+	ops := []*Operation{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
+
 	for _, utxo := range utxos {
-		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amountSpent := amountsSpent[assetKey]
+		// makes sure that the variable isn't overwritten with the next iteration
+		utxo := utxo
 
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
-		if err != nil {
-			// this utxo can't be spent with the current keys right now
+		if len(ops) > 0 {
+			// we have already been able to create the operation needed
+			break
+		}
+
+		if !utxo.AssetID().Equals(assetID) {
+			// wrong asset id
 			continue
 		}
-		input, ok := inputIntf.(ava.TransferableIn)
+		out, ok := utxo.Out.(*nftfx.MintOutput)
 		if !ok {
-			// this input doesn't have an amount, so I don't care about it here
+			// wrong output type
 			continue
 		}
-		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
-		if err != nil {
-			// there was an error calculating the consumed amount, just error
-			return nil, nil, nil, errSpendOverflow
-		}
-		amountsSpent[assetKey] = newAmountSpent
 
-		// add the new input to the array
-		ins = append(ins, &ava.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  ava.Asset{ID: assetID},
-			In:     input,
+		indices, signers, ok := kc.Match(&out.OutputOwners, time)
+		if !ok {
+			// unable to spend the output
+			continue
+		}
+
+		// add the operation to the array
+		ops = append(ops, &Operation{
+			Asset: ava.Asset{ID: assetID},
+			UTXOIDs: []*ava.UTXOID{
+				&utxo.UTXOID,
+			},
+			Op: &nftfx.MintOperation{
+				MintInput: secp256k1fx.Input{
+					SigIndices: indices,
+				},
+				GroupID: out.GroupID,
+				Payload: payload,
+				Outputs: []*secp256k1fx.OutputOwners{&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{to},
+				}},
+			},
 		})
 		// add the required keys to the array
 		keys = append(keys, signers)
 	}
 
-	ava.SortTransferableInputsWithSigners(ins, keys)
-	return amountsSpent, ins, keys, nil
+	if len(ops) == 0 {
+		return nil, nil, errAddressesCantMintAsset
+	}
+
+	sortOperationsWithSigners(ops, keys, vm.codec)
+	return ops, keys, nil
 }
 
-// Sign ...
-func (vm *VM) Sign(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
+// SignSECP256K1Fx ...
+func (vm *VM) SignSECP256K1Fx(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
@@ -850,6 +998,37 @@ func (vm *VM) Sign(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
 
 	for _, credKeys := range keys {
 		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	b, err := vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	tx.Initialize(b)
+	return nil
+}
+
+// SignNFTFx ...
+func (vm *VM) SignNFTFx(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	for _, credKeys := range keys {
+		cred := &nftfx.Credential{}
 		for _, key := range credKeys {
 			sig, err := key.SignHash(hash)
 			if err != nil {
