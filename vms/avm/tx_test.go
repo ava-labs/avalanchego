@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
@@ -72,7 +73,7 @@ func TestTxInvalidCredential(t *testing.T) {
 				},
 			}},
 		},
-		Creds: []verify.Verifiable{&ava.TestVerifiable{Err: errUnneededAddress}},
+		Creds: []verify.Verifiable{&ava.TestVerifiable{Err: errors.New("")}},
 	}
 
 	b, err := c.Marshal(tx)
