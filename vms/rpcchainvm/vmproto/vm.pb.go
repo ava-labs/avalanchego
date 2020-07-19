@@ -110,6 +110,130 @@ func (m *InitializeResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_InitializeResponse proto.InternalMessageInfo
 
+type BootstrappingRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *BootstrappingRequest) Reset()         { *m = BootstrappingRequest{} }
+func (m *BootstrappingRequest) String() string { return proto.CompactTextString(m) }
+func (*BootstrappingRequest) ProtoMessage()    {}
+func (*BootstrappingRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_cab246c8c7c5372d, []int{2}
+}
+
+func (m *BootstrappingRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BootstrappingRequest.Unmarshal(m, b)
+}
+func (m *BootstrappingRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BootstrappingRequest.Marshal(b, m, deterministic)
+}
+func (m *BootstrappingRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BootstrappingRequest.Merge(m, src)
+}
+func (m *BootstrappingRequest) XXX_Size() int {
+	return xxx_messageInfo_BootstrappingRequest.Size(m)
+}
+func (m *BootstrappingRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_BootstrappingRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BootstrappingRequest proto.InternalMessageInfo
+
+type BootstrappingResponse struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *BootstrappingResponse) Reset()         { *m = BootstrappingResponse{} }
+func (m *BootstrappingResponse) String() string { return proto.CompactTextString(m) }
+func (*BootstrappingResponse) ProtoMessage()    {}
+func (*BootstrappingResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_cab246c8c7c5372d, []int{3}
+}
+
+func (m *BootstrappingResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BootstrappingResponse.Unmarshal(m, b)
+}
+func (m *BootstrappingResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BootstrappingResponse.Marshal(b, m, deterministic)
+}
+func (m *BootstrappingResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BootstrappingResponse.Merge(m, src)
+}
+func (m *BootstrappingResponse) XXX_Size() int {
+	return xxx_messageInfo_BootstrappingResponse.Size(m)
+}
+func (m *BootstrappingResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_BootstrappingResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BootstrappingResponse proto.InternalMessageInfo
+
+type BootstrappedRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *BootstrappedRequest) Reset()         { *m = BootstrappedRequest{} }
+func (m *BootstrappedRequest) String() string { return proto.CompactTextString(m) }
+func (*BootstrappedRequest) ProtoMessage()    {}
+func (*BootstrappedRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_cab246c8c7c5372d, []int{4}
+}
+
+func (m *BootstrappedRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BootstrappedRequest.Unmarshal(m, b)
+}
+func (m *BootstrappedRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BootstrappedRequest.Marshal(b, m, deterministic)
+}
+func (m *BootstrappedRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BootstrappedRequest.Merge(m, src)
+}
+func (m *BootstrappedRequest) XXX_Size() int {
+	return xxx_messageInfo_BootstrappedRequest.Size(m)
+}
+func (m *BootstrappedRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_BootstrappedRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BootstrappedRequest proto.InternalMessageInfo
+
+type BootstrappedResponse struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *BootstrappedResponse) Reset()         { *m = BootstrappedResponse{} }
+func (m *BootstrappedResponse) String() string { return proto.CompactTextString(m) }
+func (*BootstrappedResponse) ProtoMessage()    {}
+func (*BootstrappedResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_cab246c8c7c5372d, []int{5}
+}
+
+func (m *BootstrappedResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BootstrappedResponse.Unmarshal(m, b)
+}
+func (m *BootstrappedResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BootstrappedResponse.Marshal(b, m, deterministic)
+}
+func (m *BootstrappedResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BootstrappedResponse.Merge(m, src)
+}
+func (m *BootstrappedResponse) XXX_Size() int {
+	return xxx_messageInfo_BootstrappedResponse.Size(m)
+}
+func (m *BootstrappedResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_BootstrappedResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BootstrappedResponse proto.InternalMessageInfo
+
 type ShutdownRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -120,7 +244,7 @@ func (m *ShutdownRequest) Reset()         { *m = ShutdownRequest{} }
 func (m *ShutdownRequest) String() string { return proto.CompactTextString(m) }
 func (*ShutdownRequest) ProtoMessage()    {}
 func (*ShutdownRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{2}
+	return fileDescriptor_cab246c8c7c5372d, []int{6}
 }
 
 func (m *ShutdownRequest) XXX_Unmarshal(b []byte) error {
@@ -151,7 +275,7 @@ func (m *ShutdownResponse) Reset()         { *m = ShutdownResponse{} }
 func (m *ShutdownResponse) String() string { return proto.CompactTextString(m) }
 func (*ShutdownResponse) ProtoMessage()    {}
 func (*ShutdownResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{3}
+	return fileDescriptor_cab246c8c7c5372d, []int{7}
 }
 
 func (m *ShutdownResponse) XXX_Unmarshal(b []byte) error {
@@ -182,7 +306,7 @@ func (m *CreateHandlersRequest) Reset()         { *m = CreateHandlersRequest{} }
 func (m *CreateHandlersRequest) String() string { return proto.CompactTextString(m) }
 func (*CreateHandlersRequest) ProtoMessage()    {}
 func (*CreateHandlersRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{4}
+	return fileDescriptor_cab246c8c7c5372d, []int{8}
 }
 
 func (m *CreateHandlersRequest) XXX_Unmarshal(b []byte) error {
@@ -214,7 +338,7 @@ func (m *CreateHandlersResponse) Reset()         { *m = CreateHandlersResponse{}
 func (m *CreateHandlersResponse) String() string { return proto.CompactTextString(m) }
 func (*CreateHandlersResponse) ProtoMessage()    {}
 func (*CreateHandlersResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{5}
+	return fileDescriptor_cab246c8c7c5372d, []int{9}
 }
 
 func (m *CreateHandlersResponse) XXX_Unmarshal(b []byte) error {
@@ -255,7 +379,7 @@ func (m *Handler) Reset()         { *m = Handler{} }
 func (m *Handler) String() string { return proto.CompactTextString(m) }
 func (*Handler) ProtoMessage()    {}
 func (*Handler) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{6}
+	return fileDescriptor_cab246c8c7c5372d, []int{10}
 }
 
 func (m *Handler) XXX_Unmarshal(b []byte) error {
@@ -307,7 +431,7 @@ func (m *BuildBlockRequest) Reset()         { *m = BuildBlockRequest{} }
 func (m *BuildBlockRequest) String() string { return proto.CompactTextString(m) }
 func (*BuildBlockRequest) ProtoMessage()    {}
 func (*BuildBlockRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{7}
+	return fileDescriptor_cab246c8c7c5372d, []int{11}
 }
 
 func (m *BuildBlockRequest) XXX_Unmarshal(b []byte) error {
@@ -341,7 +465,7 @@ func (m *BuildBlockResponse) Reset()         { *m = BuildBlockResponse{} }
 func (m *BuildBlockResponse) String() string { return proto.CompactTextString(m) }
 func (*BuildBlockResponse) ProtoMessage()    {}
 func (*BuildBlockResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{8}
+	return fileDescriptor_cab246c8c7c5372d, []int{12}
 }
 
 func (m *BuildBlockResponse) XXX_Unmarshal(b []byte) error {
@@ -394,7 +518,7 @@ func (m *ParseBlockRequest) Reset()         { *m = ParseBlockRequest{} }
 func (m *ParseBlockRequest) String() string { return proto.CompactTextString(m) }
 func (*ParseBlockRequest) ProtoMessage()    {}
 func (*ParseBlockRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{9}
+	return fileDescriptor_cab246c8c7c5372d, []int{13}
 }
 
 func (m *ParseBlockRequest) XXX_Unmarshal(b []byte) error {
@@ -435,7 +559,7 @@ func (m *ParseBlockResponse) Reset()         { *m = ParseBlockResponse{} }
 func (m *ParseBlockResponse) String() string { return proto.CompactTextString(m) }
 func (*ParseBlockResponse) ProtoMessage()    {}
 func (*ParseBlockResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{10}
+	return fileDescriptor_cab246c8c7c5372d, []int{14}
 }
 
 func (m *ParseBlockResponse) XXX_Unmarshal(b []byte) error {
@@ -488,7 +612,7 @@ func (m *GetBlockRequest) Reset()         { *m = GetBlockRequest{} }
 func (m *GetBlockRequest) String() string { return proto.CompactTextString(m) }
 func (*GetBlockRequest) ProtoMessage()    {}
 func (*GetBlockRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{11}
+	return fileDescriptor_cab246c8c7c5372d, []int{15}
 }
 
 func (m *GetBlockRequest) XXX_Unmarshal(b []byte) error {
@@ -529,7 +653,7 @@ func (m *GetBlockResponse) Reset()         { *m = GetBlockResponse{} }
 func (m *GetBlockResponse) String() string { return proto.CompactTextString(m) }
 func (*GetBlockResponse) ProtoMessage()    {}
 func (*GetBlockResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{12}
+	return fileDescriptor_cab246c8c7c5372d, []int{16}
 }
 
 func (m *GetBlockResponse) XXX_Unmarshal(b []byte) error {
@@ -582,7 +706,7 @@ func (m *SetPreferenceRequest) Reset()         { *m = SetPreferenceRequest{} }
 func (m *SetPreferenceRequest) String() string { return proto.CompactTextString(m) }
 func (*SetPreferenceRequest) ProtoMessage()    {}
 func (*SetPreferenceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{13}
+	return fileDescriptor_cab246c8c7c5372d, []int{17}
 }
 
 func (m *SetPreferenceRequest) XXX_Unmarshal(b []byte) error {
@@ -620,7 +744,7 @@ func (m *SetPreferenceResponse) Reset()         { *m = SetPreferenceResponse{} }
 func (m *SetPreferenceResponse) String() string { return proto.CompactTextString(m) }
 func (*SetPreferenceResponse) ProtoMessage()    {}
 func (*SetPreferenceResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{14}
+	return fileDescriptor_cab246c8c7c5372d, []int{18}
 }
 
 func (m *SetPreferenceResponse) XXX_Unmarshal(b []byte) error {
@@ -651,7 +775,7 @@ func (m *LastAcceptedRequest) Reset()         { *m = LastAcceptedRequest{} }
 func (m *LastAcceptedRequest) String() string { return proto.CompactTextString(m) }
 func (*LastAcceptedRequest) ProtoMessage()    {}
 func (*LastAcceptedRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{15}
+	return fileDescriptor_cab246c8c7c5372d, []int{19}
 }
 
 func (m *LastAcceptedRequest) XXX_Unmarshal(b []byte) error {
@@ -683,7 +807,7 @@ func (m *LastAcceptedResponse) Reset()         { *m = LastAcceptedResponse{} }
 func (m *LastAcceptedResponse) String() string { return proto.CompactTextString(m) }
 func (*LastAcceptedResponse) ProtoMessage()    {}
 func (*LastAcceptedResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{16}
+	return fileDescriptor_cab246c8c7c5372d, []int{20}
 }
 
 func (m *LastAcceptedResponse) XXX_Unmarshal(b []byte) error {
@@ -722,7 +846,7 @@ func (m *BlockVerifyRequest) Reset()         { *m = BlockVerifyRequest{} }
 func (m *BlockVerifyRequest) String() string { return proto.CompactTextString(m) }
 func (*BlockVerifyRequest) ProtoMessage()    {}
 func (*BlockVerifyRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{17}
+	return fileDescriptor_cab246c8c7c5372d, []int{21}
 }
 
 func (m *BlockVerifyRequest) XXX_Unmarshal(b []byte) error {
@@ -760,7 +884,7 @@ func (m *BlockVerifyResponse) Reset()         { *m = BlockVerifyResponse{} }
 func (m *BlockVerifyResponse) String() string { return proto.CompactTextString(m) }
 func (*BlockVerifyResponse) ProtoMessage()    {}
 func (*BlockVerifyResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{18}
+	return fileDescriptor_cab246c8c7c5372d, []int{22}
 }
 
 func (m *BlockVerifyResponse) XXX_Unmarshal(b []byte) error {
@@ -792,7 +916,7 @@ func (m *BlockAcceptRequest) Reset()         { *m = BlockAcceptRequest{} }
 func (m *BlockAcceptRequest) String() string { return proto.CompactTextString(m) }
 func (*BlockAcceptRequest) ProtoMessage()    {}
 func (*BlockAcceptRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{19}
+	return fileDescriptor_cab246c8c7c5372d, []int{23}
 }
 
 func (m *BlockAcceptRequest) XXX_Unmarshal(b []byte) error {
@@ -830,7 +954,7 @@ func (m *BlockAcceptResponse) Reset()         { *m = BlockAcceptResponse{} }
 func (m *BlockAcceptResponse) String() string { return proto.CompactTextString(m) }
 func (*BlockAcceptResponse) ProtoMessage()    {}
 func (*BlockAcceptResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{20}
+	return fileDescriptor_cab246c8c7c5372d, []int{24}
 }
 
 func (m *BlockAcceptResponse) XXX_Unmarshal(b []byte) error {
@@ -862,7 +986,7 @@ func (m *BlockRejectRequest) Reset()         { *m = BlockRejectRequest{} }
 func (m *BlockRejectRequest) String() string { return proto.CompactTextString(m) }
 func (*BlockRejectRequest) ProtoMessage()    {}
 func (*BlockRejectRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{21}
+	return fileDescriptor_cab246c8c7c5372d, []int{25}
 }
 
 func (m *BlockRejectRequest) XXX_Unmarshal(b []byte) error {
@@ -900,7 +1024,7 @@ func (m *BlockRejectResponse) Reset()         { *m = BlockRejectResponse{} }
 func (m *BlockRejectResponse) String() string { return proto.CompactTextString(m) }
 func (*BlockRejectResponse) ProtoMessage()    {}
 func (*BlockRejectResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_cab246c8c7c5372d, []int{22}
+	return fileDescriptor_cab246c8c7c5372d, []int{26}
 }
 
 func (m *BlockRejectResponse) XXX_Unmarshal(b []byte) error {
@@ -924,6 +1048,10 @@ var xxx_messageInfo_BlockRejectResponse proto.InternalMessageInfo
 func init() {
 	proto.RegisterType((*InitializeRequest)(nil), "vmproto.InitializeRequest")
 	proto.RegisterType((*InitializeResponse)(nil), "vmproto.InitializeResponse")
+	proto.RegisterType((*BootstrappingRequest)(nil), "vmproto.BootstrappingRequest")
+	proto.RegisterType((*BootstrappingResponse)(nil), "vmproto.BootstrappingResponse")
+	proto.RegisterType((*BootstrappedRequest)(nil), "vmproto.BootstrappedRequest")
+	proto.RegisterType((*BootstrappedResponse)(nil), "vmproto.BootstrappedResponse")
 	proto.RegisterType((*ShutdownRequest)(nil), "vmproto.ShutdownRequest")
 	proto.RegisterType((*ShutdownResponse)(nil), "vmproto.ShutdownResponse")
 	proto.RegisterType((*CreateHandlersRequest)(nil), "vmproto.CreateHandlersRequest")
@@ -950,46 +1078,49 @@ func init() {
 func init() { proto.RegisterFile("vm.proto", fileDescriptor_cab246c8c7c5372d) }
 
 var fileDescriptor_cab246c8c7c5372d = []byte{
-	// 617 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x6d, 0x6f, 0xd2, 0x50,
-	0x14, 0x4e, 0x21, 0x32, 0x3c, 0xc0, 0x06, 0x17, 0xd8, 0xb0, 0x6e, 0x13, 0x1b, 0xb3, 0x60, 0x62,
-	0xf8, 0x30, 0x7f, 0xc0, 0x22, 0x8a, 0x6e, 0xf1, 0x6d, 0x96, 0x84, 0x98, 0xe8, 0x97, 0x42, 0x0f,
-	0x5b, 0x95, 0xb5, 0xf5, 0xde, 0x0b, 0x73, 0xfe, 0x23, 0xff, 0xa5, 0xa1, 0xbd, 0x6d, 0xef, 0xbd,
-	0xb4, 0x59, 0xe2, 0xb7, 0x9e, 0x73, 0x9e, 0xf3, 0x9c, 0x97, 0x7b, 0x9e, 0x42, 0x75, 0x7d, 0x33,
-	0x0c, 0x69, 0xc0, 0x03, 0xb2, 0xb3, 0xbe, 0x89, 0x3e, 0xac, 0x5b, 0x68, 0x5d, 0xf8, 0x1e, 0xf7,
-	0x9c, 0xa5, 0xf7, 0x07, 0x6d, 0xfc, 0xb5, 0x42, 0xc6, 0x89, 0x09, 0x55, 0x77, 0x36, 0x41, 0xba,
-	0x46, 0xda, 0x33, 0xfa, 0xc6, 0xa0, 0x61, 0xa7, 0x36, 0xb1, 0xa0, 0x7e, 0x85, 0x3e, 0x32, 0x8f,
-	0x8d, 0xee, 0x38, 0xb2, 0x5e, 0xa9, 0x6f, 0x0c, 0xea, 0xb6, 0xe2, 0xdb, 0x60, 0xd0, 0xbf, 0xf2,
-	0x7c, 0x14, 0x1c, 0xe5, 0x88, 0x43, 0xf1, 0x59, 0x1d, 0x20, 0x72, 0x61, 0x16, 0x06, 0x3e, 0x43,
-	0xab, 0x05, 0x7b, 0x93, 0xeb, 0x15, 0x77, 0x83, 0x5b, 0x5f, 0x34, 0x63, 0x11, 0x68, 0x66, 0x2e,
-	0x01, 0x3b, 0x80, 0xee, 0x6b, 0x8a, 0x0e, 0xc7, 0x73, 0xc7, 0x77, 0x97, 0x48, 0x59, 0x02, 0x7e,
-	0x0b, 0xfb, 0x7a, 0x20, 0x4e, 0x21, 0x2f, 0xa0, 0x7a, 0x2d, 0x7c, 0x3d, 0xa3, 0x5f, 0x1e, 0xd4,
-	0x4e, 0x9b, 0x43, 0xb1, 0x84, 0xa1, 0x00, 0xdb, 0x29, 0xc2, 0xfa, 0x06, 0x3b, 0xc2, 0x49, 0xf6,
-	0xa1, 0x12, 0x52, 0x5c, 0x78, 0xbf, 0xa3, 0x55, 0x3c, 0xb4, 0x85, 0x45, 0xfa, 0x50, 0x5b, 0x06,
-	0xf3, 0x9f, 0x9f, 0x43, 0xee, 0x05, 0x7e, 0xbc, 0x87, 0x86, 0x2d, 0xbb, 0x36, 0x99, 0x4c, 0x5e,
-	0x80, 0xb0, 0xac, 0x36, 0xb4, 0x46, 0x2b, 0x6f, 0xe9, 0x8e, 0x36, 0xe0, 0xa4, 0xf3, 0x29, 0x10,
-	0xd9, 0x29, 0xba, 0xde, 0x85, 0x92, 0xe7, 0x46, 0x85, 0xeb, 0x76, 0xc9, 0x73, 0x37, 0x2f, 0x13,
-	0x3a, 0x14, 0x7d, 0x7e, 0xf1, 0x46, 0x6c, 0x3e, 0xb5, 0x49, 0x07, 0x1e, 0xcc, 0xa2, 0x27, 0x29,
-	0x47, 0x81, 0xd8, 0xb0, 0x9e, 0x43, 0xeb, 0xd2, 0xa1, 0x0c, 0xe5, 0x62, 0x19, 0xd4, 0x90, 0xa1,
-	0x5f, 0x81, 0xc8, 0xd0, 0xff, 0x68, 0x61, 0x33, 0x31, 0x77, 0xf8, 0x8a, 0xa5, 0x13, 0x47, 0x96,
-	0xf5, 0x14, 0xf6, 0xde, 0x21, 0x57, 0x5a, 0xd0, 0x68, 0xad, 0xef, 0xd0, 0xcc, 0x20, 0xa2, 0xb4,
-	0x5c, 0xca, 0x28, 0x9a, 0xb6, 0x24, 0x8d, 0x50, 0xd8, 0xc0, 0x09, 0x74, 0x26, 0xc8, 0x2f, 0x29,
-	0x2e, 0x90, 0xa2, 0x3f, 0xc7, 0xa2, 0x2e, 0x0e, 0xa0, 0xab, 0xe1, 0xc4, 0xc5, 0x75, 0xa1, 0xfd,
-	0xc1, 0x61, 0xfc, 0xd5, 0x7c, 0x8e, 0x21, 0x47, 0x37, 0x79, 0xb5, 0x13, 0xe8, 0xa8, 0xee, 0xfc,
-	0xa5, 0x59, 0xcf, 0x80, 0x44, 0xa3, 0x4d, 0x91, 0x7a, 0x8b, 0xbb, 0xa2, 0xea, 0x5d, 0x68, 0x2b,
-	0x28, 0x51, 0x3b, 0x49, 0x8e, 0xab, 0xdc, 0x97, 0x9c, 0xa0, 0xb4, 0x64, 0x1b, 0x7f, 0xe0, 0xfc,
-	0xde, 0xe4, 0x04, 0x15, 0x27, 0x9f, 0xfe, 0xad, 0x40, 0x69, 0xfa, 0x91, 0x8c, 0x01, 0x32, 0xad,
-	0x12, 0x33, 0xd5, 0xcd, 0xd6, 0x9f, 0xc3, 0x7c, 0x9c, 0x1b, 0x13, 0x4b, 0x39, 0x83, 0x6a, 0xa2,
-	0x64, 0xd2, 0x4b, 0x81, 0x9a, 0xde, 0xcd, 0x47, 0x39, 0x11, 0x41, 0xf0, 0x05, 0x76, 0x55, 0x75,
-	0x93, 0xe3, 0x14, 0x9c, 0xfb, 0x3f, 0x30, 0x9f, 0x14, 0xc6, 0x05, 0xe5, 0x18, 0x20, 0x93, 0x9d,
-	0x34, 0xda, 0x96, 0x40, 0xa5, 0xd1, 0x72, 0x74, 0x3a, 0x06, 0xc8, 0xa4, 0x23, 0xd1, 0x6c, 0x49,
-	0x4f, 0xa2, 0xc9, 0xd1, 0xda, 0x19, 0x54, 0x13, 0x11, 0x48, 0x1b, 0xd2, 0xa4, 0x23, 0x6d, 0x68,
-	0x4b, 0x31, 0x9f, 0xa0, 0xa1, 0xdc, 0x2f, 0x39, 0xca, 0xb6, 0x99, 0x73, 0xff, 0xe6, 0x71, 0x51,
-	0x58, 0xf0, 0xbd, 0x87, 0xba, 0x7c, 0xdf, 0xe4, 0x30, 0xc5, 0xe7, 0xa8, 0xc1, 0x3c, 0x2a, 0x88,
-	0x0a, 0xb2, 0x73, 0xa8, 0x49, 0xe7, 0x4d, 0xa4, 0x85, 0x6e, 0x49, 0xc3, 0x3c, 0xcc, 0x0f, 0x6a,
-	0x4c, 0x71, 0x09, 0x9d, 0x49, 0xd1, 0x89, 0xce, 0xa4, 0xca, 0x23, 0x65, 0x8a, 0x0f, 0x5f, 0x67,
-	0x52, 0x44, 0xa3, 0x33, 0xa9, 0x5a, 0x99, 0x55, 0xa2, 0xd0, 0xcb, 0x7f, 0x01, 0x00, 0x00, 0xff,
-	0xff, 0xbb, 0xac, 0x5b, 0xc8, 0x65, 0x07, 0x00, 0x00,
+	// 672 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x61, 0x4f, 0x13, 0x41,
+	0x10, 0x4d, 0x4b, 0x84, 0x3a, 0xb4, 0x40, 0x97, 0x16, 0xea, 0x09, 0x5a, 0x2f, 0x86, 0x60, 0x62,
+	0xf8, 0x80, 0x3f, 0x80, 0x58, 0x45, 0x21, 0x2a, 0xe2, 0x91, 0x10, 0x13, 0xfd, 0x72, 0xf4, 0x06,
+	0x38, 0x2d, 0x77, 0xe7, 0xee, 0xb6, 0x88, 0x3f, 0xd0, 0xdf, 0x65, 0xee, 0x6e, 0xef, 0x6e, 0x76,
+	0xbb, 0x17, 0x12, 0xbf, 0x75, 0x67, 0xde, 0xbc, 0x99, 0x9b, 0xe9, 0x7b, 0xd0, 0x9a, 0xdd, 0xec,
+	0x25, 0x3c, 0x96, 0x31, 0x5b, 0x9a, 0xdd, 0x64, 0x3f, 0xdc, 0x5b, 0xe8, 0x1e, 0x47, 0xa1, 0x0c,
+	0xfd, 0x49, 0xf8, 0x07, 0x3d, 0xfc, 0x35, 0x45, 0x21, 0x99, 0x03, 0xad, 0xe0, 0xe2, 0x0c, 0xf9,
+	0x0c, 0xf9, 0xa0, 0x31, 0x6c, 0xec, 0x76, 0xbc, 0xf2, 0xcd, 0x5c, 0x68, 0x5f, 0x61, 0x84, 0x22,
+	0x14, 0xa3, 0x3b, 0x89, 0x62, 0xd0, 0x1c, 0x36, 0x76, 0xdb, 0x9e, 0x16, 0x4b, 0x31, 0x18, 0x5d,
+	0x85, 0x11, 0x2a, 0x8e, 0x85, 0x8c, 0x43, 0x8b, 0xb9, 0x3d, 0x60, 0xb4, 0xb1, 0x48, 0xe2, 0x48,
+	0xa0, 0xbb, 0x01, 0xbd, 0x51, 0x1c, 0x4b, 0x21, 0xb9, 0x9f, 0x24, 0x61, 0x74, 0xa5, 0x26, 0x72,
+	0x37, 0xa1, 0x6f, 0xc4, 0x55, 0x41, 0x1f, 0xd6, 0xab, 0x04, 0x06, 0x05, 0x5e, 0xe3, 0x49, 0xc3,
+	0x0a, 0xde, 0x85, 0xd5, 0xb3, 0xeb, 0xa9, 0x0c, 0xe2, 0xdb, 0xa8, 0x80, 0x32, 0x58, 0xab, 0x42,
+	0x0a, 0xb6, 0x09, 0xfd, 0x37, 0x1c, 0x7d, 0x89, 0x47, 0x7e, 0x14, 0x4c, 0x90, 0x8b, 0x02, 0xfc,
+	0x0e, 0x36, 0xcc, 0x44, 0x5e, 0xc2, 0x5e, 0x42, 0xeb, 0x5a, 0xc5, 0x06, 0x8d, 0xe1, 0xc2, 0xee,
+	0xf2, 0xfe, 0xda, 0x9e, 0x5a, 0xf2, 0x9e, 0x02, 0x7b, 0x25, 0xc2, 0xfd, 0x06, 0x4b, 0x2a, 0xc8,
+	0x36, 0x60, 0x31, 0xe1, 0x78, 0x19, 0xfe, 0xce, 0x56, 0xfd, 0xd0, 0x53, 0x2f, 0x36, 0x84, 0xe5,
+	0x49, 0x3c, 0xfe, 0xf9, 0x39, 0x91, 0x61, 0x1c, 0xe5, 0x7b, 0xee, 0x78, 0x34, 0x94, 0x56, 0x0a,
+	0xba, 0x60, 0xf5, 0x72, 0xd7, 0xa1, 0x3b, 0x9a, 0x86, 0x93, 0x60, 0x94, 0x82, 0x8b, 0xc9, 0xcf,
+	0x81, 0xd1, 0xa0, 0x9a, 0x7a, 0x05, 0x9a, 0x61, 0x90, 0x35, 0x6e, 0x7b, 0xcd, 0x30, 0x48, 0x2f,
+	0x9f, 0xf8, 0x1c, 0x23, 0x79, 0xfc, 0x56, 0x5d, 0xb6, 0x7c, 0xb3, 0x1e, 0x3c, 0xb8, 0xc8, 0x4e,
+	0xbe, 0x90, 0x25, 0xf2, 0x87, 0xfb, 0x02, 0xba, 0xa7, 0x3e, 0x17, 0x48, 0x9b, 0x55, 0xd0, 0x06,
+	0x85, 0x7e, 0x05, 0x46, 0xa1, 0xff, 0x31, 0x42, 0xfa, 0xc5, 0xd2, 0x97, 0x53, 0x51, 0x7e, 0x71,
+	0xf6, 0x72, 0x9f, 0xc1, 0xea, 0x7b, 0x94, 0xda, 0x08, 0x06, 0xad, 0xfb, 0x1d, 0xd6, 0x2a, 0x88,
+	0x6a, 0x4d, 0x5b, 0x35, 0xea, 0xbe, 0xb6, 0x49, 0x3e, 0xa1, 0x76, 0x80, 0x1d, 0xe8, 0x9d, 0xa1,
+	0x3c, 0xe5, 0x78, 0x89, 0x1c, 0xa3, 0x31, 0xd6, 0x4d, 0xb1, 0x09, 0x7d, 0x03, 0x57, 0xfd, 0x8f,
+	0x3f, 0xfa, 0x42, 0xbe, 0x1e, 0x8f, 0x31, 0x91, 0xd5, 0xff, 0x78, 0x07, 0x7a, 0x7a, 0xd8, 0xbe,
+	0x34, 0xf7, 0x39, 0xb0, 0xec, 0xd3, 0xce, 0x91, 0x87, 0x97, 0x77, 0x75, 0xdd, 0x53, 0xb1, 0x50,
+	0x94, 0xea, 0x5d, 0x14, 0xe7, 0x5d, 0xee, 0x2b, 0x2e, 0x50, 0x46, 0xb1, 0x87, 0x3f, 0x70, 0x7c,
+	0x6f, 0x71, 0x81, 0xca, 0x8b, 0xf7, 0xff, 0x2e, 0x41, 0xf3, 0xfc, 0x13, 0x3b, 0x04, 0xa8, 0xbc,
+	0x80, 0x39, 0xa5, 0x6e, 0xe6, 0x9c, 0xc9, 0x79, 0x6c, 0xcd, 0xa9, 0xa5, 0x9c, 0x40, 0x47, 0x33,
+	0x09, 0xb6, 0x5d, 0xa2, 0x6d, 0xa6, 0xe2, 0x3c, 0xa9, 0x4b, 0x2b, 0xbe, 0x0f, 0xd0, 0xa6, 0x26,
+	0xc2, 0xb6, 0x2c, 0xf8, 0xf2, 0x54, 0xce, 0x76, 0x4d, 0x56, 0x91, 0x1d, 0x40, 0xab, 0xb0, 0x19,
+	0x36, 0x28, 0xa1, 0x86, 0x19, 0x39, 0x8f, 0x2c, 0x19, 0x45, 0xf0, 0x05, 0x56, 0x74, 0xeb, 0x61,
+	0xd5, 0xfc, 0x56, 0xb3, 0x72, 0x9e, 0xd6, 0xe6, 0x15, 0xe5, 0x21, 0x40, 0xe5, 0x09, 0x64, 0xef,
+	0x73, 0xee, 0x41, 0xf6, 0x6e, 0x31, 0x91, 0x43, 0x80, 0x4a, 0xd7, 0x84, 0x66, 0xce, 0x17, 0x08,
+	0x8d, 0xc5, 0x08, 0x0e, 0xa0, 0x55, 0x28, 0x94, 0x6c, 0xc8, 0xd0, 0x35, 0xd9, 0xd0, 0x9c, 0x9c,
+	0x4f, 0xa0, 0xa3, 0x89, 0x8b, 0xdc, 0xdf, 0x26, 0x4e, 0x72, 0x7f, 0xab, 0x26, 0xd3, 0xfb, 0x53,
+	0xf1, 0x91, 0xfb, 0x5b, 0xa4, 0x4a, 0xee, 0x6f, 0x55, 0xec, 0x11, 0x2c, 0x13, 0xed, 0x31, 0xb2,
+	0xd0, 0x39, 0xdd, 0x3a, 0x5b, 0xf6, 0xa4, 0xc1, 0x94, 0xb7, 0x30, 0x99, 0x34, 0x11, 0x9b, 0x4c,
+	0xba, 0x76, 0x4b, 0xa6, 0x5c, 0x95, 0x26, 0x93, 0xa6, 0x68, 0x93, 0x49, 0x17, 0xf2, 0xc5, 0x62,
+	0x96, 0x7a, 0xf5, 0x2f, 0x00, 0x00, 0xff, 0xff, 0x92, 0xa7, 0x99, 0xc8, 0x62, 0x08, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1005,6 +1136,8 @@ const _ = grpc.SupportPackageIsVersion6
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type VMClient interface {
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
+	Bootstrapping(ctx context.Context, in *BootstrappingRequest, opts ...grpc.CallOption) (*BootstrappingResponse, error)
+	Bootstrapped(ctx context.Context, in *BootstrappedRequest, opts ...grpc.CallOption) (*BootstrappedResponse, error)
 	Shutdown(ctx context.Context, in *ShutdownRequest, opts ...grpc.CallOption) (*ShutdownResponse, error)
 	CreateHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
 	BuildBlock(ctx context.Context, in *BuildBlockRequest, opts ...grpc.CallOption) (*BuildBlockResponse, error)
@@ -1028,6 +1161,24 @@ func NewVMClient(cc grpc.ClientConnInterface) VMClient {
 func (c *vMClient) Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error) {
 	out := new(InitializeResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/Initialize", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) Bootstrapping(ctx context.Context, in *BootstrappingRequest, opts ...grpc.CallOption) (*BootstrappingResponse, error) {
+	out := new(BootstrappingResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/Bootstrapping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) Bootstrapped(ctx context.Context, in *BootstrappedRequest, opts ...grpc.CallOption) (*BootstrappedResponse, error) {
+	out := new(BootstrappedResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/Bootstrapped", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1127,6 +1278,8 @@ func (c *vMClient) BlockReject(ctx context.Context, in *BlockRejectRequest, opts
 // VMServer is the server API for VM service.
 type VMServer interface {
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
+	Bootstrapping(context.Context, *BootstrappingRequest) (*BootstrappingResponse, error)
+	Bootstrapped(context.Context, *BootstrappedRequest) (*BootstrappedResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*ShutdownResponse, error)
 	CreateHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error)
 	BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error)
@@ -1145,6 +1298,12 @@ type UnimplementedVMServer struct {
 
 func (*UnimplementedVMServer) Initialize(ctx context.Context, req *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Initialize not implemented")
+}
+func (*UnimplementedVMServer) Bootstrapping(ctx context.Context, req *BootstrappingRequest) (*BootstrappingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapping not implemented")
+}
+func (*UnimplementedVMServer) Bootstrapped(ctx context.Context, req *BootstrappedRequest) (*BootstrappedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapped not implemented")
 }
 func (*UnimplementedVMServer) Shutdown(ctx context.Context, req *ShutdownRequest) (*ShutdownResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
@@ -1195,6 +1354,42 @@ func _VM_Initialize_Handler(srv interface{}, ctx context.Context, dec func(inter
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VMServer).Initialize(ctx, req.(*InitializeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_Bootstrapping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BootstrappingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).Bootstrapping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/Bootstrapping",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).Bootstrapping(ctx, req.(*BootstrappingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_Bootstrapped_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BootstrappedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).Bootstrapped(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/Bootstrapped",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).Bootstrapped(ctx, req.(*BootstrappedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1386,6 +1581,14 @@ var _VM_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Initialize",
 			Handler:    _VM_Initialize_Handler,
+		},
+		{
+			MethodName: "Bootstrapping",
+			Handler:    _VM_Bootstrapping_Handler,
+		},
+		{
+			MethodName: "Bootstrapped",
+			Handler:    _VM_Bootstrapped_Handler,
 		},
 		{
 			MethodName: "Shutdown",

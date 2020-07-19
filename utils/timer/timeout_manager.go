@@ -11,11 +11,9 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
-type timeoutHandler func()
-
 type timeout struct {
 	id      ids.ID
-	handler timeoutHandler
+	handler func()
 	timer   time.Time
 }
 
@@ -83,7 +81,7 @@ func (tm *TimeoutManager) timeout() {
 	tm.registerTimeout()
 }
 
-func (tm *TimeoutManager) put(id ids.ID, handler timeoutHandler) {
+func (tm *TimeoutManager) put(id ids.ID, handler func()) {
 	tm.remove(id)
 
 	tm.timeoutMap[id.Key()] = tm.timeoutList.PushBack(timeout{

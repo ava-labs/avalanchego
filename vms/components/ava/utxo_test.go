@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -36,7 +36,7 @@ func TestUTXOSerialize(t *testing.T) {
 	c := codec.NewDefault()
 	c.RegisterType(&secp256k1fx.MintOutput{})
 	c.RegisterType(&secp256k1fx.TransferOutput{})
-	c.RegisterType(&secp256k1fx.MintInput{})
+	c.RegisterType(&secp256k1fx.Input{})
 	c.RegisterType(&secp256k1fx.TransferInput{})
 	c.RegisterType(&secp256k1fx.Credential{})
 
@@ -83,9 +83,9 @@ func TestUTXOSerialize(t *testing.T) {
 			}),
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      12345,
-			Locktime: 54321,
+			Amt: 12345,
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  54321,
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					ids.NewShortID([20]byte{

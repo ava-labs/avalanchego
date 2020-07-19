@@ -24,22 +24,9 @@ func TestMissingBlock(t *testing.T) {
 		t.Fatalf("missingBlock.Verify returned nil, expected an error")
 	} else if bytes := mb.Bytes(); bytes != nil {
 		t.Fatalf("missingBlock.Bytes returned %v, expected %v", bytes, nil)
+	} else if err := mb.Accept(); err == nil {
+		t.Fatalf("missingBlock.Accept should have returned an error")
+	} else if err := mb.Reject(); err == nil {
+		t.Fatalf("missingBlock.Reject should have returned an error")
 	}
-
-	func() {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatalf("Should have panicked on accept")
-			}
-		}()
-		mb.Accept()
-	}()
-	func() {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatalf("Should have panicked on reject")
-			}
-		}()
-		mb.Reject()
-	}()
 }

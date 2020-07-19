@@ -20,9 +20,9 @@ type state struct {
 	db      database.Database
 }
 
-func (s *state) Vertex(id ids.ID) *vertex {
+func (s *state) Vertex(id ids.ID) *innerVertex {
 	if vtxIntf, found := s.dbCache.Get(id); found {
-		vtx, _ := vtxIntf.(*vertex)
+		vtx, _ := vtxIntf.(*innerVertex)
 		return vtx
 	}
 
@@ -41,7 +41,7 @@ func (s *state) Vertex(id ids.ID) *vertex {
 	return nil
 }
 
-func (s *state) SetVertex(id ids.ID, vtx *vertex) {
+func (s *state) SetVertex(id ids.ID, vtx *innerVertex) {
 	s.dbCache.Put(id, vtx)
 
 	if vtx == nil {

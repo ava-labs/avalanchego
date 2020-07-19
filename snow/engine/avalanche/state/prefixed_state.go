@@ -39,7 +39,7 @@ func (s *prefixedState) UniqueVertex(vtx *uniqueVertex) *uniqueVertex {
 	return s.uniqueVtx.Deduplicate(vtx).(*uniqueVertex)
 }
 
-func (s *prefixedState) Vertex(id ids.ID) *vertex {
+func (s *prefixedState) Vertex(id ids.ID) *innerVertex {
 	vID := ids.ID{}
 	if cachedVtxIDIntf, found := s.vtx.Get(id); found {
 		vID = cachedVtxIDIntf.(ids.ID)
@@ -51,7 +51,7 @@ func (s *prefixedState) Vertex(id ids.ID) *vertex {
 	return s.state.Vertex(vID)
 }
 
-func (s *prefixedState) SetVertex(vtx *vertex) {
+func (s *prefixedState) SetVertex(vtx *innerVertex) {
 	vID := ids.ID{}
 	if cachedVtxIDIntf, found := s.vtx.Get(vtx.id); found {
 		vID = cachedVtxIDIntf.(ids.ID)

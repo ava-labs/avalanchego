@@ -17,7 +17,7 @@ func (*Database) Has([]byte) (bool, error) { return false, database.ErrClosed }
 func (*Database) Get([]byte) ([]byte, error) { return nil, database.ErrClosed }
 
 // Put returns nil
-func (*Database) Put(_ []byte, _ []byte) error { return database.ErrClosed }
+func (*Database) Put(_, _ []byte) error { return database.ErrClosed }
 
 // Delete returns nil
 func (*Database) Delete([]byte) error { return database.ErrClosed }

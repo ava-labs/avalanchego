@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"
@@ -156,7 +156,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 
 	// Specify the chains that exist upon this network's creation
 	platformvmArgs.Chains = []platformvm.APIChain{
-		platformvm.APIChain{
+		{
 			GenesisData: avmReply.Bytes,
 			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        avm.ID,
@@ -167,25 +167,25 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 			},
 			Name: "X-Chain",
 		},
-		platformvm.APIChain{
+		{
 			GenesisData: formatting.CB58{Bytes: config.EVMBytes},
 			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        EVMID,
 			Name:        "C-Chain",
 		},
-		platformvm.APIChain{
+		{
 			GenesisData: spdagvmReply.Bytes,
 			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        spdagvm.ID,
 			Name:        "Simple DAG Payments",
 		},
-		platformvm.APIChain{
+		{
 			GenesisData: spchainvmReply.Bytes,
 			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        spchainvm.ID,
 			Name:        "Simple Chain Payments",
 		},
-		platformvm.APIChain{
+		{
 			GenesisData: formatting.CB58{Bytes: []byte{}}, // There is no genesis data
 			SubnetID:    platformvm.DefaultSubnetID,
 			VMID:        timestampvm.ID,
@@ -214,7 +214,9 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.CreateChainTx, error)
 		return nil, err
 	}
 	genesis := platformvm.Genesis{}
-	platformvm.Codec.Unmarshal(genesisBytes, &genesis)
+	if err := platformvm.Codec.Unmarshal(genesisBytes, &genesis); err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
+	}
 	if err := genesis.Initialize(); err != nil {
 		return nil, err
 	}

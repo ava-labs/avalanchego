@@ -6,7 +6,6 @@ package avalanche
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
@@ -34,8 +33,9 @@ type Consensus interface {
 	IsVirtuous(snowstorm.Tx) bool
 
 	// Adds a new decision. Assumes the dependencies have already been added.
-	// Assumes that mutations don't conflict with themselves.
-	Add(Vertex)
+	// Assumes that mutations don't conflict with themselves. Returns if a
+	// critical error has occurred.
+	Add(Vertex) error
 
 	// VertexIssued returns true iff Vertex has been added
 	VertexIssued(Vertex) bool
@@ -54,8 +54,9 @@ type Consensus interface {
 	Preferences() ids.Set
 
 	// RecordPoll collects the results of a network poll. If a result has not
-	// been added, the result is dropped.
-	RecordPoll(ids.UniqueBag)
+	// been added, the result is dropped. Returns if a critical error has
+	// occurred.
+	RecordPoll(ids.UniqueBag) error
 
 	// Quiesce returns true iff all vertices that have been added but not been accepted or rejected are rogue.
 	// Note, it is possible that after returning quiesce, a new decision may be added such
@@ -66,17 +67,4 @@ type Consensus interface {
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
 	Finalized() bool
-}
-
-// Vertex is a collection of multiple transactions tied to other vertices
-type Vertex interface {
-	choices.Decidable
-
-	// Returns the vertices this vertex depends on
-	Parents() []Vertex
-
-	// Returns a series of state transitions to be performed on acceptance
-	Txs() []snowstorm.Tx
-
-	Bytes() []byte
 }

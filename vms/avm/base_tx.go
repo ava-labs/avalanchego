@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -46,13 +46,18 @@ func (t *BaseTx) InputUTXOs() []*ava.UTXOID {
 	return utxos
 }
 
-// AssetIDs returns the IDs of the assets this transaction depends on
-func (t *BaseTx) AssetIDs() ids.Set {
+// ConsumedAssetIDs returns the IDs of the assets this transaction consumes
+func (t *BaseTx) ConsumedAssetIDs() ids.Set {
 	assets := ids.Set{}
 	for _, in := range t.Ins {
 		assets.Add(in.AssetID())
 	}
 	return assets
+}
+
+// AssetIDs returns the IDs of the assets this transaction depends on
+func (t *BaseTx) AssetIDs() ids.Set {
+	return t.ConsumedAssetIDs()
 }
 
 // NumCredentials returns the number of expected credentials
@@ -76,7 +81,13 @@ func (t *BaseTx) UTXOs() []*ava.UTXO {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error {
+func (t *BaseTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	_ int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -87,6 +98,10 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 	}
 
 	fc := ava.NewFlowChecker()
+
+	// The txFee must be burned
+	fc.Produce(txFeeAssetID, txFee)
+
 	for _, out := range t.Outs {
 		if err := out.Verify(); err != nil {
 			return err
@@ -106,8 +121,6 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
-
-	// TODO: Add the Tx fee to the produced side
 
 	if err := fc.Verify(); err != nil {
 		return err

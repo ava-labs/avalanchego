@@ -13,8 +13,7 @@ var (
 
 // TransferOutput ...
 type TransferOutput struct {
-	Amt      uint64 `serialize:"true" json:"amount"`
-	Locktime uint64 `serialize:"true" json:"locktime"`
+	Amt uint64 `serialize:"true" json:"amount"`
 
 	OutputOwners `serialize:"true"`
 }
@@ -33,3 +32,6 @@ func (out *TransferOutput) Verify() error {
 		return out.OutputOwners.Verify()
 	}
 }
+
+// VerifyState ...
+func (out *TransferOutput) VerifyState() error { return out.Verify() }

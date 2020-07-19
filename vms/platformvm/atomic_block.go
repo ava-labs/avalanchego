@@ -96,24 +96,29 @@ func (ab *AtomicBlock) Verify() error {
 }
 
 // Accept implements the snowman.Block interface
-func (ab *AtomicBlock) Accept() {
+func (ab *AtomicBlock) Accept() error {
 	ab.vm.Ctx.Log.Verbo("Accepting block with ID %s", ab.ID())
 
-	ab.CommonBlock.Accept()
+	if err := ab.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
 	if err := ab.onAcceptDB.Commit(); err != nil {
 		ab.vm.Ctx.Log.Error("unable to commit onAcceptDB")
+		return err
 	}
 
 	batch, err := ab.vm.DB.CommitBatch()
 	if err != nil {
 		ab.vm.Ctx.Log.Fatal("unable to commit vm's DB")
+		return err
 	}
 	defer ab.vm.DB.Abort()
 
 	if err := ab.Tx.Accept(batch); err != nil {
 		ab.vm.Ctx.Log.Error("unable to atomically commit block")
+		return err
 	}
 
 	for _, child := range ab.children {
@@ -124,6 +129,7 @@ func (ab *AtomicBlock) Accept() {
 	}
 
 	ab.free()
+	return nil
 }
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a

@@ -7,18 +7,18 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 type testOperable struct {
 	ava.TestTransferable `serialize:"true"`
 
-	Outputs []verify.Verifiable `serialize:"true"`
+	Outputs []verify.State `serialize:"true"`
 }
 
-func (o *testOperable) Outs() []verify.Verifiable { return o.Outputs }
+func (o *testOperable) Outs() []verify.State { return o.Outputs }
 
 func TestOperationVerifyNil(t *testing.T) {
 	c := codec.NewDefault()
@@ -43,11 +43,11 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 	op := &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
 		UTXOIDs: []*ava.UTXOID{
-			&ava.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
-			&ava.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
@@ -64,7 +64,7 @@ func TestOperationVerify(t *testing.T) {
 	op := &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
 		UTXOIDs: []*ava.UTXOID{
-			&ava.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
@@ -81,20 +81,20 @@ func TestOperationSorting(t *testing.T) {
 	c.RegisterType(&testOperable{})
 
 	ops := []*Operation{
-		&Operation{
+		{
 			Asset: ava.Asset{ID: ids.Empty},
 			UTXOIDs: []*ava.UTXOID{
-				&ava.UTXOID{
+				{
 					TxID:        ids.Empty,
 					OutputIndex: 1,
 				},
 			},
 			Op: &testOperable{},
 		},
-		&Operation{
+		{
 			Asset: ava.Asset{ID: ids.Empty},
 			UTXOIDs: []*ava.UTXOID{
-				&ava.UTXOID{
+				{
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
@@ -112,7 +112,7 @@ func TestOperationSorting(t *testing.T) {
 	ops = append(ops, &Operation{
 		Asset: ava.Asset{ID: ids.Empty},
 		UTXOIDs: []*ava.UTXOID{
-			&ava.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
@@ -121,5 +121,12 @@ func TestOperationSorting(t *testing.T) {
 	})
 	if isSortedAndUniqueOperations(ops, c) {
 		t.Fatalf("Shouldn't be unique")
+	}
+}
+
+func TestOperationTxNotState(t *testing.T) {
+	intf := interface{}(&OperationTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

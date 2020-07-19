@@ -12,17 +12,19 @@ type Field uint32
 
 // Fields that may be packed. These values are not sent over the wire.
 const (
-	VersionStr     Field = iota // Used in handshake
-	NetworkID                   // Used in handshake
-	NodeID                      // Used in handshake
-	MyTime                      // Used in handshake
-	IP                          // Used in handshake
-	Peers                       // Used in handshake
-	ChainID                     // Used for dispatching
-	RequestID                   // Used for all messages
-	ContainerID                 // Used for querying
-	ContainerBytes              // Used for gossiping
-	ContainerIDs                // Used for querying
+	VersionStr          Field = iota // Used in handshake
+	NetworkID                        // Used in handshake
+	NodeID                           // Used in handshake
+	MyTime                           // Used in handshake
+	IP                               // Used in handshake
+	Peers                            // Used in handshake
+	ChainID                          // Used for dispatching
+	RequestID                        // Used for all messages
+	Deadline                         // Used for request messages
+	ContainerID                      // Used for querying
+	ContainerBytes                   // Used for gossiping
+	ContainerIDs                     // Used for querying
+	MultiContainerBytes              // Used in MultiPut
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -44,12 +46,16 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHash
 	case RequestID:
 		return wrappers.TryPackInt
+	case Deadline:
+		return wrappers.TryPackLong
 	case ContainerID:
 		return wrappers.TryPackHash
 	case ContainerBytes:
 		return wrappers.TryPackBytes
 	case ContainerIDs:
 		return wrappers.TryPackHashes
+	case MultiContainerBytes:
+		return wrappers.TryPack2DBytes
 	default:
 		return nil
 	}
@@ -74,12 +80,16 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHash
 	case RequestID:
 		return wrappers.TryUnpackInt
+	case Deadline:
+		return wrappers.TryUnpackLong
 	case ContainerID:
 		return wrappers.TryUnpackHash
 	case ContainerBytes:
 		return wrappers.TryUnpackBytes
 	case ContainerIDs:
 		return wrappers.TryUnpackHashes
+	case MultiContainerBytes:
+		return wrappers.TryUnpack2DBytes
 	default:
 		return nil
 	}
@@ -101,12 +111,18 @@ func (f Field) String() string {
 		return "Peers"
 	case ChainID:
 		return "ChainID"
+	case RequestID:
+		return "RequestID"
+	case Deadline:
+		return "Deadline"
 	case ContainerID:
 		return "ContainerID"
 	case ContainerBytes:
 		return "Container Bytes"
 	case ContainerIDs:
 		return "Container IDs"
+	case MultiContainerBytes:
+		return "MultiContainerBytes"
 	default:
 		return "Unknown Field"
 	}
@@ -125,6 +141,10 @@ func (op Op) String() string {
 		return "get_peerlist"
 	case PeerList:
 		return "peerlist"
+	case Ping:
+		return "ping"
+	case Pong:
+		return "pong"
 	case GetAcceptedFrontier:
 		return "get_accepted_frontier"
 	case AcceptedFrontier:
@@ -135,8 +155,12 @@ func (op Op) String() string {
 		return "accepted"
 	case Get:
 		return "get"
+	case GetAncestors:
+		return "get_ancestors"
 	case Put:
 		return "put"
+	case MultiPut:
+		return "multi_put"
 	case PushQuery:
 		return "push_query"
 	case PullQuery:
@@ -155,11 +179,15 @@ const (
 	Version
 	GetPeerList
 	PeerList
+	Ping
+	Pong
 	// Bootstrapping:
 	GetAcceptedFrontier
 	AcceptedFrontier
 	GetAccepted
 	Accepted
+	GetAncestors
+	MultiPut
 	// Consensus:
 	Get
 	Put
@@ -172,20 +200,24 @@ const (
 var (
 	Messages = map[Op][]Field{
 		// Handshake:
-		GetVersion:  []Field{},
-		Version:     []Field{NetworkID, NodeID, MyTime, IP, VersionStr},
-		GetPeerList: []Field{},
-		PeerList:    []Field{Peers},
+		GetVersion:  {},
+		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr},
+		GetPeerList: {},
+		PeerList:    {Peers},
+		Ping:        {},
+		Pong:        {},
 		// Bootstrapping:
-		GetAcceptedFrontier: []Field{ChainID, RequestID},
-		AcceptedFrontier:    []Field{ChainID, RequestID, ContainerIDs},
-		GetAccepted:         []Field{ChainID, RequestID, ContainerIDs},
-		Accepted:            []Field{ChainID, RequestID, ContainerIDs},
+		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
+		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
+		GetAccepted:         {ChainID, RequestID, Deadline, ContainerIDs},
+		Accepted:            {ChainID, RequestID, ContainerIDs},
+		GetAncestors:        {ChainID, RequestID, Deadline, ContainerID},
+		MultiPut:            {ChainID, RequestID, MultiContainerBytes},
 		// Consensus:
-		Get:       []Field{ChainID, RequestID, ContainerID},
-		Put:       []Field{ChainID, RequestID, ContainerID, ContainerBytes},
-		PushQuery: []Field{ChainID, RequestID, ContainerID, ContainerBytes},
-		PullQuery: []Field{ChainID, RequestID, ContainerID},
-		Chits:     []Field{ChainID, RequestID, ContainerIDs},
+		Get:       {ChainID, RequestID, Deadline, ContainerID},
+		Put:       {ChainID, RequestID, ContainerID, ContainerBytes},
+		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
+		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
+		Chits:     {ChainID, RequestID, ContainerIDs},
 	}
 )

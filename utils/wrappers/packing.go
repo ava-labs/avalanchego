@@ -61,26 +61,23 @@ func (p *Packer) CheckSpace(bytes int) {
 	}
 }
 
-// Expand ensures that there is [bytes] bytes left of space in the byte array.
-// If this is not allowed due to the maximum size, an error is added to the
-// packer
+// Expand ensures that there is [bytes] bytes left of space in the byte slice.
+// If this is not allowed due to the maximum size, an error is added to the packer
+// In order to understand this code, its important to understand the difference
+// between a slice's length and its capacity.
 func (p *Packer) Expand(bytes int) {
-	p.CheckSpace(0)
-	if p.Errored() {
+	neededSize := bytes + p.Offset // Need byte slice's length to be at least [neededSize]
+	switch {
+	case neededSize <= len(p.Bytes): // Byte slice has sufficient length already
 		return
-	}
-
-	neededSize := bytes + p.Offset
-	if neededSize <= len(p.Bytes) {
+	case neededSize > p.MaxSize: // Lengthening the byte slice would cause it to grow too large
+		p.Err = errBadLength
 		return
-	}
-
-	if neededSize > p.MaxSize {
-		p.Add(errBadLength)
-	} else if neededSize > cap(p.Bytes) {
-		p.Bytes = append(p.Bytes[:cap(p.Bytes)], make([]byte, neededSize-cap(p.Bytes))...)
-	} else {
+	case neededSize <= cap(p.Bytes): // Byte slice has sufficient capacity to lengthen it without mem alloc
 		p.Bytes = p.Bytes[:neededSize]
+		return
+	default: // Add capacity/length to byte slice
+		p.Bytes = append(p.Bytes[:cap(p.Bytes)], make([]byte, neededSize-cap(p.Bytes))...)
 	}
 }
 
@@ -256,6 +253,24 @@ func (p *Packer) UnpackFixedByteSlices(size int) [][]byte {
 	return bytes
 }
 
+// Pack2DByteSlice append a 2D byte slice to the byte array
+func (p *Packer) Pack2DByteSlice(byteSlices [][]byte) {
+	p.PackInt(uint32(len(byteSlices)))
+	for _, bytes := range byteSlices {
+		p.PackBytes(bytes)
+	}
+}
+
+// Unpack2DByteSlice returns a 2D byte slice from the byte array.
+func (p *Packer) Unpack2DByteSlice() [][]byte {
+	sliceSize := p.UnpackInt()
+	bytes := [][]byte(nil)
+	for i := uint32(0); i < sliceSize && !p.Errored(); i++ {
+		bytes = append(bytes, p.UnpackBytes())
+	}
+	return bytes
+}
+
 // PackStr append a string to the byte array
 func (p *Packer) PackStr(str string) {
 	strSize := len(str)
@@ -272,7 +287,7 @@ func (p *Packer) UnpackStr() string {
 	return string(p.UnpackFixedBytes(int(strSize)))
 }
 
-// PackIP unpacks an ip port pair from the byte array
+// PackIP packs an ip port pair to the byte array
 func (p *Packer) PackIP(ip utils.IPDesc) {
 	p.PackFixedBytes(ip.IP.To16())
 	p.PackShort(ip.Port)
@@ -430,6 +445,20 @@ func TryPackBytes(packer *Packer, valIntf interface{}) {
 // TryUnpackBytes attempts to unpack the value as a list of bytes
 func TryUnpackBytes(packer *Packer) interface{} {
 	return packer.UnpackBytes()
+}
+
+// TryPack2DBytes attempts to pack the value as a 2D byte slice
+func TryPack2DBytes(packer *Packer, valIntf interface{}) {
+	if val, ok := valIntf.([][]byte); ok {
+		packer.Pack2DByteSlice(val)
+	} else {
+		packer.Add(errBadType)
+	}
+}
+
+// TryUnpack2DBytes attempts to unpack the value as a 2D byte slice
+func TryUnpack2DBytes(packer *Packer) interface{} {
+	return packer.Unpack2DByteSlice()
 }
 
 // TryPackStr attempts to pack the value as a string

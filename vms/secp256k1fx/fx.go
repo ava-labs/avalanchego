@@ -34,8 +34,9 @@ var (
 
 // Fx describes the secp256k1 feature extension
 type Fx struct {
-	VM          VM
-	SECPFactory crypto.FactorySECP256K1R
+	VM           VM
+	SECPFactory  crypto.FactorySECP256K1R
+	bootstrapped bool
 }
 
 // Initialize ...
@@ -68,6 +69,12 @@ func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	fx.VM = vm
 	return nil
 }
+
+// Bootstrapping ...
+func (fx *Fx) Bootstrapping() error { return nil }
+
+// Bootstrapped ...
+func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
 // VerifyOperation ...
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
@@ -130,14 +137,8 @@ func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) err
 func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *TransferOutput) error {
 	if err := verify.All(utxo, in, cred); err != nil {
 		return err
-	}
-
-	clock := fx.VM.Clock()
-	switch {
-	case utxo.Amt != in.Amt:
+	} else if utxo.Amt != in.Amt {
 		return errWrongAmounts
-	case utxo.Locktime > clock.Unix():
-		return errTimelocked
 	}
 
 	return fx.VerifyCredentials(tx, &in.Input, cred, &utxo.OutputOwners)
@@ -146,14 +147,22 @@ func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *Tran
 // VerifyCredentials ensures that the output can be spent by the input with the
 // credential. A nil return values means the output can be spent.
 func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputOwners) error {
+	clock := fx.VM.Clock()
 	numSigs := len(in.SigIndices)
 	switch {
+	case out.Locktime > clock.Unix():
+		return errTimelocked
 	case out.Threshold < uint32(numSigs):
 		return errTooManySigners
 	case out.Threshold > uint32(numSigs):
 		return errTooFewSigners
 	case numSigs != len(cred.Sigs):
 		return errInputCredentialSignersMismatch
+	}
+
+	// disable signature verification during bootstrapping
+	if !fx.bootstrapped {
+		return nil
 	}
 
 	txBytes := tx.UnsignedBytes()

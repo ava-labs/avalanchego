@@ -51,7 +51,7 @@ func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 		return // This instace is already decided.
 	}
 
-	if preference := sf.nnarySlush.Preference(); preference.Equals(choice) {
+	if preference := sf.Preference(); preference.Equals(choice) {
 		sf.confidence++
 	} else {
 		// confidence is set to 1 because there has already been 1 successful

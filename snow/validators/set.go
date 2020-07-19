@@ -10,7 +10,21 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/random"
+)
+
+const (
+	// maxExcessCapacityFactor ...
+	// If, when the validator set is reset, cap(set)/len(set) > MaxExcessCapacityFactor,
+	// the underlying arrays' capacities will be reduced by a factor of capacityReductionFactor.
+	// Higher value for maxExcessCapacityFactor --> less aggressive array downsizing --> less memory allocations
+	// but more unnecessary data in the underlying array that can't be garbage collected.
+	// Higher value for capacityReductionFactor --> more aggressive array downsizing --> more memory allocations
+	// but less unnecessary data in the underlying array that can't be garbage collected.
+	maxExcessCapacityFactor = 4
+	// CapacityReductionFactor ...
+	capacityReductionFactor = 2
 )
 
 // Set of validators that can be sampled
@@ -45,6 +59,9 @@ type Set interface {
 	// [size]. Otherwise, the length of the returned validators will equal
 	// [size].
 	Sample(size int) []Validator
+
+	// Calculates the total weight of the validator set
+	Weight() (uint64, error)
 }
 
 // NewSet returns a new, empty set of validators.
@@ -71,9 +88,21 @@ func (s *set) Set(vdrs []Validator) {
 }
 
 func (s *set) set(vdrs []Validator) {
-	s.vdrMap = make(map[[20]byte]int, len(vdrs))
-	s.vdrSlice = s.vdrSlice[:0]
-	s.sampler.Weights = s.sampler.Weights[:0]
+	lenVdrs := len(vdrs)
+	// If the underlying arrays are much larger than necessary, resize them to
+	// allow garbage collection of unused memory
+	if cap(s.vdrSlice) > len(s.vdrSlice)*maxExcessCapacityFactor {
+		newCap := cap(s.vdrSlice) / capacityReductionFactor
+		if newCap < lenVdrs {
+			newCap = lenVdrs
+		}
+		s.vdrSlice = make([]Validator, 0, newCap)
+		s.sampler.Weights = make([]uint64, 0, newCap)
+	} else {
+		s.vdrSlice = s.vdrSlice[:0]
+		s.sampler.Weights = s.sampler.Weights[:0]
+	}
+	s.vdrMap = make(map[[20]byte]int, lenVdrs)
 
 	for _, vdr := range vdrs {
 		s.add(vdr)
@@ -207,6 +236,25 @@ func (s *set) sample(size int) []Validator {
 		list = append(list, s.vdrSlice[i])
 	}
 	return list
+}
+
+func (s *set) Weight() (uint64, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.weight()
+}
+
+func (s *set) weight() (uint64, error) {
+	weight := uint64(0)
+	for _, validator := range s.list() {
+		newWeight, err := math.Add64(weight, validator.Weight())
+		if err != nil {
+			return weight, err
+		}
+		weight = newWeight
+	}
+	return weight, nil
 }
 
 func (s *set) String() string {

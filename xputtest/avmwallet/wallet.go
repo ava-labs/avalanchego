@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -19,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -96,7 +96,7 @@ func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keychain.Add(sk)
 // AddUTXO adds a new UTXO to this wallet if this wallet may spend it
 // The UTXO's output must be an OutputPayment
 func (w *Wallet) AddUTXO(utxo *ava.UTXO) {
-	out, ok := utxo.Out.(ava.Transferable)
+	out, ok := utxo.Out.(ava.TransferableOut)
 	if !ok {
 		return
 	}
@@ -116,7 +116,7 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 
 	assetID := utxo.AssetID()
 	assetKey := assetID.Key()
-	newBalance := w.balance[assetKey] - utxo.Out.(ava.Transferable).Amount()
+	newBalance := w.balance[assetKey] - utxo.Out.(ava.TransferableOut).Amount()
 	if newBalance == 0 {
 		delete(w.balance, assetKey)
 	} else {
@@ -148,7 +148,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok {
 			continue
 		}
@@ -181,9 +181,9 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
 		Asset: ava.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      amount,
-			Locktime: 0,
+			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{destAddr},
 			},
@@ -198,9 +198,9 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      amountSpent - amount,
-				Locktime: 0,
+				Amt: amountSpent - amount,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
 				},

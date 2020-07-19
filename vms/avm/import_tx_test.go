@@ -9,12 +9,14 @@ import (
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -68,7 +70,7 @@ func TestImportTxSerialization(t *testing.T) {
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
 		},
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -106,9 +108,10 @@ func TestIssueImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
+	baseDB := memdb.New()
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
@@ -127,10 +130,10 @@ func TestIssueImportTx(t *testing.T) {
 	}
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{&common.Fx{
+		[]*common.Fx{{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
@@ -139,6 +142,16 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	key := keys[0]
 
@@ -156,7 +169,7 @@ func TestIssueImportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  ava.Asset{ID: avaID},
 			In: &secp256k1fx.TransferInput{
@@ -255,9 +268,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
+	baseDB := memdb.New()
 
 	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
@@ -266,7 +280,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	platformID := ids.Empty.Prefix(0)
 
-	vm := &VM{platform: platformID}
+	vm := &VM{
+		ava:      ids.Empty,
+		platform: platformID,
+	}
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -275,10 +292,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{&common.Fx{
+		[]*common.Fx{{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
@@ -287,6 +304,16 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	key := keys[0]
 
@@ -306,7 +333,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
+		Ins: []*ava.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  ava.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
@@ -358,5 +385,12 @@ func TestForceAcceptImportTx(t *testing.T) {
 	utxoSource := utxoID.InputID()
 	if _, err := state.PlatformUTXO(utxoSource); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
+	}
+}
+
+func TestImportTxNotState(t *testing.T) {
+	intf := interface{}(&ImportTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

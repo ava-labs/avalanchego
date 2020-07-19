@@ -10,6 +10,10 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
+const (
+	minMapSize = 16
+)
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
@@ -65,16 +69,16 @@ func (ta *Topological) Initialize(ctx *snow.Context, params Parameters, frontier
 		ta.ctx.Log.Error("%s", err)
 	}
 
-	ta.nodes = make(map[[32]byte]Vertex)
+	ta.nodes = make(map[[32]byte]Vertex, minMapSize)
 
 	ta.cg = &snowstorm.Directed{}
 	ta.cg.Initialize(ctx, params.Parameters)
 
-	ta.frontier = make(map[[32]byte]Vertex)
+	ta.frontier = make(map[[32]byte]Vertex, minMapSize)
 	for _, vtx := range frontier {
 		ta.frontier[vtx.ID().Key()] = vtx
 	}
-	ta.updateFrontiers()
+	ctx.Log.AssertNoError(ta.updateFrontiers())
 }
 
 // Parameters implements the Avalanche interface
@@ -84,15 +88,15 @@ func (ta *Topological) Parameters() Parameters { return ta.params }
 func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool { return ta.cg.IsVirtuous(tx) }
 
 // Add implements the Avalanche interface
-func (ta *Topological) Add(vtx Vertex) {
+func (ta *Topological) Add(vtx Vertex) error {
 	ta.ctx.Log.AssertTrue(vtx != nil, "Attempting to insert nil vertex")
 
 	vtxID := vtx.ID()
 	key := vtxID.Key()
 	if vtx.Status().Decided() {
-		return // Already decided this vertex
+		return nil // Already decided this vertex
 	} else if _, exists := ta.nodes[key]; exists {
-		return // Already inserted this vertex
+		return nil // Already inserted this vertex
 	}
 
 	ta.ctx.ConsensusDispatcher.Issue(ta.ctx.ChainID, vtxID, vtx.Bytes())
@@ -100,14 +104,16 @@ func (ta *Topological) Add(vtx Vertex) {
 	for _, tx := range vtx.Txs() {
 		if !tx.Status().Decided() {
 			// Add the consumers to the conflict graph.
-			ta.cg.Add(tx)
+			if err := ta.cg.Add(tx); err != nil {
+				return err
+			}
 		}
 	}
 
 	ta.nodes[key] = vtx // Add this vertex to the set of nodes
 	ta.metrics.Issued(vtxID)
 
-	ta.update(vtx) // Update the vertex and it's ancestry
+	return ta.update(vtx) // Update the vertex and it's ancestry
 }
 
 // VertexIssued implements the Avalanche interface
@@ -132,16 +138,37 @@ func (ta *Topological) Virtuous() ids.Set { return ta.virtuous }
 func (ta *Topological) Preferences() ids.Set { return ta.preferred }
 
 // RecordPoll implements the Avalanche interface
-func (ta *Topological) RecordPoll(responses ids.UniqueBag) {
+func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
+	// If it isn't possible to have alpha votes for any transaction, then we can
+	// just reset the confidence values in the conflict graph and not perform
+	// any traversals.
+	partialVotes := ids.BitSet(0)
+	for _, vote := range responses.List() {
+		votes := responses.GetSet(vote)
+		partialVotes.Union(votes)
+		if partialVotes.Len() >= ta.params.Alpha {
+			break
+		}
+	}
+	if partialVotes.Len() < ta.params.Alpha {
+		// Skip the traversals.
+		_, err := ta.cg.RecordPoll(ids.Bag{})
+		return err
+	}
+
 	// Set up the topological sort: O(|Live Set|)
 	kahns, leaves := ta.calculateInDegree(responses)
 	// Collect the votes for each transaction: O(|Live Set|)
 	votes := ta.pushVotes(kahns, leaves)
 	// Update the conflict graph: O(|Transactions|)
 	ta.ctx.Log.Verbo("Updating consumer confidences based on:\n%s", &votes)
-	ta.cg.RecordPoll(votes)
+	if updated, err := ta.cg.RecordPoll(votes); !updated || err != nil {
+		// If the transaction statuses weren't changed, there is no need to
+		// perform a traversal.
+		return err
+	}
 	// Update the dag: O(|Live Set|)
-	ta.updateFrontiers()
+	return ta.updateFrontiers()
 }
 
 // Quiesce implements the Avalanche interface
@@ -155,7 +182,7 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 // the non-transitively applied votes. Also returns the list of leaf nodes.
 func (ta *Topological) calculateInDegree(
 	responses ids.UniqueBag) (map[[32]byte]kahnNode, []ids.ID) {
-	kahns := make(map[[32]byte]kahnNode)
+	kahns := make(map[[32]byte]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
 	for _, vote := range responses.List() {
@@ -184,7 +211,7 @@ func (ta *Topological) markAncestorInDegrees(
 	kahns map[[32]byte]kahnNode,
 	leaves ids.Set,
 	deps []Vertex) (map[[32]byte]kahnNode, ids.Set) {
-	frontier := []Vertex{}
+	frontier := make([]Vertex, 0, len(deps))
 	for _, vtx := range deps {
 		// The vertex may have been decided, no need to vote in that case
 		if !vtx.Status().Decided() {
@@ -229,6 +256,7 @@ func (ta *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode,
 	leaves []ids.ID) ids.Bag {
 	votes := make(ids.UniqueBag)
+	txConflicts := make(map[[32]byte]ids.Set, minMapSize)
 
 	for len(leaves) > 0 {
 		newLeavesSize := len(leaves) - 1
@@ -243,6 +271,12 @@ func (ta *Topological) pushVotes(
 				// Give the votes to the consumer
 				txID := tx.ID()
 				votes.UnionSet(txID, kahn.votes)
+
+				// Map txID to set of Conflicts
+				txKey := txID.Key()
+				if _, exists := txConflicts[txKey]; !exists {
+					txConflicts[txKey] = ta.cg.Conflicts(tx)
+				}
 			}
 
 			for _, dep := range vtx.Parents() {
@@ -263,6 +297,18 @@ func (ta *Topological) pushVotes(
 		}
 	}
 
+	// Create bag of votes for conflicting transactions
+	conflictingVotes := make(ids.UniqueBag)
+	for txHash, conflicts := range txConflicts {
+		txID := ids.NewID(txHash)
+		for conflictTxHash := range conflicts {
+			conflictTxID := ids.NewID(conflictTxHash)
+			conflictingVotes.UnionSet(txID, votes.GetSet(conflictTxID))
+		}
+	}
+
+	votes.Difference(&conflictingVotes)
+
 	return votes.Bag(ta.params.Alpha)
 }
 
@@ -275,11 +321,11 @@ func (ta *Topological) pushVotes(
 // If I'm preferred, remove all my ancestors from the preferred frontier, add
 //     myself to the preferred frontier
 // If all my parents are accepted and I'm acceptable, accept myself
-func (ta *Topological) update(vtx Vertex) {
+func (ta *Topological) update(vtx Vertex) error {
 	vtxID := vtx.ID()
 	vtxKey := vtxID.Key()
 	if _, cached := ta.preferenceCache[vtxKey]; cached {
-		return // This vertex has already been updated
+		return nil // This vertex has already been updated
 	}
 
 	switch vtx.Status() {
@@ -291,12 +337,12 @@ func (ta *Topological) update(vtx Vertex) {
 
 		ta.preferenceCache[vtxKey] = true
 		ta.virtuousCache[vtxKey] = true
-		return
+		return nil
 	case choices.Rejected:
 		// I'm rejected
 		ta.preferenceCache[vtxKey] = false
 		ta.virtuousCache[vtxKey] = false
-		return
+		return nil
 	}
 
 	acceptable := true  // If the batch is accepted, this vertex is acceptable
@@ -327,7 +373,9 @@ func (ta *Topological) update(vtx Vertex) {
 	deps := vtx.Parents()
 	// Update all of my dependencies
 	for _, dep := range deps {
-		ta.update(dep)
+		if err := ta.update(dep); err != nil {
+			return err
+		}
 
 		depID := dep.ID()
 		key := depID.Key()
@@ -338,13 +386,17 @@ func (ta *Topological) update(vtx Vertex) {
 	// Check my parent statuses
 	for _, dep := range deps {
 		if status := dep.Status(); status == choices.Rejected {
-			vtx.Reject() // My parent is rejected, so I should be rejected
+			// My parent is rejected, so I should be rejected
+			if err := vtx.Reject(); err != nil {
+				return err
+			}
+			ta.ctx.ConsensusDispatcher.Reject(ta.ctx.ChainID, vtxID, vtx.Bytes())
 			delete(ta.nodes, vtxKey)
 			ta.metrics.Rejected(vtxID)
 
 			ta.preferenceCache[vtxKey] = false
 			ta.virtuousCache[vtxKey] = false
-			return
+			return nil
 		} else if status != choices.Accepted {
 			acceptable = false // My parent isn't accepted, so I can't be
 		}
@@ -389,34 +441,42 @@ func (ta *Topological) update(vtx Vertex) {
 	switch {
 	case acceptable:
 		// I'm acceptable, why not accept?
+		if err := vtx.Accept(); err != nil {
+			return err
+		}
 		ta.ctx.ConsensusDispatcher.Accept(ta.ctx.ChainID, vtxID, vtx.Bytes())
-		vtx.Accept()
 		delete(ta.nodes, vtxKey)
 		ta.metrics.Accepted(vtxID)
 	case rejectable:
 		// I'm rejectable, why not reject?
-		vtx.Reject()
+		if err := vtx.Reject(); err != nil {
+			return err
+		}
 		ta.ctx.ConsensusDispatcher.Reject(ta.ctx.ChainID, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxKey)
 		ta.metrics.Rejected(vtxID)
 	}
+	return nil
 }
 
 // Update the frontier sets
-func (ta *Topological) updateFrontiers() {
+func (ta *Topological) updateFrontiers() error {
 	vts := ta.frontier
 
 	ta.preferred.Clear()
 	ta.virtuous.Clear()
 	ta.orphans.Clear()
-	ta.frontier = make(map[[32]byte]Vertex)
-	ta.preferenceCache = make(map[[32]byte]bool)
-	ta.virtuousCache = make(map[[32]byte]bool)
+	ta.frontier = make(map[[32]byte]Vertex, minMapSize)
+	ta.preferenceCache = make(map[[32]byte]bool, minMapSize)
+	ta.virtuousCache = make(map[[32]byte]bool, minMapSize)
 
 	ta.orphans.Union(ta.cg.Virtuous()) // Initially, nothing is preferred
 
 	for _, vtx := range vts {
 		// Update all the vertices that were in my previous frontier
-		ta.update(vtx)
+		if err := ta.update(vtx); err != nil {
+			return err
+		}
 	}
+	return nil
 }

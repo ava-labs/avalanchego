@@ -16,7 +16,13 @@ import (
 type ProposalTx interface {
 	initialize(vm *VM) error
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(database.Database) (onCommitDB *versiondb.Database, onAbortDB *versiondb.Database, onCommitFunc func(), onAbortFunc func(), err error)
+	SemanticVerify(database.Database) (
+		onCommitDB *versiondb.Database,
+		onAbortDB *versiondb.Database,
+		onCommitFunc func(),
+		onAbortFunc func(),
+		err TxError,
+	)
 	InitiallyPrefersCommit() bool
 }
 
@@ -43,9 +49,10 @@ type ProposalBlock struct {
 }
 
 // Accept implements the snowman.Block interface
-func (pb *ProposalBlock) Accept() {
+func (pb *ProposalBlock) Accept() error {
 	pb.SetStatus(choices.Accepted)
 	pb.VM.LastAcceptedID = pb.ID()
+	return nil
 }
 
 // Initialize this block.
@@ -97,15 +104,33 @@ func (pb *ProposalBlock) Verify() error {
 	// The parent of a proposal block (ie this block) must be a decision block
 	parent, ok := parentIntf.(decision)
 	if !ok {
+		if err := pb.Reject(); err == nil {
+			if err := pb.vm.DB.Commit(); err != nil {
+				pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+			}
+		} else {
+			pb.vm.DB.Abort()
+		}
 		return errInvalidBlockType
 	}
 
 	// pdb is the database if this block's parent is accepted
 	pdb := parent.onAccept()
 
-	var err error
+	var err TxError
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
 	if err != nil {
+		// If this block's transaction proposes to advance the timestamp, the transaction may fail
+		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
+		if !err.Temporary() {
+			if err := pb.Reject(); err == nil {
+				if err := pb.vm.DB.Commit(); err != nil {
+					pb.vm.Ctx.Log.Error("error committing Proposal block as rejected: %s", err)
+				}
+			} else {
+				pb.vm.DB.Abort()
+			}
+		}
 		return err
 	}
 
@@ -115,24 +140,32 @@ func (pb *ProposalBlock) Verify() error {
 }
 
 // Options returns the possible children of this block in preferential order.
-func (pb *ProposalBlock) Options() [2]snowman.Block {
+func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	blockID := pb.ID()
 
-	commit := pb.vm.newCommitBlock(blockID)
-	abort := pb.vm.newAbortBlock(blockID)
+	commit, err := pb.vm.newCommitBlock(blockID)
+	if err != nil {
+		return [2]snowman.Block{}, err
+	}
+	abort, err := pb.vm.newAbortBlock(blockID)
+	if err != nil {
+		return [2]snowman.Block{}, err
+	}
 
 	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
+		return [2]snowman.Block{}, err
 	}
 	if err := pb.vm.State.PutBlock(pb.vm.DB, abort); err != nil {
-		pb.vm.Ctx.Log.Warn(errDBPutBlock.Error())
+		return [2]snowman.Block{}, err
 	}
-	pb.vm.DB.Commit()
+	if err := pb.vm.DB.Commit(); err != nil {
+		return [2]snowman.Block{}, err
+	}
 
 	if pb.Tx.InitiallyPrefersCommit() {
-		return [2]snowman.Block{commit, abort}
+		return [2]snowman.Block{commit, abort}, nil
 	}
-	return [2]snowman.Block{abort, commit}
+	return [2]snowman.Block{abort, commit}, nil
 }
 
 // newProposalBlock creates a new block that proposes to issue a transaction.

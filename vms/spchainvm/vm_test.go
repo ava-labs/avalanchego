@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -59,7 +60,10 @@ func TestPayments(t *testing.T) {
 	genesisAccounts := GenesisAccounts()
 
 	codec := Codec{}
-	genesisData, _ := codec.MarshalGenesis(genesisAccounts)
+	genesisData, err := codec.MarshalGenesis(genesisAccounts)
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	bootstrappingDB := memdb.New()
 
@@ -81,7 +85,7 @@ func TestPayments(t *testing.T) {
 	ctx.Lock.Lock()
 	consensus := smeng.Transitive{}
 	consensus.Initialize(smeng.Config{
-		BootstrapConfig: smeng.BootstrapConfig{
+		Config: bootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: vdrs,

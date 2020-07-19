@@ -69,8 +69,11 @@ func (n *Network) Initialize(params snowball.Parameters, numColors, colorsPerCon
 		}
 
 		idCount++
-		tx := &TestTx{Identifier: ids.Empty.Prefix(idCount)}
-		tx.Ins.Add(selected...)
+		tx := &TestTx{TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(idCount),
+			StatusV: choices.Processing,
+		}}
+		tx.InputIDsV.Add(selected...)
 
 		n.consumers = append(n.consumers, tx)
 	}
@@ -84,9 +87,11 @@ func (n *Network) AddNode(cg Consensus) {
 	txs := map[[32]byte]*TestTx{}
 	for _, tx := range n.consumers {
 		newTx := &TestTx{
-			Identifier: tx.ID(),
-			Ins:        tx.Ins,
-			Stat:       choices.Processing,
+			TestDecidable: choices.TestDecidable{
+				IDV:     tx.ID(),
+				StatusV: choices.Processing,
+			},
+			InputIDsV: tx.InputIDs(),
 		}
 		txs[newTx.ID().Key()] = newTx
 

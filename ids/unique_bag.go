@@ -8,12 +8,16 @@ import (
 	"strings"
 )
 
+const (
+	minUniqueBagSize = 16
+)
+
 // UniqueBag ...
 type UniqueBag map[[32]byte]BitSet
 
 func (b *UniqueBag) init() {
 	if *b == nil {
-		*b = make(map[[32]byte]BitSet)
+		*b = make(map[[32]byte]BitSet, minUniqueBagSize)
 	}
 }
 
@@ -62,11 +66,16 @@ func (b *UniqueBag) Difference(diff *UniqueBag) {
 // GetSet ...
 func (b *UniqueBag) GetSet(id ID) BitSet { return (*b)[*id.ID] }
 
+// RemoveSet ...
+func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id.Key()) }
+
 // List ...
 func (b *UniqueBag) List() []ID {
-	idList := []ID(nil)
+	idList := make([]ID, len(*b))
+	i := 0
 	for id := range *b {
-		idList = append(idList, NewID(id))
+		idList[i] = NewID(id)
+		i++
 	}
 	return idList
 }

@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -558,6 +558,63 @@ func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 	utxos := []interface{}{utxo}
 	if err := fx.VerifyOperation(tx, op, cred, utxos); err == nil {
 		t.Fatalf("VerifyOperation should have errored due to the wrong hash being produced")
+	}
+}
+
+func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
+	now := time.Now()
+	clk := timer.Clock{}
+	clk.Set(now)
+	vm := secp256k1fx.TestVM{
+		CLK:  &clk,
+		Code: codec.NewDefault(),
+		Log:  logging.NoLog{},
+	}
+	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
+	vm.CLK.Set(date)
+
+	fx := Fx{}
+	if err := fx.Initialize(&vm); err != nil {
+		t.Fatal(err)
+	}
+	tx := &secp256k1fx.TestTx{
+		Bytes: txBytes,
+	}
+	cred := &Credential{Credential: secp256k1fx.Credential{
+		Sigs: [][crypto.SECP256K1RSigLen]byte{
+			sigBytes,
+		},
+	}}
+	utxo := &TransferOutput{
+		GroupID: 1,
+		Payload: []byte{2},
+		OutputOwners: secp256k1fx.OutputOwners{
+			Locktime:  clk.Unix() + 1,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				ids.NewShortID(addrBytes),
+			},
+		},
+	}
+	op := &TransferOperation{
+		Input: secp256k1fx.Input{
+			SigIndices: []uint32{0},
+		},
+		Output: TransferOutput{
+			GroupID: 1,
+			Payload: []byte{2},
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					ids.ShortEmpty,
+				},
+			},
+		},
+	}
+
+	utxos := []interface{}{utxo}
+	if err := fx.VerifyOperation(tx, op, cred, utxos); err == nil {
+		t.Fatalf("Should have errored due to locktime")
 	}
 }
 

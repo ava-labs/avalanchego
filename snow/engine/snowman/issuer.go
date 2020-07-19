@@ -29,16 +29,16 @@ func (i *issuer) Abandon(ids.ID) {
 		i.t.blocked.Abandon(blkID)
 
 		// Tracks performance statistics
-		i.t.numBlkRequests.Set(float64(i.t.blkReqs.Len()))
-		i.t.numBlockedBlk.Set(float64(i.t.pending.Len()))
+		i.t.numRequests.Set(float64(i.t.blkReqs.Len()))
+		i.t.numBlocked.Set(float64(i.t.pending.Len()))
 	}
 	i.abandoned = true
 }
 
 func (i *issuer) Update() {
-	if i.abandoned || i.deps.Len() != 0 {
+	if i.abandoned || i.deps.Len() != 0 || i.t.errs.Errored() {
 		return
 	}
 
-	i.t.deliver(i.blk)
+	i.t.errs.Add(i.t.deliver(i.blk))
 }

@@ -54,10 +54,12 @@ func (vtx *uniqueVertex) refresh() {
 func (vtx *uniqueVertex) Evict() {
 	if vtx.v != nil {
 		vtx.v.unique = false
+		// make sure the parents are able to be garbage collected
+		vtx.v.parents = nil
 	}
 }
 
-func (vtx *uniqueVertex) setVertex(innerVtx *vertex) {
+func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) {
 	vtx.refresh()
 	if vtx.v.vtx == nil {
 		vtx.v.vtx = innerVtx
@@ -76,7 +78,7 @@ func (vtx *uniqueVertex) setStatus(status choices.Status) {
 
 func (vtx *uniqueVertex) ID() ids.ID { return vtx.vtxID }
 
-func (vtx *uniqueVertex) Accept() {
+func (vtx *uniqueVertex) Accept() error {
 	vtx.setStatus(choices.Accepted)
 
 	vtx.serializer.edge.Add(vtx.vtxID)
@@ -90,17 +92,17 @@ func (vtx *uniqueVertex) Accept() {
 	// parents to be garbage collected
 	vtx.v.parents = nil
 
-	vtx.serializer.db.Commit()
+	return vtx.serializer.db.Commit()
 }
 
-func (vtx *uniqueVertex) Reject() {
+func (vtx *uniqueVertex) Reject() error {
 	vtx.setStatus(choices.Rejected)
 
 	// Should never traverse into parents of a decided vertex. Allows for the
 	// parents to be garbage collected
 	vtx.v.parents = nil
 
-	vtx.serializer.db.Commit()
+	return vtx.serializer.db.Commit()
 }
 
 func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
@@ -119,6 +121,12 @@ func (vtx *uniqueVertex) Parents() []avalanche.Vertex {
 	}
 
 	return vtx.v.parents
+}
+
+func (vtx *uniqueVertex) Height() uint64 {
+	vtx.refresh()
+
+	return vtx.v.vtx.height
 }
 
 func (vtx *uniqueVertex) Txs() []snowstorm.Tx {
@@ -170,7 +178,7 @@ func (vtx *uniqueVertex) String() string {
 type vertexState struct {
 	unique bool
 
-	vtx    *vertex
+	vtx    *innerVertex
 	status choices.Status
 
 	parents []avalanche.Vertex

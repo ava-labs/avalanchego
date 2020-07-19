@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -17,7 +17,7 @@ import (
 func TestTxNil(t *testing.T) {
 	c := codec.NewDefault()
 	tx := (*Tx)(nil)
-	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 	if err := tx.SemanticVerify(nil, nil); err == nil {
@@ -43,7 +43,7 @@ func setupCodec() codec.Codec {
 func TestTxEmpty(t *testing.T) {
 	c := setupCodec()
 	tx := &Tx{}
-	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Should have errored due to nil tx")
 	}
 }
@@ -56,7 +56,7 @@ func TestTxInvalidCredential(t *testing.T) {
 		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{&ava.TransferableInput{
+			Ins: []*ava.TransferableInput{{
 				UTXOID: ava.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 0,
@@ -81,7 +81,7 @@ func TestTxInvalidCredential(t *testing.T) {
 	}
 	tx.Initialize(b)
 
-	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
 	}
 }
@@ -95,7 +95,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 			Ins: []*ava.TransferableInput{
-				&ava.TransferableInput{
+				{
 					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
@@ -110,7 +110,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 						},
 					},
 				},
-				&ava.TransferableInput{
+				{
 					UTXOID: ava.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
@@ -139,7 +139,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	}
 	tx.Initialize(b)
 
-	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
@@ -153,7 +153,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 			Ins: []*ava.TransferableInput{
-				&ava.TransferableInput{
+				{
 					UTXOID: ava.UTXOID{TxID: ids.Empty, OutputIndex: 0},
 					Asset:  ava.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
@@ -165,7 +165,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 						},
 					},
 				},
-				&ava.TransferableInput{
+				{
 					UTXOID: ava.UTXOID{TxID: ids.Empty, OutputIndex: 1},
 					Asset:  ava.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
@@ -188,7 +188,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	}
 	tx.Initialize(b)
 
-	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }

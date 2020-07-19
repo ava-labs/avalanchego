@@ -5,6 +5,7 @@ package avm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -60,8 +61,8 @@ func (tx *UniqueTx) refresh() {
 		// intermediate object whose state I must reflect
 		if status, err := tx.vm.state.Status(tx.ID()); err == nil {
 			tx.status = status
-			tx.unique = true
 		}
+		tx.unique = true
 	} else {
 		// If someone is in the cache, they must be up to date
 
@@ -84,7 +85,11 @@ func (tx *UniqueTx) refresh() {
 
 // Evict is called when this UniqueTx will no longer be returned from a cache
 // lookup
-func (tx *UniqueTx) Evict() { tx.unique = false } // Lock is already held here
+func (tx *UniqueTx) Evict() {
+	// Lock is already held here
+	tx.unique = false
+	tx.deps = nil
+}
 
 func (tx *UniqueTx) setStatus(status choices.Status) error {
 	tx.refresh()
@@ -99,13 +104,13 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
-func (tx *UniqueTx) Accept() {
-	defer tx.vm.db.Abort()
-
-	if err := tx.setStatus(choices.Accepted); err != nil {
-		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
-		return
+func (tx *UniqueTx) Accept() error {
+	if s := tx.Status(); s != choices.Processing {
+		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
+		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
+
+	defer tx.vm.db.Abort()
 
 	// Remove spent utxos
 	for _, utxo := range tx.InputUTXOs() {
@@ -116,28 +121,33 @@ func (tx *UniqueTx) Accept() {
 		utxoID := utxo.InputID()
 		if err := tx.vm.state.SpendUTXO(utxoID); err != nil {
 			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
-			return
+			return err
 		}
 	}
 
 	// Add new utxos
 	for _, utxo := range tx.UTXOs() {
 		if err := tx.vm.state.FundUTXO(utxo); err != nil {
-			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxoID, err)
-			return
+			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
+			return err
 		}
+	}
+
+	if err := tx.setStatus(choices.Accepted); err != nil {
+		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
+		return err
 	}
 
 	txID := tx.ID()
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
-		return
+		return err
 	}
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
-		return
+		return err
 	}
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
@@ -149,15 +159,17 @@ func (tx *UniqueTx) Accept() {
 	if tx.onDecide != nil {
 		tx.onDecide(choices.Accepted)
 	}
+
+	return nil
 }
 
 // Reject is called when the transaction was finalized as rejected by consensus
-func (tx *UniqueTx) Reject() {
+func (tx *UniqueTx) Reject() error {
 	defer tx.vm.db.Abort()
 
 	if err := tx.setStatus(choices.Rejected); err != nil {
 		tx.vm.ctx.Log.Error("Failed to reject tx %s due to %s", tx.txID, err)
-		return
+		return err
 	}
 
 	txID := tx.ID()
@@ -165,6 +177,7 @@ func (tx *UniqueTx) Reject() {
 
 	if err := tx.vm.db.Commit(); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit reject %s due to %s", tx.txID, err)
+		return err
 	}
 
 	tx.vm.pubsub.Publish("rejected", txID)
@@ -174,6 +187,8 @@ func (tx *UniqueTx) Reject() {
 	if tx.onDecide != nil {
 		tx.onDecide(choices.Rejected)
 	}
+
+	return nil
 }
 
 // Status returns the current status of this transaction
@@ -195,22 +210,25 @@ func (tx *UniqueTx) Dependencies() []snowstorm.Tx {
 			continue
 		}
 		txID, _ := in.InputSource()
-		if !txIDs.Contains(txID) {
-			txIDs.Add(txID)
-			tx.deps = append(tx.deps, &UniqueTx{
-				vm:   tx.vm,
-				txID: txID,
-			})
+		if txIDs.Contains(txID) {
+			continue
 		}
+		txIDs.Add(txID)
+		tx.deps = append(tx.deps, &UniqueTx{
+			vm:   tx.vm,
+			txID: txID,
+		})
 	}
+	consumedIDs := tx.Tx.ConsumedAssetIDs()
 	for _, assetID := range tx.Tx.AssetIDs().List() {
-		if !txIDs.Contains(assetID) {
-			txIDs.Add(assetID)
-			tx.deps = append(tx.deps, &UniqueTx{
-				vm:   tx.vm,
-				txID: assetID,
-			})
+		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
+			continue
 		}
+		txIDs.Add(assetID)
+		tx.deps = append(tx.deps, &UniqueTx{
+			vm:   tx.vm,
+			txID: assetID,
+		})
 	}
 	return tx.deps
 }
@@ -281,7 +299,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, len(tx.vm.fxs))
+	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, tx.vm.ava, tx.vm.txFee, len(tx.vm.fxs))
 	return tx.validity
 }
 

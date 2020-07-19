@@ -54,9 +54,10 @@ type metrics struct {
 
 	getVersion, version,
 	getPeerlist, peerlist,
+	ping, pong,
 	getAcceptedFrontier, acceptedFrontier,
 	getAccepted, accepted,
-	get, put,
+	get, getAncestors, put, multiPut,
 	pushQuery, pullQuery, chits messageMetrics
 }
 
@@ -78,12 +79,16 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	errs.Add(m.version.initialize(Version, registerer))
 	errs.Add(m.getPeerlist.initialize(GetPeerList, registerer))
 	errs.Add(m.peerlist.initialize(PeerList, registerer))
+	errs.Add(m.ping.initialize(Ping, registerer))
+	errs.Add(m.pong.initialize(Pong, registerer))
 	errs.Add(m.getAcceptedFrontier.initialize(GetAcceptedFrontier, registerer))
 	errs.Add(m.acceptedFrontier.initialize(AcceptedFrontier, registerer))
 	errs.Add(m.getAccepted.initialize(GetAccepted, registerer))
 	errs.Add(m.accepted.initialize(Accepted, registerer))
 	errs.Add(m.get.initialize(Get, registerer))
+	errs.Add(m.getAncestors.initialize(GetAncestors, registerer))
 	errs.Add(m.put.initialize(Put, registerer))
+	errs.Add(m.multiPut.initialize(MultiPut, registerer))
 	errs.Add(m.pushQuery.initialize(PushQuery, registerer))
 	errs.Add(m.pullQuery.initialize(PullQuery, registerer))
 	errs.Add(m.chits.initialize(Chits, registerer))
@@ -101,6 +106,10 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 		return &m.getPeerlist
 	case PeerList:
 		return &m.peerlist
+	case Ping:
+		return &m.ping
+	case Pong:
+		return &m.pong
 	case GetAcceptedFrontier:
 		return &m.getAcceptedFrontier
 	case AcceptedFrontier:
@@ -111,8 +120,12 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 		return &m.accepted
 	case Get:
 		return &m.get
+	case GetAncestors:
+		return &m.getAncestors
 	case Put:
 		return &m.put
+	case MultiPut:
+		return &m.multiPut
 	case PushQuery:
 		return &m.pushQuery
 	case PullQuery:

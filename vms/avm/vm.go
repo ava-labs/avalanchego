@@ -20,22 +20,26 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 const (
 	batchTimeout   = time.Second
 	batchSize      = 30
-	stateCacheSize = 10000
-	idCacheSize    = 10000
-	txCacheSize    = 10000
+	stateCacheSize = 30000
+	idCacheSize    = 30000
+	txCacheSize    = 30000
 	addressSep     = "-"
 )
 
@@ -45,6 +49,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
+	errBootstrapping             = errors.New("chain is currently bootstrapping")
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -66,6 +71,12 @@ type VM struct {
 
 	// State management
 	state *prefixedState
+
+	// Set to true once this VM is marked as `Bootstrapped` by the engine
+	bootstrapped bool
+
+	// fee that must be burned by every transaction
+	txFee uint64
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -171,7 +182,6 @@ func (vm *VM) Initialize(
 		tx:       &cache.LRU{Size: idCacheSize},
 		utxo:     &cache.LRU{Size: idCacheSize},
 		txStatus: &cache.LRU{Size: idCacheSize},
-		funds:    &cache.LRU{Size: idCacheSize},
 
 		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
 	}
@@ -198,10 +208,33 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
+// Bootstrapping is called by the consensus engine when it starts bootstrapping
+// this chain
+func (vm *VM) Bootstrapping() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapping(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Bootstrapped is called by the consensus engine when it is done bootstrapping
+// this chain
+func (vm *VM) Bootstrapped() error {
+	for _, fx := range vm.fxs {
+		if err := fx.Fx.Bootstrapped(); err != nil {
+			return err
+		}
+	}
+	vm.bootstrapped = true
+	return nil
+}
+
 // Shutdown implements the avalanche.DAGVM interface
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
-		return
+		return nil
 	}
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
@@ -210,9 +243,7 @@ func (vm *VM) Shutdown() {
 	vm.timer.Stop()
 	vm.ctx.Lock.Lock()
 
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
-	}
+	return vm.baseDB.Close()
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
@@ -224,8 +255,8 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	rpcServer.RegisterService(&Service{vm: vm}, "avm") // name this service "avm"
 
 	return map[string]*common.HTTPHandler{
-		"":        &common.HTTPHandler{Handler: rpcServer},
-		"/pubsub": &common.HTTPHandler{LockOptions: common.NoLock, Handler: vm.pubsub},
+		"":        {Handler: rpcServer},
+		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}
 }
 
@@ -237,7 +268,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	newServer.RegisterService(&StaticService{}, "avm") // name this service "avm"
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{LockOptions: common.WriteLock, Handler: newServer},
+		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}
 }
 
@@ -275,6 +306,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
 func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
+	if !vm.bootstrapped {
+		return ids.ID{}, errBootstrapping
+	}
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err
@@ -465,10 +499,10 @@ func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
 		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
-
 		if err := tx.setStatus(choices.Processing); err != nil {
 			return nil, err
 		}
+		return tx, vm.db.Commit()
 	}
 
 	return tx, nil
@@ -573,4 +607,266 @@ func (vm *VM) Format(b []byte) string {
 		bcAlias = vm.ctx.ChainID.String()
 	}
 	return fmt.Sprintf("%s%s%s", bcAlias, addressSep, formatting.CB58{Bytes: b})
+}
+
+// LoadUser ...
+func (vm *VM) LoadUser(
+	username string,
+	password string,
+) (
+	[]*ava.UTXO,
+	*secp256k1fx.Keychain,
+	error,
+) {
+	db, err := vm.ctx.Keystore.GetDatabase(username, password)
+	if err != nil {
+		return nil, nil, fmt.Errorf("problem retrieving user: %w", err)
+	}
+
+	user := userState{vm: vm}
+
+	// The error is explicitly dropped, as it may just mean that there are no
+	// addresses.
+	addresses, _ := user.Addresses(db)
+
+	addrs := ids.Set{}
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
+	utxos, err := vm.GetUTXOs(addrs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
+	}
+
+	kc := secp256k1fx.NewKeychain()
+	for _, addr := range addresses {
+		sk, err := user.Key(db, addr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("problem retrieving private key: %w", err)
+		}
+		kc.Add(sk)
+	}
+
+	return utxos, kc, nil
+}
+
+// Spend ...
+func (vm *VM) Spend(
+	utxos []*ava.UTXO,
+	kc *secp256k1fx.Keychain,
+	amounts map[[32]byte]uint64,
+) (
+	map[[32]byte]uint64,
+	[]*ava.TransferableInput,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	amountsSpent := make(map[[32]byte]uint64, len(amounts))
+	time := vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		assetID := utxo.AssetID()
+		assetKey := assetID.Key()
+		amount := amounts[assetKey]
+		amountSpent := amountsSpent[assetKey]
+
+		if amountSpent >= amount {
+			// we already have enough inputs allocated to this asset
+			continue
+		}
+
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			// this utxo can't be spent with the current keys right now
+			continue
+		}
+		input, ok := inputIntf.(ava.TransferableIn)
+		if !ok {
+			// this input doesn't have an amount, so I don't care about it here
+			continue
+		}
+		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
+		if err != nil {
+			// there was an error calculating the consumed amount, just error
+			return nil, nil, nil, errSpendOverflow
+		}
+		amountsSpent[assetKey] = newAmountSpent
+
+		// add the new input to the array
+		ins = append(ins, &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: assetID},
+			In:     input,
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+	}
+
+	for asset, amount := range amounts {
+		if amountsSpent[asset] < amount {
+			return nil, nil, nil, errInsufficientFunds
+		}
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+	return amountsSpent, ins, keys, nil
+}
+
+// Mint ...
+func (vm *VM) Mint(
+	utxos []*ava.UTXO,
+	kc *secp256k1fx.Keychain,
+	amounts map[[32]byte]uint64,
+	to ids.ShortID,
+) (
+	[]*Operation,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	time := vm.clock.Unix()
+
+	ops := []*Operation{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+
+	for _, utxo := range utxos {
+		// makes sure that the variable isn't overwritten with the next iteration
+		utxo := utxo
+
+		assetID := utxo.AssetID()
+		assetKey := assetID.Key()
+		amount := amounts[assetKey]
+		if amount == 0 {
+			continue
+		}
+
+		out, ok := utxo.Out.(*secp256k1fx.MintOutput)
+		if !ok {
+			continue
+		}
+
+		inIntf, signers, err := kc.Spend(out, time)
+		if err != nil {
+			continue
+		}
+
+		in, ok := inIntf.(*secp256k1fx.Input)
+		if !ok {
+			continue
+		}
+
+		// add the operation to the array
+		ops = append(ops, &Operation{
+			Asset:   utxo.Asset,
+			UTXOIDs: []*ava.UTXOID{&utxo.UTXOID},
+			Op: &secp256k1fx.MintOperation{
+				MintInput:  *in,
+				MintOutput: *out,
+				TransferOutput: secp256k1fx.TransferOutput{
+					Amt: amount,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{to},
+					},
+				},
+			},
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+
+		// remove the asset from the required amounts to mint
+		delete(amounts, assetKey)
+	}
+
+	for _, amount := range amounts {
+		if amount > 0 {
+			return nil, nil, errAddressesCantMintAsset
+		}
+	}
+
+	sortOperationsWithSigners(ops, keys, vm.codec)
+	return ops, keys, nil
+}
+
+// SpendAll ...
+func (vm *VM) SpendAll(
+	utxos []*ava.UTXO,
+	kc *secp256k1fx.Keychain,
+) (
+	map[[32]byte]uint64,
+	[]*ava.TransferableInput,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	amountsSpent := make(map[[32]byte]uint64)
+	time := vm.clock.Unix()
+
+	ins := []*ava.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		assetID := utxo.AssetID()
+		assetKey := assetID.Key()
+		amountSpent := amountsSpent[assetKey]
+
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			// this utxo can't be spent with the current keys right now
+			continue
+		}
+		input, ok := inputIntf.(ava.TransferableIn)
+		if !ok {
+			// this input doesn't have an amount, so I don't care about it here
+			continue
+		}
+		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
+		if err != nil {
+			// there was an error calculating the consumed amount, just error
+			return nil, nil, nil, errSpendOverflow
+		}
+		amountsSpent[assetKey] = newAmountSpent
+
+		// add the new input to the array
+		ins = append(ins, &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: assetID},
+			In:     input,
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+	}
+
+	ava.SortTransferableInputsWithSigners(ins, keys)
+	return amountsSpent, ins, keys, nil
+}
+
+// Sign ...
+func (vm *VM) Sign(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	hash := hashing.ComputeHash256(unsignedBytes)
+
+	for _, credKeys := range keys {
+		cred := &secp256k1fx.Credential{}
+		for _, key := range credKeys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			fixedSig := [crypto.SECP256K1RSigLen]byte{}
+			copy(fixedSig[:], sig)
+
+			cred.Sigs = append(cred.Sigs, fixedSig)
+		}
+		tx.Creds = append(tx.Creds, cred)
+	}
+
+	b, err := vm.codec.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	tx.Initialize(b)
+	return nil
 }

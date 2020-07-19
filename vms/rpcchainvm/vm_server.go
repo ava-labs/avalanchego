@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/snowman"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
@@ -27,7 +27,7 @@ import (
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
-	vm     snowman.ChainVM
+	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 
 	lock    sync.Mutex
@@ -39,7 +39,7 @@ type VMServer struct {
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm snowman.ChainVM, broker *plugin.GRPCBroker) *VMServer {
+func NewServer(vm block.ChainVM, broker *plugin.GRPCBroker) *VMServer {
 	return &VMServer{
 		vm:     vm,
 		broker: broker,
@@ -84,8 +84,18 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	return &vmproto.InitializeResponse{}, nil
 }
 
+// Bootstrapping ...
+func (vm *VMServer) Bootstrapping(context.Context, *vmproto.BootstrappingRequest) (*vmproto.BootstrappingResponse, error) {
+	return &vmproto.BootstrappingResponse{}, vm.vm.Bootstrapping()
+}
+
+// Bootstrapped ...
+func (vm *VMServer) Bootstrapped(context.Context, *vmproto.BootstrappedRequest) (*vmproto.BootstrappedResponse, error) {
+	return &vmproto.BootstrappedResponse{}, vm.vm.Bootstrapped()
+}
+
 // Shutdown ...
-func (vm *VMServer) Shutdown(_ context.Context, _ *vmproto.ShutdownRequest) (*vmproto.ShutdownResponse, error) {
+func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmproto.ShutdownResponse, error) {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 
@@ -95,10 +105,10 @@ func (vm *VMServer) Shutdown(_ context.Context, _ *vmproto.ShutdownRequest) (*vm
 
 	vm.closed = true
 
-	vm.vm.Shutdown()
+	errs := wrappers.Errs{}
+	errs.Add(vm.vm.Shutdown())
 	close(vm.toEngine)
 
-	errs := wrappers.Errs{}
 	for _, conn := range vm.conns {
 		errs.Add(conn.Close())
 	}

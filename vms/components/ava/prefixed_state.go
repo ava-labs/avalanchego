@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 )
 
 // Addressable is the interface a feature extension must provide to be able to
@@ -97,11 +97,8 @@ func (s *chainState) setStatus(id ids.ID, status choices.Status) error {
 func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Remove(utxoID)
-		if err := s.setFunds(addrID, utxos.List()); err != nil {
+		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
+		if err := s.RemoveID(addrID, utxoID); err != nil {
 			return err
 		}
 	}
@@ -111,19 +108,12 @@ func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Add(utxoID)
-		if err := s.setFunds(addrID, utxos.List()); err != nil {
+		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
+		if err := s.AddID(addrID, utxoID); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func (s *chainState) setFunds(id ids.ID, idSlice []ids.ID) error {
-	return s.SetIDs(UniqueID(id, s.fundsIDPrefix, s.fundsID), idSlice)
 }
 
 // PrefixedState wraps a state object. By prefixing the state, there will

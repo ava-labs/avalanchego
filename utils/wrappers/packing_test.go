@@ -506,3 +506,63 @@ func TestPackerUnpackBool(t *testing.T) {
 		t.Fatalf("Packer.UnpackBool returned %t, expected sentinal value %t", actual, BoolSentinal)
 	}
 }
+
+func TestPacker2DByteSlice(t *testing.T) {
+	// Case: empty array
+	p := Packer{MaxSize: 1024}
+	arr := [][]byte{}
+	p.Pack2DByteSlice(arr)
+	if p.Errored() {
+		t.Fatal(p.Err)
+	}
+	arrUnpacked := p.Unpack2DByteSlice()
+	if len(arrUnpacked) != 0 {
+		t.Fatal("should be empty")
+	}
+
+	// Case: Array has one element
+	p = Packer{MaxSize: 1024}
+	arr = [][]byte{
+		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+	}
+	p.Pack2DByteSlice(arr)
+	if p.Errored() {
+		t.Fatal(p.Err)
+	}
+	p = Packer{MaxSize: 1024, Bytes: p.Bytes}
+	arrUnpacked = p.Unpack2DByteSlice()
+	if p.Errored() {
+		t.Fatal(p.Err)
+	}
+	if l := len(arrUnpacked); l != 1 {
+		t.Fatalf("should be length 1 but is length %d", l)
+	}
+	if !bytes.Equal(arrUnpacked[0], arr[0]) {
+		t.Fatal("should match")
+	}
+
+	// Case: Array has multiple elements
+	p = Packer{MaxSize: 1024}
+	arr = [][]byte{
+		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		{11, 12, 3, 4, 5, 6, 7, 8, 9, 10},
+	}
+	p.Pack2DByteSlice(arr)
+	if p.Errored() {
+		t.Fatal(p.Err)
+	}
+	p = Packer{MaxSize: 1024, Bytes: p.Bytes}
+	arrUnpacked = p.Unpack2DByteSlice()
+	if p.Errored() {
+		t.Fatal(p.Err)
+	}
+	if l := len(arrUnpacked); l != 2 {
+		t.Fatalf("should be length 1 but is length %d", l)
+	}
+	if !bytes.Equal(arrUnpacked[0], arr[0]) {
+		t.Fatal("should match")
+	}
+	if !bytes.Equal(arrUnpacked[1], arr[1]) {
+		t.Fatal("should match")
+	}
+}

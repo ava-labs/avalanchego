@@ -15,27 +15,30 @@ var (
 	errInitialize = errors.New("unexpectedly called Initialize")
 )
 
-// VMTest is a test vm
-type VMTest struct {
+// TestVM is a test vm
+type TestVM struct {
 	T *testing.T
 
-	CantInitialize, CantShutdown, CantCreateHandlers, CantCreateStaticHandlers bool
+	CantInitialize, CantBootstrapping, CantBootstrapped, CantShutdown, CantCreateHandlers, CantCreateStaticHandlers bool
 
-	InitializeF           func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
-	ShutdownF             func()
-	CreateHandlersF       func() map[string]*HTTPHandler
-	CreateStaticHandlersF func() map[string]*HTTPHandler
+	InitializeF                              func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
+	BootstrappingF, BootstrappedF, ShutdownF func() error
+	CreateHandlersF                          func() map[string]*HTTPHandler
+	CreateStaticHandlersF                    func() map[string]*HTTPHandler
 }
 
 // Default ...
-func (vm *VMTest) Default(cant bool) {
+func (vm *TestVM) Default(cant bool) {
 	vm.CantInitialize = cant
+	vm.CantBootstrapping = cant
+	vm.CantBootstrapped = cant
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
+	vm.CantCreateStaticHandlers = cant
 }
 
 // Initialize ...
-func (vm *VMTest) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
+func (vm *TestVM) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
 	if vm.InitializeF != nil {
 		return vm.InitializeF(ctx, db, initState, msgChan, fxs)
 	}
@@ -45,17 +48,47 @@ func (vm *VMTest) Initialize(ctx *snow.Context, db database.Database, initState 
 	return errInitialize
 }
 
-// Shutdown ...
-func (vm *VMTest) Shutdown() {
-	if vm.ShutdownF != nil {
-		vm.ShutdownF()
-	} else if vm.CantShutdown && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called Shutdown")
+// Bootstrapping ...
+func (vm *TestVM) Bootstrapping() error {
+	if vm.BootstrappingF != nil {
+		return vm.BootstrappingF()
+	} else if vm.CantBootstrapping {
+		if vm.T != nil {
+			vm.T.Fatalf("Unexpectedly called Bootstrapping")
+		}
+		return errors.New("Unexpectedly called Bootstrapping")
 	}
+	return nil
+}
+
+// Bootstrapped ...
+func (vm *TestVM) Bootstrapped() error {
+	if vm.BootstrappedF != nil {
+		return vm.BootstrappedF()
+	} else if vm.CantBootstrapped {
+		if vm.T != nil {
+			vm.T.Fatalf("Unexpectedly called Bootstrapped")
+		}
+		return errors.New("Unexpectedly called Bootstrapped")
+	}
+	return nil
+}
+
+// Shutdown ...
+func (vm *TestVM) Shutdown() error {
+	if vm.ShutdownF != nil {
+		return vm.ShutdownF()
+	} else if vm.CantShutdown {
+		if vm.T != nil {
+			vm.T.Fatalf("Unexpectedly called Shutdown")
+		}
+		return errors.New("Unexpectedly called Shutdown")
+	}
+	return nil
 }
 
 // CreateHandlers ...
-func (vm *VMTest) CreateHandlers() map[string]*HTTPHandler {
+func (vm *TestVM) CreateHandlers() map[string]*HTTPHandler {
 	if vm.CreateHandlersF != nil {
 		return vm.CreateHandlersF()
 	}
@@ -66,7 +99,7 @@ func (vm *VMTest) CreateHandlers() map[string]*HTTPHandler {
 }
 
 // CreateStaticHandlers ...
-func (vm *VMTest) CreateStaticHandlers() map[string]*HTTPHandler {
+func (vm *TestVM) CreateStaticHandlers() map[string]*HTTPHandler {
 	if vm.CreateStaticHandlersF != nil {
 		return vm.CreateStaticHandlersF()
 	}
