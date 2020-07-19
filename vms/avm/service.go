@@ -1320,7 +1320,7 @@ func (service *Service) SignMintNFTTx(r *http.Request, args *SignMintNFTTxArgs, 
 
 	user := userState{vm: service.vm}
 
-	addr := ids.NewID(hashing.ComputeHash256Array(minter))
+	addr, err := ids.ToShortID(minter)
 	sk, err := user.Key(db, addr)
 	if err != nil {
 		return fmt.Errorf("problem retriving private key: %w", err)
@@ -1458,7 +1458,9 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *SendN
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.Set{}
-	addrs.Add(addresses...)
+	for _, addr := range addresses {
+		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+	}
 	utxos, err := service.vm.GetUTXOs(addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's UTXOs: %w", err)
