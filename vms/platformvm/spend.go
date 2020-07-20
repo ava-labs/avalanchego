@@ -55,7 +55,7 @@ func (vm *VM) spend(
 			vm.Ctx.Log.Warn("coudn't spend UTXO %s: %s", utxo.InputID(), err2) // shouldn't happen
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(ava.TransferableIn)
 		if !ok { // should never happen
 			vm.Ctx.Log.Warn("input has unexpected type")
 			continue

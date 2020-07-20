@@ -9,9 +9,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 const (
@@ -25,7 +26,8 @@ var (
 	errNameTooLong                  = fmt.Errorf("name is too long, maximum size is %d", maxNameLen)
 	errSymbolTooLong                = fmt.Errorf("symbol is too long, maximum size is %d", maxSymbolLen)
 	errNoFxs                        = errors.New("assets must support at least one Fx")
-	errUnprintableASCIICharacter    = errors.New("unprintable ascii character was provided")
+	errIllegalNameCharacter         = errors.New("asset's name must be made up of only letters and numbers")
+	errIllegalSymbolCharacter       = errors.New("asset's symbol must be all upper case letters")
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
 )
@@ -67,7 +69,13 @@ func (t *CreateAssetTx) UTXOs() []*ava.UTXO {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *CreateAssetTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -86,17 +94,17 @@ func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs
 	}
 
 	for _, r := range t.Name {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return errUnprintableASCIICharacter
+		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
+			return errIllegalNameCharacter
 		}
 	}
 	for _, r := range t.Symbol {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return errUnprintableASCIICharacter
+		if r > unicode.MaxASCII || !unicode.IsUpper(r) {
+			return errIllegalSymbolCharacter
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
 		return err
 	}
 

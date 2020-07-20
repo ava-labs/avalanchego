@@ -45,7 +45,11 @@ func (i *issuer) Update() {
 	vtxID := i.vtx.ID()
 	i.t.pending.Remove(vtxID)
 
-	txs := i.vtx.Txs()
+	txs, err := i.vtx.Txs()
+	if err != nil {
+		i.t.errs.Add(err)
+		return
+	}
 	validTxs := []snowstorm.Tx{}
 	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
@@ -89,7 +93,7 @@ func (i *issuer) Update() {
 	}
 
 	i.t.vtxBlocked.Fulfill(vtxID)
-	for _, tx := range i.vtx.Txs() {
+	for _, tx := range txs {
 		i.t.txBlocked.Fulfill(tx.ID())
 	}
 

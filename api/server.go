@@ -104,24 +104,33 @@ func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, log logging.Logger) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
 	s.log.Info("adding route %s%s", url, endpoint)
+	h, err := s.createMiddlewareHandler(handler, lock, log)
+	if err != nil {
+		return err
+	}
+
+	return s.router.AddRouter(url, endpoint, h)
+}
+
+func (s *Server) createMiddlewareHandler(handler *common.HTTPHandler, lock *sync.RWMutex, log logging.Logger) (http.Handler, error) {
 	h := handlers.CombinedLoggingHandler(log, handler.Handler)
 	switch handler.LockOptions {
 	case common.WriteLock:
-		return s.router.AddRouter(url, endpoint, middlewareHandler{
+		return middlewareHandler{
 			before:  lock.Lock,
 			after:   lock.Unlock,
 			handler: h,
-		})
+		}, nil
 	case common.ReadLock:
-		return s.router.AddRouter(url, endpoint, middlewareHandler{
+		return middlewareHandler{
 			before:  lock.RLock,
 			after:   lock.RUnlock,
 			handler: h,
-		})
+		}, nil
 	case common.NoLock:
-		return s.router.AddRouter(url, endpoint, h)
+		return h, nil
 	default:
-		return errUnknownLockOption
+		return nil, errUnknownLockOption
 	}
 }
 
@@ -162,7 +171,6 @@ func (s *Server) Call(
 	if err != nil {
 		return err
 	}
-
 	req, err := http.NewRequest("POST", "*", body)
 	if err != nil {
 		return err

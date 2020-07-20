@@ -42,5 +42,5 @@ type Fx interface {
 type FxOperation interface {
 	verify.Verifiable
 
-	Outs() []verify.Verifiable
+	Outs() []verify.State
 }

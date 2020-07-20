@@ -90,7 +90,13 @@ func (t *BaseTx) UTXOs() []*ava.UTXO {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error {
+func (t *BaseTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	_ int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -103,6 +109,10 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 	}
 
 	fc := ava.NewFlowChecker()
+
+	// The txFee must be burned
+	fc.Produce(txFeeAssetID, txFee)
+
 	for _, out := range t.Outs {
 		if err := out.Verify(); err != nil {
 			return err
@@ -122,8 +132,6 @@ func (t *BaseTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, _ int) error 
 	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
-
-	// TODO: Add the Tx fee to the produced side
 
 	if err := fc.Verify(); err != nil {
 		return err

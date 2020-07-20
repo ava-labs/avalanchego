@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/constants"
+
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
@@ -35,6 +37,7 @@ import (
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/version"
 	"github.com/ava-labs/gecko/vms"
@@ -154,7 +157,7 @@ func (n *Node) initNetworking() error {
 		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 	}
 	n.vdrs = validators.NewManager()
-	n.vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
+	n.vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -317,10 +320,15 @@ func (n *Node) initVMManager(avaxAssetID ids.ID) error {
 	errs.Add(
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			AVA:      avaxAssetID,
-			Platform: ids.Empty,
+			Fee:      n.Config.AvaTxFee,
+			Platform: constants.PlatformChainID,
 		}),
-		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
-		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
+			Path: path.Join(n.Config.PluginDir, "evm"),
+		}),
+		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
+			TxFee: n.Config.AvaTxFee,
+		}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -357,7 +365,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 		defaultSubnetValidators := validators.NewSet()
 		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 		vdrs = validators.NewManager()
-		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
+		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 	}
 
 	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
@@ -380,13 +388,37 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 
 	// Create the Platform Chain
 	n.chainManager.ForceCreateChain(chains.ChainParameters{
-		ID:            ids.Empty,
-		SubnetID:      platformvm.DefaultSubnetID,
+		ID:            constants.PlatformChainID,
+		SubnetID:      constants.DefaultSubnetID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: n.beacons,
 	})
 
+	bootstrapWeight, err := n.beacons.Weight()
+	if err != nil {
+		return fmt.Errorf("Error calculating bootstrap weight of beacons: %s", err)
+	}
+	reqWeight := (3*bootstrapWeight + 3) / 4
+
+	if reqWeight == 0 {
+		return nil
+	}
+
+	connectToBootstrapsTimeout := timer.NewTimer(func() {
+		n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
+		go n.Net.Close()
+	})
+
+	awaiter := chains.NewAwaiter(n.beacons, reqWeight, func() {
+		n.Log.Info("Connected to required bootstrap nodes. Starting Platform Chain...")
+		connectToBootstrapsTimeout.Cancel()
+	})
+
+	go connectToBootstrapsTimeout.Dispatch()
+	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
+
+	n.Net.RegisterHandler(awaiter)
 	return nil
 }
 

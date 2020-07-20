@@ -44,7 +44,7 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 
 	is := InitialState{
 		FxID: 0,
-		Outs: []verify.Verifiable{nil},
+		Outs: []verify.State{nil},
 	}
 	if err := is.Verify(c, numFxs); err == nil {
 		t.Fatalf("Should have errored due to a nil output")
@@ -58,7 +58,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 
 	is := InitialState{
 		FxID: 0,
-		Outs: []verify.Verifiable{&ava.TestVerifiable{Err: errors.New("")}},
+		Outs: []verify.State{&ava.TestVerifiable{Err: errors.New("")}},
 	}
 	if err := is.Verify(c, numFxs); err == nil {
 		t.Fatalf("Should have errored due to an invalid output")
@@ -72,7 +72,7 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 
 	is := InitialState{
 		FxID: 0,
-		Outs: []verify.Verifiable{
+		Outs: []verify.State{
 			&ava.TestTransferable{Val: 1},
 			&ava.TestTransferable{Val: 0},
 		},
@@ -113,7 +113,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 
 	is := &InitialState{
 		FxID: 0,
-		Outs: []verify.Verifiable{
+		Outs: []verify.State{
 			&secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{

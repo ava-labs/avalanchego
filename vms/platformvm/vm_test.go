@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
@@ -187,7 +188,7 @@ func defaultVM() *VM {
 
 	defaultSubnet := validators.NewSet() // TODO do we need this?
 	vm.validators = validators.NewManager()
-	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
+	vm.validators.PutValidatorSet(constants.DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
 	db := prefixdb.New([]byte{0}, memdb.New())
@@ -265,7 +266,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of default subnet is correct
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(currentValidators.Txs) != len(genesisState.Validators) {
@@ -282,7 +283,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure pending validator set is correct (empty)
-	if pendingValidators, err := vm.getPendingValidators(vm.DB, DefaultSubnetID); err != nil {
+	if pendingValidators, err := vm.getPendingValidators(vm.DB, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 	} else if pendingValidators.Len() != 0 {
 		t.Fatal("vm's pending validator set should be empty")
@@ -374,7 +375,7 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	}
 
 	// Verify that new validator now in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, DefaultSubnetID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,7 +507,7 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	}
 
 	// Verify that new validator NOT in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, DefaultSubnetID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -735,7 +736,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := commit.Accept(); err != nil { // reward the genesis validator
 		t.Fatal(err)
-	} else if currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID); err != nil {
+	} else if currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID); err != nil {
 		// Verify that genesis validator was rewarded and removed from current validator set
 		t.Fatal(err)
 	} else if currentValidators.Len() != len(keys)-1 {
@@ -837,7 +838,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	}
 
 	// Verify that genesis validator was removed from current validator set
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -925,7 +926,7 @@ func TestCreateSubnet(t *testing.T) {
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		1,                                       // threshold
+		1, // threshold
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
 	)
 	if err != nil {
@@ -1262,7 +1263,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}
 	firstDefaultSubnet := validators.NewSet()
 	firstVM.validators = validators.NewManager()
-	firstVM.validators.PutValidatorSet(DefaultSubnetID, firstDefaultSubnet)
+	firstVM.validators.PutValidatorSet(constants.DefaultSubnetID, firstDefaultSubnet)
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
 	firstCtx.Lock.Lock()
@@ -1327,7 +1328,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondDefaultSubnet := validators.NewSet()
 	secondVM.validators = validators.NewManager()
-	secondVM.validators.PutValidatorSet(DefaultSubnetID, secondDefaultSubnet)
+	secondVM.validators.PutValidatorSet(constants.DefaultSubnetID, secondDefaultSubnet)
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
@@ -1360,7 +1361,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstDefaultSubnet := validators.NewSet()
 	firstVM.validators = validators.NewManager()
-	firstVM.validators.PutValidatorSet(DefaultSubnetID, firstDefaultSubnet)
+	firstVM.validators.PutValidatorSet(constants.DefaultSubnetID, firstDefaultSubnet)
 
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
@@ -1435,7 +1436,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondDefaultSubnet := validators.NewSet()
 	secondVM.validators = validators.NewManager()
-	secondVM.validators.PutValidatorSet(DefaultSubnetID, secondDefaultSubnet)
+	secondVM.validators.PutValidatorSet(constants.DefaultSubnetID, secondDefaultSubnet)
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
@@ -1473,7 +1474,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	defaultSubnet := validators.NewSet()
 	vm.validators = validators.NewManager()
-	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
+	vm.validators.PutValidatorSet(constants.DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
@@ -1556,6 +1557,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	handler := &router.Handler{}
 	handler.Initialize(
 		&engine,
+		vdrs,
 		msgChan,
 		1000,
 		"",
@@ -1623,7 +1625,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 	defaultSubnet := validators.NewSet()
 	vm.validators = validators.NewManager()
-	vm.validators.PutValidatorSet(DefaultSubnetID, defaultSubnet)
+	vm.validators.PutValidatorSet(constants.DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()

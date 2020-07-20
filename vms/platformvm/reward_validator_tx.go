@@ -12,9 +12,11 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
-	safemath "github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -69,7 +71,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 		return nil, nil, nil, nil, tempError{errDBNil}
 	}
 
-	defaultSubnetVdrHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	defaultSubnetVdrHeap, err := tx.vm.getCurrentValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	} else if defaultSubnetVdrHeap.Len() == 0 { // there is no validator to remove
@@ -97,13 +99,13 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 
 	// If this tx's proposal is committed, remove the validator from the validator set
 	onCommitDB := versiondb.New(db)
-	if err := tx.vm.putCurrentValidators(onCommitDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
+	if err := tx.vm.putCurrentValidators(onCommitDB, defaultSubnetVdrHeap, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// If this tx's proposal is aborted, remove the validator from the validator set
 	onAbortDB := versiondb.New(db)
-	if err := tx.vm.putCurrentValidators(onAbortDB, defaultSubnetVdrHeap, DefaultSubnetID); err != nil {
+	if err := tx.vm.putCurrentValidators(onAbortDB, defaultSubnetVdrHeap, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
@@ -221,7 +223,7 @@ func (tx *rewardValidatorTx) SemanticVerify(db database.Database) (*versiondb.Da
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
 	// (flush to vm.DB) before this is called
 	updateValidators := func() {
-		if err := tx.vm.updateValidators(DefaultSubnetID); err != nil {
+		if err := tx.vm.updateValidators(constants.DefaultSubnetID); err != nil {
 			tx.vm.Ctx.Log.Fatal("failed to update validators on the default subnet: %s", err)
 		}
 	}

@@ -18,8 +18,8 @@ type TransferOperation struct {
 }
 
 // Outs ...
-func (op *TransferOperation) Outs() []verify.Verifiable {
-	return []verify.Verifiable{&op.Output}
+func (op *TransferOperation) Outs() []verify.State {
+	return []verify.State{&op.Output}
 }
 
 // Verify ...

@@ -43,15 +43,19 @@ type blockJob struct {
 }
 
 func (b *blockJob) ID() ids.ID { return b.blk.ID() }
-func (b *blockJob) MissingDependencies() ids.Set {
+func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
 	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
 		missing.Add(parent.ID())
 	}
-	return missing
+	return missing, nil
 }
 func (b *blockJob) Execute() error {
-	if b.MissingDependencies().Len() != 0 {
+	deps, err := b.MissingDependencies()
+	if err != nil {
+		return err
+	}
+	if deps.Len() != 0 {
 		b.numDropped.Inc()
 		return errors.New("attempting to accept a block with missing dependencies")
 	}

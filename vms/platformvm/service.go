@@ -9,15 +9,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ava-labs/gecko/vms/components/ava"
-
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -305,7 +305,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		}
 		// Include Default Subnet
 		response.Subnets[len(subnets)] = APISubnet{
-			ID:          DefaultSubnetID,
+			ID:          constants.DefaultSubnetID,
 			ControlKeys: []string{},
 			Threshold:   json.Uint16(0),
 		}
@@ -329,10 +329,10 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			)
 		}
 	}
-	if idsSet.Contains(DefaultSubnetID) {
+	if idsSet.Contains(constants.DefaultSubnetID) {
 		response.Subnets = append(response.Subnets,
 			APISubnet{
-				ID:          DefaultSubnetID,
+				ID:          constants.DefaultSubnetID,
 				ControlKeys: []string{},
 				Threshold:   json.Uint16(0),
 			},
@@ -363,7 +363,7 @@ type GetCurrentValidatorsReply struct {
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 	if args.SubnetID.IsZero() {
-		args.SubnetID = DefaultSubnetID
+		args.SubnetID = constants.DefaultSubnetID
 	}
 
 	validators, err := service.vm.getCurrentValidators(service.vm.DB, args.SubnetID)
@@ -372,7 +372,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
-	if args.SubnetID.Equals(DefaultSubnetID) {
+	if args.SubnetID.Equals(constants.DefaultSubnetID) {
 		for i, tx := range validators.Txs {
 			vdr := tx.Vdr()
 			weight := json.Uint64(vdr.Weight())
@@ -387,7 +387,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 
 			reply.Validators[i] = FormattedAPIValidator{
-				ID:          vdr.ID(),
+				ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
@@ -399,7 +399,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			vdr := tx.Vdr()
 			weight := json.Uint64(vdr.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
-				ID:        vdr.ID(),
+				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(tx.StartTime().Unix()),
 				EndTime:   json.Uint64(tx.EndTime().Unix()),
 				Weight:    &weight,
@@ -426,7 +426,7 @@ type GetPendingValidatorsReply struct {
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
 	if args.SubnetID.IsZero() {
-		args.SubnetID = DefaultSubnetID
+		args.SubnetID = constants.DefaultSubnetID
 	}
 
 	validators, err := service.vm.getPendingValidators(service.vm.DB, args.SubnetID)
@@ -438,7 +438,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	for i, tx := range validators.Txs {
 		vdr := tx.Vdr()
 		weight := json.Uint64(vdr.Weight())
-		if args.SubnetID.Equals(DefaultSubnetID) {
+		if args.SubnetID.Equals(constants.DefaultSubnetID) {
 			var address ids.ShortID
 			switch tx := tx.(type) {
 			case *addDefaultSubnetValidatorTx:
@@ -449,7 +449,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
 			}
 			reply.Validators[i] = FormattedAPIValidator{
-				ID:          vdr.ID(),
+				ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime:   json.Uint64(tx.StartTime().Unix()),
 				EndTime:     json.Uint64(tx.EndTime().Unix()),
 				StakeAmount: &weight,
@@ -457,7 +457,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			}
 		} else {
 			reply.Validators[i] = FormattedAPIValidator{
-				ID:        vdr.ID(),
+				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(tx.StartTime().Unix()),
 				EndTime:   json.Uint64(tx.EndTime().Unix()),
 				Weight:    &weight,
@@ -487,7 +487,7 @@ type SampleValidatorsReply struct {
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: SampleValidators called with Size = %d", args.Size)
 	if args.SubnetID.IsZero() {
-		args.SubnetID = DefaultSubnetID
+		args.SubnetID = constants.DefaultSubnetID
 	}
 
 	validators, ok := service.vm.validators.GetValidatorSet(args.SubnetID)
@@ -527,12 +527,21 @@ type AddDefaultSubnetValidatorArgs struct {
 func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
 	switch {
-	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
-		args.ID = service.vm.Ctx.NodeID
 	case args.Destination == "":
 		return errNoDestination
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
+	}
+
+	var nodeID ids.ShortID
+	if args.ID == "" {
+		nodeID = service.vm.Ctx.NodeID
+	} else {
+		nID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+		nodeID = nID
 	}
 
 	destination, err := service.vm.ParseAddress(args.Destination)
@@ -556,7 +565,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		uint64(args.weight()),          // Stake amount
 		uint64(args.StartTime),         // Start time
 		uint64(args.EndTime),           // End time
-		args.ID,                        // Node ID
+		nodeID,                         // Node ID
 		destination,                    // Destination
 		uint32(args.DelegationFeeRate), // Shares
 		privKeys,                       // Private keys
@@ -650,7 +659,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	if err != nil {
 		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
 	}
-	if subnetID.Equals(DefaultSubnetID) {
+	if subnetID.Equals(constants.DefaultSubnetID) {
 		return errors.New("non-default subnet validator attempts to validate default subnet")
 	}
 
@@ -864,7 +873,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
-	if args.SubnetID.Equals(DefaultSubnetID) {
+	if args.SubnetID.Equals(constants.DefaultSubnetID) {
 		return errDSCantValidate
 	}
 
@@ -999,7 +1008,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	service.vm.Ctx.Log.Info("Platform: Validates called")
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the DefaultSubnetID
-	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(DefaultSubnetID) {
+	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.DefaultSubnetID) {
 		return err
 	}
 	// Get the chains that exist

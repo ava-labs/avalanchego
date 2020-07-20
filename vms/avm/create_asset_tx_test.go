@@ -161,7 +161,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 		States: []*InitialState{
 			{
 				FxID: 0,
-				Outs: []verify.Verifiable{
+				Outs: []verify.State{
 					&secp256k1fx.TransferOutput{
 						Amt: 12345,
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -207,5 +207,12 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+}
+
+func TestCreateAssetTxNotState(t *testing.T) {
+	intf := interface{}(&CreateAssetTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

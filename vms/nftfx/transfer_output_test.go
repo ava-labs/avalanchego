@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -34,5 +35,12 @@ func TestTransferOutputInvalidSecp256k1Output(t *testing.T) {
 	}
 	if err := to.Verify(); err == nil {
 		t.Fatalf("TransferOutput.Verify should have errored on too large of a payload")
+	}
+}
+
+func TestTransferOutputState(t *testing.T) {
+	intf := interface{}(&TransferOutput{})
+	if _, ok := intf.(verify.State); !ok {
+		t.Fatalf("should be marked as state")
 	}
 }

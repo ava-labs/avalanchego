@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -84,12 +85,12 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	current, pending, _, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), DefaultSubnetID)
+	current, pending, _, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if err := tx.vm.putCurrentValidators(onCommitDB, current, DefaultSubnetID); err != nil {
+	} else if err := tx.vm.putCurrentValidators(onCommitDB, current, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if err := tx.vm.putPendingValidators(onCommitDB, pending, DefaultSubnetID); err != nil {
+	} else if err := tx.vm.putPendingValidators(onCommitDB, pending, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
@@ -130,7 +131,7 @@ func (tx *advanceTimeTx) SemanticVerify(db database.Database) (*versiondb.Databa
 				tx.vm.Ctx.Log.Debug("failed to update Subnet %s: %s", subnet.id, err)
 			}
 		}
-		if err := tx.vm.updateValidators(DefaultSubnetID); err != nil {
+		if err := tx.vm.updateValidators(constants.DefaultSubnetID); err != nil {
 			tx.vm.Ctx.Log.Fatal("failed to update Default Subnet: %s", err)
 		}
 

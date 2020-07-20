@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 )
 
@@ -92,7 +93,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addPendingValidatorTx},
 		},
-		DefaultSubnetID,
+		constants.DefaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -166,7 +167,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addPendingValidatorTx},
 		},
-		DefaultSubnetID,
+		constants.DefaultSubnetID,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -180,25 +181,25 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, DefaultSubnetID); err != nil {
+	if onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 	} else if onCommitCurrentEvents.Len() != len(keys)+1 { // Each key in [keys] is a validator to start with...then we added a validator
 		t.Fatalf("Should have added the validator to the validator set")
 	}
 
-	if onCommitPendingEvents, err := vm.getPendingValidators(onCommit, DefaultSubnetID); err != nil {
+	if onCommitPendingEvents, err := vm.getPendingValidators(onCommit, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 	} else if onCommitPendingEvents.Len() != 0 {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
-	if onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, DefaultSubnetID); err != nil {
+	if onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 	} else if onAbortCurrentEvents.Len() != len(keys) {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	if onAbortPendingEvents, err := vm.getPendingValidators(onAbort, DefaultSubnetID); err != nil {
+	if onAbortPendingEvents, err := vm.getPendingValidators(onAbort, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 	} else if onAbortPendingEvents.Len() != 1 {
 		t.Fatalf("Shouldn't have removed the validator from the pending validator set")

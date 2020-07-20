@@ -12,20 +12,23 @@ import (
 type TestVertex struct {
 	choices.TestDecidable
 
-	ParentsV []Vertex
-	HeightV  uint64
-	TxsV     []snowstorm.Tx
-	BytesV   []byte
+	ParentsV    []Vertex
+	ParentsErrV error
+	HeightV     uint64
+	HeightErrV  error
+	TxsV        []snowstorm.Tx
+	TxsErrV     error
+	BytesV      []byte
 }
 
 // Parents implements the Vertex interface
-func (v *TestVertex) Parents() []Vertex { return v.ParentsV }
+func (v *TestVertex) Parents() ([]Vertex, error) { return v.ParentsV, v.ParentsErrV }
 
 // Height implements the Vertex interface
-func (v *TestVertex) Height() uint64 { return v.HeightV }
+func (v *TestVertex) Height() (uint64, error) { return v.HeightV, v.HeightErrV }
 
 // Txs implements the Vertex interface
-func (v *TestVertex) Txs() []snowstorm.Tx { return v.TxsV }
+func (v *TestVertex) Txs() ([]snowstorm.Tx, error) { return v.TxsV, v.TxsErrV }
 
 // Bytes implements the Vertex interface
 func (v *TestVertex) Bytes() []byte { return v.BytesV }
