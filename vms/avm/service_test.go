@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func setup(t *testing.T) ([]byte, *VM, *Service) {
@@ -274,6 +276,26 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	smDB := vm.ctx.SharedMemory.GetDatabase(ids.Empty)
+
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{TxID: ids.Empty},
+		Asset:  ava.Asset{ID: ids.Empty},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 7,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr0},
+			},
+		},
+	}
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+	if err := state.FundPlatformUTXO(utxo); err != nil {
+		t.Fatal(err)
+	}
+	vm.ctx.SharedMemory.ReleaseDatabase(ids.Empty)
+
 	tests := []struct {
 		label string
 		args  *GetAtomicUTXOsArgs
@@ -283,7 +305,8 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 			"Empty",
 			&GetAtomicUTXOsArgs{},
 			0,
-		}, {
+		},
+		{
 			"[<ChainID>-<unrelated address>]",
 			&GetAtomicUTXOsArgs{[]string{
 				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
@@ -291,19 +314,21 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			}},
 			0,
-		}, {
+		},
+		{
 			"[<ChainID>-<addr0>]",
 			&GetAtomicUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			}},
-			7,
-		}, {
+			1,
+		},
+		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
 			&GetAtomicUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			}},
-			7,
+			1,
 		},
 	}
 	for _, tt := range tests {

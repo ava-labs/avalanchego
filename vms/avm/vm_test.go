@@ -7,13 +7,16 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -157,15 +160,27 @@ func BuildGenesisTest(t *testing.T) []byte {
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	genesisBytes := BuildGenesisTest(t)
 
+	baseDB := memdb.New()
+
+	sm := &atomic.SharedMemory{}
+	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+
+	ctx.NetworkID = networkID
+	ctx.ChainID = chainID
+	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
 	issuer := make(chan common.Message, 1)
-	vm := &VM{}
+	vm := &VM{
+		ava:      ids.Empty,
+		platform: ids.Empty,
+	}
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
 		[]*common.Fx{{

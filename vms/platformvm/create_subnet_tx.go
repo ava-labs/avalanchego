@@ -205,10 +205,14 @@ func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []id
 }
 
 // CreateSubnetTxList is a list of *CreateSubnetTx
+// Transactions must be syntactically verified before adding to CreateSubnetTxList
+// to ensure that [CreateSubnetTxList] can always be marshalled.
 type CreateSubnetTxList []*CreateSubnetTx
 
 // Bytes returns the binary representation of [lst]
 func (lst CreateSubnetTxList) Bytes() []byte {
+	// Assumes the individual transactions have been syntactically verified
+	// so that it can be safely marshalled.
 	bytes, _ := Codec.Marshal(lst)
 	return bytes
 }

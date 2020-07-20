@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/random"
 )
 
@@ -58,6 +59,9 @@ type Set interface {
 	// [size]. Otherwise, the length of the returned validators will equal
 	// [size].
 	Sample(size int) []Validator
+
+	// Calculates the total weight of the validator set
+	Weight() (uint64, error)
 }
 
 // NewSet returns a new, empty set of validators.
@@ -232,6 +236,25 @@ func (s *set) sample(size int) []Validator {
 		list = append(list, s.vdrSlice[i])
 	}
 	return list
+}
+
+func (s *set) Weight() (uint64, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.weight()
+}
+
+func (s *set) weight() (uint64, error) {
+	weight := uint64(0)
+	for _, validator := range s.list() {
+		newWeight, err := math.Add64(weight, validator.Weight())
+		if err != nil {
+			return weight, err
+		}
+		weight = newWeight
+	}
+	return weight, nil
 }
 
 func (s *set) String() string {
