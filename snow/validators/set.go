@@ -189,6 +189,7 @@ func (s *set) remove(vdrID ids.ShortID) {
 	delete(s.vdrMap, iKey)
 	s.vdrSlice = s.vdrSlice[:e]
 	s.sampler.Weights = s.sampler.Weights[:e]
+
 	if s.weightErr != nil {
 		s.totalWeight, s.weightErr = s.calculateWeight()
 	} else {
@@ -253,6 +254,9 @@ func (s *set) sample(size int) []Validator {
 }
 
 func (s *set) Weight() (uint64, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	return s.totalWeight, s.weightErr
 }
 

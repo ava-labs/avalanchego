@@ -5,6 +5,7 @@ package nat
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"time"
 
@@ -17,8 +18,8 @@ var (
 	pmpClientTimeout = 500 * time.Millisecond
 )
 
-// natPMPClient adapts the NAT-PMP protocol implementation so it conforms to
-// the common interface.
+// pmpRouter adapts the NAT-PMP protocol implementation so it conforms to the
+// common interface.
 type pmpRouter struct {
 	client *natpmp.Client
 }
@@ -28,14 +29,20 @@ func (pmp *pmpRouter) MapPort(
 	newInternalPort uint16,
 	newExternalPort uint16,
 	mappingName string,
-	mappingDuration time.Duration) error {
+	mappingDuration time.Duration,
+) error {
 	protocol := string(networkProtocol)
 	internalPort := int(newInternalPort)
 	externalPort := int(newExternalPort)
-	// go-nat-pmp uses seconds to denote their lifetime
-	lifetime := int(mappingDuration / time.Second)
 
-	_, err := pmp.client.AddPortMapping(protocol, internalPort, externalPort, lifetime)
+	// go-nat-pmp uses seconds to denote their lifetime
+	lifetime := mappingDuration.Seconds()
+	// Assumes the architecture is at least 32-bit
+	if lifetime < 0 || lifetime > math.MaxInt32 {
+		return fmt.Errorf("invalid mapping duration range")
+	}
+
+	_, err := pmp.client.AddPortMapping(protocol, internalPort, externalPort, int(lifetime))
 	return err
 }
 

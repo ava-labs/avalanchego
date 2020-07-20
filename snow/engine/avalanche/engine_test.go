@@ -31,17 +31,19 @@ type Vtx struct {
 	status choices.Status
 
 	bytes []byte
+
+	Err error // Error to set for testing
 }
 
-func (v *Vtx) ID() ids.ID                  { return v.id }
-func (v *Vtx) DependencyIDs() []ids.ID     { return nil }
-func (v *Vtx) Parents() []avalanche.Vertex { return v.parents }
-func (v *Vtx) Height() uint64              { return v.height }
-func (v *Vtx) Txs() []snowstorm.Tx         { return v.txs }
-func (v *Vtx) Status() choices.Status      { return v.status }
-func (v *Vtx) Accept() error               { v.status = choices.Accepted; return nil }
-func (v *Vtx) Reject() error               { v.status = choices.Rejected; return nil }
-func (v *Vtx) Bytes() []byte               { return v.bytes }
+func (v *Vtx) ID() ids.ID                           { return v.id }
+func (v *Vtx) DependencyIDs() []ids.ID              { return nil }
+func (v *Vtx) Parents() ([]avalanche.Vertex, error) { return v.parents, v.Err }
+func (v *Vtx) Height() (uint64, error)              { return v.height, v.Err }
+func (v *Vtx) Txs() ([]snowstorm.Tx, error)         { return v.txs, v.Err }
+func (v *Vtx) Status() choices.Status               { return v.status }
+func (v *Vtx) Accept() error                        { v.status = choices.Accepted; return nil }
+func (v *Vtx) Reject() error                        { v.status = choices.Rejected; return nil }
+func (v *Vtx) Bytes() []byte                        { return v.bytes }
 
 type sortVts []*Vtx
 
