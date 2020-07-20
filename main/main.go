@@ -67,14 +67,25 @@ func main() {
 	mapper := nat.NewPortMapper(log, Config.Nat)
 	defer mapper.UnmapAllPorts()
 
-	port, err := mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking") // Open staking port
-	if err == nil && !Config.StakingIP.IsPrivate() {
-		Config.StakingIP.Port = port
+	// Open staking port
+	port, err := mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking")
+	if !Config.StakingIP.IsPrivate() {
+		if err == nil {
+			// The port was mapped and the ip is on a public network, the node
+			// should be able to be connected to peers on this public network.
+			Config.StakingIP.Port = port
+		} else {
+			// The port mapping errored, however it is possible the node is
+			// connected directly to a public network.
+			log.Warn("NAT traversal has failed. Unless the node is connected directly to a public network, the node will be able to connect to less nodes.")
+		}
 	} else {
+		// The reported IP is private, so this node will not be discoverable.
 		log.Warn("NAT traversal has failed. The node will be able to connect to less nodes.")
 	}
 
-	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" { // Open HTTP port iff HTTP server not listening on localhost
+	// Open the HTTP port iff the HTTP server is not listening on localhost
+	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
 		_, _ = mapper.Map("TCP", Config.HTTPPort, "gecko-http")
 	}
 
