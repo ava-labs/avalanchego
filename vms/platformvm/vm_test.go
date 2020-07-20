@@ -1708,6 +1708,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	handler := &router.Handler{}
 	handler.Initialize(
 		&engine,
+		vdrs,
 		msgChan,
 		1000,
 		"",

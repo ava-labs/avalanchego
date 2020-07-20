@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
@@ -32,20 +33,23 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	vdrs := validators.NewSet()
+	vdr0 := validators.GenerateRandomValidator(1)
+	vdrs.Add(vdr0)
 	handler.Initialize(
 		&engine,
+		vdrs,
 		nil,
-		2,
+		16,
 		"",
 		prometheus.NewRegistry(),
 	)
 
-	receiveTime := time.Now()
-	handler.clock.Set(receiveTime.Add(time.Second))
+	currentTime := time.Now()
+	handler.clock.Set(currentTime)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, receiveTime)
-	// Set the clock to simulate message timeout
-	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, receiveTime.Add(2*time.Second), ids.Set{})
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, currentTime.Add(-time.Second))
+	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, currentTime.Add(time.Second), ids.Set{})
 
 	go handler.Dispatch()
 
@@ -71,10 +75,12 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	validators := validators.NewSet()
 	handler.Initialize(
 		&engine,
+		validators,
 		nil,
-		1,
+		16,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -91,7 +97,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	}
 }
 
-func TestHandlerCallsToClose(t *testing.T) {
+func TestHandlerClosesOnError(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
 
@@ -105,8 +111,9 @@ func TestHandlerCallsToClose(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
-		1,
+		16,
 		"",
 		prometheus.NewRegistry(),
 	)

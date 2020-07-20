@@ -94,7 +94,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 	}
 
 	for _, r := range t.Name {
-		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r)) {
+		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
 			return errIllegalNameCharacter
 		}
 	}

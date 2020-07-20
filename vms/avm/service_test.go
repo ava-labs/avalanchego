@@ -406,8 +406,8 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
 		Username:     username,
 		Password:     password,
-		Name:         "test asset",
-		Symbol:       "test",
+		Name:         "testAsset",
+		Symbol:       "TEST",
 		Denomination: 1,
 		InitialHolders: []*Holder{{
 			Amount:  123456789,
@@ -418,7 +418,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "wWBk78PGAU4VkXhESr3jiYyMCEzzPPcnVYeEnNr9g4JuvYs2x" {
+	if reply.AssetID.String() != "2J2RhmrHycTj69Reytf486sQki36d3MoTUvmwPWrq16hct8C9y" {
 		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
 	}
 }
@@ -435,7 +435,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		Username: username,
 		Password: password,
 		Name:     "test asset",
-		Symbol:   "test",
+		Symbol:   "TEST",
 		MinterSets: []Owners{
 			{
 				Threshold: 1,
@@ -449,7 +449,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "2jpMDuqSgSo73JzAmVcnoJiP4G5TBQPPvFcCtbjKN8b5eH9RKH" {
+	if reply.AssetID.String() != "4BzG4M6JnR1jhB6hGZRCX2KRpWcUParz8AAKNhdFRt7Du8KP7" {
 		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 }

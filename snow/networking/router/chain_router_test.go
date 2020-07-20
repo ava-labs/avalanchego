@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -34,11 +35,13 @@ func TestShutdown(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
 		"",
 		prometheus.NewRegistry(),
 	)
+
 	go handler.Dispatch()
 
 	chainRouter.AddChain(handler)
@@ -50,6 +53,12 @@ func TestShutdown(t *testing.T) {
 	case _, _ = <-ticker.C:
 		t.Fatalf("Handler shutdown was not called or timed out after 20ms during chainRouter shutdown")
 	case _, _ = <-shutdownCalled:
+	}
+
+	select {
+	case <-handler.closed:
+	default:
+		t.Fatal("handler shutdown but never closed its closing channel")
 	}
 }
 
@@ -82,6 +91,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
 		"",

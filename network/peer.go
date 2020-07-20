@@ -220,10 +220,7 @@ func (p *peer) send(msg Msg) bool {
 	msgBytes := msg.Bytes()
 	newPendingBytes := p.net.pendingBytes + len(msgBytes)
 	newConnPendingBytes := p.pendingBytes + len(msgBytes)
-	if newPendingBytes > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
-		(newPendingBytes > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
-			newConnPendingBytes > p.net.maxNetworkPendingSendBytes/20) { // Check to see if this connection is using too much memory
+	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
 	}
@@ -311,6 +308,13 @@ func (p *peer) handle(msg Msg) {
 	default:
 		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op.String())
 	}
+}
+
+func (p *peer) dropMessage(msgLen, connPendingLen, networkPendingLen int) bool {
+	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
+		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
+			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
 }
 
 // assumes the stateLock is not held
