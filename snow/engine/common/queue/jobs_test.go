@@ -49,7 +49,7 @@ func TestPushPop(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id },
-		MissingDependenciesF: func() ids.Set { return ids.Set{} },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
 		ExecuteF:             func() error { return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
@@ -117,7 +117,7 @@ func TestExecute(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id0 },
-		MissingDependenciesF: func() ids.Set { return ids.Set{} },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
 		ExecuteF:             func() error { *executed0 = true; return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
@@ -128,7 +128,7 @@ func TestExecute(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id1 },
-		MissingDependenciesF: func() ids.Set { return ids.Set{id0.Key(): true} },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{id0.Key(): true}, nil },
 		ExecuteF:             func() error { *executed1 = true; return nil },
 		BytesF:               func() []byte { return []byte{1} },
 	}
@@ -165,7 +165,7 @@ func TestExecute(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	job1.MissingDependenciesF = func() ids.Set { return ids.Set{} }
+	job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
 	parser.ParseF = func(b []byte) (Job, error) {
 		if !bytes.Equal(b, []byte{1}) {
 			t.Fatalf("Unknown job")
@@ -205,7 +205,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id },
-		MissingDependenciesF: func() ids.Set { return ids.Set{} },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
 		ExecuteF:             func() error { return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
@@ -276,10 +276,10 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		T: t,
 
 		IDF: func() ids.ID { return id1 },
-		MissingDependenciesF: func() ids.Set {
+		MissingDependenciesF: func() (ids.Set, error) {
 			s := ids.Set{}
 			s.Add(id0)
-			return s
+			return s, nil
 		},
 		ExecuteF: func() error { return nil },
 		BytesF:   func() []byte { return []byte{1} },
@@ -288,9 +288,9 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id0 },
-		MissingDependenciesF: func() ids.Set { return ids.Set{} },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
 		ExecuteF: func() error {
-			job1.MissingDependenciesF = func() ids.Set { return ids.Set{} }
+			job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
 			return nil
 		},
 		BytesF: func() []byte { return []byte{0} },

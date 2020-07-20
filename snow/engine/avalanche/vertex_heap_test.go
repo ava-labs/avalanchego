@@ -53,21 +53,21 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 	}
 
 	vtxA := h.Pop()
-	if vtxA.Height() != 3 {
+	if height, err := vtxA.Height(); err != nil || height != 3 {
 		t.Fatalf("First height from heap was incorrect")
 	} else if !vtxA.ID().Equals(vtx3.ID()) {
 		t.Fatalf("Incorrect ID on vertex popped from heap")
 	}
 
 	vtxB := h.Pop()
-	if vtxB.Height() != 1 {
+	if height, err := vtxB.Height(); err != nil || height != 1 {
 		t.Fatalf("First height from heap was incorrect")
 	} else if !vtxB.ID().Equals(vtx1.ID()) && !vtxB.ID().Equals(vtx2.ID()) {
 		t.Fatalf("Incorrect ID on vertex popped from heap")
 	}
 
 	vtxC := h.Pop()
-	if vtxC.Height() != 1 {
+	if height, err := vtxC.Height(); err != nil || height != 1 {
 		t.Fatalf("First height from heap was incorrect")
 	} else if !vtxC.ID().Equals(vtx1.ID()) && !vtxC.ID().Equals(vtx2.ID()) {
 		t.Fatalf("Incorrect ID on vertex popped from heap")
@@ -78,7 +78,7 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 	}
 
 	vtxD := h.Pop()
-	if vtxD.Height() != 0 {
+	if height, err := vtxD.Height(); err != nil || height != 0 {
 		t.Fatalf("Last height returned was incorrect")
 	} else if !vtxD.ID().Equals(vtx0.ID()) {
 		t.Fatalf("Last item from heap had incorrect ID")
