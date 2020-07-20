@@ -35,7 +35,11 @@ func (v *voter) Update() {
 	if !finished {
 		return
 	}
-	results = v.bubbleVotes(results)
+	results, err := v.bubbleVotes(results)
+	if err != nil {
+		v.t.errs.Add(err)
+		return
+	}
 
 	v.t.Config.Context.Log.Debug("Finishing poll with:\n%s", &results)
 	if err := v.t.consensus.RecordPoll(results); err != nil {
@@ -68,7 +72,7 @@ func (v *voter) Update() {
 	v.t.errs.Add(v.t.repoll())
 }
 
-func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
+func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 	bubbledVotes := ids.UniqueBag{}
 	vertexHeap := vertex.NewHeap()
 	for _, vote := range votes.List() {
@@ -104,12 +108,17 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) ids.UniqueBag {
 		} else {
 			v.t.Config.Context.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued", set.Len(), vtx.ID())
 			bubbledVotes.RemoveSet(vtx.ID()) // Remove votes for this vertex because it hasn't been issued
-			for _, parentVtx := range vtx.Parents() {
+
+			parents, err := vtx.Parents()
+			if err != nil {
+				return bubbledVotes, err
+			}
+			for _, parentVtx := range parents {
 				bubbledVotes.UnionSet(parentVtx.ID(), set)
 				vertexHeap.Push(parentVtx)
 			}
 		}
 	}
 
-	return bubbledVotes
+	return bubbledVotes, nil
 }

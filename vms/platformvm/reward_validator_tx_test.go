@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-
-	"github.com/ava-labs/gecko/ids"
 )
 
 func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
@@ -70,7 +70,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 	}()
 
 	var nextToRemove *addDefaultSubnetValidatorTx
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,11 +107,11 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 
 	// there should be no validators of default subnet in [onCommitDB] or [onAbortDB]
 	// (as specified in defaultVM's init)
-	if currentValidators, err := vm.getCurrentValidators(onCommitDB, DefaultSubnetID); err != nil {
+	if currentValidators, err := vm.getCurrentValidators(onCommitDB, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 	} else if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
 		t.Fatalf("Should be %d validators but are %d", len(keys)-1, numValidators)
-	} else if currentValidators, err = vm.getCurrentValidators(onAbortDB, DefaultSubnetID); err != nil {
+	} else if currentValidators, err = vm.getCurrentValidators(onAbortDB, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 	} else if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
 		t.Fatalf("Should be %d validators but there are %d", len(keys)-1, numValidators)
@@ -204,13 +204,13 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	currentValidators.Add(vdrTx)
 	currentValidators.Add(delTx)
-	if err := vm.putCurrentValidators(vm.DB, currentValidators, DefaultSubnetID); err != nil {
+	if err := vm.putCurrentValidators(vm.DB, currentValidators, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
 		// Advance timestamp to when delegator should leave validator set
 	} else if err := vm.putTimestamp(vm.DB, time.Unix(int64(delEndTime), 0)); err != nil {

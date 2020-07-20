@@ -40,6 +40,8 @@ func (mt MockTransferable) Verify() error {
 	return nil
 }
 
+func (mt MockTransferable) VerifyState() error { return mt.Verify() }
+
 func (mt MockTransferable) Amount() uint64 {
 	return mt.AmountVal
 }
@@ -390,4 +392,3 @@ func TestSyntacticVerifySpend(t *testing.T) {
 		}
 	}
 }
-

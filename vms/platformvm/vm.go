@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -77,9 +78,6 @@ const (
 var (
 	// taken from https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go/32620397#32620397
 	maxTime = time.Unix(1<<63-62135596801, 0) // 0 is used because we drop the nano-seconds
-
-	// DefaultSubnetID is the ID of the default subnet
-	DefaultSubnetID = ids.Empty
 
 	timestampKey         = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
 	currentValidatorsKey = ids.NewID([32]byte{'c', 'u', 'r', 'r', 'e', 'n', 't'})
@@ -252,7 +250,7 @@ func (vm *VM) Initialize(
 		}
 
 		// Persist default subnet validator set at genesis
-		if err := vm.putCurrentValidators(vm.DB, genesis.Validators, DefaultSubnetID); err != nil {
+		if err := vm.putCurrentValidators(vm.DB, genesis.Validators, constants.DefaultSubnetID); err != nil {
 			return err
 		}
 
@@ -284,7 +282,7 @@ func (vm *VM) Initialize(
 		}
 
 		// There are no pending stakers at genesis
-		if err := vm.putPendingValidators(vm.DB, &EventHeap{SortByStartTime: true}, DefaultSubnetID); err != nil {
+		if err := vm.putPendingValidators(vm.DB, &EventHeap{SortByStartTime: true}, constants.DefaultSubnetID); err != nil {
 			return err
 		}
 
@@ -400,7 +398,7 @@ func (vm *VM) initSubnets() error {
 		return err
 	}
 
-	if err := vm.updateValidators(DefaultSubnetID); err != nil {
+	if err := vm.updateValidators(constants.DefaultSubnetID); err != nil {
 		return err
 	}
 
@@ -422,7 +420,7 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		return
 	}
-	if vm.stakingEnabled && !DefaultSubnetID.Equals(tx.SubnetID) && !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
+	if vm.stakingEnabled && !constants.DefaultSubnetID.Equals(tx.SubnetID) && !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
 		return
 	}
 
@@ -537,7 +535,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 
 	// If the chain time would be the time for the next default subnet validator to leave,
 	// then we create a block that removes the validator and proposes they receive a validator reward
-	currentValidators, err := vm.getCurrentValidators(db, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get validator set: %w", err)
 	}
@@ -712,7 +710,7 @@ func (vm *VM) resetTimer() {
 		return
 	}
 
-	nextDSValidatorEndTime := vm.nextSubnetValidatorChangeTime(db, DefaultSubnetID, false)
+	nextDSValidatorEndTime := vm.nextSubnetValidatorChangeTime(db, constants.DefaultSubnetID, false)
 	if timestamp.Equal(nextDSValidatorEndTime) {
 		vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeRewardValidator
 		return
@@ -756,7 +754,7 @@ func (vm *VM) resetTimer() {
 // Otherwise, returns the time at which the next validator (of any subnet) stops validating
 // If no such validator is found, returns maxTime
 func (vm *VM) nextValidatorChangeTime(db database.Database, start bool) time.Time {
-	earliest := vm.nextSubnetValidatorChangeTime(db, DefaultSubnetID, start)
+	earliest := vm.nextSubnetValidatorChangeTime(db, constants.DefaultSubnetID, start)
 	subnets, err := vm.getSubnets(db)
 	if err != nil {
 		return earliest
@@ -803,7 +801,7 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	if !subnetID.Equals(DefaultSubnetID) { // validators of default subnet removed in rewardValidatorTxs, not here
+	if !subnetID.Equals(constants.DefaultSubnetID) { // validators of default subnet removed in rewardValidatorTxs, not here
 		for current.Len() > 0 {
 			next := current.Peek() // current validator with earliest end time
 			if timestamp.Before(next.EndTime()) {

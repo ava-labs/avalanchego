@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -129,7 +130,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 
 	// Ensure that the period this validator validates the specified subnet is a subnet of the time they validate the default subnet
 	// First, see if they're currently validating the default subnet
-	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, constants.DefaultSubnetID)
 	var dsValidator *addDefaultSubnetValidatorTx // default subnet validator
 	if err != nil {
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
@@ -141,7 +142,7 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	} else {
 		// They aren't currently validating the default subnet.
 		// See if they will validate the default subnet in the future.
-		pendingDSValidators, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+		pendingDSValidators, err := tx.vm.getPendingValidators(db, constants.DefaultSubnetID)
 		if err != nil {
 			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
 		}
@@ -155,12 +156,12 @@ func (tx *addDefaultSubnetDelegatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// If this proposal is committed, update the pending validator set to include the validator
-	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

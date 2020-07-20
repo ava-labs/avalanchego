@@ -31,7 +31,6 @@ const (
 	queryFailedMsg
 	notifyMsg
 	gossipMsg
-	shutdownMsg
 	getAncestorsMsg
 	multiPutMsg
 	getAncestorsFailedMsg
@@ -46,6 +45,7 @@ type message struct {
 	containers   [][]byte
 	containerIDs ids.Set
 	notification common.Message
+	received     time.Time // Time this message was received
 	deadline     time.Time // Time this message must be responded to
 }
 
@@ -103,8 +103,6 @@ func (t msgType) String() string {
 		return "Notify Message"
 	case gossipMsg:
 		return "Gossip Message"
-	case shutdownMsg:
-		return "Shutdown Message"
 	default:
 		return fmt.Sprintf("Unknown Message Type: %d", t)
 	}

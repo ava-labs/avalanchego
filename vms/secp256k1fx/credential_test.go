@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestCredentialVerify(t *testing.T) {
@@ -92,5 +93,12 @@ func TestCredentialSerialize(t *testing.T) {
 
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+}
+
+func TestCredentialNotState(t *testing.T) {
+	intf := interface{}(&Credential{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

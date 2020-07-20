@@ -4,9 +4,11 @@
 package router
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
@@ -31,20 +33,23 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	vdrs := validators.NewSet()
+	vdr0 := validators.GenerateRandomValidator(1)
+	vdrs.Add(vdr0)
 	handler.Initialize(
 		&engine,
+		vdrs,
 		nil,
-		2,
+		16,
 		"",
 		prometheus.NewRegistry(),
 	)
 
-	receiveTime := time.Now()
-	handler.clock.Set(receiveTime.Add(time.Second))
+	currentTime := time.Now()
+	handler.clock.Set(currentTime)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, receiveTime)
-	// Set the clock to simulate message timeout
-	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, receiveTime.Add(2*time.Second), ids.Set{})
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, currentTime.Add(-time.Second))
+	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, currentTime.Add(time.Second), ids.Set{})
 
 	go handler.Dispatch()
 
@@ -70,10 +75,12 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	validators := validators.NewSet()
 	handler.Initialize(
 		&engine,
+		validators,
 		nil,
-		1,
+		16,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -87,5 +94,42 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	case _, _ = <-ticker.C:
 		t.Fatalf("Calling engine function timed out")
 	case _, _ = <-called:
+	}
+}
+
+func TestHandlerClosesOnError(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	closed := make(chan struct{}, 1)
+
+	engine.ContextF = snow.DefaultContextTest
+	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+		return errors.New("Engine error should cause handler to close")
+	}
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		validators.NewSet(),
+		nil,
+		16,
+		"",
+		prometheus.NewRegistry(),
+	)
+	handler.clock.Set(time.Now())
+
+	handler.toClose = func() {
+		closed <- struct{}{}
+	}
+	go handler.Dispatch()
+
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Now().Add(time.Second))
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	select {
+	case _, _ = <-ticker.C:
+		t.Fatalf("Handler shutdown timed out before calling toClose")
+	case _, _ = <-closed:
 	}
 }

@@ -3,6 +3,7 @@ package nftfx
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -28,5 +29,12 @@ func TestTransferOperationOuts(t *testing.T) {
 	}
 	if outs := op.Outs(); len(outs) != 1 {
 		t.Fatalf("Wrong number of outputs returned")
+	}
+}
+
+func TestTransferOperationState(t *testing.T) {
+	intf := interface{}(&TransferOperation{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

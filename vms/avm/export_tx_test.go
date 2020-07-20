@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -60,7 +61,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize([]byte{})
 
-	if err := tx.SyntacticVerify(ctx, c, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -105,7 +106,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	}
 	tx.Initialize([]byte{})
 
-	if err := tx.SyntacticVerify(ctx, c, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("should have errored due to memo field being too long")
 	}
 }
@@ -521,5 +522,12 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	if _, err := state.AVMUTXO(utxoID); err == nil {
 		t.Fatalf("should have failed to read the utxo")
+	}
+}
+
+func TestExportTxNotState(t *testing.T) {
+	intf := interface{}(&ExportTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

@@ -9,6 +9,9 @@ type TestVerifiable struct{ Err error }
 // Verify ...
 func (v *TestVerifiable) Verify() error { return v.Err }
 
+// VerifyState ...
+func (v *TestVerifiable) VerifyState() error { return v.Err }
+
 // TestTransferable ...
 type TestTransferable struct {
 	TestVerifiable

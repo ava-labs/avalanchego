@@ -62,7 +62,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddDefaultSubnetValidator(t *testing.T) {
-	expectedJSONString := `{"startTime":"0","endTime":"0","id":null,"destination":"","delegationFeeRate":"0","username":"","password":""}`
+	expectedJSONString := `{"startTime":"0","endTime":"0","id":"","destination":"","delegationFeeRate":"0","username":"","password":""}`
 	args := AddDefaultSubnetValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {

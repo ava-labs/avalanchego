@@ -11,4 +11,4 @@ type BurnOperation struct {
 }
 
 // Outs ...
-func (op *BurnOperation) Outs() []verify.Verifiable { return nil }
+func (op *BurnOperation) Outs() []verify.State { return nil }

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -146,7 +147,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
-	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, DefaultSubnetID)
+	currentValidatorHeap, err := tx.vm.getCurrentValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
@@ -158,7 +159,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
-	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, DefaultSubnetID)
+	pendingValidatorHeap, err := tx.vm.getPendingValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
@@ -171,7 +172,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	pendingValidatorHeap.Add(tx) // add validator to set of pending validators
 
 	// If this proposal is committed, update the pending validator set to include the validator
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

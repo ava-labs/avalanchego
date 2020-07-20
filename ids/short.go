@@ -6,7 +6,9 @@ package ids
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -38,6 +40,16 @@ func ShortFromString(idStr string) (ShortID, error) {
 		return ShortID{}, err
 	}
 	return ToShortID(cb58.Bytes)
+}
+
+// ShortFromPrefixedString returns a ShortID assuming the cb58 format is
+// prefixed
+func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
+	if !strings.HasPrefix(idStr, prefix) {
+		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
+	}
+
+	return ShortFromString(strings.TrimPrefix(idStr, prefix))
 }
 
 // MarshalJSON ...
@@ -100,6 +112,11 @@ func (id ShortID) String() string {
 	bytes := id.Bytes()
 	cb58 := formatting.CB58{Bytes: bytes}
 	return cb58.String()
+}
+
+// PrefixedString returns the String representation with a prefix added
+func (id ShortID) PrefixedString(prefix string) string {
+	return prefix + id.String()
 }
 
 type sortShortIDData []ShortID

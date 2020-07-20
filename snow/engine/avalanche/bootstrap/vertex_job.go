@@ -43,21 +43,35 @@ type vertexJob struct {
 }
 
 func (v *vertexJob) ID() ids.ID { return v.vtx.ID() }
-func (v *vertexJob) MissingDependencies() ids.Set {
+
+func (v *vertexJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
-	for _, parent := range v.vtx.Parents() {
+	parents, err := v.vtx.Parents()
+	if err != nil {
+		return missing, err
+	}
+	for _, parent := range parents {
 		if parent.Status() != choices.Accepted {
 			missing.Add(parent.ID())
 		}
 	}
-	return missing
+	return missing, nil
 }
+
 func (v *vertexJob) Execute() error {
-	if v.MissingDependencies().Len() != 0 {
+	deps, err := v.MissingDependencies()
+	if err != nil {
+		return err
+	}
+	if deps.Len() != 0 {
 		v.numDropped.Inc()
 		return errors.New("attempting to execute blocked vertex")
 	}
-	for _, tx := range v.vtx.Txs() {
+	txs, err := v.vtx.Txs()
+	if err != nil {
+		return err
+	}
+	for _, tx := range txs {
 		if tx.Status() != choices.Accepted {
 			v.numDropped.Inc()
 			v.log.Warn("attempting to execute vertex with non-accepted transactions")
@@ -77,4 +91,5 @@ func (v *vertexJob) Execute() error {
 	}
 	return nil
 }
+
 func (v *vertexJob) Bytes() []byte { return v.vtx.Bytes() }

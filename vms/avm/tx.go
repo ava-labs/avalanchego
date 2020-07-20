@@ -31,7 +31,7 @@ type UnsignedTx interface {
 	InputUTXOs() []*ava.UTXOID
 	UTXOs() []*ava.UTXO
 
-	SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
+	SyntacticVerify(ctx *snow.Context, c codec.Codec, txFeeAssetID ids.ID, txFee uint64, numFxs int) error
 	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error
 	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
@@ -52,13 +52,19 @@ type Tx struct {
 func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
 
 // SyntacticVerify verifies that this transaction is well-formed.
-func (t *Tx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *Tx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil || t.UnsignedTx == nil:
 		return errNilTx
 	}
 
-	if err := t.UnsignedTx.SyntacticVerify(ctx, c, numFxs); err != nil {
+	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
 		return err
 	}
 

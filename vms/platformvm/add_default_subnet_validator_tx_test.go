@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 )
 
@@ -251,13 +252,13 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount,       // stake amount
-		uint64(startTime.Unix()), // start time
+		MinimumStakeAmount,                                   // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
 		key2.PublicKey().Address(),                           // node ID
-		nodeID,                                               // destination
-		NumberOfShares,                                       // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},              // key
+		nodeID,                                  // destination
+		NumberOfShares,                          // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -266,7 +267,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{tx},
 		},
-		DefaultSubnetID,
+		constants.DefaultSubnetID,
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.SemanticVerify(vDB); err == nil {
