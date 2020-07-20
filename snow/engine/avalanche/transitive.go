@@ -397,7 +397,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 
 	parents, err := vtx.Parents()
 	if err != nil {
-		return errGetTx
+		return err
 	}
 	for _, parent := range parents {
 		if !t.Consensus.VertexIssued(parent) {

@@ -147,7 +147,7 @@ func (vtx *uniqueVertex) Height() (uint64, error) {
 func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 	vtx.refresh()
 
-	if vtx.v.vtx == nil && vtx.v.txs == nil {
+	if vtx.v.vtx == nil {
 		return nil, fmt.Errorf("failed to get txs for vertex with status: %s", vtx.v.status)
 	}
 
