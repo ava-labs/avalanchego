@@ -6,6 +6,8 @@ package platformvm
 import (
 	"testing"
 	"time"
+
+	"github.com/ava-labs/gecko/utils/constants"
 )
 
 func TestAdvanceTimeTxSyntacticVerify(t *testing.T) {
@@ -92,7 +94,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addPendingValidatorTx},
 		},
-		defaultSubnetID,
+		constants.DefaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +171,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addPendingValidatorTx},
 		},
-		defaultSubnetID,
+		constants.DefaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +186,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, defaultSubnetID)
+	onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +194,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatalf("Should have added the validator to the validator set")
 	}
 
-	onCommitPendingEvents, err := vm.getPendingValidators(onCommit, defaultSubnetID)
+	onCommitPendingEvents, err := vm.getPendingValidators(onCommit, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +202,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
-	onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, defaultSubnetID)
+	onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +210,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	onAbortPendingEvents, err := vm.getPendingValidators(onAbort, defaultSubnetID)
+	onAbortPendingEvents, err := vm.getPendingValidators(onAbort, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}

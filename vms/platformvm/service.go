@@ -180,7 +180,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		}
 		// Include Default Subnet
 		response.Subnets[len(subnets)] = APISubnet{
-			ID:          defaultSubnetID,
+			ID:          constants.DefaultSubnetID,
 			ControlKeys: []string{},
 			Threshold:   json.Uint16(0),
 		}
@@ -204,10 +204,10 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			)
 		}
 	}
-	if idsSet.Contains(defaultSubnetID) {
+	if idsSet.Contains(constants.DefaultSubnetID) {
 		response.Subnets = append(response.Subnets,
 			APISubnet{
-				ID:          defaultSubnetID,
+				ID:          constants.DefaultSubnetID,
 				ControlKeys: []string{},
 				Threshold:   json.Uint16(0),
 			},
@@ -239,7 +239,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 
 	if args.SubnetID.IsZero() {
-		args.SubnetID = defaultSubnetID
+		args.SubnetID = constants.DefaultSubnetID
 	}
 
 	validators, err := service.vm.getCurrentValidators(service.vm.DB, args.SubnetID)
@@ -248,7 +248,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
-	if args.SubnetID.Equals(defaultSubnetID) {
+	if args.SubnetID.Equals(constants.DefaultSubnetID) {
 		for i, tx := range validators.Txs {
 			vdr := tx.Vdr()
 			weight := json.Uint64(vdr.Weight())
@@ -303,7 +303,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
 
 	if args.SubnetID.IsZero() {
-		args.SubnetID = defaultSubnetID
+		args.SubnetID = constants.DefaultSubnetID
 	}
 
 	validators, err := service.vm.getPendingValidators(service.vm.DB, args.SubnetID)
@@ -315,7 +315,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	for i, tx := range validators.Txs {
 		vdr := tx.Vdr()
 		weight := json.Uint64(vdr.Weight())
-		if args.SubnetID.Equals(defaultSubnetID) {
+		if args.SubnetID.Equals(constants.DefaultSubnetID) {
 			var address ids.ShortID
 			switch tx := tx.(type) {
 			case *addDefaultSubnetValidatorTx:
@@ -365,7 +365,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 	service.vm.Ctx.Log.Info("Platform: SampleValidators called with {Size = %d}", args.Size)
 
 	if args.SubnetID.IsZero() {
-		args.SubnetID = defaultSubnetID
+		args.SubnetID = constants.DefaultSubnetID
 	}
 
 	validators, ok := service.vm.validators.GetValidatorSet(args.SubnetID)
@@ -703,7 +703,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
 	}
 
-	if subnetID.Equals(defaultSubnetID) {
+	if subnetID.Equals(constants.DefaultSubnetID) {
 		return errNonDSUsesDS
 	}
 
@@ -1375,7 +1375,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
-	if subnetID.Equals(defaultSubnetID) {
+	if subnetID.Equals(constants.DefaultSubnetID) {
 		return errDSCantValidate
 	}
 
@@ -1547,7 +1547,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the default subnet
-	if _, err := service.vm.getSubnet(service.vm.DB, subnetID); err != nil && !subnetID.Equals(defaultSubnetID) {
+	if _, err := service.vm.getSubnet(service.vm.DB, subnetID); err != nil && !subnetID.Equals(constants.DefaultSubnetID) {
 		return err
 	}
 	// Get the chains that exist

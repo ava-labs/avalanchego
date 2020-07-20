@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -146,7 +147,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
-	currentEvents, err := tx.vm.getCurrentValidators(db, defaultSubnetID)
+	currentEvents, err := tx.vm.getCurrentValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -158,7 +159,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	}
 
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
-	pendingEvents, err := tx.vm.getPendingValidators(db, defaultSubnetID)
+	pendingEvents, err := tx.vm.getPendingValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -174,7 +175,7 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 	// If this proposal is committed, update the pending validator set to include the validator,
 	// update the validator's account by removing the staked $AVA
 	onCommitDB := versiondb.New(db)
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, defaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingEvents, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 	if err := tx.vm.putAccount(onCommitDB, newAccount); err != nil {

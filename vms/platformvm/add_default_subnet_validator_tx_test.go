@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 )
 
 func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
@@ -291,9 +292,9 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,           // nonce
-		defaultStakeAmount,       // stake amount
-		uint64(startTime.Unix()), // start time
+		defaultNonce+1,                                       // nonce
+		defaultStakeAmount,                                   // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
 		key.PublicKey().Address(),                            // node ID
 		defaultKey.PublicKey().Address(),                     // destination
@@ -311,7 +312,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{tx},
 		},
-		defaultSubnetID,
+		constants.DefaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)

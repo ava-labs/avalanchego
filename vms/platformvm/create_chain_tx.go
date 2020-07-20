@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 )
@@ -92,7 +93,7 @@ func (tx *CreateChainTx) SyntacticVerify() error {
 		return errInvalidID
 	case tx.VMID.IsZero():
 		return errInvalidVMID
-	case tx.SubnetID.Equals(defaultSubnetID):
+	case tx.SubnetID.Equals(constants.DefaultSubnetID):
 		return errDSCantValidate
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
