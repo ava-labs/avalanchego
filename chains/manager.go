@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms"
 	"github.com/ava-labs/gecko/vms/avm"
@@ -313,7 +314,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	if m.stakingEnabled {
 		validators, ok = m.validators.GetValidatorSet(chainParams.SubnetID)
 	} else { // Staking is disabled. Every peer validates every subnet.
-		validators, ok = m.validators.GetValidatorSet(ids.Empty) // ids.Empty is the default subnet ID. TODO: Move to const package so we can use it here.
+		validators, ok = m.validators.GetValidatorSet(constants.DefaultSubnetID)
 	}
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
@@ -366,7 +367,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Allows messages to be routed to the new chain
 	m.chainRouter.AddChain(chain.Handler)
 	// If the X or P Chain panics, do not attempt to recover
-	if chainParams.SubnetID.Equals(ids.Empty) && (chainParams.ID.Equals(ids.Empty) || vmID.Equals(avm.ID)) {
+	if chainParams.SubnetID.Equals(constants.DefaultSubnetID) && (chainParams.ID.Equals(constants.PlatformChainID) || vmID.Equals(avm.ID)) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {

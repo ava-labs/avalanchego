@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 )
 
@@ -258,7 +259,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []TimedTx{addDSTx},
 		},
-		DefaultSubnetID,
+		constants.DefaultSubnetID,
 	)
 	if err != nil {
 		t.Fatal(err)

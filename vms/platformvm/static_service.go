@@ -83,7 +83,7 @@ type FormattedAPIValidator struct {
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 	Address     string       `json:"address,omitempty"`
-	ID          ids.ShortID  `json:"id"`
+	ID          string       `json:"id"`
 }
 
 func (v *FormattedAPIValidator) weight() uint64 {

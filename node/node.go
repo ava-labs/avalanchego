@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/constants"
+
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
@@ -155,7 +157,7 @@ func (n *Node) initNetworking() error {
 		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 	}
 	n.vdrs = validators.NewManager()
-	n.vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
+	n.vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -324,7 +326,7 @@ func (n *Node) initVMManager() error {
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			AVA:      avaAssetID,
 			Fee:      n.Config.AvaTxFee,
-			Platform: ids.Empty,
+			Platform: constants.PlatformChainID,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: path.Join(n.Config.PluginDir, "evm"),
@@ -368,7 +370,7 @@ func (n *Node) initChains() error {
 		defaultSubnetValidators := validators.NewSet()
 		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 		vdrs = validators.NewManager()
-		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
+		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 	}
 
 	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
@@ -401,8 +403,8 @@ func (n *Node) initChains() error {
 
 	// Create the Platform Chain
 	n.chainManager.ForceCreateChain(chains.ChainParameters{
-		ID:            ids.Empty,
-		SubnetID:      platformvm.DefaultSubnetID,
+		ID:            constants.PlatformChainID,
+		SubnetID:      constants.DefaultSubnetID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: n.beacons,

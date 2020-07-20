@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 )
 
@@ -67,7 +68,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 	}()
 
 	var nextToRemove *addDefaultSubnetValidatorTx
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +114,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 
 	// there should be no validators of default subnet in [onCommitDB] or [onAbortDB]
 	// (as specified in defaultVM's init)
-	currentValidators, err = vm.getCurrentValidators(onCommitDB, DefaultSubnetID)
+	currentValidators, err = vm.getCurrentValidators(onCommitDB, constants.DefaultSubnetID)
 	t.Log(currentValidators)
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +123,7 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatalf("Should be %d validators but are %d", len(keys)-1, numValidators)
 	}
 
-	currentValidators, err = vm.getCurrentValidators(onAbortDB, DefaultSubnetID)
+	currentValidators, err = vm.getCurrentValidators(onAbortDB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,13 +190,13 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentValidators, err := vm.getCurrentValidators(vm.DB, DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	currentValidators.Add(vdrTx)
 	currentValidators.Add(delTx)
-	vm.putCurrentValidators(vm.DB, currentValidators, DefaultSubnetID)
+	vm.putCurrentValidators(vm.DB, currentValidators, constants.DefaultSubnetID)
 
 	if err := vm.putTimestamp(vm.DB, defaultValidateEndTime.Add(-time.Second)); err != nil {
 		t.Fatal(err)

@@ -4,7 +4,7 @@
 package genesis
 
 import (
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
@@ -18,16 +18,16 @@ import (
 // Aliases returns the default aliases based on the network ID
 func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[[32]byte][]string, error) {
 	generalAliases := map[string][]string{
-		"vm/" + platformvm.ID.String():  {"vm/platform"},
-		"vm/" + avm.ID.String():         {"vm/avm"},
-		"vm/" + EVMID.String():          {"vm/evm"},
-		"vm/" + spdagvm.ID.String():     {"vm/spdag"},
-		"vm/" + spchainvm.ID.String():   {"vm/spchain"},
-		"vm/" + timestampvm.ID.String(): {"vm/timestamp"},
-		"bc/" + ids.Empty.String():      {"P", "platform", "bc/P", "bc/platform"},
+		"vm/" + platformvm.ID.String():             {"vm/platform"},
+		"vm/" + avm.ID.String():                    {"vm/avm"},
+		"vm/" + EVMID.String():                     {"vm/evm"},
+		"vm/" + spdagvm.ID.String():                {"vm/spdag"},
+		"vm/" + spchainvm.ID.String():              {"vm/spchain"},
+		"vm/" + timestampvm.ID.String():            {"vm/timestamp"},
+		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
 	}
 	chainAliases := map[[32]byte][]string{
-		ids.Empty.Key(): {"P", "platform"},
+		constants.PlatformChainID.Key(): {"P", "platform"},
 	}
 	vmAliases := map[[32]byte][]string{
 		platformvm.ID.Key():  {"platform"},
