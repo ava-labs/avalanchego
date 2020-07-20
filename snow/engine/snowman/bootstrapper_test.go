@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -19,8 +18,6 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 )
 
@@ -35,10 +32,6 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	db := memdb.New()
 	sender := &common.SenderTest{}
 	vm := &VMTest{}
-	engine := &Transitive{}
-	handler := &router.Handler{}
-	router := &router.ChainRouter{}
-	timeouts := &timeout.Manager{}
 
 	sender.T = t
 	vm.T = t
@@ -51,16 +44,6 @@ func newConfig(t *testing.T) (BootstrapConfig, ids.ShortID, *common.SenderTest, 
 	peer := validators.GenerateRandomValidator(1)
 	peerID := peer.ID()
 	peers.Add(peer)
-
-	handler.Initialize(
-		engine,
-		make(chan common.Message),
-		1,
-		"",
-		prometheus.NewRegistry(),
-	)
-	timeouts.Initialize(0)
-	router.Initialize(ctx.Log, timeouts, time.Hour, time.Second)
 
 	blocker, _ := queue.New(db)
 
