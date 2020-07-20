@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
-// ExportTx is the basis of all transactions.
+// ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 

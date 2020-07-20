@@ -26,7 +26,8 @@ var (
 	errNameTooLong                  = fmt.Errorf("name is too long, maximum size is %d", maxNameLen)
 	errSymbolTooLong                = fmt.Errorf("symbol is too long, maximum size is %d", maxSymbolLen)
 	errNoFxs                        = errors.New("assets must support at least one Fx")
-	errUnprintableASCIICharacter    = errors.New("unprintable ascii character was provided")
+	errIllegalNameCharacter         = errors.New("asset's name must be made up of only letters and numbers")
+	errIllegalSymbolCharacter       = errors.New("asset's symbol must be all upper case letters")
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
 )
@@ -93,13 +94,13 @@ func (t *CreateAssetTx) SyntacticVerify(
 	}
 
 	for _, r := range t.Name {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return errUnprintableASCIICharacter
+		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
+			return errIllegalNameCharacter
 		}
 	}
 	for _, r := range t.Symbol {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return errUnprintableASCIICharacter
+		if r > unicode.MaxASCII || !unicode.IsUpper(r) {
+			return errIllegalSymbolCharacter
 		}
 	}
 

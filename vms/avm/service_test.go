@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func setup(t *testing.T) ([]byte, *VM, *Service) {
@@ -236,6 +238,111 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 }
 
+func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	addr0 := keys[0].PublicKey().Address()
+	tests := []struct {
+		label string
+		args  *GetAtomicUTXOsArgs
+	}{
+		{"[", &GetAtomicUTXOsArgs{[]string{""}}},
+		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}}},
+		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}}},
+		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}}},
+		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}}},
+		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}}},
+		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			utxosReply := &GetAtomicUTXOsReply{}
+			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err == nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestServiceGetAtomicUTXOs(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	addr0 := keys[0].PublicKey().Address()
+	smDB := vm.ctx.SharedMemory.GetDatabase(ids.Empty)
+
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{TxID: ids.Empty},
+		Asset:  ava.Asset{ID: ids.Empty},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 7,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr0},
+			},
+		},
+	}
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+	if err := state.FundPlatformUTXO(utxo); err != nil {
+		t.Fatal(err)
+	}
+	vm.ctx.SharedMemory.ReleaseDatabase(ids.Empty)
+
+	tests := []struct {
+		label string
+		args  *GetAtomicUTXOsArgs
+		count int
+	}{
+		{
+			"Empty",
+			&GetAtomicUTXOsArgs{},
+			0,
+		},
+		{
+			"[<ChainID>-<unrelated address>]",
+			&GetAtomicUTXOsArgs{[]string{
+				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
+				//		 longer than addr0.String()
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+			}},
+			0,
+		},
+		{
+			"[<ChainID>-<addr0>]",
+			&GetAtomicUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			}},
+			1,
+		},
+		{
+			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
+			&GetAtomicUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			}},
+			1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			utxosReply := &GetAtomicUTXOsReply{}
+			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err != nil {
+				t.Error(err)
+			} else if tt.count != len(utxosReply.UTXOs) {
+				t.Errorf("Expected %d utxos, got %#v", tt.count, len(utxosReply.UTXOs))
+			}
+		})
+	}
+}
+
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
 	defer func() {
@@ -299,8 +406,8 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
 		Username:     username,
 		Password:     password,
-		Name:         "test asset",
-		Symbol:       "test",
+		Name:         "testAsset",
+		Symbol:       "TEST",
 		Denomination: 1,
 		InitialHolders: []*Holder{{
 			Amount:  123456789,
@@ -311,7 +418,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "wWBk78PGAU4VkXhESr3jiYyMCEzzPPcnVYeEnNr9g4JuvYs2x" {
+	if reply.AssetID.String() != "2J2RhmrHycTj69Reytf486sQki36d3MoTUvmwPWrq16hct8C9y" {
 		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
 	}
 }
@@ -328,7 +435,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		Username: username,
 		Password: password,
 		Name:     "test asset",
-		Symbol:   "test",
+		Symbol:   "TEST",
 		MinterSets: []Owners{
 			{
 				Threshold: 1,
@@ -342,7 +449,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "2jpMDuqSgSo73JzAmVcnoJiP4G5TBQPPvFcCtbjKN8b5eH9RKH" {
+	if reply.AssetID.String() != "4BzG4M6JnR1jhB6hGZRCX2KRpWcUParz8AAKNhdFRt7Du8KP7" {
 		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 }

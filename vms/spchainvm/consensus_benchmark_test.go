@@ -108,6 +108,7 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		handler := &router.Handler{}
 		handler.Initialize(
 			&engine,
+			vdrs,
 			msgChan,
 			1000,
 			"",
@@ -247,6 +248,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		handler := &router.Handler{}
 		handler.Initialize(
 			&engine,
+			vdrs,
 			msgChan,
 			1000,
 			"",

@@ -18,6 +18,7 @@ borealis_bootstrap:
     signature_verification_enabled: true
     db_enabled: true
     db_dir: "/home/ubuntu/db"
+    http_host: ""
     http_port: 21000
     http_tls_enabled: false
     http_tls_key_file: ""
@@ -64,6 +65,7 @@ borealis_node:
     signature_verification_enabled: true
     db_enabled: true
     db_dir: "/home/ubuntu/db"
+    http_host: ""
     http_port: 21000
     http_tls_enabled: false
     http_tls_key_file: ""

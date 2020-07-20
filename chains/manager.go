@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	defaultChannelSize = 1000
+	defaultChannelSize = 1024
 	gossipFrequency    = 10 * time.Second
 	shutdownTimeout    = 1 * time.Second
 )
@@ -472,6 +472,7 @@ func (m *manager) createAvalancheChain(
 	handler := &router.Handler{}
 	handler.Initialize(
 		engine,
+		validators,
 		msgChan,
 		defaultChannelSize,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
@@ -545,6 +546,7 @@ func (m *manager) createSnowmanChain(
 	handler := &router.Handler{}
 	handler.Initialize(
 		engine,
+		validators,
 		msgChan,
 		defaultChannelSize,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
