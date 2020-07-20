@@ -176,7 +176,7 @@ func (ml *multiLevelQueue) Shutdown() {
 // Assumes the lock is held
 func (ml *multiLevelQueue) popMessage() (message, error) {
 	startTier := ml.currentTier
-	looped := false
+
 	for {
 		select {
 		case msg := <-ml.queues[ml.currentTier].msgs:
@@ -187,25 +187,26 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 			cpu, _ := ml.throttler.GetUtilization(msg.validatorID)
 			correctIndex := ml.getPriorityIndex(cpu)
 
-			// If the message is at least the priority of the current tier,
-			// the current tier is the last one, or we have already checked the last tier
-			// return the message
-			if correctIndex <= ml.currentTier || ml.currentTier >= len(ml.queues) || looped {
+			// If the message is at least the priority of the current tier
+			// or this message comes from the lowest priority queue
+			// return the message.
+			if correctIndex <= ml.currentTier || ml.currentTier >= len(ml.queues)-1 {
 				return msg, nil
 			}
 
-			// If the message belongs on a different queue, attempt to push it down
-			// and if this fails return the message instead of dropping it.
+			// If the message belongs on a different queue, attempt to push
+			// the message down to a lower queue if possible.
 			if !ml.waterfallMessage(msg, correctIndex) {
 				return msg, nil
 			}
+
+			// If waterfalling the message was successful, there is a message on
+			// the correct queue below the current tier.
+			startTier = ml.currentTier
 		default:
 			ml.tierConsumption = 0
 			ml.currentTier++
 			ml.currentTier %= len(ml.queues)
-			if ml.currentTier == 0 {
-				looped = true
-			}
 			if ml.currentTier == startTier {
 				return message{}, errNoMessages
 			}
