@@ -169,24 +169,43 @@ func (ml *multiLevelQueue) Shutdown() {
 	close(ml.semaChan)
 }
 
-// popMessage grabs a message from the current queue. If there
-// are no pending messages on the current queue then search it
-// searches lower level queues before cycling back to the highest
-// priority queue and stopping if it reaches the original queue
-// it started on.
+// popMessage grabs a message from the current queue. If none is
+// available it loops downwards through the queues to find one.
+// If a message no longer belongs on the queue where it's found,
+// it attempts to push it down to the correct queue.
 // Assumes the lock is held
 func (ml *multiLevelQueue) popMessage() (message, error) {
 	startTier := ml.currentTier
+	looped := false
 	for {
 		select {
 		case msg := <-ml.queues[ml.currentTier].msgs:
 			ml.queues[ml.currentTier].pending.Dec()
 			ml.queues[ml.currentTier].waitingTime.Observe(float64(time.Since(msg.received)))
-			return msg, nil
+
+			// Check where messages from this validator currently belong
+			cpu, _ := ml.throttler.GetUtilization(msg.validatorID)
+			correctIndex := ml.getPriorityIndex(cpu)
+
+			// If the message is at least the priority of the current tier,
+			// the current tier is the last one, or we have already checked the last tier
+			// return the message
+			if correctIndex <= ml.currentTier || ml.currentTier >= len(ml.queues) || looped {
+				return msg, nil
+			}
+
+			// If the message belongs on a different queue, attempt to push it down
+			// and if this fails return the message instead of dropping it.
+			if !ml.waterfallMessage(msg, correctIndex) {
+				return msg, nil
+			}
 		default:
 			ml.tierConsumption = 0
 			ml.currentTier++
 			ml.currentTier %= len(ml.queues)
+			if ml.currentTier == 0 {
+				looped = true
+			}
 			if ml.currentTier == startTier {
 				return message{}, errNoMessages
 			}
@@ -209,27 +228,36 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 		return false
 	}
 
-	// Find the index of the appropriate queue for the message
-	index := len(ml.cpuRanges)
-	for i := 0; i < len(ml.cpuRanges); i++ {
-		if cpu <= ml.cpuRanges[i] {
-			index = i
-			break
-		}
-	}
+	queueIndex := ml.getPriorityIndex(cpu)
 
-	// Attempt to add the message to the appropriate queue
-	// If it's full, waterfall the message to a lower queue if possible
-	for index < len(ml.queues) {
+	return ml.waterfallMessage(msg, queueIndex)
+}
+
+// Attempt to add the message to the appropriate queue
+// If it's full, waterfall the message to a lower queue if possible
+func (ml *multiLevelQueue) waterfallMessage(msg message, queueIndex int) bool {
+	for queueIndex < len(ml.queues) {
 		select {
-		case ml.queues[index].msgs <- msg:
-			ml.queues[index].pending.Inc()
+		case ml.queues[queueIndex].msgs <- msg:
+			ml.queues[queueIndex].pending.Inc()
 			return true
 		default:
-			index++
+			queueIndex++
 		}
 	}
 	return false
+}
+
+func (ml *multiLevelQueue) getPriorityIndex(utilization float64) int {
+	for i := 0; i < len(ml.cpuRanges); i++ {
+		if utilization <= ml.cpuRanges[i] {
+			return i
+		}
+	}
+
+	// If the CPU utilization is greater than even the lowest priority CPU range
+	// return the index of the bottom queue
+	return len(ml.cpuRanges) - 1
 }
 
 type singleLevelQueue struct {
