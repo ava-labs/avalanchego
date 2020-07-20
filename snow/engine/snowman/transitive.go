@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -46,7 +47,8 @@ type Transitive struct {
 	blocked events.Blocker
 
 	// mark for if the engine has been bootstrapped or not
-	bootstrapped bool
+	bootstrapped       bool
+	atomicBootstrapped *uint32
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
@@ -64,6 +66,7 @@ func (t *Transitive) Initialize(config Config) error {
 	)
 
 	t.onFinished = t.finishBootstrapping
+	t.atomicBootstrapped = new(uint32)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
@@ -80,6 +83,7 @@ func (t *Transitive) Initialize(config Config) error {
 func (t *Transitive) finishBootstrapping() error {
 	// set the bootstrapped mark to switch consensus modes
 	t.bootstrapped = true
+	atomic.StoreUint32(t.atomicBootstrapped, 1)
 
 	// initialize consensus to the last accepted blockID
 	tailID := t.Config.VM.LastAccepted()
@@ -96,7 +100,11 @@ func (t *Transitive) finishBootstrapping() error {
 
 	switch blk := tail.(type) {
 	case OracleBlock:
-		for _, blk := range blk.Options() {
+		options, err := blk.Options()
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
 			// note that deliver will set the VM's preference
 			if err := t.deliver(blk); err != nil {
 				return err
@@ -609,7 +617,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	dropped := []snowman.Block{}
 	switch blk := blk.(type) {
 	case OracleBlock:
-		for _, blk := range blk.Options() {
+		options, err := blk.Options()
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
 			if err := blk.Verify(); err != nil {
 				t.Config.Context.Log.Debug("block failed verification due to %s, dropping block", err)
 				dropped = append(dropped, blk)
@@ -650,5 +662,5 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
-	return t.bootstrapped
+	return atomic.LoadUint32(t.atomicBootstrapped) > 0
 }

@@ -5,6 +5,7 @@ package logging
 
 import (
 	"errors"
+	"sync"
 )
 
 var (
@@ -52,6 +53,9 @@ func (NoLog) StopOnPanic() {}
 // RecoverAndPanic ...
 func (NoLog) RecoverAndPanic(f func()) { f() }
 
+// RecoverAndExit ...
+func (NoLog) RecoverAndExit(f, exit func()) { defer exit(); f() }
+
 // Stop ...
 func (NoLog) Stop() {}
 
@@ -72,3 +76,33 @@ func (NoLog) SetDisplayingEnabled(bool) {}
 
 // SetContextualDisplayingEnabled ...
 func (NoLog) SetContextualDisplayingEnabled(bool) {}
+
+// NoIOWriter is a mock Writer that does not write to any underlying source
+type NoIOWriter struct{}
+
+func (nw *NoIOWriter) Initialize(Config) error { return nil }
+
+func (nw *NoIOWriter) Flush() error { return nil }
+
+func (nw *NoIOWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+func (nw *NoIOWriter) WriteString(s string) (int, error) { return len(s), nil }
+
+func (nw *NoIOWriter) Close() error { return nil }
+
+func (nw *NoIOWriter) Rotate() error { return nil }
+
+// NewTestLog...
+func NewTestLog(config Config) (*Log, error) {
+	l := &Log{
+		config: config,
+		writer: &NoIOWriter{},
+	}
+	l.needsFlush = sync.NewCond(&l.flushLock)
+
+	l.wg.Add(1)
+
+	go l.RecoverAndPanic(l.run)
+
+	return l, nil
+}

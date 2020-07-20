@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/version"
 	"github.com/ava-labs/gecko/vms"
@@ -203,6 +204,20 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	go n.Log.RecoverAndPanic(func() {
+		if n.Config.EnableHTTPS {
+			n.Log.Debug("Initializing API server with TLS Enabled")
+			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
+		}
+
+		n.Log.Debug("Initializing API server")
+		err := n.APIServer.Dispatch()
+
+		n.Log.Fatal("API server initialization failed with %s", err)
+		n.Net.Close()
+	})
+
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
@@ -387,6 +402,30 @@ func (n *Node) initChains() error {
 		CustomBeacons: n.beacons,
 	})
 
+	bootstrapWeight, err := n.beacons.Weight()
+	if err != nil {
+		return fmt.Errorf("Error calculating bootstrap weight of beacons: %s", err)
+	}
+	reqWeight := (3*bootstrapWeight + 3) / 4
+
+	if reqWeight == 0 {
+		return nil
+	}
+
+	connectToBootstrapsTimeout := timer.NewTimer(func() {
+		n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
+		go n.Net.Close()
+	})
+
+	awaiter := chains.NewAwaiter(n.beacons, reqWeight, func() {
+		n.Log.Info("Connected to required bootstrap nodes. Starting Platform Chain...")
+		connectToBootstrapsTimeout.Cancel()
+	})
+
+	go connectToBootstrapsTimeout.Dispatch()
+	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
+
+	n.Net.RegisterHandler(awaiter)
 	return nil
 }
 
@@ -395,20 +434,6 @@ func (n *Node) initAPIServer() {
 	n.Log.Info("Initializing API server")
 
 	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
-
-	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
-			n.Log.Debug("Initializing API server with TLS Enabled")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
-		}
-
-		n.Log.Debug("Initializing API server")
-		err := n.APIServer.Dispatch()
-
-		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close()
-	})
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)

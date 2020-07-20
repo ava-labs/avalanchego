@@ -52,7 +52,7 @@ func getOutboundIP() (net.IP, error) {
 func NewNoRouter() Router {
 	ip, err := getOutboundIP()
 	if err != nil {
-		return nil
+		ip = net.IPv4zero
 	}
 	return &noRouter{
 		ip: ip,
