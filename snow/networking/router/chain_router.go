@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	DefaultCPUInterval = 5 * time.Second
+	defaultCPUInterval = 5 * time.Second
 )
 
 // ChainRouter routes incoming messages from the validator network
@@ -51,7 +51,7 @@ func (sr *ChainRouter) Initialize(
 	sr.chains = make(map[[32]byte]*Handler)
 	sr.timeouts = timeouts
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
-	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, DefaultCPUInterval)
+	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
 	sr.closeTimeout = closeTimeout
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
@@ -376,6 +376,6 @@ func (sr *ChainRouter) EndInterval() {
 	defer sr.lock.Unlock()
 
 	for _, chain := range sr.chains {
-		chain.EndInterval()
+		chain.endInterval()
 	}
 }

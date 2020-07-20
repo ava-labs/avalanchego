@@ -15,7 +15,7 @@ var (
 	errNoMessages = errors.New("No messages remaining on queue")
 )
 
-type MessageQueue interface {
+type messageQueue interface {
 	PopMessage() (message, error)    // Pop the next message from the queue
 	PushMessage(message) bool        // Push a message to the queue
 	UtilizeCPU(ids.ShortID, float64) // Registers consumption of CPU time
@@ -49,7 +49,7 @@ type multiLevelQueue struct {
 // to read from the queue. The length of consumptionRanges and consumptionAllotments
 // defines the range of priorities for the multi-level queue and the amount of time to
 // spend on each level. Their length must be the same.
-func NewMultiLevelQueue(
+func newMultiLevelQueue(
 	vdrs validators.Set,
 	log logging.Logger,
 	metrics *metrics,
@@ -58,7 +58,7 @@ func NewMultiLevelQueue(
 	bufferSize int,
 	cpuInterval float64,
 	stakerPortion float64,
-) (MessageQueue, chan struct{}) {
+) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
 	singleLevelSize := bufferSize / len(consumptionRanges)
 	throttler := NewEWMAThrottler(vdrs, uint32(bufferSize), stakerPortion, cpuInterval, log)
@@ -105,22 +105,21 @@ func (ml *multiLevelQueue) PushMessage(msg message) bool {
 	}
 	// If the message was added successfully, increment the counting sema
 	// and notify the throttler of the pending message
-	if ml.pushMessage(msg) {
-		ml.pendingMessages++
-		ml.throttler.AddMessage(msg.validatorID)
-		select {
-		case ml.semaChan <- struct{}{}:
-		default:
-			ml.log.Error("Sempahore channel was full after pushing message to the message queue")
-		}
-		ml.metrics.pending.Inc()
-		return true
-	} else {
+	if !ml.pushMessage(msg) {
 		ml.log.Debug("Dropped message during push: %s", msg)
 		ml.metrics.pending.Dec()
 		ml.metrics.dropped.Inc()
 		return false
 	}
+	ml.pendingMessages++
+	ml.throttler.AddMessage(msg.validatorID)
+	select {
+	case ml.semaChan <- struct{}{}:
+	default:
+		ml.log.Error("Sempahore channel was full after pushing message to the message queue")
+	}
+	ml.metrics.pending.Inc()
+	return true
 }
 
 // PopMessage attempts to read the next message from the queue
@@ -148,9 +147,7 @@ func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, time float64) {
 	if ml.tierConsumption > ml.cpuAllotments[ml.currentTier] {
 		ml.tierConsumption = 0
 		ml.currentTier++
-	}
-	if ml.currentTier >= len(ml.queues) {
-		ml.currentTier = 0
+		ml.currentTier %= len(ml.queues)
 	}
 }
 
@@ -160,7 +157,7 @@ func (ml *multiLevelQueue) EndInterval() {
 	defer ml.lock.Unlock()
 
 	ml.throttler.EndInterval()
-	ml.metrics.cpu.Observe(ml.intervalConsumption)
+	ml.metrics.cpu.Observe(ml.intervalConsumption / float64(time.Millisecond))
 	ml.intervalConsumption = 0
 }
 
@@ -188,11 +185,9 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 			ml.queues[ml.currentTier].waitingTime.Observe(float64(time.Since(msg.received)))
 			return msg, nil
 		default:
-			ml.currentTier++
 			ml.tierConsumption = 0
-			if ml.currentTier >= len(ml.queues) {
-				ml.currentTier = 0
-			}
+			ml.currentTier++
+			ml.currentTier %= len(ml.queues)
 			if ml.currentTier == startTier {
 				return message{}, errNoMessages
 			}

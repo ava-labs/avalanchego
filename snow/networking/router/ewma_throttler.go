@@ -31,19 +31,22 @@ type ewmaThrottler struct {
 
 	// Statistics adjusted at every interval
 	currentPeriod            uint32
-	numPeers                 int
 	periodNonStakerAllotment float64
 	periodNonStakerMessages  uint32
 }
 
-// NewEWMATHrottler returns a Throttler that uses exponentially weighted moving average to estimate CPU utilization
+// NewEWMAThrottler returns a Throttler that uses exponentially weighted moving
+// average to estimate CPU utilization.
+//
 // [maxMessages] is the maximum number of messages allotted to this chain
-// [stakerPortion] is the portion of CPU utilization and messages to reserve exclusively for stakers
-// should be in the range (0, 1]
+// [stakerPortion] is the portion of CPU utilization and messages to reserve
+// exclusively for stakers should be in the range (0, 1]
 // [period] is the interval of time to use for the caclulation of EWMA
-// Note: EWMAThrotltler uses the period as the total amount of timer per interval, which is not
-// the limit since it tracks consumption using EWMA. As a result, this aggressiveness should
-// counterbalance the fact that no chain's CPU time will actually consume nearly 100% of real time.
+//
+// Note: ewmaThrottler uses the period as the total amount of timer per
+// interval, which is not the limit since it tracks consumption using EWMA.
+// As a result, this aggressiveness should counterbalance the fact that no
+// chain's CPU time will actually consume nearly 100% of real time.
 func NewEWMAThrottler(vdrs validators.Set, maxMessages uint32, stakerPortion, period float64, log logging.Logger) Throttler {
 	// Amount of CPU time reserved for processing messages from stakers
 	stakerCPU := period * stakerPortion
@@ -164,9 +167,9 @@ func (et *ewmaThrottler) EndInterval() {
 
 	// Assume all non-validators are a single peer to defend
 	// against Sybil attack
-	et.numPeers = et.vdrs.Len() + 1
-	et.periodNonStakerAllotment = et.nonStakerCPU / float64(et.numPeers)
-	et.periodNonStakerMessages = et.nonStakerMessages / uint32(et.numPeers)
+	numPeers := et.vdrs.Len() + 1
+	et.periodNonStakerAllotment = et.nonStakerCPU / float64(numPeers)
+	et.periodNonStakerMessages = et.nonStakerMessages / uint32(numPeers)
 
 	et.currentPeriod++
 }

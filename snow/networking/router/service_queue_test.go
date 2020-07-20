@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-func setupMultiLevelQueue(t *testing.T, bufferSize int) (MessageQueue, chan struct{}, validators.Set) {
+func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}, validators.Set) {
 	vdrs := validators.NewSet()
 	metrics := &metrics{}
 	metrics.Initialize("", prometheus.NewRegistry())
@@ -22,7 +22,7 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (MessageQueue, chan stru
 		math.MaxFloat64,
 	}
 
-	cpuInterval := float64(DefaultCPUInterval)
+	cpuInterval := float64(defaultCPUInterval)
 	// Defines the percentage of CPU time allotted to processing messages
 	// from the bucket at the corresponding index.
 	consumptionAllotments := []float64{
@@ -32,7 +32,7 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (MessageQueue, chan stru
 		cpuInterval * 0.25,
 	}
 
-	queue, semaChan := NewMultiLevelQueue(
+	queue, semaChan := newMultiLevelQueue(
 		vdrs,
 		logging.NoLog{},
 		metrics,
@@ -159,7 +159,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		perTier,
 	}
 
-	queue, semaChan := NewMultiLevelQueue(
+	queue, semaChan := newMultiLevelQueue(
 		vdrs,
 		logging.NoLog{},
 		metrics,

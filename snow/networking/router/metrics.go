@@ -16,32 +16,19 @@ const (
 	defaultRequestHelpMsg = "Time spent processing this request in nanoseconds"
 )
 
-func initHistogram(namespace, name, help string, registerer prometheus.Registerer, errs *wrappers.Errs) prometheus.Histogram {
+func initHistogram(namespace, name string, registerer prometheus.Registerer, errs *wrappers.Errs) prometheus.Histogram {
 	histogram := prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      name,
-			Help:      "Time spent processing this request in nanoseconds",
+			Help:      defaultRequestHelpMsg,
 			Buckets:   timer.NanosecondsBuckets,
 		})
 
 	if err := registerer.Register(histogram); err != nil {
-		errs.Add(fmt.Errorf("failed to register %s statistics due to %s", name, err))
+		errs.Add(fmt.Errorf("failed to register %s statistics due to %w", name, err))
 	}
 	return histogram
-}
-
-func initGauge(namespace, name, help string, registerer prometheus.Registerer, errs *wrappers.Errs) prometheus.Gauge {
-	gauge := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      name,
-			Help:      help,
-		})
-	if err := registerer.Register(gauge); err != nil {
-		errs.Add(fmt.Errorf("failed to register %s statistics due to %s", name, err))
-	}
-	return gauge
 }
 
 type metrics struct {
@@ -66,67 +53,80 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	m.registerer = registerer
 	errs := wrappers.Errs{}
 
-	m.pending = initGauge(namespace, "pending", "Number of pending events", registerer, &errs)
+	m.pending = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "pending",
+		Help:      "Number of pending events",
+	})
+	if err := registerer.Register(m.pending); err != nil {
+		errs.Add(fmt.Errorf("failed to register pending statistics due to %w", err))
+	}
 
-	m.dropped = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "dropped",
-			Help:      "Number of dropped events",
-		})
+	m.dropped = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "dropped",
+		Help:      "Number of dropped events",
+	})
 
 	if err := registerer.Register(m.dropped); err != nil {
 		errs.Add(fmt.Errorf("failed to register dropped statistics due to %s", err))
 	}
 
-	m.expired = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "expired",
-			Help:      "Number of expired events",
-		})
-
+	m.expired = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "expired",
+		Help:      "Number of expired events",
+	})
 	if err := registerer.Register(m.expired); err != nil {
 		errs.Add(fmt.Errorf("failed to register expired statistics due to %s", err))
 	}
 
-	m.throttled = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "throttled",
-			Help:      "Number of throttled events",
-		})
-
+	m.throttled = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "throttled",
+		Help:      "Number of throttled events",
+	})
 	if err := registerer.Register(m.throttled); err != nil {
 		errs.Add(fmt.Errorf("failed to register throttled statistics due to %s", err))
 	}
 
-	m.cpu = initHistogram(
-		namespace,
-		"cpu_utilization",
-		"Time this handler's engine spent processing messages for a single CPU interval",
-		registerer,
-		&errs,
-	)
-	m.getAcceptedFrontier = initHistogram(namespace, "get_accepted_frontier", defaultRequestHelpMsg, registerer, &errs)
-	m.acceptedFrontier = initHistogram(namespace, "accepted_frontier", defaultRequestHelpMsg, registerer, &errs)
-	m.getAcceptedFrontierFailed = initHistogram(namespace, "get_accepted_frontier_failed", defaultRequestHelpMsg, registerer, &errs)
-	m.getAccepted = initHistogram(namespace, "get_accepted", defaultRequestHelpMsg, registerer, &errs)
-	m.accepted = initHistogram(namespace, "accepted", defaultRequestHelpMsg, registerer, &errs)
-	m.getAcceptedFailed = initHistogram(namespace, "get_accepted_failed", defaultRequestHelpMsg, registerer, &errs)
-	m.getAncestors = initHistogram(namespace, "get_ancestors", defaultRequestHelpMsg, registerer, &errs)
-	m.multiPut = initHistogram(namespace, "multi_put", defaultRequestHelpMsg, registerer, &errs)
-	m.getAncestorsFailed = initHistogram(namespace, "get_ancestors_failed", defaultRequestHelpMsg, registerer, &errs)
-	m.get = initHistogram(namespace, "get", defaultRequestHelpMsg, registerer, &errs)
-	m.put = initHistogram(namespace, "put", defaultRequestHelpMsg, registerer, &errs)
-	m.getFailed = initHistogram(namespace, "get_failed", defaultRequestHelpMsg, registerer, &errs)
-	m.pushQuery = initHistogram(namespace, "push_query", defaultRequestHelpMsg, registerer, &errs)
-	m.pullQuery = initHistogram(namespace, "pull_query", defaultRequestHelpMsg, registerer, &errs)
-	m.chits = initHistogram(namespace, "chits", defaultRequestHelpMsg, registerer, &errs)
-	m.queryFailed = initHistogram(namespace, "query_failed", defaultRequestHelpMsg, registerer, &errs)
-	m.notify = initHistogram(namespace, "notify", defaultRequestHelpMsg, registerer, &errs)
-	m.gossip = initHistogram(namespace, "gossip", defaultRequestHelpMsg, registerer, &errs)
-	m.shutdown = initHistogram(namespace, "shutdown", "Time spent in the process of shutting down", registerer, &errs)
+	m.getAcceptedFrontier = initHistogram(namespace, "get_accepted_frontier", registerer, &errs)
+	m.acceptedFrontier = initHistogram(namespace, "accepted_frontier", registerer, &errs)
+	m.getAcceptedFrontierFailed = initHistogram(namespace, "get_accepted_frontier_failed", registerer, &errs)
+	m.getAccepted = initHistogram(namespace, "get_accepted", registerer, &errs)
+	m.accepted = initHistogram(namespace, "accepted", registerer, &errs)
+	m.getAcceptedFailed = initHistogram(namespace, "get_accepted_failed", registerer, &errs)
+	m.getAncestors = initHistogram(namespace, "get_ancestors", registerer, &errs)
+	m.multiPut = initHistogram(namespace, "multi_put", registerer, &errs)
+	m.getAncestorsFailed = initHistogram(namespace, "get_ancestors_failed", registerer, &errs)
+	m.get = initHistogram(namespace, "get", registerer, &errs)
+	m.put = initHistogram(namespace, "put", registerer, &errs)
+	m.getFailed = initHistogram(namespace, "get_failed", registerer, &errs)
+	m.pushQuery = initHistogram(namespace, "push_query", registerer, &errs)
+	m.pullQuery = initHistogram(namespace, "pull_query", registerer, &errs)
+	m.chits = initHistogram(namespace, "chits", registerer, &errs)
+	m.queryFailed = initHistogram(namespace, "query_failed", registerer, &errs)
+	m.notify = initHistogram(namespace, "notify", registerer, &errs)
+	m.gossip = initHistogram(namespace, "gossip", registerer, &errs)
+
+	m.cpu = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "cpu_utilization",
+		Help:      "Time this handler's engine spent processing messages for a single CPU interval in milliseconds",
+		Buckets:   timer.MillisecondsBuckets,
+	})
+	if err := registerer.Register(m.cpu); err != nil {
+		errs.Add(fmt.Errorf("failed to register shutdown statistics due to %w", err))
+	}
+	m.shutdown = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "shutdown",
+		Help:      "Time spent in the process of shutting down in nanoseconds",
+		Buckets:   timer.NanosecondsBuckets,
+	})
+	if err := registerer.Register(m.shutdown); err != nil {
+		errs.Add(fmt.Errorf("failed to register shutdown statistics due to %w", err))
+	}
 
 	return errs.Err
 }
@@ -134,19 +134,23 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 func (m *metrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus.Histogram, error) {
 	errs := wrappers.Errs{}
 
-	gauge := initGauge(
-		m.namespace,
-		fmt.Sprintf("tier_%d", tier),
-		fmt.Sprintf("Number of pending messages on tier %d of the multi-level message queue", tier),
-		m.registerer,
-		&errs,
-	)
-	histogram := initHistogram(
-		m.namespace,
-		fmt.Sprintf("tier_%d_wait_time", tier),
-		fmt.Sprintf("Amount of time a message waits on tier %d queue before being processed", tier),
-		m.registerer,
-		&errs,
-	)
+	gauge := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: m.namespace,
+		Name:      fmt.Sprintf("tier_%d", tier),
+		Help:      fmt.Sprintf("Number of pending messages on tier %d of the multi-level message queue", tier),
+	})
+	if err := m.registerer.Register(gauge); err != nil {
+		errs.Add(fmt.Errorf("failed to register tier_%d statistics due to %w", tier, err))
+	}
+
+	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: m.namespace,
+		Name:      fmt.Sprintf("tier_%d_wait_time", tier),
+		Help:      fmt.Sprintf("Amount of time a message waits on tier %d queue before being processed", tier),
+		Buckets:   timer.NanosecondsBuckets,
+	})
+	if err := m.registerer.Register(histogram); err != nil {
+		errs.Add(fmt.Errorf("failed to register tier_%d_wait_time statistics due to %w", tier, err))
+	}
 	return gauge, histogram, errs.Err
 }

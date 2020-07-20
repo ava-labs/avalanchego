@@ -103,7 +103,7 @@ type Handler struct {
 	clock              timer.Clock
 	dropMessageTimeout time.Duration
 
-	serviceQueue MessageQueue
+	serviceQueue messageQueue
 	msgSema      <-chan struct{}
 
 	ctx    *snow.Context
@@ -140,7 +140,7 @@ func (h *Handler) Initialize(
 		math.MaxFloat64,
 	}
 
-	cpuInterval := float64(DefaultCPUInterval)
+	cpuInterval := float64(defaultCPUInterval)
 	// Defines the percentage of CPU time allotted to processing messages
 	// from the bucket at the corresponding index.
 	consumptionAllotments := []float64{
@@ -150,7 +150,7 @@ func (h *Handler) Initialize(
 		cpuInterval * 0.25,
 	}
 
-	h.serviceQueue, h.msgSema = NewMultiLevelQueue(
+	h.serviceQueue, h.msgSema = newMultiLevelQueue(
 		validators,
 		h.ctx.Log,
 		&h.metrics,
@@ -570,6 +570,4 @@ func (h *Handler) sendReliableMsg(msg message) {
 	}
 }
 
-func (h *Handler) EndInterval() {
-	h.serviceQueue.EndInterval()
-}
+func (h *Handler) endInterval() { h.serviceQueue.EndInterval() }
