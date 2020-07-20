@@ -29,8 +29,8 @@ func (i *issuer) Abandon(ids.ID) {
 		i.t.blocked.Abandon(blkID)
 
 		// Tracks performance statistics
-		i.t.numBlkRequests.Set(float64(i.t.blkReqs.Len()))
-		i.t.numBlockedBlk.Set(float64(i.t.pending.Len()))
+		i.t.numRequests.Set(float64(i.t.blkReqs.Len()))
+		i.t.numBlocked.Set(float64(i.t.pending.Len()))
 	}
 	i.abandoned = true
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -425,5 +426,12 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	if _, err := state.AVMUTXO(utxoID); err == nil {
 		t.Fatalf("should have failed to read the utxo")
+	}
+}
+
+func TestExportTxNotState(t *testing.T) {
+	intf := interface{}(&ExportTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

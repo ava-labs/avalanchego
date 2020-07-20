@@ -9,8 +9,9 @@ import (
 	"sort"
 
 	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -69,4 +70,34 @@ func sortOperations(ops []*Operation, c codec.Codec) {
 }
 func isSortedAndUniqueOperations(ops []*Operation, c codec.Codec) bool {
 	return utils.IsSortedAndUnique(&innerSortOperation{ops: ops, codec: c})
+}
+
+type innerSortOperationsWithSigners struct {
+	ops     []*Operation
+	signers [][]*crypto.PrivateKeySECP256K1R
+	codec   codec.Codec
+}
+
+func (ops *innerSortOperationsWithSigners) Less(i, j int) bool {
+	iOp := ops.ops[i]
+	jOp := ops.ops[j]
+
+	iBytes, err := ops.codec.Marshal(iOp)
+	if err != nil {
+		return false
+	}
+	jBytes, err := ops.codec.Marshal(jOp)
+	if err != nil {
+		return false
+	}
+	return bytes.Compare(iBytes, jBytes) == -1
+}
+func (ops *innerSortOperationsWithSigners) Len() int { return len(ops.ops) }
+func (ops *innerSortOperationsWithSigners) Swap(i, j int) {
+	ops.ops[j], ops.ops[i] = ops.ops[i], ops.ops[j]
+	ops.signers[j], ops.signers[i] = ops.signers[i], ops.signers[j]
+}
+
+func sortOperationsWithSigners(ops []*Operation, signers [][]*crypto.PrivateKeySECP256K1R, codec codec.Codec) {
+	sort.Sort(&innerSortOperationsWithSigners{ops: ops, signers: signers, codec: codec})
 }

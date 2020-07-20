@@ -17,3 +17,6 @@ func (out *MintOutput) Verify() error {
 		return out.OutputOwners.Verify()
 	}
 }
+
+// VerifyState ...
+func (out *MintOutput) VerifyState() error { return out.Verify() }

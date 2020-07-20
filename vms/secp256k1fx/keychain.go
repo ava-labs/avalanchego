@@ -76,10 +76,8 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 	switch out := out.(type) {
 	case *MintOutput:
 		if sigIndices, keys, able := kc.Match(&out.OutputOwners, time); able {
-			return &MintInput{
-				Input: Input{
-					SigIndices: sigIndices,
-				},
+			return &Input{
+				SigIndices: sigIndices,
 			}, keys, nil
 		}
 	case *TransferOutput:

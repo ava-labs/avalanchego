@@ -204,6 +204,7 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	// Start the HTTP endpoint
 	go n.Log.RecoverAndPanic(func() {
 		if n.Config.EnableHTTPS {
 			n.Log.Debug("Initializing API server with TLS Enabled")
@@ -215,7 +216,7 @@ func (n *Node) Dispatch() error {
 		err := n.APIServer.Dispatch()
 
 		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close()
+		n.Net.Close() // If the server isn't up, shut down the node.
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -322,10 +323,15 @@ func (n *Node) initVMManager() error {
 	errs.Add(
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			AVA:      avaAssetID,
+			Fee:      n.Config.AvaTxFee,
 			Platform: ids.Empty,
 		}),
-		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{Path: path.Join(n.Config.PluginDir, "evm")}),
-		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{TxFee: n.Config.AvaTxFee}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
+			Path: path.Join(n.Config.PluginDir, "evm"),
+		}),
+		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
+			TxFee: n.Config.AvaTxFee,
+		}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -437,8 +443,9 @@ func (n *Node) initAPIServer() {
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
-func (n *Node) initChainManager() {
-	n.chainManager = chains.New(
+func (n *Node) initChainManager() error {
+	var err error
+	n.chainManager, err = chains.New(
 		n.Config.EnableStaking,
 		n.Log,
 		n.LogFactory,
@@ -456,8 +463,12 @@ func (n *Node) initChainManager() {
 		&n.keystoreServer,
 		&n.sharedMemory,
 	)
+	if err != nil {
+		return err
+	}
 
 	n.chainManager.AddRegistrant(&n.APIServer)
+	return nil
 }
 
 // initSharedMemory initializes the shared memory for cross chain interation
@@ -645,8 +656,10 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
 	}
 
-	n.initEventDispatcher() // Set up the event dipatcher
-	n.initChainManager()    // Set up the chain manager
+	n.initEventDispatcher()                      // Set up the event dipatcher
+	if err := n.initChainManager(); err != nil { // Set up the chain manager
+		return fmt.Errorf("couldn't initialize chain manager: %w", err)
+	}
 
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
 		return fmt.Errorf("couldn't initialize admin API: %w", err)

@@ -6,22 +6,20 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/avalanche"
-	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 )
 
 func newSerializer(t *testing.T) *Serializer {
-	commonVM := common.VMTest{T: t}
-	vm := &avalanche.VMTest{VMTest: commonVM}
+	vm := vertex.TestVM{}
+	vm.T = t
 	vm.Default(true)
 
 	baseDB := memdb.New()
 	ctx := snow.DefaultContextTest()
 	s := &Serializer{}
-	s.Initialize(ctx, vm, baseDB)
+	s.Initialize(ctx, &vm, baseDB)
 	return s
 }
 
@@ -57,20 +55,16 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 func TestUniqueVertexCacheHit(t *testing.T) {
 	s := newSerializer(t)
 
-	// testTxBytes := []byte{'t', 'e', 's', 't', '-', 't', 'x'}
-	testTx := &snowstorm.TestTx{
-		Identifier: ids.NewID([32]byte{1}),
-		Deps:       nil,
-		Ins:        ids.Set{},
-		// Bits:       testTxBytes,
-	}
+	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV: ids.NewID([32]byte{1}),
+	}}
 
 	vtxID := ids.NewID([32]byte{2})
 	parentID := ids.NewID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
 	parentIDs := []ids.ID{parentID}
 	chainID := ids.NewID([32]byte{})
 	height := uint64(1)
-	vtx := &vertex{
+	vtx := &innerVertex{
 		id:        vtxID,
 		parentIDs: parentIDs,
 		chainID:   chainID,

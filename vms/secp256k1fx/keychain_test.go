@@ -207,7 +207,7 @@ func TestKeychainSpendMint(t *testing.T) {
 
 	if input, keys, err := kc.Spend(&mint, 0); err != nil {
 		t.Fatal(err)
-	} else if input, ok := input.(*MintInput); !ok {
+	} else if input, ok := input.(*Input); !ok {
 		t.Fatalf("Wrong input type returned")
 	} else if err := input.Verify(); err != nil {
 		t.Fatal(err)

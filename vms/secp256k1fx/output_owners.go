@@ -65,5 +65,8 @@ func (out *OutputOwners) Verify() error {
 	}
 }
 
+// VerifyState ...
+func (out *OutputOwners) VerifyState() error { return out.Verify() }
+
 // Sort ...
 func (out *OutputOwners) Sort() { ids.SortShortIDs(out.Addrs) }

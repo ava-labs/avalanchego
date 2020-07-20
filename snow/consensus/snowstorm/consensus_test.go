@@ -16,11 +16,6 @@ import (
 )
 
 var (
-	Red   = &TestTx{Identifier: ids.Empty.Prefix(0)}
-	Green = &TestTx{Identifier: ids.Empty.Prefix(1)}
-	Blue  = &TestTx{Identifier: ids.Empty.Prefix(2)}
-	Alpha = &TestTx{Identifier: ids.Empty.Prefix(3)}
-
 	Tests = []func(*testing.T, Factory){
 		MetricsTest,
 		ParamsTest,
@@ -42,31 +37,42 @@ var (
 		ErrorOnRejectingLowerConfidenceConflictTest,
 		ErrorOnRejectingHigherConfidenceConflictTest,
 	}
+
+	Red, Green, Blue, Alpha *TestTx
 )
 
 //  R - G - B - A
+func Setup() {
+	Red = &TestTx{}
+	Green = &TestTx{}
+	Blue = &TestTx{}
+	Alpha = &TestTx{}
 
-func init() {
+	for i, color := range []*TestTx{Red, Green, Blue, Alpha} {
+		color.IDV = ids.Empty.Prefix(uint64(i))
+		color.AcceptV = nil
+		color.RejectV = nil
+		color.StatusV = choices.Processing
+
+		color.DependenciesV = nil
+		color.InputIDsV.Clear()
+		color.VerifyV = nil
+		color.BytesV = []byte{byte(i)}
+	}
+
 	X := ids.Empty.Prefix(4)
 	Y := ids.Empty.Prefix(5)
 	Z := ids.Empty.Prefix(6)
 
-	Red.Ins.Add(X)
+	Red.InputIDsV.Add(X)
 
-	Green.Ins.Add(X)
-	Green.Ins.Add(Y)
+	Green.InputIDsV.Add(X)
+	Green.InputIDsV.Add(Y)
 
-	Blue.Ins.Add(Y)
-	Blue.Ins.Add(Z)
+	Blue.InputIDsV.Add(Y)
+	Blue.InputIDsV.Add(Z)
 
-	Alpha.Ins.Add(Z)
-}
-
-func Setup() {
-	Red.Reset()
-	Green.Reset()
-	Blue.Reset()
-	Alpha.Reset()
+	Alpha.InputIDsV.Add(Z)
 }
 
 // Execute all tests against a consensus implementation
@@ -440,11 +446,13 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Red},
 	}
-	purple.Ins.Add(ids.Empty.Prefix(8))
-	purple.Deps = []Tx{Red}
+	purple.InputIDsV.Add(ids.Empty.Prefix(8))
 
 	params := snowball.Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -529,11 +537,13 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Red, Blue},
 	}
-	purple.Ins.Add(ids.Empty.Prefix(8))
-	purple.Deps = []Tx{Red, Blue}
+	purple.InputIDsV.Add(ids.Empty.Prefix(8))
 
 	params := snowball.Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -603,10 +613,10 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-	}
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		StatusV: choices.Processing,
+	}}
 
 	params := snowball.Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -640,31 +650,35 @@ func ConflictsTest(t *testing.T, factory Factory) {
 	insPurple.Add(conflictInputID)
 
 	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-		Ins:        insPurple,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(6),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: insPurple,
 	}
 
 	insOrange := ids.Set{}
 	insOrange.Add(conflictInputID)
 
 	orange := &TestTx{
-		Identifier: ids.Empty.Prefix(6),
-		Stat:       choices.Processing,
-		Ins:        insPurple,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: insOrange,
 	}
 
 	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
 	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
-	} else if !orangeConflicts.Contains(purple.Identifier) {
+	} else if !orangeConflicts.Contains(purple.IDV) {
 		t.Fatalf("Conflicts does not contain the right transaction")
 	} else if err := graph.Add(orange); err != nil {
 		t.Fatal(err)
 	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
-	} else if !orangeConflicts.Contains(purple.Identifier) {
+	} else if !orangeConflicts.Contains(purple.IDV) {
 		t.Fatalf("Conflicts does not contain the right transaction")
 	}
 }
@@ -680,27 +694,29 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
-	rogue1 := &TestTx{
-		Identifier: ids.Empty.Prefix(0),
-		Stat:       choices.Processing,
-	}
-	rogue2 := &TestTx{
-		Identifier: ids.Empty.Prefix(1),
-		Stat:       choices.Processing,
-	}
+	rogue1 := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(0),
+		StatusV: choices.Processing,
+	}}
+	rogue2 := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(1),
+		StatusV: choices.Processing,
+	}}
 	virtuous := &TestTx{
-		Identifier: ids.Empty.Prefix(2),
-		Deps:       []Tx{rogue1},
-		Stat:       choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{rogue1},
 	}
 
 	input1 := ids.Empty.Prefix(3)
 	input2 := ids.Empty.Prefix(4)
 
-	rogue1.Ins.Add(input1)
-	rogue2.Ins.Add(input1)
+	rogue1.InputIDsV.Add(input1)
+	rogue2.InputIDsV.Add(input1)
 
-	virtuous.Ins.Add(input2)
+	virtuous.InputIDsV.Add(input2)
 
 	if err := graph.Add(rogue1); err != nil {
 		t.Fatal(err)
@@ -731,11 +747,11 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		AcceptV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
 
 	params := snowball.Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -753,12 +769,12 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
-	purple.Ins.Add(ids.Empty.Prefix(4))
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		AcceptV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
+	purple.InputIDsV.Add(ids.Empty.Prefix(4))
 
 	params := snowball.Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -784,18 +800,18 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-	}
-	purple.Ins.Add(X)
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		StatusV: choices.Processing,
+	}}
+	purple.InputIDsV.Add(X)
 
-	pink := &TestTx{
-		Identifier: ids.Empty.Prefix(8),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
-	pink.Ins.Add(X)
+	pink := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(8),
+		RejectV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
+	pink.InputIDsV.Add(X)
 
 	params := snowball.Parameters{
 		Metrics: prometheus.NewRegistry(),
@@ -823,18 +839,18 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-	}
-	purple.Ins.Add(X)
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		StatusV: choices.Processing,
+	}}
+	purple.InputIDsV.Add(X)
 
-	pink := &TestTx{
-		Identifier: ids.Empty.Prefix(8),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
-	pink.Ins.Add(X)
+	pink := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(8),
+		RejectV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
+	pink.InputIDsV.Add(X)
 
 	params := snowball.Parameters{
 		Metrics: prometheus.NewRegistry(),

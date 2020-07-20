@@ -72,13 +72,13 @@ func TestStruct(t *testing.T) {
 		Member2:      2,
 		MySlice:      []byte{1, 2, 3, 4},
 		MySlice2:     []string{"one", "two", "three"},
-		MySlice3:     []MyInnerStruct{MyInnerStruct{"a"}, MyInnerStruct{"b"}, MyInnerStruct{"c"}},
-		MySlice4:     []*MyInnerStruct2{&MyInnerStruct2{true}, &MyInnerStruct2{}},
+		MySlice3:     []MyInnerStruct{{"a"}, {"b"}, {"c"}},
+		MySlice4:     []*MyInnerStruct2{{true}, {}},
 		MySlice5:     []Foo{&MyInnerStruct2{true}, &MyInnerStruct2{}},
 		MyArray:      [4]byte{5, 6, 7, 8},
 		MyArray2:     [5]string{"four", "five", "six", "seven"},
-		MyArray3:     [3]MyInnerStruct{MyInnerStruct{"d"}, MyInnerStruct{"e"}, MyInnerStruct{"f"}},
-		MyArray4:     [2]*MyInnerStruct2{&MyInnerStruct2{}, &MyInnerStruct2{true}},
+		MyArray3:     [3]MyInnerStruct{{"d"}, {"e"}, {"f"}},
+		MyArray4:     [2]*MyInnerStruct2{{}, {true}},
 		MyInterface:  &MyInnerStruct{"yeet"},
 		InnerStruct3: MyInnerStruct3{
 			Str: "str",
@@ -246,12 +246,12 @@ func TestPointerToStruct(t *testing.T) {
 // Test marshalling a slice of structs
 func TestSliceOfStruct(t *testing.T) {
 	mySlice := []MyInnerStruct3{
-		MyInnerStruct3{
+		{
 			Str: "One",
 			M1:  MyInnerStruct{"Two"},
 			F:   &MyInnerStruct{"Three"},
 		},
-		MyInnerStruct3{
+		{
 			Str: "Four",
 			M1:  MyInnerStruct{"Five"},
 			F:   &MyInnerStruct{"Six"},

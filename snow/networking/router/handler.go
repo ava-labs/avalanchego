@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
@@ -28,8 +27,7 @@ type Handler struct {
 	closed           chan struct{}
 	msgChan          <-chan common.Message
 
-	clock              timer.Clock
-	dropMessageTimeout time.Duration
+	clock timer.Clock
 
 	ctx    *snow.Context
 	engine common.Engine
@@ -51,7 +49,6 @@ func (h *Handler) Initialize(
 	h.reliableMsgsSema = make(chan struct{}, 1)
 	h.closed = make(chan struct{})
 	h.msgChan = msgChan
-	h.dropMessageTimeout = timeout.DefaultRequestTimeout
 
 	h.ctx = engine.Context()
 	h.engine = engine
@@ -194,12 +191,12 @@ func (h *Handler) dispatchMsg(msg message) {
 
 // GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
 // network to the consensus engine.
-func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) bool {
+func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32, deadline time.Time) bool {
 	return h.sendMsg(message{
 		messageType: getAcceptedFrontierMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
-		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
+		deadline:    deadline,
 	})
 }
 
@@ -226,13 +223,13 @@ func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID u
 
 // GetAccepted passes a GetAccepted message received from the
 // network to the consensus engine.
-func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerIDs ids.Set) bool {
 	return h.sendMsg(message{
 		messageType:  getAcceptedMsg,
 		validatorID:  validatorID,
 		requestID:    requestID,
+		deadline:     deadline,
 		containerIDs: containerIDs,
-		deadline:     h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -258,13 +255,13 @@ func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) {
 }
 
 // GetAncestors passes a GetAncestors message received from the network to the consensus engine.
-func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) bool {
+func (h *Handler) GetAncestors(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID) bool {
 	return h.sendMsg(message{
 		messageType: getAncestorsMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+		deadline:    deadline,
 		containerID: containerID,
-		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -288,13 +285,13 @@ func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 }
 
 // Get passes a Get message received from the network to the consensus engine.
-func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) bool {
+func (h *Handler) Get(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID) bool {
 	return h.sendMsg(message{
 		messageType: getMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+		deadline:    deadline,
 		containerID: containerID,
-		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
@@ -319,25 +316,25 @@ func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 }
 
 // PushQuery passes a PushQuery message received from the network to the consensus engine.
-func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, blockID ids.ID, block []byte) bool {
+func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID, block []byte) bool {
 	return h.sendMsg(message{
 		messageType: pushQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+		deadline:    deadline,
 		containerID: blockID,
 		container:   block,
-		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 
 // PullQuery passes a PullQuery message received from the network to the consensus engine.
-func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, blockID ids.ID) bool {
+func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID) bool {
 	return h.sendMsg(message{
 		messageType: pullQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+		deadline:    deadline,
 		containerID: blockID,
-		deadline:    h.clock.Time().Add(h.dropMessageTimeout),
 	})
 }
 

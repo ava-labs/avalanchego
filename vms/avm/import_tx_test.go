@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -279,7 +280,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	platformID := ids.Empty.Prefix(0)
 
-	vm := &VM{platform: platformID}
+	vm := &VM{
+		ava:      ids.Empty,
+		platform: platformID,
+	}
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -381,5 +385,12 @@ func TestForceAcceptImportTx(t *testing.T) {
 	utxoSource := utxoID.InputID()
 	if _, err := state.PlatformUTXO(utxoSource); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
+	}
+}
+
+func TestImportTxNotState(t *testing.T) {
+	intf := interface{}(&ImportTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

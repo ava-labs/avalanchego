@@ -16,10 +16,11 @@ import (
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/engine/avalanche"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -31,9 +32,11 @@ import (
 
 	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
 	avaeng "github.com/ava-labs/gecko/snow/engine/avalanche"
+	avabootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 
 	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
+	smbootstrap "github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 )
 
 const (
@@ -154,9 +157,15 @@ func New(
 	server *api.Server,
 	keystore *keystore.Keystore,
 	sharedMemory *atomic.SharedMemory,
-) Manager {
+) (Manager, error) {
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize(timeout.DefaultRequestTimeout)
+	err := timeoutManager.Initialize(
+		"gecko",
+		consensusParams.Metrics,
+	)
+	if err != nil {
+		return nil, err
+	}
 	go log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
@@ -182,7 +191,7 @@ func New(
 		chains:          make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
-	return m
+	return m, nil
 }
 
 // Router that this chain manager is using to route consensus messages to chains
@@ -322,7 +331,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	var chain *chain
 	switch vm := vm.(type) {
-	case avalanche.DAGVM:
+	case vertex.DAGVM:
 		chain, err = m.createAvalancheChain(
 			ctx,
 			chainParams.GenesisData,
@@ -336,7 +345,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new avalanche vm %s", err)
 		}
-	case smeng.ChainVM:
+	case block.ChainVM:
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
@@ -398,7 +407,7 @@ func (m *manager) createAvalancheChain(
 	genesisData []byte,
 	validators,
 	beacons validators.Set,
-	vm avalanche.DAGVM,
+	vm vertex.DAGVM,
 	fxs []*common.Fx,
 	consensusParams avacon.Parameters,
 	bootstrapWeight uint64,
@@ -431,8 +440,8 @@ func (m *manager) createAvalancheChain(
 
 	// Handles serialization/deserialization of vertices and also the
 	// persistence of vertices
-	vtxState := &state.Serializer{}
-	vtxState.Initialize(ctx, vm, vertexDB)
+	vtxManager := &state.Serializer{}
+	vtxManager.Initialize(ctx, vm, vertexDB)
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
@@ -441,7 +450,7 @@ func (m *manager) createAvalancheChain(
 	// The engine handles consensus
 	engine := &avaeng.Transitive{}
 	engine.Initialize(avaeng.Config{
-		BootstrapConfig: avaeng.BootstrapConfig{
+		Config: avabootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,
@@ -451,7 +460,7 @@ func (m *manager) createAvalancheChain(
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
-			State:      vtxState,
+			Manager:    vtxManager,
 			VM:         vm,
 		},
 		Params:    consensusParams,
@@ -482,7 +491,7 @@ func (m *manager) createSnowmanChain(
 	genesisData []byte,
 	validators,
 	beacons validators.Set,
-	vm smeng.ChainVM,
+	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
 	bootstrapWeight uint64,
@@ -515,7 +524,7 @@ func (m *manager) createSnowmanChain(
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	engine.Initialize(smeng.Config{
-		BootstrapConfig: smeng.BootstrapConfig{
+		Config: smbootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,

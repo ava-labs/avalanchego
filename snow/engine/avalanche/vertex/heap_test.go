@@ -1,8 +1,9 @@
-package avalanche
+package vertex
 
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 )
@@ -10,35 +11,42 @@ import (
 // This example inserts several ints into an IntHeap, checks the minimum,
 // and removes them in order of priority.
 func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
-	h := newMaxVertexHeap()
+	h := NewHeap()
 
-	vtx0 := &Vtx{
-		id:     GenerateID(),
-		height: 0,
-		status: choices.Processing,
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 0,
 	}
-
-	vtx1 := &Vtx{
-		id:     GenerateID(),
-		height: 1,
-		status: choices.Processing,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 1,
 	}
-
-	vtx2 := &Vtx{
-		id:     GenerateID(),
-		height: 1,
-		status: choices.Processing,
+	vtx2 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 1,
 	}
-
-	vtx3 := &Vtx{
-		id:     GenerateID(),
-		height: 3,
-		status: choices.Processing,
+	vtx3 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 3,
 	}
-
-	vtx4 := &Vtx{
-		id:     GenerateID(),
-		status: choices.Unknown,
+	vtx4 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		HeightV: 0,
 	}
 
 	vts := []avalanche.Vertex{vtx0, vtx1, vtx2, vtx3, vtx4}
@@ -90,30 +98,37 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 }
 
 func TestUniqueVertexHeapRemainsUnique(t *testing.T) {
-	h := newMaxVertexHeap()
+	h := NewHeap()
 
-	vtx0 := &Vtx{
-		height: 0,
-		id:     GenerateID(),
-		status: choices.Processing,
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 0,
 	}
-	vtx1 := &Vtx{
-		height: 1,
-		id:     GenerateID(),
-		status: choices.Processing,
-	}
-
-	sharedID := GenerateID()
-	vtx2 := &Vtx{
-		height: 1,
-		id:     sharedID,
-		status: choices.Processing,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		HeightV: 1,
 	}
 
-	vtx3 := &Vtx{
-		height: 2,
-		id:     sharedID,
-		status: choices.Processing,
+	sharedID := ids.GenerateTestID()
+	vtx2 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     sharedID,
+			StatusV: choices.Processing,
+		},
+		HeightV: 1,
+	}
+	vtx3 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     sharedID,
+			StatusV: choices.Processing,
+		},
+		HeightV: 2,
 	}
 
 	pushed1 := h.Push(vtx0)

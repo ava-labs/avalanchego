@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
@@ -31,6 +32,8 @@ var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
 var keys []*crypto.PrivateKeySECP256K1R
 var ctx *snow.Context
 var asset = ids.NewID([32]byte{1, 2, 3})
+var username = "bobby"
+var password = "StrnasfqewiurPasswdn56d"
 
 func init() {
 	ctx = snow.DefaultContextTest()
@@ -172,6 +175,12 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
+
+	userKeystore := keystore.CreateTestKeystore(t)
+	if err := userKeystore.AddUser(username, password); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
@@ -376,7 +385,7 @@ func TestTxSerialization(t *testing.T) {
 		States: []*InitialState{
 			{
 				FxID: 0,
-				Outs: []verify.Verifiable{
+				Outs: []verify.State{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -673,7 +682,9 @@ func TestIssueDependentTx(t *testing.T) {
 
 // Test issuing a transaction that creates an NFT family
 func TestIssueNFT(t *testing.T) {
-	vm := &VM{}
+	vm := &VM{
+		ava: ids.Empty,
+	}
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -723,7 +734,7 @@ func TestIssueNFT(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{{
 			FxID: 1,
-			Outs: []verify.Verifiable{
+			Outs: []verify.State{
 				&nftfx.MintOutput{
 					GroupID: 1,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -840,7 +851,9 @@ func TestIssueNFT(t *testing.T) {
 
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
-	vm := &VM{}
+	vm := &VM{
+		ava: ids.Empty,
+	}
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -894,7 +907,7 @@ func TestIssueProperty(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{{
 			FxID: 2,
-			Outs: []verify.Verifiable{
+			Outs: []verify.State{
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,

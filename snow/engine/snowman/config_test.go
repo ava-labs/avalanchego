@@ -11,23 +11,25 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 )
 
 func DefaultConfig() Config {
 	blocked, _ := queue.New(memdb.New())
 	return Config{
-		BootstrapConfig: BootstrapConfig{
+		Config: bootstrap.Config{
 			Config:  common.DefaultConfigTest(),
 			Blocked: blocked,
-			VM:      &VMTest{},
+			VM:      &block.TestVM{},
 		},
 		Params: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:                    1,
-			Alpha:                1,
-			BetaVirtuous:         1,
-			BetaRogue:            2,
-			ConcurrentRepolls:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 1,
+			Alpha:             1,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Consensus: &snowman.Topological{},
 	}
