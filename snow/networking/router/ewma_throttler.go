@@ -43,7 +43,7 @@ type ewmaThrottler struct {
 // exclusively for stakers should be in the range (0, 1]
 // [period] is the interval of time to use for the caclulation of EWMA
 //
-// Note: ewmaThrottler uses the period as the total amount of timer per
+// Note: ewmaThrottler uses the period as the total amount of time per
 // interval, which is not the limit since it tracks consumption using EWMA.
 // As a result, this aggressiveness should counterbalance the fact that no
 // chain's CPU time will actually consume nearly 100% of real time.
@@ -137,8 +137,8 @@ func (et *ewmaThrottler) GetUtilization(validatorID ids.ShortID) (float64, bool)
 		cpuUtilization := et.nonStaker.ewma / et.periodNonStakerAllotment
 		exceedsMessageAllotment := et.nonStaker.pendingMessages > et.periodNonStakerMessages
 		if exceedsMessageAllotment {
-			et.log.Verbo("Throttling message from non-staker %s with %d pending messages at CPU Utilization %f", validatorID, sp.pendingMessages, sp.ewma)
-			et.log.Verbo("Cumulative non-staker has %d pending messages and CPU Utilization %f", et.nonStaker.pendingMessages, et.nonStaker.ewma)
+			et.log.Verbo("Throttling message from non-staker %s with %d pending messages, cumulative non-staker has %d pending and CPU Utilization: %f",
+				validatorID, sp.pendingMessages, et.nonStaker.pendingMessages, et.nonStaker.ewma)
 		}
 		return cpuUtilization, exceedsMessageAllotment
 	}

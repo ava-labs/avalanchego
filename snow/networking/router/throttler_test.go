@@ -49,7 +49,6 @@ func TestEWMAThrottler(t *testing.T) {
 	}
 }
 
-// Add test that when a validator leaves/enters validator set pending messages is handled appropriately
 func TestValidatorStopsStaking(t *testing.T) {
 	vdrs := validators.NewSet()
 	validator0 := validators.GenerateRandomValidator(1)
