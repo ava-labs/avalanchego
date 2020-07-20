@@ -192,7 +192,11 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			} else {
 				b.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
 			}
-			for _, tx := range vtx.Txs() { // Add transactions to queue of transactions to execute when bootstrapping finishes.
+			txs, err := vtx.Txs()
+			if err != nil {
+				return err
+			}
+			for _, tx := range txs { // Add transactions to queue of transactions to execute when bootstrapping finishes.
 				if err := b.TxBlocked.Push(&txJob{
 					log:         b.Context.Log,
 					numAccepted: b.numAcceptedTxs,
@@ -204,12 +208,20 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 					b.Context.Log.Verbo("couldn't push to txBlocked: %s", err)
 				}
 			}
-			for _, parent := range vtx.Parents() { // Process the parents of this vertex (traverse up the DAG)
+			parents, err := vtx.Parents()
+			if err != nil {
+				return err
+			}
+			for _, parent := range parents { // Process the parents of this vertex (traverse up the DAG)
 				if _, ok := b.processedCache.Get(parent.ID()); !ok { // But only if we haven't processed the parent
 					toProcess.Push(parent)
 				}
 			}
-			if vtx.Height()%stripeDistance < stripeWidth { // See comment for stripeDistance
+			height, err := vtx.Height()
+			if err != nil {
+				return err
+			}
+			if height%stripeDistance < stripeWidth { // See comment for stripeDistance
 				b.processedCache.Put(vtx.ID(), nil)
 			}
 		}
@@ -269,7 +281,11 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the valid vertices in this message
 	processVertices[0] = vtx
 	eligibleVertices := ids.Set{}
-	for _, parent := range vtx.Parents() {
+	parents, err := vtx.Parents()
+	if err != nil {
+		return err
+	}
+	for _, parent := range parents {
 		eligibleVertices.Add(parent.ID())
 	}
 
@@ -286,7 +302,11 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 			break
 		}
 		eligibleVertices.Remove(vtxID)
-		for _, parent := range vtx.Parents() {
+		parents, err := vtx.Parents()
+		if err != nil {
+			return err
+		}
+		for _, parent := range parents {
 			eligibleVertices.Add(parent.ID())
 		}
 		processVertices = append(processVertices, vtx)

@@ -101,7 +101,11 @@ func (ta *Topological) Add(vtx Vertex) error {
 
 	ta.ctx.ConsensusDispatcher.Issue(ta.ctx.ChainID, vtxID, vtx.Bytes())
 
-	for _, tx := range vtx.Txs() {
+	txs, err := vtx.Txs()
+	if err != nil {
+		return err
+	}
+	for _, tx := range txs {
 		if !tx.Status().Decided() {
 			// Add the consumers to the conflict graph.
 			if err := ta.cg.Add(tx); err != nil {
@@ -157,9 +161,15 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	}
 
 	// Set up the topological sort: O(|Live Set|)
-	kahns, leaves := ta.calculateInDegree(responses)
+	kahns, leaves, err := ta.calculateInDegree(responses)
+	if err != nil {
+		return err
+	}
 	// Collect the votes for each transaction: O(|Live Set|)
-	votes := ta.pushVotes(kahns, leaves)
+	votes, err := ta.pushVotes(kahns, leaves)
+	if err != nil {
+		return err
+	}
 	// Update the conflict graph: O(|Transactions|)
 	ta.ctx.Log.Verbo("Updating consumer confidences based on:\n%s", &votes)
 	if updated, err := ta.cg.RecordPoll(votes); !updated || err != nil {
@@ -180,8 +190,11 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 // Takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf nodes.
-func (ta *Topological) calculateInDegree(
-	responses ids.UniqueBag) (map[[32]byte]kahnNode, []ids.ID) {
+func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
+	map[[32]byte]kahnNode,
+	[]ids.ID,
+	error,
+) {
 	kahns := make(map[[32]byte]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
@@ -198,19 +211,27 @@ func (ta *Topological) calculateInDegree(
 			if !previouslySeen {
 				// If I've never seen this node before, it is currently a leaf.
 				leaves.Add(vote)
-				ta.markAncestorInDegrees(kahns, leaves, vtx.Parents())
+				parents, err := vtx.Parents()
+				if err != nil {
+					return nil, nil, err
+				}
+				kahns, leaves, err = ta.markAncestorInDegrees(kahns, leaves, parents)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
 		}
 	}
 
-	return kahns, leaves.List()
+	return kahns, leaves.List(), nil
 }
 
 // adds a new in-degree reference for all nodes
 func (ta *Topological) markAncestorInDegrees(
 	kahns map[[32]byte]kahnNode,
 	leaves ids.Set,
-	deps []Vertex) (map[[32]byte]kahnNode, ids.Set) {
+	deps []Vertex,
+) (map[[32]byte]kahnNode, ids.Set, error) {
 	frontier := make([]Vertex, 0, len(deps))
 	for _, vtx := range deps {
 		// The vertex may have been decided, no need to vote in that case
@@ -240,7 +261,11 @@ func (ta *Topological) markAncestorInDegrees(
 		if !alreadySeen {
 			// If I am seeing this node for the first time, I need to check its
 			// parents
-			for _, depVtx := range current.Parents() {
+			parents, err := current.Parents()
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, depVtx := range parents {
 				// No need to traverse to a decided vertex
 				if !depVtx.Status().Decided() {
 					frontier = append(frontier, depVtx)
@@ -248,13 +273,14 @@ func (ta *Topological) markAncestorInDegrees(
 			}
 		}
 	}
-	return kahns, leaves
+	return kahns, leaves, nil
 }
 
 // count the number of votes for each operation
 func (ta *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode,
-	leaves []ids.ID) ids.Bag {
+	leaves []ids.ID,
+) (ids.Bag, error) {
 	votes := make(ids.UniqueBag)
 	txConflicts := make(map[[32]byte]ids.Set, minMapSize)
 
@@ -267,7 +293,11 @@ func (ta *Topological) pushVotes(
 		kahn := kahnNodes[key]
 
 		if vtx := ta.nodes[key]; vtx != nil {
-			for _, tx := range vtx.Txs() {
+			txs, err := vtx.Txs()
+			if err != nil {
+				return ids.Bag{}, err
+			}
+			for _, tx := range txs {
 				// Give the votes to the consumer
 				txID := tx.ID()
 				votes.UnionSet(txID, kahn.votes)
@@ -279,7 +309,11 @@ func (ta *Topological) pushVotes(
 				}
 			}
 
-			for _, dep := range vtx.Parents() {
+			parents, err := vtx.Parents()
+			if err != nil {
+				return ids.Bag{}, err
+			}
+			for _, dep := range parents {
 				depID := dep.ID()
 				depKey := depID.Key()
 				if depNode, notPruned := kahnNodes[depKey]; notPruned {
@@ -308,8 +342,7 @@ func (ta *Topological) pushVotes(
 	}
 
 	votes.Difference(&conflictingVotes)
-
-	return votes.Bag(ta.params.Alpha)
+	return votes.Bag(ta.params.Alpha), nil
 }
 
 // If I've already checked, do nothing
@@ -349,7 +382,10 @@ func (ta *Topological) update(vtx Vertex) error {
 	rejectable := false // If I'm rejectable, I must be rejected
 	preferred := true
 	virtuous := true
-	txs := vtx.Txs()
+	txs, err := vtx.Txs()
+	if err != nil {
+		return err
+	}
 	preferences := ta.cg.Preferences()
 	virtuousTxs := ta.cg.Virtuous()
 
@@ -370,7 +406,10 @@ func (ta *Topological) update(vtx Vertex) error {
 		}
 	}
 
-	deps := vtx.Parents()
+	deps, err := vtx.Parents()
+	if err != nil {
+		return err
+	}
 	// Update all of my dependencies
 	for _, dep := range deps {
 		if err := ta.update(dep); err != nil {
