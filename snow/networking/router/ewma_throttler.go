@@ -85,8 +85,13 @@ func (et *ewmaThrottler) AddMessage(validatorID ids.ShortID) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp := et.getSpender(validatorID)
+	sp, staker := et.getSpender(validatorID)
+
+	if !staker {
+		et.nonStaker.pendingMessages++
+	}
 	sp.pendingMessages++
+
 }
 
 // RemoveMessage...
@@ -94,8 +99,12 @@ func (et *ewmaThrottler) RemoveMessage(validatorID ids.ShortID) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp := et.getSpender(validatorID)
+	sp, staking := et.getSpender(validatorID)
 	sp.pendingMessages--
+
+	if !staking {
+		et.nonStaker.pendingMessages--
+	}
 }
 
 // UtilizeCPU...
@@ -103,9 +112,14 @@ func (et *ewmaThrottler) UtilizeCPU(validatorID ids.ShortID, consumption float64
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp := et.getSpender(validatorID)
+	sp, staking := et.getSpender(validatorID)
 	sp.ewma += consumption
 	sp.lastSpend = et.currentPeriod
+
+	if !staking {
+		et.nonStaker.ewma += consumption
+		et.nonStaker.lastSpend = et.currentPeriod
+	}
 }
 
 // GetUtilization...
@@ -116,30 +130,28 @@ func (et *ewmaThrottler) GetUtilization(validatorID ids.ShortID) (float64, bool)
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp := et.getSpender(validatorID)
+	sp, _ := et.getSpender(validatorID)
 	vdr, exists := et.vdrs.Get(validatorID)
 
-	et.log.Verbo("Spender has %d pending messages", sp.pendingMessages)
-
-	var (
-		cpuUtilization          float64
-		exceedsMessageAllotment bool
-	)
-	if exists {
-		stakingFactor := float64(vdr.Weight()) / float64(et.stakingWeight)
-		stakerAllotment := et.stakerCPU * stakingFactor
-		stakerMessages := uint32(float64(et.reservedStakerMessages) * stakingFactor)
-		cpuUtilization = sp.ewma / (et.periodNonStakerAllotment + stakerAllotment)
-		exceedsMessageAllotment = sp.pendingMessages > stakerMessages+et.periodNonStakerMessages
-	} else {
-		cpuUtilization = (sp.ewma / et.periodNonStakerAllotment)
-		exceedsMessageAllotment = sp.pendingMessages > et.periodNonStakerMessages
+	if !exists {
+		cpuUtilization := et.nonStaker.ewma / et.periodNonStakerAllotment
+		exceedsMessageAllotment := et.nonStaker.pendingMessages > et.periodNonStakerMessages
+		if exceedsMessageAllotment {
+			et.log.Verbo("Throttling message from non-staker %s with %d pending messages at CPU Utilization %f", validatorID, sp.pendingMessages, sp.ewma)
+			et.log.Verbo("Cumulative non-staker has %d pending messages and CPU Utilization %f", et.nonStaker.pendingMessages, et.nonStaker.ewma)
+		}
+		return cpuUtilization, exceedsMessageAllotment
 	}
+
+	stakingFactor := float64(vdr.Weight()) / float64(et.stakingWeight)
+	stakerAllotment := et.stakerCPU * stakingFactor
+	stakerMessages := uint32(float64(et.reservedStakerMessages) * stakingFactor)
+	cpuUtilization := sp.ewma / (et.periodNonStakerAllotment + stakerAllotment)
+	exceedsMessageAllotment := sp.pendingMessages > stakerMessages+et.periodNonStakerMessages
 
 	if exceedsMessageAllotment {
-		et.log.Debug("Validator: %s has exceeded its message allotment with %d messages at CPU Utlization: %f", validatorID, sp.pendingMessages, cpuUtilization)
+		et.log.Debug("Staker %s has exceeded its message allotment with %d messages at CPU Utilization: %f", validatorID, sp.pendingMessages, cpuUtilization)
 	}
-
 	return cpuUtilization, exceedsMessageAllotment
 }
 
@@ -152,7 +164,7 @@ func (et *ewmaThrottler) EndInterval() {
 
 	for key, spender := range et.spenders {
 		spender.ewma /= et.decayFactor
-		if spender.lastSpend+defaultIntervalsUntilPruning < et.currentPeriod {
+		if spender.lastSpend+defaultIntervalsUntilPruning < et.currentPeriod && spender.pendingMessages == 0 {
 			et.log.Debug("Removing validator from throttler after not hearing from it for %d periods", et.currentPeriod-spender.lastSpend)
 			delete(et.spenders, key)
 		}
@@ -174,21 +186,47 @@ func (et *ewmaThrottler) EndInterval() {
 	et.currentPeriod++
 }
 
-// getSpender returns the [spender] corresponding to [validatorID]
-func (et *ewmaThrottler) getSpender(validatorID ids.ShortID) *spender {
-	if !et.vdrs.Contains(validatorID) {
-		return et.nonStaker
-	}
+// getSpender returns the [spender] corresponding to [validatorID] and whether or not the validator is currently staking
+func (et *ewmaThrottler) getSpender(validatorID ids.ShortID) (*spender, bool) {
 	validatorKey := validatorID.Key()
 	sp, exists := et.spenders[validatorKey]
+	staking := et.vdrs.Contains(validatorID)
+
 	if !exists {
-		sp = &spender{currentPeriod: et.currentPeriod}
+		// If this validator did not exist in spenders, create it and return
+		sp = &spender{
+			currentPeriod: et.currentPeriod,
+			staking:       staking,
+		}
 		et.spenders[validatorKey] = sp
+		return sp, staking
 	}
-	return sp
+
+	// If this validator has not changed whether or not it is staking
+	// return as is
+	if sp.staking == staking {
+		return sp, staking
+	}
+
+	// If this spender was previously staking and stopped, add its
+	// pending messages to nonStaker's.
+	if sp.staking {
+		sp.staking = false
+		et.nonStaker.pendingMessages += sp.pendingMessages
+
+		return sp, staking
+	}
+
+	// Otherwise, it has started staking, so remove its pending messages
+	// from nonStaker's
+	sp.staking = true
+	et.nonStaker.pendingMessages -= sp.pendingMessages
+
+	return sp, staking
 }
 
 type spender struct {
 	currentPeriod, lastSpend, pendingMessages uint32
 	ewma                                      float64
+	staking                                   bool
 }

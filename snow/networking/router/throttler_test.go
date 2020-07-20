@@ -49,6 +49,67 @@ func TestEWMAThrottler(t *testing.T) {
 	}
 }
 
+// Add test that when a validator leaves/enters validator set pending messages is handled appropriately
+func TestValidatorStopsStaking(t *testing.T) {
+	vdrs := validators.NewSet()
+	validator0 := validators.GenerateRandomValidator(1)
+	validator1 := validators.GenerateRandomValidator(1)
+	nonValidator := validators.GenerateRandomValidator(1)
+	vdrs.Add(validator0)
+	vdrs.Add(validator1)
+
+	maxMessages := uint32(16)
+	stakerPortion := 0.25
+	period := float64(time.Second)
+	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
+
+	throttler.AddMessage(validator0.ID())
+	throttler.AddMessage(validator0.ID())
+	throttler.AddMessage(nonValidator.ID())
+
+	vdrs.Remove(validator0.ID())
+
+	ewmat, ok := throttler.(*ewmaThrottler)
+	if !ok {
+		t.Fatal("Throttler returned by NewEWMAThrottler should have been an instance of ewmaThrottler")
+	}
+
+	ewmat.getSpender(validator0.ID())
+	if ewmat.nonStaker.pendingMessages != 3 {
+		t.Fatalf("nonStaker should have had 3 pending messages after validator0 stopped staking, but had %d", ewmat.nonStaker.pendingMessages)
+	}
+}
+
+func TestValidatorStartsStaking(t *testing.T) {
+	vdrs := validators.NewSet()
+	validator0 := validators.GenerateRandomValidator(1)
+	validator1 := validators.GenerateRandomValidator(1)
+	pendingValidator := validators.GenerateRandomValidator(1)
+	vdrs.Add(validator0)
+	vdrs.Add(validator1)
+
+	maxMessages := uint32(16)
+	stakerPortion := 0.25
+	period := float64(time.Second)
+	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
+
+	throttler.AddMessage(validator0.ID())
+	throttler.AddMessage(pendingValidator.ID())
+	throttler.AddMessage(pendingValidator.ID())
+
+	vdrs.Add(pendingValidator)
+
+	ewmat, ok := throttler.(*ewmaThrottler)
+	if !ok {
+		t.Fatal("Throttler returned by NewEWMAThrottler should have been an instance of ewmaThrottler")
+	}
+
+	ewmat.getSpender(pendingValidator.ID())
+	if ewmat.nonStaker.pendingMessages != 0 {
+		t.Fatalf("nonStaker should have had 0 pending messages after pendingValidator started staking, but had %d", ewmat.nonStaker.pendingMessages)
+	}
+}
+
 func TestCalculatesEWMA(t *testing.T) {
 	vdrs := validators.NewSet()
 	validator0 := validators.GenerateRandomValidator(1)
@@ -84,7 +145,7 @@ func TestCalculatesEWMA(t *testing.T) {
 	if !ok {
 		t.Fatal("Throttler returned by NewEWMAThrottler should be an instance of ewmaThrottler")
 	}
-	sp := ewmat.getSpender(validator0.ID())
+	sp, _ := ewmat.getSpender(validator0.ID())
 	if sp.ewma != ewma {
 		t.Fatalf("EWMA Throttler calculated EWMA incorrectly, expected: %f, but calculated: %f", ewma, sp.ewma)
 	}
