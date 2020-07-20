@@ -107,7 +107,6 @@ func (ml *multiLevelQueue) PushMessage(msg message) bool {
 	// and notify the throttler of the pending message
 	if !ml.pushMessage(msg) {
 		ml.log.Debug("Dropped message during push: %s", msg)
-		ml.metrics.pending.Dec()
 		ml.metrics.dropped.Inc()
 		return false
 	}
