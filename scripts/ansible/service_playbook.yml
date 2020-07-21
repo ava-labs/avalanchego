@@ -10,4 +10,5 @@
     - name: avalanche_user
     - name: avalanche_install
     - name: avalanche_upgrade
+    - name: avalanche_staker
     - name: avalanche_service
