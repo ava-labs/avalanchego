@@ -131,14 +131,13 @@ func (n *Node) initNetworking() error {
 			return err
 		}
 
+		// #nosec G402
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
 			// We do not use TLS's CA functionality, we just require an
 			// authenticated channel. Therefore, we can safely skip verification
 			// here.
-			//
-			// TODO: Security audit required
 			InsecureSkipVerify: true,
 		}
 
@@ -181,7 +180,7 @@ func (n *Node) initNetworking() error {
 	}
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		n.Net.Close()
+		n.Net.Close() // #nosec G104
 	}, os.Interrupt, os.Kill)
 
 	return nil
@@ -215,7 +214,7 @@ func (n *Node) Dispatch() error {
 		err := n.APIServer.Dispatch()
 
 		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close()
+		n.Net.Close() // #nosec #104
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -473,14 +472,16 @@ func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
 	n.keystoreServer.Initialize(n.Log, keystoreDB)
-	keystoreHandler := n.keystoreServer.CreateHandler()
+	keystoreHandler, err := n.keystoreServer.CreateHandler()
+	if err != nil {
+		return err
+	}
 	if !n.Config.KeystoreAPIEnabled {
 		n.Log.Info("skipping keystore API initializaion because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
 	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
-
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -506,7 +507,10 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 }
 
@@ -516,9 +520,11 @@ func (n *Node) initInfoAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
-
 }
 
 // initHealthAPI initializes the Health API service
@@ -555,7 +561,11 @@ func (n *Node) initHealthAPI() error {
 	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
+	handler, err := service.Handler()
+	if err != nil {
+		return err
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
 // initIPCAPI initializes the IPC API service
@@ -566,7 +576,10 @@ func (n *Node) initIPCAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
-	service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	service, err := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
@@ -672,7 +685,8 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 // Shutdown this node
 func (n *Node) Shutdown() {
 	n.Log.Info("shutting down the node")
-	n.Net.Close()
+	// Close already logs its own error if one occurs, so the error is ignored here
+	n.Net.Close() // #nosec G104
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
 	n.Log.Info("node shut down successfully")

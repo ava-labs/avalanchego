@@ -228,6 +228,9 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
+	// Ignore weak randomness warning because strong randomness is unnecessary for
+	// creating the nodeID
+	// #nosec G404
 	net := &network{
 		log:                                log,
 		id:                                 id,
@@ -265,7 +268,9 @@ func NewNetwork(
 		myIPs:           map[string]struct{}{ip.String(): {}},
 		peers:           make(map[[20]byte]*peer),
 	}
-	net.initialize(registerer)
+	if err := net.initialize(registerer); err != nil {
+		log.Error("error initializing network metrics: %w", err)
+	}
 	net.executor.Initialize()
 	net.heartbeat()
 	return net
@@ -701,6 +706,9 @@ func (n *network) Close() error {
 
 	n.closed = true
 	err := n.listener.Close()
+	if err != nil {
+		n.log.Error("Error while closing network listener: %w", err)
+	}
 
 	peersToClose := []*peer(nil)
 	for _, peer := range n.peers {
@@ -846,10 +854,12 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = n.initialReconnectDelay
 		}
 
-		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
+		// Ignore weak randomness warnings in calculating timeouts because true randomness
+		// is unnecessary here
+		delay = time.Duration(float64(delay) * (1 + rand.Float64())) // #nosec G404
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
-			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4) // #nosec G404
 		}
 
 		n.stateLock.Lock()
@@ -917,7 +927,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	defer n.stateLock.Unlock()
 
 	if n.closed {
-		p.conn.Close()
+		p.conn.Close() // #nosec G104
 		return nil
 	}
 
@@ -936,17 +946,19 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
-		p.conn.Close()
+		p.conn.Close() // #nosec G104
 		return nil
 	}
 
+	// If I have an old connection to this peer, then I should close the old
+	// connection and mark the peer as reconnected.
 	if _, ok := n.peers[key]; ok {
 		if !p.ip.IsZero() {
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		p.conn.Close()
+		p.conn.Close() // #nosec G104
 		return nil
 	}
 

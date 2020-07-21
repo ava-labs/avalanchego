@@ -112,8 +112,8 @@ func (svm *SnowmanVM) DBInitialized() bool {
 }
 
 // SetDBInitialized marks the database as initialized
-func (svm *SnowmanVM) SetDBInitialized() {
-	svm.State.PutStatus(svm.DB, dbInitializedID, choices.Accepted)
+func (svm *SnowmanVM) SetDBInitialized() error {
+	return svm.State.PutStatus(svm.DB, dbInitializedID, choices.Accepted)
 }
 
 // SaveBlock saves [block] to state
@@ -142,7 +142,9 @@ func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ..
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterService(service, name)
+	if err := server.RegisterService(service, name); err != nil {
+		svm.Ctx.Log.Error("error creating static handlers: %w", err)
+	}
 
 	var lock common.LockOption = common.WriteLock
 	if len(lockOption) != 0 {

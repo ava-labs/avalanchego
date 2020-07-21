@@ -248,7 +248,7 @@ func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID 
 // GetAncestors ...
 func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
 	if e.GetAncestorsF != nil {
-		e.GetAncestorsF(validatorID, requestID, containerID)
+		return e.GetAncestorsF(validatorID, requestID, containerID)
 	} else if e.CantGetAncestors && e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAncestors")
 	}

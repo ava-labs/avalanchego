@@ -70,13 +70,15 @@ func (c *Client) WriteHeader(statusCode int) {
 			Values: values,
 		})
 	}
-	// TODO: How should we handle an error here?
+	// TODO: Is there a way to handle the error here?
+	// #nosec G104
 	c.client.WriteHeader(context.Background(), req)
 }
 
 // Flush ...
 func (c *Client) Flush() {
-	// TODO: How should we handle an error here?
+	// TODO: is there a way to handle the error here?
+	// #nosec G104
 	c.client.Flush(context.Background(), &gresponsewriterproto.FlushRequest{})
 }
 
@@ -102,14 +104,16 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 	readerConn, err := c.broker.Dial(resp.ReaderServer)
 	if err != nil {
-		connConn.Close()
+		// Ignore error closing resources to return original error
+		connConn.Close() // #nosec G104
 		return nil, nil, err
 	}
 
 	writerConn, err := c.broker.Dial(resp.WriterServer)
 	if err != nil {
-		connConn.Close()
-		readerConn.Close()
+		// Ignore errors closing resources to return original error
+		connConn.Close()   // #nosec G104
+		readerConn.Close() // #nosec G104
 		return nil, nil, err
 	}
 

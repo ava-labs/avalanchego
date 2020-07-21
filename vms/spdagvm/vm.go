@@ -155,7 +155,8 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Service{vm: vm}, "spdag") // name this service "spdag"
+	// name this service "spdag"
+	vm.ctx.Log.AssertNoError(newServer.RegisterService(&Service{vm: vm}, "spdag"))
 	return map[string]*common.HTTPHandler{
 		"": &common.HTTPHandler{Handler: newServer},
 	}
@@ -167,7 +168,10 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&StaticService{}, "spdag") // name this service "spdag"
+	// name this service "spdag"
+	if err := newServer.RegisterService(&StaticService{}, "spdag"); err != nil {
+		vm.ctx.Log.Error("error creating static handlers: %w", err)
+	}
 	return map[string]*common.HTTPHandler{
 		// NoLock because the static functions probably wont be stateful (i.e. no
 		// write operations)
@@ -207,6 +211,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	// cache.
 	if err := tx.VerifyState(); err != nil {
 		vm.ctx.Log.Debug("GetTx resulted in fetching a tx that failed verification: %s", err)
+		// If the status cannot be set in the database, the error can be ignored safely while setting
+		// the status to rejected because it will be set correctly in memory.
+		// #nosec G104
 		tx.setStatus(choices.Rejected)
 	}
 
@@ -544,6 +551,10 @@ func (vm *VM) wrapTx(rawTx *Tx, finalized func(choices.Status)) (*UniqueTx, erro
 		if err := vm.state.SetTx(tx.ID(), tx.t.tx); err != nil {
 			return nil, err
 		}
+		// It is not essential to set the status to Processing. In case of an error,
+		// the status will still be set in memory and if it's evicted the status in
+		// the database will be Unknown
+		// #nosec G104
 		tx.setStatus(choices.Processing)
 	}
 

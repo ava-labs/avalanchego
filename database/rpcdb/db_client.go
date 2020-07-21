@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/database/nodb"
 	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
 var (
@@ -208,7 +209,7 @@ type iterator struct {
 	id    uint64
 	key   []byte
 	value []byte
-	err   error
+	errs  wrappers.Errs
 }
 
 // Next attempts to move the iterator to the next element and returns if this
@@ -217,8 +218,9 @@ func (it *iterator) Next() bool {
 	resp, err := it.db.client.IteratorNext(context.Background(), &rpcdbproto.IteratorNextRequest{
 		Id: it.id,
 	})
+
 	if err != nil {
-		it.err = err
+		it.errs.Add(err)
 		return false
 	}
 	it.key = resp.Key
@@ -228,15 +230,15 @@ func (it *iterator) Next() bool {
 
 // Error returns any that occurred while iterating
 func (it *iterator) Error() error {
-	if it.err != nil {
-		return it.err
+	if it.errs.Errored() {
+		return it.errs.Err
 	}
 
 	_, err := it.db.client.IteratorError(context.Background(), &rpcdbproto.IteratorErrorRequest{
 		Id: it.id,
 	})
-	it.err = updateError(err)
-	return it.err
+	it.errs.Add(updateError(err))
+	return it.errs.Err
 }
 
 // Key returns the key of the current element
@@ -247,9 +249,10 @@ func (it *iterator) Value() []byte { return it.value }
 
 // Release frees any resources held by the iterator
 func (it *iterator) Release() {
-	it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
+	_, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
 		Id: it.id,
 	})
+	it.errs.Add(err)
 }
 
 // updateError sets the error value to the errors required by the Database

@@ -367,12 +367,18 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	reqWeight := (3*bootstrapWeight + 3) / 4
 	if reqWeight == 0 {
-		chain.Engine.Startup()
+		if err := chain.Engine.Startup(); err != nil {
+			chain.Handler.Shutdown()
+			return nil, fmt.Errorf("failed to start consensus engine: %w", err)
+		}
 	} else {
 		awaiter := NewAwaiter(beacons, reqWeight, func() {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
-			chain.Engine.Startup()
+			if err := chain.Engine.Startup(); err != nil {
+				chain.Ctx.Log.Error("failed to start consensus engine: %w", err)
+				chain.Handler.Shutdown()
+			}
 		})
 		go m.net.RegisterHandler(awaiter)
 	}
@@ -440,7 +446,7 @@ func (m *manager) createAvalancheChain(
 
 	// The engine handles consensus
 	engine := &avaeng.Transitive{}
-	engine.Initialize(avaeng.Config{
+	if err := engine.Initialize(avaeng.Config{
 		BootstrapConfig: avaeng.BootstrapConfig{
 			Config: common.Config{
 				Context:    ctx,
@@ -456,7 +462,9 @@ func (m *manager) createAvalancheChain(
 		},
 		Params:    consensusParams,
 		Consensus: &avacon.Topological{},
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -515,7 +523,7 @@ func (m *manager) createSnowmanChain(
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
-	engine.Initialize(smeng.Config{
+	if err := engine.Initialize(smeng.Config{
 		BootstrapConfig: smeng.BootstrapConfig{
 			Config: common.Config{
 				Context:    ctx,
@@ -530,7 +538,9 @@ func (m *manager) createSnowmanChain(
 		},
 		Params:    consensusParams,
 		Consensus: &smcon.Topological{},
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}

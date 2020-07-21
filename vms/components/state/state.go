@@ -213,7 +213,7 @@ func (s *state) uniqueID(ID ids.ID, typeID uint64) ids.ID {
 }
 
 // NewState returns a new State
-func NewState() State {
+func NewState() (State, error) {
 	state := &state{
 		unmarshallers:  make(map[uint64]func([]byte) (interface{}, error)),
 		uniqueIDCaches: make(map[uint64]*cache.LRU),
@@ -221,11 +221,17 @@ func NewState() State {
 
 	// Register ID, Status and time.Time so they can be put/get without client code
 	// having to register them
-	state.RegisterType(IDTypeID, unmarshalID)
-	state.RegisterType(StatusTypeID, unmarshalStatus)
-	state.RegisterType(TimeTypeID, unmarshalTime)
+	if err := state.RegisterType(IDTypeID, unmarshalID); err != nil {
+		return nil, err
+	}
+	if err := state.RegisterType(StatusTypeID, unmarshalStatus); err != nil {
+		return nil, err
+	}
+	if err := state.RegisterType(TimeTypeID, unmarshalTime); err != nil {
+		return nil, err
+	}
 
-	return state
+	return state, nil
 }
 
 // So we can marshal time

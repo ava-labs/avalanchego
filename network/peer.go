@@ -326,7 +326,7 @@ func (p *peer) close() {
 	defer p.net.stateLock.Unlock()
 
 	p.closed = true
-	p.conn.Close()
+	p.conn.Close() // #nosec G104
 	close(p.sender)
 	p.net.disconnected(p)
 }

@@ -45,6 +45,8 @@ func (s *Weighted) Sample() int {
 // not removed.
 func (s *Weighted) SampleReplace() int {
 	s.init()
+	// Weak randomness is acceptable for sampling
+	// #nosec G404
 	for w, i := rand.Int63n(s.cumWeights[0]), 0; ; {
 		w -= s.weights[i]
 		if w < 0 {

@@ -34,19 +34,21 @@ type IPCs struct {
 }
 
 // NewService returns a new IPCs API service
-func NewService(log logging.Logger, chainManager chains.Manager, events *triggers.EventDispatcher, httpServer *api.Server) *common.HTTPHandler {
+func NewService(log logging.Logger, chainManager chains.Manager, events *triggers.EventDispatcher, httpServer *api.Server) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&IPCs{
+	if err := newServer.RegisterService(&IPCs{
 		log:          log,
 		chainManager: chainManager,
 		httpServer:   httpServer,
 		events:       events,
 		chains:       map[[32]byte]*ChainIPC{},
-	}, "ipcs")
-	return &common.HTTPHandler{Handler: newServer}
+	}, "ipcs"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{Handler: newServer}, nil
 }
 
 // PublishBlockchainArgs are the arguments for calling PublishBlockchain
@@ -87,6 +89,8 @@ func (ipc *IPCs) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs,
 
 	if err = sock.Listen(url); err != nil {
 		ipc.log.Error("can't listen on pub socket: %s", err)
+		// Closing the socket should only error if it has already been closed
+		// #nosec G104
 		sock.Close()
 		return err
 	}
@@ -97,6 +101,8 @@ func (ipc *IPCs) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs,
 	}
 	if err := ipc.events.RegisterChain(chainID, "ipc", chainIPC); err != nil {
 		ipc.log.Error("couldn't register event: %s", err)
+		// Closing the socket should only error if it has already been closed
+		// #nosec G104
 		sock.Close()
 		return err
 	}

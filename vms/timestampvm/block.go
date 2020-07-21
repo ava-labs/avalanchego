@@ -12,7 +12,8 @@ import (
 
 var (
 	errTimestampTooEarly = errors.New("block's timestamp is later than its parent's timestamp")
-	errDatabase          = errors.New("error while retrieving data from database")
+	errDatabaseGet       = errors.New("error while retrieving data from database")
+	errDatabaseSave      = errors.New("error while saving block to the database")
 	errTimestampTooLate  = errors.New("block's timestamp is more than 1 hour ahead of local time")
 )
 
@@ -37,7 +38,7 @@ func (b *Block) Verify() error {
 	// Get [b]'s parent
 	parent, ok := b.Parent().(*Block)
 	if !ok {
-		return errDatabase
+		return errDatabaseGet
 	}
 
 	if b.Timestamp < time.Unix(parent.Timestamp, 0).Unix() {
@@ -49,6 +50,8 @@ func (b *Block) Verify() error {
 	}
 
 	// Persist the block
-	b.VM.SaveBlock(b.VM.DB, b)
+	if err := b.VM.SaveBlock(b.VM.DB, b); err != nil {
+		return errDatabaseSave
+	}
 	return b.VM.DB.Commit()
 }

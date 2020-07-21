@@ -48,6 +48,7 @@ func New(config Config) (*Log, error) {
 	return l, nil
 }
 
+// #nosec G104
 func (l *Log) run() {
 	defer l.wg.Done()
 

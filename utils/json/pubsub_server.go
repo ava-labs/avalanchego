@@ -202,12 +202,20 @@ type Connection struct {
 func (c *Connection) readPump() {
 	defer func() {
 		c.s.removeConnection(c)
-		c.conn.Close()
+		// Close should error if there are pending read/writes, which can be safely ignored
+		c.conn.Close() // #nosec G104
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	// SetReadDeadline returns an error if the connection is corrupted
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		return
+	}
+	c.conn.SetPongHandler(func(string) error {
+		// If SetReadDeadline errors there's no need for the PongHandler to return an error.
+		c.conn.SetReadDeadline(time.Now().Add(pongWait)) // #nosec G104
+		return nil
+	})
 
 	for {
 		msg := subscribe{}
@@ -235,15 +243,18 @@ func (c *Connection) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		// Close should error if there are pending read/writes, which can be safely ignored
+		c.conn.Close() // #nosec G104
 	}()
 	for {
 		select {
 		case message, ok := <-c.send:
+			// SetWriteDeadline sets a single variable and returns nil, so it's safe to ignore the error
+			// #nosec G104
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{}) // #nosec G104
 				return
 			}
 
@@ -251,6 +262,8 @@ func (c *Connection) writePump() {
 				return
 			}
 		case <-ticker.C:
+			// SetWriteDeadline sets a single variable and returns nil, so it's safe to ignore the error
+			// #nosec G104
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return

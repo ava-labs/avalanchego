@@ -82,7 +82,9 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 		vtxID:      vtxID,
 		serializer: s,
 	}
-	uVtx.setVertex(vtx)
+	if err := uVtx.setVertex(vtx); err != nil {
+		t.Fatalf("Failed to set vertex due to: %w", err)
+	}
 
 	newUVtx := &uniqueVertex{
 		vtxID:      vtxID,

@@ -164,7 +164,9 @@ func TestBatchPut(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Fatalf("Error while closing the database: %s", err)
+	}
 
 	if err := batch.Write(); err != ErrClosed {
 		t.Fatalf("Expected %s on batch.Write", ErrClosed)
@@ -729,13 +731,13 @@ func TestStatNoPanic(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
-	db.Stat("")
+	db.Stat("") // #nosec G104
 
 	if err := db.Close(); err != nil {
 		t.Fatalf("Unexpected error on db.Close: %s", err)
 	}
 
-	db.Stat("")
+	db.Stat("") // #nosec G104
 }
 
 // TestCompactNoPanic ...
@@ -757,11 +759,11 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
-	db.Compact(nil, nil)
+	db.Compact(nil, nil) // #nosec G104
 
 	if err := db.Close(); err != nil {
 		t.Fatalf("Unexpected error on db.Close: %s", err)
 	}
 
-	db.Compact(nil, nil)
+	db.Compact(nil, nil) // #nosec G104
 }
