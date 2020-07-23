@@ -84,6 +84,16 @@ func (self *ETHChain) GenBlock() {
 	self.backend.Miner().GenBlock()
 }
 
+func (self *ETHChain) VerifyBlock(block *types.Block) bool {
+	txnHash := types.DeriveSha(block.Transactions())
+	uncleHash := types.CalcUncleHash(block.Uncles())
+	ethHeader := block.Header()
+	if txnHash != ethHeader.TxHash || uncleHash != ethHeader.UncleHash {
+		return false
+	}
+	return true
+}
+
 func (self *ETHChain) PendingSize() (int, error) {
 	pending, err := self.backend.TxPool().Pending()
 	count := 0

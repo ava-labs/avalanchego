@@ -314,6 +314,9 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err := rlp.DecodeBytes(b, ethBlock); err != nil {
 		return nil, err
 	}
+	if !vm.chain.VerifyBlock(ethBlock) {
+		return nil, errInvalidBlock
+	}
 	blockHash := ethBlock.Hash()
 	// Coinbase must be zero on C-Chain
 	if bytes.Compare(blockHash.Bytes(), vm.genesisHash.Bytes()) != 0 &&

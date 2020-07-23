@@ -91,6 +91,9 @@ func NewTestChain(name string, config *eth.Config,
 				if err != nil {
 					panic(err)
 				}
+				if !tc.chain.VerifyBlock(block) {
+					panic("invalid block")
+				}
 				tc.chain.InsertChain([]*types.Block{block})
 				tc.insertBlock(block)
 				log.Info(fmt.Sprintf("%s: got block %s, sending ack", name, block.Hash().Hex()))
