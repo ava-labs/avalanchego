@@ -980,28 +980,48 @@ func TestVerifyPermission(t *testing.T) {
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
+	if err := fx.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
 
 	type test struct {
 		description string
 		tx          Tx
+		in          *Input
 		cred        *Credential
 		cg          *OutputOwners
 		shouldErr   bool
 	}
 	tests := []test{
 		{
-			"threshold 0, no sigs",
+			"threshold 0, no sigs, has addrs",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
 			&OutputOwners{
 				Threshold: 0,
 				Addrs:     []ids.ShortID{addr},
+			},
+			true,
+		},
+		{
+			"threshold 0, no sigs, no addrs",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
+			&OutputOwners{
+				Threshold: 0,
+				Addrs:     []ids.ShortID{},
 			},
 			false,
 		},
 		{
 			"threshold 1, 1 sig",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
 			&OutputOwners{
 				Threshold: 1,
@@ -1012,6 +1032,7 @@ func TestVerifyPermission(t *testing.T) {
 		{
 			"threshold 0, 1 sig (too many sigs)",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
 			&OutputOwners{
 				Threshold: 0,
@@ -1022,6 +1043,7 @@ func TestVerifyPermission(t *testing.T) {
 		{
 			"threshold 1, 0 sigs (too few sigs)",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
 			&OutputOwners{
 				Threshold: 1,
@@ -1032,6 +1054,7 @@ func TestVerifyPermission(t *testing.T) {
 		{
 			"threshold 1, 1 incorrect sig",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
 			&OutputOwners{
 				Threshold: 1,
@@ -1042,6 +1065,7 @@ func TestVerifyPermission(t *testing.T) {
 		{
 			"repeated sig",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0, 0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
 			&OutputOwners{
 				Threshold: 2,
@@ -1052,6 +1076,7 @@ func TestVerifyPermission(t *testing.T) {
 		{
 			"threshold 2, repeated address and repeated sig",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0, 1}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
 			&OutputOwners{
 				Threshold: 2,
@@ -1062,6 +1087,7 @@ func TestVerifyPermission(t *testing.T) {
 		{
 			"threshold 2, 2 sigs",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0, 1}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
 				Threshold: 2,
@@ -1070,19 +1096,20 @@ func TestVerifyPermission(t *testing.T) {
 			false,
 		},
 		{
-			"threshold 2, 2 sigs reversed",
+			"threshold 2, 2 sigs reversed (should be sorted)",
 			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{1, 0}},
 			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sig2Bytes, sigBytes}},
 			&OutputOwners{
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
-			false,
+			true,
 		},
 	}
 
 	for _, test := range tests {
-		if err := fx.VerifyPermission(test.tx, test.cred, test.cg); err != nil && !test.shouldErr {
+		if err := fx.VerifyPermission(test.tx, test.in, test.cred, test.cg); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' errored but it shouldn't have: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' should have errored but didn't", test.description)

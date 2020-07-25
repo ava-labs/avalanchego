@@ -381,6 +381,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 			StakingEnabled: n.Config.EnableStaking,
 			AVA:            avaxAssetID,
 			AVM:            createAVMTx.ID(),
+			Fee:            n.Config.AvaTxFee,
 		},
 	); err != nil {
 		return err

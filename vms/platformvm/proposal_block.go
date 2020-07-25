@@ -29,9 +29,9 @@ type ProposalBlock struct {
 	// The database that the chain will have if this block's proposal is aborted
 	onAbortDB *versiondb.Database
 	// The function to execute if this block's proposal is committed
-	onCommitFunc func()
+	onCommitFunc func() error
 	// The function to execute if this block's proposal is aborted
-	onAbortFunc func()
+	onAbortFunc func() error
 }
 
 // Accept implements the snowman.Block interface
@@ -67,7 +67,7 @@ func (pb *ProposalBlock) setBaseDatabase(db database.Database) {
 //      accepted Commit block.)
 //   2. A function be be executed when this block's proposal is committed.
 //      This function should not write to state.
-func (pb *ProposalBlock) onCommit() (*versiondb.Database, func()) {
+func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error) {
 	return pb.onCommitDB, pb.onCommitFunc
 }
 
@@ -75,7 +75,7 @@ func (pb *ProposalBlock) onCommit() (*versiondb.Database, func()) {
 // onAbort returns a database that contains the state of the chain assuming this
 // block's proposal is rejected. (That is, if this block is accepted and
 // followed by an accepted Abort block.)
-func (pb *ProposalBlock) onAbort() (*versiondb.Database, func()) {
+func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error) {
 	return pb.onAbortDB, pb.onAbortFunc
 }
 

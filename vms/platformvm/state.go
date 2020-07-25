@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/utils/formatting"
-	safemath "github.com/ava-labs/gecko/utils/math"
-	"github.com/ava-labs/gecko/vms/components/ava"
-
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/vms/components/ava"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 // This file contains methods of VM that deal with getting/putting values from database
@@ -28,38 +28,14 @@ const (
 
 // get the validators currently validating the specified subnet
 func (vm *VM) getCurrentValidators(db database.Database, subnetID ids.ID) (*EventHeap, error) {
-	// if current validators aren't specified in database, return empty validator set
-	key := subnetID.Prefix(currentValidatorsPrefix)
-	has, err := vm.State.Has(db, validatorsTypeID, key)
-	if err != nil {
-		return nil, err
-	}
-	if !has {
-		return &EventHeap{
-			SortByStartTime: false,
-			Txs:             make([]TimedTx, 0),
-		}, nil
-	}
-	currentValidatorsInterface, err := vm.State.Get(db, validatorsTypeID, key)
-	if err != nil {
-		return nil, err
-	}
-	currentValidators, ok := currentValidatorsInterface.(*EventHeap)
-	if !ok {
-		err := fmt.Errorf("expected to retrieve *EventHeap from database but got type %T", currentValidatorsInterface)
-		vm.Ctx.Log.Error(err.Error())
-		return nil, err
-	}
-	for _, validator := range currentValidators.Txs {
-		if err := validator.initialize(vm); err != nil {
-			return nil, err
-		}
-	}
-	return currentValidators, nil
+	return vm.getValidatorsFromDB(db, subnetID, currentValidatorsPrefix, false)
 }
 
 // put the validators currently validating the specified subnet
 func (vm *VM) putCurrentValidators(db database.Database, validators *EventHeap, subnetID ids.ID) error {
+	if validators.SortByStartTime {
+		return errors.New("current validators should be sorted by end time")
+	}
 	err := vm.State.Put(db, validatorsTypeID, subnetID.Prefix(currentValidatorsPrefix), validators)
 	if err != nil {
 		return fmt.Errorf("couldn't put current validator set: %w", err)
@@ -69,29 +45,7 @@ func (vm *VM) putCurrentValidators(db database.Database, validators *EventHeap, 
 
 // get the validators that are slated to validate the specified subnet in the future
 func (vm *VM) getPendingValidators(db database.Database, subnetID ids.ID) (*EventHeap, error) {
-	// if pending validators aren't specified in database, return empty validator set
-	key := subnetID.Prefix(pendingValidatorsPrefix)
-	has, err := vm.State.Has(db, validatorsTypeID, key)
-	if err != nil {
-		return nil, err
-	}
-	if !has {
-		return &EventHeap{
-			SortByStartTime: true,
-			Txs:             make([]TimedTx, 0),
-		}, nil
-	}
-	pendingValidatorHeapInterface, err := vm.State.Get(db, validatorsTypeID, key)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get pending validators: %w", err)
-	}
-	pendingValidatorHeap, ok := pendingValidatorHeapInterface.(*EventHeap)
-	if !ok {
-		err := fmt.Errorf("expected to retrieve *EventHeap from database but got type %T", pendingValidatorHeapInterface)
-		vm.Ctx.Log.Error(err.Error())
-		return nil, err
-	}
-	return pendingValidatorHeap, nil
+	return vm.getValidatorsFromDB(db, subnetID, pendingValidatorsPrefix, true)
 }
 
 // put the validators that are slated to validate the specified subnet in the future
@@ -104,6 +58,40 @@ func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, 
 		return fmt.Errorf("couldn't put pending validator set: %w", err)
 	}
 	return nil
+}
+
+// get the validators currently validating the specified subnet
+func (vm *VM) getValidatorsFromDB(
+	db database.Database,
+	subnetID ids.ID,
+	prefix uint64,
+	sortByStartTime bool,
+) (*EventHeap, error) {
+	// if current validators aren't specified in database, return empty validator set
+	key := subnetID.Prefix(prefix)
+	has, err := vm.State.Has(db, validatorsTypeID, key)
+	if err != nil {
+		return nil, err
+	}
+	if !has {
+		return &EventHeap{SortByStartTime: sortByStartTime}, nil
+	}
+	validatorsInterface, err := vm.State.Get(db, validatorsTypeID, key)
+	if err != nil {
+		return nil, err
+	}
+	validators, ok := validatorsInterface.(*EventHeap)
+	if !ok {
+		err := fmt.Errorf("expected to retrieve *EventHeap from database but got type %T", validatorsInterface)
+		vm.Ctx.Log.Error("error while fetching validators: %s", err)
+		return nil, err
+	}
+	for _, validator := range validators.Txs {
+		if err := validator.initialize(vm); err != nil {
+			return nil, err
+		}
+	}
+	return validators, nil
 }
 
 // getUTXO returns the UTXO with the specified ID
@@ -123,13 +111,16 @@ func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
 
 // putUTXO persists the given UTXO
 func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
-	if err := vm.State.Put(db, utxoTypeID, utxo.InputID(), utxo); err != nil {
+	utxoID := utxo.InputID()
+	if err := vm.State.Put(db, utxoTypeID, utxoID, utxo); err != nil {
 		return err
 	}
-	if addressable, ok := utxo.Out.(ava.Addressable); ok { // If this output lists addresses that it references
+
+	// If this output lists addresses that it references index it
+	if addressable, ok := utxo.Out.(ava.Addressable); ok {
 		// For each owner of this UTXO, add to list of UTXOs owned by that addr
 		for _, addrBytes := range addressable.Addresses() {
-			if err := vm.putReferencingUTXO(db, addrBytes, utxo.InputID()); err != nil {
+			if err := vm.putReferencingUTXO(db, addrBytes, utxoID); err != nil {
 				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
 			}
 		}
@@ -139,18 +130,19 @@ func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
 
 // removeUTXO removes the UTXO with the given ID
 // If the utxo doesn't exist, returns nil
-func (vm *VM) removeUTXO(db database.Database, ID ids.ID) error {
-	utxo, err := vm.getUTXO(db, ID) // Get the UTXO
+func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
+	utxo, err := vm.getUTXO(db, utxoID) // Get the UTXO
 	if err != nil {
 		return nil
 	}
-	if err := vm.State.Put(db, utxoTypeID, ID, nil); err != nil { // remove the UTXO
+	if err := vm.State.Put(db, utxoTypeID, utxoID, nil); err != nil { // remove the UTXO
 		return err
 	}
-	if addressable, ok := utxo.Out.(ava.Addressable); ok { // If this output lists addresses that it references
-		// For each owner of this UTXO, add to list of UTXOs owned by that addr
+	// If this output lists addresses that it references remove the indices
+	if addressable, ok := utxo.Out.(ava.Addressable); ok {
+		// For each owner of this UTXO, remove from their list of UTXOs
 		for _, addrBytes := range addressable.Addresses() {
-			if err := vm.removeReferencingUTXO(db, addrBytes, utxo.InputID()); err != nil {
+			if err := vm.removeReferencingUTXO(db, addrBytes, utxoID); err != nil {
 				return fmt.Errorf("couldn't update UTXO set of address %s", formatting.CB58{Bytes: addrBytes})
 			}
 		}
@@ -196,7 +188,7 @@ func (vm *VM) getUTXOs(db database.Database, addrs [][]byte) ([]*ava.UTXO, error
 		}
 		utxoIDs.Union(addrUTXOs)
 	}
-	utxos := make([]*ava.UTXO, utxoIDs.Len(), utxoIDs.Len())
+	utxos := make([]*ava.UTXO, utxoIDs.Len())
 	for i, utxoID := range utxoIDs.List() {
 		utxo, err := vm.getUTXO(db, utxoID)
 		if err != nil {
@@ -255,35 +247,22 @@ func (vm *VM) getChain(db database.Database, ID ids.ID) (*CreateChainTx, error) 
 
 // put the list of blockchains that exist to database
 func (vm *VM) putChains(db database.Database, chains []*CreateChainTx) error {
-	if err := vm.State.Put(db, chainsTypeID, chainsKey, chains); err != nil {
-		return err
-	}
-	return nil
+	return vm.State.Put(db, chainsTypeID, chainsKey, chains)
 }
 
 // get the platfrom chain's timestamp from [db]
 func (vm *VM) getTimestamp(db database.Database) (time.Time, error) {
-	timestamp, err := vm.State.GetTime(db, timestampKey)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return timestamp, nil
+	return vm.State.GetTime(db, timestampKey)
 }
 
 // put the platform chain's timestamp in [db]
 func (vm *VM) putTimestamp(db database.Database, timestamp time.Time) error {
-	if err := vm.State.PutTime(db, timestampKey, timestamp); err != nil {
-		return err
-	}
-	return nil
+	return vm.State.PutTime(db, timestampKey, timestamp)
 }
 
 // put the subnets that exist to [db]
 func (vm *VM) putSubnets(db database.Database, subnets []*CreateSubnetTx) error {
-	if err := vm.State.Put(db, subnetsTypeID, subnetsKey, subnets); err != nil {
-		return err
-	}
-	return nil
+	return vm.State.Put(db, subnetsTypeID, subnetsKey, subnets)
 }
 
 // get the subnets that exist in [db]
@@ -305,10 +284,10 @@ func (vm *VM) getSubnets(db database.Database) ([]*CreateSubnetTx, error) {
 }
 
 // get the subnet with the specified ID
-func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error) {
+func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, TxError) {
 	subnets, err := vm.getSubnets(db)
 	if err != nil {
-		return nil, err
+		return nil, tempError{err}
 	}
 
 	for _, subnet := range subnets {
@@ -316,7 +295,7 @@ func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, error
 			return subnet, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find subnet with ID %s", id)
+	return nil, permError{fmt.Errorf("couldn't find subnet with ID %s", id)}
 }
 
 // Returns the height of the preferred block

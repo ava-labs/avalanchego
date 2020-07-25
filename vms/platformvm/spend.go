@@ -42,7 +42,7 @@ func (vm *VM) spend(
 		err = errNoKeys
 		return
 	}
-	addrs := make([][]byte, len(keys), len(keys)) // The addresses controlled by [keys]
+	addrs := make([][]byte, len(keys)) // The addresses controlled by [keys]
 	for i, key := range keys {
 		addrs[i] = key.PublicKey().Address().Bytes()
 	}
@@ -121,33 +121,35 @@ func (vm *VM) spend(
 // The outputs that are created by this method are defined by [spends].
 // Each element of [spends] describes an output.
 // Change is sent according to [changeSpend].
-func (vm *VM) spend(
+func (vm *VM) burn(
 	db database.Database,
 	keys []*crypto.PrivateKeySECP256K1R,
-	spends []*spend,
-	changeSpend *spend,
-	burnAmt uint64,
-) (ins []*ava.TransferableInput, outs []*ava.TransferableOutput, credKeys [][]*crypto.PrivateKeySECP256K1R, err error) {
+	burnUnlocked uint64,
+	burnLocked uint64,
+) (
+	[]*ava.TransferableInput,
+	[]*ava.TransferableOutput,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
 	if len(keys) == 0 {
-		err = errNoKeys
-		return
+		return nil, nil, nil, errNoKeys
 	}
 
-	toSpend := uint64(burnAmt) // Calculate the total amount we need to spend
-	for _, spend := range spends {
-		if toSpend, err = safemath.Add64(toSpend, spend.Amount); err != nil {
-			return
-		}
+	toBurn, err := safemath.Add64(burnUnlocked, burnLocked)
+	if err != nil {
+		return nil, nil, nil, errInputOverflow
 	}
-	addrs := make([][]byte, len(keys), len(keys)) // The addresses controlled by [keys]
+
+	addrs := make([][]byte, len(keys)) // The addresses controlled by [keys]
 	for i, key := range keys {
 		addrs[i] = key.PublicKey().Address().Bytes()
 	}
 	utxos, err := vm.getUTXOs(db, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
-		err = fmt.Errorf("couldn't get UTXOs: %w", err)
-		return
+		return nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
+
 	kc := secp256k1fx.NewKeychain() // Keychain consumes UTXOs and creates new ones
 	for _, key := range keys {
 		kc.Add(key)
@@ -155,72 +157,68 @@ func (vm *VM) spend(
 
 	// Consume UTXOs
 	now := uint64(vm.clock.Time().Unix())
-	fundsAvailable := uint64(0)
+	spent := uint64(0)
+	ins := []*ava.TransferableInput{}
+	signers := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos { // See which UTXOs we can spend
+		if spent >= toSpend { // We have enough AVAX; stop.
+			break
+		}
 		if assetID := utxo.AssetID(); !assetID.Equals(vm.avaxAssetID) {
 			vm.Ctx.Log.Warn("UTXO has unexpected asset ID %s", assetID) // should never happen
 			continue
-		} else if inputIntf, signers, err2 := kc.Spend(utxo.Out, now); err2 != nil {
-			continue
-		} else if input, ok := inputIntf.(ava.Transferable); !ok { // should never happen
-			vm.Ctx.Log.Warn("expected input to be ava.Transferable but is %T", inputIntf)
-			continue
-		} else if fundsAvailable, err = safemath.Add64(fundsAvailable, input.Amount()); err != nil { // Should never happen
-			return
-		} else {
-			ins = append(ins, &ava.TransferableInput{
-				UTXOID: utxo.UTXOID,
-				Asset:  ava.Asset{ID: vm.avaxAssetID},
-				In:     input,
-			})
-			credKeys = append(credKeys, signers)
-			if fundsAvailable >= toSpend { // We have enough AVAX; stop.
-				break
-			}
 		}
+		inIntf, inSigners, err := kc.Spend(utxo.Out, now)
+		if err != nil {
+			continue
+		}
+		in, ok := inIntf.(ava.TransferableIn)
+		if !ok { // should never happen
+			vm.Ctx.Log.Warn("expected input to be ava.TransferableIn but is %T", inIntf)
+			continue
+		}
+		newSpent, err := safemath.Add64(spent, input.Amount())
+		if err != nil { // Should never happen
+			return nil, nil, nil, err
+		}
+
+		ins = append(ins, &ava.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  ava.Asset{ID: vm.avaxAssetID},
+			In:     in,
+		})
+		signers = append(signers, inSigners)
+		spent = newSpent
 	}
-	if fundsAvailable < toSpend {
-		err = fmt.Errorf("provided keys have balance %d but need %d", fundsAvailable, toSpend)
-		return
+	if spent < toSpend {
+		return nil, nil, nil, fmt.Errorf("provided keys have balance %d but need %d", fundsAvailable, toSpend)
 	}
-	ava.SortTransferableInputsWithSigners(ins, credKeys) // sort inputs and keys
+	ava.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
 
 	// We have enough tokens. Create the outputs.
-	for _, spend := range spends {
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: vm.avaxAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: spend.Amount,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  spend.Locktime,
-					Threshold: spend.Threshold,
-					Addrs:     spend.Addrs,
-				},
-			},
-		})
-		fundsAvailable, err = safemath.Sub64(fundsAvailable, spend.Amount)
-		if err != nil {
-			return // Should never happen
-		}
-	}
-
+	outs := []*ava.TransferableOutput{}
 	// If there is change, send it to [changeAddr]
-	if fundsAvailable > 0 {
+	if spent > toSpend {
+		changeAddr := kc.Keys[0].PublicKey().Address()
 		outs = append(outs, &ava.TransferableOutput{
 			Asset: ava.Asset{ID: vm.avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: fundsAvailable, // Amount is ignored for [changeSpend]. Just send change.
+				Amt: spent - toSpend,
 				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  changeSpend.Locktime,
-					Threshold: changeSpend.Threshold,
-					Addrs:     changeSpend.Addrs,
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{changeAddr},
 				},
 			},
 		})
 	}
-	ava.SortTransferableOutputs(outs, vm.codec) //sort outputs
-	return
+	return ins, outs, signers, nil
 }
+
+var (
+	errInputOverflow  = errors.New("inputs overflowed uint64")
+	errOutputOverflow = errors.New("outputs overflowed uint64")
+)
 
 // Verify that:
 // * inputs and outputs are sorted
@@ -229,38 +227,28 @@ func (vm *VM) spend(
 func syntacticVerifySpend(
 	ins []*ava.TransferableInput,
 	outs []*ava.TransferableOutput,
-	creds []verify.Verifiable,
 	burnAmount uint64,
 	avaxAssetID ids.ID,
 ) error {
-	if len(ins) != len(creds) {
-		return fmt.Errorf("there are %d inputs but %d credentials. Should be same number", len(ins), len(creds))
-	}
-	for _, cred := range creds {
-		if err := cred.Verify(); err != nil {
-			return err
-		}
-	}
-
 	var err error
 	avaxConsumed := uint64(0) // AVAX consumed in this tx
 	for _, in := range ins {
-		if !in.AssetID().Equals(avaxAssetID) { // all inputs must be AVAX
-			return fmt.Errorf("input has unexpected asset ID %s", in.AssetID())
-		} else if err := in.Verify(); err != nil {
+		if err := in.Verify(); err != nil {
 			return err
+		} else if assetID := in.AssetID(); !assetID.Equals(avaxAssetID) { // all inputs must be AVAX
+			return fmt.Errorf("input has unexpected asset ID %s expected %s", assetID, avaxAssetID)
 		} else if avaxConsumed, err = safemath.Add64(avaxConsumed, in.Input().Amount()); err != nil {
-			return errors.New("inputs overflowed uint64")
+			return errInputOverflow
 		}
 	}
 	avaxProducedAndBurnt := uint64(burnAmount) // AVAX produced in this tx, plus the burned amount
 	for _, out := range outs {
-		if !out.AssetID().Equals(avaxAssetID) { // all outputs must be AVAX
-			return fmt.Errorf("output has unexpected asset ID %s", out.AssetID())
-		} else if err = out.Verify(); err != nil {
+		if err = out.Verify(); err != nil {
 			return err
+		} else if assetID := out.AssetID(); !assetID.Equals(avaxAssetID) { // all outputs must be AVAX
+			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, avaxAssetID)
 		} else if avaxProducedAndBurnt, err = safemath.Add64(avaxProducedAndBurnt, out.Output().Amount()); err != nil {
-			return errors.New("outputs overflowed uint64")
+			return errOutputOverflow
 		}
 	}
 	if avaxProducedAndBurnt > avaxConsumed {
@@ -285,6 +273,15 @@ func (vm *VM) semanticVerifySpend(
 	outs []*ava.TransferableOutput,
 	creds []verify.Verifiable,
 ) TxError {
+	if len(ins) != len(creds) {
+		return fmt.Errorf("there are %d inputs but %d credentials. Should be same number", len(ins), len(creds))
+	}
+	for _, cred := range creds {
+		if err := cred.Verify(); err != nil {
+			return err
+		}
+	}
+
 	for index, in := range ins {
 		if utxo, err := vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
 			return tempError{err}
@@ -308,4 +305,36 @@ func (vm *VM) semanticVerifySpend(
 		}
 	}
 	return nil
+}
+
+// Verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
+// Adds/removes the new/old UTXOs
+// [db] should not be committed if an error is returned
+// Precondition: [tx] has already been syntactically verified
+func (vm *VM) generateRefund(
+	txID ids.ID,
+	_ []*ava.TransferableInput,
+	_ []*ava.TransferableOutput,
+	_ uint64,
+	refund uint64,
+	owner verify.Verifiable,
+) ([]*ava.UTXO, error) {
+	// Refund the stake here
+	outIntf, err := tx.vm.fx.CreateOutput(refund, owner)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	out, ok := outIntf.(verify.State)
+	if !ok {
+		return nil, nil, nil, nil, errInvalidState
+	}
+
+	return []*ava.UTXO{{
+		UTXOID: ava.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(tx.Outs)),
+		},
+		Asset: ava.Asset{ID: vm.avaxAssetID},
+		Out:   out,
+	}}, nil
 }

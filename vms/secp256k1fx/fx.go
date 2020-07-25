@@ -5,9 +5,7 @@ package secp256k1fx
 
 import (
 	"errors"
-	"fmt"
 
-	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -80,43 +78,27 @@ func (fx *Fx) Bootstrapping() error { return nil }
 func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
 // VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
-func (fx *Fx) VerifyPermission(txIntf, credIntf, controlGroup interface{}) error {
+func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {
 		return errWrongTxType
+	}
+	in, ok := inIntf.(*Input)
+	if !ok {
+		return errWrongInputType
 	}
 	cred, ok := credIntf.(*Credential)
 	if !ok {
 		return errWrongCredentialType
 	}
-	owner, ok := controlGroup.(*OutputOwners)
+	owner, ok := ownerIntf.(*OutputOwners)
 	if !ok {
 		return errWrongOwnerType
 	}
-	return fx.verifyPermission(tx, cred, owner)
-}
-
-func (fx *Fx) verifyPermission(tx Tx, cred *Credential, owners *OutputOwners) error {
-	if err := verify.All(cred, owners); err != nil { // Make sure cred and control group are well-formed
+	if err := verify.All(in, cred, owner); err != nil {
 		return err
-	} else if len(cred.Sigs) != int(owners.Threshold) {
-		return fmt.Errorf("credential has %d signatures but should have %d", len(cred.Sigs), owners.Threshold)
 	}
-	txHash := hashing.ComputeHash256(tx.UnsignedBytes())
-	controlAddrs := owners.AddressesSet()
-	seen := ids.ShortSet{} // addresses we've already seen sigs from
-	for _, sig := range cred.Sigs {
-		if pubKey, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:]); err != nil {
-			return err
-		} else if addr := pubKey.Address(); !controlAddrs.Contains(addr) {
-			return fmt.Errorf("credential has signature from %s, which is not in the control group", addr)
-		} else if seen.Contains(addr) {
-			return fmt.Errorf("signature from %s appears multiple times", addr)
-		} else {
-			seen.Add(addr)
-		}
-	}
-	return nil
+	return fx.VerifyCredentials(tx, in, cred, owner)
 }
 
 // VerifyOperation ...

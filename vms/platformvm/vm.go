@@ -24,13 +24,14 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 const (
@@ -71,8 +72,6 @@ const (
 	// MaximumStakingDuration is the longest amount of time a staker can bond
 	// their funds for.
 	MaximumStakingDuration = 365 * 24 * time.Hour
-
-	txFee = uint64(500)
 )
 
 var (
@@ -118,6 +117,9 @@ func init() {
 		Codec.RegisterType(&StandardBlock{}),
 		Codec.RegisterType(&AtomicBlock{}),
 
+		// The Fx is registered here because this is the same place it is
+		// registered in the AVM. This ensures that the typeIDs match up for
+		// utxos in shared memory.
 		Codec.RegisterType(&secp256k1fx.TransferInput{}),
 		Codec.RegisterType(&secp256k1fx.MintOutput{}),
 		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
@@ -226,7 +228,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.codec = Codec
-	vm.txFee = txFee
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()
@@ -286,8 +287,8 @@ func (vm *VM) Initialize(
 			return err
 		}
 
-		// Create the genesis block and save it as being accepted
-		// (We don't just do genesisBlock.Accept() because then it'd look for genesisBlock's
+		// Create the genesis block and save it as being accepted (We don't just
+		// do genesisBlock.Accept() because then it'd look for genesisBlock's
 		// non-existent parent)
 		genesisBlock, err := vm.newCommitBlock(ids.Empty, 0)
 		if err != nil {
@@ -297,7 +298,9 @@ func (vm *VM) Initialize(
 			return err
 		}
 		genesisBlock.onAcceptDB = versiondb.New(vm.DB)
-		genesisBlock.CommonBlock.Accept()
+		if err := genesisBlock.CommonBlock.Accept(); err != nil {
+			return err
+		}
 
 		vm.SetDBInitialized()
 
@@ -420,7 +423,9 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 		vm.Ctx.Log.Error("blockchain %s validated by Subnet %s but couldn't get that Subnet. Blockchain not created")
 		return
 	}
-	if vm.stakingEnabled && !constants.DefaultSubnetID.Equals(tx.SubnetID) && !validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
+	if vm.stakingEnabled && // Staking is enabled, so nodes might not validate all chains
+		!constants.DefaultSubnetID.Equals(tx.SubnetID) && // All nodes must validate the default subnet
+		!validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
 		return
 	}
 
@@ -437,14 +442,10 @@ func (vm *VM) createChain(tx *CreateChainTx) {
 }
 
 // Bootstrapping marks this VM as bootstrapping
-func (vm *VM) Bootstrapping() error {
-	return vm.fx.Bootstrapping()
-}
+func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 
 // Bootstrapped marks this VM as bootstrapped
-func (vm *VM) Bootstrapped() error {
-	return vm.fx.Bootstrapped()
-}
+func (vm *VM) Bootstrapped() error { return vm.fx.Bootstrapped() }
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
@@ -464,12 +465,13 @@ func (vm *VM) Shutdown() error {
 // BuildBlock builds a block to be added to consensus
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.Ctx.Log.Debug("in BuildBlock")
-	preferredID := vm.Preferred()
 	// TODO: Add PreferredHeight() to core.snowmanVM
 	preferredHeight, err := vm.preferredHeight()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get preferred block's height: %w", err)
 	}
+
+	preferredID := vm.Preferred()
 
 	// If there are pending decision txs, build a block with a batch of them
 	if len(vm.unissuedDecisionTxs) > 0 {
@@ -481,6 +483,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		txs, vm.unissuedDecisionTxs = vm.unissuedDecisionTxs[:numTxs], vm.unissuedDecisionTxs[numTxs:]
 		blk, err := vm.newStandardBlock(preferredID, preferredHeight+1, txs)
 		if err != nil {
+			vm.resetTimer()
 			return nil, err
 		}
 		if err := blk.Verify(); err != nil {
@@ -488,6 +491,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+			vm.resetTimer()
 			return nil, err
 		}
 		return blk, vm.DB.Commit()
@@ -667,9 +671,7 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	// Static service's name is platform
 	handler := vm.SnowmanVM.NewHandler("platform", &StaticService{})
-	return map[string]*common.HTTPHandler{
-		"": handler,
-	}
+	return map[string]*common.HTTPHandler{"": handler}
 }
 
 // Check if there is a block ready to be added to consensus

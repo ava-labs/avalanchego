@@ -200,7 +200,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	if err != nil {
 		return fmt.Errorf("couldn't get addresses: %w", err)
 	}
-	response.Addresses = make([]string, len(addresses), len(addresses))
+	response.Addresses = make([]string, len(addresses))
 	for i, addr := range addresses {
 		response.Addresses[i] = service.vm.FormatAddress(addr)
 	}
@@ -235,7 +235,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		return fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
 
-	response.UTXOs = make([]formatting.CB58, len(utxos), len(utxos))
+	response.UTXOs = make([]formatting.CB58, len(utxos))
 	for i, utxo := range utxos {
 		bytes, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
