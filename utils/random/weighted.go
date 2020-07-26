@@ -35,7 +35,7 @@ func (s *Weighted) init() {
 // O(log(len(weights))) time.
 func (s *Weighted) Sample() int {
 	i := s.SampleReplace()
-	s.changeWeight(i, 0)
+	s.decreaseWeight(i, s.weights[i])
 	return i
 }
 
@@ -102,15 +102,15 @@ func (s *Weighted) Replace() {
 	}
 }
 
-func (s *Weighted) changeWeight(i int, newWeight int64) {
-	change := s.weights[i] - newWeight
-
-	s.weights[i] = newWeight
-
-	// Decrease my weight and all my parents weights.
-	s.cumWeights[i] -= change
-	for i > 0 {
-		i = (i - 1) / 2
+func (s *Weighted) decreaseWeight(i int, change int64) {
+	for {
+		// decrease the current weight
 		s.cumWeights[i] -= change
+		// if this node is the root, then we should exit
+		if i == 0 {
+			return
+		}
+		// traverse to my parent
+		i = (i - 1) / 2
 	}
 }

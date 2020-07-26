@@ -16,7 +16,10 @@ func Rand(min, max int) int { return rand.Intn(max-min) + min }
 // Subset creates a list of at most k unique numbers sampled from the sampler.
 // Runs in O(k) * O(Sample) time with O(k) space used.
 func Subset(s Sampler, k int) []int {
-	inds := []int{}
+	if k <= 0 {
+		return nil
+	}
+	inds := make([]int, 0, k)
 	for i := 0; i < k && s.CanSample(); i++ {
 		inds = append(inds, s.Sample())
 	}
