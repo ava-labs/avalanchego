@@ -7,8 +7,9 @@ import (
 	"math"
 	"testing"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/random"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 func WeightedUniformBenchmark(b *testing.B, s Weighted, size int) {
@@ -55,24 +56,17 @@ func WeightedPowBenchmark(b *testing.B, s Weighted, exponent float64, size int) 
 	}
 }
 
-func WeightedExponentialBenchmark(b *testing.B, s Weighted, size int) {
-	if size > 60 {
-		b.Fatalf("This test can only be performed with a small number of values")
-	}
-
+func WeightedSingletonBenchmark(b *testing.B, s Weighted, size int) {
 	weights := make([]uint64, size)
-	currentWeight := uint64(math.MaxUint64 / 4)
-	maxWeight := uint64(0)
-	for i := range weights {
-		weights[i] = currentWeight
-		maxWeight += currentWeight
-		currentWeight /= 2
+	weights[0] = uint64(math.MaxInt64 - size + 1)
+	for i := 1; i < len(weights); i++ {
+		weights[i] = 1
 	}
 	s.Initialize(weights)
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		s.StartSearch(uint64(random.Rand(0, int(maxWeight))))
+		s.StartSearch(uint64(random.Rand(0, math.MaxInt64)))
 		for {
 			if _, ok := s.ContinueSearch(); ok {
 				break

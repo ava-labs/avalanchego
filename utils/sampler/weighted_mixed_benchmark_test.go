@@ -154,30 +154,37 @@ func BenchmarkWeightedMixedCubic50000(b *testing.B) {
 	}, 3, 50000)
 }
 
-// BenchmarkWeightedMixedExponential10
-func BenchmarkWeightedMixedExponential10(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedMixed{
+// BenchmarkWeightedMixedSingleton10
+func BenchmarkWeightedMixedSingleton10(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedMixed{
 		weighteds: []Weighted{&weightedArray{}, &weightedHeap{}},
 	}, 10)
 }
 
-// BenchmarkWeightedMixedExponential20
-func BenchmarkWeightedMixedExponential20(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedMixed{
+// BenchmarkWeightedMixedSingleton100
+func BenchmarkWeightedMixedSingleton100(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedMixed{
 		weighteds: []Weighted{&weightedArray{}, &weightedHeap{}},
-	}, 20)
+	}, 100)
 }
 
-// BenchmarkWeightedMixedExponential40
-func BenchmarkWeightedMixedExponential40(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedMixed{
+// BenchmarkWeightedMixedSingleton1000
+func BenchmarkWeightedMixedSingleton1000(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedMixed{
 		weighteds: []Weighted{&weightedArray{}, &weightedHeap{}},
-	}, 40)
+	}, 1000)
 }
 
-// BenchmarkWeightedMixedExponential60
-func BenchmarkWeightedMixedExponential60(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedMixed{
+// BenchmarkWeightedMixedSingleton10000
+func BenchmarkWeightedMixedSingleton10000(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedMixed{
 		weighteds: []Weighted{&weightedArray{}, &weightedHeap{}},
-	}, 60)
+	}, 10000)
+}
+
+// BenchmarkWeightedMixedSingleton100000
+func BenchmarkWeightedMixedSingleton100000(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedMixed{
+		weighteds: []Weighted{&weightedArray{}, &weightedHeap{}},
+	}, 100000)
 }

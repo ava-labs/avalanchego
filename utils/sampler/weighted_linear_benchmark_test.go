@@ -112,22 +112,27 @@ func BenchmarkWeightedLinearCubic50000(b *testing.B) {
 	WeightedPowBenchmark(b, &weightedLinear{}, 3, 50000)
 }
 
-// BenchmarkWeightedLinearExponential10
-func BenchmarkWeightedLinearExponential10(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedLinear{}, 10)
+// BenchmarkWeightedLinearSingleton10
+func BenchmarkWeightedLinearSingleton10(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedLinear{}, 10)
 }
 
-// BenchmarkWeightedLinearExponential20
-func BenchmarkWeightedLinearExponential20(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedLinear{}, 20)
+// BenchmarkWeightedLinearSingleton100
+func BenchmarkWeightedLinearSingleton100(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedLinear{}, 100)
 }
 
-// BenchmarkWeightedLinearExponential40
-func BenchmarkWeightedLinearExponential40(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedLinear{}, 40)
+// BenchmarkWeightedLinearSingleton1000
+func BenchmarkWeightedLinearSingleton1000(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedLinear{}, 1000)
 }
 
-// BenchmarkWeightedLinearExponential60
-func BenchmarkWeightedLinearExponential60(b *testing.B) {
-	WeightedExponentialBenchmark(b, &weightedLinear{}, 60)
+// BenchmarkWeightedLinearSingleton10000
+func BenchmarkWeightedLinearSingleton10000(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedLinear{}, 10000)
+}
+
+// BenchmarkWeightedLinearSingleton100000
+func BenchmarkWeightedLinearSingleton100000(b *testing.B) {
+	WeightedSingletonBenchmark(b, &weightedLinear{}, 100000)
 }
