@@ -28,6 +28,18 @@ func (v *Validator) Weight() uint64 { return v.Wght }
 // Vdr returns this validator
 func (v *Validator) Vdr() validators.Validator { return v }
 
+// Verify this validator is valid
+func (v *Validator) Verify() error {
+	switch {
+	case v.NodeID.IsZero(): // Ensure the validator has a valid ID
+		return errInvalidID
+	case v.Wght == 0: // Ensure the validator has some weight
+		return errWeightTooSmall
+	default:
+		return nil
+	}
+}
+
 // DurationValidator ...
 type DurationValidator struct {
 	Validator `serialize:"true"`
@@ -55,6 +67,19 @@ func (v *DurationValidator) BoundedBy(startTime, endTime time.Time) bool {
 	return !v.StartTime().Before(startTime) && !v.EndTime().After(endTime)
 }
 
+// Verify this validator is valid
+func (v *DurationValidator) Verify() error {
+	duration := v.Duration()
+	switch {
+	case duration < MinimumStakingDuration: // Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > MaximumStakingDuration: // Ensure staking length is not too long
+		return errStakeTooLong
+	default:
+		return v.Validator.Verify()
+	}
+}
+
 // SubnetValidator validates a blockchain on the AVA network.
 type SubnetValidator struct {
 	DurationValidator `serialize:"true"`
@@ -65,3 +90,13 @@ type SubnetValidator struct {
 
 // SubnetID is the ID of the subnet this validator is validating
 func (v *SubnetValidator) SubnetID() ids.ID { return v.Subnet }
+
+// Verify this validator is valid
+func (v *SubnetValidator) Verify() error {
+	switch {
+	case v.Subnet.IsZero():
+		return errNoSubnetID
+	default:
+		return v.DurationValidator.Verify()
+	}
+}

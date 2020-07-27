@@ -47,7 +47,11 @@ func (pb *ProposalBlock) Accept() error {
 func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 	pb.vm = vm
 	pb.Block.Initialize(bytes, vm.SnowmanVM)
-	return pb.Tx.initialize(vm)
+	txBytes, err := pb.vm.codec.Marshal(&pb.Tx)
+	if err != nil {
+		return err
+	}
+	return pb.Tx.initialize(vm, txBytes)
 }
 
 // setBaseDatabase sets this block's base database to [db]
@@ -104,7 +108,7 @@ func (pb *ProposalBlock) Verify() error {
 	pdb := parent.onAccept()
 
 	var err TxError
-	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb)
+	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb, &pb.Tx)
 	if err != nil {
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.

@@ -200,3 +200,19 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 
 	return nil
 }
+
+// CreateOutput creates a new output with the provided control group worth
+// the specified amount
+func (fx *Fx) CreateOutput(amount uint64, ownerIntf interface{}) (interface{}, error) {
+	owner, ok := ownerIntf.(*OutputOwners)
+	if !ok {
+		return nil, errWrongOwnerType
+	}
+	if err := owner.Verify(); err != nil {
+		return nil, err
+	}
+	return &TransferOutput{
+		Amt:          amount,
+		OutputOwners: *owner,
+	}, nil
+}

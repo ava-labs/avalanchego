@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -15,32 +14,28 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-// UnsignedProposalTx is an unsigned operation that can be proposed
-type UnsignedProposalTx interface {
+// UnsignedDecisionTx ...
+type UnsignedDecisionTx interface {
 	initialize(vm *VM, bytes []byte) error
 	ID() ids.ID
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(db database.Database, stx *ProposalTx) (
-		onCommitDB *versiondb.Database,
-		onAbortDB *versiondb.Database,
-		onCommitFunc func() error,
-		onAbortFunc func() error,
+	SemanticVerify(db database.Database, stx *DecisionTx) (
+		onAcceptFunc func() error,
 		err TxError,
 	)
-	InitiallyPrefersCommit() bool
 }
 
-// ProposalTx is an operation that can be proposed
-type ProposalTx struct {
-	UnsignedProposalTx `serialize:"true"`
+// DecisionTx is an operation that can be decided without being proposed
+type DecisionTx struct {
+	UnsignedDecisionTx `serialize:"true"`
 	// Credentials that authorize the inputs to be spent
 	Credentials []verify.Verifiable `serialize:"true"`
 }
 
-func (vm *VM) signProposalTx(tx *ProposalTx, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedProposalTx)
+func (vm *VM) signDecisionTx(tx *DecisionTx, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedDecisionTx)
 	if err != nil {
-		return fmt.Errorf("couldn't marshal UnsignedProposalTx: %w", err)
+		return fmt.Errorf("couldn't marshal UnsignedDecisionTx: %w", err)
 	}
 
 	// Attach credentials

@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/verify"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -45,20 +44,23 @@ func (tx *UnsignedAdvanceTimeTx) initialize(vm *VM, bytes []byte) error {
 	tx.bytes = bytes
 	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
 	var err error
-	tx.unsignedBytes, err = vm.codec.Marshal(interface{}(tx))
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedAdvanceTimeTx: %w", err)
 	}
 	return nil
 }
 
+// ID returns the ID of this transaction
+func (tx *UnsignedAdvanceTimeTx) ID() ids.ID { return tx.id }
+
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-// SyntacticVerify that this transaction is well formed
-func (tx *UnsignedAdvanceTimeTx) SyntacticVerify() TxError {
+// Verify that this transaction is well formed
+func (tx *UnsignedAdvanceTimeTx) Verify() TxError {
 	switch {
 	case tx == nil:
 		return tempError{errNilTx}
@@ -73,7 +75,7 @@ func (tx *UnsignedAdvanceTimeTx) SyntacticVerify() TxError {
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	db database.Database,
-	creds []verify.Verifiable,
+	stx *ProposalTx,
 ) (
 	*versiondb.Database,
 	*versiondb.Database,
@@ -81,10 +83,10 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	if len(creds) != 0 {
+	if len(stx.Credentials) != 0 {
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.SyntacticVerify(); err != nil {
+	if err := tx.Verify(); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -138,11 +140,12 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 	for _, subnet := range subnets {
-		if current, pending, started, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), subnet.id); err != nil {
+		subnetID := subnet.ID()
+		if current, pending, started, _, err := tx.vm.calculateValidators(db, tx.Timestamp(), subnetID); err != nil {
 			return nil, nil, nil, nil, tempError{err}
-		} else if err := tx.vm.putCurrentValidators(onCommitDB, current, subnet.id); err != nil {
+		} else if err := tx.vm.putCurrentValidators(onCommitDB, current, subnetID); err != nil {
 			return nil, nil, nil, nil, tempError{err}
-		} else if err := tx.vm.putPendingValidators(onCommitDB, pending, subnet.id); err != nil {
+		} else if err := tx.vm.putPendingValidators(onCommitDB, pending, subnetID); err != nil {
 			return nil, nil, nil, nil, tempError{err}
 		} else {
 			startedValidating[subnet.ID().Key()] = started
@@ -158,7 +161,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 			return err
 		}
 		for _, subnet := range subnets {
-			if err := tx.vm.updateValidators(subnet.id); err != nil {
+			if err := tx.vm.updateValidators(subnet.ID()); err != nil {
 				return err
 			}
 		}
@@ -176,11 +179,13 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 				continue
 			}
 			for _, chain := range chains {
-				if bytes.Equal(subnetID[:], chain.SubnetID.Bytes()) {
+				unsignedChain := chain.UnsignedDecisionTx.(*UnsignedCreateChainTx)
+				if bytes.Equal(subnetID[:], unsignedChain.SubnetID.Bytes()) {
 					tx.vm.createChain(chain)
 				}
 			}
 		}
+		return nil
 	}
 
 	// State doesn't change if this proposal is aborted

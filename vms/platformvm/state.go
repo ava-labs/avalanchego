@@ -87,7 +87,11 @@ func (vm *VM) getValidatorsFromDB(
 		return nil, err
 	}
 	for _, validator := range validators.Txs {
-		if err := validator.initialize(vm); err != nil {
+		txBytes, err := vm.codec.Marshal(validator)
+		if err != nil {
+			return nil, err
+		}
+		if err := validator.initialize(vm, txBytes); err != nil {
 			return nil, err
 		}
 	}
@@ -217,12 +221,12 @@ func (vm *VM) getBalance(db database.Database, addrs [][]byte) (uint64, error) {
 }
 
 // get all the blockchains that exist
-func (vm *VM) getChains(db database.Database) ([]*CreateChainTx, error) {
+func (vm *VM) getChains(db database.Database) ([]*DecisionTx, error) {
 	chainsInterface, err := vm.State.Get(db, chainsTypeID, chainsKey)
 	if err != nil {
 		return nil, err
 	}
-	chains, ok := chainsInterface.([]*CreateChainTx)
+	chains, ok := chainsInterface.([]*DecisionTx)
 	if !ok {
 		err := fmt.Errorf("expected to retrieve []*CreateChainTx from database but got type %T", chainsInterface)
 		vm.Ctx.Log.Error(err.Error())
@@ -232,7 +236,7 @@ func (vm *VM) getChains(db database.Database) ([]*CreateChainTx, error) {
 }
 
 // get a blockchain by its ID
-func (vm *VM) getChain(db database.Database, ID ids.ID) (*CreateChainTx, error) {
+func (vm *VM) getChain(db database.Database, ID ids.ID) (*DecisionTx, error) {
 	chains, err := vm.getChains(db)
 	if err != nil {
 		return nil, err
@@ -246,7 +250,7 @@ func (vm *VM) getChain(db database.Database, ID ids.ID) (*CreateChainTx, error) 
 }
 
 // put the list of blockchains that exist to database
-func (vm *VM) putChains(db database.Database, chains []*CreateChainTx) error {
+func (vm *VM) putChains(db database.Database, chains []*DecisionTx) error {
 	return vm.State.Put(db, chainsTypeID, chainsKey, chains)
 }
 
@@ -261,37 +265,41 @@ func (vm *VM) putTimestamp(db database.Database, timestamp time.Time) error {
 }
 
 // put the subnets that exist to [db]
-func (vm *VM) putSubnets(db database.Database, subnets []*CreateSubnetTx) error {
+func (vm *VM) putSubnets(db database.Database, subnets []*DecisionTx) error {
 	return vm.State.Put(db, subnetsTypeID, subnetsKey, subnets)
 }
 
 // get the subnets that exist in [db]
-func (vm *VM) getSubnets(db database.Database) ([]*CreateSubnetTx, error) {
+func (vm *VM) getSubnets(db database.Database) ([]*DecisionTx, error) {
 	subnetsIntf, err := vm.State.Get(db, subnetsTypeID, subnetsKey)
 	if err != nil {
 		return nil, err
 	}
-	subnets, ok := subnetsIntf.([]*CreateSubnetTx)
+	subnets, ok := subnetsIntf.([]*DecisionTx)
 	if !ok {
 		err := fmt.Errorf("expected to retrieve []*CreateSubnetTx from database but got type %T", subnetsIntf)
 		vm.Ctx.Log.Error(err.Error())
 		return nil, err
 	}
 	for _, subnet := range subnets {
-		subnet.vm = vm
+		txBytes, err := vm.codec.Marshal(subnet)
+		if err != nil {
+			return nil, err
+		}
+		subnet.initialize(vm, txBytes)
 	}
 	return subnets, nil
 }
 
 // get the subnet with the specified ID
-func (vm *VM) getSubnet(db database.Database, id ids.ID) (*CreateSubnetTx, TxError) {
+func (vm *VM) getSubnet(db database.Database, id ids.ID) (*DecisionTx, TxError) {
 	subnets, err := vm.getSubnets(db)
 	if err != nil {
 		return nil, tempError{err}
 	}
 
 	for _, subnet := range subnets {
-		if subnet.id.Equals(id) {
+		if subnet.ID().Equals(id) {
 			return subnet, nil
 		}
 	}
@@ -322,7 +330,11 @@ func (vm *VM) registerDBTypes() {
 			return nil, err
 		}
 		for _, tx := range stakers.Txs {
-			if err := tx.initialize(vm); err != nil {
+			txBytes, err := vm.codec.Marshal(tx)
+			if err != nil {
+				return nil, err
+			}
+			if err := tx.initialize(vm, txBytes); err != nil {
 				return nil, err
 			}
 		}
@@ -333,18 +345,22 @@ func (vm *VM) registerDBTypes() {
 	}
 
 	marshalChainsFunc := func(chainsIntf interface{}) ([]byte, error) {
-		if chains, ok := chainsIntf.([]*CreateChainTx); ok {
+		if chains, ok := chainsIntf.([]*DecisionTx); ok {
 			return Codec.Marshal(chains)
 		}
 		return nil, fmt.Errorf("expected []*CreateChainTx but got type %T", chainsIntf)
 	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
-		var chains []*CreateChainTx
+		var chains []*DecisionTx
 		if err := Codec.Unmarshal(bytes, &chains); err != nil {
 			return nil, err
 		}
 		for _, chain := range chains {
-			if err := chain.initialize(vm); err != nil {
+			txBytes, err := vm.codec.Marshal(chain)
+			if err != nil {
+				return nil, err
+			}
+			if err := chain.initialize(vm, txBytes); err != nil {
 				return nil, err
 			}
 		}
@@ -355,18 +371,22 @@ func (vm *VM) registerDBTypes() {
 	}
 
 	marshalSubnetsFunc := func(subnetsIntf interface{}) ([]byte, error) {
-		if subnets, ok := subnetsIntf.([]*CreateSubnetTx); ok {
+		if subnets, ok := subnetsIntf.([]*DecisionTx); ok {
 			return Codec.Marshal(subnets)
 		}
-		return nil, fmt.Errorf("expected []*CreateSubnetTx but got type %T", subnetsIntf)
+		return nil, fmt.Errorf("expected []*DecisionTx but got type %T", subnetsIntf)
 	}
 	unmarshalSubnetsFunc := func(bytes []byte) (interface{}, error) {
-		var subnets []*CreateSubnetTx
+		var subnets []*DecisionTx
 		if err := Codec.Unmarshal(bytes, &subnets); err != nil {
 			return nil, err
 		}
 		for _, subnet := range subnets {
-			if err := subnet.initialize(vm); err != nil {
+			txBytes, err := vm.codec.Marshal(subnet)
+			if err != nil {
+				return nil, err
+			}
+			if err := subnet.initialize(vm, txBytes); err != nil {
 				return nil, err
 			}
 		}

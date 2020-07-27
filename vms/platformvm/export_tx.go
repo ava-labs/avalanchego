@@ -13,10 +13,11 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -27,139 +28,94 @@ var (
 
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
-	// Metadata, inputs and outputs
-	// The outputs in BaseTx are non-exported
 	BaseTx `serialize:"true"`
-	// Amount of nAVAX being exported to the X-Chain
-	Amount uint64 `serialize:"true"`
 	// Outputs that are exported to the X-Chain
-	// Should only have one element
 	ExportedOutputs []*ava.TransferableOutput `serialize:"true"`
 }
 
-// ExportTx exports funds to the AVM
-type ExportTx struct {
-	UnsignedExportTx `serialize:"true"`
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Creds []verify.Verifiable `serialize:"true"`
-}
-
-// Outs returns this transaction's outputs
-func (tx *ExportTx) Outs() []*ava.TransferableOutput {
-	// We copy to a new slice so that
-	// when we sort the inputs, we don't modify underlying slices
-	outs := make([]*ava.TransferableOutput, len(tx.BaseTx.Outs), len(tx.BaseTx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.BaseTx.Outs)
-	copy(outs[len(tx.BaseTx.Outs):], tx.ExportedOutputs)
-	// Sort since syntactic verify assumes Outs() is sorted
-	ava.SortTransferableOutputs(outs, tx.vm.codec)
-	return outs
-}
-
-// InputUTXOs returns the IDs of the imported UTXOs this tx consumes
-// Since this tx consumes no imported UTXOs, it returns an empty set
-func (tx *ExportTx) InputUTXOs() ids.Set {
-	return ids.Set{}
-}
-
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
-func (tx *ExportTx) initialize(vm *VM) error {
+func (tx *UnsignedExportTx) initialize(vm *VM, bytes []byte) error {
 	if tx.vm != nil { // already been initialized
 		return nil
 	}
 	tx.vm = vm
+	tx.bytes = bytes
+	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
 	var err error
-	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedExportTx))
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedExportTx: %w", err)
 	}
-	tx.bytes, err = Codec.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal ExportTx: %w", err)
-	}
-	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
-	return err
+	return nil
 }
 
-// SyntacticVerify this transaction is well-formed
-func (tx *ExportTx) SyntacticVerify() error {
+// InputUTXOs returns an empty set
+func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
+
+// Verify this transaction is well-formed
+func (tx *UnsignedExportTx) Verify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.NetworkID != tx.vm.Ctx.NetworkID:
-		return errWrongNetworkID
-	case tx.id.IsZero():
-		return errInvalidID
-	case len(tx.ExportedOutputs) != 1:
-		return fmt.Errorf("tx has %d exported outputs but should have 1", len(tx.ExportedOutputs))
+	case len(tx.ExportedOutputs) == 0:
+		return errNoExportOutputs
 	}
-	if err := tx.BaseTx.SyntacticVerify(); err != nil {
-		return err
-	} else if exportedAmt := tx.ExportedOutputs[0].Output().Amount(); exportedAmt != tx.Amount {
-		return fmt.Errorf("exported output has amount %d but should be %d", exportedAmt, tx.Amount)
-	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs(),
-		tx.Creds, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+
+	if err := tx.BaseTx.Verify(); err != nil {
 		return err
 	}
+
+	for _, out := range tx.ExportedOutputs {
+		if err := out.Verify(); err != nil {
+			return err
+		}
+	}
+	if !ava.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
+		return errOutputsNotSorted
+	}
+
+	allOuts := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(allOuts, tx.Outs)
+	copy(allOuts[len(tx.Outs):], tx.ExportedOutputs)
+	if err := syntacticVerifySpend(tx.Ins, allOuts, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	}
+
 	tx.syntacticallyVerified = true
 	return nil
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *ExportTx) SemanticVerify(db database.Database) error {
-	if err := tx.SyntacticVerify(); err != nil {
-		return err
-	} else if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.BaseTx.Outs, tx.Creds); err != nil {
-		return err
+func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.Verifiable) TxError {
+	if err := tx.Verify(); err != nil {
+		return permError{err}
 	}
-	// // Spend inputs
-	// for index, in := range tx.Ins {
-	// 	if utxo, err := tx.vm.getUTXO(db, in.UTXOID.InputID()); err != nil {
-	// 		return err
-	// 	} else if err := tx.vm.fx.VerifyTransfer(tx, in.In, tx.Creds[index], utxo.Out); err != nil {
-	// 		return err
-	// 	} else if err := tx.vm.removeUTXO(db, in.UTXOID.InputID()); err != nil {
-	// 		return err
-	// 	}
-	// }
-	// Produce non-exported UTXOs
-	// txID := tx.ID()
-	// for index, out := range tx.BaseTx.Outs {
-	// 	if err := tx.vm.putUTXO(db, &ava.UTXO{
-	// 		UTXOID: ava.UTXOID{
-	// 			TxID:        txID,
-	// 			OutputIndex: uint32(index),
-	// 		},
-	// 		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-	// 		Out:   out.Output(),
-	// 	}); err != nil {
-	// 		return err
-	// 	}
-	// }
-	return nil
+	return tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, creds)
 }
 
 // Accept this transaction.
-func (tx *ExportTx) Accept(batch database.Batch) error {
-
+func (tx *UnsignedExportTx) Accept(batch database.Batch) error {
 	// Produce exported UTXOs
 	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
 	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
-	vsmDB := versiondb.New(smDB)
 
+	vsmDB := versiondb.New(smDB)
 	state := ava.NewPrefixedState(vsmDB, Codec)
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{
-			TxID:        tx.ID(),
-			OutputIndex: uint32(len(tx.BaseTx.Outs)),
-		},
-		Asset: ava.Asset{ID: tx.vm.avaxAssetID},
-		Out:   tx.ExportedOutputs[0].Output(), // SyntacticVerify guarantees len(ExportedOutput) == 1
-	}
-	if err := state.FundPlatformUTXO(utxo); err != nil {
-		return err
+
+	txID := tx.ID()
+	for i, out := range tx.ExportedOutputs {
+		if err := state.FundPlatformUTXO(&ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(tx.BaseTx.Outs) + i),
+			},
+			Asset: out.Asset,
+			Out:   out.Output(),
+		}); err != nil {
+			return err
+		}
 	}
 
 	sharedBatch, err := vsmDB.CommitBatch()
@@ -174,68 +130,39 @@ func (vm *VM) newExportTx(
 	amount uint64, // Amount of tokens to export
 	to ids.ShortID, // Address of X-Chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
-) (*ExportTx, error) {
-	burnAmt, err := safemath.Add64(amount, vm.txFee)
+) (*AtomicTx, error) {
+	toBurn, err := safemath.Add64(amount, vm.txFee)
 	if err != nil {
-		return nil, err
+		return nil, errOverflowExport
 	}
-
-	// Calculate inputs and outputs
-	changeSpend := &spend{
-		Threshold: 1,
-		Locktime:  0,
-		Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-	}
-	ins, outs, credKeys, err := vm.spend(vm.DB, keys, nil, changeSpend, burnAmt)
+	ins, outs, signers, err := vm.burn(vm.DB, keys, toBurn, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
 	// Create the transaction
-	tx := &ExportTx{
-		UnsignedExportTx: UnsignedExportTx{
-			BaseTx: BaseTx{
-				NetworkID:    vm.Ctx.NetworkID,
-				BlockchainID: vm.Ctx.ChainID,
-				Ins:          ins,
-				Outs:         outs, // Non-exported outputs
-			},
-			Amount: amount, // amount of tokens being exported
-			ExportedOutputs: []*ava.TransferableOutput{ // Exported to X-Chain
-				&ava.TransferableOutput{
-					Asset: ava.Asset{ID: vm.avaxAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: amount,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{to},
-						},
-					},
+	utx := &UnsignedExportTx{
+		BaseTx: BaseTx{
+			NetworkID:    vm.Ctx.NetworkID,
+			BlockchainID: vm.Ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs, // Non-exported outputs
+		},
+		ExportedOutputs: []*ava.TransferableOutput{{ // Exported to X-Chain
+			Asset: ava.Asset{ID: vm.avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amount,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{to},
 				},
 			},
-		},
+		}},
 	}
-
-	// Generate byte repr. of unsigned transaction
-	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedExportTx)); err != nil {
-		return nil, fmt.Errorf("couldn't marshal UnsignedExportTx: %w", err)
+	tx := &AtomicTx{UnsignedAtomicTx: utx}
+	if err := vm.signAtomicTx(tx, signers); err != nil {
+		return nil, err
 	}
-	hash := hashing.ComputeHash256(tx.unsignedBytes)
-
-	// Attach credentials that allow the inputs to be spent
-	tx.Creds = make([]verify.Verifiable, len(credKeys))
-	for i, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
-		cred := &secp256k1fx.Credential{Sigs: make([][crypto.SECP256K1RSigLen]byte, len(inputKeys))}
-		for j, key := range inputKeys {
-			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
-			if err != nil {
-				return nil, fmt.Errorf("problem generating credential: %w", err)
-			}
-			copy(cred.Sigs[j][:], sig)
-		}
-		tx.Creds[i] = cred // Attach credential to tx
-	}
-
-	return tx, tx.initialize(vm)
+	return tx, utx.Verify()
 }

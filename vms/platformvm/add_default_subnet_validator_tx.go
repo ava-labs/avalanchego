@@ -59,8 +59,8 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) initialize(vm *VM, bytes []byte) 
 	return nil
 }
 
-// SyntacticVerify return nil iff [tx] is valid
-func (tx *UnsignedAddDefaultSubnetValidatorTx) SyntacticVerify() error {
+// Verify return nil iff [tx] is valid
+func (tx *UnsignedAddDefaultSubnetValidatorTx) Verify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -68,26 +68,20 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SyntacticVerify() error {
 		return nil
 	}
 
-	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+	if err := verify.All(
+		&tx.BaseTx,
+		&tx.DurationValidator,
+		tx.StakeOwner,
+		tx.RewardsOwner,
+	); err != nil {
 		return err
 	}
 
-	stakingDuration := tx.Duration()
 	switch {
-	case tx.NodeID.IsZero(): // Ensure the validator has a valid ID
-		return errInvalidID
 	case tx.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
-	case stakingDuration < MinimumStakingDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case stakingDuration > MaximumStakingDuration: // Ensure staking length is not too long
-		return errStakeTooLong
 	case tx.Shares > NumberOfShares: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
-	}
-
-	if err := verify.All(tx.StakeOwner, tx.RewardsOwner); err != nil {
-		return err
 	}
 
 	// verify the flow check
@@ -106,7 +100,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SyntacticVerify() error {
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	db database.Database,
-	creds []verify.Verifiable,
+	stx *ProposalTx,
 ) (
 	*versiondb.Database,
 	*versiondb.Database,
@@ -115,7 +109,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(); err != nil {
+	if err := tx.Verify(); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -156,20 +150,20 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	onCommitDB := versiondb.New(db)
 
 	// Consume / produce the static UTXOS
-	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, creds); err != nil {
+	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, stx.Credentials); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	// Add validator to set of pending validators
-	pendingValidators.Add(tx)
+	pendingValidators.Add(stx)
 	// If this proposal is committed, update the pending validator set to include the validator
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidatorHeap, constants.DefaultSubnetID); err != nil {
+	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidators, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	onAbortDB := versiondb.New(db)
 
 	// Consume / produce the static UTXOS
-	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, tx.Outs, creds); err != nil {
+	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, tx.Outs, stx.Credentials); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -188,7 +182,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	}
 
 	for _, utxo := range refundUTXOs {
-		if err := vm.putUTXO(onAbortDB, utxo); err != nil {
+		if err := tx.vm.putUTXO(onAbortDB, utxo); err != nil {
 			return nil, nil, nil, nil, tempError{err}
 		}
 	}
@@ -217,8 +211,8 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 	// Create the tx
-	tx := &ProposalTx{UnsignedProposalTx: &UnsignedAddDefaultSubnetValidatorTx{
-		BaseTx: &BaseTx{
+	utx := &UnsignedAddDefaultSubnetValidatorTx{
+		BaseTx: BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
 			Ins:          ins,
@@ -243,6 +237,10 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 			Addrs:     []ids.ShortID{destination},
 		},
 		Shares: shares,
-	}}
-	return tx, vm.signProposalTx(tx, signers)
+	}
+	tx := &ProposalTx{UnsignedProposalTx: utx}
+	if err := vm.signProposalTx(tx, signers); err != nil {
+		return nil, err
+	}
+	return tx, utx.Verify()
 }

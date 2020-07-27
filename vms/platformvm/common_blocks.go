@@ -183,7 +183,7 @@ type CommonDecisionBlock struct {
 	onAcceptDB *versiondb.Database
 
 	// to be executed if this block is accepted
-	onAcceptFunc func()
+	onAcceptFunc func() error
 }
 
 // initialize this block
@@ -237,7 +237,9 @@ func (sdb *SingleDecisionBlock) Accept() error {
 		child.setBaseDatabase(sdb.vm.DB)
 	}
 	if sdb.onAcceptFunc != nil {
-		sdb.onAcceptFunc()
+		if err := sdb.onAcceptFunc(); err != nil {
+			return err
+		}
 	}
 
 	sdb.free()

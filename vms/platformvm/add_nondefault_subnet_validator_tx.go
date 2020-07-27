@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -42,15 +41,15 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) initialize(vm *VM, bytes []byt
 	tx.bytes = bytes
 	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
 	var err error
-	tx.unsignedBytes, err = vm.codec.Marshal(interface{}(tx))
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
 	}
 	return nil
 }
 
-// SyntacticVerify return nil iff [tx] is valid
-func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SyntacticVerify() error {
+// Verify return nil iff [tx] is valid
+func (tx *UnsignedAddNonDefaultSubnetValidatorTx) Verify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -58,27 +57,15 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 		return nil
 	}
 
-	if err := tx.BaseTx.SyntacticVerify(); err != nil {
+	if err := verify.All(
+		&tx.BaseTx,
+		&tx.SubnetValidator,
+		tx.SubnetAuth,
+	); err != nil {
 		return err
 	}
 
-	stakingDuration := tx.Duration()
-	switch {
-	case tx.NodeID.IsZero(): // Ensure the validator has a valid ID
-		return errInvalidID
-	case tx.Subnet.IsZero(): // Ensure the subnet has a valid ID
-		return errInvalidID
-	case tx.Wght == 0: // Ensure the validator has some weight
-		return errWeightTooSmall
-	case stakingDuration < MinimumStakingDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case stakingDuration > MaximumStakingDuration: // Ensure staking length is not too long
-		return errStakeTooLong
-	}
-
-	if err := tx.SubnetAuth.Verify(); err != nil {
-		return err
-	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -89,7 +76,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SyntacticVerify() error {
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	db database.Database,
-	creds []verify.Verifiable,
+	stx *ProposalTx,
 ) (
 	*versiondb.Database,
 	*versiondb.Database,
@@ -98,12 +85,11 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.SyntacticVerify(); err != nil {
-		return nil, nil, nil, nil, permError{err}
-	}
-
-	if len(creds) == 0 {
+	if len(stx.Credentials) == 0 {
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
+	}
+	if err := tx.Verify(); err != nil {
+		return nil, nil, nil, nil, permError{err}
 	}
 
 	// Ensure the proposed validator starts after the current timestamp
@@ -115,13 +101,6 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 			validatorStartTime)}
 	}
 
-	subnet, err := tx.vm.getSubnet(db, tx.Subnet)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	// TODO: check subnet ownership with the FX
-
 	// Ensure that the period this validator validates the specified subnet is a
 	// subnet of the time they validate the default subnet. First, see if
 	// they're currently validating the default subnet.
@@ -130,11 +109,12 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
 	}
 	if dsValidator, err := currentDSValidators.getDefaultSubnetStaker(tx.NodeID); err == nil {
-		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
+		unsignedValidator := dsValidator.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		if !tx.DurationValidator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
 					tx.DurationValidator.StartTime(), tx.DurationValidator.EndTime(),
-					dsValidator.StartTime(), dsValidator.EndTime())}
+					unsignedValidator.StartTime(), unsignedValidator.EndTime())}
 		}
 	} else {
 		// They aren't currently validating the default subnet. See if they will
@@ -148,11 +128,12 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("validator would not be validating default subnet while validating non-default subnet")}
 		}
-		if !tx.DurationValidator.BoundedBy(dsValidator.StartTime(), dsValidator.EndTime()) {
+		unsignedValidator := dsValidator.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		if !tx.DurationValidator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
 					tx.DurationValidator.StartTime(), tx.DurationValidator.EndTime(),
-					dsValidator.StartTime(), dsValidator.EndTime())}
+					unsignedValidator.StartTime(), unsignedValidator.EndTime())}
 		}
 	}
 
@@ -182,9 +163,18 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 		}
 	}
 
-	baseTxCredsLen := len(creds) - 1
-	baseTxCreds := creds[:baseTxCredsLen]
-	subnetCred := creds[baseTxCredsLen]
+	baseTxCredsLen := len(stx.Credentials) - 1
+	baseTxCreds := stx.Credentials[:baseTxCredsLen]
+	subnetCred := stx.Credentials[baseTxCredsLen]
+
+	subnet, txErr := tx.vm.getSubnet(db, tx.Subnet)
+	if err != nil {
+		return nil, nil, nil, nil, txErr
+	}
+	unsignedSubnet := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+	if err := tx.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {
+		return nil, nil, nil, nil, permError{err}
+	}
 
 	// Set up the DB if this tx is committed
 	onCommitDB := versiondb.New(db)
@@ -194,7 +184,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, err
 	}
 	// Add the validator to the set of pending validators
-	pendingValidators.Add(tx)
+	pendingValidators.Add(stx)
 	// If this proposal is committed, update the pending validator set to include the delegator
 	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidators, tx.Subnet); err != nil {
 		return nil, nil, nil, nil, tempError{err}
@@ -235,34 +225,14 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	// Get information about the subnet we're adding a chain to
-	subnet, err := vm.getSubnet(vm.DB, subnetID)
+	subnetAuth, subnetSigners, err := vm.authorize(vm.DB, subnetID, keys)
 	if err != nil {
-		return nil, fmt.Errorf("subnet %s doesn't exist", subnetID)
-	}
-
-	// Make sure the owners of the subnet match the provided keys
-	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, errUnknownOwner
-	}
-
-	// Add the keys to a keychain
-	kc := secp256k1fx.NewKeychain()
-	for _, key := range keys {
-		kc.Add(key)
-	}
-
-	// Attempt to prove ownership of the subnet
-	now := uint64(vm.clock.Time().Unix())
-	indices, subnetSigners, matches := kc.Match(owner, now)
-	if !matches {
-		return nil, errCantSign
+		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
 	signers = append(signers, subnetSigners)
 
 	// Create the tx
-	tx := &ProposalTx{UnsignedProposalTx: &UnsignedAddNonDefaultSubnetValidatorTx{
+	utx := &UnsignedAddNonDefaultSubnetValidatorTx{
 		BaseTx: BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
@@ -280,9 +250,11 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 			},
 			Subnet: subnetID,
 		},
-		SubnetAuth: &secp256k1fx.Input{
-			SigIndices: indices,
-		},
-	}}
-	return tx, vm.signProposalTx(tx, signers)
+		SubnetAuth: subnetAuth,
+	}
+	tx := &ProposalTx{UnsignedProposalTx: utx}
+	if err := vm.signProposalTx(tx, signers); err != nil {
+		return nil, err
+	}
+	return tx, utx.Verify()
 }

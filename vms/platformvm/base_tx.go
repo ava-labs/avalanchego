@@ -55,8 +55,8 @@ func (tx *BaseTx) Bytes() []byte { return tx.bytes }
 // ID returns this transaction's ID
 func (tx *BaseTx) ID() ids.ID { return tx.id }
 
-// SyntacticVerify returns nil iff this tx is well formed
-func (tx *BaseTx) SyntacticVerify() error {
+// Verify returns nil iff this tx is well formed
+func (tx *BaseTx) Verify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -73,6 +73,22 @@ func (tx *BaseTx) SyntacticVerify() error {
 	case len(tx.Memo) > maxMemoSize:
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d",
 			len(tx.Memo), maxMemoSize)
+	}
+	for _, out := range tx.Outs {
+		if err := out.Verify(); err != nil {
+			return err
+		}
+	}
+	for _, in := range tx.Ins {
+		if err := in.Verify(); err != nil {
+			return err
+		}
+	}
+	switch {
+	case !ava.IsSortedTransferableOutputs(tx.Outs, Codec):
+		return errOutputsNotSorted
+	case !ava.IsSortedAndUniqueTransferableInputs(tx.Ins):
+		return errInputsNotSortedUnique
 	default:
 		return nil
 	}

@@ -21,7 +21,7 @@ type Fx interface {
 
 	// VerifyPermission returns nil iff [cred] proves that [controlGroup]
 	// assents to [tx]
-	VerifyPermission(tx, cred, controlGroup interface{}) error
+	VerifyPermission(tx, in, cred, controlGroup interface{}) error
 
 	// CreateOutput creates a new output with the provided control group worth
 	// the specified amount

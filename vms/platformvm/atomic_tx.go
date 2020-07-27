@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -15,32 +14,29 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-// UnsignedProposalTx is an unsigned operation that can be proposed
-type UnsignedProposalTx interface {
+// UnsignedAtomicTx ...
+type UnsignedAtomicTx interface {
 	initialize(vm *VM, bytes []byte) error
 	ID() ids.ID
+	// UTXOs this tx consumes
+	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(db database.Database, stx *ProposalTx) (
-		onCommitDB *versiondb.Database,
-		onAbortDB *versiondb.Database,
-		onCommitFunc func() error,
-		onAbortFunc func() error,
-		err TxError,
-	)
-	InitiallyPrefersCommit() bool
+	SemanticVerify(db database.Database, creds []verify.Verifiable) TxError
+	Accept(database.Batch) error
 }
 
-// ProposalTx is an operation that can be proposed
-type ProposalTx struct {
-	UnsignedProposalTx `serialize:"true"`
+// AtomicTx is an operation that can be decided without being proposed, but must
+// have special control over database commitment
+type AtomicTx struct {
+	UnsignedAtomicTx `serialize:"true"`
 	// Credentials that authorize the inputs to be spent
 	Credentials []verify.Verifiable `serialize:"true"`
 }
 
-func (vm *VM) signProposalTx(tx *ProposalTx, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedProposalTx)
+func (vm *VM) signAtomicTx(tx *AtomicTx, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedAtomicTx)
 	if err != nil {
-		return fmt.Errorf("couldn't marshal UnsignedProposalTx: %w", err)
+		return fmt.Errorf("couldn't marshal UnsignedAtomicTx: %w", err)
 	}
 
 	// Attach credentials
@@ -62,7 +58,7 @@ func (vm *VM) signProposalTx(tx *ProposalTx, signers [][]*crypto.PrivateKeySECP2
 
 	txBytes, err := vm.codec.Marshal(tx)
 	if err != nil {
-		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
+		return fmt.Errorf("couldn't marshal AtomicTx: %w", err)
 	}
 	return tx.initialize(vm, txBytes)
 }
