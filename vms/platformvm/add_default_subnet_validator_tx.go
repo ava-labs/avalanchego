@@ -15,8 +15,6 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -85,10 +83,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) Verify() error {
 	}
 
 	// verify the flow check
-	minimumBurnAmount, err := safemath.Add64(tx.vm.txFee, tx.Wght)
-	if err != nil {
-		return fmt.Errorf("overflow during flow check with fee=%d and weight=%d", tx.vm.txFee, tx.Wght)
-	} else if err := syntacticVerifySpend(tx.Ins, tx.Outs, minimumBurnAmount, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.Wght, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 

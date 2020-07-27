@@ -65,7 +65,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) Verify() error {
 		return err
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 

@@ -79,7 +79,7 @@ func (tx *UnsignedExportTx) Verify() error {
 	allOuts := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(allOuts, tx.Outs)
 	copy(allOuts[len(tx.Outs):], tx.ExportedOutputs)
-	if err := syntacticVerifySpend(tx.Ins, allOuts, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, allOuts, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 

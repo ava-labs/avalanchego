@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/vms/components/verify"
-
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -172,10 +172,15 @@ var (
 func syntacticVerifySpend(
 	ins []*ava.TransferableInput,
 	outs []*ava.TransferableOutput,
-	burnAmount uint64,
+	burnUnlocked uint64,
+	burnLocked uint64,
 	avaxAssetID ids.ID,
 ) error {
-	var err error
+	burnAmount, err := safemath.Add64(burnUnlocked, burnLocked)
+	if err != nil {
+		return fmt.Errorf("outputs overflowed on requested amount %d + %d",
+			burnUnlocked, burnLocked)
+	}
 	avaxConsumed := uint64(0) // AVAX consumed in this tx
 	for _, in := range ins {
 		if err := in.Verify(); err != nil {

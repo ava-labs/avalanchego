@@ -14,8 +14,7 @@ type StakeableLock struct {
 
 // Verify ...
 func (s *StakeableLock) Verify() error {
-	_, nested := s.TransferableOut.(*StakeableLock)
-	if nested {
+	if _, nested := s.TransferableOut.(*StakeableLock); nested {
 		return errors.New("shouldn't nest stakeable locks")
 	}
 	return s.TransferableOut.Verify()

@@ -88,7 +88,7 @@ func (tx *UnsignedImportTx) Verify() error {
 	allIns := make([]*ava.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(allIns, tx.Ins)
 	copy(allIns[len(tx.Ins):], tx.ImportedInputs)
-	if err := syntacticVerifySpend(allIns, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(allIns, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 

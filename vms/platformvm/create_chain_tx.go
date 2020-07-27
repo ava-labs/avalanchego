@@ -94,7 +94,7 @@ func (tx *UnsignedCreateChainTx) Verify() error {
 	if err := verify.All(&tx.BaseTx, tx.SubnetAuth); err != nil {
 		return err
 	}
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
