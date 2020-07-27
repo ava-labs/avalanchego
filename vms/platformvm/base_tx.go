@@ -1,8 +1,12 @@
 package platformvm
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/ava-labs/gecko/utils/formatting"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -38,7 +42,7 @@ type BaseTx struct {
 	// ID of this blockchain. In practice is always the empty ID.
 	// This is only here to match avm.BaseTx's format
 	BlockchainID ids.ID `serialize:"true"`
-	// Output UTXOa
+	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
 	// Inputs consumed by this tx
 	Ins []*ava.TransferableInput `serialize:"true"`
@@ -92,4 +96,27 @@ func (tx *BaseTx) Verify() error {
 	default:
 		return nil
 	}
+}
+
+// MarshalJSON marshals this tx to JSON
+func (tx *BaseTx) MarshalJSON() ([]byte, error) {
+	fields := map[string]interface{}{
+		"networkID":    tx.NetworkID,
+		"blockchainID": tx.BlockchainID,
+		"inputs":       tx.Ins,
+		"outputs":      tx.Outs,
+	}
+	buffer := bytes.NewBufferString("{")
+	for fieldName, fieldValue := range fields {
+		jsonValue, err := json.Marshal(fieldValue)
+		if err != nil {
+			return nil, err
+		}
+		buffer.WriteString(fmt.Sprintf("\"%s\":%s", fieldName, string(jsonValue)))
+		buffer.WriteString(",")
+	}
+	cb58 := formatting.CB58{Bytes: tx.Memo}
+	buffer.WriteString(fmt.Sprintf("\"memo\":\"%s\"", cb58))
+	buffer.WriteString("}")
+	return buffer.Bytes(), nil
 }
