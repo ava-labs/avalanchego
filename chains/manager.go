@@ -214,6 +214,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	}
 
 	chain, err := m.buildChain(chainParams)
+	m.chains[chainParams.ID.Key()] = chain.Handler
+
 	if err != nil {
 		m.log.Error("Error while creating new chain: %s", err)
 		return
