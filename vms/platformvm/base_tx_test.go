@@ -2,6 +2,7 @@ package platformvm
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -90,6 +91,7 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 	assetID := ids.NewID([32]byte{3})
 	tx := &BaseTx{
 		vm:           vm,
+		id:           ids.NewID([32]byte{'i', 'd'}),
 		BlockchainID: blockchainID,
 		NetworkID:    4,
 		Ins: []*ava.TransferableInput{
@@ -120,5 +122,7 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 		t.Fatal("inputs are wrong")
 	} else if !strings.Contains(asString, "\"outputs\":[{\"assetID\":\"2KdbbWvpeAShCx5hGbtdF15FMMepq9kajsNTqVvvEbhiCRSxU\",\"output\":{\"FailVerify\":false,\"AmountVal\":100}}]") {
 		t.Fatal("outputs are wrong")
+	} else if !strings.Contains(asString, fmt.Sprintf("\"id\":\"%s\"", tx.id)) {
+		t.Fatal("id is wrong")
 	}
 }

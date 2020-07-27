@@ -199,6 +199,11 @@ func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit() bool {
 	return !tx.Timestamp().After(tx.vm.clock.Time())
 }
 
+// MarshalJSON marshals [tx] to JSON
+func (tx *UnsignedAdvanceTimeTx) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("{\"type:\":\"advanceTimeTx\", \"id\":\"%s\", \"time\":%d}", tx.id, tx.Time)), nil
+}
+
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 // Commit block, will set the chain's timestamp to [timestamp].
 func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*ProposalTx, error) {
