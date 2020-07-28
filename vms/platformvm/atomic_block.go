@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -78,13 +77,10 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	} else if rawTx, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
 		return err
-	} else if jsonBytes, err := json.Marshal(ab.Tx); err != nil {
-		return err
 	} else if err := ab.vm.putTx(ab.onAcceptDB, &WrappedTx{
 		ID:     ab.Tx.ID(),
 		Status: choices.Accepted,
-		Raw:    rawTx,
-		JSON:   jsonBytes,
+		Tx:     rawTx,
 	}); err != nil {
 		return err
 	}
@@ -98,13 +94,10 @@ func (ab *AtomicBlock) Verify() error {
 func (ab *AtomicBlock) Reject() error {
 	if rawTx, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
 		return err
-	} else if jsonBytes, err := json.Marshal(ab.Tx); err != nil {
-		return err
 	} else if err := ab.vm.putTx(ab.vm.DB, &WrappedTx{
 		ID:     ab.Tx.ID(),
 		Status: choices.Rejected,
-		Raw:    rawTx,
-		JSON:   jsonBytes,
+		Tx:     rawTx,
 	}); err != nil {
 		return err
 	}

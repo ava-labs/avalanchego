@@ -4,8 +4,6 @@
 package platformvm
 
 import (
-	"encoding/json"
-
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
@@ -76,13 +74,10 @@ func (pb *ProposalBlock) setBaseDatabase(db database.Database) {
 func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
 	if rawTx, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
 		return nil, nil, err
-	} else if jsonTx, err := json.Marshal(pb.Tx); err != nil {
-		return nil, nil, err
 	} else if err := pb.vm.putTx(pb.onCommitDB, &WrappedTx{
 		ID:     pb.Tx.ID(),
 		Status: choices.Accepted,
-		Raw:    rawTx,
-		JSON:   jsonTx,
+		Tx:     rawTx,
 	}); err != nil {
 		return nil, nil, err
 	}
@@ -96,13 +91,10 @@ func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
 func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error, error) {
 	if rawTx, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
 		return nil, nil, err
-	} else if jsonTx, err := json.Marshal(pb.Tx); err != nil {
-		return nil, nil, err
 	} else if err := pb.vm.putTx(pb.onAbortDB, &WrappedTx{
 		ID:     pb.Tx.ID(),
 		Status: choices.Rejected,
-		Raw:    rawTx,
-		JSON:   jsonTx,
+		Tx:     rawTx,
 	}); err != nil {
 		return nil, nil, err
 	}

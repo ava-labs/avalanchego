@@ -17,9 +17,7 @@ type WrappedTx struct {
 	// Status of the tx
 	Status choices.Status `serialize:"true"`
 	// Raw byte representation of the tx
-	Raw []byte `serialize:"true"`
-	// JSON representation of the tx
-	JSON []byte `serialize:"true"`
+	Tx []byte `serialize:"true"`
 }
 
 // MarshalJSON marshals [tx] to JSON
@@ -27,8 +25,7 @@ func (tx *WrappedTx) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString("{")
 	buffer.WriteString(fmt.Sprintf("\"id\":\"%s\",", tx.ID))
 	buffer.WriteString(fmt.Sprintf("\"status\":\"%s\",", tx.Status))
-	buffer.WriteString(fmt.Sprintf("\"raw\":\"%s\",", formatting.CB58{Bytes: tx.Raw}))
-	buffer.WriteString(fmt.Sprintf("\"json\":%s", string(tx.JSON)))
+	buffer.WriteString(fmt.Sprintf("\"raw\":\"%s\",", formatting.CB58{Bytes: tx.Tx}))
 	buffer.WriteString("}")
 	return buffer.Bytes(), nil
 }

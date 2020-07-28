@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"bytes"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -28,6 +31,7 @@ var (
 	errNoPassword           = errors.New("argument 'password' not provided")
 	errNoSubnetID           = errors.New("argument 'subnetID' not provided")
 	errNoDestination        = errors.New("argument 'destination' not provided")
+	errUnexpectedTxType     = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -1081,7 +1085,23 @@ type GetTxArgs struct {
 
 // GetTxResponse ...
 type GetTxResponse struct {
-	Tx *WrappedTx `json:"tx"`
+	ID     ids.ID         `json:"ID"`
+	Status choices.Status `json:"status"`
+	// Raw byte representation of the transaction
+	RawTx formatting.CB58 `json:"rawTx"`
+	// JSON representation of the transaction
+	JSON []byte `json:"json"`
+}
+
+// MarshalJSON marshals [tx] to JSON
+func (tx *GetTxResponse) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString("{")
+	buffer.WriteString(fmt.Sprintf("\"id\":\"%s\",", tx.ID))
+	buffer.WriteString(fmt.Sprintf("\"status\":\"%s\",", tx.Status))
+	buffer.WriteString(fmt.Sprintf("\"raw\":\"%s\",", tx.RawTx))
+	buffer.WriteString(fmt.Sprintf("\"json\":%s", tx.JSON))
+	buffer.WriteString("}")
+	return buffer.Bytes(), nil
 }
 
 // GetTx gets a tx
@@ -1090,6 +1110,32 @@ func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxR
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.Tx = tx
-	return nil
+	response.ID = tx.ID
+	response.Status = tx.Status
+	response.RawTx.Bytes = tx.Tx
+
+	// Parse the raw bytes to a struct so we can get the JSON representation
+	// First, figure out what kind of tx this is
+	var proposalTx ProposalTx
+	if err := service.vm.codec.Unmarshal(tx.Tx, &proposalTx); err == nil {
+		if response.JSON, err = stdjson.Marshal(proposalTx); err != nil {
+			return fmt.Errorf("couldn't marshal tx to json: %w", err)
+		}
+		return nil
+	}
+	var decisionTx DecisionTx
+	if err := service.vm.codec.Unmarshal(tx.Tx, &decisionTx); err == nil {
+		if response.JSON, err = stdjson.Marshal(decisionTx); err != nil {
+			return fmt.Errorf("couldn't marshal tx to json: %w", err)
+		}
+		return nil
+	}
+	var atomicTx AtomicTx
+	if err := service.vm.codec.Unmarshal(tx.Tx, &atomicTx); err == nil {
+		if response.JSON, err = stdjson.Marshal(atomicTx); err != nil {
+			return fmt.Errorf("couldn't marshal tx to json: %w", err)
+		}
+		return nil
+	}
+	return errUnexpectedTxType
 }

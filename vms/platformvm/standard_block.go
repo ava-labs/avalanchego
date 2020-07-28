@@ -4,8 +4,6 @@
 package platformvm
 
 import (
-	"encoding/json"
-
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -76,13 +74,10 @@ func (sb *StandardBlock) Verify() error {
 		}
 		if rawTx, err := sb.vm.codec.Marshal(tx); err != nil {
 			return err
-		} else if jsonTx, err := json.Marshal(tx); err != nil {
-			return err
 		} else if err := sb.vm.putTx(sb.onAcceptDB, &WrappedTx{
 			ID:     tx.ID(),
 			Status: choices.Accepted,
-			Raw:    rawTx,
-			JSON:   jsonTx,
+			Tx:     rawTx,
 		}); err != nil {
 			return err
 		} else if onAccept != nil {
@@ -113,13 +108,10 @@ func (sb *StandardBlock) Reject() error {
 	for _, tx := range sb.Txs {
 		if rawTx, err := sb.vm.codec.Marshal(tx); err != nil {
 			return err
-		} else if jsonBytes, err := json.Marshal(tx); err != nil {
-			return err
 		} else if err := sb.vm.putTx(sb.vm.DB, &WrappedTx{
 			ID:     tx.ID(),
 			Status: choices.Rejected,
-			Raw:    rawTx,
-			JSON:   jsonBytes,
+			Tx:     rawTx,
 		}); err != nil {
 			return err
 		}
