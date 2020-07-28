@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -1085,8 +1084,6 @@ type GetTxArgs struct {
 
 // GetTxResponse ...
 type GetTxResponse struct {
-	ID     ids.ID         `json:"ID"`
-	Status choices.Status `json:"status"`
 	// Raw byte representation of the transaction
 	RawTx formatting.CB58 `json:"rawTx"`
 	// JSON representation of the transaction
@@ -1096,8 +1093,6 @@ type GetTxResponse struct {
 // MarshalJSON marshals [tx] to JSON
 func (tx *GetTxResponse) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString("{")
-	buffer.WriteString(fmt.Sprintf("\"id\":\"%s\",", tx.ID))
-	buffer.WriteString(fmt.Sprintf("\"status\":\"%s\",", tx.Status))
 	buffer.WriteString(fmt.Sprintf("\"raw\":\"%s\",", tx.RawTx))
 	buffer.WriteString(fmt.Sprintf("\"json\":%s", tx.JSON))
 	buffer.WriteString("}")
@@ -1106,36 +1101,53 @@ func (tx *GetTxResponse) MarshalJSON() ([]byte, error) {
 
 // GetTx gets a tx
 func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
+	service.vm.Ctx.Log.Info("Platform: GetTx called")
 	tx, err := service.vm.getTx(service.vm.DB, args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.ID = tx.ID
-	response.Status = tx.Status
-	response.RawTx.Bytes = tx.Tx
+	response.RawTx = formatting.CB58{Bytes: tx}
 
 	// Parse the raw bytes to a struct so we can get the JSON representation
-	// First, figure out what kind of tx this is
+	// We don't know what kind of tx this is, so we go through the possibilities
+	// until we find the right one
 	var proposalTx ProposalTx
-	if err := service.vm.codec.Unmarshal(tx.Tx, &proposalTx); err == nil {
+	if err := service.vm.codec.Unmarshal(tx, &proposalTx); err == nil {
 		if response.JSON, err = stdjson.Marshal(proposalTx); err != nil {
 			return fmt.Errorf("couldn't marshal tx to json: %w", err)
 		}
 		return nil
 	}
 	var decisionTx DecisionTx
-	if err := service.vm.codec.Unmarshal(tx.Tx, &decisionTx); err == nil {
+	if err := service.vm.codec.Unmarshal(tx, &decisionTx); err == nil {
 		if response.JSON, err = stdjson.Marshal(decisionTx); err != nil {
 			return fmt.Errorf("couldn't marshal tx to json: %w", err)
 		}
 		return nil
 	}
 	var atomicTx AtomicTx
-	if err := service.vm.codec.Unmarshal(tx.Tx, &atomicTx); err == nil {
+	if err := service.vm.codec.Unmarshal(tx, &atomicTx); err == nil {
 		if response.JSON, err = stdjson.Marshal(atomicTx); err != nil {
 			return fmt.Errorf("couldn't marshal tx to json: %w", err)
 		}
 		return nil
 	}
 	return errUnexpectedTxType
+}
+
+// GetTxStatusArgs ...
+type GetTxStatusArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxStatus gets a tx's status
+func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *Status) error {
+	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
+	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
+	if err != nil {
+		// TODO check if it's processing
+		*response = Unknown
+	}
+	*response = status
+	return nil
 }

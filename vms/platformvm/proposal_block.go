@@ -72,13 +72,11 @@ func (pb *ProposalBlock) setBaseDatabase(db database.Database) {
 //   2. A function be be executed when this block's proposal is committed.
 //      This function should not write to state.
 func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
-	if rawTx, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
+	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
 		return nil, nil, err
-	} else if err := pb.vm.putTx(pb.onCommitDB, &WrappedTx{
-		ID:     pb.Tx.ID(),
-		Status: choices.Accepted,
-		Tx:     rawTx,
-	}); err != nil {
+	} else if err := pb.vm.putTx(pb.onCommitDB, pb.Tx.ID(), txBytes); err != nil {
+		return nil, nil, err
+	} else if err := pb.vm.putStatus(pb.onCommitDB, pb.Tx.ID(), Committed); err != nil {
 		return nil, nil, err
 	}
 	return pb.onCommitDB, pb.onCommitFunc, nil
@@ -89,13 +87,11 @@ func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
 // block's proposal is rejected. (That is, if this block is accepted and
 // followed by an accepted Abort block.)
 func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error, error) {
-	if rawTx, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
+	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
 		return nil, nil, err
-	} else if err := pb.vm.putTx(pb.onAbortDB, &WrappedTx{
-		ID:     pb.Tx.ID(),
-		Status: choices.Rejected,
-		Tx:     rawTx,
-	}); err != nil {
+	} else if err := pb.vm.putTx(pb.onAbortDB, pb.Tx.ID(), txBytes); err != nil {
+		return nil, nil, err
+	} else if err := pb.vm.putStatus(pb.onAbortDB, pb.Tx.ID(), Aborted); err != nil {
 		return nil, nil, err
 	}
 	return pb.onAbortDB, pb.onAbortFunc, nil

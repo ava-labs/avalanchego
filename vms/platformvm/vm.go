@@ -43,6 +43,7 @@ const (
 	utxoTypeID
 	utxoSetTypeID
 	txTypeID
+	statusTypeID
 
 	platformAlias = "P"
 	addressSep    = "-"
