@@ -148,7 +148,9 @@ func (g *Genesis) Initialize() error {
 		}
 	}
 	for _, chain := range g.Chains {
-		if err := chain.initialize(nil, nil); err != nil {
+		if chainBytes, err := Codec.Marshal(chain); err != nil {
+			return err
+		} else if err := chain.initialize(nil, chainBytes); err != nil {
 			return err
 		}
 	}
