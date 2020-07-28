@@ -32,9 +32,9 @@ type UnsignedProposalTx interface {
 
 // ProposalTx is an operation that can be proposed
 type ProposalTx struct {
-	UnsignedProposalTx `serialize:"true"`
+	UnsignedProposalTx `serialize:"true", json:"unsignedProposalTx"`
 	// Credentials that authorize the inputs to be spent
-	Credentials []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true", json:"credentials"`
 }
 
 // add credentials to a ProposalTx

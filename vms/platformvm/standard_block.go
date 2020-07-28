@@ -4,8 +4,11 @@
 package platformvm
 
 import (
+	"encoding/json"
+
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
 
@@ -71,9 +74,16 @@ func (sb *StandardBlock) Verify() error {
 			}
 			return err
 		}
-		if txBytes, err := sb.vm.codec.Marshal(tx); err != nil {
+		if rawTx, err := sb.vm.codec.Marshal(tx); err != nil {
 			return err
-		} else if err := sb.vm.putTx(sb.onAcceptDB, tx.ID(), txBytes); err != nil {
+		} else if jsonTx, err := json.Marshal(tx); err != nil {
+			return err
+		} else if err := sb.vm.putTx(sb.onAcceptDB, &WrappedTx{
+			ID:     tx.ID(),
+			Status: choices.Accepted,
+			Raw:    rawTx,
+			JSON:   jsonTx,
+		}); err != nil {
 			return err
 		} else if onAccept != nil {
 			funcs = append(funcs, onAccept)
@@ -96,6 +106,25 @@ func (sb *StandardBlock) Verify() error {
 	sb.vm.currentBlocks[sb.ID().Key()] = sb
 	sb.parentBlock().addChild(sb)
 	return nil
+}
+
+// Reject implements the snowman.Block interface
+func (sb *StandardBlock) Reject() error {
+	for _, tx := range sb.Txs {
+		if rawTx, err := sb.vm.codec.Marshal(tx); err != nil {
+			return err
+		} else if jsonBytes, err := json.Marshal(tx); err != nil {
+			return err
+		} else if err := sb.vm.putTx(sb.vm.DB, &WrappedTx{
+			ID:     tx.ID(),
+			Status: choices.Rejected,
+			Raw:    rawTx,
+			JSON:   jsonBytes,
+		}); err != nil {
+			return err
+		}
+	}
+	return sb.SingleDecisionBlock.Reject()
 }
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a

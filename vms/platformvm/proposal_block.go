@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"encoding/json"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
@@ -72,9 +74,16 @@ func (pb *ProposalBlock) setBaseDatabase(db database.Database) {
 //   2. A function be be executed when this block's proposal is committed.
 //      This function should not write to state.
 func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
-	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
+	if rawTx, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
 		return nil, nil, err
-	} else if err := pb.vm.putTx(pb.onCommitDB, pb.Tx.ID(), txBytes); err != nil {
+	} else if jsonTx, err := json.Marshal(pb.Tx); err != nil {
+		return nil, nil, err
+	} else if err := pb.vm.putTx(pb.onCommitDB, &WrappedTx{
+		ID:     pb.Tx.ID(),
+		Status: choices.Accepted,
+		Raw:    rawTx,
+		JSON:   jsonTx,
+	}); err != nil {
 		return nil, nil, err
 	}
 	return pb.onCommitDB, pb.onCommitFunc, nil
@@ -85,9 +94,16 @@ func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
 // block's proposal is rejected. (That is, if this block is accepted and
 // followed by an accepted Abort block.)
 func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error, error) {
-	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
+	if rawTx, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
 		return nil, nil, err
-	} else if err := pb.vm.putTx(pb.onCommitDB, pb.Tx.ID(), txBytes); err != nil {
+	} else if jsonTx, err := json.Marshal(pb.Tx); err != nil {
+		return nil, nil, err
+	} else if err := pb.vm.putTx(pb.onAbortDB, &WrappedTx{
+		ID:     pb.Tx.ID(),
+		Status: choices.Rejected,
+		Raw:    rawTx,
+		JSON:   jsonTx,
+	}); err != nil {
 		return nil, nil, err
 	}
 	return pb.onAbortDB, pb.onAbortFunc, nil

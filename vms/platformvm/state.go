@@ -27,16 +27,16 @@ const (
 )
 
 // perist a tx
-func (vm *VM) putTx(db database.Database, txID ids.ID, txBytes []byte) error {
-	return vm.State.Put(db, txTypeID, txID, txBytes)
+func (vm *VM) putTx(db database.Database, tx *WrappedTx) error {
+	return vm.State.Put(db, txTypeID, tx.ID, tx)
 }
 
-func (vm *VM) getTx(db database.Database, txID ids.ID) ([]byte, error) {
+func (vm *VM) getTx(db database.Database, txID ids.ID) (*WrappedTx, error) {
 	txIntf, err := vm.State.Get(db, txTypeID, txID)
 	if err != nil {
 		return nil, err
 	}
-	if tx, ok := txIntf.([]byte); ok {
+	if tx, ok := txIntf.(*WrappedTx); ok {
 		return tx, nil
 	}
 	return nil, fmt.Errorf("expected tx to be []byte but is type %T", txIntf)
@@ -431,14 +431,18 @@ func (vm *VM) registerDBTypes() {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 
-	marshalTxFunc := func(txBytesIntf interface{}) ([]byte, error) {
-		if txBytes, ok := txBytesIntf.([]byte); ok {
-			return txBytes, nil
+	marshalTxFunc := func(txIntf interface{}) ([]byte, error) {
+		if tx, ok := txIntf.(*WrappedTx); ok {
+			return Codec.Marshal(tx)
 		}
-		return nil, fmt.Errorf("expected []byte but got type %T", txBytesIntf)
+		return nil, fmt.Errorf("expected *WrappedTx but got type %T", txIntf)
 	}
 	unmarshalTxFunc := func(bytes []byte) (interface{}, error) {
-		return bytes, nil
+		var tx WrappedTx
+		if err := Codec.Unmarshal(bytes, &tx); err != nil {
+			return nil, err
+		}
+		return &tx, nil
 	}
 	if err := vm.State.RegisterType(txTypeID, marshalTxFunc, unmarshalTxFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())

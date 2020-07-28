@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -75,15 +76,39 @@ func (ab *AtomicBlock) Verify() error {
 	ab.onAcceptDB = versiondb.New(pdb)
 	if err := ab.Tx.SemanticVerify(ab.onAcceptDB, ab.Tx.Credentials); err != nil {
 		return err
-	} else if txBytes, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
+	} else if rawTx, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
 		return err
-	} else if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
+	} else if jsonBytes, err := json.Marshal(ab.Tx); err != nil {
+		return err
+	} else if err := ab.vm.putTx(ab.onAcceptDB, &WrappedTx{
+		ID:     ab.Tx.ID(),
+		Status: choices.Accepted,
+		Raw:    rawTx,
+		JSON:   jsonBytes,
+	}); err != nil {
 		return err
 	}
 
 	ab.vm.currentBlocks[ab.ID().Key()] = ab
 	ab.parentBlock().addChild(ab)
 	return nil
+}
+
+// Reject implements the snowman.Block interface
+func (ab *AtomicBlock) Reject() error {
+	if rawTx, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
+		return err
+	} else if jsonBytes, err := json.Marshal(ab.Tx); err != nil {
+		return err
+	} else if err := ab.vm.putTx(ab.vm.DB, &WrappedTx{
+		ID:     ab.Tx.ID(),
+		Status: choices.Rejected,
+		Raw:    rawTx,
+		JSON:   jsonBytes,
+	}); err != nil {
+		return err
+	}
+	return ab.CommonDecisionBlock.Reject()
 }
 
 // Accept implements the snowman.Block interface

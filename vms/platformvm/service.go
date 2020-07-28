@@ -1081,15 +1081,15 @@ type GetTxArgs struct {
 
 // GetTxResponse ...
 type GetTxResponse struct {
-	Tx formatting.CB58 `json:"tx"`
+	Tx *WrappedTx `json:"tx"`
 }
 
 // GetTx gets a tx
 func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
-	txBytes, err := service.vm.getTx(service.vm.DB, args.TxID)
+	tx, err := service.vm.getTx(service.vm.DB, args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.Tx.Bytes = txBytes
+	response.Tx = tx
 	return nil
 }
