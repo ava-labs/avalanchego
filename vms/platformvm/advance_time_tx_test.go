@@ -4,9 +4,6 @@
 package platformvm
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -259,31 +256,5 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	} else if tx.Time != unmarshaledTx.Time {
 		t.Fatal("should have same timestamp")
-	}
-}
-
-func TestAdvanceTimeTxMarshalJSON(t *testing.T) {
-	vm := defaultVM()
-	vm.Ctx.Lock.Lock()
-	defer func() {
-		vm.Shutdown()
-		vm.Ctx.Lock.Unlock()
-	}()
-
-	tx, err := vm.newAdvanceTimeTx(defaultGenesisTime)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	asJSON, err := json.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	asString := string(asJSON)
-	t.Log(asString)
-	if !strings.Contains(asString, fmt.Sprintf("\"id\":\"%s\"", tx.ID())) {
-		t.Fatal("id is wrong")
-	} else if !strings.Contains(asString, fmt.Sprintf("\"time\":%d", defaultGenesisTime.Unix())) {
-		t.Fatal("time is wrong")
 	}
 }
