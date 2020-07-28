@@ -27,7 +27,7 @@ type UnsignedDecisionTx interface {
 
 // DecisionTx is an operation that can be decided without being proposed
 type DecisionTx struct {
-	UnsignedDecisionTx `serialize:"true"`
+	UnsignedDecisionTx `serialize:"true", json:"unsignedDecisionTx"`
 	// Credentials that authorize the inputs to be spent
 	Credentials []verify.Verifiable `serialize:"true", json:"credentials"`
 }
