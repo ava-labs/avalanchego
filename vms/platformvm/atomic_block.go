@@ -75,6 +75,10 @@ func (ab *AtomicBlock) Verify() error {
 	ab.onAcceptDB = versiondb.New(pdb)
 	if err := ab.Tx.SemanticVerify(ab.onAcceptDB, ab.Tx.Credentials); err != nil {
 		return err
+	} else if txBytes, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
+		return err
+	} else if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
+		return err
 	}
 
 	ab.vm.currentBlocks[ab.ID().Key()] = ab

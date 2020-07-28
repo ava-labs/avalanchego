@@ -26,6 +26,22 @@ const (
 	pendingValidatorsPrefix
 )
 
+// perist a tx
+func (vm *VM) putTx(db database.Database, txID ids.ID, txBytes []byte) error {
+	return vm.State.Put(db, txTypeID, txID, txBytes)
+}
+
+func (vm *VM) getTx(db database.Database, txID ids.ID) ([]byte, error) {
+	txIntf, err := vm.State.Get(db, txTypeID, txID)
+	if err != nil {
+		return nil, err
+	}
+	if tx, ok := txIntf.([]byte); ok {
+		return tx, nil
+	}
+	return nil, fmt.Errorf("expected tx to be []byte but is type %T", txIntf)
+}
+
 // get the validators currently validating the specified subnet
 func (vm *VM) getCurrentValidators(db database.Database, subnetID ids.ID) (*EventHeap, error) {
 	return vm.getValidatorsFromDB(db, subnetID, currentValidatorsPrefix, false)
@@ -412,6 +428,19 @@ func (vm *VM) registerDBTypes() {
 		return &utxo, nil
 	}
 	if err := vm.State.RegisterType(utxoTypeID, marshalUTXOFunc, unmarshalUTXOFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
+	}
+
+	marshalTxFunc := func(txBytesIntf interface{}) ([]byte, error) {
+		if txBytes, ok := txBytesIntf.([]byte); ok {
+			return txBytes, nil
+		}
+		return nil, fmt.Errorf("expected []byte but got type %T", txBytesIntf)
+	}
+	unmarshalTxFunc := func(bytes []byte) (interface{}, error) {
+		return bytes, nil
+	}
+	if err := vm.State.RegisterType(txTypeID, marshalTxFunc, unmarshalTxFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 }

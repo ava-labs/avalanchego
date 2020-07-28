@@ -71,7 +71,11 @@ func (sb *StandardBlock) Verify() error {
 			}
 			return err
 		}
-		if onAccept != nil {
+		if txBytes, err := sb.vm.codec.Marshal(tx); err != nil {
+			return err
+		} else if err := sb.vm.putTx(sb.onAcceptDB, tx.ID(), txBytes); err != nil {
+			return err
+		} else if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
 	}

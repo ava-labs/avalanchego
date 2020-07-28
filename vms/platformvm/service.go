@@ -1073,3 +1073,23 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	}
 	return nil
 }
+
+// GetTxArgs ...
+type GetTxArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxResponse ...
+type GetTxResponse struct {
+	Tx formatting.CB58 `json:"tx"`
+}
+
+// GetTx gets a tx
+func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
+	txBytes, err := service.vm.getTx(service.vm.DB, args.TxID)
+	if err != nil {
+		return fmt.Errorf("couldn't get tx: %w", err)
+	}
+	response.Tx.Bytes = txBytes
+	return nil
+}

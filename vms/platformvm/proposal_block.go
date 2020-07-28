@@ -71,16 +71,26 @@ func (pb *ProposalBlock) setBaseDatabase(db database.Database) {
 //      accepted Commit block.)
 //   2. A function be be executed when this block's proposal is committed.
 //      This function should not write to state.
-func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error) {
-	return pb.onCommitDB, pb.onCommitFunc
+func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
+	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
+		return nil, nil, err
+	} else if err := pb.vm.putTx(pb.onCommitDB, pb.Tx.ID(), txBytes); err != nil {
+		return nil, nil, err
+	}
+	return pb.onCommitDB, pb.onCommitFunc, nil
 }
 
 // onAbort should only be called after Verify is called.
 // onAbort returns a database that contains the state of the chain assuming this
 // block's proposal is rejected. (That is, if this block is accepted and
 // followed by an accepted Abort block.)
-func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error) {
-	return pb.onAbortDB, pb.onAbortFunc
+func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error, error) {
+	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
+		return nil, nil, err
+	} else if err := pb.vm.putTx(pb.onCommitDB, pb.Tx.ID(), txBytes); err != nil {
+		return nil, nil, err
+	}
+	return pb.onAbortDB, pb.onAbortFunc, nil
 }
 
 // Verify this block is valid.

@@ -42,6 +42,7 @@ const (
 	subnetsTypeID
 	utxoTypeID
 	utxoSetTypeID
+	txTypeID
 
 	platformAlias = "P"
 	addressSep    = "-"

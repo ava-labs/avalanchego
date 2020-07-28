@@ -37,6 +37,7 @@ type ProposalTx struct {
 	Credentials []verify.Verifiable `serialize:"true"`
 }
 
+// add credentials to a ProposalTx
 func (vm *VM) signProposalTx(tx *ProposalTx, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedProposalTx)
 	if err != nil {
