@@ -26,6 +26,13 @@ import (
 	"github.com/ava-labs/go-ethereum/log"
 )
 
+var (
+	BuiltinAddr = common.Address{
+		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
+)
+
 // Config are the configuration options for the Interpreter
 type Config struct {
 	Debug                   bool   // Enables debugging
@@ -131,6 +138,13 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 // considered a revert-and-consume-all-gas operation except for
 // errExecutionReverted which means revert-and-keep-gas-left.
 func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (ret []byte, err error) {
+	if contract.Address() == BuiltinAddr {
+		self := AccountRef(contract.Caller())
+		if _, ok := contract.caller.(*Contract); ok {
+			contract = contract.AsDelegate()
+		}
+		contract.self = self
+	}
 	if in.intPool == nil {
 		in.intPool = poolOfIntPools.get()
 		defer func() {

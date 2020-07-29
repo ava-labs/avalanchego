@@ -21,8 +21,6 @@ func (t txdata) MarshalJSON() ([]byte, error) {
 		GasLimit     hexutil.Uint64  `json:"gas"      gencodec:"required"`
 		Recipient    *common.Address `json:"to"       rlp:"nil"`
 		Amount       *hexutil.Big    `json:"value"    gencodec:"required"`
-		CoinID       *common.Hash    `json:"coinid"   rlp:"nil"`
-		Amount2      *hexutil.Big    `json:"value2"   rlp:"nil"`
 		Payload      hexutil.Bytes   `json:"input"    gencodec:"required"`
 		V            *hexutil.Big    `json:"v" gencodec:"required"`
 		R            *hexutil.Big    `json:"r" gencodec:"required"`
@@ -35,8 +33,6 @@ func (t txdata) MarshalJSON() ([]byte, error) {
 	enc.GasLimit = hexutil.Uint64(t.GasLimit)
 	enc.Recipient = t.Recipient
 	enc.Amount = (*hexutil.Big)(t.Amount)
-	enc.CoinID = t.CoinID
-	enc.Amount2 = (*hexutil.Big)(t.Amount2)
 	enc.Payload = t.Payload
 	enc.V = (*hexutil.Big)(t.V)
 	enc.R = (*hexutil.Big)(t.R)
@@ -53,8 +49,6 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 		GasLimit     *hexutil.Uint64 `json:"gas"      gencodec:"required"`
 		Recipient    *common.Address `json:"to"       rlp:"nil"`
 		Amount       *hexutil.Big    `json:"value"    gencodec:"required"`
-		CoinID       *common.Hash    `json:"coinid"   rlp:"nil"`
-		Amount2      *hexutil.Big    `json:"value2"   rlp:"nil"`
 		Payload      *hexutil.Bytes  `json:"input"    gencodec:"required"`
 		V            *hexutil.Big    `json:"v" gencodec:"required"`
 		R            *hexutil.Big    `json:"r" gencodec:"required"`
@@ -84,12 +78,6 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'value' for txdata")
 	}
 	t.Amount = (*big.Int)(dec.Amount)
-	if dec.CoinID != nil {
-		t.CoinID = dec.CoinID
-	}
-	if dec.Amount2 != nil {
-		t.Amount2 = (*big.Int)(dec.Amount2)
-	}
 	if dec.Payload == nil {
 		return errors.New("missing required field 'input' for txdata")
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
@@ -51,18 +52,18 @@ func main() {
 	}
 
 	// configure the genesis block
-	genKey, _ := coreth.NewKey(rand.Reader)
-	bob, _ := coreth.NewKey(rand.Reader)
+	genesisJSON := `{"config":{"chainId":1,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"751a0b96e1042bee789452ecb20253fba40dbe85":{"balance":"0x1000000000000000", "mcbalance": {"0x0000000000000000000000000000000000000000000000000000000000000000": 1000000000000000000}}, "0100000000000000000000000000000000000000": {"code": "0x730000000000000000000000000000000000000000301460806040526004361061004b5760003560e01c80631e01043914610050578063abb24ba014610092578063b6510bb3146100a9575b600080fd5b61007c6004803603602081101561006657600080fd5b8101908080359060200190929190505050610118565b6040518082815260200191505060405180910390f35b81801561009e57600080fd5b506100a761013b565b005b8180156100b557600080fd5b50610116600480360360808110156100cc57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190803590602001909291908035906020019092919050505061013e565b005b60003073ffffffffffffffffffffffffffffffffffffffff1682905d9050919050565b5c565b8373ffffffffffffffffffffffffffffffffffffffff1681836108fc8690811502906040516000604051808303818888878c8af69550505050505015801561018a573d6000803e3d6000fd5b505050505056fea2646970667358221220ed2100d6623a884d196eceefabe5e03da4309a2562bb25262f3874f1acb31cd764736f6c634300060a0033", "balance": "0x0", "mcbalance": {}}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
+	mcAbiJSON := `[{"inputs":[],"name":"enableMultiCoin","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"coinid","type":"uint256"}],"name":"getBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address payable","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"coinid","type":"uint256"},{"internalType":"uint256","name":"amount2","type":"uint256"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
+	genesisKey := "0xabd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1"
 
-	g := new(core.Genesis)
-	b := `{"config":{"chainId":1,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"751a0b96e1042bee789452ecb20253fba40dbe85":{"balance":"0x1000000000000000", "mcbalance": {"0x0000000000000000000000000000000000000000000000000000000000000000": 1000000000000000000}}, "0100000000000000000000000000000000000000": {"code": "0x730000000000000000000000000000000000000000301460806040526004361061004b5760003560e01c80631e01043914610050578063abb24ba014610092578063b6510bb3146100a9575b600080fd5b61007c6004803603602081101561006657600080fd5b8101908080359060200190929190505050610118565b6040518082815260200191505060405180910390f35b81801561009e57600080fd5b506100a761013b565b005b8180156100b557600080fd5b50610116600480360360808110156100cc57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff16906020019092919080359060200190929190803590602001909291908035906020019092919050505061013e565b005b60003073ffffffffffffffffffffffffffffffffffffffff1682905d9050919050565b5c565b8373ffffffffffffffffffffffffffffffffffffffff1681836108fc8690811502906040516000604051808303818888878c8af69550505050505015801561018a573d6000803e3d6000fd5b505050505056fea2646970667358221220ed2100d6623a884d196eceefabe5e03da4309a2562bb25262f3874f1acb31cd764736f6c634300060a0033", "balance": "0x0", "mcbalance": {}}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
-	k := "0xabd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1"
-	err := json.Unmarshal([]byte(b), g)
+	bobKey, _ := coreth.NewKey(rand.Reader)
+	genesisBlock := new(core.Genesis)
+	err := json.Unmarshal([]byte(genesisJSON), genesisBlock)
 	checkError(err)
-	config.Genesis = g
-	hk, _ := crypto.HexToECDSA(k[2:])
-	genKey = coreth.NewKeyFromECDSA(hk)
+	hk, _ := crypto.HexToECDSA(genesisKey[2:])
+	genKey := coreth.NewKeyFromECDSA(hk)
 
+	config.Genesis = genesisBlock
 	// grab the control of block generation and disable auto uncle
 	config.Miner.ManualMining = true
 	config.Miner.ManualUncle = true
@@ -88,17 +89,27 @@ func main() {
 	chain := coreth.NewETHChain(&config, nil, nil, nil)
 	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	log.Info(chain.GetGenesisBlock().Hash().Hex())
+
+	mcAbi, err := abi.JSON(strings.NewReader(mcAbiJSON))
+	checkError(err)
+	enableCode, err := mcAbi.Pack("enableMultiCoin")
+	checkError(err)
+
+	abiStr, err := json.Marshal(contract.Info.AbiDefinition)
+	contractAbi, err := abi.JSON(strings.NewReader(string(abiStr)))
+	checkError(err)
+
 	var contractAddr common.Address
-	coin0 := common.HexToHash("0x0")
 	postGen := func(block *types.Block) bool {
 		if blockCount == 15 {
+			coin0 := common.HexToHash("0x0")
 			state, err := chain.CurrentState()
 			checkError(err)
 			log.Info(fmt.Sprintf("genesis balance = %s", state.GetBalance(genKey.Address)))
-			log.Info(fmt.Sprintf("genesis balance2 = %s", state.GetBalanceMultiCoin(genKey.Address, coin0)))
-			log.Info(fmt.Sprintf("contract balance2 = %s", state.GetBalanceMultiCoin(contractAddr, coin0)))
-			log.Info(fmt.Sprintf("bob's balance = %s", state.GetBalance(bob.Address)))
-			log.Info(fmt.Sprintf("bob's balance2 = %s", state.GetBalanceMultiCoin(bob.Address, coin0)))
+			log.Info(fmt.Sprintf("genesis mcbalance(0) = %s", state.GetBalanceMultiCoin(genKey.Address, coin0)))
+			log.Info(fmt.Sprintf("bob's balance = %s", state.GetBalance(bobKey.Address)))
+			log.Info(fmt.Sprintf("bob's mcbalance(0) = %s", state.GetBalanceMultiCoin(bobKey.Address, coin0)))
+			log.Info(fmt.Sprintf("contract mcbalance(0) = %s", state.GetBalanceMultiCoin(contractAddr, coin0)))
 			log.Info(fmt.Sprintf("state = %s", state.Dump(true, false, true)))
 			return true
 		}
@@ -111,53 +122,54 @@ func main() {
 			log.Info(fmt.Sprintf("contract addr = %s", contractAddr.String()))
 
 			go func() {
-				tx := types.NewTransaction(nonce, bob.Address, big.NewInt(300000000000000000), uint64(gasLimit), gasPrice, nil)
+				// give Bob some initial balance
+				tx := types.NewTransaction(nonce, bobKey.Address, big.NewInt(300000000000000000), uint64(gasLimit), gasPrice, nil)
 				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 				checkError(err)
 				chain.AddRemoteTxs([]*types.Transaction{signedTx})
 				nonce++
 				time.Sleep(20 * time.Millisecond)
 
-				// self-loop tx to enable MC
-				tx = types.NewTransaction(0, bob.Address, big.NewInt(1), uint64(gasLimit), gasPrice, nil)
-				tx.SetMultiCoinValue(&coin0, big.NewInt(0))
-				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), bob.PrivateKey)
+				// enable MC for Bob
+				tx = types.NewTransaction(0, vm.BuiltinAddr, big.NewInt(0), uint64(gasLimit), gasPrice, enableCode)
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), bobKey.PrivateKey)
 				checkError(err)
 				chain.AddRemoteTxs([]*types.Transaction{signedTx})
+
 				time.Sleep(20 * time.Millisecond)
 
-				var code []byte
-				var a abi.ABI
-				abiStr, err := json.Marshal(contract.Info.AbiDefinition)
-				a, err = abi.JSON(strings.NewReader(string(abiStr)))
+				bobTransferInput, err := mcAbi.Pack("transfer", bobKey.Address, big.NewInt(0), big.NewInt(0), big.NewInt(100000000000000000))
 				checkError(err)
-				code, err = a.Pack("deposit")
+				contractTransferInput, err := mcAbi.Pack("transfer", contractAddr, big.NewInt(0), big.NewInt(0), big.NewInt(100000000000000000))
 				checkError(err)
 
 				for i := 0; i < 5; i++ {
-					tx := types.NewTransaction(nonce, bob.Address, big.NewInt(0), uint64(gasLimit), gasPrice, nil)
-					tx.SetMultiCoinValue(&coin0, big.NewInt(100000000000000000))
+					// transfer some coin0 balance to Bob
+					tx := types.NewTransaction(nonce, vm.BuiltinAddr, big.NewInt(0), uint64(gasLimit), gasPrice, bobTransferInput)
 					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 					checkError(err)
 					chain.AddRemoteTxs([]*types.Transaction{signedTx})
 					nonce++
 
-					tx = types.NewTransaction(nonce, contractAddr, big.NewInt(0), uint64(gasLimit), gasPrice, code)
-					tx.SetMultiCoinValue(&coin0, big.NewInt(100000000000000000))
+					// transfer some coin0 balance to the contract
+					tx = types.NewTransaction(nonce, vm.BuiltinAddr, big.NewInt(0), uint64(gasLimit), gasPrice, contractTransferInput)
 					signedTx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 					checkError(err)
 					chain.AddRemoteTxs([]*types.Transaction{signedTx})
 					nonce++
 				}
-				code, err = a.Pack("withdraw", big.NewInt(0), big.NewInt(0), big.NewInt(10000000000000000))
-				tx = types.NewTransaction(nonce, contractAddr, big.NewInt(0), uint64(gasLimit), gasPrice, code)
+
+				// test contract methods
+
+				input, err := contractAbi.Pack("withdraw", big.NewInt(0), big.NewInt(0), big.NewInt(10000000000000000))
+				tx = types.NewTransaction(nonce, contractAddr, big.NewInt(0), uint64(gasLimit), gasPrice, input)
 				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 				checkError(err)
 				chain.AddRemoteTxs([]*types.Transaction{signedTx})
 				nonce++
 
-				code, err = a.Pack("updateBalance", big.NewInt(0))
-				tx = types.NewTransaction(nonce, contractAddr, big.NewInt(0), uint64(gasLimit), gasPrice, code)
+				input, err = contractAbi.Pack("updateBalance", big.NewInt(0))
+				tx = types.NewTransaction(nonce, contractAddr, big.NewInt(0), uint64(gasLimit), gasPrice, input)
 				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 				checkError(err)
 				chain.AddRemoteTxs([]*types.Transaction{signedTx})
@@ -191,6 +203,7 @@ func main() {
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 	chain.Start()
 	code := common.Hex2Bytes(contract.Code[2:])
+
 	tx := types.NewContractCreation(nonce, big.NewInt(0), uint64(gasLimit), gasPrice, code)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), genKey.PrivateKey)
 	checkError(err)

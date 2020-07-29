@@ -55,8 +55,6 @@ type StateTransition struct {
 	gasPrice   *big.Int
 	initialGas uint64
 	value      *big.Int
-	coinID     *common.Hash
-	value2     *big.Int
 	data       []byte
 	state      vm.StateDB
 	evm        *vm.EVM
@@ -71,8 +69,6 @@ type Message interface {
 	GasPrice() *big.Int
 	Gas() uint64
 	Value() *big.Int
-	CoinID() *common.Hash
-	Value2() *big.Int
 
 	Nonce() uint64
 	CheckNonce() bool
@@ -124,8 +120,6 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		msg:      msg,
 		gasPrice: msg.GasPrice(),
 		value:    msg.Value(),
-		coinID:   msg.CoinID(),
-		value2:   msg.Value2(),
 		data:     msg.Data(),
 		state:    evm.StateDB,
 	}
@@ -221,7 +215,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = evm.CallExpert(sender, st.to(), st.data, st.gas, st.value, st.coinID, st.value2)
+		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmerr != nil {
 		log.Debug("VM returned with error", "err", vmerr)

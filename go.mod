@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/ava-labs/gecko v0.5.7
 	github.com/ava-labs/go-ethereum v1.9.3
+	github.com/cespare/cp v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0
