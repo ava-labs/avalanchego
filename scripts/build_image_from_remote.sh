@@ -8,9 +8,16 @@ set -o pipefail
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 BASE_DIR="$SRC_DIR/.."
 
-# Two arguments specify the remote and branch to use
-REMOTE=$1
-BRANCH=$2
+REMOTE="https://github.com/ava-labs/gecko.git"
+BRANCH="master"
+
+# TODO switch to using named arguments to override default remote and branch
+if [[ $# -eq 2 ]]; then
+    REMOTE=$1
+    BRANCH=$2
+else
+    echo "Using default remote: $REMOTE and branch: $BRANCH to build image"
+fi
 
 
 echo "Building docker image from branch: $BRANCH at remote: $REMOTE"
@@ -41,4 +48,5 @@ fi
 
 GECKO_COMMIT="$(git --git-dir="$GECKO_CLONE/.git" rev-parse --short HEAD)"
 
+# Note: previous version of Dockerfile not compatible to create image usable by Kurtosis/ava-e2e-tests
 "${DOCKER}" build -t "gecko-$GECKO_COMMIT" "$GECKO_CLONE" -f "$GECKO_CLONE/Dockerfile"

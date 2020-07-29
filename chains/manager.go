@@ -214,12 +214,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	}
 
 	chain, err := m.buildChain(chainParams)
-	m.chains[chainParams.ID.Key()] = chain.Handler
-
 	if err != nil {
 		m.log.Error("Error while creating new chain: %s", err)
 		return
 	}
+	m.chains[chainParams.ID.Key()] = chain.Handler
 
 	// Associate the newly created chain with its default alias
 	m.log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
