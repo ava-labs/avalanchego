@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -156,6 +158,24 @@ func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
 		return err
 	}
 	return atomic.WriteAll(batch, sharedBatch)
+}
+
+// MarshalJSON marshals [tx] to JSON
+func (tx *UnsignedImportTx) MarshalJSON() ([]byte, error) {
+	// Marshal the base tx
+	baseTxJSON, err := json.Marshal(tx.BaseTx)
+	if err != nil {
+		return nil, err
+	}
+	importedInsJSON, err := json.Marshal(tx.ImportedInputs)
+	if err != nil {
+		return nil, err
+	}
+	buffer := bytes.NewBufferString("{")
+	buffer.WriteString(fmt.Sprintf("\"baseTx\":%s,", string(baseTxJSON)))
+	buffer.WriteString(fmt.Sprintf("\"importedInputs\":%s", string(importedInsJSON)))
+	buffer.WriteString("}")
+	return buffer.Bytes(), nil
 }
 
 // Create a new transaction
