@@ -386,8 +386,8 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler.RegisterName("admin", &admin.Performance{})
 
 	return map[string]*commonEng.HTTPHandler{
-		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler)},
-		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler.WebsocketHandler([]string{"*"}))},
+		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
+		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}
 }
 
@@ -396,8 +396,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*commonEng.HTTPHandler {
 	handler := rpc.NewServer()
 	handler.RegisterName("static", &StaticService{})
 	return map[string]*commonEng.HTTPHandler{
-		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler)},
-		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: newIPFilter(handler.WebsocketHandler([]string{"*"}))},
+		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
+		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}
 }
 
