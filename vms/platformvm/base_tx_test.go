@@ -1,9 +1,7 @@
 package platformvm
 
-/*
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -12,11 +10,11 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
-func TestBaseTxSyntacticVerify(t *testing.T) {
+func TestBaseTxVerify(t *testing.T) {
 	type test struct {
-		tx        *BaseTx
-		shouldErr bool
-		errMsg    string
+		description string
+		tx          *BaseTx
+		shouldErr   bool
 	}
 
 	vm := defaultVM()
@@ -26,55 +24,80 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	nilID := ids.NewID([32]byte{})
-	nilID.ID = nil
+	nilID := ids.ID{ID: nil}
 	tests := []test{
 		{
+			"tx is nil",
 			nil,
 			true,
-			"tx is nil",
 		},
 		{
+			"vm is nil",
 			&BaseTx{
 				vm:           nil,
-				BlockchainID: ids.Empty,
+				id:           ids.GenerateTestID(),
+				BlockchainID: vm.Ctx.ChainID,
+				NetworkID:    vm.Ctx.NetworkID + 1,
 			},
 			true,
-			"vm is nil",
 		},
 		{
+			"Blockchain ID is wrong",
 			&BaseTx{
 				vm:           vm,
-				BlockchainID: nilID,
+				id:           ids.GenerateTestID(),
+				BlockchainID: ids.GenerateTestID(),
+				NetworkID:    vm.Ctx.NetworkID + 1,
 			},
 			true,
-			"ID is nil",
 		},
 		{
+			"tx ID is nil",
+			&BaseTx{
+				vm:           vm,
+				id:           nilID,
+				BlockchainID: vm.Ctx.ChainID,
+				NetworkID:    vm.Ctx.NetworkID + 1,
+			},
+			true,
+		},
+		{
+			"network ID is wrong",
+			&BaseTx{
+				vm:           vm,
+				id:           ids.GenerateTestID(),
+				BlockchainID: vm.Ctx.ChainID,
+				NetworkID:    vm.Ctx.NetworkID + 1,
+			},
+			true,
+		},
+		{
+			"memo is too long",
 			&BaseTx{
 				vm:           vm,
 				BlockchainID: ids.Empty,
 				Memo:         make([]byte, maxMemoSize+1),
 			},
 			true,
-			"memo is too long",
 		},
 		{
+			"valid",
 			&BaseTx{
 				vm:           vm,
-				BlockchainID: ids.Empty,
+				id:           ids.GenerateTestID(),
+				BlockchainID: vm.Ctx.ChainID,
+				NetworkID:    vm.Ctx.NetworkID,
 				Memo:         make([]byte, maxMemoSize),
 			},
 			false,
-			"",
 		},
 	}
 
 	for _, test := range tests {
-		if err := test.tx.SyntacticVerify(); err == nil && test.shouldErr {
-			t.Errorf("expected error because '%s' but got none", test.errMsg)
+		if err := test.tx.Verify(); err == nil && test.shouldErr {
+			t.Errorf("expected test '%s' to error but got none", test.description)
 		} else if err != nil && !test.shouldErr {
-			t.Errorf("expected no error but got %s", err)
+			t.Errorf("test '%s' shouldn't have errored but got %s", test.description, err)
 		}
 	}
 }
@@ -123,8 +146,5 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 		t.Fatal("inputs are wrong")
 	} else if !strings.Contains(asString, "\"outputs\":[{\"assetID\":\"2KdbbWvpeAShCx5hGbtdF15FMMepq9kajsNTqVvvEbhiCRSxU\",\"output\":{\"FailVerify\":false,\"AmountVal\":100}}]") {
 		t.Fatal("outputs are wrong")
-	} else if !strings.Contains(asString, fmt.Sprintf("\"id\":\"%s\"", tx.id)) {
-		t.Fatal("id is wrong")
 	}
 }
-*/

@@ -1,10 +1,7 @@
 package platformvm
 
-/*
 import (
 	"errors"
-	"math"
-	"testing"
 
 	"github.com/ava-labs/gecko/vms/components/verify"
 
@@ -82,6 +79,7 @@ func (tx MockSpendTx) Creds() []verify.Verifiable {
 	return nil
 }
 
+/*
 func TestSyntacticVerifySpend(t *testing.T) {
 	avaxAssetID := ids.NewID([32]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	otherAssetID := ids.NewID([32]byte{1, 2, 3})

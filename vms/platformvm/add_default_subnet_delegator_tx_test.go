@@ -216,7 +216,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 		feeKeys     []*crypto.PrivateKeySECP256K1R
 		setup       func(db database.Database)
 		shouldErr   bool
-		errMsg      string
+		description string
 	}
 
 	tests := []test{
@@ -245,7 +245,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 		{
 			MinimumStakeAmount,
 			uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
-			uint64(defaultValidateStartTime.Add(-5 * time.Second).Unix()),
+			uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			newValidatorID,
 			destination,
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -284,7 +284,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
 			addValidator,
 			false,
-			"",
+			"valid",
 		},
 		{
 			MinimumStakeAmount, // weight
@@ -331,15 +331,15 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			tt.feeKeys,
 		)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("couldn't build tx in test '%s': %s", tt.description, err)
 		}
 		if tt.setup != nil {
 			tt.setup(vdb)
 		}
 		if _, _, _, _, err := tx.SemanticVerify(vdb, tx); err != nil && !tt.shouldErr {
-			t.Fatalf("got unexpected error %s", err)
+			t.Fatalf("test '%s' shouldn't have errored but got %s", tt.description, err)
 		} else if err == nil && tt.shouldErr {
-			t.Fatalf("expected error '%s' but got none", tt.errMsg)
+			t.Fatalf("expected test '%s' to error but got none", tt.description)
 		}
 	}
 }

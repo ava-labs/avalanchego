@@ -183,6 +183,9 @@ func defaultVM() *VM {
 	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
 		panic(err)
 	}
+	if err := vm.Bootstrapped(); err != nil {
+		panic(err)
+	}
 
 	// Create a non-default subnet and store it in testSubnet1
 	if tx, err := vm.newCreateSubnetTx(

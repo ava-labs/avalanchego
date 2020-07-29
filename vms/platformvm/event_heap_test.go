@@ -3,7 +3,6 @@
 
 package platformvm
 
-/*
 import (
 	"testing"
 
@@ -22,57 +21,60 @@ func TestTxHeapStart(t *testing.T) {
 	txHeap := EventHeap{SortByStartTime: true}
 
 	validator0, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                        // stake amount
-		0,                          // startTime
-		3,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	vdr0Tx := validator0.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	validator1, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                         // stake amount
-		1,                           // startTime
-		3,                           // endTime
-		ids.NewShortID([20]byte{1}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+2), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+2), // endTime
+		ids.NewShortID([20]byte{1}),                                     // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	vdr1Tx := validator1.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	validator2, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                        // stake amount
-		2,                          // startTime
-		4,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+3), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+3), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	vdr2Tx := validator2.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	txHeap.Add(validator2)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(validator2.StartTime()) {
-		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, validator2.StartTime())
+	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.StartTime()) {
+		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr2Tx.StartTime())
 	}
 
 	txHeap.Add(validator1)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(validator1.StartTime()) {
-		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, validator1.StartTime())
+	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr1Tx.StartTime()) {
+		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr1Tx.StartTime())
 	}
 
 	txHeap.Add(validator0)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(validator0.StartTime()) {
-		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, validator0.StartTime())
+	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr0Tx.StartTime()) {
+		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr0Tx.StartTime())
 	} else if top := txHeap.Peek(); !top.ID().Equals(validator0.ID()) {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), validator0.ID())
 	}
@@ -89,57 +91,60 @@ func TestTxHeapStop(t *testing.T) {
 	txHeap := EventHeap{}
 
 	validator0, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                        // stake amount
-		1,                          // startTime
-		2,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	vdr0Tx := validator0.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	validator1, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                         // stake amount
-		1,                           // startTime
-		3,                           // endTime
-		ids.NewShortID([20]byte{1}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+2), // endTime
+		ids.NewShortID([20]byte{1}),                                     // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	vdr1Tx := validator1.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	validator2, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                        // stake amount
-		2,                          // startTime
-		4,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+3), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	vdr2Tx := validator2.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	txHeap.Add(validator2)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(validator2.EndTime()) {
-		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, validator2.EndTime())
+	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.EndTime()) {
+		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr2Tx.EndTime())
 	}
 
 	txHeap.Add(validator1)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(validator1.EndTime()) {
-		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, validator1.EndTime())
+	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr1Tx.EndTime()) {
+		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr1Tx.EndTime())
 	}
 
 	txHeap.Add(validator0)
-	if timestamp := txHeap.Timestamp(); !timestamp.Equal(validator0.EndTime()) {
-		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, validator0.EndTime())
+	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr0Tx.EndTime()) {
+		t.Fatalf("TxHeap.Timestamp returned %s, expected %s", timestamp, vdr0Tx.EndTime())
 	} else if top := txHeap.Txs[0]; !top.ID().Equals(validator0.ID()) {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), validator0.ID())
 	}
@@ -156,11 +161,11 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 	txHeap := EventHeap{SortByStartTime: true}
 
 	validator, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                        // stake amount
-		1,                          // startTime
-		3,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
@@ -169,12 +174,12 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 	}
 
 	delegator, err := vm.newAddDefaultSubnetDelegatorTx(
-		123,                        // stake amount
-		1,                          // startTime
-		3,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},       // key
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},                         // key
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -199,11 +204,11 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 	txHeap := EventHeap{}
 
 	validator, err := vm.newAddDefaultSubnetValidatorTx(
-		123,                        // stake amount
-		1,                          // startTime
-		3,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
@@ -212,12 +217,12 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 	}
 
 	delegator, err := vm.newAddDefaultSubnetDelegatorTx(
-		123,                        // stake amount
-		1,                          // startTime
-		3,                          // endTime
-		ids.NewShortID([20]byte{}), // node ID
-		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}), // destination
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},       // key
+		MinimumStakeAmount,                  // stake amount
+		uint64(defaultGenesisTime.Unix()+1), // startTime
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
+		ids.NewShortID([20]byte{}),                                      // node ID
+		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // destination
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},                         // key
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -230,4 +235,3 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), delegator.ID())
 	}
 }
-*/
