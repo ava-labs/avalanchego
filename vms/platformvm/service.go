@@ -1144,10 +1144,37 @@ type GetTxStatusArgs struct {
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *Status) error {
 	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
 	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
+	if err == nil { // Found the status. Report it.
+		*response = status
+		return nil
+	}
+	// The status of this transaction is not in the database.
+	// Check if the tx is in the preferred block's db. If so, return that it's processing.
+	preferred, err := service.vm.getBlock(service.vm.Preferred())
 	if err != nil {
-		// TODO check if it's processing
+		service.vm.Ctx.Log.Error("couldn't get preferred block: %s", err)
+		*response = Unknown
+		return nil
+	}
+	switch block := preferred.(type) {
+	case *Abort:
+		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+			*response = Processing // Found the status in the preferred block's db. Report tx is processing.
+		}
+	case *Commit:
+		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+			*response = Processing
+		}
+	case *AtomicBlock:
+		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+			*response = Processing
+		}
+	case *StandardBlock:
+		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+			*response = Processing
+		}
+	default:
 		*response = Unknown
 	}
-	*response = status
 	return nil
 }
