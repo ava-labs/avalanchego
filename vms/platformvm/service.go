@@ -1158,22 +1158,29 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	}
 	switch block := preferred.(type) {
 	case *Abort:
-		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
 			*response = Processing // Found the status in the preferred block's db. Report tx is processing.
+			return nil
 		}
 	case *Commit:
-		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
 			*response = Processing
+			return nil
 		}
 	case *AtomicBlock:
-		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
 			*response = Processing
+			return nil
 		}
 	case *StandardBlock:
-		if _, err := service.vm.getStatus(block.onAcceptDB, args.TxID); err == nil {
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
 			*response = Processing
+			return nil
 		}
-	default:
+	}
+	if _, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
+		*response = Dropped
+	} else {
 		*response = Unknown
 	}
 	return nil

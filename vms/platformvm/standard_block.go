@@ -62,6 +62,7 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		onAccept, err := tx.SemanticVerify(sb.onAcceptDB, tx)
 		if err != nil {
+			sb.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
 			if err := sb.Reject(); err == nil {
 				if err := sb.vm.DB.Commit(); err != nil {
 					return err

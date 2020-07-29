@@ -27,6 +27,7 @@ const (
 	Committed
 	Aborted
 	Processing
+	Dropped
 )
 
 // MarshalJSON ...
@@ -58,6 +59,8 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 		*s = Aborted
 	case "\"Processing\"":
 		*s = Processing
+	case "\"Dropped\"":
+		*s = Dropped
 	default:
 		return errUnknownStatus
 	}
@@ -67,7 +70,7 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 // Valid returns nil if the status is a valid status.
 func (s Status) Valid() error {
 	switch s {
-	case Unknown, Preferred, Created, Validating, Committed, Aborted, Processing:
+	case Unknown, Preferred, Created, Validating, Committed, Aborted, Processing, Dropped:
 		return nil
 	default:
 		return errUnknownStatus
@@ -90,6 +93,8 @@ func (s Status) String() string {
 		return "Aborted"
 	case Processing:
 		return "Processing"
+	case Dropped:
+		return "Dropped"
 	default:
 		return "Invalid status"
 	}
