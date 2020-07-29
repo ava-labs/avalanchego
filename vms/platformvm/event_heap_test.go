@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"testing"
 
@@ -229,3 +230,4 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 		t.Fatalf("TxHeap prioritized %s, expected %s", top.ID(), delegator.ID())
 	}
 }
+*/

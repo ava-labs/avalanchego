@@ -131,6 +131,7 @@ func init() {
 		Codec.RegisterType(&secp256k1fx.MintOperation{}),
 		Codec.RegisterType(&secp256k1fx.Credential{}),
 		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
+		Codec.RegisterType(&secp256k1fx.Input{}),
 
 		Codec.RegisterType(&BaseTx{}),
 

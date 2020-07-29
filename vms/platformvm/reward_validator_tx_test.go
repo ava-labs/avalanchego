@@ -3,6 +3,7 @@
 
 package platformvm
 
+/*
 import (
 	"testing"
 	"time"
@@ -264,3 +265,4 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal("expected delgator balance to increase by stake amount upon abort")
 	}
 }
+*/

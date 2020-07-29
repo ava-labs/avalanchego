@@ -27,8 +27,8 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	destination := nodeID
 
 	// Case : tx is nil
-	var tx *addDefaultSubnetDelegatorTx
-	if err := tx.SyntacticVerify(); err == nil {
+	var unsignedTx *UnsignedAddDefaultSubnetDelegatorTx
+	if err := unsignedTx.Verify(); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -44,8 +44,10 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.id = ids.ID{}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).id = ids.ID{ID: nil}
+	// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(); err == nil {
 		t.Fatal("should have errored because ID is nil")
 	}
 
@@ -61,8 +63,10 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.NetworkID = tx.NetworkID + 1
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).id = ids.ID{}
+	// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -78,14 +82,16 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.NodeID = ids.ShortID{}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).NodeID = ids.ShortID{}
+	// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(); err == nil {
 		t.Fatal("should have errored because NodeID is nil")
 	}
 
 	// Case: Not enough weight
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
-		MinimumStakeAmount-1,
+		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -95,7 +101,10 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Validator.Wght = MinimumStakeAmount - 1
+	// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(); err == nil {
 		t.Fatal("should have errored because of not enough weight")
 	}
 
@@ -103,7 +112,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	tx, err = vm.newAddDefaultSubnetDelegatorTx(
 		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix())-1,
+		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
 		nodeID,
 		destination,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -111,8 +120,10 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = tx.SyntacticVerify()
-	if err == nil {
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).End-- // 1 shorter than minimum stake time
+	// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
+	if err = tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
@@ -120,13 +131,17 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	if tx, err = vm.newAddDefaultSubnetDelegatorTx(
 		MinimumStakeAmount,
 		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix())+1,
+		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix()),
 		nodeID,
 		destination,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.SyntacticVerify(); err == nil {
+	}
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).End++ // 1 longer than maximum stake time
+	// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
@@ -140,7 +155,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.SyntacticVerify(); err != nil {
+	} else if err := tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -184,7 +199,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			db,
 			&EventHeap{
 				SortByStartTime: true,
-				Txs:             []TimedTx{tx},
+				Txs:             []*ProposalTx{tx},
 			},
 			constants.DefaultSubnetID,
 		); err != nil {
@@ -321,7 +336,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 		if tt.setup != nil {
 			tt.setup(vdb)
 		}
-		if _, _, _, _, err := tx.SemanticVerify(vdb); err != nil && !tt.shouldErr {
+		if _, _, _, _, err := tx.SemanticVerify(vdb, tx); err != nil && !tt.shouldErr {
 			t.Fatalf("got unexpected error %s", err)
 		} else if err == nil && tt.shouldErr {
 			t.Fatalf("expected error '%s' but got none", tt.errMsg)

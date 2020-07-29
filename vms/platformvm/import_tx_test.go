@@ -1,5 +1,6 @@
 package platformvm
 
+/*
 import (
 	"math/rand"
 	"testing"
@@ -209,3 +210,4 @@ func TestImportTxInsDoesntModify(t *testing.T) {
 		t.Fatal("Ins() shouldn't return the same underlying slice as tx.BaseTx.Inputs")
 	}
 }
+*/
