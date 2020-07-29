@@ -4,14 +4,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Note: this script will build a docker image by cloning a remote version of gecko into a temporary
+# location and using that version's Dockerfile to build the image.
 
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
-BASE_DIR="$SRC_DIR/.."
 
 REMOTE="https://github.com/ava-labs/gecko.git"
 BRANCH="master"
 
-# TODO switch to using named arguments to override default remote and branch
 if [[ $# -eq 2 ]]; then
     REMOTE=$1
     BRANCH=$2
@@ -48,5 +48,4 @@ fi
 
 GECKO_COMMIT="$(git --git-dir="$GECKO_CLONE/.git" rev-parse --short HEAD)"
 
-# Note: previous version of Dockerfile not compatible to create image usable by Kurtosis/ava-e2e-tests
 "${DOCKER}" build -t "gecko-$GECKO_COMMIT" "$GECKO_CLONE" -f "$GECKO_CLONE/Dockerfile"

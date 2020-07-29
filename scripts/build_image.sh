@@ -13,5 +13,5 @@ if [[ $# -eq 0 ]]; then
 elif [[ $# -eq 2 ]]; then
     "$SRC_DIR/build_image_from_remote.sh" $@
 else
-    echo "Build image requires either no arguments to build from local source or two arguments to build from a remote branch"
+    echo "Build image requires either no arguments to build from local source or two arguments to specify a remote and branch."
 fi
