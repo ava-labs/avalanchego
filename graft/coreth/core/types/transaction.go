@@ -49,8 +49,6 @@ type txdata struct {
 	GasLimit     uint64          `json:"gas"      gencodec:"required"`
 	Recipient    *common.Address `json:"to"       rlp:"nil"` // nil means contract creation
 	Amount       *big.Int        `json:"value"    gencodec:"required"`
-	CoinID       *common.Hash    `json:"coinid"   rlp:"nil"`
-	Amount2      *big.Int        `json:"value2"   rlp:"nil"`
 	Payload      []byte          `json:"input"    gencodec:"required"`
 
 	// Signature values
@@ -67,8 +65,6 @@ type txdataMarshaling struct {
 	Price        *hexutil.Big
 	GasLimit     hexutil.Uint64
 	Amount       *hexutil.Big
-	CoinID       *common.Hash
-	Amount2      *hexutil.Big
 	Payload      hexutil.Bytes
 	V            *hexutil.Big
 	R            *hexutil.Big
@@ -92,8 +88,6 @@ func newTransaction(nonce uint64, to *common.Address, amount *big.Int, gasLimit 
 		Recipient:    to,
 		Payload:      data,
 		Amount:       new(big.Int),
-		CoinID:       nil,
-		Amount2:      new(big.Int),
 		GasLimit:     gasLimit,
 		Price:        new(big.Int),
 		V:            new(big.Int),
@@ -108,11 +102,6 @@ func newTransaction(nonce uint64, to *common.Address, amount *big.Int, gasLimit 
 	}
 
 	return &Transaction{data: d}
-}
-
-func (tx *Transaction) SetMultiCoinValue(coinID *common.Hash, amount *big.Int) {
-	tx.data.CoinID = coinID
-	tx.data.Amount2.Set(amount)
 }
 
 // ChainId returns which chain id this transaction was signed for (if at all)
@@ -183,14 +172,12 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func (tx *Transaction) Data() []byte         { return common.CopyBytes(tx.data.Payload) }
-func (tx *Transaction) Gas() uint64          { return tx.data.GasLimit }
-func (tx *Transaction) GasPrice() *big.Int   { return new(big.Int).Set(tx.data.Price) }
-func (tx *Transaction) Value() *big.Int      { return new(big.Int).Set(tx.data.Amount) }
-func (tx *Transaction) CoinID() *common.Hash { return tx.data.CoinID }
-func (tx *Transaction) Value2() *big.Int     { return new(big.Int).Set(tx.data.Amount2) }
-func (tx *Transaction) Nonce() uint64        { return tx.data.AccountNonce }
-func (tx *Transaction) CheckNonce() bool     { return true }
+func (tx *Transaction) Data() []byte       { return common.CopyBytes(tx.data.Payload) }
+func (tx *Transaction) Gas() uint64        { return tx.data.GasLimit }
+func (tx *Transaction) GasPrice() *big.Int { return new(big.Int).Set(tx.data.Price) }
+func (tx *Transaction) Value() *big.Int    { return new(big.Int).Set(tx.data.Amount) }
+func (tx *Transaction) Nonce() uint64      { return tx.data.AccountNonce }
+func (tx *Transaction) CheckNonce() bool   { return true }
 
 // To returns the recipient address of the transaction.
 // It returns nil if the transaction is a contract creation.
@@ -237,8 +224,6 @@ func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 		gasPrice:   new(big.Int).Set(tx.data.Price),
 		to:         tx.data.Recipient,
 		amount:     tx.data.Amount,
-		coinID:     tx.data.CoinID,
-		amount2:    tx.data.Amount2,
 		data:       tx.data.Payload,
 		checkNonce: true,
 	}
@@ -405,8 +390,6 @@ type Message struct {
 	from       common.Address
 	nonce      uint64
 	amount     *big.Int
-	coinID     *common.Hash
-	amount2    *big.Int
 	gasLimit   uint64
 	gasPrice   *big.Int
 	data       []byte
@@ -419,8 +402,6 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		to:         to,
 		nonce:      nonce,
 		amount:     amount,
-		coinID:     nil,
-		amount2:    big.NewInt(0),
 		gasLimit:   gasLimit,
 		gasPrice:   gasPrice,
 		data:       data,
@@ -432,8 +413,6 @@ func (m Message) From() common.Address { return m.from }
 func (m Message) To() *common.Address  { return m.to }
 func (m Message) GasPrice() *big.Int   { return m.gasPrice }
 func (m Message) Value() *big.Int      { return m.amount }
-func (m Message) CoinID() *common.Hash { return m.coinID }
-func (m Message) Value2() *big.Int     { return m.amount2 }
 func (m Message) Gas() uint64          { return m.gasLimit }
 func (m Message) Nonce() uint64        { return m.nonce }
 func (m Message) Data() []byte         { return m.data }
