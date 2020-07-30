@@ -439,7 +439,7 @@ func (vm *VM) semanticVerifySpend(
 		if !ok {
 			return permError{errUnknownOwners}
 		}
-		owner := owned.Owner()
+		owner := owned.Owners()
 		ownerBytes, err := vm.codec.Marshal(owner)
 		if err != nil {
 			return tempError{err}
@@ -469,7 +469,7 @@ func (vm *VM) semanticVerifySpend(
 		if !ok {
 			return permError{errUnknownOwners}
 		}
-		owner := owned.Owner()
+		owner := owned.Owners()
 		ownerBytes, err := vm.codec.Marshal(owner)
 		if err != nil {
 			return tempError{err}
@@ -509,7 +509,7 @@ func (vm *VM) semanticVerifySpend(
 		if !ok {
 			return permError{errUnknownOwners}
 		}
-		owner := owned.Owner()
+		owner := owned.Owners()
 		ownerBytes, err := vm.codec.Marshal(owner)
 		if err != nil {
 			return tempError{err}
@@ -547,14 +547,14 @@ func (vm *VM) semanticVerifySpend(
 	}
 	delete(consumed, 0)
 
-	if unlockedConsumed < unlockedProduced {
+	if unlockedProduced < unlockedConsumed {
 		return permError{errInvalidAmount}
 	}
 
-	for locktime, producedAmounts := range produced {
-		consumedAmounts := consumed[locktime]
-		for ownerID, amount := range producedAmounts {
-			if consumedAmounts[ownerID] < amount {
+	for locktime, consumedAmounts := range consumed {
+		producedAmounts := produced[locktime]
+		for ownerID, amount := range consumedAmounts {
+			if producedAmounts[ownerID] < amount {
 				return permError{errInvalidAmount}
 			}
 		}

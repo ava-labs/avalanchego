@@ -3,94 +3,89 @@
 
 package platformvm
 
-import (
-	"errors"
-	"testing"
-)
+// var (
+// 	errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
+// )
 
-var (
-	errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
-)
+// func TestValidatorBoundedBy(t *testing.T) {
+// 	// case 1: a starts, a finishes, b starts, b finishes
+// 	aStartTime := uint64(0)
+// 	aEndTIme := uint64(1)
+// 	a := &DurationValidator{
+// 		Validator: Validator{
+// 			NodeID: keys[0].PublicKey().Address(),
+// 			Wght:   defaultWeight,
+// 		},
+// 		Start: aStartTime,
+// 		End:   aEndTIme,
+// 	}
 
-func TestValidatorBoundedBy(t *testing.T) {
-	// case 1: a starts, a finishes, b starts, b finishes
-	aStartTime := uint64(0)
-	aEndTIme := uint64(1)
-	a := &DurationValidator{
-		Validator: Validator{
-			NodeID: keys[0].PublicKey().Address(),
-			Wght:   defaultWeight,
-		},
-		Start: aStartTime,
-		End:   aEndTIme,
-	}
+// 	bStartTime := uint64(2)
+// 	bEndTime := uint64(3)
+// 	b := &DurationValidator{
+// 		Validator: Validator{
+// 			NodeID: keys[0].PublicKey().Address(),
+// 			Wght:   defaultWeight,
+// 		},
+// 		Start: bStartTime,
+// 		End:   bEndTime,
+// 	}
 
-	bStartTime := uint64(2)
-	bEndTime := uint64(3)
-	b := &DurationValidator{
-		Validator: Validator{
-			NodeID: keys[0].PublicKey().Address(),
-			Wght:   defaultWeight,
-		},
-		Start: bStartTime,
-		End:   bEndTime,
-	}
+// 	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
+// 		t.Fatal(errCalculatedSubsetWrong)
+// 	}
 
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+// 	// case 2: a starts, b starts, a finishes, b finishes
+// 	a.Start = 0
+// 	b.Start = 1
+// 	a.End = 2
+// 	b.End = 3
+// 	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
+// 		t.Fatal(errCalculatedSubsetWrong)
+// 	}
 
-	// case 2: a starts, b starts, a finishes, b finishes
-	a.Start = 0
-	b.Start = 1
-	a.End = 2
-	b.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+// 	// case 3: a starts, b starts, b finishes, a finishes
+// 	a.Start = 0
+// 	b.Start = 1
+// 	b.End = 2
+// 	a.End = 3
+// 	if a.BoundedBy(b.StartTime(), b.EndTime()) || !b.BoundedBy(a.StartTime(), a.EndTime()) {
+// 		t.Fatal(errCalculatedSubsetWrong)
+// 	}
 
-	// case 3: a starts, b starts, b finishes, a finishes
-	a.Start = 0
-	b.Start = 1
-	b.End = 2
-	a.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || !b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+// 	// case 4: b starts, a starts, a finishes, b finishes
+// 	b.Start = 0
+// 	a.Start = 1
+// 	a.End = 2
+// 	b.End = 3
+// 	if !a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
+// 		t.Fatal(errCalculatedSubsetWrong)
+// 	}
 
-	// case 4: b starts, a starts, a finishes, b finishes
-	b.Start = 0
-	a.Start = 1
-	a.End = 2
-	b.End = 3
-	if !a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+// 	// case 5: b starts, b finishes, a starts, a finishes
+// 	b.Start = 0
+// 	b.End = 1
+// 	a.Start = 2
+// 	a.End = 3
+// 	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
+// 		t.Fatal(errCalculatedSubsetWrong)
+// 	}
 
-	// case 5: b starts, b finishes, a starts, a finishes
-	b.Start = 0
-	b.End = 1
-	a.Start = 2
-	a.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+// 	// case 6: b starts, a starts, b finishes, a finishes
+// 	b.Start = 0
+// 	a.Start = 1
+// 	b.End = 2
+// 	a.End = 3
+// 	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
+// 		t.Fatal(errCalculatedSubsetWrong)
+// 	}
 
-	// case 6: b starts, a starts, b finishes, a finishes
-	b.Start = 0
-	a.Start = 1
-	b.End = 2
-	a.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
-
-	// case 3: a starts, b starts, b finishes, a finishes
-	a.Start = 0
-	b.Start = 0
-	b.End = 1
-	a.End = 1
-	if !a.BoundedBy(b.StartTime(), b.EndTime()) || !b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
-}
+// 	// case 3: a starts, b starts, b finishes, a finishes
+// 	a.Start = 0
+// 	b.Start = 0
+// 	b.End = 1
+// 	a.End = 1
+// 	if !a.BoundedBy(b.StartTime(), b.EndTime()) || !b.BoundedBy(a.StartTime(), a.EndTime()) {
+// 		t.Fatal(errCalculatedSubsetWrong)
+// 	}
+// }

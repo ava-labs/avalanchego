@@ -30,5 +30,5 @@ type Fx interface {
 
 // Owned ...
 type Owned interface {
-	Owner() interface{}
+	Owners() interface{}
 }
