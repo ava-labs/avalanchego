@@ -3,6 +3,14 @@
 
 package platformvm
 
+import (
+	"testing"
+	"time"
+
+	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/crypto"
+)
+
 // func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 // 	vm := defaultVM()
 // 	vm.Ctx.Lock.Lock()
@@ -527,3 +535,74 @@ package platformvm
 // 		t.Fatal("should be equal")
 // 	}
 // }
+
+// Accept proposal to add validator to non-default subnet
+func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
+	vm := defaultVM(t)
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
+	endTime := startTime.Add(MinimumStakingDuration)
+
+	// create valid tx
+	// note that [startTime, endTime] is a subset of time that keys[0]
+	// validates default subnet ([defaultValidateStartTime, defaultValidateEndTime])
+	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+		defaultWeight,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		keys[0].PublicKey().Address(),
+		testSubnet1.id,
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], keys[0]},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// trigger block creation
+	if err := vm.issueTx(tx); err != nil {
+		t.Fatal(err)
+	}
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	options, err := block.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, ok := options[0].(*Commit)
+	if !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefAbort)
+	} else if err := block.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := block.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Accept(); err != nil { // accept the proposal
+		t.Fatal(err)
+	}
+
+	// Verify that new validator is in pending validator set
+	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pendingSampler := validators.NewSet()
+	pendingSampler.Set(vm.getValidators(pendingValidators))
+	if !pendingSampler.Contains(keys[0].PublicKey().Address()) {
+		t.Fatalf("should have added validator to pending validator set")
+	}
+}
