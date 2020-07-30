@@ -79,7 +79,7 @@ func (tx *UnsignedExportTx) Verify() error {
 	allOuts := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(allOuts, tx.Outs)
 	copy(allOuts[len(tx.Outs):], tx.ExportedOutputs)
-	if err := syntacticVerifySpend(tx.Ins, allOuts, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, allOuts, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -92,7 +92,7 @@ func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.
 	if err := tx.Verify(); err != nil {
 		return permError{err}
 	}
-	return tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, creds)
+	return tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, nil, creds)
 }
 
 // Accept this transaction.
@@ -135,7 +135,7 @@ func (vm *VM) newExportTx(
 	if err != nil {
 		return nil, errOverflowExport
 	}
-	ins, outs, signers, err := vm.burn(vm.DB, keys, toBurn, 0)
+	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, toBurn)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

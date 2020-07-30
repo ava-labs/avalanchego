@@ -51,7 +51,7 @@ func (tx *UnsignedCreateSubnetTx) Verify() error {
 	if err := verify.All(&tx.BaseTx, tx.Owner); err != nil {
 		return err
 	}
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -83,7 +83,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	}
 
 	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Credentials); err != nil {
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, nil, stx.Credentials); err != nil {
 		return nil, err
 	}
 
@@ -102,7 +102,7 @@ func (vm *VM) newCreateSubnetTx(
 	ownerAddrs []ids.ShortID, // control addresses for the new subnet
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 ) (*DecisionTx, error) {
-	ins, outs, signers, err := vm.burn(vm.DB, keys, vm.txFee, 0)
+	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

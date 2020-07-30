@@ -38,7 +38,7 @@ type BaseTx struct {
 	// ID of this blockchain. In practice is always the empty ID.
 	// This is only here to match avm.BaseTx's format
 	BlockchainID ids.ID `serialize:"true"`
-	// Output UTXOa
+	// Output UTXOs
 	Outs []*ava.TransferableOutput `serialize:"true"`
 	// Inputs consumed by this tx
 	Ins []*ava.TransferableInput `serialize:"true"`

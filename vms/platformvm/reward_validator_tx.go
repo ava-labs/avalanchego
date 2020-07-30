@@ -150,19 +150,16 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	switch uVdrTx := vdrTx.UnsignedProposalTx.(type) {
 	case *UnsignedAddDefaultSubnetValidatorTx:
 		// Refund the stake here
-		refundUTXOs, err := uVdrTx.vm.generateRefund(
-			txID,
-			uVdrTx.Ins,
-			uVdrTx.Outs,
-			uVdrTx.vm.txFee,
-			uVdrTx.Wght,
-			uVdrTx.StakeOwner,
-		)
-		if err != nil {
-			return nil, nil, nil, nil, permError{err}
-		}
+		for i, out := range uVdrTx.Stake {
+			utxo := &ava.UTXO{
+				UTXOID: ava.UTXOID{
+					TxID:        txID,
+					OutputIndex: uint32(len(uVdrTx.Outs) + i),
+				},
+				Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+				Out:   out.Output(),
+			}
 
-		for _, utxo := range refundUTXOs {
 			if err := tx.vm.putUTXO(onCommitDB, utxo); err != nil {
 				return nil, nil, nil, nil, tempError{err}
 			}
@@ -184,7 +181,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			if err := tx.vm.putUTXO(onCommitDB, &ava.UTXO{
 				UTXOID: ava.UTXOID{
 					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + len(refundUTXOs)),
+					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake)),
 				},
 				Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 				Out:   out,
@@ -201,19 +198,16 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		unsignedParentTx := parentTx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 		// Refund the stake here
-		refundUTXOs, err := uVdrTx.vm.generateRefund(
-			txID,
-			uVdrTx.Ins,
-			uVdrTx.Outs,
-			uVdrTx.vm.txFee,
-			uVdrTx.Wght,
-			uVdrTx.StakeOwner,
-		)
-		if err != nil {
-			return nil, nil, nil, nil, permError{err}
-		}
+		for i, out := range uVdrTx.Stake {
+			utxo := &ava.UTXO{
+				UTXOID: ava.UTXOID{
+					TxID:        txID,
+					OutputIndex: uint32(len(uVdrTx.Outs) + i),
+				},
+				Asset: ava.Asset{ID: tx.vm.avaxAssetID},
+				Out:   out.Output(),
+			}
 
-		for _, utxo := range refundUTXOs {
 			if err := tx.vm.putUTXO(onCommitDB, utxo); err != nil {
 				return nil, nil, nil, nil, tempError{err}
 			}
@@ -249,7 +243,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			if err := tx.vm.putUTXO(onCommitDB, &ava.UTXO{
 				UTXOID: ava.UTXOID{
 					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + len(refundUTXOs)),
+					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake)),
 				},
 				Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 				Out:   out,
@@ -273,7 +267,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			if err := tx.vm.putUTXO(onCommitDB, &ava.UTXO{
 				UTXOID: ava.UTXOID{
 					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + len(refundUTXOs) + offset),
+					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake) + offset),
 				},
 				Asset: ava.Asset{ID: tx.vm.avaxAssetID},
 				Out:   out,

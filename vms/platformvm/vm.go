@@ -142,7 +142,8 @@ func init() {
 		Codec.RegisterType(&UnsignedAdvanceTimeTx{}),
 		Codec.RegisterType(&UnsignedRewardValidatorTx{}),
 
-		Codec.RegisterType(&StakeableLock{}),
+		Codec.RegisterType(&StakeableLockIn{}),
+		Codec.RegisterType(&StakeableLockOut{}),
 
 		// TODO: Why are these needed?
 		Codec.RegisterType(&ava.TransferableInput{}),

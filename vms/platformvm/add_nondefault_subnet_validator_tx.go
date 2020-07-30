@@ -65,7 +65,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) Verify() error {
 		return err
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -180,7 +180,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	onCommitDB := versiondb.New(db)
 
 	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
+	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, nil, baseTxCreds); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	// Add the validator to the set of pending validators
@@ -193,7 +193,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	onAbortDB := versiondb.New(db)
 
 	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
+	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, tx.Outs, nil, baseTxCreds); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -220,7 +220,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 ) (*ProposalTx, error) {
-	ins, outs, signers, err := vm.burn(vm.DB, keys, vm.txFee, 0)
+	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

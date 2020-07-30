@@ -88,7 +88,7 @@ func (tx *UnsignedImportTx) Verify() error {
 	allIns := make([]*ava.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(allIns, tx.Ins)
 	copy(allIns[len(tx.Ins):], tx.ImportedInputs)
-	if err := syntacticVerifySpend(allIns, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(allIns, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -107,7 +107,7 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 	importCreds := creds[baseTxCredsLen:]
 
 	// Spend un-imported inputs; generate outputs
-	if err := tx.vm.semanticVerifySpend(db, tx, tx.BaseTx.Ins, tx.Outs, baseTxCreds); err != nil {
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.BaseTx.Ins, tx.Outs, nil, baseTxCreds); err != nil {
 		return err
 	}
 
@@ -215,7 +215,7 @@ func (vm *VM) newImportTx(
 	outs := []*ava.TransferableOutput{}
 	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
 		var baseSigners [][]*crypto.PrivateKeySECP256K1R
-		ins, outs, baseSigners, err = vm.burn(vm.DB, keys, vm.txFee-importedAmount, 0)
+		ins, outs, _, baseSigners, err = vm.spend(vm.DB, keys, 0, vm.txFee-importedAmount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
