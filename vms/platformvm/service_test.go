@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/ava-labs/gecko/vms/avm"
+
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/utils/crypto"
 )
@@ -43,6 +45,7 @@ func defaultService(t *testing.T) *Service {
 	return &Service{vm: vm}
 }
 
+// Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
 	service.vm.Ctx.Lock.Lock()
 	defer service.vm.Ctx.Lock.Unlock()
@@ -57,6 +60,8 @@ func defaultAddress(t *testing.T, service *Service) {
 	}
 	privKey := pk.(*crypto.PrivateKeySECP256K1R)
 	if err := user.putAddress(privKey); err != nil {
+		t.Fatal(err)
+	} else if err := user.putAddress(keys[0]); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -126,5 +131,61 @@ func TestImportKey(t *testing.T) {
 	}
 	if testAddress != reply.Address {
 		t.Fatalf("Expected %q, got %q", testAddress, reply.Address)
+	}
+}
+
+// Test issuing a tx, having it be dropped, and then re-issued and accepted
+func TestGetTxStatus(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+
+	// create a tx
+	tx, err := service.vm.newCreateChainTx(
+		testSubnet1.id,
+		nil,
+		avm.ID,
+		nil,
+		"chain name",
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arg := &GetTxStatusArgs{TxID: tx.ID()}
+	var status Status
+	if err := service.GetTxStatus(nil, arg, &status); err != nil {
+		t.Fatal(err)
+	} else if status != Unknown {
+		t.Fatalf("status should be unknown but is %s", status)
+		// put the chain in existing chain list
+	} else if err := service.vm.issueTx(tx); err != nil {
+		t.Fatal(err)
+	} else if err := service.vm.putChains(service.vm.DB, []*DecisionTx{tx}); err != nil {
+		t.Fatal(err)
+	} else if _, err := service.vm.BuildBlock(); err == nil {
+		t.Fatal("should have errored because chain already exists")
+	} else if err := service.GetTxStatus(nil, arg, &status); err != nil {
+		t.Fatal(err)
+	} else if status != Dropped {
+		t.Fatalf("status should be Dropped but is %s", status)
+		// remove the chain from existing chain list
+	} else if err := service.vm.putChains(service.vm.DB, []*DecisionTx{}); err != nil {
+		t.Fatal(err)
+	} else if err := service.vm.issueTx(tx); err != nil {
+		t.Fatal(err)
+	} else if block, err := service.vm.BuildBlock(); err != nil {
+		t.Fatal(err)
+	} else if blk, ok := block.(*StandardBlock); !ok {
+		t.Fatalf("should be *StandardBlock but it %T", blk)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := service.GetTxStatus(nil, arg, &status); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 }

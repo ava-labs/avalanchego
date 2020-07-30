@@ -546,7 +546,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	switch {
 	case args.Destination == "":
 		return errNoDestination
-	case int64(args.StartTime) < time.Now().Unix():
+	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
 	}
 
