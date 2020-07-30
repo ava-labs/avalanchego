@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
@@ -15,11 +16,13 @@ func TestVertexVerify(t *testing.T) {
 	inputs := ids.Set{}
 	inputs.Add(conflictingInputID)
 	tx0 := &snowstorm.TestTx{
-		Identifier: ids.NewID([32]byte{'t', 'x', '0'}),
-		Deps:       nil,
-		Ins:        inputs,
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.NewID([32]byte{'t', 'x', '0'}),
+		},
+		DependenciesV: nil,
+		InputIDsV:     inputs,
 	}
-	validVertex := &vertex{
+	validVertex := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
@@ -31,7 +34,7 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatalf("Valid vertex failed verification due to: %w", err)
 	}
 
-	nonUniqueParentsVtx := &vertex{
+	nonUniqueParentsVtx := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
@@ -47,7 +50,7 @@ func TestVertexVerify(t *testing.T) {
 	parent1 := ids.NewID([32]byte{1})
 	sortedParents := []ids.ID{parent0, parent1}
 	ids.SortIDs(sortedParents)
-	nonSortedParentsVtx := &vertex{
+	nonSortedParentsVtx := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
@@ -59,7 +62,7 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with non-sorted parents should not have passed verification")
 	}
 
-	noTxsVertex := &vertex{
+	noTxsVertex := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
@@ -72,13 +75,15 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	tx1 := &snowstorm.TestTx{
-		Identifier: ids.NewID([32]byte{'t', 'x', '1'}),
-		Deps:       nil,
-		Ins:        nil,
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.NewID([32]byte{'t', 'x', '1'}),
+		},
+		DependenciesV: nil,
+		InputIDsV:     nil,
 	}
 	sortedTxs := []snowstorm.Tx{tx0, tx1}
 	sortTxs(sortedTxs)
-	unsortedTxsVertex := &vertex{
+	unsortedTxsVertex := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
@@ -90,7 +95,7 @@ func TestVertexVerify(t *testing.T) {
 		t.Fatal("Vertex with unsorted transactions should not have passed verification")
 	}
 
-	nonUniqueTxsVertex := &vertex{
+	nonUniqueTxsVertex := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
@@ -104,15 +109,17 @@ func TestVertexVerify(t *testing.T) {
 
 	inputs.Add(ids.NewID([32]byte{'e', 'x', 't', 'r', 'a'}))
 	conflictingTx := &snowstorm.TestTx{
-		Identifier: ids.NewID([32]byte{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'}),
-		Deps:       nil,
-		Ins:        inputs,
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.NewID([32]byte{'c', 'o', 'n', 'f', 'l', 'i', 'c', 't'}),
+		},
+		DependenciesV: nil,
+		InputIDsV:     inputs,
 	}
 
 	conflictingTxs := []snowstorm.Tx{tx0, conflictingTx}
 	sortTxs(conflictingTxs)
 
-	conflictingTxsVertex := &vertex{
+	conflictingTxsVertex := &innerVertex{
 		id:        ids.NewID([32]byte{}),
 		chainID:   ids.NewID([32]byte{1}),
 		height:    1,
