@@ -17,14 +17,14 @@
 package core
 
 import (
+	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/misc"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/consensus"
-	"github.com/ava-labs/go-ethereum/consensus/misc"
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/go-ethereum/core/vm"
 	"github.com/ava-labs/go-ethereum/crypto"
-	"github.com/ava-labs/go-ethereum/params"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning

@@ -34,7 +34,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/ava-labs/go-ethereum/core"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/go-ethereum/rlp"
 )
 

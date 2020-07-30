@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/compiler"
-	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/log"
-	"github.com/ava-labs/go-ethereum/params"
 	"go/build"
 	"math/big"
 	"os"
@@ -57,6 +57,7 @@ func main() {
 	b := `{"config":{"chainId":1,"homesteadBlock":0,"daoForkBlock":0,"daoForkSupport":true,"eip150Block":0,"eip150Hash":"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0},"nonce":"0x0","timestamp":"0x0","extraData":"0x00","gasLimit":"0x5f5e100","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","coinbase":"0x0000000000000000000000000000000000000000","alloc":{"751a0b96e1042bee789452ecb20253fba40dbe85":{"balance":"0x16345785d8a0000"}},"number":"0x0","gasUsed":"0x0","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}`
 	k := "0xabd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1"
 	err := json.Unmarshal([]byte(b), g)
+	checkError(err)
 	config.Genesis = g
 	hk, _ := crypto.HexToECDSA(k[2:])
 	genKey = coreth.NewKeyFromECDSA(hk)

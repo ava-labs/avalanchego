@@ -23,36 +23,34 @@ import (
 	"math/big"
 	"runtime"
 	"sync"
-	"sync/atomic"
+	//"sync/atomic"
 
+	"github.com/ava-labs/coreth/accounts"
+	"github.com/ava-labs/coreth/accounts/abi/bind"
+	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/clique"
 	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/consensus/ethash"
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
-	myparams "github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/go-ethereum/accounts"
-	"github.com/ava-labs/go-ethereum/accounts/abi/bind"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/consensus"
-	"github.com/ava-labs/go-ethereum/consensus/clique"
-	"github.com/ava-labs/go-ethereum/consensus/ethash"
 	"github.com/ava-labs/go-ethereum/core/bloombits"
-	"github.com/ava-labs/go-ethereum/core/rawdb"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/go-ethereum/core/vm"
 	"github.com/ava-labs/go-ethereum/eth/downloader"
 	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/p2p"
-	//"github.com/ava-labs/go-ethereum/p2p/enr"
-	"github.com/ava-labs/go-ethereum/params"
 	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 type LesServer interface {
@@ -78,10 +76,10 @@ type Ethereum struct {
 	server *p2p.Server
 
 	// Handlers
-	txPool          *core.TxPool
-	blockchain      *core.BlockChain
-	protocolManager *ProtocolManager
-	lesServer       LesServer
+	txPool     *core.TxPool
+	blockchain *core.BlockChain
+	//protocolManager *ProtocolManager
+	lesServer LesServer
 
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -253,8 +251,8 @@ func makeExtraData(extra []byte) []byte {
 			runtime.GOOS,
 		})
 	}
-	if uint64(len(extra)) > myparams.MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", myparams.MaximumExtraDataSize)
+	if uint64(len(extra)) > params.MaximumExtraDataSize {
+		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", params.MaximumExtraDataSize)
 		extra = nil
 	}
 	return extra
@@ -486,8 +484,8 @@ func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }
 func (s *Ethereum) IsListening() bool                  { return true } // Always listening
 func (s *Ethereum) EthVersion() int                    { return int(ProtocolVersions[0]) }
 func (s *Ethereum) NetVersion() uint64                 { return s.networkID }
-func (s *Ethereum) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
-func (s *Ethereum) Synced() bool                       { return atomic.LoadUint32(&s.protocolManager.acceptTxs) == 1 }
+func (s *Ethereum) Downloader() *downloader.Downloader { return nil }  // s.protocolManager.downloader }
+func (s *Ethereum) Synced() bool                       { return true } // atomic.LoadUint32(&s.protocolManager.acceptTxs) == 1 }
 func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
 
 // Protocols implements node.Service, returning all the currently configured

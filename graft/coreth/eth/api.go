@@ -29,13 +29,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/core/rawdb"
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/rlp"
 	"github.com/ava-labs/go-ethereum/trie"
 )

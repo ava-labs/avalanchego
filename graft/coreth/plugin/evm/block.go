@@ -6,7 +6,7 @@ package evm
 import (
 	"fmt"
 
-	"github.com/ava-labs/go-ethereum/core/types"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/go-ethereum/rlp"
 
 	"github.com/ava-labs/gecko/ids"

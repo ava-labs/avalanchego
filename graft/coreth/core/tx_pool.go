@@ -25,14 +25,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/prque"
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/metrics"
-	"github.com/ava-labs/go-ethereum/params"
 )
 
 const (
