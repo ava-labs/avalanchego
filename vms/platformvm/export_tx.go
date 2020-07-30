@@ -71,6 +71,9 @@ func (tx *UnsignedExportTx) Verify() error {
 		if err := out.Verify(); err != nil {
 			return err
 		}
+		if _, ok := out.Output().(*StakeableLockOut); ok {
+			return errInvalidAmount
+		}
 	}
 	if !ava.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
 		return errOutputsNotSorted
@@ -92,7 +95,11 @@ func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.
 	if err := tx.Verify(); err != nil {
 		return permError{err}
 	}
-	return tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, nil, creds)
+
+	allOuts := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(allOuts, tx.Outs)
+	copy(allOuts[len(tx.Outs):], tx.ExportedOutputs)
+	return tx.vm.semanticVerifySpend(db, tx, tx.Ins, allOuts, nil, creds)
 }
 
 // Accept this transaction.

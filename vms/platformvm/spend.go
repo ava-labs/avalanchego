@@ -301,62 +301,74 @@ func syntacticVerifySpend(
 	unlockedOuts []*ava.TransferableOutput,
 	lockedOuts []*ava.TransferableOutput,
 	locked uint64,
-	unlocked uint64,
+	burnedUnlocked uint64,
 	avaxAssetID ids.ID,
 ) error {
 	// AVAX consumed in this tx
-	consumed := uint64(0)
+	consumedLocked := uint64(0)
+	consumedUnlocked := uint64(0)
 	for _, in := range ins {
 		if assetID := in.AssetID(); !assetID.Equals(avaxAssetID) { // all inputs must be AVAX
 			return fmt.Errorf("input has unexpected asset ID %s expected %s", assetID, avaxAssetID)
 		}
 
-		newConsumed, err := safemath.Add64(consumed, in.Input().Amount())
-		if err != nil {
-			return errInputOverflow
+		in := in.Input()
+		consumed := in.Amount()
+		if _, ok := in.(*StakeableLockIn); ok {
+			newConsumed, err := safemath.Add64(consumedLocked, consumed)
+			if err != nil {
+				return errInputOverflow
+			}
+			consumedLocked = newConsumed
+		} else {
+			newConsumed, err := safemath.Add64(consumedUnlocked, consumed)
+			if err != nil {
+				return errInputOverflow
+			}
+			consumedUnlocked = newConsumed
 		}
-		consumed = newConsumed
 	}
 
 	// AVAX produced in this tx
-	producedUnlocked := unlocked
+	producedUnlocked := burnedUnlocked
 	for _, out := range unlockedOuts {
 		if assetID := out.AssetID(); !assetID.Equals(avaxAssetID) { // all outputs must be AVAX
 			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, avaxAssetID)
 		}
 
-		newProduced, err := safemath.Add64(producedUnlocked, out.Output().Amount())
-		if err != nil {
-			return errOutputOverflow
+		out := out.Output()
+		produced := out.Amount()
+		if _, ok := out.(*StakeableLockOut); !ok {
+			newProduced, err := safemath.Add64(producedUnlocked, produced)
+			if err != nil {
+				return errOutputOverflow
+			}
+			producedUnlocked = newProduced
 		}
-		producedUnlocked = newProduced
 	}
 
+	// AVAX produced in this tx
 	producedLocked := uint64(0)
 	for _, out := range lockedOuts {
 		if assetID := out.AssetID(); !assetID.Equals(avaxAssetID) { // all outputs must be AVAX
 			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, avaxAssetID)
 		}
 
-		newProduced, err := safemath.Add64(producedLocked, out.Output().Amount())
+		out := out.Output()
+		produced := out.Amount()
+		newProduced, err := safemath.Add64(producedLocked, produced)
 		if err != nil {
 			return errOutputOverflow
 		}
 		producedLocked = newProduced
 	}
-
-	totalProduced, err := safemath.Add64(producedUnlocked, producedLocked)
-	if err != nil {
-		return errOutputOverflow
+	if producedLocked < locked {
+		return fmt.Errorf("tx locked outputs (%d) < required locked (%d)",
+			producedLocked, locked)
 	}
-
-	if totalProduced > consumed {
-		return fmt.Errorf("tx outputs (%d) > inputs (%d)",
-			totalProduced, consumed)
-	}
-	if producedLocked != locked {
-		return fmt.Errorf("tx has wrong locked outputs (%d) amount",
-			producedLocked)
+	if producedUnlocked > consumedUnlocked {
+		return fmt.Errorf("tx unlocked outputs (%d) + burn amount (%d) > inputs (%d)",
+			producedUnlocked-burnedUnlocked, burnedUnlocked, consumedUnlocked)
 	}
 	return nil
 }
