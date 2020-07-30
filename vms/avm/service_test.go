@@ -4,7 +4,9 @@
 package avm
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +23,33 @@ import (
 
 func setup(t *testing.T) ([]byte, *VM, *Service) {
 	genesisBytes, _, vm := GenesisVM(t)
+	keystore := keystore.CreateTestKeystore()
+	keystore.AddUser(username, password)
+	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
 	s := &Service{vm: vm}
+	return genesisBytes, vm, s
+}
+
+func setupWithKeys(t *testing.T) ([]byte, *VM, *Service) {
+	genesisBytes, vm, s := setup(t)
+
+	// Import the initially funded private keys
+	user := userState{vm: vm}
+	db, err := s.vm.ctx.Keystore.GetDatabase(username, password)
+	if err != nil {
+		t.Fatalf("Failed to get user database: %s", err)
+	}
+
+	addrs := []ids.ShortID{}
+	for _, sk := range keys {
+		if err := user.SetKey(db, sk); err != nil {
+			t.Fatalf("Failed to set key for user: %s", err)
+		}
+		addrs = append(addrs, sk.PublicKey().Address())
+	}
+	if err := user.SetAddresses(db, addrs); err != nil {
+		t.Fatalf("Failed to set user addresses: %s", err)
+	}
 	return genesisBytes, vm, s
 }
 
@@ -115,6 +143,34 @@ func TestServiceGetBalance(t *testing.T) {
 	assert.Equal(t, uint64(balanceReply.Balance), uint64(300000))
 
 	assert.Len(t, balanceReply.UTXOIDs, 4, "should have only returned four utxoIDs")
+}
+
+func TestServiceGetAllBalances(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+
+	defer vm.ctx.Lock.Unlock()
+	defer vm.Shutdown()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	assetID := genesisTx.ID()
+	addr := keys[0].PublicKey().Address()
+
+	balanceArgs := &GetAllBalancesArgs{
+		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+	}
+	balanceReply := &GetAllBalancesReply{}
+	err := s.GetAllBalances(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+
+	assert.Len(t, balanceReply.Balances, 1)
+
+	balance := balanceReply.Balances[0]
+	alias, err := vm.PrimaryAlias(assetID)
+	if err != nil {
+		t.Fatalf("Failed to get primary alias of genesis asset: %s", err)
+	}
+	assert.Equal(t, balance.AssetID, alias)
+	assert.Equal(t, uint64(balance.Balance), uint64(300000))
 }
 
 func TestServiceGetTx(t *testing.T) {
@@ -469,27 +525,12 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 }
 
-func TestImportAVMKey(t *testing.T) {
+func TestImportExportKey(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
-
-	userKeystore := keystore.CreateTestKeystore(t)
-
-	username := "bobby"
-	password := "StrnasfqewiurPasswdn56d"
-	if err := userKeystore.AddUser(username, password); err != nil {
-		t.Fatal(err)
-	}
-
-	vm.ctx.Keystore = userKeystore.NewBlockchainKeyStore(vm.ctx.ChainID)
-	_, err := vm.ctx.Keystore.GetDatabase(username, password)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.NewPrivateKey()
@@ -498,14 +539,37 @@ func TestImportAVMKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	args := ImportKeyArgs{
+	formattedKey := formatting.CB58{Bytes: sk.Bytes()}
+	importArgs := &ImportKeyArgs{
 		Username:   username,
 		Password:   password,
 		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
 	}
-	reply := ImportKeyReply{}
-	if err = s.ImportKey(nil, &args, &reply); err != nil {
+	importReply := &ImportKeyReply{}
+	if err = s.ImportKey(nil, importArgs, importReply); err != nil {
 		t.Fatal(err)
+	}
+
+	exportArgs := &ExportKeyArgs{
+		Username: username,
+		Password: password,
+		Address:  vm.Format(sk.PublicKey().Address().Bytes()),
+	}
+	exportReply := &ExportKeyReply{}
+	if err = s.ExportKey(nil, exportArgs, exportReply); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.HasPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix) {
+		t.Fatalf("ExportKeyReply private key: %s mssing secret key prefix: %s", exportReply.PrivateKey, constants.SecretKeyPrefix)
+	}
+
+	exportedKey := formatting.CB58{}
+	if err := exportedKey.FromString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix)); err != nil {
+		t.Fatal("Failed to parse exported private key")
+	}
+	if !bytes.Equal(exportedKey.Bytes, formattedKey.Bytes) {
+		t.Fatal("Unexpected key was found in ExportKeyReply")
 	}
 }
 
@@ -516,20 +580,6 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
 	}()
-
-	userKeystore := keystore.CreateTestKeystore(t)
-
-	username := "bobby"
-	password := "StrnasfqewiurPasswdn56d"
-	if err := userKeystore.AddUser(username, password); err != nil {
-		t.Fatal(err)
-	}
-
-	vm.ctx.Keystore = userKeystore.NewBlockchainKeyStore(vm.ctx.ChainID)
-	_, err := vm.ctx.Keystore.GetDatabase(username, password)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.NewPrivateKey()
@@ -579,4 +629,75 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	if addrsReply.Addresses[0] != expectedAddress {
 		t.Fatal("List addresses returned an incorrect address")
 	}
+}
+
+func TestSend(t *testing.T) {
+	genesisBytes, vm, s := setupWithKeys(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	assetID := genesisTx.ID()
+	addr := keys[0].PublicKey().Address()
+
+	args := &SendArgs{
+		Username: username,
+		Password: password,
+		Amount:   500,
+		AssetID:  assetID.String(),
+		To:       vm.Format(addr.Bytes()),
+	}
+	reply := &SendReply{}
+	vm.timer.Cancel()
+	if err := s.Send(nil, args, reply); err != nil {
+		t.Fatalf("Failed to send transaction: %s", err)
+	}
+
+	pendingTxs := vm.txs
+	if len(pendingTxs) != 1 {
+		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
+	}
+
+	if !reply.TxID.Equals(pendingTxs[0].ID()) {
+		t.Fatal("Transaction ID returned by Send does not match the transaction found in vm's pending transactions")
+	}
+}
+
+func TestCreateAndListAddresses(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
+
+	createArgs := &CreateAddressArgs{
+		Username: username,
+		Password: password,
+	}
+	createReply := &CreateAddressReply{}
+
+	if err := s.CreateAddress(nil, createArgs, createReply); err != nil {
+		t.Fatalf("Failed to create address: %s", err)
+	}
+
+	newAddr := createReply.Address
+
+	listArgs := &ListAddressesArgs{
+		Username: username,
+		Password: password,
+	}
+	listReply := &ListAddressesResponse{}
+
+	if err := s.ListAddresses(nil, listArgs, listReply); err != nil {
+		t.Fatalf("Failed to list addresses: %s", err)
+	}
+
+	for _, addr := range listReply.Addresses {
+		if addr == newAddr {
+			return
+		}
+	}
+	t.Fatalf("Failed to find newly created address among %d addresses", len(listReply.Addresses))
 }

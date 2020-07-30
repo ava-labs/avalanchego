@@ -183,7 +183,7 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore := keystore.CreateTestKeystore(t)
+	userKeystore := keystore.CreateTestKeystore()
 	if err := userKeystore.AddUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -199,10 +199,16 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
+		[]*common.Fx{
+			{
+				ID: ids.Empty,
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: nftfx.ID,
+				Fx: &nftfx.Fx{},
+			},
+		},
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -1247,7 +1247,7 @@ type MintNFTReply struct {
 	TxID ids.ID `json:"txID"`
 }
 
-// MintNFT returns the newly created unsigned transaction
+// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *MintNFTReply) error {
 	service.vm.ctx.Log.Info("AVM: MintNFT called with username: %s", args.Username)
 

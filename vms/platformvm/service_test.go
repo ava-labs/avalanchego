@@ -41,7 +41,7 @@ func defaultService(t *testing.T) *Service {
 	vm := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
-	ks := keystore.CreateTestKeystore(t)
+	ks := keystore.CreateTestKeystore()
 	if err := ks.AddUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
