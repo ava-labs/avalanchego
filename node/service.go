@@ -20,12 +20,12 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"github.com/ava-labs/go-ethereum/accounts"
-	"github.com/ava-labs/go-ethereum/core/rawdb"
+	"github.com/ava-labs/coreth/accounts"
+	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/p2p"
-	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 // ServiceContext is a collection of service independent options inherited from

@@ -21,10 +21,10 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core/vm"
 	"github.com/ava-labs/go-ethereum/log"
-	"github.com/ava-labs/go-ethereum/params"
 )
 
 var (

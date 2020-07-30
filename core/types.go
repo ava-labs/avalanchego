@@ -17,9 +17,9 @@
 package core
 
 import (
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/go-ethereum/core/vm"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
 )
 
 // Validator is an interface which defines the standard for block validation. It

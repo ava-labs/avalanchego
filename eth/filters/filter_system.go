@@ -26,14 +26,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core"
-	myrpc "github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/rpc"
 	ethereum "github.com/ava-labs/go-ethereum"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core/rawdb"
-	"github.com/ava-labs/go-ethereum/core/types"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/log"
-	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 // Type determines the kind of filter and is used to put the filter in to
@@ -197,24 +196,24 @@ func (es *EventSystem) subscribe(sub *subscription) *Subscription {
 // given criteria to the given logs channel. Default value for the from and to
 // block is "latest". If the fromBlock > toBlock an error is returned.
 func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) (*Subscription, error) {
-	var from, to myrpc.BlockNumber
+	var from, to rpc.BlockNumber
 	if crit.FromBlock == nil {
-		from = myrpc.LatestBlockNumber
+		from = rpc.LatestBlockNumber
 	} else {
-		from = myrpc.BlockNumber(crit.FromBlock.Int64())
+		from = rpc.BlockNumber(crit.FromBlock.Int64())
 	}
 	if crit.ToBlock == nil {
-		to = myrpc.LatestBlockNumber
+		to = rpc.LatestBlockNumber
 	} else {
-		to = myrpc.BlockNumber(crit.ToBlock.Int64())
+		to = rpc.BlockNumber(crit.ToBlock.Int64())
 	}
 
 	// only interested in pending logs
-	if from == myrpc.PendingBlockNumber && to == myrpc.PendingBlockNumber {
+	if from == rpc.PendingBlockNumber && to == rpc.PendingBlockNumber {
 		return es.subscribePendingLogs(crit, logs), nil
 	}
 	// only interested in new mined logs
-	if from == myrpc.LatestBlockNumber && to == myrpc.LatestBlockNumber {
+	if from == rpc.LatestBlockNumber && to == rpc.LatestBlockNumber {
 		return es.subscribeLogs(crit, logs), nil
 	}
 	// only interested in mined logs within a specific block range
@@ -222,11 +221,11 @@ func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 		return es.subscribeLogs(crit, logs), nil
 	}
 	// interested in mined logs from a specific block number, new logs and pending logs
-	if from >= myrpc.LatestBlockNumber && to == myrpc.PendingBlockNumber {
+	if from >= rpc.LatestBlockNumber && to == rpc.PendingBlockNumber {
 		return es.subscribeMinedPendingLogs(crit, logs), nil
 	}
 	// interested in logs from a specific block number to new mined blocks
-	if from >= 0 && to == myrpc.LatestBlockNumber {
+	if from >= 0 && to == rpc.LatestBlockNumber {
 		return es.subscribeLogs(crit, logs), nil
 	}
 	return nil, fmt.Errorf("invalid from and to block combination: from > to")

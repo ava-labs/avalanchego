@@ -22,11 +22,11 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/core/types"
 )
 
 var maxPrice = big.NewInt(500 * params.GWei)

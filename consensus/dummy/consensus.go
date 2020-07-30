@@ -8,14 +8,13 @@ import (
 	"runtime"
 	"time"
 
-	myparams "github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/consensus"
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/go-ethereum/params"
 	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/rpc"
 	mapset "github.com/deckarep/golang-set"
 )
 
@@ -56,8 +55,8 @@ var (
 // modified from consensus.go
 func (self *DummyEngine) verifyHeader(chain consensus.ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > myparams.MaximumExtraDataSize {
-		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), myparams.MaximumExtraDataSize)
+	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
+		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 	}
 	// Verify the header's timestamp
 	if !uncle {

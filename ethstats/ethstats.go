@@ -30,17 +30,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/mclock"
-	"github.com/ava-labs/go-ethereum/consensus"
-	"github.com/ava-labs/go-ethereum/core"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/go-ethereum/event"
 	"github.com/ava-labs/go-ethereum/les"
 	"github.com/ava-labs/go-ethereum/log"
 	"github.com/ava-labs/go-ethereum/p2p"
-	"github.com/ava-labs/go-ethereum/rpc"
 	"github.com/gorilla/websocket"
 )
 

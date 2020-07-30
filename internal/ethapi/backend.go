@@ -21,20 +21,18 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/core"
-	myrpc "github.com/ava-labs/coreth/rpc"
-	"github.com/ava-labs/go-ethereum/accounts"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
-	ethcore "github.com/ava-labs/go-ethereum/core"
 	"github.com/ava-labs/go-ethereum/core/bloombits"
-	"github.com/ava-labs/go-ethereum/core/state"
-	"github.com/ava-labs/go-ethereum/core/types"
-	"github.com/ava-labs/go-ethereum/core/vm"
 	"github.com/ava-labs/go-ethereum/eth/downloader"
 	"github.com/ava-labs/go-ethereum/ethdb"
 	"github.com/ava-labs/go-ethereum/event"
-	"github.com/ava-labs/go-ethereum/params"
-	"github.com/ava-labs/go-ethereum/rpc"
 )
 
 // Backend interface provides the common API services (that are provided by
@@ -52,14 +50,14 @@ type Backend interface {
 
 	// Blockchain API
 	SetHead(number uint64)
-	HeaderByNumber(ctx context.Context, number myrpc.BlockNumber) (*types.Header, error)
+	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
-	BlockByNumber(ctx context.Context, number myrpc.BlockNumber) (*types.Block, error)
+	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
-	StateAndHeaderByNumber(ctx context.Context, number myrpc.BlockNumber) (*state.StateDB, *types.Header, error)
+	StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
 	GetTd(hash common.Hash) *big.Int
-	GetEVM(ctx context.Context, msg ethcore.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error)
+	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error)
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
