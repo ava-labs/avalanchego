@@ -12,6 +12,5 @@ var (
 // Weighted ...
 type Weighted interface {
 	Initialize([]uint64) error
-	StartSearch(uint64) error
-	ContinueSearch() (int, bool)
+	Sample(uint64) (int, error)
 }

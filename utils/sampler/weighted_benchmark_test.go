@@ -20,13 +20,8 @@ func WeightedUniformBenchmark(b *testing.B, s Weighted, size int) {
 	s.Initialize(weights)
 
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		s.StartSearch(uint64(random.Rand(0, len(weights))))
-		for {
-			if _, ok := s.ContinueSearch(); ok {
-				break
-			}
-		}
+	for i := 0; i < b.N; i++ {
+		s.Sample(uint64(random.Rand(0, len(weights))))
 	}
 }
 
@@ -43,16 +38,15 @@ func WeightedPowBenchmark(b *testing.B, s Weighted, exponent float64, size int) 
 		}
 		maxWeight = newWeight
 	}
+	if maxWeight > math.MaxInt64 {
+		b.Fatalf("overflow error")
+	}
+
 	s.Initialize(weights)
 
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		s.StartSearch(uint64(random.Rand(0, int(maxWeight))))
-		for {
-			if _, ok := s.ContinueSearch(); ok {
-				break
-			}
-		}
+	for i := 0; i < b.N; i++ {
+		s.Sample(uint64(random.Rand(0, int(maxWeight))))
 	}
 }
 
@@ -65,19 +59,7 @@ func WeightedSingletonBenchmark(b *testing.B, s Weighted, size int) {
 	s.Initialize(weights)
 
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		s.StartSearch(uint64(random.Rand(0, math.MaxInt64)))
-		for {
-			if _, ok := s.ContinueSearch(); ok {
-				break
-			}
-		}
-	}
-}
-
-// BenchmarkRNG
-func BenchmarkRNG(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		_ = random.Rand(0, 10)
+	for i := 0; i < b.N; i++ {
+		s.Sample(uint64(random.Rand(0, math.MaxInt64)))
 	}
 }

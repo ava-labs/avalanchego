@@ -35,7 +35,7 @@ func (s *weightedLinear) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the most probable values are at the front of the array
-	sortweightedLinear(s.arr)
+	sortWeightedLinear(s.arr)
 
 	for i := 1; i < len(s.arr); i++ {
 		newWeight, err := safemath.Add64(
@@ -51,28 +51,25 @@ func (s *weightedLinear) Initialize(weights []uint64) error {
 	return nil
 }
 
-func (s *weightedLinear) StartSearch(value uint64) error {
+func (s *weightedLinear) Sample(value uint64) (int, error) {
 	if len(s.arr) == 0 || s.arr[len(s.arr)-1].cumulativeWeight <= value {
-		return errOutOfRange
+		return 0, errOutOfRange
 	}
-	s.currentIndex = 0
-	s.value = value
-	return nil
+
+	index := 0
+	for {
+		if currentElement := s.arr[index]; value < currentElement.cumulativeWeight {
+			return currentElement.index, nil
+		}
+		index++
+	}
 }
 
-func (s *weightedLinear) ContinueSearch() (int, bool) {
-	if currentElement := s.arr[s.currentIndex]; s.value < currentElement.cumulativeWeight {
-		return currentElement.index, true
-	}
-	s.currentIndex++
-	return 0, false
-}
+type innerSortWeightedLinear []weightedLinearElement
 
-type innerSortweightedLinear []weightedLinearElement
-
-func (lst innerSortweightedLinear) Less(i, j int) bool {
+func (lst innerSortWeightedLinear) Less(i, j int) bool {
 	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
 }
-func (lst innerSortweightedLinear) Len() int         { return len(lst) }
-func (lst innerSortweightedLinear) Swap(i, j int)    { lst[j], lst[i] = lst[i], lst[j] }
-func sortweightedLinear(lst []weightedLinearElement) { sort.Sort(innerSortweightedLinear(lst)) }
+func (lst innerSortWeightedLinear) Len() int         { return len(lst) }
+func (lst innerSortWeightedLinear) Swap(i, j int)    { lst[j], lst[i] = lst[i], lst[j] }
+func sortWeightedLinear(lst []weightedLinearElement) { sort.Sort(innerSortWeightedLinear(lst)) }

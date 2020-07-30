@@ -16,9 +16,7 @@ type weightedHeapElement struct {
 }
 
 type weightedHeap struct {
-	heap         []weightedHeapElement
-	currentIndex int
-	currentValue uint64
+	heap []weightedHeapElement
 }
 
 func (s *weightedHeap) Initialize(weights []uint64) error {
@@ -54,33 +52,30 @@ func (s *weightedHeap) Initialize(weights []uint64) error {
 	return nil
 }
 
-func (s *weightedHeap) StartSearch(value uint64) error {
+func (s *weightedHeap) Sample(value uint64) (int, error) {
 	if len(s.heap) == 0 || s.heap[0].cumulativeWeight <= value {
-		return errOutOfRange
+		return 0, errOutOfRange
 	}
-	s.currentIndex = 0
-	s.currentValue = value
-	return nil
-}
 
-func (s *weightedHeap) ContinueSearch() (int, bool) {
-	currentElement := s.heap[s.currentIndex]
-	currentWeight := currentElement.weight
-	if s.currentValue < currentWeight {
-		return currentElement.index, true
+	index := 0
+	for {
+		currentElement := s.heap[index]
+		currentWeight := currentElement.weight
+		if value < currentWeight {
+			return currentElement.index, nil
+		}
+		value -= currentWeight
+
+		// We shouldn't return the root, so check the left child
+		index = index*2 + 1
+
+		if leftWeight := s.heap[index].cumulativeWeight; leftWeight <= value {
+			// If the weight is greater than the left weight, you should move to
+			// the right child
+			value -= leftWeight
+			index++
+		}
 	}
-	s.currentValue -= currentWeight
-
-	// We shouldn't return the root, so check the left child
-	s.currentIndex = s.currentIndex*2 + 1
-
-	if leftWeight := s.heap[s.currentIndex].cumulativeWeight; leftWeight <= s.currentValue {
-		// If the weight is greater than the left weight, you should move to
-		// the right child
-		s.currentValue -= leftWeight
-		s.currentIndex++
-	}
-	return 0, false
 }
 
 type innerSortWeightedHeap []weightedHeapElement

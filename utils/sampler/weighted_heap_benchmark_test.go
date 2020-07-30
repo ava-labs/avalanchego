@@ -17,19 +17,9 @@ func BenchmarkWeightedHeapUniform10(b *testing.B) {
 	WeightedUniformBenchmark(b, &weightedHeap{}, 10)
 }
 
-// BenchmarkWeightedHeapUniform100
-func BenchmarkWeightedHeapUniform100(b *testing.B) {
-	WeightedUniformBenchmark(b, &weightedHeap{}, 100)
-}
-
 // BenchmarkWeightedHeapUniform1000
 func BenchmarkWeightedHeapUniform1000(b *testing.B) {
 	WeightedUniformBenchmark(b, &weightedHeap{}, 1000)
-}
-
-// BenchmarkWeightedHeapUniform10000
-func BenchmarkWeightedHeapUniform10000(b *testing.B) {
-	WeightedUniformBenchmark(b, &weightedHeap{}, 10000)
 }
 
 // BenchmarkWeightedHeapUniform100000
@@ -42,19 +32,9 @@ func BenchmarkWeightedHeapLinear10(b *testing.B) {
 	WeightedPowBenchmark(b, &weightedHeap{}, 1, 10)
 }
 
-// BenchmarkWeightedHeapLinear100
-func BenchmarkWeightedHeapLinear100(b *testing.B) {
-	WeightedPowBenchmark(b, &weightedHeap{}, 1, 100)
-}
-
 // BenchmarkWeightedHeapLinear1000
 func BenchmarkWeightedHeapLinear1000(b *testing.B) {
 	WeightedPowBenchmark(b, &weightedHeap{}, 1, 1000)
-}
-
-// BenchmarkWeightedHeapLinear10000
-func BenchmarkWeightedHeapLinear10000(b *testing.B) {
-	WeightedPowBenchmark(b, &weightedHeap{}, 1, 10000)
 }
 
 // BenchmarkWeightedHeapLinear100000
@@ -67,19 +47,9 @@ func BenchmarkWeightedHeapQuadratic10(b *testing.B) {
 	WeightedPowBenchmark(b, &weightedHeap{}, 2, 10)
 }
 
-// BenchmarkWeightedHeapQuadratic100
-func BenchmarkWeightedHeapQuadratic100(b *testing.B) {
-	WeightedPowBenchmark(b, &weightedHeap{}, 2, 100)
-}
-
 // BenchmarkWeightedHeapQuadratic1000
 func BenchmarkWeightedHeapQuadratic1000(b *testing.B) {
 	WeightedPowBenchmark(b, &weightedHeap{}, 2, 1000)
-}
-
-// BenchmarkWeightedHeapQuadratic10000
-func BenchmarkWeightedHeapQuadratic10000(b *testing.B) {
-	WeightedPowBenchmark(b, &weightedHeap{}, 2, 10000)
 }
 
 // BenchmarkWeightedHeapQuadratic100000
@@ -92,19 +62,9 @@ func BenchmarkWeightedHeapCubic10(b *testing.B) {
 	WeightedPowBenchmark(b, &weightedHeap{}, 3, 10)
 }
 
-// BenchmarkWeightedHeapCubic100
-func BenchmarkWeightedHeapCubic100(b *testing.B) {
-	WeightedPowBenchmark(b, &weightedHeap{}, 3, 100)
-}
-
 // BenchmarkWeightedHeapCubic1000
 func BenchmarkWeightedHeapCubic1000(b *testing.B) {
 	WeightedPowBenchmark(b, &weightedHeap{}, 3, 1000)
-}
-
-// BenchmarkWeightedHeapCubic10000
-func BenchmarkWeightedHeapCubic10000(b *testing.B) {
-	WeightedPowBenchmark(b, &weightedHeap{}, 3, 10000)
 }
 
 // BenchmarkWeightedHeapCubic50000
@@ -117,19 +77,9 @@ func BenchmarkWeightedHeapSingleton10(b *testing.B) {
 	WeightedSingletonBenchmark(b, &weightedHeap{}, 10)
 }
 
-// BenchmarkWeightedHeapSingleton100
-func BenchmarkWeightedHeapSingleton100(b *testing.B) {
-	WeightedSingletonBenchmark(b, &weightedHeap{}, 100)
-}
-
 // BenchmarkWeightedHeapSingleton1000
 func BenchmarkWeightedHeapSingleton1000(b *testing.B) {
 	WeightedSingletonBenchmark(b, &weightedHeap{}, 1000)
-}
-
-// BenchmarkWeightedHeapSingleton10000
-func BenchmarkWeightedHeapSingleton10000(b *testing.B) {
-	WeightedSingletonBenchmark(b, &weightedHeap{}, 10000)
 }
 
 // BenchmarkWeightedHeapSingleton100000

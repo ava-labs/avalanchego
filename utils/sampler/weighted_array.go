@@ -4,11 +4,18 @@
 package sampler
 
 import (
+	"sort"
+
 	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
+type weightedArrayElement struct {
+	cumulativeWeight uint64
+	index            int
+}
+
 type weightedArray struct {
-	arr          []uint64
+	arr          []weightedArrayElement
 	minIndex     int
 	currentIndex int
 	maxIndex     int
@@ -17,66 +24,96 @@ type weightedArray struct {
 
 func (s *weightedArray) Initialize(weights []uint64) error {
 	if len(weights) > len(s.arr) {
-		s.arr = make([]uint64, len(weights))
+		s.arr = make([]weightedArrayElement, len(weights))
 	} else {
 		s.arr = s.arr[:len(weights)]
 	}
 
-	cumulativeWeight := uint64(0)
 	for i, weight := range weights {
+		s.arr[i] = weightedArrayElement{
+			cumulativeWeight: weight,
+			index:            i,
+		}
+	}
+
+	// Optimize so that the array is closer to the uniform distribution
+	sortWeightedArray(s.arr)
+
+	arrCopy := make([]weightedArrayElement, len(weights))
+	copy(arrCopy, s.arr)
+
+	midpoint := (len(s.arr) + 1) / 2
+	for i := 0; i < midpoint; i++ {
+		start := 2 * i
+		end := len(s.arr) - 1 - i
+		s.arr[start] = arrCopy[i]
+		if start+1 < len(s.arr) {
+			s.arr[start+1] = arrCopy[end]
+		}
+	}
+
+	cumulativeWeight := uint64(0)
+	for i := 0; i < len(s.arr); i++ {
 		newWeight, err := safemath.Add64(
 			cumulativeWeight,
-			weight,
+			s.arr[i].cumulativeWeight,
 		)
 		if err != nil {
 			return err
 		}
 		cumulativeWeight = newWeight
-		s.arr[i] = cumulativeWeight
+		s.arr[i].cumulativeWeight = cumulativeWeight
 	}
 
 	return nil
 }
 
-func (s *weightedArray) StartSearch(value uint64) error {
-	if len(s.arr) == 0 || s.arr[len(s.arr)-1] <= value {
-		return errOutOfRange
+func (s *weightedArray) Sample(value uint64) (int, error) {
+	if len(s.arr) == 0 || s.arr[len(s.arr)-1].cumulativeWeight <= value {
+		return 0, errOutOfRange
 	}
-	s.minIndex = 0
-	s.maxIndex = len(s.arr) - 1
-	s.value = value
-	s.currentIndex = int((float64(value) * float64(s.maxIndex+1)) / float64(s.arr[len(s.arr)-1]))
-	return nil
+	minIndex := 0
+	maxIndex := len(s.arr) - 1
+	index := int((float64(value) * float64(s.maxIndex+1)) / float64(s.arr[len(s.arr)-1].cumulativeWeight))
+
+	for {
+		previousWeight := uint64(0)
+		if index > 0 {
+			previousWeight = s.arr[index-1].cumulativeWeight
+		}
+		currentElem := s.arr[index]
+		currentWeight := currentElem.cumulativeWeight
+		if previousWeight <= value && value < currentWeight {
+			return currentElem.index, nil
+		}
+
+		if value < previousWeight {
+			// go to the left
+			maxIndex = index - 1
+		} else {
+			// go to the right
+			minIndex = index + 1
+		}
+
+		minWeight := uint64(0)
+		if minIndex > 0 {
+			minWeight = s.arr[minIndex-1].cumulativeWeight
+		}
+		maxWeight := s.arr[maxIndex].cumulativeWeight
+
+		valueRange := maxWeight - minWeight
+		adjustedLookupValue := value - minWeight
+		indexRange := maxIndex - minIndex + 1
+
+		index = int((float64(adjustedLookupValue)*float64(indexRange))/float64(valueRange)) + minIndex
+	}
 }
 
-func (s *weightedArray) ContinueSearch() (int, bool) {
-	previousWeight := uint64(0)
-	if s.currentIndex > 0 {
-		previousWeight = s.arr[s.currentIndex-1]
-	}
-	currentWeight := s.arr[s.currentIndex]
-	if previousWeight <= s.value && s.value < currentWeight {
-		return s.currentIndex, true
-	}
+type innerSortWeightedArray []weightedArrayElement
 
-	if s.value < previousWeight {
-		// go to the left
-		s.maxIndex = s.currentIndex - 1
-	} else {
-		// go to the right
-		s.minIndex = s.currentIndex + 1
-	}
-
-	minWeight := uint64(0)
-	if s.minIndex > 0 {
-		minWeight = s.arr[s.minIndex-1]
-	}
-	maxWeight := s.arr[s.maxIndex]
-
-	valueRange := maxWeight - minWeight
-	adjustedLookupValue := s.value - minWeight
-	indexRange := s.maxIndex - s.minIndex + 1
-
-	s.currentIndex = int((float64(adjustedLookupValue)*float64(indexRange))/float64(valueRange)) + s.minIndex
-	return 0, false
+func (lst innerSortWeightedArray) Less(i, j int) bool {
+	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
 }
+func (lst innerSortWeightedArray) Len() int        { return len(lst) }
+func (lst innerSortWeightedArray) Swap(i, j int)   { lst[j], lst[i] = lst[i], lst[j] }
+func sortWeightedArray(lst []weightedArrayElement) { sort.Sort(innerSortWeightedArray(lst)) }
