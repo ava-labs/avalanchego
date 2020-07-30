@@ -181,9 +181,12 @@ func (vm *VM) spend(
 				// Reduce the value of this input to be able to be put towards
 				// the fee or being returned
 				value -= amount - spentLocked
+				spentLocked = amount
 			} else {
 				// We need to lock all of this input
 				amountToLock = value
+				spentLocked += value
+				value = 0
 			}
 		}
 		if burned < fee {
