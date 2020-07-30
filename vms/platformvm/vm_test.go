@@ -4,24 +4,39 @@
 package platformvm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/snow/consensus/snowball"
+	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/gecko/snow/networking/router"
+	"github.com/ava-labs/gecko/snow/networking/sender"
+	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/gecko/vms/timestampvm"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -210,7 +225,6 @@ func defaultVM() *VM {
 	return vm
 }
 
-/*
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	vm := defaultVM()
@@ -282,11 +296,6 @@ func TestGenesis(t *testing.T) {
 
 	// Ensure the new subnet we created exists
 	if _, err := vm.getSubnet(vm.DB, testSubnet1.ID()); err != nil {
-		subnets, err := vm.getSubnets(vm.DB)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("subnets: %+v", subnets)
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
 	}
 }
@@ -402,7 +411,7 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blk, err := vm.newProposalBlock(vm.LastAccepted(), preferredHeight+1, tx)
+	blk, err := vm.newProposalBlock(vm.LastAccepted(), preferredHeight+1, *tx)
 	if err != nil {
 		t.Fatal(err)
 	} else if err := vm.State.PutBlock(vm.DB, blk); err != nil {
@@ -524,7 +533,6 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.id,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -598,7 +606,6 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.id,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -860,7 +867,6 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -881,7 +887,7 @@ func TestCreateChain(t *testing.T) {
 	}
 	foundNewChain := false
 	for _, chain := range chains {
-		if bytes.Equal(chain.Bytes(), tx.Bytes()) {
+		if bytes.Equal(chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).Bytes(), tx.UnsignedDecisionTx.(*UnsignedCreateChainTx).Bytes()) {
 			foundNewChain = true
 		}
 	}
@@ -906,11 +912,11 @@ func TestCreateSubnet(t *testing.T) {
 	nodeID := keys[0].PublicKey().Address()
 
 	createSubnetTx, err := vm.newCreateSubnetTx(
+		1, //threshold
 		[]ids.ShortID{ // control keys
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		1,                                       // threshold
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
 	)
 	if err != nil {
@@ -936,8 +942,7 @@ func TestCreateSubnet(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		createSubnetTx.id,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		createSubnetTx.ID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -975,13 +980,13 @@ func TestCreateSubnet(t *testing.T) {
 	}
 
 	// Verify validator is in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.id)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 	foundNewValidator := false
 	for _, tx := range pendingValidators.Txs {
-		if tx.Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Vdr().ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1025,20 +1030,20 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Verify validator no longer in pending validator set
 	// Verify validator is in pending validator set
-	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id); err != nil {
+	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if pendingValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
 	}
 
 	// Verify validator is in current validator set
-	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.id)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 	foundNewValidator = false
 	for _, tx := range currentValidators.Txs {
-		if tx.Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Vdr().ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1078,11 +1083,11 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	}
 	// pending validators and current validator should be empty
-	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id); err != nil {
+	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if pendingValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
-	} else if currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.id); err != nil {
+	} else if currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if currentValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
@@ -1112,8 +1117,8 @@ func TestAtomicImport(t *testing.T) {
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
 	if _, err := vm.newImportTx(
+		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		recipientKey,
 	); err == nil {
 		t.Fatalf("should have errored due to missing utxos")
 	}
@@ -1138,8 +1143,8 @@ func TestAtomicImport(t *testing.T) {
 	vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
 
 	tx, err := vm.newImportTx(
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		recipientKey,
+		recipientKey.PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1235,7 +1240,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	}
 }
 */
-/*
+
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
@@ -1267,7 +1272,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1293,11 +1298,9 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
-		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
-		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
-		0, 95, 12, 157, 133,
-	}
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 6, 150, 225, 43, 97, 69, 215, 238,
+		150, 164, 249, 184, 2, 197, 216, 49, 6, 78, 81, 50, 190, 8, 44, 165, 219, 127, 96, 39,
+		235, 155, 17, 108, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 0, 95, 34, 234, 149, 0, 0, 0, 0}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
 	}
@@ -1364,7 +1367,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1388,24 +1391,27 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	/* This code, when uncommented, prints [secondAdvanceTimeBlkBytes]
-	secondAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(2*time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstVM.preferredHeight()+1, secondAdvanceTimeTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Fatal(secondAdvanceTimeBlk.Bytes())
-*/
-/*
+	/*
+		//This code, when uncommented, prints [secondAdvanceTimeBlkBytes]
+		secondAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		preferredHeight, err = firstVM.preferredHeight()
+		if err != nil {
+			t.Fatal(err)
+		}
+		secondAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *secondAdvanceTimeTx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal(secondAdvanceTimeBlk.Bytes())
+	*/
+
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
-		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
-		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
-		0, 95, 12, 157, 133,
-	}
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 6, 150, 225, 43, 97, 69, 215, 238,
+		150, 164, 249, 184, 2, 197, 216, 49, 6, 78, 81, 50, 190, 8, 44, 165, 219, 127, 96, 39,
+		235, 155, 17, 108, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 0, 95, 34, 234, 149, 0, 0, 0, 0}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
 	}
@@ -1479,7 +1485,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, advanceTimeTx)
+	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, *advanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1632,7 +1638,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1653,7 +1659,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, secondAdvanceTimeTx)
+	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, *secondAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1718,4 +1724,3 @@ func TestFormatAddress(t *testing.T) {
 		})
 	}
 }
-*/

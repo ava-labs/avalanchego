@@ -3,7 +3,6 @@
 
 package platformvm
 
-/*
 import (
 	"testing"
 	"time"
@@ -15,9 +14,9 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
+func TestUnsignedewardValidatorTxSyntacticVerify(t *testing.T) {
 	type test struct {
-		tx        *rewardValidatorTx
+		tx        *UnsignedRewardValidatorTx
 		shouldErr bool
 	}
 
@@ -36,14 +35,14 @@ func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			tx: &rewardValidatorTx{
+			tx: &UnsignedRewardValidatorTx{
 				vm:   vm,
 				TxID: txID,
 			},
 			shouldErr: false,
 		},
 		{
-			tx: &rewardValidatorTx{
+			tx: &UnsignedRewardValidatorTx{
 				vm:   vm,
 				TxID: ids.ID{},
 			},
@@ -62,7 +61,7 @@ func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
 	}
 }
 
-func TestRewardValidatorTxSemanticVerify(t *testing.T) {
+func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 	vm := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -70,25 +69,24 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	var nextToRemove *addDefaultSubnetValidatorTx
 	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// ID of validator that should leave DS validator set next
-	nextToRemove = currentValidators.Peek().(*addDefaultSubnetValidatorTx)
+	nextToRemove := currentValidators.Peek().UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(nextToRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
+	} else if _, _, _, _, err := tx.SemanticVerify(vm.DB, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
 	// Case 2: Wrong validator
-	if tx, err := vm.newRewardValidatorTx(vm.Ctx.ChainID); err != nil {
+	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
+	} else if _, _, _, _, err := tx.SemanticVerify(vm.DB, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
@@ -101,56 +99,47 @@ func TestRewardValidatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommitDB, onAbortDB, _, _, err := tx.SemanticVerify(vm.DB)
+	onCommitDB, onAbortDB, _, _, err := tx.SemanticVerify(vm.DB, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// there should be no validators of default subnet in [onCommitDB] or [onAbortDB]
-	// (as specified in defaultVM's init)
+	// Should be one less validator than before
+	oldNumValidators := len(currentValidators.Txs)
 	if currentValidators, err := vm.getCurrentValidators(onCommitDB, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	} else if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
-		t.Fatalf("Should be %d validators but are %d", len(keys)-1, numValidators)
+	} else if numValidators := currentValidators.Len(); numValidators != oldNumValidators-1 {
+		t.Fatalf("Should be %d validators but are %d", oldNumValidators-1, numValidators)
 	} else if currentValidators, err = vm.getCurrentValidators(onAbortDB, constants.DefaultSubnetID); err != nil {
 		t.Fatal(err)
-	} else if numValidators := currentValidators.Len(); numValidators != len(keys)-1 {
-		t.Fatalf("Should be %d validators but there are %d", len(keys)-1, numValidators)
+	} else if numValidators := currentValidators.Len(); numValidators != oldNumValidators-1 {
+		t.Fatalf("Should be %d validators but there are %d", oldNumValidators-1, numValidators)
 	}
 
-	// check that address got validator reward
-	destAddrSlice := [][]byte{nextToRemove.Destination.Bytes()}
-	oldBalance := uint64(nextToRemove.Weight())
-	utxos, err := vm.getUTXOs(vm.DB, destAddrSlice)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, utxo := range utxos {
-		oldBalance += utxo.Out.(*secp256k1fx.TransferOutput).Amount()
-	}
-
-	commitBalance := uint64(0)
-	utxos, err = vm.getUTXOs(onCommitDB, destAddrSlice)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, utxo := range utxos {
-		commitBalance += utxo.Out.(*secp256k1fx.TransferOutput).Amount()
-	}
-	if commitBalance <= oldBalance && InflationRate > 1.0 {
-		t.Fatal("expected address balance to have increased due to receiving validator reward")
-	}
-
-	abortBalance := uint64(0)
-	utxos, err = vm.getUTXOs(onAbortDB, destAddrSlice)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, utxo := range utxos {
-		abortBalance += utxo.Out.(*secp256k1fx.TransferOutput).Amount()
-	}
-	if abortBalance != oldBalance {
-		t.Fatal("expected address balance to have remained same due to not receiving validator reward")
+	// check that stake/reward is given back
+	stakeOwners := nextToRemove.StakeOwner.(*secp256k1fx.OutputOwners).AddressesSet()
+	// Get old balances, balances if tx abort, balances if tx committed
+	for _, stakeOwner := range stakeOwners.List() {
+		oldBalance, err := vm.getBalance(vm.DB, [][]byte{stakeOwner.Bytes()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		onAbortBalance, err := vm.getBalance(onAbortDB, [][]byte{stakeOwner.Bytes()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		onCommitBalance, err := vm.getBalance(onCommitDB, [][]byte{stakeOwner.Bytes()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if onAbortBalance != oldBalance+nextToRemove.Weight() {
+			t.Fatalf("on abort, should have got back staked amount")
+		}
+		expectedReward := reward(nextToRemove.Duration(), nextToRemove.Weight(), InflationRate)
+		if onCommitBalance != oldBalance+expectedReward+nextToRemove.Weight() {
+			t.Fatalf("on commit, should have old balance (%d) + staked amount (%d) + reward (%d) but have %d",
+				oldBalance, nextToRemove.Weight(), expectedReward, onCommitBalance)
+		}
 	}
 }
 
@@ -189,6 +178,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	unsignedVdrTx := vdrTx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	delStartTime := vdrStartTime + 1
 	delEndTime := vdrEndTime - 1
@@ -204,6 +194,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	unsignedDelTx := delTx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetDelegatorTx)
 
 	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
 	if err != nil {
@@ -222,7 +213,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommitDB, onAbortDB, _, _, err := tx.SemanticVerify(vm.DB)
+	onCommitDB, onAbortDB, _, _, err := tx.SemanticVerify(vm.DB, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,8 +223,8 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 	expectedReward := reward(
 		time.Unix(int64(delEndTime), 0).Sub(time.Unix(int64(delStartTime), 0)), // duration
-		delTx.Weight(), // amount
-		InflationRate)  // inflation rate
+		unsignedDelTx.Weight(), // amount
+		InflationRate)          // inflation rate
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
@@ -249,7 +240,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	} else if delBalanceChange, err := math.Sub64(commitDelBalance, oldDelBalance); err != nil || delBalanceChange == 0 {
 		t.Fatal("expected delgator balance to increase upon commit")
-	} else if delReward, err := math.Sub64(delBalanceChange, vdrTx.Weight()); err != nil || delReward == 0 && InflationRate > 1.0 {
+	} else if delReward, err := math.Sub64(delBalanceChange, unsignedVdrTx.Weight()); err != nil || delReward == 0 && InflationRate > 1.0 {
 		t.Fatal("expected delegator reward to be non-zero")
 	} else if delReward < vdrReward {
 		t.Fatal("the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
@@ -261,8 +252,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal("expected delgatee balance to stay the same upon abort")
 	} else if abortDelBalance, err := vm.getBalance(onAbortDB, delDestSlice); err != nil {
 		t.Fatal(err)
-	} else if delReward, err = math.Sub64(abortDelBalance, oldDelBalance); err != nil || delReward != delTx.Weight() {
+	} else if delReward, err = math.Sub64(abortDelBalance, oldDelBalance); err != nil || delReward != unsignedDelTx.Weight() {
 		t.Fatal("expected delgator balance to increase by stake amount upon abort")
 	}
 }
-*/

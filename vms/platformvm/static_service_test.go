@@ -3,7 +3,6 @@
 
 package platformvm
 
-/*
 import (
 	"testing"
 
@@ -178,13 +177,12 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	if validators.Len() == 0 {
 		t.Fatal("Validators should contain 3 validators")
 	}
-	currentValidator := validators.Remove()
+	currentValidator := validators.Remove().UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 	for validators.Len() > 0 {
-		nextValidator := validators.Remove()
+		nextValidator := validators.Remove().UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
 		if currentValidator.EndTime().Unix() > nextValidator.EndTime().Unix() {
 			t.Fatalf("Validators returned by genesis should be a min heap sorted by end time")
 		}
 		currentValidator = nextValidator
 	}
 }
-*/
