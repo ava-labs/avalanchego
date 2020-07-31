@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -356,23 +354,6 @@ func (vm *VM) LastAccepted() ids.ID {
 	defer vm.metalock.Unlock()
 
 	return vm.lastAccepted.ID()
-}
-
-type ipFilter struct {
-	handler http.Handler
-}
-
-func (ipf ipFilter) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	if ips, _, err := net.SplitHostPort(request.RemoteAddr); err == nil && ips == "127.0.0.1" {
-		ipf.handler.ServeHTTP(writer, request)
-		return
-	}
-	writer.WriteHeader(404)
-	writer.Write([]byte("404 page not found\r\n"))
-}
-
-func newIPFilter(handler http.Handler) http.Handler {
-	return ipFilter{handler}
 }
 
 // CreateHandlers makes new http handlers that can handle API calls
