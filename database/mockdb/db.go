@@ -23,48 +23,48 @@ type Database struct {
 	// Executed when Has is called
 	OnHas                           func([]byte) (bool, error)
 	OnGet                           func([]byte) ([]byte, error)
-	OnPut                           func([]byte) error
+	OnPut                           func([]byte, []byte) error
 	OnDelete                        func([]byte) error
 	OnNewBatch                      func() database.Batch
 	OnNewIterator                   func() database.Iterator
 	OnNewIteratorWithStart          func([]byte) database.Iterator
 	OnNewIteratorWithPrefix         func([]byte) database.Iterator
 	OnNewIteratorWithStartAndPrefix func([]byte, []byte) database.Iterator
-	OnStat                          func() (string, error)
+	OnStat                          func(string) (string, error)
 	OnCompact                       func([]byte, []byte) error
 	OnClose                         func() error
 }
 
 // Has implements the database.Database interface
-func (db *Database) Has(b []byte) (bool, error) {
+func (db *Database) Has(k []byte) (bool, error) {
 	if db.OnHas == nil {
 		return false, errNoFunction
 	}
-	return db.OnHas(b)
+	return db.OnHas(k)
 }
 
 // Get implements the database.Database interface
-func (db *Database) Get(b []byte) ([]byte, error) {
+func (db *Database) Get(k []byte) ([]byte, error) {
 	if db.OnGet == nil {
 		return nil, errNoFunction
 	}
-	return db.OnGet(b)
+	return db.OnGet(k)
 }
 
 // Put implements the database.Database interface
-func (db *Database) Put(b []byte) error {
+func (db *Database) Put(k, v []byte) error {
 	if db.OnPut == nil {
 		return errNoFunction
 	}
-	return db.OnPut(b)
+	return db.OnPut(k, v)
 }
 
 // Delete implements the database.Database interface
-func (db *Database) Delete(b []byte) error {
+func (db *Database) Delete(k []byte) error {
 	if db.OnDelete == nil {
 		return errNoFunction
 	}
-	return db.OnDelete(b)
+	return db.OnDelete(k)
 }
 
 // NewBatch implements the database.Database interface
@@ -108,11 +108,11 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 }
 
 // Stat implements the database.Database interface
-func (db *Database) Stat() (string, error) {
+func (db *Database) Stat(stat string) (string, error) {
 	if db.OnStat == nil {
 		return "", errNoFunction
 	}
-	return db.OnStat()
+	return db.OnStat(stat)
 }
 
 // Compact implements the database.Database interface
@@ -132,6 +132,4 @@ func (db *Database) Close() error {
 }
 
 // New returns a new mock database
-func New() *Database {
-	return &Database{}
-}
+func New() *Database { return &Database{} }
