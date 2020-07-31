@@ -6,7 +6,7 @@ require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200609010056-95bcf8053598 // indirect
-	github.com/ava-labs/coreth v0.2.7-rc.4 // indirect
+	github.com/ava-labs/coreth v0.2.10 // indirect
 	github.com/ava-labs/go-ethereum v1.9.3 // indirect
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
