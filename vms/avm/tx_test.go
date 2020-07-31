@@ -15,6 +15,7 @@ import (
 )
 
 func TestTxNil(t *testing.T) {
+	ctx := NewContext()
 	c := codec.NewDefault()
 	tx := (*Tx)(nil)
 	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
@@ -41,6 +42,7 @@ func setupCodec() codec.Codec {
 }
 
 func TestTxEmpty(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 	tx := &Tx{}
 	if err := tx.SyntacticVerify(ctx, c, 1); err == nil {
@@ -49,6 +51,7 @@ func TestTxEmpty(t *testing.T) {
 }
 
 func TestTxInvalidCredential(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 	c.RegisterType(&ava.TestVerifiable{})
 
@@ -87,6 +90,7 @@ func TestTxInvalidCredential(t *testing.T) {
 }
 
 func TestTxInvalidUnsignedTx(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 	c.RegisterType(&ava.TestVerifiable{})
 
@@ -145,6 +149,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 }
 
 func TestTxInvalidNumberOfCredentials(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 	c.RegisterType(&ava.TestVerifiable{})
 

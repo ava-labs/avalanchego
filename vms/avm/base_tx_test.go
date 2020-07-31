@@ -178,6 +178,7 @@ func TestBaseTxGetters(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerify(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -220,6 +221,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyNil(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := (*BaseTx)(nil)
@@ -229,6 +231,7 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -271,6 +274,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -313,6 +317,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -346,6 +351,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -402,6 +408,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -427,6 +434,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -489,6 +497,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -543,6 +552,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -585,6 +595,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -627,6 +638,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 
 func TestBaseTxSemanticVerify(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -694,6 +706,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 
 func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -746,6 +759,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -814,6 +828,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
+	ctx := NewContext()
 	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
@@ -917,6 +932,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -969,6 +985,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 
 func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -1036,6 +1053,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 
 func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -1103,6 +1121,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	ctx := vm.ctx
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1237,6 +1256,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	ctx := vm.ctx
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1371,6 +1391,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
+	ctx := NewContext()
 
 	issuer := make(chan common.Message, 1)
 
@@ -1533,6 +1554,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
+	ctx := NewContext()
 
 	issuer := make(chan common.Message, 1)
 
