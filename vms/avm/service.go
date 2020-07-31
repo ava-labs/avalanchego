@@ -23,6 +23,11 @@ import (
 	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
+const (
+	// Max number of addresses that can be passed in as argument to GetUTXOs
+	maxGetUTXOsAddrs = 128
+)
+
 var (
 	errUnknownAssetID         = errors.New("unknown asset ID")
 	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
@@ -119,9 +124,13 @@ func (service *Service) GetTx(r *http.Request, args *GetTxArgs, reply *GetTxRepl
 	return nil
 }
 
-// GetUTXOsArgs are arguments for passing into GetUTXOs requests
+// GetUTXOsArgs are arguments for passing into GetUTXOs.
+// Gets the UTXOs that reference at least one address in [Addresses].
+// Returns at most [MaxCount] addresses. If [MaxCount] == 0,
+// gets up to math.MaxInt32 UTXOs.
 type GetUTXOsArgs struct {
-	Addresses []string `json:"addresses"`
+	Addresses []string    `json:"addresses"`
+	MaxCount  json.Uint32 `json:"maxCount"`
 }
 
 // GetUTXOsReply defines the GetUTXOs replies returned from the API
@@ -133,6 +142,10 @@ type GetUTXOsReply struct {
 func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
 	service.vm.ctx.Log.Info("AVM: GetUTXOs called with %s", args.Addresses)
 
+	if len(args.Addresses) > maxGetUTXOsAddrs {
+		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
+	}
+
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
 		addrBytes, err := service.vm.Parse(addr)
@@ -142,25 +155,26 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
 	}
 
-	utxos, err := service.vm.GetUTXOs(addrSet)
+	utxos, err := service.vm.GetUTXOs(addrSet, int(args.MaxCount))
 	if err != nil {
 		return err
 	}
 
-	reply.UTXOs = []formatting.CB58{}
-	for _, utxo := range utxos {
+	reply.UTXOs = make([]formatting.CB58, len(utxos))
+	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return err
 		}
-		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: b})
+		reply.UTXOs[i] = formatting.CB58{Bytes: b}
 	}
 	return nil
 }
 
 // GetAtomicUTXOsArgs are arguments for passing into GetAtomicUTXOs requests
 type GetAtomicUTXOsArgs struct {
-	Addresses []string `json:"addresses"`
+	Addresses []string    `json:"addresses"`
+	MaxCount  json.Uint32 `json:"maxCount"`
 }
 
 // GetAtomicUTXOsReply defines the GetAtomicUTXOs replies returned from the API
@@ -181,18 +195,18 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
 	}
 
-	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
+	utxos, err := service.vm.GetAtomicUTXOs(addrSet, int(args.MaxCount))
 	if err != nil {
 		return err
 	}
 
-	reply.UTXOs = []formatting.CB58{}
-	for _, utxo := range utxos {
+	reply.UTXOs = make([]formatting.CB58, len(utxos))
+	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return err
 		}
-		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: b})
+		reply.UTXOs[i] = formatting.CB58{Bytes: b}
 	}
 	return nil
 }
@@ -274,7 +288,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	addrSet := ids.Set{}
 	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(address)))
 
-	utxos, err := service.vm.GetUTXOs(addrSet)
+	utxos, err := service.vm.GetUTXOs(addrSet, -1)
 	if err != nil {
 		return err
 	}
@@ -330,7 +344,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	addrAsSet := ids.Set{}
 	addrAsSet.Add(ids.NewID(hashing.ComputeHash256Array(address)))
 
-	utxos, err := service.vm.GetUTXOs(addrAsSet)
+	utxos, err := service.vm.GetUTXOs(addrAsSet, -1)
 	if err != nil {
 		return fmt.Errorf("couldn't get address's UTXOs: %s", err)
 	}
@@ -1367,7 +1381,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
 	}
 
-	atomicUtxos, err := service.vm.GetAtomicUTXOs(addrs)
+	atomicUtxos, err := service.vm.GetAtomicUTXOs(addrs, -1)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}

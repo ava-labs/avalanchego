@@ -168,13 +168,13 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 		label string
 		args  *GetUTXOsArgs
 	}{
-		{"[", &GetUTXOsArgs{[]string{""}}},
-		{"[-]", &GetUTXOsArgs{[]string{"-"}}},
-		{"[foo]", &GetUTXOsArgs{[]string{"foo"}}},
-		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}}},
-		{"[<ChainID>]", &GetUTXOsArgs{[]string{ctx.ChainID.String()}}},
-		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}}},
-		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+		{"[", &GetUTXOsArgs{[]string{""}, 0}},
+		{"[-]", &GetUTXOsArgs{[]string{"-"}, 0}},
+		{"[foo]", &GetUTXOsArgs{[]string{"foo"}, 0}},
+		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}, 0}},
+		{"[<ChainID>]", &GetUTXOsArgs{[]string{ctx.ChainID.String()}, 0}},
+		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0}},
+		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -209,21 +209,46 @@ func TestServiceGetUTXOs(t *testing.T) {
 				// TODO: Should GetUTXOs() raise an error for this? The address portion is
 				//		 longer than addr0.String()
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
-			}},
+			},
+				0,
+			},
 			0,
 		}, {
 			"[<ChainID>-<addr0>]",
 			&GetUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-			}},
+			},
+				0,
+			},
 			7,
-		}, {
+		},
+		{
+			"[<ChainID>-<addr0>] limit to 5 UTXOs",
+			&GetUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			},
+				5,
+			},
+			5,
+		},
+		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
 			&GetUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-			}},
+			},
+				0,
+			},
 			7,
+		}, {
+			"[<ChainID>-<addr0>,<ChainID>-<addr0>], limit to 5 UTXOs",
+			&GetUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+			},
+				5,
+			},
+			5,
 		},
 	}
 	for _, tt := range tests {
@@ -250,13 +275,13 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 		label string
 		args  *GetAtomicUTXOsArgs
 	}{
-		{"[", &GetAtomicUTXOsArgs{[]string{""}}},
-		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}}},
-		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}}},
-		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}}},
-		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}}},
-		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}}},
-		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+		{"[", &GetAtomicUTXOsArgs{[]string{""}, 0}},
+		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}, 0}},
+		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}, 0}},
+		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}, 0}},
+		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}, 0}},
+		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0}},
+		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -312,14 +337,18 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
 				//		 longer than addr0.String()
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
-			}},
+			},
+				0,
+			},
 			0,
 		},
 		{
 			"[<ChainID>-<addr0>]",
 			&GetAtomicUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-			}},
+			},
+				0,
+			},
 			1,
 		},
 		{
@@ -327,7 +356,9 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 			&GetAtomicUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-			}},
+			},
+				0,
+			},
 			1,
 		},
 	}

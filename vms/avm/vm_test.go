@@ -537,7 +537,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 	addrs := ids.Set{}
 	addrs.Add(addr)
-	utxos, err := vm.GetUTXOs(addrs)
+	utxos, err := vm.GetUTXOs(addrs, -1)
 	if err != nil {
 		t.Fatal(err)
 	}

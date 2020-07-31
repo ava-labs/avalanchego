@@ -6,6 +6,7 @@ package avm
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"time"
@@ -322,47 +323,57 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
-// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+// GetAtomicUTXOs returns the atomic utxos that at least one of the provided addresses is
+// referenced in. Returns at most [maxCount] UTXOs. If [maxCount] <= 0, it is set
+// to math.MaxInt32.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set, maxCount int) ([]*ava.UTXO, error) {
+	if maxCount <= 0 {
+		maxCount = math.MaxInt32
+	}
 	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
-
 	state := ava.NewPrefixedState(smDB, vm.codec)
-
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
 		utxos, _ := state.PlatformFunds(addr)
 		utxoIDs.Add(utxos...)
+		if utxoIDs.Len() >= maxCount {
+			break
+		}
 	}
-
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := state.PlatformUTXO(utxoID)
-		if err != nil {
+	utxoIDsList := utxoIDs.CappedList(maxCount)
+	utxos := make([]*ava.UTXO, len(utxoIDsList))
+	var err error
+	for i, utxoID := range utxoIDsList {
+		if utxos[i], err = state.PlatformUTXO(utxoID); err != nil {
 			return nil, err
 		}
-		utxos = append(utxos, utxo)
 	}
 	return utxos, nil
 }
 
 // GetUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+// referenced in. Returns at most [maxCount] UTXOs. If [maxCount] <= 0, it is
+// set to math.MaxInt32.
+func (vm *VM) GetUTXOs(addrs ids.Set, maxCount int) ([]*ava.UTXO, error) {
+	if maxCount <= 0 {
+		maxCount = math.MaxInt32
+	}
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
 		utxos, _ := vm.state.Funds(addr)
 		utxoIDs.Add(utxos...)
+		if utxoIDs.Len() >= maxCount {
+			break
+		}
 	}
-
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := vm.state.UTXO(utxoID)
-		if err != nil {
+	utxoIDsList := utxoIDs.CappedList(maxCount)
+	utxos := make([]*ava.UTXO, len(utxoIDsList))
+	var err error
+	for i, utxoID := range utxoIDsList {
+		if utxos[i], err = vm.state.UTXO(utxoID); err != nil {
 			return nil, err
 		}
-		utxos = append(utxos, utxo)
 	}
 	return utxos, nil
 }
@@ -634,7 +645,7 @@ func (vm *VM) LoadUser(
 	for _, addr := range addresses {
 		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
 	}
-	utxos, err := vm.GetUTXOs(addrs)
+	utxos, err := vm.GetUTXOs(addrs, -1)
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
 	}
