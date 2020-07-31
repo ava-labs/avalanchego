@@ -5,6 +5,7 @@ package avm
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/mockdb"
@@ -1050,8 +1051,45 @@ func TestTxCached(t *testing.T) {
 	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 
-	vm.state.state.DB = mockdb.New()
+	db := mockdb.New()
+	called := new(bool)
+	db.OnGet = func([]byte) ([]byte, error) {
+		*called = true
+		return nil, errors.New("")
+	}
+	vm.state.state.DB = db
+	vm.state.state.Cache.Flush()
 
 	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
+	assert.False(t, *called, "shouldn't have called the DB")
+}
+
+func TestTxNotCached(t *testing.T) {
+	genesisBytes, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := NewTx(t, genesisBytes, vm)
+	txBytes := newTx.Bytes()
+
+	_, err := vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+
+	db := mockdb.New()
+	called := new(bool)
+	db.OnGet = func([]byte) ([]byte, error) {
+		*called = true
+		return nil, errors.New("")
+	}
+	db.OnPut = func([]byte, []byte) error { return nil }
+	vm.state.state.DB = db
+	vm.state.uniqueTx.Flush()
+	vm.state.state.Cache.Flush()
+
+	_, err = vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+	assert.True(t, *called, "should have called the DB")
 }
