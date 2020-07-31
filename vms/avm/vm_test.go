@@ -7,6 +7,10 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/gecko/database/mockdb"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -1031,4 +1035,23 @@ func TestVMFormatAliased(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTxCached(t *testing.T) {
+	genesisBytes, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := NewTx(t, genesisBytes, vm)
+	txBytes := newTx.Bytes()
+
+	_, err := vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+
+	vm.state.state.DB = mockdb.New()
+
+	_, err = vm.ParseTx(txBytes)
+	assert.NoError(t, err)
 }
