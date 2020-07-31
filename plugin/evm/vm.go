@@ -60,6 +60,10 @@ const (
 )
 
 var (
+	// minGasPrice is the number of nAVAX required per gas unit for a transaction
+	// to be valid
+	minGasPrice = big.NewInt(85)
+
 	errEmptyBlock     = errors.New("empty block")
 	errCreateBlock    = errors.New("couldn't create block")
 	errUnknownBlock   = errors.New("unknown block")
@@ -140,6 +144,12 @@ func (vm *VM) Initialize(
 	config.Genesis = g
 	config.Miner.ManualMining = true
 	config.Miner.DisableUncle = true
+
+	// Set minimum price for mining and default gas price oracle value to the min
+	// gas price to prevent so transactions and blocks all use the correct fees
+	config.Miner.GasPrice = minGasPrice
+	config.GPO.Default = minGasPrice
+
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
 	}
