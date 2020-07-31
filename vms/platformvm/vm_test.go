@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
@@ -220,6 +221,10 @@ func defaultVM() *VM {
 		panic(err)
 	} else {
 		testSubnet1 = tx.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+	}
+
+	vm.Ctx.SharedMemory = MockSharedMemory{
+		GetDatabaseF: func(ids.ID) database.Database { return memdb.New() },
 	}
 
 	return vm
