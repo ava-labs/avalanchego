@@ -117,7 +117,7 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	// check that stake/reward is given back
-	stakeOwners := nextToRemove.StakeOwner.(*secp256k1fx.OutputOwners).AddressesSet()
+	stakeOwners := nextToRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 	// Get old balances, balances if tx abort, balances if tx committed
 	for _, stakeOwner := range stakeOwners.List() {
 		oldBalance, err := vm.getBalance(vm.DB, [][]byte{stakeOwner.Bytes()})
@@ -219,12 +219,13 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	vdrDestSlice := [][]byte{vdrDestination.Bytes()}
-	delDestSlice := [][]byte{delDestination.Bytes()}
+	delDestSlice := [][]byte{keys[0].PublicKey().Address().Bytes()}
 
 	expectedReward := reward(
 		time.Unix(int64(delEndTime), 0).Sub(time.Unix(int64(delStartTime), 0)), // duration
-		unsignedDelTx.Weight(), // amount
-		InflationRate)          // inflation rate
+		unsignedDelTx.Weight(),                                                 // amount
+		InflationRate,                                                          // inflation rate
+	)
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%

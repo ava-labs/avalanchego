@@ -6,9 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/utils/formatting"
-
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/vms/components/ava"
 )
 

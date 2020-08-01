@@ -5,11 +5,12 @@ package platformvm
 
 import (
 	"bytes"
-	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"

@@ -27,9 +27,9 @@ type UnsignedDecisionTx interface {
 
 // DecisionTx is an operation that can be decided without being proposed
 type DecisionTx struct {
-	UnsignedDecisionTx `serialize:"true", json:"unsignedDecisionTx"`
+	UnsignedDecisionTx `serialize:"true" json:"unsignedDecisionTx"`
 	// Credentials that authorize the inputs to be spent
-	Credentials []verify.Verifiable `serialize:"true", json:"credentials"`
+	Credentials []verify.Verifiable `serialize:"true" json:"credentials"`
 }
 
 func (vm *VM) signDecisionTx(tx *DecisionTx, signers [][]*crypto.PrivateKeySECP256K1R) error {

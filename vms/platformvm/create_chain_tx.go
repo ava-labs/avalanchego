@@ -94,7 +94,7 @@ func (tx *UnsignedCreateChainTx) Verify() error {
 	if err := verify.All(&tx.BaseTx, tx.SubnetAuth); err != nil {
 		return err
 	}
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -123,9 +123,20 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	baseTxCreds := stx.Credentials[:baseTxCredsLen]
 	subnetCred := stx.Credentials[baseTxCredsLen]
 
-	// Verify inputs/outputs and update the UTXO set
+	// Verify the flowcheck
 	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
 		return nil, err
+	}
+
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+		return nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return nil, tempError{err}
 	}
 
 	// Verify that this chain is authorized by the subnet
@@ -168,7 +179,7 @@ func (vm *VM) newCreateChainTx(
 	chainName string, // Name of the chain
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 ) (*DecisionTx, error) {
-	ins, outs, signers, err := vm.burn(vm.DB, keys, vm.txFee, 0)
+	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

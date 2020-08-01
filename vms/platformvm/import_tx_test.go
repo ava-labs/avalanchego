@@ -4,16 +4,14 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
-
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/nodb"
-	"github.com/ava-labs/gecko/vms/components/ava"
-
-	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 // implements snow.SharedMemory
@@ -55,7 +53,7 @@ func TestNewImportTx(t *testing.T) {
 				state := ava.NewPrefixedState(db, Codec)
 				if err := state.FundAVMUTXO(&ava.UTXO{
 					UTXOID: ava.UTXOID{
-						TxID:        generateRandomID(),
+						TxID:        ids.GenerateTestID(),
 						OutputIndex: rand.Uint32(),
 					},
 					Asset: ava.Asset{ID: avaxAssetID},
@@ -76,7 +74,7 @@ func TestNewImportTx(t *testing.T) {
 	}
 
 	vm := defaultVM()
-	avmID := generateRandomID()
+	avmID := ids.GenerateTestID()
 	vm.avm = avmID
 	vm.Ctx.Lock.Lock()
 	defer func() {

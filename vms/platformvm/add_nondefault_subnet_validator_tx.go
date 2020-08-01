@@ -65,7 +65,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) Verify() error {
 		return err
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, 0, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -176,12 +176,22 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{err}
 	}
 
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	txID := tx.ID()
+
 	// Set up the DB if this tx is committed
 	onCommitDB := versiondb.New(db)
-
-	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
-		return nil, nil, nil, nil, err
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 	// Add the validator to the set of pending validators
 	pendingValidators.Add(stx)
@@ -191,10 +201,13 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	}
 
 	onAbortDB := versiondb.New(db)
-
-	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
-		return nil, nil, nil, nil, err
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onAbortDB, txID, tx.Outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	return onCommitDB, onAbortDB, nil, nil, nil
@@ -220,7 +233,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 ) (*ProposalTx, error) {
-	ins, outs, signers, err := vm.burn(vm.DB, keys, vm.txFee, 0)
+	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

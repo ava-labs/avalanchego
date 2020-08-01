@@ -5,9 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/gecko/vms/components/ava"
-
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 func TestBaseTxVerify(t *testing.T) {

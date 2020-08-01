@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/constants"
-
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 )
 

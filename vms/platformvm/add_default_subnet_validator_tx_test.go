@@ -7,13 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
-
 	"github.com/ava-labs/gecko/database/versiondb"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
@@ -109,11 +108,17 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).StakeOwner = &secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     nil,
-	}
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).Stake = []*ava.TransferableOutput{{
+		Asset: ava.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: MinimumStakeAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     nil,
+			},
+		},
+	}}
 	// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
 	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(); err == nil {
@@ -315,13 +320,13 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount,       // stake amount
-		uint64(startTime.Unix()), // start time
+		MinimumStakeAmount,                                   // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
 		key2.PublicKey().Address(),                           // node ID
-		nodeID,                                               // destination
-		NumberOfShares,                                       // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},              // key
+		nodeID,                                  // destination
+		NumberOfShares,                          // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)

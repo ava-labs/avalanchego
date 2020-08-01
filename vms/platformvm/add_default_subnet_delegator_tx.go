@@ -13,8 +13,11 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -28,7 +31,7 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
 	// Where to send staked tokens when done validating
-	StakeOwner verify.Verifiable `serialize:"true"`
+	Stake []*ava.TransferableOutput `serialize:"true"`
 	// Where to send staking rewards when done validating
 	RewardsOwner verify.Verifiable `serialize:"true"`
 }
@@ -49,6 +52,10 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) initialize(vm *VM, bytes []byte) 
 	return nil
 }
 
+var (
+	errInvalidAmount = errors.New("invalid amount")
+)
+
 // Verify return nil iff [tx] is valid
 func (tx *UnsignedAddDefaultSubnetDelegatorTx) Verify() error {
 	switch {
@@ -61,18 +68,35 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) Verify() error {
 	if err := verify.All(
 		&tx.BaseTx,
 		&tx.DurationValidator,
-		tx.StakeOwner,
 		tx.RewardsOwner,
 	); err != nil {
 		return err
 	}
 
-	if tx.Wght < MinimumStakeAmount { // Ensure validator is staking at least the minimum amount
+	returnedWeight := uint64(0)
+	for _, out := range tx.Stake {
+		if err := out.Verify(); err != nil {
+			return err
+		}
+		newWeight, err := safemath.Add64(returnedWeight, out.Output().Amount())
+		if err != nil {
+			return err
+		}
+		returnedWeight = newWeight
+	}
+
+	switch {
+	case !ava.IsSortedTransferableOutputs(tx.Stake, Codec):
+		return errOutputsNotSorted
+	case returnedWeight != tx.Wght:
+		return errInvalidAmount
+	case tx.Wght < MinimumStakeAmount:
+		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
 
 	// verify the flow check
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.vm.txFee, tx.Wght, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.Stake, tx.Wght, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
@@ -136,13 +160,28 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 		}
 	}
 
-	// Set up the DB if this tx is committed
-	onCommitDB := versiondb.New(db)
+	outs := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.Stake))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.Stake)
 
-	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, stx.Credentials); err != nil {
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Credentials); err != nil {
 		return nil, nil, nil, nil, err
 	}
+
+	txID := tx.ID()
+
+	// Set up the DB if this tx is committed
+	onCommitDB := versiondb.New(db)
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+
 	// Add the delegator to the pending validators heap
 	pendingValidators.Add(stx)
 	// If this proposal is committed, update the pending validator set to include the delegator
@@ -152,30 +191,13 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 
 	// Set up the DB if this tx is aborted
 	onAbortDB := versiondb.New(db)
-
-	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, tx.Outs, stx.Credentials); err != nil {
-		return nil, nil, nil, nil, err
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
-
-	// Refund the stake here
-	txID := tx.ID()
-	refundUTXOs, err := tx.vm.generateRefund(
-		txID,
-		tx.Ins,
-		tx.Outs,
-		tx.vm.txFee,
-		tx.Wght,
-		tx.StakeOwner,
-	)
-	if err != nil {
-		return nil, nil, nil, nil, permError{err}
-	}
-
-	for _, utxo := range refundUTXOs {
-		if err := tx.vm.putUTXO(onAbortDB, utxo); err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onAbortDB, txID, outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	return onCommitDB, onAbortDB, nil, nil, nil
@@ -196,7 +218,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	destination ids.ShortID, // Address to returned staked tokens (and maybe reward) to
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
 ) (*ProposalTx, error) {
-	ins, outs, signers, err := vm.burn(vm.DB, keys, vm.txFee, stakeAmt)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.spend(vm.DB, keys, stakeAmt, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -206,7 +228,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
 			Ins:          ins,
-			Outs:         outs,
+			Outs:         unlockedOuts,
 		},
 		DurationValidator: DurationValidator{
 			Validator: Validator{
@@ -216,11 +238,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 			Start: startTime,
 			End:   endTime,
 		},
-		StakeOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{destination},
-		},
+		Stake: lockedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,

@@ -43,7 +43,7 @@ type BaseTx struct {
 	BCID  ids.ID                    `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
 	Outs  []*ava.TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
 	Ins   []*ava.TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
-	Memo  []byte                    `serialize:"true"`                     // Memo field contains arbitrary bytes, up to maxMemoSize
+	Memo  []byte                    `serialize:"true" json:"memo"`         // Memo field contains arbitrary bytes, up to maxMemoSize
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
