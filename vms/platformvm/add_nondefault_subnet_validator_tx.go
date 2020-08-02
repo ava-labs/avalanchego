@@ -29,7 +29,7 @@ type UnsignedAddNonDefaultSubnetValidatorTx struct {
 	// The validator
 	SubnetValidator `serialize:"true"`
 	// Auth that will be allowing this validator into the network
-	SubnetAuth verify.Verifiable `serialize:"true"`
+	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -176,12 +176,22 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{err}
 	}
 
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	txID := tx.ID()
+
 	// Set up the DB if this tx is committed
 	onCommitDB := versiondb.New(db)
-
-	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, nil, baseTxCreds); err != nil {
-		return nil, nil, nil, nil, err
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 	// Add the validator to the set of pending validators
 	pendingValidators.Add(stx)
@@ -191,10 +201,13 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	}
 
 	onAbortDB := versiondb.New(db)
-
-	// Consume / produce the UTXOS
-	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, tx.Outs, nil, baseTxCreds); err != nil {
-		return nil, nil, nil, nil, err
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onAbortDB, txID, tx.Outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	return onCommitDB, onAbortDB, nil, nil, nil

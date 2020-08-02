@@ -34,9 +34,10 @@ type UnsignedProposalTx interface {
 type ProposalTx struct {
 	UnsignedProposalTx `serialize:"true"`
 	// Credentials that authorize the inputs to be spent
-	Credentials []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true" json:"credentials"`
 }
 
+// add credentials to a ProposalTx
 func (vm *VM) signProposalTx(tx *ProposalTx, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedProposalTx)
 	if err != nil {

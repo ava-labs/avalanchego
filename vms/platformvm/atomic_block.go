@@ -21,7 +21,7 @@ var (
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx AtomicTx `serialize:"true"`
+	Tx AtomicTx `serialize:"true" json:"tx"`
 
 	inputs ids.Set
 }
@@ -74,6 +74,13 @@ func (ab *AtomicBlock) Verify() error {
 
 	ab.onAcceptDB = versiondb.New(pdb)
 	if err := ab.Tx.SemanticVerify(ab.onAcceptDB, ab.Tx.Credentials); err != nil {
+		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
+		return err
+	} else if txBytes, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
+		return err
+	} else if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
+		return err
+	} else if err := ab.vm.putStatus(ab.onAcceptDB, ab.Tx.ID(), Committed); err != nil {
 		return err
 	}
 

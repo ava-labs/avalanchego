@@ -34,16 +34,16 @@ type BaseTx struct {
 	bytes []byte
 
 	// ID of the network on which this tx was issued
-	NetworkID uint32 `serialize:"true"`
+	NetworkID uint32 `serialize:"true" json:"networkID"`
 	// ID of this blockchain. In practice is always the empty ID.
 	// This is only here to match avm.BaseTx's format
-	BlockchainID ids.ID `serialize:"true"`
+	BlockchainID ids.ID `serialize:"true" json:"blockchainID"`
 	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true"`
+	Outs []*ava.TransferableOutput `serialize:"true" json:"outputs"`
 	// Inputs consumed by this tx
-	Ins []*ava.TransferableInput `serialize:"true"`
+	Ins []*ava.TransferableInput `serialize:"true" json:"inputs"`
 	// Memo field contains arbitrary bytes, up to maxMemoSize
-	Memo []byte `serialize:"true"`
+	Memo []byte `serialize:"true" json:"memo"`
 }
 
 // UnsignedBytes returns the byte representation of this unsigned tx

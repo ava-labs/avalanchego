@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/hashing"
-
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 )
 
 // UnsignedAdvanceTimeTx is a transaction to increase the chain's timestamp.
@@ -32,7 +31,7 @@ type UnsignedAdvanceTimeTx struct {
 	bytes []byte
 
 	// Unix time this block proposes increasing the timestamp to
-	Time uint64 `serialize:"true"`
+	Time uint64 `serialize:"true" json:"time"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]

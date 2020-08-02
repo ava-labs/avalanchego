@@ -33,7 +33,7 @@ var (
 type UnsignedImportTx struct {
 	BaseTx `serialize:"true"`
 	// Inputs that consume UTXOs produced on the X-Chain
-	ImportedInputs []*ava.TransferableInput `serialize:"true"`
+	ImportedInputs []*ava.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -102,30 +102,48 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 		return permError{err}
 	}
 
-	baseTxCredsLen := len(tx.BaseTx.Ins)
-	baseTxCreds := creds[:baseTxCredsLen]
-	importCreds := creds[baseTxCredsLen:]
-
-	// Spend un-imported inputs; generate outputs
-	if err := tx.vm.semanticVerifySpend(db, tx, tx.BaseTx.Ins, tx.Outs, nil, baseTxCreds); err != nil {
-		return err
-	}
-
 	// Verify (but don't spend) imported inputs
 	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
 	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
 
-	state := ava.NewPrefixedState(smDB, Codec)
-	for i, in := range tx.ImportedInputs {
-		cred := importCreds[i]
-		utxoID := in.UTXOID.InputID()
-		if utxo, err := state.AVMUTXO(utxoID); err != nil { // Get the UTXO
+	utxos := make([]*ava.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
+	for index, input := range tx.Ins {
+		utxoID := input.UTXOID.InputID()
+		utxo, err := tx.vm.getUTXO(db, utxoID)
+		if err != nil {
 			return tempError{err}
-		} else if !utxo.AssetID().Equals(in.AssetID()) {
-			return permError{errAssetIDMismatch}
-		} else if err := tx.vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
-			return permError{err}
 		}
+		utxos[index] = utxo
+	}
+
+	state := ava.NewPrefixedState(smDB, Codec)
+	for index, input := range tx.ImportedInputs {
+		utxoID := input.UTXOID.InputID()
+		utxo, err := state.AVMUTXO(utxoID)
+		if err != nil { // Get the UTXO
+			return tempError{err}
+		}
+		utxos[index+len(tx.Ins)] = utxo
+	}
+
+	ins := make([]*ava.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+	copy(ins, tx.Ins)
+	copy(ins[len(tx.Ins):], tx.ImportedInputs)
+
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, creds); err != nil {
+		return err
+	}
+
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+		return tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return tempError{err}
 	}
 
 	return nil

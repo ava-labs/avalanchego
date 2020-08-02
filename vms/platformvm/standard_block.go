@@ -14,7 +14,7 @@ import (
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
 
-	Txs []*DecisionTx `serialize:"true"`
+	Txs []*DecisionTx `serialize:"true" json:"txs"`
 }
 
 // initialize this block
@@ -62,6 +62,7 @@ func (sb *StandardBlock) Verify() error {
 	for _, tx := range sb.Txs {
 		onAccept, err := tx.SemanticVerify(sb.onAcceptDB, tx)
 		if err != nil {
+			sb.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
 			if err := sb.Reject(); err == nil {
 				if err := sb.vm.DB.Commit(); err != nil {
 					return err
@@ -71,7 +72,13 @@ func (sb *StandardBlock) Verify() error {
 			}
 			return err
 		}
-		if onAccept != nil {
+		if txBytes, err := sb.vm.codec.Marshal(tx); err != nil {
+			return err
+		} else if err := sb.vm.putTx(sb.onAcceptDB, tx.ID(), txBytes); err != nil {
+			return err
+		} else if err := sb.vm.putStatus(sb.onAcceptDB, tx.ID(), Committed); err != nil {
+			return err
+		} else if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
 	}

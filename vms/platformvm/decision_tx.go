@@ -29,7 +29,7 @@ type UnsignedDecisionTx interface {
 type DecisionTx struct {
 	UnsignedDecisionTx `serialize:"true"`
 	// Credentials that authorize the inputs to be spent
-	Credentials []verify.Verifiable `serialize:"true"`
+	Credentials []verify.Verifiable `serialize:"true" json:"credentials"`
 }
 
 func (vm *VM) signDecisionTx(tx *DecisionTx, signers [][]*crypto.PrivateKeySECP256K1R) error {

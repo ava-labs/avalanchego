@@ -35,17 +35,17 @@ type UnsignedCreateChainTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// ID of the Subnet that validates this blockchain
-	SubnetID ids.ID `serialize:"true"`
+	SubnetID ids.ID `serialize:"true" json:"subnetID"`
 	// A human readable name for the chain; need not be unique
-	ChainName string `serialize:"true"`
+	ChainName string `serialize:"true" json:"chainName"`
 	// ID of the VM running on the new chain
-	VMID ids.ID `serialize:"true"`
+	VMID ids.ID `serialize:"true" json:"vmID"`
 	// IDs of the feature extensions running on the new chain
-	FxIDs []ids.ID `serialize:"true"`
+	FxIDs []ids.ID `serialize:"true" json:"fxIDs"`
 	// Byte representation of genesis state of the new chain
-	GenesisData []byte `serialize:"true"`
+	GenesisData []byte `serialize:"true" json:"genesisData"`
 	// Auth that will be allowing this validator into the network
-	SubnetAuth verify.Verifiable `serialize:"true"`
+	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -123,9 +123,20 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	baseTxCreds := stx.Credentials[:baseTxCredsLen]
 	subnetCred := stx.Credentials[baseTxCredsLen]
 
-	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, nil, baseTxCreds); err != nil {
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
 		return nil, err
+	}
+
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+		return nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return nil, tempError{err}
 	}
 
 	// Verify that this chain is authorized by the subnet

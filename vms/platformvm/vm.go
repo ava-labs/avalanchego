@@ -11,6 +11,7 @@ import (
 
 	"math"
 
+	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -42,6 +43,8 @@ const (
 	subnetsTypeID
 	utxoTypeID
 	utxoSetTypeID
+	txTypeID
+	statusTypeID
 
 	platformAlias = "P"
 	addressSep    = "-"
@@ -72,6 +75,8 @@ const (
 	// MaximumStakingDuration is the longest amount of time a staker can bond
 	// their funds for.
 	MaximumStakingDuration = 365 * 24 * time.Hour
+
+	droppedTxCacheSize = 50
 )
 
 var (
@@ -199,6 +204,11 @@ type VM struct {
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
 	timer *timer.Timer
+
+	// Contains the IDs of transactions recently dropped because they failed verification.
+	// These txs may be re-issued and put into accepted blocks, so check the database
+	// to see if it was later committed/aborted before reporting that it's dropped
+	droppedTxCache cache.LRU
 }
 
 // Initialize this blockchain.
@@ -223,6 +233,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.codec = Codec
+
+	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()

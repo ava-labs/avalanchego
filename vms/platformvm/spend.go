@@ -382,21 +382,79 @@ var (
 	errUnknownOwners                = errors.New("unknown owners")
 )
 
+func (vm *VM) consumeInputs(
+	db database.Database,
+	ins []*ava.TransferableInput,
+) error {
+	for _, input := range ins {
+		utxoID := input.UTXOID.InputID()
+		if err := vm.removeUTXO(db, utxoID); err != nil {
+			return tempError{err}
+		}
+	}
+	return nil
+}
+
+func (vm *VM) produceOutputs(
+	db database.Database,
+	txID ids.ID,
+	outs []*ava.TransferableOutput,
+) error {
+	for index, out := range outs {
+		if err := vm.putUTXO(db, &ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(index),
+			},
+			Asset: ava.Asset{ID: vm.avaxAssetID},
+			Out:   out.Output(),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
-// Adds/removes the new/old UTXOs
 // [db] should not be committed if an error is returned
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	db database.Database,
 	tx SpendTx,
 	ins []*ava.TransferableInput,
-	unlockedOuts []*ava.TransferableOutput,
-	lockedOuts []*ava.TransferableOutput,
+	outs []*ava.TransferableOutput,
+	creds []verify.Verifiable,
+) TxError {
+	utxos := make([]*ava.UTXO, len(ins))
+	for index, input := range ins {
+		utxoID := input.UTXOID.InputID()
+		utxo, err := vm.getUTXO(db, utxoID)
+		if err != nil {
+			return tempError{err}
+		}
+		utxos[index] = utxo
+	}
+
+	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, outs, creds)
+}
+
+// Verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
+// [db] should not be committed if an error is returned
+// Precondition: [tx] has already been syntactically verified
+func (vm *VM) semanticVerifySpendUTXOs(
+	tx SpendTx,
+	utxos []*ava.UTXO,
+	ins []*ava.TransferableInput,
+	outs []*ava.TransferableOutput,
 	creds []verify.Verifiable,
 ) TxError {
 	if len(ins) != len(creds) {
 		return permError{fmt.Errorf("there are %d inputs but %d credentials. Should be same number",
 			len(ins), len(creds))}
+	}
+	if len(ins) != len(utxos) {
+		return permError{fmt.Errorf("there are %d inputs but %d utxos. Should be same number",
+			len(ins), len(utxos))}
 	}
 	for _, cred := range creds {
 		if err := cred.Verify(); err != nil {
@@ -409,11 +467,7 @@ func (vm *VM) semanticVerifySpend(
 	produced := make(map[uint64]map[[32]byte]uint64)
 	consumed := make(map[uint64]map[[32]byte]uint64)
 	for index, input := range ins {
-		utxoID := input.UTXOID.InputID()
-		utxo, err := vm.getUTXO(db, utxoID)
-		if err != nil {
-			return tempError{err}
-		}
+		utxo := utxos[index]
 
 		out := utxo.Out
 		locktime := uint64(0)
@@ -434,8 +488,6 @@ func (vm *VM) semanticVerifySpend(
 
 		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 			return permError{err}
-		} else if err := vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{err}
 		}
 
 		owned, ok := out.(Owned)
@@ -459,48 +511,7 @@ func (vm *VM) semanticVerifySpend(
 		}
 		owners[ownerID] = newAmount
 	}
-	txID := tx.ID()
-	for index, out := range unlockedOuts {
-		output := out.Output()
-		locktime := uint64(0)
-		if inner, ok := output.(*StakeableLockOut); ok {
-			output = inner.TransferableOut
-			locktime = inner.Locktime
-		}
-
-		owned, ok := output.(Owned)
-		if !ok {
-			return permError{errUnknownOwners}
-		}
-		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(owner)
-		if err != nil {
-			return tempError{err}
-		}
-		ownerID := hashing.ComputeHash256Array(ownerBytes)
-		owners, ok := consumed[locktime]
-		if !ok {
-			owners = make(map[[32]byte]uint64)
-			consumed[locktime] = owners
-		}
-		newAmount, err := safemath.Add64(owners[ownerID], output.Amount())
-		if err != nil {
-			return permError{err}
-		}
-		owners[ownerID] = newAmount
-
-		if err := vm.putUTXO(db, &ava.UTXO{
-			UTXOID: ava.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(index),
-			},
-			Asset: ava.Asset{ID: vm.avaxAssetID},
-			Out:   output,
-		}); err != nil {
-			return tempError{err}
-		}
-	}
-	for _, out := range lockedOuts {
+	for _, out := range outs {
 		output := out.Output()
 		locktime := uint64(0)
 		if inner, ok := output.(*StakeableLockOut); ok {

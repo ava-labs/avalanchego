@@ -26,6 +26,40 @@ const (
 	pendingValidatorsPrefix
 )
 
+// persist a tx
+func (vm *VM) putTx(db database.Database, ID ids.ID, tx []byte) error {
+	return vm.State.Put(db, txTypeID, ID, tx)
+}
+
+// retrieve a tx
+func (vm *VM) getTx(db database.Database, txID ids.ID) ([]byte, error) {
+	txIntf, err := vm.State.Get(db, txTypeID, txID)
+	if err != nil {
+		return nil, err
+	}
+	if tx, ok := txIntf.([]byte); ok {
+		return tx, nil
+	}
+	return nil, fmt.Errorf("expected tx to be []byte but is type %T", txIntf)
+}
+
+// Persist a status
+func (vm *VM) putStatus(db database.Database, ID ids.ID, status Status) error {
+	return vm.State.Put(db, statusTypeID, ID, status)
+}
+
+// Retrieve a status
+func (vm *VM) getStatus(db database.Database, ID ids.ID) (Status, error) {
+	statusIntf, err := vm.State.Get(db, statusTypeID, ID)
+	if err != nil {
+		return Unknown, err
+	}
+	if status, ok := statusIntf.(Status); ok {
+		return status, nil
+	}
+	return Unknown, fmt.Errorf("expected status to be type Status but is type %T", statusIntf)
+}
+
 // get the validators currently validating the specified subnet
 func (vm *VM) getCurrentValidators(db database.Database, subnetID ids.ID) (*EventHeap, error) {
 	return vm.getValidatorsFromDB(db, subnetID, currentValidatorsPrefix, false)
@@ -414,6 +448,37 @@ func (vm *VM) registerDBTypes() {
 	if err := vm.State.RegisterType(utxoTypeID, marshalUTXOFunc, unmarshalUTXOFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
+
+	marshalTxFunc := func(txIntf interface{}) ([]byte, error) {
+		if tx, ok := txIntf.([]byte); ok {
+			return tx, nil
+		}
+		return nil, fmt.Errorf("expected []byte but got type %T", txIntf)
+	}
+	unmarshalTxFunc := func(bytes []byte) (interface{}, error) {
+		return bytes, nil
+	}
+	if err := vm.State.RegisterType(txTypeID, marshalTxFunc, unmarshalTxFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
+	}
+
+	marshalStatusFunc := func(statusIntf interface{}) ([]byte, error) {
+		if status, ok := statusIntf.(Status); ok {
+			return vm.codec.Marshal(status)
+		}
+		return nil, fmt.Errorf("expected Status but got type %T", statusIntf)
+	}
+	unmarshalStatusFunc := func(bytes []byte) (interface{}, error) {
+		var status Status
+		if err := Codec.Unmarshal(bytes, &status); err != nil {
+			return nil, err
+		}
+		return status, nil
+	}
+	if err := vm.State.RegisterType(statusTypeID, marshalStatusFunc, unmarshalStatusFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
+	}
+
 }
 
 // Unmarshal a Block from bytes and initialize it

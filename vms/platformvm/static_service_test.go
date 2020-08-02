@@ -3,179 +3,186 @@
 
 package platformvm
 
-// func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
-// 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-// 	utxo := APIUTXO{
-// 		Address: id,
-// 		Amount:  0,
-// 	}
-// 	weight := json.Uint64(987654321)
-// 	validator := APIDefaultSubnetValidator{
-// 		APIValidator: APIValidator{
-// 			EndTime: 15,
-// 			Weight:  &weight,
-// 			ID:      id,
-// 		},
-// 		Destination: id,
-// 	}
+import (
+	"testing"
 
-// 	args := BuildGenesisArgs{
-// 		UTXOs: []APIUTXO{
-// 			utxo,
-// 		},
-// 		Validators: []APIDefaultSubnetValidator{
-// 			validator,
-// 		},
-// 		Time: 5,
-// 	}
-// 	reply := BuildGenesisReply{}
+	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/json"
+)
 
-// 	ss := StaticService{}
-// 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
-// 		t.Fatalf("Should have errored due to an invalid balance")
-// 	}
-// }
+func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
+	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	utxo := APIUTXO{
+		Address: id,
+		Amount:  0,
+	}
+	weight := json.Uint64(987654321)
+	validator := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			EndTime: 15,
+			Weight:  &weight,
+			ID:      id,
+		},
+		Destination: id,
+	}
 
-// func TestBuildGenesisInvalidAmount(t *testing.T) {
-// 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-// 	utxo := APIUTXO{
-// 		Address: id,
-// 		Amount:  123456789,
-// 	}
-// 	weight := json.Uint64(0)
-// 	validator := APIDefaultSubnetValidator{
-// 		APIValidator: APIValidator{
-// 			StartTime: 0,
-// 			EndTime:   15,
-// 			Weight:    &weight,
-// 			ID:        id,
-// 		},
-// 		Destination: id,
-// 	}
+	args := BuildGenesisArgs{
+		UTXOs: []APIUTXO{
+			utxo,
+		},
+		Validators: []APIDefaultSubnetValidator{
+			validator,
+		},
+		Time: 5,
+	}
+	reply := BuildGenesisReply{}
 
-// 	args := BuildGenesisArgs{
-// 		UTXOs: []APIUTXO{
-// 			utxo,
-// 		},
-// 		Validators: []APIDefaultSubnetValidator{
-// 			validator,
-// 		},
-// 		Time: 5,
-// 	}
-// 	reply := BuildGenesisReply{}
+	ss := StaticService{}
+	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
+		t.Fatalf("Should have errored due to an invalid balance")
+	}
+}
 
-// 	ss := StaticService{}
-// 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
-// 		t.Fatalf("Should have errored due to an invalid amount")
-// 	}
-// }
+func TestBuildGenesisInvalidAmount(t *testing.T) {
+	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	utxo := APIUTXO{
+		Address: id,
+		Amount:  123456789,
+	}
+	weight := json.Uint64(0)
+	validator := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 0,
+			EndTime:   15,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
 
-// func TestBuildGenesisInvalidEndtime(t *testing.T) {
-// 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-// 	utxo := APIUTXO{
-// 		Address: id,
-// 		Amount:  123456789,
-// 	}
+	args := BuildGenesisArgs{
+		UTXOs: []APIUTXO{
+			utxo,
+		},
+		Validators: []APIDefaultSubnetValidator{
+			validator,
+		},
+		Time: 5,
+	}
+	reply := BuildGenesisReply{}
 
-// 	weight := json.Uint64(987654321)
-// 	validator := APIDefaultSubnetValidator{
-// 		APIValidator: APIValidator{
-// 			StartTime: 0,
-// 			EndTime:   5,
-// 			Weight:    &weight,
-// 			ID:        id,
-// 		},
-// 		Destination: id,
-// 	}
+	ss := StaticService{}
+	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
+		t.Fatalf("Should have errored due to an invalid amount")
+	}
+}
 
-// 	args := BuildGenesisArgs{
-// 		UTXOs: []APIUTXO{
-// 			utxo,
-// 		},
-// 		Validators: []APIDefaultSubnetValidator{
-// 			validator,
-// 		},
-// 		Time: 5,
-// 	}
-// 	reply := BuildGenesisReply{}
+func TestBuildGenesisInvalidEndtime(t *testing.T) {
+	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	utxo := APIUTXO{
+		Address: id,
+		Amount:  123456789,
+	}
 
-// 	ss := StaticService{}
-// 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
-// 		t.Fatalf("Should have errored due to an invalid end time")
-// 	}
-// }
+	weight := json.Uint64(987654321)
+	validator := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 0,
+			EndTime:   5,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
 
-// func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
-// 	id := ids.NewShortID([20]byte{1})
-// 	utxo := APIUTXO{
-// 		Address: id,
-// 		Amount:  123456789,
-// 	}
+	args := BuildGenesisArgs{
+		UTXOs: []APIUTXO{
+			utxo,
+		},
+		Validators: []APIDefaultSubnetValidator{
+			validator,
+		},
+		Time: 5,
+	}
+	reply := BuildGenesisReply{}
 
-// 	weight := json.Uint64(987654321)
-// 	validator1 := APIDefaultSubnetValidator{
-// 		APIValidator: APIValidator{
-// 			StartTime: 0,
-// 			EndTime:   20,
-// 			Weight:    &weight,
-// 			ID:        id,
-// 		},
-// 		Destination: id,
-// 	}
+	ss := StaticService{}
+	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
+		t.Fatalf("Should have errored due to an invalid end time")
+	}
+}
 
-// 	validator2 := APIDefaultSubnetValidator{
-// 		APIValidator: APIValidator{
-// 			StartTime: 3,
-// 			EndTime:   15,
-// 			Weight:    &weight,
-// 			ID:        id,
-// 		},
-// 		Destination: id,
-// 	}
+func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
+	id := ids.NewShortID([20]byte{1})
+	utxo := APIUTXO{
+		Address: id,
+		Amount:  123456789,
+	}
 
-// 	validator3 := APIDefaultSubnetValidator{
-// 		APIValidator: APIValidator{
-// 			StartTime: 1,
-// 			EndTime:   10,
-// 			Weight:    &weight,
-// 			ID:        id,
-// 		},
-// 		Destination: id,
-// 	}
+	weight := json.Uint64(987654321)
+	validator1 := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 0,
+			EndTime:   20,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
 
-// 	args := BuildGenesisArgs{
-// 		AvaxAssetID: ids.NewID([32]byte{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}),
-// 		UTXOs: []APIUTXO{
-// 			utxo,
-// 		},
-// 		Validators: []APIDefaultSubnetValidator{
-// 			validator1,
-// 			validator2,
-// 			validator3,
-// 		},
-// 		Time: 5,
-// 	}
-// 	reply := BuildGenesisReply{}
+	validator2 := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 3,
+			EndTime:   15,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
 
-// 	ss := StaticService{}
-// 	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
-// 		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
-// 	}
+	validator3 := APIDefaultSubnetValidator{
+		APIValidator: APIValidator{
+			StartTime: 1,
+			EndTime:   10,
+			Weight:    &weight,
+			ID:        id,
+		},
+		Destination: id,
+	}
 
-// 	genesis := &Genesis{}
-// 	if err := Codec.Unmarshal(reply.Bytes.Bytes, genesis); err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	validators := genesis.Validators
-// 	if validators.Len() == 0 {
-// 		t.Fatal("Validators should contain 3 validators")
-// 	}
-// 	currentValidator := validators.Remove()
-// 	for validators.Len() > 0 {
-// 		nextValidator := validators.Remove()
-// 		if currentValidator.EndTime().Unix() > nextValidator.EndTime().Unix() {
-// 			t.Fatalf("Validators returned by genesis should be a min heap sorted by end time")
-// 		}
-// 		currentValidator = nextValidator
-// 	}
-// }
+	args := BuildGenesisArgs{
+		AvaxAssetID: ids.NewID([32]byte{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}),
+		UTXOs: []APIUTXO{
+			utxo,
+		},
+		Validators: []APIDefaultSubnetValidator{
+			validator1,
+			validator2,
+			validator3,
+		},
+		Time: 5,
+	}
+	reply := BuildGenesisReply{}
+
+	ss := StaticService{}
+	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
+		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
+	}
+
+	genesis := &Genesis{}
+	if err := Codec.Unmarshal(reply.Bytes.Bytes, genesis); err != nil {
+		t.Fatal(err)
+	}
+	validators := genesis.Validators
+	if validators.Len() == 0 {
+		t.Fatal("Validators should contain 3 validators")
+	}
+	currentValidator := validators.Remove().UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+	for validators.Len() > 0 {
+		nextValidator := validators.Remove().UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		if currentValidator.EndTime().Unix() > nextValidator.EndTime().Unix() {
+			t.Fatalf("Validators returned by genesis should be a min heap sorted by end time")
+		}
+		currentValidator = nextValidator
+	}
+}

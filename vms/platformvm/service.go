@@ -28,6 +28,7 @@ var (
 	errNoPassword           = errors.New("argument 'password' not provided")
 	errNoSubnetID           = errors.New("argument 'subnetID' not provided")
 	errNoDestination        = errors.New("argument 'destination' not provided")
+	errUnexpectedTxType     = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -543,7 +544,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	switch {
 	case args.Destination == "":
 		return errNoDestination
-	case int64(args.StartTime) < time.Now().Unix():
+	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
 	}
 
@@ -1070,6 +1071,99 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			SubnetID: uChain.SubnetID,
 			VMID:     uChain.VMID,
 		})
+	}
+	return nil
+}
+
+// GetTxArgs ...
+type GetTxArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxResponse ...
+type GetTxResponse struct {
+	// Raw byte representation of the transaction
+	RawTx formatting.CB58 `json:"rawTx"`
+	// JSON representation of the transaction
+	JSON interface{} `json:"json"`
+}
+
+// GetTx gets a tx
+func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
+	service.vm.Ctx.Log.Info("Platform: GetTx called")
+	txBytes, err := service.vm.getTx(service.vm.DB, args.TxID)
+	if err != nil {
+		return fmt.Errorf("couldn't get tx: %w", err)
+	}
+	response.RawTx.Bytes = txBytes
+
+	// Parse the raw bytes to a struct so we can get the JSON representation
+	// We don't know what kind of tx this is, so we go through the possibilities
+	// until we find the right one
+	var (
+		proposalTx ProposalTx
+		decisionTx DecisionTx
+		atomicTx   AtomicTx
+	)
+	if err := service.vm.codec.Unmarshal(txBytes, &proposalTx); err == nil {
+		response.JSON = &proposalTx
+	} else if err := service.vm.codec.Unmarshal(txBytes, &decisionTx); err == nil {
+		response.JSON = &decisionTx
+	} else if err := service.vm.codec.Unmarshal(txBytes, &atomicTx); err == nil {
+		response.JSON = &atomicTx
+	} else {
+		return errUnexpectedTxType
+	}
+	return nil
+}
+
+// GetTxStatusArgs ...
+type GetTxStatusArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxStatus gets a tx's status
+func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *Status) error {
+	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
+	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
+	if err == nil { // Found the status. Report it.
+		*response = status
+		return nil
+	}
+	// The status of this transaction is not in the database.
+	// Check if the tx is in the preferred block's db. If so, return that it's processing.
+	preferred, err := service.vm.getBlock(service.vm.Preferred())
+	if err != nil {
+		service.vm.Ctx.Log.Error("couldn't get preferred block: %s", err)
+		*response = Unknown
+		return nil
+	}
+	switch block := preferred.(type) {
+	case *Abort:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing // Found the status in the preferred block's db. Report tx is processing.
+			return nil
+		}
+	case *Commit:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing
+			return nil
+		}
+	case *AtomicBlock:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing
+			return nil
+		}
+	case *StandardBlock:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing
+			return nil
+		}
+	}
+	if _, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
+		*response = Dropped
+	} else {
+		*response = Unknown
 	}
 	return nil
 }

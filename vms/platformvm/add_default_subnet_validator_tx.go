@@ -13,10 +13,11 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 var (
@@ -35,12 +36,12 @@ type UnsignedAddDefaultSubnetValidatorTx struct {
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
 	// Where to send staked tokens when done validating
-	Stake []*ava.TransferableOutput `serialize:"true"`
+	Stake []*ava.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner verify.Verifiable `serialize:"true"`
+	RewardsOwner verify.Verifiable `serialize:"true" json:"rewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
-	Shares uint32 `serialize:"true"`
+	Shares uint32 `serialize:"true" json:"shares"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -158,13 +159,28 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 		}
 	}
 
-	// Verify inputs/outputs and update the UTXO set
-	onCommitDB := versiondb.New(db)
+	outs := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.Stake))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.Stake)
 
-	// Consume / produce the static UTXOS
-	if err := tx.vm.semanticVerifySpend(onCommitDB, tx, tx.Ins, tx.Outs, tx.Stake, stx.Credentials); err != nil {
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Credentials); err != nil {
 		return nil, nil, nil, nil, err
 	}
+
+	txID := tx.ID()
+
+	// Verify inputs/outputs and update the UTXO set
+	onCommitDB := versiondb.New(db)
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+
 	// Add validator to set of pending validators
 	pendingValidators.Add(stx)
 	// If this proposal is committed, update the pending validator set to include the validator
@@ -173,15 +189,13 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	}
 
 	onAbortDB := versiondb.New(db)
-
-	// Refund the stake here
-	allOuts := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.Stake))
-	copy(allOuts, tx.Outs)
-	copy(allOuts[len(tx.Outs):], tx.Stake)
-
-	// Consume / produce the static UTXOS
-	if err := tx.vm.semanticVerifySpend(onAbortDB, tx, tx.Ins, allOuts, nil, stx.Credentials); err != nil {
-		return nil, nil, nil, nil, err
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(onAbortDB, txID, tx.Outs); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	return onCommitDB, onAbortDB, nil, nil, nil

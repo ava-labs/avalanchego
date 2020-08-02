@@ -20,7 +20,7 @@ type UnsignedCreateSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Who is authorized to manage this subnet
-	Owner verify.Verifiable `serialize:"true"`
+	Owner verify.Verifiable `serialize:"true" json:"owner"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -82,9 +82,20 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 		return nil, tempError{err}
 	}
 
-	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, nil, stx.Credentials); err != nil {
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Credentials); err != nil {
 		return nil, err
+	}
+
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+		return nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return nil, tempError{err}
 	}
 
 	// Register new subnet in validator manager

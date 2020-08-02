@@ -30,7 +30,7 @@ var (
 type UnsignedExportTx struct {
 	BaseTx `serialize:"true"`
 	// Outputs that are exported to the X-Chain
-	ExportedOutputs []*ava.TransferableOutput `serialize:"true"`
+	ExportedOutputs []*ava.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -96,10 +96,27 @@ func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.
 		return permError{err}
 	}
 
-	allOuts := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(allOuts, tx.Outs)
-	copy(allOuts[len(tx.Outs):], tx.ExportedOutputs)
-	return tx.vm.semanticVerifySpend(db, tx, tx.Ins, allOuts, nil, creds)
+	outs := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
+
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, outs, creds); err != nil {
+		return err
+	}
+
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+		return tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(db, txID, outs); err != nil {
+		return tempError{err}
+	}
+
+	return nil
 }
 
 // Accept this transaction.

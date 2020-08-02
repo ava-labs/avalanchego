@@ -22,7 +22,7 @@ import (
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx ProposalTx `serialize:"true"`
+	Tx ProposalTx `serialize:"true" json:"tx"`
 
 	// The database that the chain will have if this block's proposal is committed
 	onCommitDB *versiondb.Database
@@ -107,9 +107,12 @@ func (pb *ProposalBlock) Verify() error {
 	// pdb is the database if this block's parent is accepted
 	pdb := parent.onAccept()
 
+	txID := pb.Tx.ID()
+
 	var err TxError
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb, &pb.Tx)
 	if err != nil {
+		pb.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
@@ -121,6 +124,25 @@ func (pb *ProposalBlock) Verify() error {
 				pb.vm.DB.Abort()
 			}
 		}
+		return err
+	}
+
+	txBytes, tErr := pb.vm.codec.Marshal(pb.Tx)
+	if tErr != nil {
+		return tErr
+	}
+
+	if err := pb.vm.putTx(pb.onCommitDB, txID, txBytes); err != nil {
+		return err
+	}
+	if err := pb.vm.putStatus(pb.onCommitDB, txID, Committed); err != nil {
+		return err
+	}
+
+	if err := pb.vm.putTx(pb.onAbortDB, txID, txBytes); err != nil {
+		return err
+	}
+	if err := pb.vm.putStatus(pb.onAbortDB, txID, Aborted); err != nil {
 		return err
 	}
 
