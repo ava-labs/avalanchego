@@ -4,8 +4,6 @@
 package platformvm
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -32,7 +30,7 @@ var (
 type UnsignedExportTx struct {
 	BaseTx `serialize:"true"`
 	// Outputs that are exported to the X-Chain
-	ExportedOutputs []*ava.TransferableOutput `serialize:"true"`
+	ExportedOutputs []*ava.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -149,24 +147,6 @@ func (tx *UnsignedExportTx) Accept(batch database.Batch) error {
 		return err
 	}
 	return atomic.WriteAll(batch, sharedBatch)
-}
-
-// MarshalJSON marshals [tx] to JSON
-func (tx *UnsignedExportTx) MarshalJSON() ([]byte, error) {
-	// Marshal the base tx
-	baseTxJSON, err := json.Marshal(tx.BaseTx)
-	if err != nil {
-		return nil, err
-	}
-	exportedOutsJSON, err := json.Marshal(tx.ExportedOutputs)
-	if err != nil {
-		return nil, err
-	}
-	buffer := bytes.NewBufferString("{")
-	buffer.WriteString(fmt.Sprintf("\"baseTx\":%s,", string(baseTxJSON)))
-	buffer.WriteString(fmt.Sprintf("\"exportedOutputs\":%s", string(exportedOutsJSON)))
-	buffer.WriteString("}")
-	return buffer.Bytes(), nil
 }
 
 // Create a new transaction

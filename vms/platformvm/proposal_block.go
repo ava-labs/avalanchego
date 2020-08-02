@@ -22,7 +22,7 @@ import (
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx ProposalTx `serialize:"true"`
+	Tx ProposalTx `serialize:"true" json:"tx"`
 
 	// The database that the chain will have if this block's proposal is committed
 	onCommitDB *versiondb.Database
@@ -71,30 +71,16 @@ func (pb *ProposalBlock) setBaseDatabase(db database.Database) {
 //      accepted Commit block.)
 //   2. A function be be executed when this block's proposal is committed.
 //      This function should not write to state.
-func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error, error) {
-	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
-		return nil, nil, err
-	} else if err := pb.vm.putTx(pb.onCommitDB, pb.Tx.ID(), txBytes); err != nil {
-		return nil, nil, err
-	} else if err := pb.vm.putStatus(pb.onCommitDB, pb.Tx.ID(), Committed); err != nil {
-		return nil, nil, err
-	}
-	return pb.onCommitDB, pb.onCommitFunc, nil
+func (pb *ProposalBlock) onCommit() (*versiondb.Database, func() error) {
+	return pb.onCommitDB, pb.onCommitFunc
 }
 
 // onAbort should only be called after Verify is called.
 // onAbort returns a database that contains the state of the chain assuming this
 // block's proposal is rejected. (That is, if this block is accepted and
 // followed by an accepted Abort block.)
-func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error, error) {
-	if txBytes, err := pb.vm.codec.Marshal(pb.Tx); err != nil {
-		return nil, nil, err
-	} else if err := pb.vm.putTx(pb.onAbortDB, pb.Tx.ID(), txBytes); err != nil {
-		return nil, nil, err
-	} else if err := pb.vm.putStatus(pb.onAbortDB, pb.Tx.ID(), Aborted); err != nil {
-		return nil, nil, err
-	}
-	return pb.onAbortDB, pb.onAbortFunc, nil
+func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error) {
+	return pb.onAbortDB, pb.onAbortFunc
 }
 
 // Verify this block is valid.
@@ -121,10 +107,12 @@ func (pb *ProposalBlock) Verify() error {
 	// pdb is the database if this block's parent is accepted
 	pdb := parent.onAccept()
 
+	txID := pb.Tx.ID()
+
 	var err TxError
 	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb, &pb.Tx)
 	if err != nil {
-		pb.vm.droppedTxCache.Put(pb.Tx.ID(), nil) // cache tx as dropped
+		pb.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
 		// verification now but be valid in the future, so don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
@@ -136,6 +124,25 @@ func (pb *ProposalBlock) Verify() error {
 				pb.vm.DB.Abort()
 			}
 		}
+		return err
+	}
+
+	txBytes, tErr := pb.vm.codec.Marshal(pb.Tx)
+	if tErr != nil {
+		return tErr
+	}
+
+	if err := pb.vm.putTx(pb.onCommitDB, txID, txBytes); err != nil {
+		return err
+	}
+	if err := pb.vm.putStatus(pb.onCommitDB, txID, Committed); err != nil {
+		return err
+	}
+
+	if err := pb.vm.putTx(pb.onAbortDB, txID, txBytes); err != nil {
+		return err
+	}
+	if err := pb.vm.putStatus(pb.onAbortDB, txID, Aborted); err != nil {
 		return err
 	}
 

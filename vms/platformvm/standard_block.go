@@ -14,7 +14,7 @@ import (
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
 
-	Txs []*DecisionTx `serialize:"true"`
+	Txs []*DecisionTx `serialize:"true" json:"txs"`
 }
 
 // initialize this block

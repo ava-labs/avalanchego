@@ -35,11 +35,7 @@ func (a *Abort) Verify() error {
 		return errInvalidBlockType
 	}
 
-	var err error
-	a.onAcceptDB, a.onAcceptFunc, err = parent.onAbort()
-	if err != nil {
-		return err
-	}
+	a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
 
 	a.vm.currentBlocks[a.ID().Key()] = a
 	a.parentBlock().addChild(a)

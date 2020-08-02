@@ -31,9 +31,9 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
 	// Where to send staked tokens when done validating
-	Stake []*ava.TransferableOutput `serialize:"true"`
+	Stake []*ava.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner verify.Verifiable `serialize:"true"`
+	RewardsOwner verify.Verifiable `serialize:"true" json:"rewardsOwner"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]

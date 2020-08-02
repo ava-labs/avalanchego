@@ -43,7 +43,7 @@ type UnsignedRewardValidatorTx struct {
 	bytes []byte
 
 	// ID of the tx that created the delegator/validator being removed/rewarded
-	TxID ids.ID `serialize:"true"`
+	TxID ids.ID `serialize:"true" json:"txID"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]

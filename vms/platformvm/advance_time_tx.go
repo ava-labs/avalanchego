@@ -31,7 +31,7 @@ type UnsignedAdvanceTimeTx struct {
 	bytes []byte
 
 	// Unix time this block proposes increasing the timestamp to
-	Time uint64 `serialize:"true"`
+	Time uint64 `serialize:"true" json:"time"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]

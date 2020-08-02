@@ -29,7 +29,7 @@ type UnsignedAddNonDefaultSubnetValidatorTx struct {
 	// The validator
 	SubnetValidator `serialize:"true"`
 	// Auth that will be allowing this validator into the network
-	SubnetAuth verify.Verifiable `serialize:"true"`
+	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]

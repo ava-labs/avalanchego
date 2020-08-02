@@ -20,7 +20,7 @@ type UnsignedCreateSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Who is authorized to manage this subnet
-	Owner verify.Verifiable `serialize:"true"`
+	Owner verify.Verifiable `serialize:"true" json:"owner"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]

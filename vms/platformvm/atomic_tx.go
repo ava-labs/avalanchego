@@ -28,7 +28,7 @@ type UnsignedAtomicTx interface {
 // AtomicTx is an operation that can be decided without being proposed, but must
 // have special control over database commitment
 type AtomicTx struct {
-	UnsignedAtomicTx `serialize:"true" json:"unsignedAtomicTx"`
+	UnsignedAtomicTx `serialize:"true"`
 	// Credentials that authorize the inputs to be spent
 	Credentials []verify.Verifiable `serialize:"true" json:"credentials"`
 }

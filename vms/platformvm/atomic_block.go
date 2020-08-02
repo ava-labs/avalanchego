@@ -21,7 +21,7 @@ var (
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx AtomicTx `serialize:"true"`
+	Tx AtomicTx `serialize:"true" json:"tx"`
 
 	inputs ids.Set
 }

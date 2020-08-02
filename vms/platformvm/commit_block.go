@@ -35,11 +35,7 @@ func (c *Commit) Verify() error {
 		return errInvalidBlockType
 	}
 
-	var err error
-	c.onAcceptDB, c.onAcceptFunc, err = parent.onCommit()
-	if err != nil {
-		return err
-	}
+	c.onAcceptDB, c.onAcceptFunc = parent.onCommit()
 
 	c.vm.currentBlocks[c.ID().Key()] = c
 	c.parentBlock().addChild(c)

@@ -4,13 +4,10 @@
 package platformvm
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
-
-	stdjson "encoding/json"
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"
@@ -1088,52 +1085,36 @@ type GetTxResponse struct {
 	// Raw byte representation of the transaction
 	RawTx formatting.CB58 `json:"rawTx"`
 	// JSON representation of the transaction
-	JSON []byte `json:"json"`
-}
-
-// MarshalJSON marshals [tx] to JSON
-func (tx *GetTxResponse) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString("{")
-	buffer.WriteString(fmt.Sprintf("\"raw\":\"%s\",", tx.RawTx))
-	buffer.WriteString(fmt.Sprintf("\"json\":%s", tx.JSON))
-	buffer.WriteString("}")
-	return buffer.Bytes(), nil
+	JSON interface{} `json:"json"`
 }
 
 // GetTx gets a tx
 func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
 	service.vm.Ctx.Log.Info("Platform: GetTx called")
-	tx, err := service.vm.getTx(service.vm.DB, args.TxID)
+	txBytes, err := service.vm.getTx(service.vm.DB, args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.RawTx = formatting.CB58{Bytes: tx}
+	response.RawTx.Bytes = txBytes
 
 	// Parse the raw bytes to a struct so we can get the JSON representation
 	// We don't know what kind of tx this is, so we go through the possibilities
 	// until we find the right one
-	var proposalTx ProposalTx
-	if err := service.vm.codec.Unmarshal(tx, &proposalTx); err == nil {
-		if response.JSON, err = stdjson.Marshal(proposalTx); err != nil {
-			return fmt.Errorf("couldn't marshal tx to json: %w", err)
-		}
-		return nil
+	var (
+		proposalTx ProposalTx
+		decisionTx DecisionTx
+		atomicTx   AtomicTx
+	)
+	if err := service.vm.codec.Unmarshal(txBytes, &proposalTx); err == nil {
+		response.JSON = &proposalTx
+	} else if err := service.vm.codec.Unmarshal(txBytes, &decisionTx); err == nil {
+		response.JSON = &decisionTx
+	} else if err := service.vm.codec.Unmarshal(txBytes, &atomicTx); err == nil {
+		response.JSON = &atomicTx
+	} else {
+		return errUnexpectedTxType
 	}
-	var decisionTx DecisionTx
-	if err := service.vm.codec.Unmarshal(tx, &decisionTx); err == nil {
-		if response.JSON, err = stdjson.Marshal(decisionTx); err != nil {
-			return fmt.Errorf("couldn't marshal tx to json: %w", err)
-		}
-		return nil
-	}
-	var atomicTx AtomicTx
-	if err := service.vm.codec.Unmarshal(tx, &atomicTx); err == nil {
-		if response.JSON, err = stdjson.Marshal(atomicTx); err != nil {
-			return fmt.Errorf("couldn't marshal tx to json: %w", err)
-		}
-		return nil
-	}
-	return errUnexpectedTxType
+	return nil
 }
 
 // GetTxStatusArgs ...

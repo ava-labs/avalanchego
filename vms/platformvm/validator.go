@@ -13,10 +13,10 @@ import (
 // Validator ...
 type Validator struct {
 	// Node ID of the staker
-	NodeID ids.ShortID `serialize:"true"`
+	NodeID ids.ShortID `serialize:"true" json:"nodeID"`
 
 	// Weight of this validator used when sampling
-	Wght uint64 `serialize:"true"`
+	Wght uint64 `serialize:"true" json:"weight"`
 }
 
 // ID returns the node ID of the staker
@@ -45,10 +45,10 @@ type DurationValidator struct {
 	Validator `serialize:"true"`
 
 	// Unix time this staker starts validating
-	Start uint64 `serialize:"true"`
+	Start uint64 `serialize:"true" json:"start"`
 
 	// Unix time this staker stops validating
-	End uint64 `serialize:"true"`
+	End uint64 `serialize:"true" json:"end"`
 }
 
 // StartTime is the time that this staker will enter the validator set
@@ -85,7 +85,7 @@ type SubnetValidator struct {
 	DurationValidator `serialize:"true"`
 
 	// ID of the subnet this validator is validating
-	Subnet ids.ID `serialize:"true"`
+	Subnet ids.ID `serialize:"true" json:"subnet"`
 }
 
 // SubnetID is the ID of the subnet this validator is validating
