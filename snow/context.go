@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/triggers"
@@ -52,6 +54,9 @@ type Context struct {
 	Keystore            Keystore
 	SharedMemory        SharedMemory
 	BCLookup            AliasLookup
+
+	Namespace string
+	Metrics   prometheus.Registerer
 }
 
 // DefaultContextTest ...
@@ -67,5 +72,6 @@ func DefaultContextTest() *Context {
 		DecisionDispatcher:  &decisionED,
 		ConsensusDispatcher: &consensusED,
 		BCLookup:            &ids.Aliaser{},
+		Metrics:             prometheus.NewRegistry(),
 	}
 }

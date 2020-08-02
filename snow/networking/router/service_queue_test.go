@@ -150,7 +150,6 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		tier3,
 	}
 
-	// cpuInterval := float64(3 * time.Second)
 	perTier := float64(time.Second)
 	// Give each tier 1 second of processing time
 	consumptionAllotments := []float64{
@@ -218,5 +217,93 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		t.Fatal(err)
 	} else if !msg3.validatorID.Equals(validator1.ID()) {
 		t.Fatal("Expected final message to come from validator1")
+	}
+}
+
+func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
+	bufferSize := 16
+	vdrs := validators.NewSet()
+	vdr0 := validators.GenerateRandomValidator(2000)
+	vdr1 := validators.GenerateRandomValidator(2000)
+	vdrs.Set([]validators.Validator{
+		vdr0,
+		vdr1,
+	})
+
+	metrics := &metrics{}
+	metrics.Initialize("", prometheus.NewRegistry())
+	// Set tier1 cutoff sufficiently low so that only messages from validators
+	// the message queue has not serviced will be placed on it for the test.
+	tier1 := 0.001
+	tier2 := 1.0
+	tier3 := math.MaxFloat64
+	consumptionRanges := []float64{
+		tier1,
+		tier2,
+		tier3,
+	}
+
+	perTier := float64(time.Second)
+	// Give each tier 1 second of processing time
+	consumptionAllotments := []float64{
+		perTier,
+		perTier,
+		perTier,
+	}
+
+	queue, semaChan := newMultiLevelQueue(
+		vdrs,
+		logging.NoLog{},
+		metrics,
+		consumptionRanges,
+		consumptionAllotments,
+		bufferSize,
+		float64(time.Second),
+		defaultStakerPortion,
+	)
+
+	queue.PushMessage(message{
+		validatorID: vdr0.ID(),
+		requestID:   1,
+	})
+	queue.PushMessage(message{
+		validatorID: vdr0.ID(),
+		requestID:   2,
+	})
+	queue.PushMessage(message{
+		validatorID: vdr1.ID(),
+		requestID:   3,
+	})
+
+	<-semaChan
+	msg, err := queue.PopMessage()
+	if err != nil {
+		t.Fatalf("Popping first message errored: %s", err)
+	}
+	if !msg.validatorID.Equals(vdr0.ID()) {
+		t.Fatal("Expected first message to come from vdr0")
+	}
+
+	// Utilize enough CPU so that messages from vdr0 will be placed in a lower
+	// priority queue, but not exhaust the time spent processing messages from
+	// the highest priority queue
+	queue.UtilizeCPU(vdr0.ID(), float64(time.Second)/2)
+
+	<-semaChan
+	msg, err = queue.PopMessage()
+	if err != nil {
+		t.Fatalf("Popping second message errored: %s", err)
+	}
+	if !msg.validatorID.Equals(vdr1.ID()) {
+		t.Fatal("Expected second message to come from vdr1 after vdr0 dropped in priority")
+	}
+
+	<-semaChan
+	msg, err = queue.PopMessage()
+	if err != nil {
+		t.Fatalf("Popping third message errored: %s", err)
+	}
+	if !msg.validatorID.Equals(vdr0.ID()) {
+		t.Fatal("Expected third message to come from vdr0")
 	}
 }
