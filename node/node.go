@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/database/meterdb"
+
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
@@ -494,7 +496,15 @@ func (n *Node) initMetricsAPI() error {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing metrics API")
+
+	db, err := meterdb.New("gecko_db", registry, n.DB)
+	if err != nil {
+		return err
+	}
+	n.DB = db
+
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
 
@@ -502,7 +512,7 @@ func (n *Node) initMetricsAPI() error {
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
 func (n *Node) initAdminAPI() error {
 	if !n.Config.AdminAPIEnabled {
-		n.Log.Info("skipping admin API initializaion because it has been disabled")
+		n.Log.Info("skipping admin API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing admin API")
