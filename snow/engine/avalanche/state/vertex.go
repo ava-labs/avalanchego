@@ -52,17 +52,18 @@ func (vtx *innerVertex) Verify() error {
 		return errNoTxs
 	case !isSortedAndUniqueTxs(vtx.txs):
 		return errInvalidTxs
-	default:
-		inputIDs := ids.Set{}
-		for _, tx := range vtx.txs {
-			inputs := tx.InputIDs()
-			if inputs.Overlaps(inputIDs) {
-				return errConflictingTxs
-			}
-			inputIDs.Union(inputs)
-		}
-		return nil
 	}
+
+	inputIDs := ids.Set{}
+	for _, tx := range vtx.txs {
+		inputs := tx.InputIDs()
+		if inputs.Overlaps(inputIDs) {
+			return errConflictingTxs
+		}
+		inputIDs.Union(inputs)
+	}
+
+	return nil
 }
 
 /*
