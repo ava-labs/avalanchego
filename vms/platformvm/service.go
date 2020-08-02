@@ -460,7 +460,7 @@ func (service *Service) ListAccounts(_ *http.Request, args *ListAccountsArgs, re
 	for _, accountID := range accountIDs {
 		account, err := service.vm.getAccount(service.vm.DB, accountID) // Get account whose ID is [accountID]
 		if err != nil && err != database.ErrNotFound {
-			service.vm.Ctx.Log.Error("couldn't get account from database: %w", err)
+			service.vm.Ctx.Log.Error("couldn't get account from database: %s", err)
 			continue
 		} else if err == database.ErrNotFound {
 			account = newAccount(accountID, 0, 0)
@@ -1388,7 +1388,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 
 	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
 	if err != nil {
-		service.vm.Ctx.Log.Error("problem marshaling createChainTx: %w", err)
+		service.vm.Ctx.Log.Error("problem marshaling createChainTx: %s", err)
 		return errCreatingTransaction
 	}
 

@@ -631,14 +631,15 @@ func (vm *VM) SetPreference(blkID ids.ID) {
 // See API documentation for more information
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	// Create a service with name "platform"
-	handler := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
+	handler, err := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
+	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{"": handler}
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	// Static service's name is platform
-	handler := vm.SnowmanVM.NewHandler("platform", &StaticService{})
+	handler, _ := vm.SnowmanVM.NewHandler("platform", &StaticService{})
 	return map[string]*common.HTTPHandler{
 		"": handler,
 	}

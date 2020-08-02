@@ -224,9 +224,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// Name the API service "spchain"
-	if err := newServer.RegisterService(&StaticService{}, "spchain"); err != nil {
-		vm.ctx.Log.Error("error creating static handlers: %w", err)
-	}
+	_ = newServer.RegisterService(&StaticService{}, "spchain")
 	return map[string]*common.HTTPHandler{
 		"": &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer},
 	}

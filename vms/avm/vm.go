@@ -270,9 +270,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "avm"
-	if err := newServer.RegisterService(&StaticService{}, "avm"); err != nil {
-		vm.ctx.Log.Error("error creating static handlers: %w", err)
-	}
+	_ = newServer.RegisterService(&StaticService{}, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}

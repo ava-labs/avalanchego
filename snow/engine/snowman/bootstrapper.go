@@ -153,7 +153,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 
 	wantedBlk, err := b.VM.ParseBlock(blks[0]) // the block we requested
 	if err != nil {
-		b.BootstrapConfig.Context.Log.Debug("Failed to parse requested block %s: %w", wantedBlkID, err)
+		b.BootstrapConfig.Context.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
 	} else if actualID := wantedBlk.ID(); !actualID.Equals(wantedBlkID) {
 		b.BootstrapConfig.Context.Log.Debug("expected the first block to be the requested block, %s, but is %s", wantedBlk, actualID)
@@ -162,7 +162,7 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 
 	for _, blkBytes := range blks {
 		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
-			b.BootstrapConfig.Context.Log.Debug("Failed to parse block: %w", err)
+			b.BootstrapConfig.Context.Log.Debug("Failed to parse block: %s", err)
 			b.BootstrapConfig.Context.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
 		}
 	}

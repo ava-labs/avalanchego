@@ -218,9 +218,9 @@ func (it *iterator) Next() bool {
 	resp, err := it.db.client.IteratorNext(context.Background(), &rpcdbproto.IteratorNextRequest{
 		Id: it.id,
 	})
+	it.errs.Add(updateError(err))
 
 	if err != nil {
-		it.errs.Add(err)
 		return false
 	}
 	it.key = resp.Key
@@ -252,7 +252,7 @@ func (it *iterator) Release() {
 	_, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
 		Id: it.id,
 	})
-	it.errs.Add(err)
+	it.errs.Add(updateError(err))
 }
 
 // updateError sets the error value to the errors required by the Database

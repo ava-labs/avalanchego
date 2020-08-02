@@ -228,9 +228,6 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
-	// Ignore weak randomness warning because strong randomness is unnecessary for
-	// creating the nodeID
-	// #nosec G404
 	net := &network{
 		log:                                log,
 		id:                                 id,
@@ -269,7 +266,7 @@ func NewNetwork(
 		peers:           make(map[[20]byte]*peer),
 	}
 	if err := net.initialize(registerer); err != nil {
-		log.Error("error initializing network metrics: %w", err)
+		log.Warn("initializing network metrics failed with: %s", err)
 	}
 	net.executor.Initialize()
 	net.heartbeat()
@@ -404,7 +401,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID) {
 	msg, err := n.b.GetAncestors(chainID, requestID, containerID)
 	if err != nil {
-		n.log.Error("failed to build GetAncestors message: %w", err)
+		n.log.Error("failed to build GetAncestors message: %s", err)
 		return
 	}
 
@@ -707,7 +704,7 @@ func (n *network) Close() error {
 	n.closed = true
 	err := n.listener.Close()
 	if err != nil {
-		n.log.Error("Error while closing network listener: %w", err)
+		n.log.Debug("closing network listener failed with: %s", err)
 	}
 
 	peersToClose := []*peer(nil)

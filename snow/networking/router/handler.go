@@ -125,7 +125,7 @@ func (h *Handler) Initialize(
 ) {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
-		h.ctx.Log.Error("Error initializing handler metrics: %w", err)
+		h.ctx.Log.Warn("initializing handler metrics errored with: %s", err)
 	}
 	h.reliableMsgsSema = make(chan struct{}, 1)
 	h.closed = make(chan struct{})

@@ -39,9 +39,7 @@ func (p *Performance) StartCPUProfiler() error {
 		return err
 	}
 	if err := pprof.StartCPUProfile(file); err != nil {
-		// Close should return an error if it has already been called
-		// Return the original error in case of error
-		file.Close() // #nosec G104
+		_ = file.Close() // Return the original error
 		return err
 	}
 	runtime.SetMutexProfileFraction(1)
@@ -70,9 +68,7 @@ func (p *Performance) MemoryProfile() error {
 	}
 	runtime.GC() // get up-to-date statistics
 	if err := pprof.WriteHeapProfile(file); err != nil {
-		// Close should return an error if it has already been called
-		// Return the original error in case of error
-		file.Close() // #nosec G104
+		_ = file.Close() // Return the original error
 		return err
 	}
 	return file.Close()
@@ -87,9 +83,7 @@ func (p *Performance) LockProfile() error {
 
 	profile := pprof.Lookup("mutex")
 	if err := profile.WriteTo(file, 1); err != nil {
-		// Close should return an error if it has already been called
-		// Return the original error in case of error
-		file.Close() // #nosec G104
+		_ = file.Close() // Return the original error
 		return err
 	}
 	return file.Close()

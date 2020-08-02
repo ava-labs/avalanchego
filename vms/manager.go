@@ -120,7 +120,7 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 		staticVM, ok := vm.(common.VM)
 		if ok {
 			if err := staticVM.Shutdown(); err != nil {
-				m.log.Error("Error while shutting down static API Endpoints: %w", err)
+				m.log.Error("shutting down static API endpoints errored with: %s", err)
 			}
 		}
 		return

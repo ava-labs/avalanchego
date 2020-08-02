@@ -169,9 +169,7 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	// name this service "spdag"
-	if err := newServer.RegisterService(&StaticService{}, "spdag"); err != nil {
-		vm.ctx.Log.Error("error creating static handlers: %w", err)
-	}
+	_ = newServer.RegisterService(&StaticService{}, "spdag")
 	return map[string]*common.HTTPHandler{
 		// NoLock because the static functions probably wont be stateful (i.e. no
 		// write operations)

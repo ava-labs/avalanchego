@@ -100,7 +100,8 @@ func (vm *VM) Initialize(
 // Keys: The path extension for this VM's API (empty in this case)
 // Values: The handler for the API
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
-	handler := vm.NewHandler("timestamp", &Service{vm})
+	handler, err := vm.NewHandler("timestamp", &Service{vm})
+	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{
 		"": handler,
 	}

@@ -89,9 +89,7 @@ func (ipc *IPCs) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs,
 
 	if err = sock.Listen(url); err != nil {
 		ipc.log.Error("can't listen on pub socket: %s", err)
-		// Closing the socket should only error if it has already been closed
-		// #nosec G104
-		sock.Close()
+		_ = sock.Close() // Return the original error
 		return err
 	}
 
@@ -101,9 +99,7 @@ func (ipc *IPCs) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs,
 	}
 	if err := ipc.events.RegisterChain(chainID, "ipc", chainIPC); err != nil {
 		ipc.log.Error("couldn't register event: %s", err)
-		// Closing the socket should only error if it has already been closed
-		// #nosec G104
-		sock.Close()
+		_ = sock.Close() // Return the original error
 		return err
 	}
 

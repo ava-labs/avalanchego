@@ -379,7 +379,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
 			if err := chain.Engine.Startup(); err != nil {
-				chain.Ctx.Log.Error("failed to start consensus engine: %w", err)
+				chain.Ctx.Log.Error("failed to start consensus engine: %s", err)
 				chain.Handler.Shutdown()
 			}
 		})
