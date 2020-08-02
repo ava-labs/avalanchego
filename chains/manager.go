@@ -218,6 +218,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.log.Error("Error while creating new chain: %s", err)
 		return
 	}
+	m.chains[chainParams.ID.Key()] = chain.Handler
 
 	// Associate the newly created chain with its default alias
 	m.log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
@@ -255,6 +256,8 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		Keystore:            m.keystore.NewBlockchainKeyStore(chainParams.ID),
 		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chainParams.ID),
 		BCLookup:            m,
+		Namespace:           fmt.Sprintf("gecko_%s_vm", primaryAlias),
+		Metrics:             m.consensusParams.Metrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain

@@ -50,6 +50,7 @@ var (
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
+	metrics
 	ids.Aliaser
 
 	ava      ids.ID
@@ -126,6 +127,8 @@ func (vm *VM) Initialize(
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		vm.metrics.Initialize(ctx.Namespace, ctx.Metrics),
+
 		vm.pubsub.Register("accepted"),
 		vm.pubsub.Register("rejected"),
 		vm.pubsub.Register("verified"),
@@ -204,6 +207,8 @@ func (vm *VM) Initialize(
 // Bootstrapping is called by the consensus engine when it starts bootstrapping
 // this chain
 func (vm *VM) Bootstrapping() error {
+	vm.metrics.numBootstrappingCalls.Inc()
+
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -215,6 +220,8 @@ func (vm *VM) Bootstrapping() error {
 // Bootstrapped is called by the consensus engine when it is done bootstrapping
 // this chain
 func (vm *VM) Bootstrapped() error {
+	vm.metrics.numBootstrappedCalls.Inc()
+
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -241,6 +248,8 @@ func (vm *VM) Shutdown() error {
 
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+	vm.metrics.numCreateHandlersCalls.Inc()
+
 	rpcServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	rpcServer.RegisterCodec(codec, "application/json")
@@ -271,6 +280,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 
 // PendingTxs implements the avalanche.DAGVM interface
 func (vm *VM) PendingTxs() []snowstorm.Tx {
+	vm.metrics.numPendingTxsCalls.Inc()
+
 	vm.timer.Cancel()
 
 	txs := vm.txs
@@ -279,10 +290,16 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 }
 
 // ParseTx implements the avalanche.DAGVM interface
-func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) { return vm.parseTx(b) }
+func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
+	vm.metrics.numParseTxCalls.Inc()
+
+	return vm.parseTx(b)
+}
 
 // GetTx implements the avalanche.DAGVM interface
 func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
+	vm.metrics.numGetTxCalls.Inc()
+
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: txID,
