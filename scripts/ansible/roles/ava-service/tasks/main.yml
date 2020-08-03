@@ -1,0 +1,21 @@
+- name: Configure AVA service
+  become: true
+  template:
+    src: ava.service
+    dest: /etc/systemd/system
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  notify:
+    - Reload systemd
+    - Restart AVA service
+
+- name: Enable AVA service
+  become: true
+  systemd:
+    name: ava
+    state: started
+    enabled: true
+    daemon_reload: true
+  notify:
+    - Restart AVA service
