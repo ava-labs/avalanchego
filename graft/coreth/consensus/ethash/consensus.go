@@ -635,3 +635,7 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	}
 	state.AddBalance(header.Coinbase, reward)
 }
+
+func (ethash *Ethash) ExtraStateChange(_ *types.Block, _ *state.StateDB) error {
+	return nil
+}
