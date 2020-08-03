@@ -18,6 +18,7 @@ type Config struct {
 	FileSize, RotationSize, FlushSize                                                               int
 	DisableLogging, DisableDisplaying, DisableContextualDisplaying, DisableFlushOnWrite, Assertions bool
 	LogLevel, DisplayLevel                                                                          Level
+	DisplayHighlight                                                                                Highlight
 	Directory, MsgPrefix                                                                            string
 }
 
@@ -30,6 +31,7 @@ func DefaultConfig() (Config, error) {
 		RotationSize:     7,
 		FlushSize:        1,
 		DisplayLevel:     Info,
+		DisplayHighlight: Plain,
 		LogLevel:         Debug,
 		Directory:        dir,
 	}, err
