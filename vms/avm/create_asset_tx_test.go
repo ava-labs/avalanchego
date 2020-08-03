@@ -203,6 +203,346 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 	}
 }
 
+func TestCreateAssetTxGetters(t *testing.T) {
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if initialStates := tx.InitialStates(); len(initialStates) != 1 {
+		t.Fatalf("Wrong number of assets returned")
+	} else if initialState := initialStates[0]; initialState.FxID != 0 {
+		t.Fatalf("Wrong fxID returned")
+	} else if len(initialState.Outs) != 0 {
+		t.Fatalf("Wrong number of outs returned")
+	} else if utxos := tx.UTXOs(); len(utxos) != 0 {
+		t.Fatalf("Wrong number of utxos returned")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerify(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := (*CreateAssetTx)(nil)
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Nil CreateAssetTx should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Too short name should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name: "BRADY WINSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" +
+			"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" +
+			"SSS",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Too long name should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Too short symbol should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "TOM",
+		Symbol:       "BRADY",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Too long symbol should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM",
+		Denomination: 0,
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("No Fxs should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM",
+		Denomination: 33,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Too large denomination should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY ",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Whitespace at the end of the name should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY!",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Name with an invalid character should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM!",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Symbol with an invalid character should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID + 1,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Invalid BaseTx should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 1,
+		}},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Invalid InitialState should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{
+			NetID: networkID,
+			BCID:  chainID,
+		},
+		Name:         "BRADY",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{
+			{
+				FxID: 1,
+			},
+			{
+				FxID: 0,
+			},
+		},
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 2); err == nil {
+		t.Fatalf("Unsorted InitialStates should have errored")
+	}
+}
+
 func TestCreateAssetTxNotState(t *testing.T) {
 	intf := interface{}(&CreateAssetTx{})
 	if _, ok := intf.(verify.State); ok {

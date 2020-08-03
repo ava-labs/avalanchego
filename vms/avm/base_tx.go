@@ -15,16 +15,14 @@ import (
 )
 
 var (
-	errNilTx          = errors.New("nil tx is not valid")
-	errWrongNetworkID = errors.New("tx has wrong network ID")
-	errWrongChainID   = errors.New("tx has wrong chain ID")
-
+	errNilTx                 = errors.New("nil tx is not valid")
+	errWrongNetworkID        = errors.New("tx has wrong network ID")
+	errWrongChainID          = errors.New("tx has wrong chain ID")
 	errOutputsNotSorted      = errors.New("outputs not sorted")
 	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
-
-	errInputOverflow     = errors.New("inputs overflowed uint64")
-	errOutputOverflow    = errors.New("outputs overflowed uint64")
-	errInsufficientFunds = errors.New("insufficient funds")
+	errInputOverflow         = errors.New("inputs overflowed uint64")
+	errOutputOverflow        = errors.New("outputs overflowed uint64")
+	errInsufficientFunds     = errors.New("insufficient funds")
 )
 
 // BaseTx is the basis of all transactions.
