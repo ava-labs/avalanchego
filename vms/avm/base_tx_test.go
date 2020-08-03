@@ -19,6 +19,8 @@ import (
 
 func TestBaseTxSerialization(t *testing.T) {
 	expected := []byte{
+		// Codec version:
+		0x00, 0x00,
 		// txID:
 		0x00, 0x00, 0x00, 0x00,
 		// networkID:
@@ -73,6 +75,10 @@ func TestBaseTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01,
 		// signature index[0]:
 		0x00, 0x00, 0x00, 0x02,
+		// Memo length:
+		0x00, 0x00, 0x00, 0x04,
+		// Memo:
+		0x00, 0x01, 0x02, 0x03,
 	}
 
 	tx := &Tx{UnsignedTx: &BaseTx{
@@ -106,6 +112,7 @@ func TestBaseTxSerialization(t *testing.T) {
 				},
 			},
 		}},
+		Memo: []byte{0x00, 0x01, 0x02, 0x03},
 	}}
 
 	c := setupCodec()
@@ -179,6 +186,7 @@ func TestBaseTxGetters(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerify(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -220,7 +228,52 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 	}
 }
 
+func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
+	ctx := NewContext()
+	c := setupCodec()
+
+	tx := &BaseTx{
+		NetID: networkID,
+		BCID:  chainID,
+		Outs: []*ava.TransferableOutput{{
+			Asset: ava.Asset{ID: asset},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 12345,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+				},
+			},
+		}},
+		Ins: []*ava.TransferableInput{{
+			UTXOID: ava.UTXOID{
+				TxID: ids.NewID([32]byte{
+					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
+					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
+					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
+				}),
+				OutputIndex: 0,
+			},
+			Asset: ava.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 54321,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{2},
+				},
+			},
+		}},
+		Memo: make([]byte, maxMemoSize+1),
+	}
+	tx.Initialize([]byte{})
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+		t.Fatal("should have failed because memo is too large")
+	}
+}
+
 func TestBaseTxSyntacticVerifyNil(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := (*BaseTx)(nil)
@@ -230,6 +283,7 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -272,6 +326,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -314,6 +369,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -347,6 +403,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -403,6 +460,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -428,6 +486,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -490,6 +549,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -544,6 +604,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -586,6 +647,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{
@@ -628,6 +690,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 
 func TestBaseTxSemanticVerify(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -695,6 +758,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 
 func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -747,6 +811,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -815,6 +880,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
+	ctx := NewContext()
 	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
@@ -918,6 +984,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -970,6 +1037,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 
 func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -1037,6 +1105,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 
 func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -1104,6 +1173,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	ctx := vm.ctx
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1238,6 +1308,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	ctx := vm.ctx
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1372,6 +1443,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
+	ctx := NewContext()
 
 	issuer := make(chan common.Message, 1)
 
@@ -1536,6 +1608,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
+	ctx := NewContext()
 
 	issuer := make(chan common.Message, 1)
 
@@ -1702,6 +1775,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 
 func TestBaseTxSemanticVerifyMalformedOutput(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()

@@ -41,7 +41,7 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 		propertyfx.ID.Key():  {"propertyfx"},
 	}
 
-	genesisBytes, err := Genesis(networkID)
+	genesisBytes, _, err := Genesis(networkID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -55,20 +55,21 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 	}
 
 	for _, chain := range genesis.Chains {
+		uChain := chain.UnsignedDecisionTx.(*platformvm.UnsignedCreateChainTx)
 		switch {
-		case avm.ID.Equals(chain.VMID):
+		case avm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
 			chainAliases[chain.ID().Key()] = []string{"X", "avm"}
-		case EVMID.Equals(chain.VMID):
+		case EVMID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
 			chainAliases[chain.ID().Key()] = []string{"C", "evm"}
-		case spdagvm.ID.Equals(chain.VMID):
+		case spdagvm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/spdag"}
 			chainAliases[chain.ID().Key()] = []string{"spdag"}
-		case spchainvm.ID.Equals(chain.VMID):
+		case spchainvm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/spchain"}
 			chainAliases[chain.ID().Key()] = []string{"spchain"}
-		case timestampvm.ID.Equals(chain.VMID):
+		case timestampvm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
 			chainAliases[chain.ID().Key()] = []string{"timestamp"}
 		}

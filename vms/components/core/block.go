@@ -24,7 +24,8 @@ var (
 // Block's methods can be over-written by structs that embed this struct.
 type Block struct {
 	Metadata
-	PrntID ids.ID `serialize:"true"` // parent's ID
+	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
+	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
 	VM     *SnowmanVM
 }
 
@@ -39,6 +40,9 @@ func (b *Block) Initialize(bytes []byte, vm *SnowmanVM) {
 
 // ParentID returns [b]'s parent's ID
 func (b *Block) ParentID() ids.ID { return b.PrntID }
+
+// Height returns this block's height. The genesis block has height 0.
+func (b *Block) Height() uint64 { return b.Hght }
 
 // Parent returns [b]'s parent
 func (b *Block) Parent() snowman.Block {
@@ -106,6 +110,6 @@ func (b *Block) Verify() (bool, error) {
 }
 
 // NewBlock returns a new *Block
-func NewBlock(parentID ids.ID) *Block {
-	return &Block{PrntID: parentID}
+func NewBlock(parentID ids.ID, height uint64) *Block {
+	return &Block{PrntID: parentID, Hght: height}
 }

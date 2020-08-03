@@ -185,6 +185,7 @@ func (p *peer) WriteMessages() {
 
 		p.net.stateLock.Lock()
 		p.pendingBytes -= len(msg)
+		p.net.pendingBytes -= len(msg)
 		p.net.stateLock.Unlock()
 
 		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}

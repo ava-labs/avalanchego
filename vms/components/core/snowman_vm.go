@@ -74,7 +74,6 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if block, ok := block.(snowman.Block); ok {
 		return block, nil
 	}

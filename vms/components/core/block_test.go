@@ -19,12 +19,16 @@ func TestBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := NewBlock(parentID)
+	b := NewBlock(parentID, 1)
 
 	b.Initialize([]byte{1, 2, 3}, &SnowmanVM{
 		DB:    db,
 		State: state,
 	})
+
+	if b.Hght != 1 {
+		t.Fatal("height should be 1")
+	}
 
 	// should be unknown until someone queries for it
 	if status := b.Metadata.status; status != choices.Unknown {

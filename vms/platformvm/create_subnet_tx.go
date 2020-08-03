@@ -4,7 +4,6 @@
 package platformvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
@@ -12,207 +11,132 @@ import (
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-)
-
-const maxThreshold = 25
-
-var (
-	errThresholdExceedsKeysLen       = errors.New("threshold must be no more than number of control keys")
-	errThresholdTooHigh              = fmt.Errorf("threshold can't be greater than %d", maxThreshold)
-	errControlKeysNotSortedAndUnique = errors.New("control keys must be sorted and unique")
-	errUnneededKeys                  = errors.New("subnets shouldn't have keys if the threshold is 0")
+	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
-	// NetworkID is the ID of the network this tx was issued on
-	NetworkID uint32 `serialize:"true"`
-
-	// Next unused nonce of account paying the transaction fee for this transaction.
-	// Currently unused, as there are no tx fees.
-	Nonce uint64 `serialize:"true"`
-
-	// Each element in ControlKeys is the address of a public key
-	// In order to add a validator to this subnet, a tx must be signed
-	// with Threshold of these keys
-	ControlKeys []ids.ShortID `serialize:"true"`
-	Threshold   uint16        `serialize:"true"`
+	// Metadata, inputs and outputs
+	BaseTx `serialize:"true"`
+	// Who is authorized to manage this subnet
+	Owner verify.Verifiable `serialize:"true" json:"owner"`
 }
 
-// CreateSubnetTx is a proposal to create a new subnet
-type CreateSubnetTx struct {
-	UnsignedCreateSubnetTx `serialize:"true"`
-
-	// Signature on the UnsignedCreateSubnetTx's byte repr
-	Sig [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-
-	// The public key that signed this transaction
-	// The transaction fee will be paid from the corresponding account
-	// (ie the account whose ID is [key].Address())
-	// [key] is non-nil iff this tx is valid
-	key crypto.PublicKey
-
-	// The VM this tx exists within
-	vm *VM
-
-	// ID is this transaction's ID
-	id ids.ID
-
-	// Byte representation of this transaction (including signature)
-	bytes []byte
+// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
+func (tx *UnsignedCreateSubnetTx) initialize(vm *VM, bytes []byte) error {
+	if tx.vm != nil { // already been initialized
+		return nil
+	}
+	tx.vm = vm
+	tx.bytes = bytes
+	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
+	var err error
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
+	if err != nil {
+		return fmt.Errorf("couldn't marshal UnsignedCreateSubnetTx: %w", err)
+	}
+	return nil
 }
 
-// ID returns the ID of this transaction
-func (tx *CreateSubnetTx) ID() ids.ID { return tx.id }
-
-// SyntacticVerify nil iff [tx] is syntactically valid.
-// If [tx] is valid, this method sets [tx.key]
-func (tx *CreateSubnetTx) SyntacticVerify() error {
+// Verify this transaction is well-formed
+func (tx *UnsignedCreateSubnetTx) Verify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.key != nil:
-		return nil // Only verify the transaction once
-	case tx.id.IsZero():
-		return errInvalidID
-	case tx.NetworkID != tx.vm.Ctx.NetworkID:
-		return errWrongNetworkID
-	case tx.Threshold > uint16(len(tx.ControlKeys)):
-		return errThresholdExceedsKeysLen
-	case tx.Threshold > maxThreshold:
-		return errThresholdTooHigh
-	case tx.Threshold == 0 && len(tx.ControlKeys) > 0:
-		return errUnneededKeys
-	case !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys):
-		return errControlKeysNotSortedAndUnique
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
 	}
 
-	// Byte representation of the unsigned transaction
-	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
-	if err != nil {
+	if err := verify.All(&tx.BaseTx, tx.Owner); err != nil {
+		return err
+	}
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
 		return err
 	}
 
-	// Recover signature from byte repr. of unsigned tx
-	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:]) // the public key that signed [tx]
-	if err != nil {
-		return err
-	}
-
-	tx.key = key
+	tx.syntacticallyVerified = true
 	return nil
 }
 
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
-func (tx *CreateSubnetTx) SemanticVerify(db database.Database) (func(), error) {
-	if err := tx.SyntacticVerify(); err != nil {
-		return nil, err
+func (tx *UnsignedCreateSubnetTx) SemanticVerify(
+	db database.Database,
+	stx *DecisionTx,
+) (
+	func() error,
+	TxError,
+) {
+	// Make sure this transaction is well formed.
+	if err := tx.Verify(); err != nil {
+		return nil, permError{err}
 	}
 
 	// Add new subnet to list of subnets
 	subnets, err := tx.vm.getSubnets(db)
 	if err != nil {
-		return nil, err
+		return nil, tempError{err}
 	}
-	subnets = append(subnets, tx) // add new subnet
+	subnets = append(subnets, stx) // add new subnet
 	if err := tx.vm.putSubnets(db, subnets); err != nil {
+		return nil, tempError{err}
+	}
+
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Credentials); err != nil {
 		return nil, err
 	}
 
-	// Deduct tx fee from payer's account
-	account, err := tx.vm.getAccount(db, tx.key.Address())
-	if err != nil {
-		return nil, err
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+		return nil, tempError{err}
 	}
-	account, err = account.Remove(0, tx.Nonce)
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.vm.putAccount(db, account); err != nil {
-		return nil, err
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return nil, tempError{err}
 	}
 
 	// Register new subnet in validator manager
-	onAccept := func() {
+	onAccept := func() error {
 		tx.vm.validators.PutValidatorSet(tx.id, validators.NewSet())
+		return nil
 	}
-
 	return onAccept, nil
-}
-
-// Bytes returns the byte representation of [tx]
-func (tx *CreateSubnetTx) Bytes() []byte {
-	if tx.bytes != nil {
-		return tx.bytes
-	}
-	var err error
-	tx.bytes, err = Codec.Marshal(tx)
-	if err != nil {
-		tx.vm.Ctx.Log.Error("problem marshaling tx: %v", err)
-	}
-	return tx.bytes
-}
-
-// initialize sets [tx.vm] to [vm]
-func (tx *CreateSubnetTx) initialize(vm *VM) error {
-	tx.vm = vm
-	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
-	if err != nil {
-		return err
-	}
-	tx.bytes = txBytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
-	return nil
 }
 
 // [controlKeys] must be unique. They will be sorted by this method.
 // If [controlKeys] is nil, [tx.Controlkeys] will be an empty list.
-func (vm *VM) newCreateSubnetTx(networkID uint32, nonce uint64, controlKeys []ids.ShortID,
-	threshold uint16, payerKey *crypto.PrivateKeySECP256K1R,
-) (*CreateSubnetTx, error) {
-	tx := &CreateSubnetTx{UnsignedCreateSubnetTx: UnsignedCreateSubnetTx{
-		NetworkID:   networkID,
-		Nonce:       nonce,
-		ControlKeys: controlKeys,
-		Threshold:   threshold,
-	}}
-
-	if threshold == 0 && len(tx.ControlKeys) > 0 {
-		return nil, errUnneededKeys
-	}
-
-	// Sort control keys
-	ids.SortShortIDs(tx.ControlKeys)
-	// Ensure control keys are unique
-	if !ids.IsSortedAndUniqueShortIDs(tx.ControlKeys) {
-		return nil, errControlKeysNotSortedAndUnique
-	}
-
-	unsignedIntf := interface{}(&tx.UnsignedCreateSubnetTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf)
+func (vm *VM) newCreateSubnetTx(
+	threshold uint32, // [threshold] of [ownerAddrs] needed to manage this subnet
+	ownerAddrs []ids.ShortID, // control addresses for the new subnet
+	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
+) (*DecisionTx, error) {
+	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	// Sort control addresses
+	ids.SortShortIDs(ownerAddrs)
+
+	// Create the tx
+	utx := &UnsignedCreateSubnetTx{
+		BaseTx: BaseTx{
+			NetworkID:    vm.Ctx.NetworkID,
+			BlockchainID: vm.Ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		},
+		Owner: &secp256k1fx.OutputOwners{
+			Threshold: threshold,
+			Addrs:     ownerAddrs,
+		},
+	}
+	tx := &DecisionTx{UnsignedDecisionTx: utx}
+	if err := vm.signDecisionTx(tx, signers); err != nil {
 		return nil, err
 	}
-
-	sig, err := payerKey.Sign(unsignedBytes)
-	if err != nil {
-		return nil, err
-	}
-	copy(tx.Sig[:], sig)
-
-	return tx, tx.initialize(vm)
-}
-
-// CreateSubnetTxList is a list of *CreateSubnetTx
-// Transactions must be syntactically verified before adding to CreateSubnetTxList
-// to ensure that [CreateSubnetTxList] can always be marshalled.
-type CreateSubnetTxList []*CreateSubnetTx
-
-// Bytes returns the binary representation of [lst]
-func (lst CreateSubnetTxList) Bytes() []byte {
-	// Assumes the individual transactions have been syntactically verified
-	// so that it can be safely marshalled.
-	bytes, _ := Codec.Marshal(lst)
-	return bytes
+	return tx, utx.Verify()
 }

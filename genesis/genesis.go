@@ -37,10 +37,13 @@ var (
 // defining the genesis state of the network.
 // The ID of the new network is [networkID].
 
-// FromConfig ...
-func FromConfig(networkID uint32, config *Config) ([]byte, error) {
+// FromConfig returns:
+// 1) The byte representation of the genesis state of the platform chain
+//    (ie the genesis state of the network)
+// 2) The asset ID of AVAX
+func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 	if err := config.init(); err != nil {
-		return nil, err
+		return nil, ids.ID{}, err
 	}
 
 	// Specify the genesis state of the AVM
@@ -67,8 +70,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 		}
 
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
-			// The AVM starts out with one asset, $AVA
-			"AVA": ava,
+			"AVA": ava, // The AVM starts out with one asset: AVAX
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}
@@ -76,7 +78,12 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 	avmSS := avm.StaticService{}
 	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
 	if err != nil {
-		return nil, err
+		return nil, ids.ID{}, err
+	}
+
+	avaxAssetID, err := AVAXAssetID(avmReply.Bytes.Bytes)
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
 	// Specify the genesis state of the simple payments DAG
@@ -94,7 +101,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 	spdagvmReply := spdagvm.BuildGenesisReply{}
 	spdagvmSS := spdagvm.StaticService{}
 	if err := spdagvmSS.BuildGenesis(nil, &spdagvmArgs, &spdagvmReply); err != nil {
-		return nil, fmt.Errorf("problem creating simple payments DAG: %w", err)
+		return nil, ids.ID{}, fmt.Errorf("problem creating simple payments DAG: %w", err)
 	}
 
 	// Specify the genesis state of the simple payments chain
@@ -111,18 +118,19 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 
 	spchainvmSS := spchainvm.StaticService{}
 	if err := spchainvmSS.BuildGenesis(nil, &spchainvmArgs, &spchainvmReply); err != nil {
-		return nil, fmt.Errorf("problem creating simple payments chain: %w", err)
+		return nil, ids.ID{}, fmt.Errorf("problem creating simple payments chain: %w", err)
 	}
 
 	// Specify the initial state of the Platform Chain
 	platformvmArgs := platformvm.BuildGenesisArgs{
-		NetworkID: json.Uint32(networkID),
+		NetworkID:   json.Uint32(networkID),
+		AvaxAssetID: avaxAssetID,
 	}
 	for _, addr := range config.ParsedFundedAddresses {
-		platformvmArgs.Accounts = append(platformvmArgs.Accounts,
-			platformvm.APIAccount{
+		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
+			platformvm.APIUTXO{
 				Address: addr,
-				Balance: json.Uint64(20 * units.KiloAva),
+				Amount:  json.Uint64(20 * units.KiloAva),
 			},
 		)
 	}
@@ -199,18 +207,23 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 
 	platformvmSS := platformvm.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
-		return nil, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
+		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	return platformvmReply.Bytes.Bytes, nil
+	return platformvmReply.Bytes.Bytes, avaxAssetID, nil
 }
 
-// Genesis ...
-func Genesis(networkID uint32) ([]byte, error) { return FromConfig(networkID, GetConfig(networkID)) }
+// Genesis returns:
+// 1) The byte representation of the genesis state of the platform chain
+//    (ie the genesis state of the network)
+// 2) The asset ID of AVAX
+func Genesis(networkID uint32) ([]byte, ids.ID, error) {
+	return FromConfig(networkID, GetConfig(networkID))
+}
 
 // VMGenesis ...
-func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.CreateChainTx, error) {
-	genesisBytes, err := Genesis(networkID)
+func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.DecisionTx, error) {
+	genesisBytes, _, err := Genesis(networkID)
 	if err != nil {
 		return nil, err
 	}
@@ -222,19 +235,16 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.CreateChainTx, error)
 		return nil, err
 	}
 	for _, chain := range genesis.Chains {
-		if chain.VMID.Equals(vmID) {
+		uChain := chain.UnsignedDecisionTx.(*platformvm.UnsignedCreateChainTx)
+		if uChain.VMID.Equals(vmID) {
 			return chain, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find subnet with VM ID %s", vmID)
+	return nil, fmt.Errorf("couldn't find blockchain with VM ID %s", vmID)
 }
 
-// AVAAssetID ...
-func AVAAssetID(networkID uint32) (ids.ID, error) {
-	createAVM, err := VMGenesis(networkID, avm.ID)
-	if err != nil {
-		return ids.ID{}, err
-	}
+// AVAXAssetID ...
+func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 
 	c := codec.NewDefault()
 	errs := wrappers.Errs{}
@@ -255,7 +265,7 @@ func AVAAssetID(networkID uint32) (ids.ID, error) {
 	}
 
 	genesis := avm.Genesis{}
-	if err := c.Unmarshal(createAVM.GenesisData, &genesis); err != nil {
+	if err := c.Unmarshal(avmGenesisBytes, &genesis); err != nil {
 		return ids.ID{}, err
 	}
 

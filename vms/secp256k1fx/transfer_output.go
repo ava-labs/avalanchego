@@ -35,3 +35,6 @@ func (out *TransferOutput) Verify() error {
 
 // VerifyState ...
 func (out *TransferOutput) VerifyState() error { return out.Verify() }
+
+// Owners ...
+func (out *TransferOutput) Owners() interface{} { return &out.OutputOwners }

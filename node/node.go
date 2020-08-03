@@ -16,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/constants"
-
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
@@ -28,6 +26,7 @@ import (
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/meterdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
@@ -35,6 +34,7 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -242,7 +242,7 @@ func (n *Node) Dispatch() error {
 func (n *Node) initDatabase() error {
 	n.DB = n.Config.DB
 
-	expectedGenesis, err := genesis.Genesis(n.Config.NetworkID)
+	expectedGenesis, _, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return err
 	}
@@ -311,20 +311,15 @@ func (n *Node) initBeacons() {
 
 // Create the vmManager and register the following vms:
 // AVM, Simple Payments DAG, Simple Payments Chain
-// The Platform VM is registered in initStaking because
+// The Platform VM is registered in initChains because
 // its factory needs to reference n.chainManager, which is nil right now
-func (n *Node) initVMManager() error {
-	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
-
+func (n *Node) initVMManager(avaxAssetID ids.ID) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVA:      avaAssetID,
+			AVA:      avaxAssetID,
 			Fee:      n.Config.AvaTxFee,
 			Platform: constants.PlatformChainID,
 		}),
@@ -358,7 +353,7 @@ func (n *Node) initEventDispatcher() {
 // Initializes the Platform chain.
 // Its genesis data specifies the other chains that should
 // be created.
-func (n *Node) initChains() error {
+func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	n.Log.Info("initializing chains")
 
 	vdrs := n.vdrs
@@ -373,31 +368,22 @@ func (n *Node) initChains() error {
 		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 	}
 
-	avaAssetID, err := genesis.AVAAssetID(n.Config.NetworkID)
-	if err != nil {
-		return err
-	}
 	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
 	if err != nil {
 		return err
 	}
 
-	err = n.vmManager.RegisterVMFactory(
+	if err := n.vmManager.RegisterVMFactory(
 		/*vmID=*/ platformvm.ID,
 		/*vmFactory=*/ &platformvm.Factory{
 			ChainManager:   n.chainManager,
 			Validators:     vdrs,
 			StakingEnabled: n.Config.EnableStaking,
-			AVA:            avaAssetID,
+			AVA:            avaxAssetID,
 			AVM:            createAVMTx.ID(),
+			Fee:            n.Config.AvaTxFee,
 		},
-	)
-	if err != nil {
-		return err
-	}
-
-	genesisBytes, err := genesis.Genesis(n.Config.NetworkID)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -507,7 +493,15 @@ func (n *Node) initMetricsAPI() error {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing metrics API")
+
+	db, err := meterdb.New("gecko_db", registry, n.DB)
+	if err != nil {
+		return err
+	}
+	n.DB = db
+
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
 
@@ -515,7 +509,7 @@ func (n *Node) initMetricsAPI() error {
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
 func (n *Node) initAdminAPI() error {
 	if !n.Config.AdminAPIEnabled {
-		n.Log.Info("skipping admin API initializaion because it has been disabled")
+		n.Log.Info("skipping admin API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing admin API")
@@ -647,22 +641,24 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("couldn't initialize metrics API: %w", err)
 	}
 
-	// initialize shared memory
-	n.initSharedMemory()
+	n.initSharedMemory() // Initialize shared memory
 
 	if err = n.initNetworking(); err != nil { // Set up all networking
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
-	if err := n.initVMManager(); err != nil { // Set up the vm manager
+	n.initEventDispatcher() // Set up the event dipatcher
+
+	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
+	if err != nil {
+		return fmt.Errorf("couldn't create genesis bytes: %w", err)
+	}
+	if err := n.initVMManager(avaxAssetID); err != nil { // Set up the VM manager
 		return fmt.Errorf("problem initializing the VM manager: %w", err)
 	}
-
-	n.initEventDispatcher()                      // Set up the event dipatcher
 	if err := n.initChainManager(); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
-
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
 		return fmt.Errorf("couldn't initialize admin API: %w", err)
 	}
@@ -678,7 +674,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initAliases(); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
-	if err := n.initChains(); err != nil { // Start the Platform chain
+	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
 	}
 	return nil

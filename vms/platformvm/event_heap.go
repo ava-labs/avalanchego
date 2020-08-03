@@ -6,18 +6,14 @@ package platformvm
 import (
 	"bytes"
 	"container/heap"
+	"errors"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/validators"
 )
 
 // TimedTx ...
 type TimedTx interface {
-	ProposalTx
-
-	Vdr() validators.Validator
-
 	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
@@ -32,14 +28,14 @@ type TimedTx interface {
 // Transactions must be syntactically verified before adding to EventHeap to
 // ensure that EventHeap can always by marshalled.
 type EventHeap struct {
-	SortByStartTime bool      `serialize:"true"`
-	Txs             []TimedTx `serialize:"true"`
+	SortByStartTime bool          `serialize:"true"`
+	Txs             []*ProposalTx `serialize:"true"`
 }
 
 func (h *EventHeap) Len() int { return len(h.Txs) }
 func (h *EventHeap) Less(i, j int) bool {
-	iTx := h.Txs[i]
-	jTx := h.Txs[j]
+	iTx := h.Txs[i].UnsignedProposalTx.(TimedTx)
+	jTx := h.Txs[j].UnsignedProposalTx.(TimedTx)
 
 	iTime := iTx.EndTime()
 	jTime := jTx.EndTime()
@@ -52,8 +48,8 @@ func (h *EventHeap) Less(i, j int) bool {
 	case iTime.Unix() < jTime.Unix():
 		return true
 	case iTime == jTime:
-		_, iOk := iTx.(*addDefaultSubnetValidatorTx)
-		_, jOk := jTx.(*addDefaultSubnetValidatorTx)
+		_, iOk := iTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		_, jOk := jTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 		if iOk != jOk {
 			return iOk == h.SortByStartTime
@@ -67,23 +63,24 @@ func (h *EventHeap) Swap(i, j int) { h.Txs[i], h.Txs[j] = h.Txs[j], h.Txs[i] }
 
 // Timestamp returns the timestamp on the top transaction on the heap
 func (h *EventHeap) Timestamp() time.Time {
+	tx := h.Txs[0].UnsignedProposalTx.(TimedTx)
 	if h.SortByStartTime {
-		return h.Txs[0].StartTime()
+		return tx.StartTime()
 	}
-	return h.Txs[0].EndTime()
+	return tx.EndTime()
 }
 
 // Add ...
-func (h *EventHeap) Add(tx TimedTx) { heap.Push(h, tx) }
+func (h *EventHeap) Add(tx *ProposalTx) { heap.Push(h, tx) }
 
 // Peek ...
-func (h *EventHeap) Peek() TimedTx { return h.Txs[0] }
+func (h *EventHeap) Peek() *ProposalTx { return h.Txs[0] }
 
 // Remove ...
-func (h *EventHeap) Remove() TimedTx { return heap.Pop(h).(TimedTx) }
+func (h *EventHeap) Remove() *ProposalTx { return heap.Pop(h).(*ProposalTx) }
 
 // Push implements the heap interface
-func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(TimedTx)) }
+func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(*ProposalTx)) }
 
 // Pop implements the heap interface
 func (h *EventHeap) Pop() interface{} {
@@ -94,9 +91,20 @@ func (h *EventHeap) Pop() interface{} {
 }
 
 // Bytes returns the byte representation of this heap
-func (h *EventHeap) Bytes() []byte {
-	// Assumes the individual transactions have been syntactically verified
-	// so that it can be safely marshalled.
-	bytes, _ := Codec.Marshal(h)
-	return bytes
+func (h *EventHeap) Bytes() ([]byte, error) {
+	return Codec.Marshal(h)
+}
+
+// getDefaultSubnetStaker ...
+func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*ProposalTx, error) {
+	for _, txIntf := range h.Txs {
+		tx, ok := txIntf.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		if !ok {
+			continue
+		}
+		if id.Equals(tx.NodeID) {
+			return txIntf, nil
+		}
+	}
+	return nil, errors.New("couldn't find validator in the default subnet")
 }

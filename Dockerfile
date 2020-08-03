@@ -9,3 +9,5 @@ COPY . gecko
 
 WORKDIR $GOPATH/src/github.com/ava-labs/gecko
 RUN ./scripts/build.sh
+
+RUN ln -sv $GOPATH/src/github.com/ava-labs/gecko/ /gecko

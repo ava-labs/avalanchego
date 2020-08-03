@@ -16,6 +16,7 @@ import (
 
 func TestStateIDs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -151,6 +152,7 @@ func TestStateIDs(t *testing.T) {
 
 func TestStateStatuses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -197,6 +199,7 @@ func TestStateStatuses(t *testing.T) {
 
 func TestStateUTXOs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -272,6 +275,7 @@ func TestStateUTXOs(t *testing.T) {
 
 func TestStateTXs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
