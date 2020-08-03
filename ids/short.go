@@ -42,6 +42,8 @@ func ShortFromString(idStr string) (ShortID, error) {
 	return ToShortID(cb58.Bytes)
 }
 
+// ShortFromPrefixedString returns a ShortID assuming the cb58 format is
+// prefixed
 func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
 	if !strings.HasPrefix(idStr, prefix) {
 		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
@@ -112,6 +114,7 @@ func (id ShortID) String() string {
 	return cb58.String()
 }
 
+// PrefixedString returns the String representation with a prefix added
 func (id ShortID) PrefixedString(prefix string) string {
 	return prefix + id.String()
 }
@@ -132,4 +135,11 @@ func SortShortIDs(ids []ShortID) { sort.Sort(sortShortIDData(ids)) }
 // IsSortedAndUniqueShortIDs returns true if the ids are sorted and unique
 func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
 	return utils.IsSortedAndUnique(sortShortIDData(ids))
+}
+
+// IsUniqueShortIDs returns true iff [ids] are unique
+func IsUniqueShortIDs(ids []ShortID) bool {
+	set := ShortSet{}
+	set.Add(ids...)
+	return set.Len() == len(ids)
 }

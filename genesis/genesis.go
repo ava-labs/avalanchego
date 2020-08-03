@@ -222,7 +222,7 @@ func Genesis(networkID uint32) ([]byte, ids.ID, error) {
 }
 
 // VMGenesis ...
-func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.CreateChainTx, error) {
+func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.DecisionTx, error) {
 	genesisBytes, _, err := Genesis(networkID)
 	if err != nil {
 		return nil, err
@@ -235,7 +235,8 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.CreateChainTx, error)
 		return nil, err
 	}
 	for _, chain := range genesis.Chains {
-		if chain.VMID.Equals(vmID) {
+		uChain := chain.UnsignedDecisionTx.(*platformvm.UnsignedCreateChainTx)
+		if uChain.VMID.Equals(vmID) {
 			return chain, nil
 		}
 	}

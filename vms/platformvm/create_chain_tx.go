@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"unicode"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -13,13 +14,20 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
 	errInvalidVMID                   = errors.New("invalid VM ID")
 	errFxIDsNotSortedAndUnique       = errors.New("feature extensions IDs must be sorted and unique")
 	errControlSigsNotSortedAndUnique = errors.New("control signatures must be sorted and unique")
+	errNameTooLong                   = errors.New("name too long")
+	errGenesisTooLong                = errors.New("genesis too long")
+	errIllegalNameCharacter          = errors.New("illegal name character")
+)
+
+const (
+	maxNameLen    = 1 << 7
+	maxGenesisLen = 1 << 20
 )
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx
@@ -27,146 +35,138 @@ type UnsignedCreateChainTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// ID of the Subnet that validates this blockchain
-	SubnetID ids.ID `serialize:"true"`
+	SubnetID ids.ID `serialize:"true" json:"subnetID"`
 	// A human readable name for the chain; need not be unique
-	ChainName string `serialize:"true"`
+	ChainName string `serialize:"true" json:"chainName"`
 	// ID of the VM running on the new chain
-	VMID ids.ID `serialize:"true"`
+	VMID ids.ID `serialize:"true" json:"vmID"`
 	// IDs of the feature extensions running on the new chain
-	FxIDs []ids.ID `serialize:"true"`
+	FxIDs []ids.ID `serialize:"true" json:"fxIDs"`
 	// Byte representation of genesis state of the new chain
-	GenesisData []byte `serialize:"true"`
-}
-
-// CreateChainTx is a proposal to create a chain
-type CreateChainTx struct {
-	UnsignedCreateChainTx `serialize:"true"`
-	// Credentials that authorize the inputs to spend the corresponding outputs
-	Credentials []verify.Verifiable `serialize:"true"`
-	// Signatures from Subnet's control keys
-	// Should not empty slice, not nil, if there are no control sigs
-	ControlSigs [][crypto.SECP256K1RSigLen]byte `serialize:"true"`
-}
-
-// Creds returns this transactions credentials
-func (tx *CreateChainTx) Creds() []verify.Verifiable {
-	return tx.Credentials
+	GenesisData []byte `serialize:"true" json:"genesisData"`
+	// Auth that will be allowing this validator into the network
+	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
-func (tx *CreateChainTx) initialize(vm *VM) error {
+func (tx *UnsignedCreateChainTx) initialize(vm *VM, bytes []byte) error {
 	if tx.vm != nil { // already been initialized
 		return nil
 	}
 	tx.vm = vm
+	tx.bytes = bytes
+	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
 	var err error
-	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateChainTx))
+	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedCreateChainTx: %w", err)
 	}
-	tx.bytes, err = Codec.Marshal(tx) // byte representation of the signed transaction
-	if err != nil {
-		return fmt.Errorf("couldn't marshal CreateChainTx: %w", err)
-	}
-	tx.id = ids.NewID(hashing.ComputeHash256Array(tx.bytes))
-	return err
+	return nil
 }
 
-// SyntacticVerify this transaction is well-formed
-// Also populates [tx.Key] with the public key that signed this transaction
-func (tx *CreateChainTx) SyntacticVerify() error {
+// Verify this transaction is well-formed
+func (tx *UnsignedCreateChainTx) Verify() error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
-		return errWrongNetworkID
-	case tx.id.IsZero():
-		return errInvalidID
-	case tx.VMID.IsZero():
-		return errInvalidVMID
+	case tx.SubnetID.IsZero():
+		return errNoSubnetID
 	case tx.SubnetID.Equals(constants.DefaultSubnetID):
 		return errDSCantValidate
+	case len(tx.ChainName) > maxNameLen:
+		return errNameTooLong
+	case tx.VMID.IsZero():
+		return errInvalidVMID
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
-	case !crypto.IsSortedAndUniqueSECP2561RSigs(tx.ControlSigs):
-		return errControlSigsNotSortedAndUnique
+	case len(tx.GenesisData) > maxGenesisLen:
+		return errGenesisTooLong
 	}
-	if err := tx.BaseTx.SyntacticVerify(); err != nil {
-		return err
-	} else if err := syntacticVerifySpend(tx, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+
+	for _, r := range tx.ChainName {
+		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
+			return errIllegalNameCharacter
+		}
+	}
+
+	if err := verify.All(&tx.BaseTx, tx.SubnetAuth); err != nil {
 		return err
 	}
+	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+		return err
+	}
+
 	tx.syntacticallyVerified = true
 	return nil
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *CreateChainTx) SemanticVerify(db database.Database) (func(), error) {
-	if err := tx.SyntacticVerify(); err != nil {
+func (tx *UnsignedCreateChainTx) SemanticVerify(
+	db database.Database,
+	stx *DecisionTx,
+) (
+	func() error,
+	TxError,
+) {
+	// Make sure this transaction is well formed.
+	if len(stx.Credentials) == 0 {
+		return nil, permError{errWrongNumberOfCredentials}
+	}
+	if err := tx.Verify(); err != nil {
+		return nil, permError{err}
+	}
+
+	// Select the credentials for each purpose
+	baseTxCredsLen := len(stx.Credentials) - 1
+	baseTxCreds := stx.Credentials[:baseTxCredsLen]
+	subnetCred := stx.Credentials[baseTxCredsLen]
+
+	// Verify the flowcheck
+	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
 		return nil, err
 	}
 
-	currentChains, err := tx.vm.getChains(db) // chains that currently exist
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+		return nil, tempError{err}
+	}
+	// Produce the UTXOS
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return nil, tempError{err}
+	}
+
+	// Verify that this chain is authorized by the subnet
+	subnet, err := tx.vm.getSubnet(db, tx.SubnetID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get list of blockchains: %w", err)
+		return nil, err
+	}
+	unsignedSubnet := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+	if err := tx.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {
+		return nil, permError{err}
+	}
+
+	// Attempt to add the new chain to the database
+	currentChains, sErr := tx.vm.getChains(db) // chains that currently exist
+	if err != nil {
+		return nil, tempError{fmt.Errorf("couldn't get list of blockchains: %w", sErr)}
 	}
 	for _, chain := range currentChains {
 		if chain.ID().Equals(tx.ID()) {
-			return nil, fmt.Errorf("chain %s already exists", chain.ID())
+			return nil, permError{fmt.Errorf("chain %s already exists", chain.ID())}
 		}
 	}
-	currentChains = append(currentChains, tx) // add this new chain
+	currentChains = append(currentChains, stx) // add this new chain
 	if err := tx.vm.putChains(db, currentChains); err != nil {
-		return nil, err
-	}
-
-	// Verify inputs/outputs and update the UTXO set
-	if err := tx.vm.semanticVerifySpend(db, tx); err != nil {
-		return nil, err
-	}
-
-	// Verify that this transaction has sufficient control signatures
-	subnets, err := tx.vm.getSubnets(db) // all subnets that exist
-	if err != nil {
-		return nil, err
-	}
-	var subnet *CreateSubnetTx // the subnet that will validate the new chain
-	for _, sn := range subnets {
-		if sn.id.Equals(tx.SubnetID) {
-			subnet = sn
-			break
-		}
-	}
-	if subnet == nil {
-		return nil, fmt.Errorf("subnet %s doesn't exist", tx.SubnetID)
-	} else if len(tx.ControlSigs) != int(subnet.Threshold) {
-		return nil, fmt.Errorf("expected tx to have %d control sigs but has %d", subnet.Threshold, len(tx.ControlSigs))
-	}
-	unsignedBytesHash := hashing.ComputeHash256(tx.unsignedBytes)
-	// Each element is ID of key that signed this tx
-	controlIDs := make([]ids.ShortID, len(tx.ControlSigs))
-	for i, sig := range tx.ControlSigs {
-		key, err := tx.vm.factory.RecoverHashPublicKey(unsignedBytesHash, sig[:])
-		if err != nil {
-			return nil, err
-		}
-		controlIDs[i] = key.Address()
-	}
-
-	// Verify each control signature on this tx is from a control key
-	controlKeys := ids.ShortSet{}
-	controlKeys.Add(subnet.ControlKeys...)
-	for _, controlID := range controlIDs {
-		if !controlKeys.Contains(controlID) {
-			return nil, errors.New("tx has control signature from key not in subnet's ControlKeys")
-		}
+		return nil, tempError{err}
 	}
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() { tx.vm.createChain(tx) }
+	onAccept := func() error { tx.vm.createChain(stx); return nil }
 	return onAccept, nil
 }
 
@@ -177,88 +177,36 @@ func (vm *VM) newCreateChainTx(
 	vmID ids.ID, // VM this chain runs
 	fxIDs []ids.ID, // fxs this chain supports
 	chainName string, // Name of the chain
-	controlKeys []*crypto.PrivateKeySECP256K1R, // Control keys for the subnet
-	feeKeys []*crypto.PrivateKeySECP256K1R, // Pay the fee
-) (*CreateChainTx, error) {
-
-	// Get information about the subnet we're adding a chain to
-	subnetInfo, err := vm.getSubnet(vm.DB, subnetID)
-	if err != nil {
-		return nil, fmt.Errorf("subnet %s doesn't exist", subnetID)
-	}
-	// Make sure we have enough of this subnet's control keys
-	subnetControlKeys := ids.ShortSet{} // Subnet's
-	for _, key := range subnetInfo.ControlKeys {
-		subnetControlKeys.Add(key)
-	}
-	// [usableKeys] are the control keys that will sign this transaction
-	usableKeys := make([]*crypto.PrivateKeySECP256K1R, 0, subnetInfo.Threshold)
-	for _, key := range controlKeys {
-		if subnetControlKeys.Contains(key.PublicKey().Address()) {
-			usableKeys = append(usableKeys, key) // This key is useful
-		}
-		if len(usableKeys) > int(subnetInfo.Threshold) {
-			break
-		}
-	}
-	if len(usableKeys) != int(subnetInfo.Threshold) {
-		return nil, fmt.Errorf("don't have enough control keys for subnet %s", subnetID)
-	}
-
-	// Calculate inputs, outputs, and keys used to sign this tx
-	inputs, outputs, credKeys, err := vm.spend(vm.DB, vm.txFee, feeKeys)
+	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
+) (*DecisionTx, error) {
+	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
+	subnetAuth, subnetSigners, err := vm.authorize(vm.DB, subnetID, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
+	}
+	signers = append(signers, subnetSigners)
+
+	// Sort the provided fxIDs
+	ids.SortIDs(fxIDs)
+
 	// Create the tx
-	tx := &CreateChainTx{
-		UnsignedCreateChainTx: UnsignedCreateChainTx{
-			BaseTx: BaseTx{
-				NetworkID:    vm.Ctx.NetworkID,
-				BlockchainID: vm.Ctx.ChainID,
-				Inputs:       inputs,
-				Outputs:      outputs,
-			},
-			SubnetID:    subnetID,
-			GenesisData: genesisData,
-			VMID:        vmID,
-			FxIDs:       fxIDs,
-			ChainName:   chainName,
+	tx := &DecisionTx{UnsignedDecisionTx: &UnsignedCreateChainTx{
+		BaseTx: BaseTx{
+			NetworkID:    vm.Ctx.NetworkID,
+			BlockchainID: vm.Ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
 		},
-	}
-
-	// Generate byte repr. of unsigned transaction
-	if tx.unsignedBytes, err = Codec.Marshal(interface{}(tx.UnsignedCreateChainTx)); err != nil {
-		return nil, fmt.Errorf("couldn't marshal UnsignedAddNonDefaultSubnetValidatorTx: %w", err)
-	}
-	hash := hashing.ComputeHash256(tx.unsignedBytes)
-
-	// Sign the tx with control keys
-	tx.ControlSigs = make([][crypto.SECP256K1RSigLen]byte, len(usableKeys))
-	for i, key := range usableKeys {
-		sig, err := key.SignHash(hash)
-		if err != nil {
-			return nil, err
-		}
-		copy(tx.ControlSigs[i][:], sig)
-	}
-	crypto.SortSECP2561RSigs(tx.ControlSigs) // Sort the control signatures
-
-	// Attach credentials that allow input UTXOs to be spent
-	for _, inputKeys := range credKeys { // [inputKeys] are the keys used to authorize spend of an input
-		cred := &secp256k1fx.Credential{}
-		for _, key := range inputKeys {
-			sig, err := key.SignHash(hash) // Sign hash(tx.unsignedBytes)
-			if err != nil {
-				return nil, fmt.Errorf("problem generating credential: %w", err)
-			}
-			sigArr := [crypto.SECP256K1RSigLen]byte{}
-			copy(sigArr[:], sig)
-			cred.Sigs = append(cred.Sigs, sigArr)
-		}
-		tx.Credentials = append(tx.Credentials, cred) // Attach credential to tx
-	}
-
-	return tx, tx.initialize(vm)
+		SubnetID:    subnetID,
+		ChainName:   chainName,
+		VMID:        vmID,
+		FxIDs:       fxIDs,
+		GenesisData: genesisData,
+		SubnetAuth:  subnetAuth,
+	}}
+	return tx, vm.signDecisionTx(tx, signers)
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
@@ -67,7 +68,7 @@ var (
 
 	// non-default Subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
-	testSubnet1            *CreateSubnetTx
+	testSubnet1            *UnsignedCreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 )
 
@@ -200,13 +201,15 @@ func defaultVM() *VM {
 	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
 		panic(err)
 	}
+	if err := vm.Bootstrapped(); err != nil {
+		panic(err)
+	}
 
 	// Create a non-default subnet and store it in testSubnet1
 	if tx, err := vm.newCreateSubnetTx(
+		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
-		// threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		2,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
 	); err != nil {
 		panic(err)
@@ -219,7 +222,11 @@ func defaultVM() *VM {
 	} else if err := blk.Accept(); err != nil {
 		panic(err)
 	} else {
-		testSubnet1 = tx
+		testSubnet1 = tx.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+	}
+
+	vm.Ctx.SharedMemory = MockSharedMemory{
+		GetDatabaseF: func(ids.ID) database.Database { return memdb.New() },
 	}
 
 	return vm
@@ -245,9 +252,7 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		addrSet := ids.ShortSet{}
-		addrSet.Add(utxo.Address)
-		utxos, err := vm.getUTXOs(vm.DB, addrSet)
+		utxos, err := vm.getUTXOs(vm.DB, [][]byte{utxo.Address.Bytes()})
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -298,11 +303,6 @@ func TestGenesis(t *testing.T) {
 
 	// Ensure the new subnet we created exists
 	if _, err := vm.getSubnet(vm.DB, testSubnet1.ID()); err != nil {
-		subnets, err := vm.getSubnets(vm.DB)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("subnets: %+v", subnets)
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
 	}
 }
@@ -360,18 +360,18 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	_, ok = options[1].(*Abort)
 	if !ok {
 		t.Fatal(errShouldPrefAbort)
-	}
-
-	if err := block.Verify(); err != nil {
+	} else if err := block.Verify(); err != nil {
 		t.Fatal(err)
-	}
-	block.Accept()
-
-	if err := commit.Verify(); err != nil {
+	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
-	}
-	if err := commit.Accept(); err != nil { // commit the proposal
+	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
+	} else if err := commit.Accept(); err != nil { // commit the proposal
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status of tx should be Committed but is %s", status)
 	}
 
 	// Verify that new validator now in pending validator set
@@ -401,7 +401,7 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create invalid tx
-	tx, err := vm.newAddDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -409,17 +409,11 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 		ID,
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
-	}
-
-	preferredHeight, err := vm.preferredHeight()
-	if err != nil {
+	} else if preferredHeight, err := vm.preferredHeight(); err != nil {
 		t.Fatal(err)
-	}
-	blk, err := vm.newProposalBlock(vm.LastAccepted(), preferredHeight+1, tx)
-	if err != nil {
+	} else if blk, err := vm.newProposalBlock(vm.LastAccepted(), preferredHeight+1, *tx); err != nil {
 		t.Fatal(err)
 	} else if err := vm.State.PutBlock(vm.DB, blk); err != nil {
 		t.Fatal(err)
@@ -429,10 +423,9 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 		t.Fatalf("Should have errored during verification")
 	} else if status := blk.Status(); status != choices.Rejected {
 		t.Fatalf("Should have marked the block as rejected")
-	}
-
-	parsedBlk, err := vm.GetBlock(blk.ID())
-	if err != nil {
+	} else if _, ok := vm.droppedTxCache.Get(blk.Tx.ID()); !ok {
+		t.Fatal("tx should be in dropped tx cache")
+	} else if parsedBlk, err := vm.GetBlock(blk.ID()); err != nil {
 		t.Fatal(err)
 	} else if status := parsedBlk.Status(); status != choices.Rejected {
 		t.Fatalf("Should have marked the block as rejected")
@@ -481,29 +474,28 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
-	}
-	commit, ok := options[0].(*Commit)
-	if !ok {
+	} else if commit, ok := options[0].(*Commit); !ok {
 		t.Fatal(errShouldPrefCommit)
-	}
-	abort, ok := options[1].(*Abort)
-	if !ok {
+	} else if abort, ok := options[1].(*Abort); !ok {
 		t.Fatal(errShouldPrefAbort)
-	}
-
-	if err := block.Verify(); err != nil {
+	} else if err := block.Verify(); err != nil {
 		t.Fatal(err)
-	}
-	block.Accept()
-
-	if err := commit.Verify(); err != nil { // should pass verification
+	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil { // should pass verification
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(commit.onAccept(), tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	} else if err := abort.Verify(); err != nil { // should pass verification
 		t.Fatal(err)
-	}
-
-	if err := abort.Accept(); err != nil { // reject the proposal
+	} else if err := abort.Accept(); err != nil { // reject the proposal
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	}
 
 	// Verify that new validator NOT in pending validator set
@@ -540,7 +532,6 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.id,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -574,8 +565,16 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(abort.onAccept(), tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // accept the proposal
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 
 	// Verify that new validator is in pending validator set
@@ -614,7 +613,6 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.id,
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -646,10 +644,18 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(commit.onAccept(), tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // reject the proposal
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	}
 
 	// Verify that new validator NOT in pending validator set
@@ -700,8 +706,16 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 
 	// Verify that chain's timestamp has advanced
@@ -734,8 +748,16 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // reward the genesis validator
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	} else if currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID); err != nil {
 		// Verify that genesis validator was rewarded and removed from current validator set
 		t.Fatal(err)
@@ -763,78 +785,63 @@ func TestRewardValidatorReject(t *testing.T) {
 
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
-	options, err := block.Options()
-	if err != nil {
+	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	}
-	commit, ok := options[0].(*Commit)
-	if !ok {
+	} else if commit, ok := options[0].(*Commit); !ok {
 		t.Fatal(errShouldPrefCommit)
-	}
-	abort, ok := options[1].(*Abort)
-	if !ok {
+	} else if abort, ok := options[1].(*Abort); !ok {
 		t.Fatal(errShouldPrefAbort)
-	}
-
-	if err := block.Verify(); err != nil {
+	} else if err := block.Verify(); err != nil {
 		t.Fatal(err)
-	}
-	block.Accept()
-
-	if err := commit.Verify(); err != nil {
+	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
-	}
-	if err := abort.Verify(); err != nil {
+	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	}
-
-	if err := commit.Accept(); err != nil { // advance the timestamp
+	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
-	}
-
-	// Verify that chain's timestamp has advanced
-	timestamp, err := vm.getTimestamp(vm.DB)
-	if err != nil {
+	} else if status, err := vm.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	}
-	if !timestamp.Equal(defaultValidateEndTime) {
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if err := commit.Accept(); err != nil { // advance the timestamp
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if timestamp, err := vm.getTimestamp(vm.DB); err != nil { // Verify that chain's timestamp has advanced
+		t.Fatal(err)
+	} else if !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
-
-	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
-	if err != nil {
+	if blk, err = vm.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
 		t.Fatal(err)
 	}
-
-	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
-	options, err = block.Options()
-	if err != nil {
+	if options, err := blk.(*ProposalBlock).Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	}
-	commit, ok = options[0].(*Commit)
-	if !ok {
+	} else if commit, ok := options[0].(*Commit); !ok {
 		t.Fatal(errShouldPrefCommit)
-	}
-	abort, ok = options[1].(*Abort)
-	if !ok {
+	} else if abort, ok := options[1].(*Abort); !ok {
 		t.Fatal(errShouldPrefAbort)
-	}
-
-	if err := block.Verify(); err != nil {
+	} else if err := blk.(*ProposalBlock).Verify(); err != nil {
 		t.Fatal(err)
-	}
-	block.Accept()
-
-	if err := commit.Verify(); err != nil {
+	} else if err := blk.(*ProposalBlock).Accept(); err != nil {
 		t.Fatal(err)
-	}
-	if err := abort.Verify(); err != nil {
+	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
-	}
-
-	if err := abort.Accept(); err != nil { // do not reward the genesis validator
+	} else if status, err := vm.getStatus(commit.onAccept(), block.Tx.ID()); err != nil {
 		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	}
 
 	// Verify that genesis validator was removed from current validator set
@@ -876,7 +883,6 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -888,6 +894,10 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 
 	// Verify chain was created
@@ -897,7 +907,7 @@ func TestCreateChain(t *testing.T) {
 	}
 	foundNewChain := false
 	for _, chain := range chains {
-		if bytes.Equal(chain.Bytes(), tx.Bytes()) {
+		if bytes.Equal(chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).Bytes(), tx.UnsignedDecisionTx.(*UnsignedCreateChainTx).Bytes()) {
 			foundNewChain = true
 		}
 	}
@@ -922,11 +932,11 @@ func TestCreateSubnet(t *testing.T) {
 	nodeID := keys[0].PublicKey().Address()
 
 	createSubnetTx, err := vm.newCreateSubnetTx(
+		1, //threshold
 		[]ids.ShortID{ // control keys
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		1, // threshold
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
 	)
 	if err != nil {
@@ -939,6 +949,10 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, createSubnetTx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	} else if _, err := vm.getSubnet(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal("should've created new subnet but didn't")
 	}
@@ -952,8 +966,7 @@ func TestCreateSubnet(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
-		createSubnetTx.id,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		createSubnetTx.ID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -986,18 +999,26 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // add the validator to pending validator set
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 
 	// Verify validator is in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.id)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, createSubnetTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 	foundNewValidator := false
 	for _, tx := range pendingValidators.Txs {
-		if tx.Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Vdr().ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1035,26 +1056,34 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // move validator addValidatorTx from pending to current
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 
 	// Verify validator no longer in pending validator set
 	// Verify validator is in pending validator set
-	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id); err != nil {
+	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if pendingValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
 	}
 
 	// Verify validator is in current validator set
-	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.id)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, createSubnetTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 	foundNewValidator = false
 	for _, tx := range currentValidators.Txs {
-		if tx.Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Vdr().ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1090,15 +1119,23 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // remove validator from current validator set
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 	// pending validators and current validator should be empty
-	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.id); err != nil {
+	if pendingValidators, err = vm.getPendingValidators(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if pendingValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
-	} else if currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.id); err != nil {
+	} else if currentValidators, err = vm.getCurrentValidators(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if currentValidators.Len() != 0 {
 		t.Fatal("pending validator set should be empty")
@@ -1128,8 +1165,8 @@ func TestAtomicImport(t *testing.T) {
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
 	if _, err := vm.newImportTx(
+		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		recipientKey,
 	); err == nil {
 		t.Fatalf("should have errored due to missing utxos")
 	}
@@ -1154,8 +1191,8 @@ func TestAtomicImport(t *testing.T) {
 	vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
 
 	tx, err := vm.newImportTx(
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		recipientKey,
+		recipientKey.PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1169,6 +1206,10 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
 	}
 
 	smDB = vm.Ctx.SharedMemory.GetDatabase(avmID)
@@ -1283,7 +1324,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1309,11 +1350,9 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
-		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
-		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
-		0, 95, 12, 157, 133,
-	}
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 6, 150, 225, 43, 97, 69, 215, 238,
+		150, 164, 249, 184, 2, 197, 216, 49, 6, 78, 81, 50, 190, 8, 44, 165, 219, 127, 96, 39,
+		235, 155, 17, 108, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 0, 95, 34, 234, 149, 0, 0, 0, 0}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
 	}
@@ -1380,7 +1419,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1404,24 +1443,27 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	/* This code, when uncommented, prints [secondAdvanceTimeBlkBytes]
-	secondAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(2*time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), firstVM.preferredHeight()+1, secondAdvanceTimeTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Fatal(secondAdvanceTimeBlk.Bytes())
+	/*
+		//This code, when uncommented, prints [secondAdvanceTimeBlkBytes]
+		secondAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		preferredHeight, err = firstVM.preferredHeight()
+		if err != nil {
+			t.Fatal(err)
+		}
+		secondAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *secondAdvanceTimeTx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal(secondAdvanceTimeBlk.Bytes())
 	*/
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 175, 165,
-		179, 18, 84, 54, 209, 73, 77, 66, 108, 26, 59, 20, 86, 210, 143, 238, 39, 220,
-		52, 243, 166, 149, 166, 139, 210, 93, 199, 143, 58, 199, 0, 0, 0, 25, 0, 0, 0,
-		0, 95, 12, 157, 133,
-	}
+	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 6, 150, 225, 43, 97, 69, 215, 238,
+		150, 164, 249, 184, 2, 197, 216, 49, 6, 78, 81, 50, 190, 8, 44, 165, 219, 127, 96, 39,
+		235, 155, 17, 108, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 0, 95, 34, 234, 149, 0, 0, 0, 0}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
 	}
@@ -1495,7 +1537,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, advanceTimeTx)
+	advanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, *advanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1648,7 +1690,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, firstAdvanceTimeTx)
+	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1669,7 +1711,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, secondAdvanceTimeTx)
+	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, *secondAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
 	}

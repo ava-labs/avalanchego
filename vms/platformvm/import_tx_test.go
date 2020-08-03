@@ -4,16 +4,14 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
-
+	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/nodb"
-	"github.com/ava-labs/gecko/vms/components/ava"
-
-	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 // implements snow.SharedMemory
@@ -32,11 +30,11 @@ func (msm MockSharedMemory) ReleaseDatabase(ID ids.ID) {}
 
 func TestNewImportTx(t *testing.T) {
 	type test struct {
-		description  string
-		sharedMemory MockSharedMemory
-		feeKeys      []*crypto.PrivateKeySECP256K1R
-		recipientKey *crypto.PrivateKeySECP256K1R
-		shouldErr    bool
+		description   string
+		sharedMemory  MockSharedMemory
+		feeKeys       []*crypto.PrivateKeySECP256K1R
+		recipientKeys []*crypto.PrivateKeySECP256K1R
+		shouldErr     bool
 	}
 
 	factory := crypto.FactorySECP256K1R{}
@@ -55,7 +53,7 @@ func TestNewImportTx(t *testing.T) {
 				state := ava.NewPrefixedState(db, Codec)
 				if err := state.FundAVMUTXO(&ava.UTXO{
 					UTXOID: ava.UTXOID{
-						TxID:        generateRandomID(),
+						TxID:        ids.GenerateTestID(),
 						OutputIndex: rand.Uint32(),
 					},
 					Asset: ava.Asset{ID: avaxAssetID},
@@ -76,7 +74,7 @@ func TestNewImportTx(t *testing.T) {
 	}
 
 	vm := defaultVM()
-	avmID := generateRandomID()
+	avmID := ids.GenerateTestID()
 	vm.avm = avmID
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -86,40 +84,25 @@ func TestNewImportTx(t *testing.T) {
 
 	tests := []test{
 		{
-			description:  "recipient key can't pay fee; no fee keys",
-			sharedMemory: fundedSharedMemory(vm.txFee - 1),
-			feeKeys:      nil,
-			recipientKey: recipientKey,
-			shouldErr:    true,
+			description:   "recipient key can't pay fee;",
+			sharedMemory:  fundedSharedMemory(vm.txFee - 1),
+			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
+			shouldErr:     true,
 		},
 		{
 
-			description:  "recipient key pays fee",
-			sharedMemory: fundedSharedMemory(vm.txFee),
-			feeKeys:      nil,
-			recipientKey: recipientKey,
-			shouldErr:    false,
-		},
-		{
-			description:  "no recipient keys provided",
-			sharedMemory: fundedSharedMemory(0),
-			feeKeys:      []*crypto.PrivateKeySECP256K1R{keys[0]},
-			recipientKey: nil,
-			shouldErr:    true,
-		},
-		{
-			description:  "fee keys and recipient key both pay part of tx fee",
-			sharedMemory: fundedSharedMemory(vm.txFee - 1),
-			feeKeys:      []*crypto.PrivateKeySECP256K1R{keys[0]},
-			recipientKey: recipientKey,
-			shouldErr:    false,
+			description:   "recipient key pays fee",
+			sharedMemory:  fundedSharedMemory(vm.txFee),
+			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
+			shouldErr:     false,
 		},
 	}
 
 	vdb := versiondb.New(vm.DB)
+	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		vm.Ctx.SharedMemory = tt.sharedMemory
-		tx, err := vm.newImportTx(tt.feeKeys, tt.recipientKey)
+		tx, err := vm.newImportTx(to, tt.recipientKeys)
 		if err != nil {
 			if !tt.shouldErr {
 				t.Fatalf("test '%s' errored but it shouldn't have", tt.description)
@@ -127,85 +110,27 @@ func TestNewImportTx(t *testing.T) {
 			continue
 		} else if tt.shouldErr {
 			t.Fatalf("test '%s' didn't error but it should have", tt.description)
-		} else if len(tx.Ins()) == 0 {
-			t.Fatal("tx has no inputs")
-		} else if len(tx.ImportedInputs) == 0 {
-			t.Fatal("tx has no imported inputs")
-		} else if len(tx.Outs()) == 0 {
-			t.Fatal("tx has no outputs")
-		} else if len(tx.Creds()) != len(tx.Ins()) {
-			t.Fatal("should have same number of credentials as inputs")
+		}
+		unsignedTx := tx.UnsignedAtomicTx.(*UnsignedImportTx)
+		if len(unsignedTx.ImportedInputs) == 0 {
+			t.Fatalf("in test '%s', tx has no imported inputs", tt.description)
+		} else if len(tx.Credentials) != len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs) {
+			t.Fatalf("in test '%s', should have same number of credentials as inputs", tt.description)
 		}
 		totalIn := uint64(0)
-		for _, in := range tx.Ins() {
+		for _, in := range unsignedTx.Ins {
+			totalIn += in.Input().Amount()
+		}
+		for _, in := range unsignedTx.ImportedInputs {
 			totalIn += in.Input().Amount()
 		}
 		totalOut := uint64(0)
-		for _, out := range tx.Outs() {
+		for _, out := range unsignedTx.Outs {
 			totalOut += out.Out.Amount()
 		}
 		if totalIn-totalOut != vm.txFee {
-			t.Fatal("inputs should equal outputs + txFee")
+			t.Fatalf("in test '%s'. inputs (%d) != outputs (%d) + txFee (%d)", tt.description, totalIn, totalOut, vm.txFee)
 		}
 		vdb.Abort()
-	}
-}
-
-// Ensure that calling Ins() doesn't modify the tx
-func TestImportTxInsDoesntModify(t *testing.T) {
-	vm := defaultVM()
-	avmID := generateRandomID()
-	vm.avm = avmID
-	vm.Ctx.Lock.Lock()
-	defer func() {
-		vm.Shutdown()
-		vm.Ctx.Lock.Unlock()
-	}()
-
-	factory := crypto.FactorySECP256K1R{}
-	recipientKeyIntf, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
-
-	// Returns a shared memory where GetDatabase returns a database
-	// where [recipientKey] has a balance of 50,000
-	vm.Ctx.SharedMemory = MockSharedMemory{
-		GetDatabaseF: func(ids.ID) database.Database {
-			db := memdb.New()
-			state := ava.NewPrefixedState(db, Codec)
-			if err := state.FundAVMUTXO(&ava.UTXO{
-				UTXOID: ava.UTXOID{
-					TxID:        generateRandomID(),
-					OutputIndex: rand.Uint32(),
-				},
-				Asset: ava.Asset{ID: avaxAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 50000,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
-						Threshold: 1,
-					},
-				},
-			}); err != nil {
-				panic(err)
-			}
-			return db
-		},
-	}
-
-	tx, err := vm.newImportTx(keys, recipientKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ins := tx.Ins()
-	if len(ins) == 0 {
-		t.Fatal("len(ins) should be at least 1")
-	}
-	ins[0] = nil // If ins points to tx.BaseTx.Inputs, then setting first element to nil will do the same in tx.BaseTx.Inputs
-	if len(tx.BaseTx.Inputs) > 0 && tx.BaseTx.Inputs[0] == nil {
-		t.Fatal("Ins() shouldn't return the same underlying slice as tx.BaseTx.Inputs")
 	}
 }

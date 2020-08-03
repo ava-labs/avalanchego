@@ -133,7 +133,7 @@ func (u *user) getKeys() ([]*crypto.PrivateKeySECP256K1R, error) {
 	if err != nil {
 		return nil, err
 	}
-	keys := make([]*crypto.PrivateKeySECP256K1R, len(addrs), len(addrs))
+	keys := make([]*crypto.PrivateKeySECP256K1R, len(addrs))
 	for i, addr := range addrs {
 		key, err := u.getKey(addr)
 		if err != nil {

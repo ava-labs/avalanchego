@@ -28,6 +28,7 @@ var (
 	errNoPassword           = errors.New("argument 'password' not provided")
 	errNoSubnetID           = errors.New("argument 'subnetID' not provided")
 	errNoDestination        = errors.New("argument 'destination' not provided")
+	errUnexpectedTxType     = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -144,9 +145,8 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
 
-	addrSet := ids.ShortSet{}
-	addrSet.Add(address)
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrSet)
+	addrs := [][]byte{address.Bytes()}
+	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
 	}
@@ -201,7 +201,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	if err != nil {
 		return fmt.Errorf("couldn't get addresses: %w", err)
 	}
-	response.Addresses = make([]string, len(addresses), len(addresses))
+	response.Addresses = make([]string, len(addresses))
 	for i, addr := range addresses {
 		response.Addresses[i] = service.vm.FormatAddress(addr)
 	}
@@ -222,21 +222,21 @@ type GetUTXOsResponse struct {
 func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *GetUTXOsResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
-	addrSet := ids.ShortSet{}
+	addrs := [][]byte{}
 	for _, addrStr := range args.Addresses {
 		addr, err := service.vm.ParseAddress(addrStr)
 		if err != nil {
 			return fmt.Errorf("can't parse %s to address: %w", addr, err)
 		}
-		addrSet.Add(addr)
+		addrs = append(addrs, addr.Bytes())
 	}
 
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrSet)
+	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
 
-	response.UTXOs = make([]formatting.CB58, len(utxos), len(utxos))
+	response.UTXOs = make([]formatting.CB58, len(utxos))
 	for i, utxo := range utxos {
 		bytes, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
@@ -262,7 +262,7 @@ type APISubnet struct {
 	// A transaction to add a validator to this subnet requires
 	// signatures from [Threshold] of these keys to be valid.
 	ControlKeys []string    `json:"controlKeys"`
-	Threshold   json.Uint16 `json:"threshold"`
+	Threshold   json.Uint32 `json:"threshold"`
 }
 
 // GetSubnetsArgs are the arguments to GetSubnet
@@ -293,21 +293,23 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	if getAll {
 		response.Subnets = make([]APISubnet, len(subnets)+1)
 		for i, subnet := range subnets {
+			unsignedTx := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
-			for _, controlKeyID := range subnet.ControlKeys {
+			for _, controlKeyID := range owner.Addrs {
 				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
 			}
 			response.Subnets[i] = APISubnet{
-				ID:          subnet.id,
+				ID:          subnet.ID(),
 				ControlKeys: controlAddrs,
-				Threshold:   json.Uint16(subnet.Threshold),
+				Threshold:   json.Uint32(owner.Threshold),
 			}
 		}
 		// Include Default Subnet
 		response.Subnets[len(subnets)] = APISubnet{
 			ID:          constants.DefaultSubnetID,
 			ControlKeys: []string{},
-			Threshold:   json.Uint16(0),
+			Threshold:   json.Uint32(0),
 		}
 		return nil
 	}
@@ -315,16 +317,18 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	idsSet := ids.Set{}
 	idsSet.Add(args.IDs...)
 	for _, subnet := range subnets {
-		if idsSet.Contains(subnet.id) {
+		if idsSet.Contains(subnet.ID()) {
+			unsignedTx := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
-			for _, controlKeyID := range subnet.ControlKeys {
+			for _, controlKeyID := range owner.Addrs {
 				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
 			}
 			response.Subnets = append(response.Subnets,
 				APISubnet{
-					ID:          subnet.id,
+					ID:          subnet.ID(),
 					ControlKeys: controlAddrs,
-					Threshold:   json.Uint16(subnet.Threshold),
+					Threshold:   json.Uint32(owner.Threshold),
 				},
 			)
 		}
@@ -334,7 +338,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			APISubnet{
 				ID:          constants.DefaultSubnetID,
 				ControlKeys: []string{},
-				Threshold:   json.Uint16(0),
+				Threshold:   json.Uint32(0),
 			},
 		)
 	}
@@ -374,34 +378,38 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
 	if args.SubnetID.Equals(constants.DefaultSubnetID) {
 		for i, tx := range validators.Txs {
-			vdr := tx.Vdr()
-			weight := json.Uint64(vdr.Weight())
-			var address ids.ShortID
-			switch tx := tx.(type) {
-			case *addDefaultSubnetValidatorTx:
-				address = tx.Destination
-			case *addDefaultSubnetDelegatorTx:
-				address = tx.Destination
+			switch tx := tx.UnsignedProposalTx.(type) {
+			case *UnsignedAddDefaultSubnetValidatorTx:
+				vdr := tx.Vdr()
+				weight := json.Uint64(vdr.Weight())
+				reply.Validators[i] = FormattedAPIValidator{
+					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
+					StakeAmount: &weight,
+				}
+			case *UnsignedAddDefaultSubnetDelegatorTx:
+				vdr := tx.Vdr()
+				weight := json.Uint64(vdr.Weight())
+				reply.Validators[i] = FormattedAPIValidator{
+					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
+					StakeAmount: &weight,
+				}
 			default: // Shouldn't happen
 				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
-			}
-
-			reply.Validators[i] = FormattedAPIValidator{
-				ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(tx.StartTime().Unix()),
-				EndTime:     json.Uint64(tx.EndTime().Unix()),
-				StakeAmount: &weight,
-				Address:     service.vm.FormatAddress(address),
 			}
 		}
 	} else {
 		for i, tx := range validators.Txs {
-			vdr := tx.Vdr()
+			utx := tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
+			vdr := utx.Vdr()
 			weight := json.Uint64(vdr.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime: json.Uint64(tx.StartTime().Unix()),
-				EndTime:   json.Uint64(tx.EndTime().Unix()),
+				StartTime: json.Uint64(utx.StartTime().Unix()),
+				EndTime:   json.Uint64(utx.EndTime().Unix()),
 				Weight:    &weight,
 			}
 		}
@@ -436,30 +444,37 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
 	for i, tx := range validators.Txs {
-		vdr := tx.Vdr()
-		weight := json.Uint64(vdr.Weight())
 		if args.SubnetID.Equals(constants.DefaultSubnetID) {
-			var address ids.ShortID
-			switch tx := tx.(type) {
-			case *addDefaultSubnetValidatorTx:
-				address = tx.Destination
-			case *addDefaultSubnetDelegatorTx:
-				address = tx.Destination
+			switch tx := tx.UnsignedProposalTx.(type) {
+			case *UnsignedAddDefaultSubnetValidatorTx:
+				vdr := tx.Vdr()
+				weight := json.Uint64(vdr.Weight())
+				reply.Validators[i] = FormattedAPIValidator{
+					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
+					StakeAmount: &weight,
+				}
+			case *UnsignedAddDefaultSubnetDelegatorTx:
+				vdr := tx.Vdr()
+				weight := json.Uint64(vdr.Weight())
+				reply.Validators[i] = FormattedAPIValidator{
+					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
+					StakeAmount: &weight,
+				}
 			default: // Shouldn't happen
 				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
 			}
-			reply.Validators[i] = FormattedAPIValidator{
-				ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(tx.StartTime().Unix()),
-				EndTime:     json.Uint64(tx.EndTime().Unix()),
-				StakeAmount: &weight,
-				Address:     service.vm.FormatAddress(address),
-			}
 		} else {
+			utx := tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
+			vdr := utx.Vdr()
+			weight := json.Uint64(vdr.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime: json.Uint64(tx.StartTime().Unix()),
-				EndTime:   json.Uint64(tx.EndTime().Unix()),
+				StartTime: json.Uint64(utx.StartTime().Unix()),
+				EndTime:   json.Uint64(utx.EndTime().Unix()),
 				Weight:    &weight,
 			}
 		}
@@ -529,7 +544,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	switch {
 	case args.Destination == "":
 		return errNoDestination
-	case int64(args.StartTime) < time.Now().Unix():
+	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
 	}
 
@@ -572,9 +587,6 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
-	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return err
 	}
 
 	reply.TxID = tx.ID()
@@ -630,9 +642,6 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return err
-	}
 
 	reply.TxID = tx.ID()
 	return service.vm.issueTx(tx)
@@ -681,14 +690,10 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 		uint64(args.EndTime),   // End time
 		args.ID,                // Node ID
 		subnetID,               // Subnet ID
-		keys,                   // Control keys
-		keys,                   // Keys for paying the fee
+		keys,                   // Keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
-	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return err
 	}
 
 	response.TxID = tx.ID()
@@ -729,15 +734,12 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 	// Create the transaction
 	tx, err := service.vm.newCreateSubnetTx(
-		controlKeys,            // Control Keys
-		uint16(args.Threshold), // Threshold
+		uint32(args.Threshold), // Threshold
+		controlKeys,            // Control Addresses
 		privKeys,               // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
-	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return err
 	}
 
 	response.TxID = tx.ID()
@@ -758,8 +760,7 @@ type ExportAVAArgs struct {
 // It must be imported on the X-Chain to complete the transfer
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
-	switch {
-	case uint64(args.Amount) == 0:
+	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
 	}
 
@@ -769,20 +770,23 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	if privKeys, err := user.getKeys(); err != nil {
+	privKeys, err := user.getKeys()
+	if err != nil {
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	} else if tx, err := service.vm.newExportTx( // Create the transaction
+	}
+
+	// Create the transaction
+	tx, err := service.vm.newExportTx(
 		uint64(args.Amount), // Amount
 		args.To,             // X-Chain address
 		privKeys,            // Private keys
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
-	} else if err := tx.SyntacticVerify(); err != nil {
-		return err
-	} else {
-		response.TxID = tx.ID()
-		return service.vm.issueTx(tx)
 	}
+
+	response.TxID = tx.ID()
+	return service.vm.issueTx(tx)
 }
 
 // ImportAVAArgs are the arguments to ImportAVA
@@ -804,20 +808,23 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	}
 	user := user{db: db}
 
-	if to, err := service.vm.ParseAddress(args.To); err != nil { // Parse address
+	to, err := service.vm.ParseAddress(args.To)
+	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
-	} else if privKeys, err := user.getKeys(); err != nil { // Get keys
-		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
-	} else if recipientKey, err := user.getKey(to); err != nil {
-		return fmt.Errorf("user does not have the key that controls address %s", service.vm.FormatAddress(to))
-	} else if tx, err := service.vm.newImportTx(privKeys, recipientKey); err != nil {
-		return err
-	} else if err := tx.SyntacticVerify(); err != nil {
-		return err
-	} else {
-		response.TxID = tx.ID()
-		return service.vm.issueTx(tx)
 	}
+
+	privKeys, err := user.getKeys()
+	if err != nil { // Get keys
+		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
+	}
+
+	tx, err := service.vm.newImportTx(to, privKeys)
+	if err != nil {
+		return err
+	}
+
+	response.TxID = tx.ID()
+	return service.vm.issueTx(tx)
 }
 
 /*
@@ -883,24 +890,26 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	if keys, err := user.getKeys(); err != nil {
+	keys, err := user.getKeys()
+	if err != nil {
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	} else if tx, err := service.vm.newCreateChainTx( // Create the transaction
+	}
+
+	// Create the transaction
+	tx, err := service.vm.newCreateChainTx(
 		args.SubnetID,
 		args.GenesisData.Bytes,
 		vmID,
 		fxIDs,
 		args.Name,
-		keys, // Control Keys
-		keys, // Keys to pay fee
-	); err != nil {
+		keys,
+	)
+	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
-	} else if err := tx.SyntacticVerify(); err != nil {
-		return err
-	} else {
-		response.TxID = tx.ID()
-		return service.vm.issueTx(tx)
 	}
+
+	response.TxID = tx.ID()
+	return service.vm.issueTx(tx)
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
@@ -989,7 +998,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	if err != nil {
 		return err
 	}
-	response.SubnetID = chain.SubnetID
+	response.SubnetID = chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).SubnetID
 	return nil
 }
 
@@ -1018,7 +1027,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
-		if chain.SubnetID.Equals(args.SubnetID) {
+		if chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).SubnetID.Equals(args.SubnetID) {
 			response.BlockchainIDs = append(response.BlockchainIDs, chain.ID())
 		}
 	}
@@ -1055,12 +1064,106 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	}
 
 	for _, chain := range chains {
+		uChain := chain.UnsignedDecisionTx.(*UnsignedCreateChainTx)
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
-			ID:       chain.ID(),
-			Name:     chain.ChainName,
-			SubnetID: chain.SubnetID,
-			VMID:     chain.VMID,
+			ID:       uChain.ID(),
+			Name:     uChain.ChainName,
+			SubnetID: uChain.SubnetID,
+			VMID:     uChain.VMID,
 		})
+	}
+	return nil
+}
+
+// GetTxArgs ...
+type GetTxArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxResponse ...
+type GetTxResponse struct {
+	// Raw byte representation of the transaction
+	RawTx formatting.CB58 `json:"rawTx"`
+	// JSON representation of the transaction
+	JSON interface{} `json:"json"`
+}
+
+// GetTx gets a tx
+func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxResponse) error {
+	service.vm.Ctx.Log.Info("Platform: GetTx called")
+	txBytes, err := service.vm.getTx(service.vm.DB, args.TxID)
+	if err != nil {
+		return fmt.Errorf("couldn't get tx: %w", err)
+	}
+	response.RawTx.Bytes = txBytes
+
+	// Parse the raw bytes to a struct so we can get the JSON representation
+	// We don't know what kind of tx this is, so we go through the possibilities
+	// until we find the right one
+	var (
+		proposalTx ProposalTx
+		decisionTx DecisionTx
+		atomicTx   AtomicTx
+	)
+	if err := service.vm.codec.Unmarshal(txBytes, &proposalTx); err == nil {
+		response.JSON = &proposalTx
+	} else if err := service.vm.codec.Unmarshal(txBytes, &decisionTx); err == nil {
+		response.JSON = &decisionTx
+	} else if err := service.vm.codec.Unmarshal(txBytes, &atomicTx); err == nil {
+		response.JSON = &atomicTx
+	} else {
+		return errUnexpectedTxType
+	}
+	return nil
+}
+
+// GetTxStatusArgs ...
+type GetTxStatusArgs struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// GetTxStatus gets a tx's status
+func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *Status) error {
+	service.vm.Ctx.Log.Info("Platform: GetTxStatus called")
+	status, err := service.vm.getStatus(service.vm.DB, args.TxID)
+	if err == nil { // Found the status. Report it.
+		*response = status
+		return nil
+	}
+	// The status of this transaction is not in the database.
+	// Check if the tx is in the preferred block's db. If so, return that it's processing.
+	preferred, err := service.vm.getBlock(service.vm.Preferred())
+	if err != nil {
+		service.vm.Ctx.Log.Error("couldn't get preferred block: %s", err)
+		*response = Unknown
+		return nil
+	}
+	switch block := preferred.(type) {
+	case *Abort:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing // Found the status in the preferred block's db. Report tx is processing.
+			return nil
+		}
+	case *Commit:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing
+			return nil
+		}
+	case *AtomicBlock:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing
+			return nil
+		}
+	case *StandardBlock:
+		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
+			*response = Processing
+			return nil
+		}
+	}
+	if _, ok := service.vm.droppedTxCache.Get(args.TxID); ok {
+		*response = Dropped
+	} else {
+		*response = Unknown
 	}
 	return nil
 }

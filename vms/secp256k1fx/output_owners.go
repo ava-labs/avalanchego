@@ -32,6 +32,13 @@ func (out *OutputOwners) Addresses() [][]byte {
 	return addrs
 }
 
+// AddressesSet returns addresses as a set
+func (out *OutputOwners) AddressesSet() ids.ShortSet {
+	set := ids.ShortSet{}
+	set.Add(out.Addrs...)
+	return set
+}
+
 // Equals returns true if the provided owners create the same condition
 func (out *OutputOwners) Equals(other *OutputOwners) bool {
 	if out == other {

@@ -13,8 +13,8 @@ import (
 
 func TestAdvanceTimeTxSyntacticVerify(t *testing.T) {
 	// Case: Tx is nil
-	var tx *advanceTimeTx
-	if err := tx.SyntacticVerify(); err == nil {
+	var unsignedTx *UnsignedAdvanceTimeTx
+	if err := unsignedTx.Verify(); err == nil {
 		t.Fatal("should have failed verification because tx is nil")
 	}
 
@@ -26,19 +26,19 @@ func TestAdvanceTimeTxSyntacticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	tx = &advanceTimeTx{
+	tx := &UnsignedAdvanceTimeTx{
 		Time: uint64(defaultGenesisTime.Add(Delta).Add(1 * time.Second).Unix()),
 		vm:   vm,
 	}
 
-	err := tx.SyntacticVerify()
+	err := tx.Verify()
 	if err == nil {
 		t.Fatal("should've failed verification because timestamp is ahead of synchrony bound")
 	}
 
 	// Case 3: Valid
 	tx.Time = uint64(defaultGenesisTime.Add(Delta).Unix())
-	err = tx.SyntacticVerify()
+	err = tx.Verify()
 	if err != nil {
 		t.Fatalf("should've passed verification but got: %v", err)
 	}
@@ -53,12 +53,9 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	tx := &advanceTimeTx{
-		Time: uint64(defaultGenesisTime.Unix()),
-		vm:   vm,
-	}
-	_, _, _, _, err := tx.SemanticVerify(vm.DB)
-	if err == nil {
+	if tx, err := vm.newAdvanceTimeTx(defaultGenesisTime); err != nil {
+		t.Fatal(err)
+	} else if _, _, _, _, err = tx.SemanticVerify(vm.DB, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 	}
 }
@@ -91,7 +88,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		vm.DB,
 		&EventHeap{
 			SortByStartTime: true,
-			Txs:             []TimedTx{addPendingValidatorTx},
+			Txs:             []*ProposalTx{addPendingValidatorTx},
 		},
 		constants.DefaultSubnetID,
 	)
@@ -99,12 +96,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx := &advanceTimeTx{
-		Time: uint64(pendingValidatorStartTime.Add(1 * time.Second).Unix()),
-		vm:   vm,
-	}
-	_, _, _, _, err = tx.SemanticVerify(vm.DB)
-	if err == nil {
+	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
+	if err != nil {
+		t.Fatal(err)
+	} else if _, _, _, _, err = tx.SemanticVerify(vm.DB, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 	vm.Shutdown()
@@ -122,13 +117,9 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime.Add(-10 * time.Second))
 
 	// Proposes advancing timestamp to 1 second after genesis validators stop validating
-	tx = &advanceTimeTx{
-		Time: uint64(defaultValidateEndTime.Add(1 * time.Second).Unix()),
-		vm:   vm,
-	}
-	_, _, _, _, err = tx.SemanticVerify(vm.DB)
-	t.Log(err)
-	if err == nil {
+	if tx, err := vm.newAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second)); err != nil {
+		t.Fatal(err)
+	} else if _, _, _, _, err = tx.SemanticVerify(vm.DB, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 }
@@ -165,18 +156,18 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		vm.DB,
 		&EventHeap{
 			SortByStartTime: true,
-			Txs:             []TimedTx{addPendingValidatorTx},
+			Txs:             []*ProposalTx{addPendingValidatorTx},
 		},
 		constants.DefaultSubnetID,
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	tx := &advanceTimeTx{
-		Time: uint64(pendingValidatorStartTime.Unix()),
-		vm:   vm,
+	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime)
+	if err != nil {
+		t.Fatal(err)
 	}
-	onCommit, onAbort, _, _, err := tx.SemanticVerify(vm.DB)
+	onCommit, onAbort, _, _, err := tx.SemanticVerify(vm.DB, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,10 +242,10 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var unmarshaledTx advanceTimeTx
+	var unmarshaledTx *ProposalTx
 	if err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
-	} else if tx.Time != unmarshaledTx.Time {
+	} else if tx.UnsignedProposalTx.(*UnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedProposalTx.(*UnsignedAdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")
 	}
 }

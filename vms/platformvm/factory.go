@@ -22,6 +22,7 @@ type Factory struct {
 	StakingEnabled bool
 	AVA            ids.ID
 	AVM            ids.ID
+	Fee            uint64
 }
 
 // New returns a new instance of the Platform Chain
@@ -32,5 +33,6 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		stakingEnabled: f.StakingEnabled,
 		avaxAssetID:    f.AVA,
 		avm:            f.AVM,
+		txFee:          f.Fee,
 	}, nil
 }
