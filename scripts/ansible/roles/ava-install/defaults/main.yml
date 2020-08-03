@@ -1,0 +1,22 @@
+# These names, & default values are based on Meson build builtin options;
+# which in turn follow established *nix conventions.
+# See
+#   https://mesonbuild.com/Builtin-options.html
+#   https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
+prefix: "/usr/local"
+bindir: "{{ prefix }}/bin"
+libdir: "{{ prefix }}/lib"
+localstatedir: "{{ prefix | replace('/usr', '/var') }}"
+sharedstatedir: "{{ localstatedir }}/lib"
+# Has no Meson builtin equivalent
+logdir: "{{ localstatedir }}/log"
+
+# These names are specific to AVA. Default values are based loosely on *nix
+# conventions.
+ava_daemon_home_dir: "{{ sharedstatedir }}/ava"
+ava_daemon_db_dir: "{{ ava_daemon_home_dir }}/db"
+ava_daemon_log_dir: "{{ logdir }}/ava"
+ava_daemon_plugin_dir: "{{ libdir }}/ava/plugins"
+ava_daemon_staking_dir: "{{ ava_daemon_home_dir }}/staking"
+ava_daemon_staking_tls_cert: "{{ ava_daemon_staking_dir }}/staker.crt"
+ava_daemon_staking_tls_key: "{{ ava_daemon_staking_dir }}/staker.key"

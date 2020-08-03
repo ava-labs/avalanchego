@@ -5,11 +5,15 @@ package avm
 
 import (
 	"bytes"
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/database/mockdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -30,15 +34,11 @@ var networkID uint32 = 43110
 var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
 
 var keys []*crypto.PrivateKeySECP256K1R
-var ctx *snow.Context
 var asset = ids.NewID([32]byte{1, 2, 3})
 var username = "bobby"
 var password = "StrnasfqewiurPasswdn56d"
 
 func init() {
-	ctx = snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
 	cb58 := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
 
@@ -47,11 +47,17 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		ctx.Log.AssertNoError(cb58.FromString(key))
-		pk, err := factory.ToPrivateKey(cb58.Bytes)
-		ctx.Log.AssertNoError(err)
+		_ = cb58.FromString(key)
+		pk, _ := factory.ToPrivateKey(cb58.Bytes)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 	}
+}
+
+func NewContext() *snow.Context {
+	ctx := snow.DefaultContextTest()
+	ctx.NetworkID = networkID
+	ctx.ChainID = chainID
+	return ctx
 }
 
 func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
@@ -162,6 +168,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	genesisBytes := BuildGenesisTest(t)
+	ctx := NewContext()
 
 	baseDB := memdb.New()
 
@@ -434,6 +441,7 @@ func TestTxSerialization(t *testing.T) {
 
 func TestInvalidGenesis(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext()
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -454,6 +462,7 @@ func TestInvalidGenesis(t *testing.T) {
 
 func TestInvalidFx(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext()
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -477,6 +486,7 @@ func TestInvalidFx(t *testing.T) {
 
 func TestFxInitializationFailure(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext()
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -505,6 +515,7 @@ func (tx *testTxBytes) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func TestIssueTx(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -534,6 +545,7 @@ func TestIssueTx(t *testing.T) {
 
 func TestGenesisGetUTXOs(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -558,6 +570,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
 	genesisBytes, issuer, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -692,6 +705,7 @@ func TestIssueNFT(t *testing.T) {
 	vm := &VM{
 		ava: ids.Empty,
 	}
+	ctx := NewContext()
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -861,6 +875,7 @@ func TestIssueProperty(t *testing.T) {
 	vm := &VM{
 		ava: ids.Empty,
 	}
+	ctx := NewContext()
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -1020,6 +1035,7 @@ func TestIssueProperty(t *testing.T) {
 
 func TestVMFormat(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -1042,6 +1058,7 @@ func TestVMFormat(t *testing.T) {
 
 func TestVMFormatAliased(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -1068,4 +1085,62 @@ func TestVMFormatAliased(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTxCached(t *testing.T) {
+	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := NewTx(t, genesisBytes, vm)
+	txBytes := newTx.Bytes()
+
+	_, err := vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+
+	db := mockdb.New()
+	called := new(bool)
+	db.OnGet = func([]byte) ([]byte, error) {
+		*called = true
+		return nil, errors.New("")
+	}
+	vm.state.state.DB = db
+	vm.state.state.Cache.Flush()
+
+	_, err = vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+	assert.False(t, *called, "shouldn't have called the DB")
+}
+
+func TestTxNotCached(t *testing.T) {
+	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := NewTx(t, genesisBytes, vm)
+	txBytes := newTx.Bytes()
+
+	_, err := vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+
+	db := mockdb.New()
+	called := new(bool)
+	db.OnGet = func([]byte) ([]byte, error) {
+		*called = true
+		return nil, errors.New("")
+	}
+	db.OnPut = func([]byte, []byte) error { return nil }
+	vm.state.state.DB = db
+	vm.state.uniqueTx.Flush()
+	vm.state.state.Cache.Flush()
+
+	_, err = vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+	assert.True(t, *called, "should have called the DB")
 }

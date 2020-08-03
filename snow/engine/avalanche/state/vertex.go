@@ -26,6 +26,7 @@ var (
 	errInvalidParents = errors.New("vertex contains non-sorted or duplicated parentIDs")
 	errInvalidTxs     = errors.New("vertex contains non-sorted or duplicated transactions")
 	errNoTxs          = errors.New("vertex contains no transactions")
+	errConflictingTxs = errors.New("vertex contains conflicting transactions")
 )
 
 type innerVertex struct {
@@ -51,9 +52,18 @@ func (vtx *innerVertex) Verify() error {
 		return errNoTxs
 	case !isSortedAndUniqueTxs(vtx.txs):
 		return errInvalidTxs
-	default:
-		return nil
 	}
+
+	inputIDs := ids.Set{}
+	for _, tx := range vtx.txs {
+		inputs := tx.InputIDs()
+		if inputs.Overlaps(inputIDs) {
+			return errConflictingTxs
+		}
+		inputIDs.Union(inputs)
+	}
+
+	return nil
 }
 
 /*

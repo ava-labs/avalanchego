@@ -1,0 +1,10 @@
+- name: Reload systemd
+  become: true
+  systemd:
+    daemon_reload: true
+
+- name: Restart AVA service
+  become: true
+  service:
+    name: ava
+    state: restarted
