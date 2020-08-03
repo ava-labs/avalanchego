@@ -6,7 +6,11 @@ package platformvm
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
+
+	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/gecko/utils/formatting"
 
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/ids"
@@ -108,13 +112,23 @@ func TestExportKey(t *testing.T) {
 	if err := service.ExportKey(nil, &args, &reply); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(testPrivateKey, reply.PrivateKey.Bytes) {
-		t.Fatalf("Expected %v, got %v", testPrivateKey, reply.PrivateKey)
+
+	if !strings.HasPrefix(reply.PrivateKey, constants.SecretKeyPrefix) {
+		t.Fatalf("ExportKeyReply is missing secret key prefix: %s", constants.SecretKeyPrefix)
+	}
+	privateKeyString := strings.TrimPrefix(reply.PrivateKey, constants.SecretKeyPrefix)
+	privateKey := formatting.CB58{}
+	if err := privateKey.FromString(privateKeyString); err != nil {
+		t.Fatalf("Failed to parse key: %s", err)
+	}
+
+	if !bytes.Equal(testPrivateKey, privateKey.Bytes) {
+		t.Fatalf("Expected %v, got %v", testPrivateKey, privateKey.Bytes)
 	}
 }
 
 func TestImportKey(t *testing.T) {
-	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","privateKey":"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
+	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","privateKey":"SECRETKEY-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
 	args := ImportKeyArgs{}
 	err := json.Unmarshal([]byte(jsonString), &args)
 	if err != nil {

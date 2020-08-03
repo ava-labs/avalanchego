@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -804,7 +806,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -832,15 +834,15 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	reply.PrivateKey.Bytes = sk.Bytes()
+	reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
 	return nil
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
-	Username   string          `json:"username"`
-	Password   string          `json:"password"`
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ImportKeyReply is the response for ImportKey
@@ -860,8 +862,16 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 
 	user := userState{vm: service.vm}
 
+	// TODO TrimPrefix returns the original string if the prefix is not present
+	// make the prefix non-optional by checking for the prefix explicitly
+	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
+	formattedPrivateKey := formatting.CB58{}
+	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+
 	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(args.PrivateKey.Bytes)
+	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key %s: %w", args.PrivateKey, err)
 	}

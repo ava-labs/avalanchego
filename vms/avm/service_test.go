@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -500,7 +501,7 @@ func TestImportAVMKey(t *testing.T) {
 	args := ImportKeyArgs{
 		Username:   username,
 		Password:   password,
-		PrivateKey: formatting.CB58{Bytes: sk.Bytes()},
+		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
 	}
 	reply := ImportKeyReply{}
 	if err = s.ImportKey(nil, &args, &reply); err != nil {
@@ -540,7 +541,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	args := ImportKeyArgs{
 		Username:   username,
 		Password:   password,
-		PrivateKey: formatting.CB58{Bytes: sk.Bytes()},
+		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
 	}
 	reply := ImportKeyReply{}
 	if err = s.ImportKey(nil, &args, &reply); err != nil {

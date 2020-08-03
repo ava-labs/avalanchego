@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/gecko/api"
@@ -58,7 +59,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -74,7 +75,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	} else if sk, err := user.getKey(address); err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	} else {
-		reply.PrivateKey.Bytes = sk.Bytes()
+		reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
 		return nil
 	}
 }
@@ -82,7 +83,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ImportKeyReply is the response for ImportKey
@@ -102,7 +103,16 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	user := user{db: db}
 
 	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(args.PrivateKey.Bytes)
+
+	// TODO TrimPrefix returns the original string if the prefix is not present
+	// make the prefix non-optional by checking for the prefix explicitly
+	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
+	formattedPrivateKey := formatting.CB58{}
+	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+
+	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key %s: %w", args.PrivateKey, err)
 	}
