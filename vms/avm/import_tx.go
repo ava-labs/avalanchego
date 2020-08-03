@@ -5,6 +5,7 @@ package avm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -73,6 +74,8 @@ func (t *ImportTx) SyntacticVerify(
 		return errWrongNetworkID
 	case !t.BCID.Equals(ctx.ChainID):
 		return errWrongChainID
+	case len(t.Memo) > maxMemoSize:
+		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	case len(t.Ins) == 0:
 		return errNoImportInputs
 	}

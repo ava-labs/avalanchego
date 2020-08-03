@@ -4,6 +4,8 @@
 package avm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -36,6 +38,8 @@ func (t *ExportTx) SyntacticVerify(
 		return errWrongNetworkID
 	case !t.BCID.Equals(ctx.ChainID):
 		return errWrongChainID
+	case len(t.Memo) > maxMemoSize:
+		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	}
 
 	fc := ava.NewFlowChecker()

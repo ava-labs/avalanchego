@@ -144,6 +144,8 @@ func TestOutputSerialize(t *testing.T) {
 	c := codec.NewDefault()
 
 	expected := []byte{
+		// Codec version
+		0x00, 0x00,
 		// amount:
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x39,
 		// locktime:

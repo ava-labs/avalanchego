@@ -32,6 +32,8 @@ func TestCredentialSerialize(t *testing.T) {
 	c := codec.NewDefault()
 
 	expected := []byte{
+		// Codec version
+		0x00, 0x00,
 		// length:
 		0x00, 0x00, 0x00, 0x02,
 		// sig[0]

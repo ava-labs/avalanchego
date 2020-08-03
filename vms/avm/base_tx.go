@@ -5,6 +5,7 @@ package avm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -13,6 +14,10 @@ import (
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
+
+// Max size of memo field
+// Don't change without also changing platformvm.maxMemoSize
+const maxMemoSize = 256
 
 var (
 	errNilTx          = errors.New("nil tx is not valid")
@@ -28,6 +33,9 @@ var (
 )
 
 // BaseTx is the basis of all transactions.
+// The serialized fields of this struct should be exactly the same as those of platformvm.BaseTx
+// Do not change this struct's serialized fields without doing the same on platformvm.BaseTx
+// TODO: Factor out this and platformvm.BaseTx
 type BaseTx struct {
 	ava.Metadata
 
@@ -35,6 +43,7 @@ type BaseTx struct {
 	BCID  ids.ID                    `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
 	Outs  []*ava.TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
 	Ins   []*ava.TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
+	Memo  []byte                    `serialize:"true" json:"memo"`         // Memo field contains arbitrary bytes, up to maxMemoSize
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -95,6 +104,8 @@ func (t *BaseTx) SyntacticVerify(
 		return errWrongNetworkID
 	case !t.BCID.Equals(ctx.ChainID):
 		return errWrongChainID
+	case len(t.Memo) > maxMemoSize:
+		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	}
 
 	fc := ava.NewFlowChecker()

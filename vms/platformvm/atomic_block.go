@@ -6,7 +6,6 @@ package platformvm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -17,28 +16,12 @@ var (
 	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 )
 
-// AtomicTx is an operation that can be decided without being proposed, but must have special control over database commitment
-type AtomicTx interface {
-	initialize(vm *VM) error
-
-	ID() ids.ID
-
-	// UTXOs this tx consumes
-	InputUTXOs() ids.Set
-
-	// Attempt to verify this transaction with the provided state. The provided
-	// database can be modified arbitrarily.
-	SemanticVerify(database.Database) error
-
-	Accept(database.Batch) error
-}
-
 // AtomicBlock being accepted results in the transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx AtomicTx `serialize:"true"`
+	Tx AtomicTx `serialize:"true" json:"tx"`
 
 	inputs ids.Set
 }
@@ -48,7 +31,11 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
-	return ab.Tx.initialize(vm)
+	txBytes, err := ab.vm.codec.Marshal(&ab.Tx)
+	if err != nil {
+		return err
+	}
+	return ab.Tx.initialize(vm, txBytes)
 }
 
 // Reject implements the snowman.Block interface
@@ -86,7 +73,14 @@ func (ab *AtomicBlock) Verify() error {
 	pdb := parent.onAccept()
 
 	ab.onAcceptDB = versiondb.New(pdb)
-	if err := ab.Tx.SemanticVerify(ab.onAcceptDB); err != nil {
+	if err := ab.Tx.SemanticVerify(ab.onAcceptDB, ab.Tx.Credentials); err != nil {
+		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
+		return err
+	} else if txBytes, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
+		return err
+	} else if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
+		return err
+	} else if err := ab.vm.putStatus(ab.onAcceptDB, ab.Tx.ID(), Committed); err != nil {
 		return err
 	}
 
@@ -134,12 +128,14 @@ func (ab *AtomicBlock) Accept() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, tx AtomicTx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx AtomicTx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
-		CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-			Block: core.NewBlock(parentID),
-			vm:    vm,
-		}},
+		CommonDecisionBlock: CommonDecisionBlock{
+			CommonBlock: CommonBlock{
+				Block: core.NewBlock(parentID, height),
+				vm:    vm,
+			},
+		},
 		Tx: tx,
 	}
 
