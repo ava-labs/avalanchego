@@ -495,7 +495,7 @@ type SampleValidatorsArgs struct {
 
 // SampleValidatorsReply are the results from calling Sample
 type SampleValidatorsReply struct {
-	Validators []ids.ShortID `json:"validators"`
+	Validators []string `json:"validators"`
 }
 
 // SampleValidators returns a sampling of the list of current validators
@@ -515,11 +515,15 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		return fmt.Errorf("current number of validators (%d) is insufficient to sample %d validators", setLen, args.Size)
 	}
 
-	reply.Validators = make([]ids.ShortID, int(args.Size))
+	validatorIDs := make([]ids.ShortID, int(args.Size))
 	for i, vdr := range sample {
-		reply.Validators[i] = vdr.ID()
+		validatorIDs[i] = vdr.ID()
 	}
-	ids.SortShortIDs(reply.Validators)
+	ids.SortShortIDs(validatorIDs)
+	reply.Validators = make([]string, int(args.Size))
+	for i, vdrID := range validatorIDs {
+		reply.Validators[i] = vdrID.PrefixedString(constants.NodeIDPrefix)
+	}
 
 	return nil
 }
@@ -595,7 +599,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 
 // AddDefaultSubnetDelegatorArgs are the arguments to AddDefaultSubnetDelegator
 type AddDefaultSubnetDelegatorArgs struct {
-	APIValidator
+	FormattedAPIValidator
 	api.UserPass
 	Destination string `json:"destination"`
 }
@@ -606,12 +610,21 @@ type AddDefaultSubnetDelegatorArgs struct {
 func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
 	switch {
-	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
-		args.ID = service.vm.Ctx.NodeID
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
 	case args.Destination == "":
 		return errNoDestination
+	}
+
+	var nodeID ids.ShortID
+	if args.ID == "" { // If ID unspecified, use this node's ID as validator ID
+		nodeID = service.vm.Ctx.NodeID
+	} else {
+		nID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+		nodeID = nID
 	}
 
 	destination, err := service.vm.ParseAddress(args.Destination)
@@ -635,7 +648,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		uint64(args.weight()),  // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
-		args.ID,                // Node ID
+		nodeID,                 // Node ID
 		destination,            // Destination
 		privKeys,               // Private keys
 	)
@@ -649,7 +662,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 
 // AddNonDefaultSubnetValidatorArgs are the arguments to AddNonDefaultSubnetValidator
 type AddNonDefaultSubnetValidatorArgs struct {
-	APIValidator
+	FormattedAPIValidator
 	api.UserPass
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
@@ -662,6 +675,11 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
+	}
+
+	nodeID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+	if err != nil {
+		return fmt.Errorf("Error parsing nodeID: '%s': %w", args.ID, err)
 	}
 
 	subnetID, err := ids.FromString(args.SubnetID)
@@ -688,7 +706,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 		uint64(args.weight()),  // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
-		args.ID,                // Node ID
+		nodeID,                 // Node ID
 		subnetID,               // Subnet ID
 		keys,                   // Keys
 	)
