@@ -23,6 +23,7 @@ import (
 )
 
 func TestExportTxSyntacticVerify(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -67,6 +68,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &ExportTx{

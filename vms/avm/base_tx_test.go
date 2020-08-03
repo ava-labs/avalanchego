@@ -229,6 +229,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &BaseTx{

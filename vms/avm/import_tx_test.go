@@ -21,6 +21,7 @@ import (
 )
 
 func TestImportTxSyntacticVerify(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &ImportTx{
@@ -65,6 +66,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 }
 
 func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
+	ctx := NewContext()
 	c := setupCodec()
 
 	tx := &ImportTx{
