@@ -143,6 +143,10 @@ func (self *ETHChain) SetOnFinalizeAndAssemble(cb dummy.OnFinalizeAndAssembleCal
 	self.cb.OnFinalizeAndAssemble = cb
 }
 
+func (self *ETHChain) SetOnExtraStateChange(cb dummy.OnExtraStateChangeType) {
+	self.cb.OnExtraStateChange = cb
+}
+
 func (self *ETHChain) SetOnQueryAcceptedBlock(cb func() *types.Block) {
 	self.bcb.OnQueryAcceptedBlock = cb
 }

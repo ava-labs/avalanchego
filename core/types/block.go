@@ -150,6 +150,7 @@ type Block struct {
 	header       *Header
 	uncles       []*Header
 	transactions Transactions
+	version      uint32
 	extdata      []byte
 
 	// caches
@@ -187,11 +188,11 @@ type extblock struct {
 }
 
 type myextblock struct {
-	Header        *Header
-	Txs           []*Transaction
-	Uncles        []*Header
-	VersionNumber uint32
-	ExtData       []byte
+	Header  *Header
+	Txs     []*Transaction
+	Uncles  []*Header
+	Version uint32
+	ExtData []byte `rlp:"nil"`
 }
 
 // [deprecated by eth/63]
@@ -291,8 +292,20 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
-func (b *Block) RawExtraData() []byte {
+func (b *Block) SetExtraData(data []byte) {
+	b.extdata = data
+}
+
+func (b *Block) ExtraData() []byte {
 	return b.extdata
+}
+
+func (b *Block) SetVersion(ver uint32) {
+	b.version = ver
+}
+
+func (b *Block) Version() uint32 {
+	return b.version
 }
 
 // EncodeRLPEth serializes b into the Ethereum RLP block format.
@@ -304,25 +317,24 @@ func (b *Block) EncodeRLPEth(w io.Writer) error {
 	})
 }
 
-func (b *Block) EncodeRLPTest(w io.Writer, ver uint32, data []byte) error {
+func (b *Block) EncodeRLPTest(w io.Writer, ver uint32) error {
 	return rlp.Encode(w, myextblock{
-		Header:        b.header,
-		Txs:           b.transactions,
-		Uncles:        b.uncles,
-		VersionNumber: ver,
-		ExtData:       data,
+		Header:  b.header,
+		Txs:     b.transactions,
+		Uncles:  b.uncles,
+		Version: ver,
+		ExtData: b.extdata,
 	})
 }
 
 // EncodeRLP serializes b into an extended format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, myextblock{
-		Header:        b.header,
-		Txs:           b.transactions,
-		Uncles:        b.uncles,
-		VersionNumber: 0,
-		// TODO: add actual extra data for the current version
-		ExtData: []byte{},
+		Header:  b.header,
+		Txs:     b.transactions,
+		Uncles:  b.uncles,
+		Version: b.version,
+		ExtData: b.extdata,
 	})
 }
 

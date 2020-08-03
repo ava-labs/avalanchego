@@ -114,6 +114,8 @@ type Engine interface {
 
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
+
+	ExtraStateChange(block *types.Block, statedb *state.StateDB) error
 }
 
 // PoW is a consensus engine based on proof-of-work.

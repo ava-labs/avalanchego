@@ -736,3 +736,7 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 		panic("can't encode: " + err.Error())
 	}
 }
+
+func (c *Clique) ExtraStateChange(_ *types.Block, _ *state.StateDB) error {
+	return nil
+}

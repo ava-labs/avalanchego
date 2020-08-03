@@ -21,6 +21,7 @@ import (
 type OnFinalizeCallbackType = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
 type OnFinalizeAndAssembleCallbackType = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt)
 type OnAPIsCallbackType = func(consensus.ChainReader) []rpc.API
+type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
 
 type ConsensusCallbacks struct {
 	OnSeal                func(*types.Block) error
@@ -28,6 +29,7 @@ type ConsensusCallbacks struct {
 	OnAPIs                OnAPIsCallbackType
 	OnFinalize            OnFinalizeCallbackType
 	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
+	OnExtraStateChange    OnExtraStateChangeType
 }
 
 type DummyEngine struct {
@@ -320,5 +322,12 @@ func (self *DummyEngine) APIs(chain consensus.ChainReader) (res []rpc.API) {
 }
 
 func (self *DummyEngine) Close() error {
+	return nil
+}
+
+func (self *DummyEngine) ExtraStateChange(block *types.Block, statedb *state.StateDB) error {
+	if self.cb.OnExtraStateChange != nil {
+		return self.cb.OnExtraStateChange(block, statedb)
+	}
 	return nil
 }
