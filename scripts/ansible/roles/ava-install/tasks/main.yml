@@ -1,0 +1,64 @@
+- name: Create shared directories
+  become: true
+  file:
+    # Don't specify owner, mode etc for directories not specific to AVA.
+    # OS defaults, or local defaults are better than any guess we could make.
+    path: "{{ item.path }}"
+    state: directory
+  loop:
+    - path: "{{ sharedstatedir }}"
+    - path: "{{ logdir }}"
+
+- name: Create AVA directories
+  become: true
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner | default(ava_daemon_user) }}"
+    group: "{{ item.group | default(ava_daemon_group) }}"
+    mode: "{{ item.mode }}"
+    recurse: "{{ item.recurse | default(omit) }}"
+    state: directory
+  loop:
+    - path: "{{ ava_daemon_home_dir }}"
+      mode: u=rwX,go=rX
+    - path: "{{ ava_daemon_db_dir }}"
+      mode: u=rwX,go=rX
+    - path: "{{ ava_daemon_staking_dir }}"
+      mode: u=rX,go=
+    - path: "{{ ava_daemon_log_dir }}"
+      mode: u=rwX,go=rX
+    - path: "{{ ava_daemon_plugin_dir }}"
+      owner: root
+      group: root
+      mode: u=rwX,go=rX
+      recurse: true
+  loop_control:
+    label: "{{ item.path }}"
+  notify:
+    - Restart AVA service
+
+- name: Install AVA binary
+  become: true
+  copy:
+    src: "{{ ava_binary }}"
+    dest: "{{ bindir }}/ava"
+    remote_src: true
+    owner: root
+    group: root
+    mode: u=rwx,go=rx
+  notify:
+    - Restart AVA service
+
+- name: Install AVA plugins
+  become: true
+  copy:
+    src: "{{ item.path }}"
+    dest: "{{ ava_daemon_plugin_dir }}"
+    owner: root
+    group: root
+    mode: u=rwx,go=rx
+    remote_src: true
+  loop:
+    - path: "{{ repo_folder }}/build/plugins/evm"
+  notify:
+    - Restart AVA service
