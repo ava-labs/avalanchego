@@ -228,7 +228,7 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
-	net := &network{
+	netw := &network{
 		log:                                log,
 		id:                                 id,
 		ip:                                 ip,
@@ -258,19 +258,18 @@ func NewNetwork(
 		gossipSize:                         gossipSize,
 		pingPongTimeout:                    pingPongTimeout,
 		pingFrequency:                      pingFrequency,
-
-		disconnectedIPs: make(map[string]struct{}),
-		connectedIPs:    make(map[string]struct{}),
-		retryDelay:      make(map[string]time.Duration),
-		myIPs:           map[string]struct{}{ip.String(): {}},
-		peers:           make(map[[20]byte]*peer),
+		disconnectedIPs:                    make(map[string]struct{}),
+		connectedIPs:                       make(map[string]struct{}),
+		retryDelay:                         make(map[string]time.Duration),
+		myIPs:                              map[string]struct{}{ip.String(): {}},
+		peers:                              make(map[[20]byte]*peer),
 	}
-	if err := net.initialize(registerer); err != nil {
+	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
-	net.executor.Initialize()
-	net.heartbeat()
-	return net
+	netw.executor.Initialize()
+	netw.heartbeat()
+	return netw
 }
 
 // GetAcceptedFrontier implements the Sender interface.
