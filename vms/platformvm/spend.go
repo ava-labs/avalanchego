@@ -584,8 +584,8 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	// Make sure that for each locktime, tokens produced <= tokens consumed
 	for locktime, producedAmounts := range produced {
 		consumedAmounts := consumed[locktime]
-		for ownerID, amount := range producedAmounts {
-			if amount > consumedAmounts[ownerID] {
+		for ownerID, producedAmount := range producedAmounts {
+			if consumedAmount, ok := consumedAmounts[ownerID]; !ok || producedAmount > consumedAmount {
 				return permError{errInvalidAmount}
 			}
 		}
