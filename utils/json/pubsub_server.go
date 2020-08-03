@@ -202,8 +202,9 @@ type Connection struct {
 func (c *Connection) readPump() {
 	defer func() {
 		c.s.removeConnection(c)
-		// Close should error if there are pending read/writes, which can be safely ignored
-		c.conn.Close() // #nosec G104
+		// close is called by both the writePump and the readPump so one of them
+		// will always error
+		_ = c.conn.Close()
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
@@ -212,9 +213,7 @@ func (c *Connection) readPump() {
 		return
 	}
 	c.conn.SetPongHandler(func(string) error {
-		// If SetReadDeadline errors there's no need for the PongHandler to return an error.
-		c.conn.SetReadDeadline(time.Now().Add(pongWait)) // #nosec G104
-		return nil
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 
 	for {
@@ -243,18 +242,21 @@ func (c *Connection) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		// Close should error if there are pending read/writes, which can be safely ignored
-		c.conn.Close() // #nosec G104
+		// close is called by both the writePump and the readPump so one of them
+		// will always error
+		_ = c.conn.Close()
 	}()
 	for {
 		select {
 		case message, ok := <-c.send:
-			// SetWriteDeadline sets a single variable and returns nil, so it's safe to ignore the error
-			// #nosec G104
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				c.s.ctx.Log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				return
+			}
 			if !ok {
-				// The hub closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{}) // #nosec G104
+				// The hub closed the channel. Attempt to close the connection
+				// gracefully.
+				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
@@ -262,9 +264,10 @@ func (c *Connection) writePump() {
 				return
 			}
 		case <-ticker.C:
-			// SetWriteDeadline sets a single variable and returns nil, so it's safe to ignore the error
-			// #nosec G104
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				c.s.ctx.Log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				return
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

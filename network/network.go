@@ -851,12 +851,12 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = n.initialReconnectDelay
 		}
 
-		// Ignore weak randomness warnings in calculating timeouts because true randomness
-		// is unnecessary here
-		delay = time.Duration(float64(delay) * (1 + rand.Float64())) // #nosec G404
+		// Ignore weak randomness warnings in calculating timeouts because true
+		// randomness is unnecessary here
+		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
-			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4) // #nosec G404
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
 		}
 
 		n.stateLock.Lock()
@@ -924,7 +924,9 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	defer n.stateLock.Unlock()
 
 	if n.closed {
-		p.conn.Close() // #nosec G104
+		// the network is closing, so make sure that no further reconnect
+		// attempts are made.
+		_ = p.conn.Close()
 		return nil
 	}
 
@@ -943,19 +945,23 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
-		p.conn.Close() // #nosec G104
+		// don't attempt to reconnect to myself, so return nil even if closing
+		// returns an error
+		_ = p.conn.Close()
 		return nil
 	}
 
-	// If I have an old connection to this peer, then I should close the old
-	// connection and mark the peer as reconnected.
+	// If I am already connected to this peer, then I should close this new
+	// connection.
 	if _, ok := n.peers[key]; ok {
 		if !p.ip.IsZero() {
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		p.conn.Close() // #nosec G104
+		// I'm already connected to this peer, so don't attempt to reconnect to
+		// this ip, even if an error occurres during closing
+		_ = p.conn.Close()
 		return nil
 	}
 

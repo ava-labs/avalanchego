@@ -63,23 +63,23 @@ func (vtx *uniqueVertex) Evict() {
 
 func (vtx *uniqueVertex) setVertex(innerVtx *vertex) error {
 	vtx.refresh()
-	if vtx.v.vtx == nil {
-		vtx.v.vtx = innerVtx
-		if err := vtx.serializer.state.SetVertex(innerVtx); err != nil {
-			return err
-		}
-		return vtx.setStatus(choices.Processing)
+	if vtx.v.vtx != nil {
+		return nil
 	}
-	return nil
+	vtx.v.vtx = innerVtx
+	if err := vtx.serializer.state.SetVertex(innerVtx); err != nil {
+		return err
+	}
+	return vtx.setStatus(choices.Processing)
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
 	vtx.refresh()
-	if vtx.v.status != status {
-		vtx.v.status = status
-		return vtx.serializer.state.SetStatus(vtx.ID(), status)
+	if vtx.v.status == status {
+		return nil
 	}
-	return nil
+	vtx.v.status = status
+	return vtx.serializer.state.SetStatus(vtx.ID(), status)
 }
 
 func (vtx *uniqueVertex) ID() ids.ID { return vtx.vtxID }

@@ -55,7 +55,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	msgConn, err := vm.broker.Dial(req.EngineServer)
 	if err != nil {
 		// Ignore DB closing error to return the original error
-		dbConn.Close() // #nosec G104
+		_ = dbConn.Close()
 		return nil, err
 	}
 
@@ -66,7 +66,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	go func() {
 		for msg := range toEngine {
 			// Nothing to do with the error within the goroutine
-			msgClient.Notify(msg) // #nosec G104
+			_ = msgClient.Notify(msg)
 		}
 	}()
 
@@ -75,8 +75,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 
 	if err := vm.vm.Initialize(ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
 		// Ignore errors closing resources to return the original error
-		dbConn.Close()  // #nosec G104
-		msgConn.Close() // #nosec G104
+		_ = dbConn.Close()
+		_ = msgConn.Close()
 		close(toEngine)
 		return nil, err
 	}

@@ -209,10 +209,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	// cache.
 	if err := tx.VerifyState(); err != nil {
 		vm.ctx.Log.Debug("GetTx resulted in fetching a tx that failed verification: %s", err)
-		// If the status cannot be set in the database, the error can be ignored safely while setting
-		// the status to rejected because it will be set correctly in memory.
-		// #nosec G104
-		tx.setStatus(choices.Rejected)
+		if err := tx.setStatus(choices.Rejected); err != nil {
+			return nil, err
+		}
 	}
 
 	return tx, nil
@@ -549,11 +548,9 @@ func (vm *VM) wrapTx(rawTx *Tx, finalized func(choices.Status)) (*UniqueTx, erro
 		if err := vm.state.SetTx(tx.ID(), tx.t.tx); err != nil {
 			return nil, err
 		}
-		// It is not essential to set the status to Processing. In case of an error,
-		// the status will still be set in memory and if it's evicted the status in
-		// the database will be Unknown
-		// #nosec G104
-		tx.setStatus(choices.Processing)
+		if err := tx.setStatus(choices.Processing); err != nil {
+			return nil, err
+		}
 	}
 
 	tx.addEvents(finalized)

@@ -223,8 +223,7 @@ func (tx *UniqueTx) VerifyTx() error {
 // VerifyState the validity of this transaction
 func (tx *UniqueTx) VerifyState() error {
 	// VerifyTx sets validity to be checked in the next statement, so the error is ignored here.
-	// #nosec G104
-	tx.VerifyTx()
+	_ = tx.VerifyTx()
 
 	if tx.t.validity != nil || tx.t.verifiedState {
 		return tx.t.validity

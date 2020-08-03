@@ -12,8 +12,7 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 
 // Rand returns a number inside [min, max). Panics if min >= max
 func Rand(min, max int) int {
-	// Ignore weak randomness warning for pseudorandom number generation
-	return rand.Intn(max-min) + min // #nosec G404
+	return rand.Intn(max-min) + min
 }
 
 // Subset creates a list of at most k unique numbers sampled from the sampler.
@@ -28,7 +27,5 @@ func Subset(s Sampler, k int) []int {
 
 // Bernoulli ...
 func Bernoulli(p float64) bool {
-	// Ignore weak randomness warning for pseudorandom number generation
-	// #nosec G404
 	return rand.Float64() < p
 }

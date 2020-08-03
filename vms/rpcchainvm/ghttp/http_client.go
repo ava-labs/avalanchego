@@ -144,9 +144,8 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Ignore the error and do not assume Handle returns a non-nil *HTTPResponse
-	// #nosec G104
-	c.client.Handle(r.Context(), req)
+	// TODO: is there a better way to handle this error?
+	_, _ = c.client.Handle(r.Context(), req)
 
 	reader.Stop()
 	writer.Stop()

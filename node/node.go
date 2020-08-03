@@ -182,7 +182,8 @@ func (n *Node) initNetworking() error {
 	}
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		n.Net.Close() // #nosec G104
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close()
 	}, os.Interrupt, os.Kill)
 
 	return nil
@@ -216,7 +217,9 @@ func (n *Node) Dispatch() error {
 		err := n.APIServer.Dispatch()
 
 		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close() // #nosec #104
+
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close()
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -695,8 +698,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 // Shutdown this node
 func (n *Node) Shutdown() {
 	n.Log.Info("shutting down the node")
-	// Close already logs its own error if one occurs, so the error is ignored here
-	n.Net.Close() // #nosec G104
+	// Close already logs its own error if one occurs, so the error is ignored
+	// here
+	_ = n.Net.Close()
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
 	n.Log.Info("node shut down successfully")

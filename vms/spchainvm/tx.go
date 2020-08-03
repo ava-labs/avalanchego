@@ -79,8 +79,7 @@ func (tx *Tx) Key(ctx *snow.Context) crypto.PublicKey { return tx.key(ctx, &cryp
 
 func (tx *Tx) key(ctx *snow.Context, factory *crypto.FactorySECP256K1R) crypto.PublicKey {
 	// Verify must be called to check this error and ensure that the public key is valid
-	// #nosec G104
-	tx.verify(ctx, factory) // Sets the public key
+	_ = tx.verify(ctx, factory) // Sets the public key, assuming this tx is valid
 	return tx.pubkey
 }
 
