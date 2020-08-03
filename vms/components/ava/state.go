@@ -4,6 +4,7 @@
 package ava
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/ava-labs/gecko/cache"
@@ -116,37 +117,38 @@ func (s *State) SetStatus(id ids.ID, status choices.Status) error {
 	return s.DB.Put(id.Bytes(), bytes)
 }
 
-// IDs returns a slice of IDs from storage
-func (s *State) IDs(id ids.ID) ([]ids.ID, error) {
+// IDs returns the slice of IDs associated with [id], starting after [start].
+// If start is ids.Empty, starts at beginning.
+// Returns at most [limit] IDs.
+func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 	idSlice := []ids.ID(nil)
-	iter := prefixdb.NewNested(id.Bytes(), s.DB).NewIterator()
+	iter := prefixdb.NewNested(key, s.DB).NewIteratorWithStart(start)
 	defer iter.Release()
 
-	for iter.Next() {
-		keyID, err := ids.ToID(iter.Key())
-		if err != nil {
+	for i := 0; i < limit && iter.Next(); i++ {
+		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
+		} else if !bytes.Equal(keyID.Bytes(), start) { // don't return [start]
+			idSlice = append(idSlice, keyID)
 		}
-
-		idSlice = append(idSlice, keyID)
 	}
 	return idSlice, nil
 }
 
 // AddID saves an ID to the prefixed database
-func (s *State) AddID(id ids.ID, key ids.ID) error {
-	if key.IsZero() {
+func (s *State) AddID(key []byte, ID ids.ID) error {
+	if ID.IsZero() {
 		return errZeroID
 	}
-	db := prefixdb.NewNested(id.Bytes(), s.DB)
-	return db.Put(key.Bytes(), nil)
+	db := prefixdb.NewNested(key, s.DB)
+	return db.Put(ID.Bytes(), nil)
 }
 
 // RemoveID removes an ID from the prefixed database
-func (s *State) RemoveID(id ids.ID, key ids.ID) error {
-	if key.IsZero() {
+func (s *State) RemoveID(key []byte, ID ids.ID) error {
+	if ID.IsZero() {
 		return errZeroID
 	}
-	db := prefixdb.NewNested(id.Bytes(), s.DB)
-	return db.Delete(key.Bytes())
+	db := prefixdb.NewNested(key, s.DB)
+	return db.Delete(ID.Bytes())
 }

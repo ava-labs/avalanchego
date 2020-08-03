@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
@@ -73,9 +72,12 @@ func (s *prefixedState) SetDBInitialized(status choices.Status) error {
 	return s.state.SetStatus(dbInitialized, status)
 }
 
-// Funds returns the mapping from the 32 byte representation of an address to a
-// list of utxo IDs that reference the address.
-func (s *prefixedState) Funds(id ids.ID) ([]ids.ID, error) { return s.state.IDs(id) }
+// Funds returns a list of UTXO IDs such that each UTXO references [id].
+// All returned UTXO IDs have IDs greater than [start], where ids.Empty is the "least" ID.
+// Returns at most [limit] UTXO IDs.
+func (s *prefixedState) Funds(id ids.ShortID, start ids.ID, limit int) ([]ids.ID, error) {
+	return s.state.IDs(id.Bytes(), start.Bytes(), limit)
+}
 
 // SpendUTXO consumes the provided utxo.
 func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
@@ -97,8 +99,7 @@ func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 
 func (s *prefixedState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		if err := s.state.RemoveID(addrID, utxoID); err != nil {
+		if err := s.state.RemoveID(addr, utxoID); err != nil {
 			return err
 		}
 	}
@@ -122,8 +123,7 @@ func (s *prefixedState) FundUTXO(utxo *ava.UTXO) error {
 
 func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		if err := s.state.AddID(addrID, utxoID); err != nil {
+		if err := s.state.AddID(addr, utxoID); err != nil {
 			return err
 		}
 	}

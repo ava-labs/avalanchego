@@ -8,8 +8,8 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/hashing"
 )
 
 // Addressable is the interface a feature extension must provide to be able to
@@ -46,8 +46,10 @@ func (s *chainState) UTXO(id ids.ID) (*UTXO, error) {
 
 // Funds returns the mapping from the 32 byte representation of an
 // address to a list of utxo IDs that reference the address.
-func (s *chainState) Funds(id ids.ID) ([]ids.ID, error) {
-	return s.IDs(UniqueID(id, s.fundsIDPrefix, s.fundsID))
+// All UTXO IDs have IDs greater than [start].
+// The returned list contains at most [limit] UTXO IDs.
+func (s *chainState) Funds(id ids.ID, start ids.ID, limit int) ([]ids.ID, error) {
+	return s.IDs(UniqueID(id, s.fundsIDPrefix, s.fundsID).Bytes(), start.Bytes(), limit)
 }
 
 // SpendUTXO consumes the provided platform utxo.
@@ -98,7 +100,7 @@ func (s *chainState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.RemoveID(addrID, utxoID); err != nil {
+		if err := s.RemoveID(addrID.Bytes(), utxoID); err != nil {
 			return err
 		}
 	}
@@ -109,7 +111,7 @@ func (s *chainState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
 		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
 		addrID = UniqueID(addrID, s.fundsIDPrefix, s.fundsID)
-		if err := s.AddID(addrID, utxoID); err != nil {
+		if err := s.AddID(addrID.Bytes(), utxoID); err != nil {
 			return err
 		}
 	}
@@ -162,8 +164,11 @@ func (s *PrefixedState) PlatformUTXO(id ids.ID) (*UTXO, error) {
 
 // PlatformFunds returns the mapping from the 32 byte representation of an
 // address to a list of utxo IDs that reference the address.
-func (s *PrefixedState) PlatformFunds(id ids.ID) ([]ids.ID, error) {
-	return s.platform.Funds(id)
+// All returned UTXO IDs have IDs greater than [start].
+// (ids.Empty is the "least" ID.)
+// Returns at most [limit] UTXO IDs.
+func (s *PrefixedState) PlatformFunds(id ids.ID, start ids.ID, limit int) ([]ids.ID, error) {
+	return s.platform.Funds(id, start, limit)
 }
 
 // SpendPlatformUTXO consumes the provided platform utxo.
@@ -183,8 +188,11 @@ func (s *PrefixedState) AVMUTXO(id ids.ID) (*UTXO, error) {
 
 // AVMFunds returns the mapping from the 32 byte representation of an
 // address to a list of utxo IDs that reference the address.
-func (s *PrefixedState) AVMFunds(id ids.ID) ([]ids.ID, error) {
-	return s.avm.Funds(id)
+// All returned UTXO IDs have IDs greater than [start].
+// (ids.Empty is the "least" ID.)
+// Returns at most [limit] UTXO IDs.
+func (s *PrefixedState) AVMFunds(id ids.ID, start ids.ID, limit int) ([]ids.ID, error) {
+	return s.avm.Funds(id, start, limit)
 }
 
 // SpendAVMUTXO consumes the provided platform utxo.

@@ -934,8 +934,8 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+// referenced in. Returns at most [maxCount] UTXO IDs.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set, maxCount int) ([]*ava.UTXO, error) {
 	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
 	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
 
@@ -943,7 +943,7 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
-		utxos, err := state.AVMFunds(addr)
+		utxos, err := state.AVMFunds(addr, ids.Empty, maxCount)
 		if err != nil {
 			return nil, err
 		}
