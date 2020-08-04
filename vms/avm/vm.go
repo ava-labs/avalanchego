@@ -355,7 +355,7 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtx
 	}
 	toFetch := limit
 
-	seen := ids.Set{}
+	seen := ids.Set{} // IDs of UTXOs already in the list
 	utxos := make([]*ava.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
@@ -370,9 +370,7 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtx
 		}
 		utxoIDs, _ := state.AVMFunds(addr.LongID(), startUtxo, toFetch) // TODO: Use LongID()?
 		for _, utxoID := range utxoIDs {
-			if toFetch <= 0 { // We fetched enough UTXOs; stop.
-				break
-			} else if seen.Contains(utxoID) { // Already have this UTXO in the list
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
 			utxo, err := state.AVMUTXO(utxoID)
@@ -381,10 +379,13 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtx
 			}
 			utxos = append(utxos, utxo)
 			seen.Add(utxoID)
+			lastAddr = addr
 			lastIndex = utxoID
 			toFetch--
+			if toFetch <= 0 { // We fetched enough UTXOs; stop.
+				break
+			}
 		}
-		lastAddr = addr
 	}
 	return utxos, lastAddr, lastIndex, nil
 }
@@ -402,7 +403,7 @@ func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.
 	}
 	toFetch := limit
 
-	seen := ids.Set{}
+	seen := ids.Set{} // IDs of UTXOs already in the list
 	utxos := make([]*ava.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
@@ -414,8 +415,7 @@ func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.
 		} else if toFetch <= 0 {
 			break
 		}
-		utxoIDs, _ := vm.state.Funds(addr, startUtxo, toFetch)         // Get UTXOs associated with [addr]
-		vm.ctx.Log.Fatal("utxoIDs: %s. toFetch: %v", utxoIDs, toFetch) // TODO delete
+		utxoIDs, _ := vm.state.Funds(addr.Bytes(), startUtxo, toFetch) // Get UTXOs associated with [addr]
 		for _, utxoID := range utxoIDs {
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
@@ -426,13 +426,13 @@ func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.
 			}
 			utxos = append(utxos, utxo)
 			seen.Add(utxoID)
+			lastAddr = addr
 			lastIndex = utxoID
 			toFetch--
 			if toFetch <= 0 {
 				break // Found [limit] utxos; stop.
 			}
 		}
-		lastAddr = addr
 	}
 	return utxos, lastAddr, lastIndex, nil
 }
