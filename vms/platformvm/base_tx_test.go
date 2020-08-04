@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 func TestBaseTxVerify(t *testing.T) {
@@ -117,16 +117,16 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 		id:           ids.NewID([32]byte{'i', 'd'}),
 		BlockchainID: blockchainID,
 		NetworkID:    4,
-		Ins: []*ava.TransferableInput{
-			&ava.TransferableInput{
-				UTXOID: ava.UTXOID{TxID: utxoTxID, OutputIndex: 5},
-				Asset:  ava.Asset{ID: assetID},
+		Ins: []*avax.TransferableInput{
+			&avax.TransferableInput{
+				UTXOID: avax.UTXOID{TxID: utxoTxID, OutputIndex: 5},
+				Asset:  avax.Asset{ID: assetID},
 				In:     MockTransferable{AmountVal: 100},
 			},
 		},
-		Outs: []*ava.TransferableOutput{
-			&ava.TransferableOutput{
-				Asset: ava.Asset{ID: assetID},
+		Outs: []*avax.TransferableOutput{
+			&avax.TransferableOutput{
+				Asset: avax.Asset{ID: assetID},
 				Out:   MockTransferable{AmountVal: 100},
 			},
 		},

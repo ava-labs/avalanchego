@@ -1,0 +1,21 @@
+- name: Configure Avalanche service
+  become: true
+  template:
+    src: avalanche.service
+    dest: /etc/systemd/system
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  notify:
+    - Reload systemd
+    - Restart Avalanche service
+
+- name: Enable Avalanche service
+  become: true
+  systemd:
+    name: avalanche
+    state: started
+    enabled: true
+    daemon_reload: true
+  notify:
+    - Restart Avalanche service

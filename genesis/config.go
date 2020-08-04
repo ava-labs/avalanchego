@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 )
 
-// Note that since an AVA network has exactly one Platform Chain,
+// Note that since an Avalanche network has exactly one Platform Chain,
 // and the Platform Chain defines the genesis state of the network
 // (who is staking, which chains exist, etc.), defining the genesis
 // state of the Platform Chain is the same as defining the genesis

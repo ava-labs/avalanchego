@@ -65,7 +65,7 @@ var (
 	versionParser = version.NewDefaultParser()
 )
 
-// Node is an instance of an Ava node.
+// Node is an instance of an Avalanche node.
 type Node struct {
 	Log        logging.Logger
 	LogFactory logging.Factory
@@ -319,15 +319,15 @@ func (n *Node) initVMManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVA:      avaxAssetID,
-			Fee:      n.Config.AvaTxFee,
+			AVAX:     avaxAssetID,
+			Fee:      n.Config.AvaxTxFee,
 			Platform: constants.PlatformChainID,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: path.Join(n.Config.PluginDir, "evm"),
 		}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
-			TxFee: n.Config.AvaTxFee,
+			TxFee: n.Config.AvaxTxFee,
 		}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
@@ -379,9 +379,9 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 			ChainManager:   n.chainManager,
 			Validators:     vdrs,
 			StakingEnabled: n.Config.EnableStaking,
-			AVA:            avaxAssetID,
+			AVAX:           avaxAssetID,
 			AVM:            createAVMTx.ID(),
-			Fee:            n.Config.AvaTxFee,
+			Fee:            n.Config.AvaxTxFee,
 		},
 	); err != nil {
 		return err

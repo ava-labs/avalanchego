@@ -104,8 +104,8 @@ type network struct {
 	dialer         Dialer
 	serverUpgrader Upgrader
 	clientUpgrader Upgrader
-	vdrs           validators.Set // set of current validators in the AVAnet
-	beacons        validators.Set // set of beacons in the AVAnet
+	vdrs           validators.Set // set of current validators in the Avalanche network
+	beacons        validators.Set // set of beacons in the Avalanche network
 	router         router.Router  // router must be thread safe
 
 	nodeID uint32

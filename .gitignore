@@ -27,6 +27,7 @@ awscpu
 
 *.pb*
 *.ava
+*.avax
 
 db*
 

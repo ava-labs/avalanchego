@@ -12,4 +12,4 @@ BUILD_DIR=$GECKO_PATH/build # Where binaries go
 
 # Build Gecko
 echo "Building Gecko..."
-go build -o "$BUILD_DIR/ava" "$GECKO_PATH/main/"*.go
+go build -o "$BUILD_DIR/avalanche" "$GECKO_PATH/main/"*.go

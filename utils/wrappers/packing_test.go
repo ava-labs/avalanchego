@@ -243,24 +243,24 @@ func TestPackerUnpackLong(t *testing.T) {
 }
 
 func TestPackerPackFixedBytes(t *testing.T) {
-	p := Packer{MaxSize: 3}
+	p := Packer{MaxSize: 4}
 
-	p.PackFixedBytes([]byte("Ava"))
+	p.PackFixedBytes([]byte("Avax"))
 
 	if p.Errored() {
 		t.Fatal(p.Err)
 	}
 
-	if size := len(p.Bytes); size != 3 {
-		t.Fatalf("Packer.PackFixedBytes wrote %d byte(s) but expected %d byte(s)", size, 3)
+	if size := len(p.Bytes); size != 4 {
+		t.Fatalf("Packer.PackFixedBytes wrote %d byte(s) but expected %d byte(s)", size, 4)
 	}
 
-	expected := []byte("Ava")
+	expected := []byte("Avax")
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackFixedBytes wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
 	}
 
-	p.PackFixedBytes([]byte("Ava"))
+	p.PackFixedBytes([]byte("Avax"))
 	if !p.Errored() {
 		t.Fatal("Packer.PackFixedBytes did not fail when attempt was beyond p.MaxSize")
 	}
@@ -268,10 +268,10 @@ func TestPackerPackFixedBytes(t *testing.T) {
 
 func TestPackerUnpackFixedBytes(t *testing.T) {
 	var (
-		p           = Packer{Bytes: []byte("Ava")}
-		actual      = p.UnpackFixedBytes(3)
-		expected    = []byte("Ava")
-		expectedLen = 3
+		p           = Packer{Bytes: []byte("Avax")}
+		actual      = p.UnpackFixedBytes(4)
+		expected    = []byte("Avax")
+		expectedLen = 4
 	)
 	if p.Errored() {
 		t.Fatalf("Packer.UnpackFixedBytes unexpectedly raised %s", p.Err)
@@ -281,7 +281,7 @@ func TestPackerUnpackFixedBytes(t *testing.T) {
 		t.Fatalf("Packer.UnpackFixedBytes left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
-	actual = p.UnpackFixedBytes(3)
+	actual = p.UnpackFixedBytes(4)
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackFixedBytes should have set error, due to attempted out of bounds read")
 	} else if actual != nil {
@@ -290,24 +290,24 @@ func TestPackerUnpackFixedBytes(t *testing.T) {
 }
 
 func TestPackerPackBytes(t *testing.T) {
-	p := Packer{MaxSize: 7}
+	p := Packer{MaxSize: 8}
 
-	p.PackBytes([]byte("Ava"))
+	p.PackBytes([]byte("Avax"))
 
 	if p.Errored() {
 		t.Fatal(p.Err)
 	}
 
-	if size := len(p.Bytes); size != 7 {
+	if size := len(p.Bytes); size != 8 {
 		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 7)
 	}
 
-	expected := []byte("\x00\x00\x00\x03Ava")
+	expected := []byte("\x00\x00\x00\x04Avax")
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackBytes wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
 	}
 
-	p.PackBytes([]byte("Ava"))
+	p.PackBytes([]byte("Avax"))
 	if !p.Errored() {
 		t.Fatal("Packer.PackBytes did not fail when attempt was beyond p.MaxSize")
 	}
@@ -315,10 +315,10 @@ func TestPackerPackBytes(t *testing.T) {
 
 func TestPackerUnpackBytes(t *testing.T) {
 	var (
-		p           = Packer{Bytes: []byte("\x00\x00\x00\x03Ava")}
+		p           = Packer{Bytes: []byte("\x00\x00\x00\x04Avax")}
 		actual      = p.UnpackBytes()
-		expected    = []byte("Ava")
-		expectedLen = 7
+		expected    = []byte("Avax")
+		expectedLen = 8
 	)
 	if p.Errored() {
 		t.Fatalf("Packer.UnpackBytes unexpectedly raised %s", p.Err)
@@ -337,24 +337,24 @@ func TestPackerUnpackBytes(t *testing.T) {
 }
 
 func TestPackerPackFixedByteSlices(t *testing.T) {
-	p := Packer{MaxSize: 10}
+	p := Packer{MaxSize: 12}
 
-	p.PackFixedByteSlices([][]byte{[]byte("Ava"), []byte("Eva")})
+	p.PackFixedByteSlices([][]byte{[]byte("Avax"), []byte("Evax")})
 
 	if p.Errored() {
 		t.Fatal(p.Err)
 	}
 
-	if size := len(p.Bytes); size != 10 {
-		t.Fatalf("Packer.PackFixedByteSlices wrote %d byte(s) but expected %d byte(s)", size, 13)
+	if size := len(p.Bytes); size != 12 {
+		t.Fatalf("Packer.PackFixedByteSlices wrote %d byte(s) but expected %d byte(s)", size, 12)
 	}
 
-	expected := []byte("\x00\x00\x00\x02AvaEva")
+	expected := []byte("\x00\x00\x00\x02AvaxEvax")
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackPackFixedByteSlicesBytes wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
 	}
 
-	p.PackFixedByteSlices([][]byte{[]byte("Ava"), []byte("Eva")})
+	p.PackFixedByteSlices([][]byte{[]byte("Avax"), []byte("Evax")})
 	if !p.Errored() {
 		t.Fatal("Packer.PackFixedByteSlices did not fail when attempt was beyond p.MaxSize")
 	}
@@ -362,10 +362,10 @@ func TestPackerPackFixedByteSlices(t *testing.T) {
 
 func TestPackerUnpackFixedByteSlices(t *testing.T) {
 	var (
-		p           = Packer{Bytes: []byte("\x00\x00\x00\x02AvaEva")}
-		actual      = p.UnpackFixedByteSlices(3)
-		expected    = [][]byte{[]byte("Ava"), []byte("Eva")}
-		expectedLen = 10
+		p           = Packer{Bytes: []byte("\x00\x00\x00\x02AvaxEvax")}
+		actual      = p.UnpackFixedByteSlices(4)
+		expected    = [][]byte{[]byte("Avax"), []byte("Evax")}
+		expectedLen = 12
 	)
 	if p.Errored() {
 		t.Fatalf("Packer.UnpackFixedByteSlices unexpectedly raised %s", p.Err)
@@ -375,7 +375,7 @@ func TestPackerUnpackFixedByteSlices(t *testing.T) {
 		t.Fatalf("Packer.UnpackFixedByteSlices left Offset %d, expected %d", p.Offset, expectedLen)
 	}
 
-	actual = p.UnpackFixedByteSlices(3)
+	actual = p.UnpackFixedByteSlices(4)
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackFixedByteSlices should have set error, due to attempted out of bounds read")
 	} else if actual != nil {
@@ -384,19 +384,19 @@ func TestPackerUnpackFixedByteSlices(t *testing.T) {
 }
 
 func TestPackerString(t *testing.T) {
-	p := Packer{MaxSize: 5}
+	p := Packer{MaxSize: 6}
 
-	p.PackStr("Ava")
+	p.PackStr("Avax")
 
 	if p.Errored() {
 		t.Fatal(p.Err)
 	}
 
-	if size := len(p.Bytes); size != 5 {
+	if size := len(p.Bytes); size != 6 {
 		t.Fatalf("Packer.PackStr wrote %d byte(s) but expected %d byte(s)", size, 5)
 	}
 
-	expected := []byte{0x00, 0x03, 0x41, 0x76, 0x61}
+	expected := []byte{0x00, 0x04, 0x41, 0x76, 0x61, 0x78}
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackStr wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
 	}

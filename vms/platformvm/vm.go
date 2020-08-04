@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -65,7 +65,7 @@ const (
 	InflationRate = 1.00
 
 	// MinimumStakeAmount is the minimum amount of tokens one must bond to be a staker
-	MinimumStakeAmount = 10 * units.MicroAva
+	MinimumStakeAmount = 10 * units.MicroAvax
 
 	// MinimumStakingDuration is the shortest amount of time a staker can bond
 	// their funds for.
@@ -170,7 +170,7 @@ type VM struct {
 	// AVAX asset ID
 	avaxAssetID ids.ID
 
-	// AVM is the ID of the ava virtual machine
+	// AVM is the ID of the avm virtual machine
 	avm ids.ID
 
 	fx    Fx
@@ -932,11 +932,11 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
-func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*avax.UTXO, error) {
 	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
 	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec)
 
 	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
@@ -947,7 +947,7 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 		utxoIDs.Add(utxos...)
 	}
 
-	utxos := []*ava.UTXO{}
+	utxos := []*avax.UTXO{}
 	for _, utxoID := range utxoIDs.List() {
 		utxo, err := state.AVMUTXO(utxoID)
 		if err != nil {

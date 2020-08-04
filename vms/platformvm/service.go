@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -139,8 +139,8 @@ type GetBalanceArgs struct {
 // GetBalanceResponse ...
 type GetBalanceResponse struct {
 	// Balance, in nAVAX, of the address
-	Balance json.Uint64   `json:"balance"`
-	UTXOIDs []*ava.UTXOID `json:"utxoIDs"`
+	Balance json.Uint64    `json:"balance"`
+	UTXOIDs []*avax.UTXOID `json:"utxoIDs"`
 }
 
 // GetBalance gets the balance of an address
@@ -790,18 +790,18 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	return service.vm.issueTx(tx)
 }
 
-// ExportAVAArgs are the arguments to ExportAVA
-type ExportAVAArgs struct {
+// ExportAVAXArgs are the arguments to ExportAVAX
+type ExportAVAXArgs struct {
 	api.UserPass
 	To string `json:"to"`
-	// Amount of nAVA to send
+	// Amount of nAVAX to send
 	Amount json.Uint64 `json:"amount"`
 }
 
-// ExportAVA exports AVAX from the P-Chain to the X-Chain
+// ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: ExportAVAX called")
 	xchainID := service.vm.avm
 	chainPrefixes := []string{xchainID.String()}
 	if alias, err := service.vm.Ctx.BCLookup.PrimaryAlias(xchainID); err == nil {
@@ -847,17 +847,17 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	return service.vm.issueTx(tx)
 }
 
-// ImportAVAArgs are the arguments to ImportAVA
-type ImportAVAArgs struct {
+// ImportAVAXArgs are the arguments to ImportAVAX
+type ImportAVAXArgs struct {
 	api.UserPass
 	// The address that will receive the imported funds
 	To string `json:"to"`
 }
 
-// ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
-// The AVA must have already been exported from the X-Chain.
-func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
+// ImportAVAX returns an unsigned transaction to import AVAX from the X-Chain.
+// The AVAX must have already been exported from the X-Chain.
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
 
 	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)

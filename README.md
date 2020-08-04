@@ -2,7 +2,7 @@
 
 ## Installation
 
-AVA is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
+Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 
 - Hardware: 2 GHz or faster CPU, 3 GB RAM, 250 MB hard disk.
 - OS: Ubuntu >= 18.04 or Mac OS X >= Catalina.
@@ -26,7 +26,7 @@ Build Gecko using the build script:
 ./scripts/build.sh
 ```
 
-The Gecko binary, named `ava`, is in the `build` directory.
+The Gecko binary, named `avalanche`, is in the `build` directory.
 
 ### Docker Install
 
@@ -34,7 +34,7 @@ The Gecko binary, named `ava`, is in the `build` directory.
 - Build the docker image of latest gecko branch by `scripts/build_image.sh`.
 - Check the built image by `docker image ls`, you should see some image tagged
   `gecko-xxxxxxxx`, where `xxxxxxxx` is the commit id of the Gecko source it was built from.
-- Test Gecko by `docker run -ti -p 9650:9650 -p 9651:9651 gecko-xxxxxxxx /gecko/build/ava
+- Test Gecko by `docker run -ti -p 9650:9650 -p 9651:9651 gecko-xxxxxxxx /gecko/build/avalanche
    --public-ip=127.0.0.1 --snow-sample-size=1 --snow-quorum-size=1 --staking-tls-enabled=false`. (For a production deployment,
   you may want to extend the docker image with required credentials for
   staking and TLS.)
@@ -44,10 +44,10 @@ The Gecko binary, named `ava`, is in the `build` directory.
 To create your own local test network, run:
 
 ```sh
-./build/ava --public-ip=127.0.0.1 --snow-sample-size=1 --snow-quorum-size=1 --staking-tls-enabled=false
+./build/avalanche --public-ip=127.0.0.1 --snow-sample-size=1 --snow-quorum-size=1 --staking-tls-enabled=false
 ```
 
-This launches an AVA network with one node.
+This launches an Avalanche network with one node.
 
 You should see some pretty ASCII art and log messages.
 You may see a few warnings. These are OK.

@@ -10,12 +10,12 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 var (
 	errAssetIDMismatch = errors.New("asset IDs in the input don't match the utxo")
-	errWrongAssetID    = errors.New("asset ID must be AVA in the atomic tx")
+	errWrongAssetID    = errors.New("asset ID must be AVAX in the atomic tx")
 	errMissingUTXO     = errors.New("missing utxo")
 	errUnknownTx       = errors.New("transaction is unknown")
 	errRejectedTx      = errors.New("transaction is rejected")
@@ -38,8 +38,8 @@ type TxState struct {
 	validity                          error
 
 	inputs     ids.Set
-	inputUTXOs []*ava.UTXOID
-	utxos      []*ava.UTXO
+	inputUTXOs []*avax.UTXOID
+	utxos      []*avax.UTXO
 	deps       []snowstorm.Tx
 
 	status choices.Status
@@ -254,7 +254,7 @@ func (tx *UniqueTx) InputIDs() ids.Set {
 }
 
 // InputUTXOs returns the utxos that will be consumed on tx acceptance
-func (tx *UniqueTx) InputUTXOs() []*ava.UTXOID {
+func (tx *UniqueTx) InputUTXOs() []*avax.UTXOID {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.inputUTXOs) != 0 {
 		return tx.inputUTXOs
@@ -264,7 +264,7 @@ func (tx *UniqueTx) InputUTXOs() []*ava.UTXOID {
 }
 
 // UTXOs returns the utxos that will be added to the UTXO set on tx acceptance
-func (tx *UniqueTx) UTXOs() []*ava.UTXO {
+func (tx *UniqueTx) UTXOs() []*avax.UTXO {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.utxos) != 0 {
 		return tx.utxos
@@ -306,7 +306,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, tx.vm.ava, tx.vm.txFee, len(tx.vm.fxs))
+	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, tx.vm.avax, tx.vm.txFee, len(tx.vm.fxs))
 	return tx.validity
 }
 

@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -389,9 +389,9 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{TxID: ids.Empty},
-		Asset:  ava.Asset{ID: ids.Empty},
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: ids.Empty},
+		Asset:  avax.Asset{ID: ids.Empty},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 7,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -401,7 +401,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 		},
 	}
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec)
 	if err := state.FundPlatformUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
@@ -469,11 +469,11 @@ func TestGetAssetDescription(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaAssetID := genesisTx.ID()
+	avaxAssetID := genesisTx.ID()
 
 	reply := GetAssetDescriptionReply{}
 	err := s.GetAssetDescription(nil, &GetAssetDescriptionArgs{
-		AssetID: avaAssetID.String(),
+		AssetID: avaxAssetID.String(),
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -496,7 +496,7 @@ func TestGetBalance(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaAssetID := genesisTx.ID()
+	avaxAssetID := genesisTx.ID()
 
 	reply := GetBalanceReply{}
 	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
@@ -505,7 +505,7 @@ func TestGetBalance(t *testing.T) {
 	}
 	err = s.GetBalance(nil, &GetBalanceArgs{
 		Address: addrstr,
-		AssetID: avaAssetID.String(),
+		AssetID: avaxAssetID.String(),
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -942,7 +942,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	t.Fatalf("Failed to find newly created address among %d addresses", len(listReply.Addresses))
 }
 
-func TestImportAVA(t *testing.T) {
+func TestImportAVAX(t *testing.T) {
 	genesisBytes, vm, s := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
@@ -954,11 +954,11 @@ func TestImportAVA(t *testing.T) {
 	addr0 := keys[0].PublicKey().Address()
 	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
 
-	// Must set ava assetID to be the correct asset since only AVA can be imported
-	vm.ava = assetID
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{TxID: ids.Empty},
-		Asset:  ava.Asset{ID: assetID},
+	// Must set AVAX assetID to be the correct asset since only AVAX can be imported
+	vm.avax = assetID
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: ids.Empty},
+		Asset:  avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 7,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -968,7 +968,7 @@ func TestImportAVA(t *testing.T) {
 		},
 	}
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec)
 	if err := state.FundPlatformUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
@@ -977,7 +977,7 @@ func TestImportAVA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	importArgs := &ImportAVAArgs{
+	importArgs := &ImportAVAXArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
@@ -985,7 +985,7 @@ func TestImportAVA(t *testing.T) {
 		To: addrstr,
 	}
 	importReply := &api.JsonTxID{}
-	if err := s.ImportAVA(nil, importArgs, importReply); err != nil {
-		t.Fatalf("Failed to import AVA due to %s", err)
+	if err := s.ImportAVAX(nil, importArgs, importReply); err != nil {
+		t.Fatalf("Failed to import AVAX due to %s", err)
 	}
 }

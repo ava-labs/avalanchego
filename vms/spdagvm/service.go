@@ -16,7 +16,7 @@ var (
 	errNilID = errors.New("nil ID is not valid")
 )
 
-// Service defines the API services exposed by the ava vm
+// Service defines the API services exposed by the avm vm
 type Service struct{ vm *VM }
 
 // IssueTxArgs are arguments for passing into IssueTx requests

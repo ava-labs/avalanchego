@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -30,7 +30,7 @@ var (
 type UnsignedExportTx struct {
 	BaseTx `serialize:"true"`
 	// Outputs that are exported to the X-Chain
-	ExportedOutputs []*ava.TransferableOutput `serialize:"true" json:"exportedOutputs"`
+	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -75,11 +75,11 @@ func (tx *UnsignedExportTx) Verify() error {
 			return errInvalidAmount
 		}
 	}
-	if !ava.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
+	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
 		return errOutputsNotSorted
 	}
 
-	allOuts := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	allOuts := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(allOuts, tx.Outs)
 	copy(allOuts[len(tx.Outs):], tx.ExportedOutputs)
 	if err := syntacticVerifySpend(tx.Ins, allOuts, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
@@ -96,7 +96,7 @@ func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.
 		return permError{err}
 	}
 
-	outs := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
@@ -126,12 +126,12 @@ func (tx *UnsignedExportTx) Accept(batch database.Batch) error {
 	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
 
 	vsmDB := versiondb.New(smDB)
-	state := ava.NewPrefixedState(vsmDB, Codec)
+	state := avax.NewPrefixedState(vsmDB, Codec)
 
 	txID := tx.ID()
 	for i, out := range tx.ExportedOutputs {
-		if err := state.FundPlatformUTXO(&ava.UTXO{
-			UTXOID: ava.UTXOID{
+		if err := state.FundPlatformUTXO(&avax.UTXO{
+			UTXOID: avax.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(len(tx.BaseTx.Outs) + i),
 			},
@@ -172,8 +172,8 @@ func (vm *VM) newExportTx(
 			Ins:          ins,
 			Outs:         outs, // Non-exported outputs
 		},
-		ExportedOutputs: []*ava.TransferableOutput{{ // Exported to X-Chain
-			Asset: ava.Asset{ID: vm.avaxAssetID},
+		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
+			Asset: avax.Asset{ID: vm.avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amount,
 				OutputOwners: secp256k1fx.OutputOwners{

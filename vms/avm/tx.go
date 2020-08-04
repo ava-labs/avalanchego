@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -30,8 +30,8 @@ type UnsignedTx interface {
 	AssetIDs() ids.Set
 
 	NumCredentials() int
-	InputUTXOs() []*ava.UTXOID
-	UTXOs() []*ava.UTXO
+	InputUTXOs() []*avax.UTXOID
+	UTXOs() []*avax.UTXO
 
 	SyntacticVerify(ctx *snow.Context, c codec.Codec, txFeeAssetID ids.ID, txFee uint64, numFxs int) error
 	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error

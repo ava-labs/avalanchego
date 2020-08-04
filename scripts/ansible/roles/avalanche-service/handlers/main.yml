@@ -1,0 +1,10 @@
+- name: Reload systemd
+  become: true
+  systemd:
+    daemon_reload: true
+
+- name: Restart Avalanche service
+  become: true
+  service:
+    name: avalanche
+    state: restarted
