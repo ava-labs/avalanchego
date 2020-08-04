@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -551,12 +550,11 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	shortAddr := keys[0].PublicKey().Address()
-	addr := ids.NewID(hashing.ComputeHash256Array(shortAddr.Bytes()))
+	addr := keys[0].PublicKey().Address()
 
-	addrs := ids.Set{}
+	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, err := vm.GetUTXOs(addrs, -1)
+	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		t.Fatal(err)
 	}

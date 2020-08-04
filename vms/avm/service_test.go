@@ -175,13 +175,13 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 		label string
 		args  *GetUTXOsArgs
 	}{
-		{"[", &GetUTXOsArgs{[]string{""}, 0}},
-		{"[-]", &GetUTXOsArgs{[]string{"-"}, 0}},
-		{"[foo]", &GetUTXOsArgs{[]string{"foo"}, 0}},
-		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}, 0}},
-		{"[<ChainID>]", &GetUTXOsArgs{[]string{ctx.ChainID.String()}, 0}},
-		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0}},
-		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0}},
+		{"[", &GetUTXOsArgs{[]string{""}, 0, Index{}}},
+		{"[-]", &GetUTXOsArgs{[]string{"-"}, 0, Index{}}},
+		{"[foo]", &GetUTXOsArgs{[]string{"foo"}, 0, Index{}}},
+		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}, 0, Index{}}},
+		{"[<ChainID>]", &GetUTXOsArgs{[]string{ctx.ChainID.String()}, 0, Index{}}},
+		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0, Index{}}},
+		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0, Index{}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -203,14 +203,16 @@ func TestServiceGetUTXOs(t *testing.T) {
 
 	addr0 := keys[0].PublicKey().Address()
 	tests := []struct {
-		label string
-		args  *GetUTXOsArgs
-		count int
+		label     string
+		args      *GetUTXOsArgs
+		count     int
+		shouldErr bool
 	}{
 		{
 			"Empty",
 			&GetUTXOsArgs{},
 			0,
+			false,
 		}, {
 			"[<ChainID>-<unrelated address>]",
 			&GetUTXOsArgs{[]string{
@@ -219,16 +221,20 @@ func TestServiceGetUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			},
 				0,
+				Index{},
 			},
 			0,
+			true,
 		}, {
 			"[<ChainID>-<addr0>]",
 			&GetUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			},
 				0,
+				Index{},
 			},
 			7,
+			false,
 		},
 		{
 			"[<ChainID>-<addr0>] limit to 5 UTXOs",
@@ -236,8 +242,10 @@ func TestServiceGetUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			},
 				5,
+				Index{},
 			},
 			5,
+			false,
 		},
 		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
@@ -246,8 +254,10 @@ func TestServiceGetUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			},
 				0,
+				Index{},
 			},
 			7,
+			false,
 		}, {
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>], limit to 5 UTXOs",
 			&GetUTXOsArgs{[]string{
@@ -255,15 +265,19 @@ func TestServiceGetUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			},
 				5,
+				Index{},
 			},
 			5,
+			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			utxosReply := &GetUTXOsReply{}
-			if err := s.GetUTXOs(nil, tt.args, utxosReply); err != nil {
+			if err := s.GetUTXOs(nil, tt.args, utxosReply); err != nil && !tt.shouldErr {
 				t.Error(err)
+			} else if err == nil && tt.shouldErr {
+				t.Error("should have errored")
 			} else if tt.count != len(utxosReply.UTXOs) {
 				t.Errorf("Expected %d utxos, got %#v", tt.count, len(utxosReply.UTXOs))
 			}
@@ -284,13 +298,13 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 		label string
 		args  *GetAtomicUTXOsArgs
 	}{
-		{"[", &GetAtomicUTXOsArgs{[]string{""}, 0}},
-		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}, 0}},
-		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}, 0}},
-		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}, 0}},
-		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}, 0}},
-		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0}},
-		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0}},
+		{"[", &GetAtomicUTXOsArgs{[]string{""}, 0, Index{}}},
+		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}, 0, Index{}}},
+		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}, 0, Index{}}},
+		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}, 0, Index{}}},
+		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}, 0, Index{}}},
+		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0, Index{}}},
+		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0, Index{}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -332,14 +346,16 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	vm.ctx.SharedMemory.ReleaseDatabase(ids.Empty)
 
 	tests := []struct {
-		label string
-		args  *GetAtomicUTXOsArgs
-		count int
+		label     string
+		args      *GetAtomicUTXOsArgs
+		count     int
+		shouldErr bool
 	}{
 		{
 			"Empty",
 			&GetAtomicUTXOsArgs{},
 			0,
+			false,
 		},
 		{
 			"[<ChainID>-<unrelated address>]",
@@ -349,8 +365,10 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			},
 				0,
+				Index{},
 			},
 			0,
+			true,
 		},
 		{
 			"[<ChainID>-<addr0>]",
@@ -358,8 +376,10 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			},
 				0,
+				Index{},
 			},
 			1,
+			false,
 		},
 		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
@@ -368,15 +388,19 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
 			},
 				0,
+				Index{},
 			},
 			1,
+			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			utxosReply := &GetAtomicUTXOsReply{}
-			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err != nil {
+			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err != nil && !tt.shouldErr {
 				t.Error(err)
+			} else if err == nil && tt.shouldErr {
+				t.Error("should have errored")
 			} else if tt.count != len(utxosReply.UTXOs) {
 				t.Errorf("Expected %d utxos, got %#v", tt.count, len(utxosReply.UTXOs))
 			}
