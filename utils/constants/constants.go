@@ -7,7 +7,7 @@ import "github.com/ava-labs/gecko/ids"
 
 const (
 	NodeIDPrefix    string = "NodeID-"
-	SecretKeyPrefix string = "SECRETKEY-"
+	SecretKeyPrefix string = "PrivateKey-"
 )
 
 var (
