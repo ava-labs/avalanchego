@@ -10,8 +10,10 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -87,4 +89,33 @@ func (t *Tx) SemanticVerify(vm *VM, uTx *UniqueTx) error {
 	}
 
 	return t.UnsignedTx.SemanticVerify(vm, uTx, t.Creds)
+}
+
+func (t *Tx) sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(&t.UnsignedTx)
+	if err != nil {
+		return err
+	}
+
+	t.Creds = make([]verify.Verifiable, len(signers))
+	for i, keys := range signers {
+		cred := &secp256k1fx.Credential{
+			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
+		}
+		for j, key := range keys {
+			sig, err := key.Sign(unsignedBytes)
+			if err != nil {
+				return err
+			}
+			copy(cred.Sigs[j][:], sig)
+		}
+		t.Creds[i] = cred
+	}
+
+	b, err := c.Marshal(t)
+	if err != nil {
+		return err
+	}
+	t.Initialize(b)
+	return nil
 }

@@ -286,7 +286,8 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
-	smDB := vm.ctx.SharedMemory.GetDatabase(ids.Empty)
+	platformID := ids.Empty.Prefix(0)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{TxID: ids.Empty},
@@ -304,7 +305,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	if err := state.FundPlatformUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	vm.ctx.SharedMemory.ReleaseDatabase(ids.Empty)
+	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
 	tests := []struct {
 		label string
