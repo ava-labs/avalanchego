@@ -4,8 +4,9 @@
 package ipcs
 
 import (
-	"nanomsg.org/go/mangos/v2"
-	"nanomsg.org/go/mangos/v2/protocol/pub"
+	"go.nanomsg.org/mangos/v3/protocol/pub"
+
+	mangos "go.nanomsg.org/mangos/v3"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/triggers"

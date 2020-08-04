@@ -265,6 +265,8 @@ github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c/go.mod h1:lB8K/P019DLNhe
 github.com/xdg/stringprep v1.0.0/go.mod h1:Jhud4/sHMO4oL310DaZAKk9ZaJ08SJfe+sJh0HrGL1Y=
 github.com/xtaci/kcp-go v5.4.20+incompatible/go.mod h1:bN6vIwHQbfHaHtFpEssmWsN45a+AZwO7eyRCmEIbtvE=
 github.com/xtaci/lossyconn v0.0.0-20190602105132-8df528c0c9ae/go.mod h1:gXtu8J62kEgmN++bm9BVICuT/e8yiLI2KFobd/TRFsE=
+go.nanomsg.org/mangos/v3 v3.0.1 h1:xR8nca0ZeAvwsoRWjeEHuR2/B0N+Po/ZJpGNCpDz6To=
+go.nanomsg.org/mangos/v3 v3.0.1/go.mod h1:RxVwsn46YtfJ74mF8MeVo+MFjg545KCI50NuZrFXmzc=
 go.opencensus.io v0.22.1 h1:8dP3SGL7MPB94crU3bEPplMPe83FI4EouesJUeFHv50=
 go.opencensus.io v0.22.1/go.mod h1:Ap50jQcDJrx6rB6VgeeFPtuPIf3wMRvRfrfYDO6+BmA=
 golang.org/x/crypto v0.0.0-20180904163835-0709b304e793/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
@@ -387,6 +389,3 @@ gopkg.in/yaml.v2 v2.2.8 h1:obN1ZagJSUGI0Ek/LBmuj4SNLPfIny3KsKFopxRdj10=
 gopkg.in/yaml.v2 v2.2.8/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
-nanomsg.org/go/mangos v2.0.0+incompatible h1:LE83iAKZmIY8CP0gI9ETWgGL9X2m0d4WH0oyIRuAJ7o=
-nanomsg.org/go/mangos/v2 v2.0.8 h1:Nnc5gCNPd8sSyxgfMTdlKK020p4nxLAxcQrhLVnjGQ8=
-nanomsg.org/go/mangos/v2 v2.0.8/go.mod h1:gngxudWUZkxqHN+8n/2y9gWZPcwmSbliFYJsYG8mbKs=
