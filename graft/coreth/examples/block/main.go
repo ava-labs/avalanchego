@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/rand"
 	"fmt"
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
@@ -11,6 +10,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
+	"github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/rlp"
 	"math/big"
 )
@@ -43,7 +43,9 @@ func main() {
 
 	// configure the genesis block
 	genBalance := big.NewInt(100000000000000000)
-	genKey, _ := coreth.NewKey(rand.Reader)
+	hk, _ := crypto.HexToECDSA(
+		"abd71b35d559563fea757f0f5edbde286fb8c043105b15abb7cd57189306d7d1")
+	genKey := coreth.NewKeyFromECDSA(hk)
 
 	config.Genesis = &core.Genesis{
 		Config:     chainConfig,
@@ -108,11 +110,11 @@ func main() {
 	checkError(err)
 	buff.WriteString("somesuffix")
 	fmt.Println(buff.Len())
-	fmt.Println(common.ToHex(buff.Bytes()))
+	fmt.Println(blk2.Hash().Hex())
 
 	err = rlp.Decode(buff, blk2)
-	fmt.Println(buff.Len(), (string)(blk2.ExtraData()))
 	checkError(err)
+	fmt.Println(buff.Len(), (string)(blk2.ExtraData()), blk2.Hash().Hex())
 	decoded1 := new(string)
 	err = rlp.DecodeBytes(blk2.ExtraData(), decoded1)
 	checkError(err)
@@ -138,11 +140,12 @@ func main() {
 	blk2.SetExtraData(extra)
 	err = blk2.EncodeRLPTest(buff, 0xfffffffe)
 	checkError(err)
+	fmt.Println(blk2.Hash().Hex())
 	err = rlp.Decode(buff, blk2)
 	checkError(err)
 	decoded2 := new(MyData)
 	err = rlp.DecodeBytes(blk2.ExtraData(), decoded2)
 	checkError(err)
-	fmt.Println(buff.Len(), decoded2)
+	fmt.Println(buff.Len(), decoded2, blk2.Hash().Hex())
 	buff.Reset()
 }

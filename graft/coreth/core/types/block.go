@@ -85,6 +85,7 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"`
 	Nonce       BlockNonce     `json:"nonce"`
+	ExtDataHash common.Hash    `json:"extDataHash"		gencodec:"required"`
 }
 
 // field type overrides for gencodec
@@ -288,12 +289,15 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 		b.header, b.uncles, b.transactions = eb.Header, eb.Uncles, eb.Txs
 		b.extdata = nil
 	}
+	b.hash = atomic.Value{}
 	b.size.Store(common.StorageSize(rlp.ListSize(size)))
 	return nil
 }
 
 func (b *Block) SetExtraData(data []byte) {
 	b.extdata = data
+	b.header.ExtDataHash = rlpHash(data)
+	b.hash = atomic.Value{}
 }
 
 func (b *Block) ExtraData() []byte {
