@@ -4,7 +4,7 @@
 package ipcs
 
 import (
-	"nanomsg.org/go/mangos/v2"
+	"go.nanomsg.org/mangos/v3"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
