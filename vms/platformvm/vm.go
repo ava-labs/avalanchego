@@ -133,8 +133,6 @@ func init() {
 		Codec.RegisterType(&secp256k1fx.Input{}),
 		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
 
-		Codec.RegisterType(&BaseTx{}),
-
 		Codec.RegisterType(&UnsignedAddDefaultSubnetValidatorTx{}),
 		Codec.RegisterType(&UnsignedAddNonDefaultSubnetValidatorTx{}),
 		Codec.RegisterType(&UnsignedAddDefaultSubnetDelegatorTx{}),
@@ -150,10 +148,6 @@ func init() {
 
 		Codec.RegisterType(&StakeableLockIn{}),
 		Codec.RegisterType(&StakeableLockOut{}),
-
-		// TODO: Why are these needed?
-		Codec.RegisterType(&ava.TransferableInput{}),
-		Codec.RegisterType(&ava.TransferableOutput{}),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

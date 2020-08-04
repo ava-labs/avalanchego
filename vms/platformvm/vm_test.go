@@ -1350,9 +1350,19 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	}
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 6, 150, 225, 43, 97, 69, 215, 238,
-		150, 164, 249, 184, 2, 197, 216, 49, 6, 78, 81, 50, 190, 8, 44, 165, 219, 127, 96, 39,
-		235, 155, 17, 108, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 0, 95, 34, 234, 149, 0, 0, 0, 0}
+	secondAdvanceTimeBlkBytes := []byte{
+		0, 0,
+		0, 0, 0, 0,
+		6, 150, 225, 43, 97, 69, 215, 238,
+		150, 164, 249, 184, 2, 197, 216, 49,
+		6, 78, 81, 50, 190, 8, 44, 165,
+		219, 127, 96, 39, 235, 155, 17, 108,
+		0, 0, 0, 0,
+		0, 0, 0, 1,
+		0, 0, 0, 19,
+		0, 0, 0, 0, 95, 34, 234, 149,
+		0, 0, 0, 0,
+	}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
 	}
@@ -1461,9 +1471,19 @@ func TestRestartFullyAccepted(t *testing.T) {
 	*/
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{0, 0, 0, 0, 0, 0, 6, 150, 225, 43, 97, 69, 215, 238,
-		150, 164, 249, 184, 2, 197, 216, 49, 6, 78, 81, 50, 190, 8, 44, 165, 219, 127, 96, 39,
-		235, 155, 17, 108, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 0, 95, 34, 234, 149, 0, 0, 0, 0}
+	secondAdvanceTimeBlkBytes := []byte{
+		0, 0,
+		0, 0, 0, 0,
+		6, 150, 225, 43, 97, 69, 215, 238,
+		150, 164, 249, 184, 2, 197, 216, 49,
+		6, 78, 81, 50, 190, 8, 44, 165,
+		219, 127, 96, 39, 235, 155, 17, 108,
+		0, 0, 0, 0,
+		0, 0, 0, 1,
+		0, 0, 0, 19,
+		0, 0, 0, 0, 95, 34, 234, 149,
+		0, 0, 0, 0,
+	}
 	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
 		t.Fatal(err)
 	}

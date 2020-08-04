@@ -20,16 +20,14 @@ import (
 const maxMemoSize = 256
 
 var (
-	errNilTx          = errors.New("nil tx is not valid")
-	errWrongNetworkID = errors.New("tx has wrong network ID")
-	errWrongChainID   = errors.New("tx has wrong chain ID")
-
+	errNilTx                 = errors.New("nil tx is not valid")
+	errWrongNetworkID        = errors.New("tx has wrong network ID")
+	errWrongChainID          = errors.New("tx has wrong chain ID")
 	errOutputsNotSorted      = errors.New("outputs not sorted")
 	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
-
-	errInputOverflow     = errors.New("inputs overflowed uint64")
-	errOutputOverflow    = errors.New("outputs overflowed uint64")
-	errInsufficientFunds = errors.New("insufficient funds")
+	errInputOverflow         = errors.New("inputs overflowed uint64")
+	errOutputOverflow        = errors.New("outputs overflowed uint64")
+	errInsufficientFunds     = errors.New("insufficient funds")
 )
 
 // BaseTx is the basis of all transactions.
@@ -168,6 +166,15 @@ func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable
 
 		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
 			return err
+		}
+	}
+	for _, out := range t.Outs {
+		fxIndex, err := vm.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
+			return errIncompatibleFx
 		}
 	}
 	return nil

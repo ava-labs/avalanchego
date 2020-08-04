@@ -902,7 +902,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 			},
 			{
 				ID: ids.NewID([32]byte{1}),
-				Fx: &testFx{},
+				Fx: &FxTest{},
 			},
 		},
 	)
@@ -1464,7 +1464,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			},
 			{
 				ID: ids.Empty,
-				Fx: &testFx{},
+				Fx: &FxTest{},
 			},
 		},
 	)
@@ -1629,7 +1629,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			},
 			{
 				ID: ids.Empty,
-				Fx: &testFx{},
+				Fx: &FxTest{},
 			},
 		},
 	)
@@ -1820,6 +1820,63 @@ func TestBaseTxSemanticVerifyMalformedOutput(t *testing.T) {
 	tx := &Tx{}
 	if err := vm.codec.Unmarshal(txBytes, tx); err == nil {
 		t.Fatalf("should have failed to unmarshal the tx")
+	}
+}
+
+func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
+	genesisBytes, _, vm := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	if err := vm.codec.RegisterType(&ava.TestTransferable{}); err != nil {
+		t.Fatal(err)
+	}
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	tx := &Tx{UnsignedTx: &BaseTx{
+		NetID: networkID,
+		BCID:  chainID,
+		Ins: []*ava.TransferableInput{{
+			UTXOID: ava.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: ava.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*ava.TransferableOutput{{
+			Asset: ava.Asset{ID: genesisTx.ID()},
+			Out: &ava.TestTransferable{
+				Val: 1,
+			},
+		}},
+	}}
+
+	if err := tx.sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+		t.Fatal(err)
+	}
+
+	uTx := &UniqueTx{
+		TxState: &TxState{
+			Tx: tx,
+		},
+		vm:   vm,
+		txID: tx.ID(),
+	}
+
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+		t.Fatalf("should have errored due to sending funds to an un-authorized fx")
 	}
 }
 
