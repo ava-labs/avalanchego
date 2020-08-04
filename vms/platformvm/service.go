@@ -21,6 +21,11 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
+const (
+	// Max number of addresses that can be passed in as argument to GetUTXOs
+	maxGetUTXOsAddrs = 128
+)
+
 var (
 	errMissingDecisionBlock = errors.New("should have a decision block within the past two blocks")
 	errNoFunds              = errors.New("no spendable funds were found")
@@ -146,7 +151,7 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 	}
 
 	addrs := [][]byte{address.Bytes()}
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
+	utxos, _, _, err := service.vm.getUTXOs(service.vm.DB, addrs, nil, ids.Empty, -1)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
 	}
@@ -208,42 +213,93 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	return nil
 }
 
-// GetUTXOsArgs ...
-type GetUTXOsArgs struct {
-	Addresses []string `json:"addresses"`
+// Index is an address and an associated UTXO.
+// Marks a starting or stopping point when fetching UTXOs. Used for pagination.
+type Index struct {
+	Address string `json:"address"` // The address as a string
+	Utxo    string `json:"utxo"`    // The UTXO ID as a string
 }
 
-// GetUTXOsResponse ...
+// GetUTXOsArgs are arguments for passing into GetUTXOs.
+// Gets the UTXOs that reference at least one address in [Addresses].
+// Returns at most [MaxCount] addresses.
+// If [MaxCount] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
+// [StartIndex] defines where to start fetching UTXOs. It's used for pagination.
+type GetUTXOsArgs struct {
+	Addresses  []string    `json:"addresses"`
+	MaxCount   json.Uint32 `json:"maxCount"`
+	StartIndex Index       `json:"startIndex"`
+}
+
+// GetUTXOsResponse defines the GetUTXOs replies returned from the API
 type GetUTXOsResponse struct {
+	// Number of UTXOs returned
+	NumFetched json.Uint64 `json:"numFetched"`
+	// The UTXOs
 	UTXOs []formatting.CB58 `json:"utxos"`
+	// The last UTXO that was returned, and the address it corresponds to.
+	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
+	// again and set [StartIndex] to this value.
+	EndIndex Index `json:"endIndex"`
 }
 
 // GetUTXOs returns the UTXOs controlled by the given addresses
 func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *GetUTXOsResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
-	addrs := [][]byte{}
-	for _, addrStr := range args.Addresses {
-		addr, err := service.vm.ParseAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("can't parse %s to address: %w", addr, err)
-		}
-		addrs = append(addrs, addr.Bytes())
+	if len(args.Addresses) > maxGetUTXOsAddrs {
+		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
+	addrsSet := ids.ShortSet{} // Put in a set for de-duplication
+	for _, addrStr := range args.Addresses {
+		if addr, err := service.vm.ParseAddress(addrStr); err == nil {
+			addrsSet.Add(addr)
+		} else {
+			return err
+		}
+	}
+	addrs := make([][]byte, addrsSet.Len())
+	for i, addr := range addrsSet.List() {
+		addrs[i] = addr.Bytes()
+	}
+
+	var startAddr []byte
+	startUtxo := ids.Empty
+	var err error
+	if args.StartIndex.Address != "" || args.StartIndex.Utxo != "" {
+		startAddrID, err := service.vm.ParseAddress(args.StartIndex.Address)
+		if err != nil {
+			return fmt.Errorf("couldn't parse start index address: %s", err)
+		}
+		startAddr = startAddrID.Bytes()
+		startUtxo, err = ids.FromString(args.StartIndex.Utxo)
+		if err != nil {
+			return fmt.Errorf("couldn't parse start index utxo: %s", err)
+		}
+	}
+
+	utxos, endAddr, endUtxoID, err := service.vm.getUTXOs(service.vm.DB, addrs, startAddr, startUtxo, int(args.MaxCount))
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXOs: %w", err)
+		return fmt.Errorf("couldn't get UTXOs: %s", err)
 	}
 
 	response.UTXOs = make([]formatting.CB58, len(utxos))
 	for i, utxo := range utxos {
 		bytes, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
-			return fmt.Errorf("couldn't serialize UTXO %s: %w", utxo.InputID(), err)
+			return fmt.Errorf("couldn't serialize UTXO %s: %s", utxo.InputID(), err)
 		}
 		response.UTXOs[i] = formatting.CB58{Bytes: bytes}
 	}
+	response.NumFetched = json.Uint64(len(response.UTXOs))
+	endAddrID, err := ids.ToShortID(endAddr)
+	if err == nil {
+		response.EndIndex.Address = service.vm.FormatAddress(endAddrID)
+	} else {
+		response.EndIndex.Address = ids.ShortEmpty.String()
+	}
+	response.EndIndex.Utxo = endUtxoID.String()
 	return nil
 }
 

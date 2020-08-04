@@ -186,11 +186,7 @@ func (vm *VM) newImportTx(
 		kc.Add(key)
 	}
 
-	addrSet := ids.Set{}
-	for _, addr := range kc.Addresses().List() {
-		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
-	}
-	atomicUTXOs, err := vm.GetAtomicUTXOs(addrSet, -1)
+	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}

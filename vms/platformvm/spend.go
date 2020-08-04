@@ -40,7 +40,7 @@ func (vm *VM) spend(
 	for i, key := range keys {
 		addrs[i] = key.PublicKey().Address().Bytes()
 	}
-	utxos, err := vm.getUTXOs(db, addrs) // The UTXOs controlled by [keys]
+	utxos, _, _, err := vm.getUTXOs(db, addrs, nil, ids.Empty, -1) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}

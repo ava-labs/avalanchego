@@ -412,8 +412,6 @@ func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.
 	for _, addr := range addrsList {
 		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
 			continue
-		} else if toFetch <= 0 {
-			break
 		}
 		utxoIDs, _ := vm.state.Funds(addr.Bytes(), startUtxo, toFetch) // Get UTXOs associated with [addr]
 		for _, utxoID := range utxoIDs {
