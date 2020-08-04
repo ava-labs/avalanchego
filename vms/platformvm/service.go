@@ -67,7 +67,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ExportKey called")
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
 	if address, err := service.vm.ParseAddress(args.Address); err != nil {
@@ -185,7 +185,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving data: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
 	factory := crypto.FactorySECP256K1R{}
@@ -205,7 +205,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving data: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
 	addresses, err := user.getAddresses()
@@ -1025,7 +1025,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	service.vm.Ctx.Log.Info("Platform: ValidatedBy called")
 	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving blockchain '%s': %w", args.BlockchainID, err)
 	}
 	response.SubnetID = chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).SubnetID
 	return nil
@@ -1047,12 +1047,12 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the DefaultSubnetID
 	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.DefaultSubnetID) {
-		return err
+		return fmt.Errorf("problem retrieving subnet '%s': %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
 	chains, err := service.vm.getChains(service.vm.DB)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving chains for subnet '%s': %w", args.SubnetID, err)
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {

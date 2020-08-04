@@ -139,21 +139,21 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	for _, addr := range args.Addresses {
 		addrBytes, err := service.vm.Parse(addr)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
 		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
 	}
 
 	utxos, err := service.vm.GetUTXOs(addrSet)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
 	reply.UTXOs = []formatting.CB58{}
 	for _, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
 		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: b})
 	}
@@ -178,21 +178,21 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 	for _, addr := range args.Addresses {
 		addrBytes, err := service.vm.Parse(addr)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
 		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
 	}
 
 	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
 
 	reply.UTXOs = []formatting.CB58{}
 	for _, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem marshalling atomic UTXO: %w", err)
 		}
 		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: b})
 	}
@@ -262,14 +262,14 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
 		assetID, err = ids.FromString(args.AssetID)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem parsing assetID '%s': %w", args.AssetID, err)
 		}
 	}
 
@@ -278,7 +278,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 	utxos, err := service.vm.GetUTXOs(addrSet)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
 	reply.UTXOIDs = make([]ava.UTXOID, 0, len(utxos))
@@ -327,7 +327,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
-		return fmt.Errorf("couldn't parse given address: %s", err)
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 	addrAsSet := ids.Set{}
 	addrAsSet.Add(ids.NewID(hashing.ComputeHash256Array(address)))
@@ -733,7 +733,7 @@ func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, 
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
 	user := userState{vm: service.vm}
@@ -779,7 +779,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, 
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
 	response.Addresses = []string{}
@@ -815,16 +815,16 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
-		return fmt.Errorf("problem parsing address: %w", err)
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 	addr, err := ids.ToShortID(address)
 	if err != nil {
-		return fmt.Errorf("problem parsing address: %w", err)
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
 	user := userState{vm: service.vm}
