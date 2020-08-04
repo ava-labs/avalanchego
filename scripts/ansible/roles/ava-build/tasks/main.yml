@@ -1,6 +1,6 @@
 - name: Update git clone
   git:
-    repo: ssh://git@github.com/{{ repo_name }}.git
+    repo: "{{ repo_url }}"
     dest: "{{ repo_folder }}"
     version: "{{ repo_branch }}"
     update: yes
