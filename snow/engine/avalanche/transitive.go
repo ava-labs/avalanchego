@@ -454,7 +454,9 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 		inputs := tx.InputIDs()
 		overlaps := consumed.Overlaps(inputs)
 		if len(batch) >= t.Params.BatchSize || (force && overlaps) {
-			t.issueBatch(batch)
+			if err := t.issueBatch(batch); err != nil {
+				return err
+			}
 			batch = make([]snowstorm.Tx, 0, t.Params.BatchSize)
 			consumed.Clear()
 			issued = true

@@ -62,7 +62,9 @@ func (i *issuer) Update() {
 	if len(validTxs) != len(txs) {
 		i.t.Config.Context.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
 
-		i.t.batch(validTxs, false /*=force*/, false /*=empty*/)
+		if err := i.t.batch(validTxs, false /*=force*/, false /*=empty*/); err != nil {
+			i.t.errs.Add(err)
+		}
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}

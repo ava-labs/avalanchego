@@ -89,7 +89,10 @@ func unmarshalAccount(bytes []byte) (interface{}, error) {
 // Ensure there is an error if someone tries to do a put without registering the type
 func TestPutUnregistered(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -119,7 +122,10 @@ func TestPutUnregistered(t *testing.T) {
 // key that doesn't exist
 func TestKeyDoesNotExist(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -142,7 +148,10 @@ func TestKeyDoesNotExist(t *testing.T) {
 // Ensure there is an error if someone tries to register a type ID that already exists
 func TestRegisterExistingTypeID(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -162,7 +171,10 @@ func TestRegisterExistingTypeID(t *testing.T) {
 // Ensure there is an error when someone tries to get a value using the wrong typeID
 func TestGetWrongTypeID(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -178,8 +190,7 @@ func TestGetWrongTypeID(t *testing.T) {
 		value:    5,
 	}
 	blockID := ids.NewID([32]byte{1, 2, 3})
-	err := state.Put(db, blockTypeID, blockID, block)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, blockID, block); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,7 +204,10 @@ func TestGetWrongTypeID(t *testing.T) {
 // key but different type IDs
 func TestSameKeyDifferentTypeID(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -219,8 +233,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 	}
 
 	// put it using sharedKey
-	err := state.Put(db, accountTypeID, sharedKey, acc)
-	if err != nil {
+	if err = state.Put(db, accountTypeID, sharedKey, acc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -231,8 +244,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 	}
 
 	// put it using sharedKey
-	err = state.Put(db, blockTypeID, sharedKey, block1)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, sharedKey, block1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -264,7 +276,10 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 // Ensure that overwriting a value works
 func TestOverwrite(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -283,8 +298,7 @@ func TestOverwrite(t *testing.T) {
 	key := ids.NewID([32]byte{1, 2, 3})
 
 	// put it
-	err := state.Put(db, blockTypeID, key, block1)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, key, block1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -295,8 +309,7 @@ func TestOverwrite(t *testing.T) {
 	}
 
 	// put it with the same key
-	err = state.Put(db, blockTypeID, key, block2)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, key, block2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -316,15 +329,17 @@ func TestOverwrite(t *testing.T) {
 // Put 4 values, 2 of one type and 2 of another
 func TestHappyPath(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
 	accountTypeID := uint64(1)
 
 	// register type account
-	err := state.RegisterType(accountTypeID, unmarshalAccount)
-	if err != nil {
+	if err = state.RegisterType(accountTypeID, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -336,8 +351,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, accountTypeID, acc1.id, acc1)
-	if err != nil {
+	if err = state.Put(db, accountTypeID, acc1.id, acc1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -362,8 +376,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, accountTypeID, acc2.id, acc2)
-	if err != nil {
+	if err = state.Put(db, accountTypeID, acc2.id, acc2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -382,8 +395,7 @@ func TestHappyPath(t *testing.T) {
 
 	// register type block
 	blockTypeID := uint64(2)
-	err = state.RegisterType(blockTypeID, unmarshalBlock)
-	if err != nil {
+	if err = state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -395,8 +407,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, blockTypeID, block1ID, block1)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, block1ID, block1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -419,8 +430,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, blockTypeID, block2ID, block2)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, block2ID, block2); err != nil {
 		t.Fatal(err)
 	}
 

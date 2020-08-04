@@ -312,7 +312,9 @@ func (tx *UniqueTx) SyntacticVerify() error {
 
 // SemanticVerify the validity of this transaction
 func (tx *UniqueTx) SemanticVerify() error {
-	tx.SyntacticVerify()
+	// SyntacticVerify sets the error on validity and is checked in the next
+	// statement
+	_ = tx.SyntacticVerify()
 
 	if tx.validity != nil || tx.verifiedState {
 		return tx.validity
