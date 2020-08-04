@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
@@ -28,6 +26,7 @@ import (
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
 var networkID uint32 = 43110
@@ -174,10 +173,7 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
-
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+	ctx.SharedMemory = sm.NewBlockchainSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
@@ -189,20 +185,27 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	avaID := genesisTx.ID()
+	platformID := ids.Empty.Prefix(0)
+
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
-		ava:      ids.Empty,
-		platform: ids.Empty,
+		ava:      avaID,
+		platform: platformID,
 	}
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
+		[]*common.Fx{
+			{
+				ID: ids.Empty,
+				Fx: &secp256k1fx.Fx{},
+			},
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -501,7 +504,11 @@ func TestFxInitializationFailure(t *testing.T) {
 		/*engineMessenger=*/ make(chan common.Message, 1),
 		/*fxs=*/ []*common.Fx{{
 			ID: ids.Empty,
-			Fx: &testFx{initialize: errUnknownFx},
+			Fx: &FxTest{
+				InitializeF: func(interface{}) error {
+					return errUnknownFx
+				},
+			},
 		}},
 	)
 	if err == nil {

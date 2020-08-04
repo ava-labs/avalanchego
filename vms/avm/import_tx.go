@@ -161,6 +161,15 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 			return err
 		}
 	}
+	for _, out := range t.Outs {
+		fxIndex, err := vm.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
+			return errIncompatibleFx
+		}
+	}
 	return nil
 }
 
