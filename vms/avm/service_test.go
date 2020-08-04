@@ -4,7 +4,9 @@
 package avm
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +14,7 @@ import (
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/vms/components/ava"
@@ -20,16 +23,41 @@ import (
 
 func setup(t *testing.T) ([]byte, *VM, *Service) {
 	genesisBytes, _, vm := GenesisVM(t)
+	keystore := keystore.CreateTestKeystore()
+	keystore.AddUser(username, password)
+	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
 	s := &Service{vm: vm}
+	return genesisBytes, vm, s
+}
+
+func setupWithKeys(t *testing.T) ([]byte, *VM, *Service) {
+	genesisBytes, vm, s := setup(t)
+
+	// Import the initially funded private keys
+	user := userState{vm: vm}
+	db, err := s.vm.ctx.Keystore.GetDatabase(username, password)
+	if err != nil {
+		t.Fatalf("Failed to get user database: %s", err)
+	}
+
+	addrs := []ids.ShortID{}
+	for _, sk := range keys {
+		if err := user.SetKey(db, sk); err != nil {
+			t.Fatalf("Failed to set key for user: %s", err)
+		}
+		addrs = append(addrs, sk.PublicKey().Address())
+	}
+	if err := user.SetAddresses(db, addrs); err != nil {
+		t.Fatalf("Failed to set user addresses: %s", err)
+	}
 	return genesisBytes, vm, s
 }
 
 func TestServiceIssueTx(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	txArgs := &IssueTxArgs{}
@@ -52,10 +80,9 @@ func TestServiceIssueTx(t *testing.T) {
 
 func TestServiceGetTxStatus(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	statusArgs := &GetTxStatusArgs{}
@@ -96,9 +123,10 @@ func TestServiceGetTxStatus(t *testing.T) {
 
 func TestServiceGetBalance(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	ctx := vm.ctx
-	defer ctx.Lock.Unlock()
-	defer vm.Shutdown()
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
@@ -116,12 +144,40 @@ func TestServiceGetBalance(t *testing.T) {
 	assert.Len(t, balanceReply.UTXOIDs, 4, "should have only returned four utxoIDs")
 }
 
-func TestServiceGetTx(t *testing.T) {
+func TestServiceGetAllBalances(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	assetID := genesisTx.ID()
+	addr := keys[0].PublicKey().Address()
+
+	balanceArgs := &GetAllBalancesArgs{
+		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+	}
+	balanceReply := &GetAllBalancesReply{}
+	err := s.GetAllBalances(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+
+	assert.Len(t, balanceReply.Balances, 1)
+
+	balance := balanceReply.Balances[0]
+	alias, err := vm.PrimaryAlias(assetID)
+	if err != nil {
+		t.Fatalf("Failed to get primary alias of genesis asset: %s", err)
+	}
+	assert.Equal(t, balance.AssetID, alias)
+	assert.Equal(t, uint64(balance.Balance), uint64(300000))
+}
+
+func TestServiceGetTx(t *testing.T) {
+	genesisBytes, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -138,10 +194,9 @@ func TestServiceGetTx(t *testing.T) {
 
 func TestServiceGetNilTx(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTxReply{}
@@ -151,10 +206,9 @@ func TestServiceGetNilTx(t *testing.T) {
 
 func TestServiceGetUnknownTx(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTxReply{}
@@ -164,10 +218,9 @@ func TestServiceGetUnknownTx(t *testing.T) {
 
 func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
@@ -179,8 +232,8 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 		{"[-]", &GetUTXOsArgs{[]string{"-"}}},
 		{"[foo]", &GetUTXOsArgs{[]string{"foo"}}},
 		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}}},
-		{"[<ChainID>]", &GetUTXOsArgs{[]string{ctx.ChainID.String()}}},
-		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}}},
+		{"[<ChainID>]", &GetUTXOsArgs{[]string{vm.ctx.ChainID.String()}}},
+		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
 		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
 	}
 	for _, tt := range tests {
@@ -195,10 +248,9 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 
 func TestServiceGetUTXOs(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
@@ -216,20 +268,20 @@ func TestServiceGetUTXOs(t *testing.T) {
 			&GetUTXOsArgs{[]string{
 				// TODO: Should GetUTXOs() raise an error for this? The address portion is
 				//		 longer than addr0.String()
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			}},
 			0,
 		}, {
 			"[<ChainID>-<addr0>]",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
 			}},
 			7,
 		}, {
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
 			}},
 			7,
 		},
@@ -248,10 +300,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 
 func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
@@ -263,8 +314,8 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}}},
 		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}}},
 		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}}},
-		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}}},
-		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}}},
+		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{vm.ctx.ChainID.String()}}},
+		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
 		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
 	}
 	for _, tt := range tests {
@@ -279,10 +330,9 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 
 func TestServiceGetAtomicUTXOs(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
@@ -322,22 +372,22 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 			&GetAtomicUTXOsArgs{[]string{
 				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
 				//		 longer than addr0.String()
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			}},
 			0,
 		},
 		{
 			"[<ChainID>-<addr0>]",
 			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
 			}},
 			1,
 		},
 		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
 			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
 			}},
 			1,
 		},
@@ -356,10 +406,9 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -384,10 +433,9 @@ func TestGetAssetDescription(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -410,10 +458,9 @@ func TestGetBalance(t *testing.T) {
 
 func TestCreateFixedCapAsset(t *testing.T) {
 	_, vm, s := setup(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	reply := CreateFixedCapAssetReply{}
@@ -438,11 +485,10 @@ func TestCreateFixedCapAsset(t *testing.T) {
 }
 
 func TestCreateVariableCapAsset(t *testing.T) {
-	_, vm, s := setup(t)
-	ctx := vm.ctx
+	_, vm, s := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	reply := CreateVariableCapAssetReply{}
@@ -464,32 +510,147 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "23FV5zQpuG9EZBh7BXKj9wqPAMe7tY9T4jEWpobbMQHLLUf88o" {
+	createdAssetID := reply.AssetID.String()
+
+	if createdAssetID != "23FV5zQpuG9EZBh7BXKj9wqPAMe7tY9T4jEWpobbMQHLLUf88o" {
 		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
+	}
+
+	createAssetTx := UniqueTx{
+		vm:   vm,
+		txID: reply.AssetID,
+	}
+	if status := createAssetTx.Status(); status != choices.Processing {
+		t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
+	}
+	if err := createAssetTx.Accept(); err != nil {
+		t.Fatalf("Failed to accept CreateVariableCapAssetTx due to: %s", err)
+	}
+
+	// Test minting of the created variable cap asset
+	mintArgs := &MintArgs{
+		Username: username,
+		Password: password,
+		Amount:   200,
+		AssetID:  createdAssetID,
+		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+	}
+	mintReply := &MintReply{}
+	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
+		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
+	}
+
+	mintTx := UniqueTx{
+		vm:   vm,
+		txID: mintReply.TxID,
+	}
+
+	if status := mintTx.Status(); status != choices.Processing {
+		t.Fatalf("MintTx status should have been Processing, but was %s", status)
+	}
+	if err := mintTx.Accept(); err != nil {
+		t.Fatalf("Failed to accept MintTx due to: %s", err)
+	}
+
+	sendArgs := &SendArgs{
+		Username: username,
+		Password: password,
+		Amount:   200,
+		AssetID:  createdAssetID,
+		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+	}
+	sendReply := &SendReply{}
+	if err := s.Send(nil, sendArgs, sendReply); err != nil {
+		t.Fatalf("Failed to send newly minted variable cap asset due to: %s", err)
 	}
 }
 
-func TestImportAVMKey(t *testing.T) {
-	_, vm, s := setup(t)
-	ctx := vm.ctx
+func TestNFTWorkflow(t *testing.T) {
+	_, vm, s := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
-	userKeystore := keystore.CreateTestKeystore(t)
-
-	username := "bobby"
-	password := "StrnasfqewiurPasswdn56d"
-	if err := userKeystore.AddUser(username, password); err != nil {
-		t.Fatal(err)
+	// Test minting of the created variable cap asset
+	createArgs := &CreateNFTAssetArgs{
+		Username: username,
+		Password: password,
+		Name:     "BIG COIN",
+		Symbol:   "COIN",
+		MinterSets: []Owners{
+			Owners{
+				Threshold: 1,
+				Minters: []string{
+					vm.Format(keys[0].PublicKey().Address().Bytes()),
+				},
+			},
+		},
+	}
+	createReply := &CreateNFTAssetReply{}
+	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
+		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
 	}
 
-	vm.ctx.Keystore = userKeystore.NewBlockchainKeyStore(vm.ctx.ChainID)
-	_, err := vm.ctx.Keystore.GetDatabase(username, password)
-	if err != nil {
-		t.Fatal(err)
+	assetID := createReply.AssetID
+	createNFTTx := UniqueTx{
+		vm:   vm,
+		txID: createReply.AssetID,
 	}
+	if createNFTTx.Status() != choices.Processing {
+		t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
+	}
+
+	// Accept the transaction so that we can Mint NFTs for the test
+	if err := createNFTTx.Accept(); err != nil {
+		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
+	}
+
+	mintArgs := &MintNFTArgs{
+		Username: username,
+		Password: password,
+		AssetID:  assetID.String(),
+		Payload:  formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
+		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+	}
+	mintReply := &MintNFTReply{}
+
+	if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
+		t.Fatalf("MintNFT returned an error: %s", err)
+	}
+
+	mintNFTTx := UniqueTx{
+		vm:   vm,
+		txID: mintReply.TxID,
+	}
+	if mintNFTTx.Status() != choices.Processing {
+		t.Fatal("MintNFTTx should have been processing after minting the NFT")
+	}
+
+	// Accept the transaction so that we can send the newly minted NFT
+	if err := mintNFTTx.Accept(); err != nil {
+		t.Fatalf("Failed to accept MintNFTTx: %s", err)
+	}
+
+	sendArgs := &SendNFTArgs{
+		Username: username,
+		Password: password,
+		AssetID:  assetID.String(),
+		GroupID:  0,
+		To:       vm.Format(keys[2].PublicKey().Address().Bytes()),
+	}
+	sendReply := &SendNFTReply{}
+	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
+		t.Fatalf("Failed to send NFT due to: %s", err)
+	}
+}
+
+func TestImportExportKey(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
 
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.NewPrivateKey()
@@ -498,14 +659,37 @@ func TestImportAVMKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	args := ImportKeyArgs{
+	formattedKey := formatting.CB58{Bytes: sk.Bytes()}
+	importArgs := &ImportKeyArgs{
 		Username:   username,
 		Password:   password,
-		PrivateKey: formatting.CB58{Bytes: sk.Bytes()},
+		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
 	}
-	reply := ImportKeyReply{}
-	if err = s.ImportKey(nil, &args, &reply); err != nil {
+	importReply := &ImportKeyReply{}
+	if err = s.ImportKey(nil, importArgs, importReply); err != nil {
 		t.Fatal(err)
+	}
+
+	exportArgs := &ExportKeyArgs{
+		Username: username,
+		Password: password,
+		Address:  vm.Format(sk.PublicKey().Address().Bytes()),
+	}
+	exportReply := &ExportKeyReply{}
+	if err = s.ExportKey(nil, exportArgs, exportReply); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.HasPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix) {
+		t.Fatalf("ExportKeyReply private key: %s mssing secret key prefix: %s", exportReply.PrivateKey, constants.SecretKeyPrefix)
+	}
+
+	exportedKey := formatting.CB58{}
+	if err := exportedKey.FromString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix)); err != nil {
+		t.Fatal("Failed to parse exported private key")
+	}
+	if !bytes.Equal(exportedKey.Bytes, formattedKey.Bytes) {
+		t.Fatal("Unexpected key was found in ExportKeyReply")
 	}
 }
 
@@ -517,20 +701,6 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	userKeystore := keystore.CreateTestKeystore(t)
-
-	username := "bobby"
-	password := "StrnasfqewiurPasswdn56d"
-	if err := userKeystore.AddUser(username, password); err != nil {
-		t.Fatal(err)
-	}
-
-	vm.ctx.Keystore = userKeystore.NewBlockchainKeyStore(vm.ctx.ChainID)
-	_, err := vm.ctx.Keystore.GetDatabase(username, password)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.NewPrivateKey()
 	if err != nil {
@@ -541,7 +711,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	args := ImportKeyArgs{
 		Username:   username,
 		Password:   password,
-		PrivateKey: formatting.CB58{Bytes: sk.Bytes()},
+		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
 	}
 	reply := ImportKeyReply{}
 	if err = s.ImportKey(nil, &args, &reply); err != nil {
@@ -578,5 +748,119 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 
 	if addrsReply.Addresses[0] != expectedAddress {
 		t.Fatal("List addresses returned an incorrect address")
+	}
+}
+
+func TestSend(t *testing.T) {
+	genesisBytes, vm, s := setupWithKeys(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	assetID := genesisTx.ID()
+	addr := keys[0].PublicKey().Address()
+
+	args := &SendArgs{
+		Username: username,
+		Password: password,
+		Amount:   500,
+		AssetID:  assetID.String(),
+		To:       vm.Format(addr.Bytes()),
+	}
+	reply := &SendReply{}
+	vm.timer.Cancel()
+	if err := s.Send(nil, args, reply); err != nil {
+		t.Fatalf("Failed to send transaction: %s", err)
+	}
+
+	pendingTxs := vm.txs
+	if len(pendingTxs) != 1 {
+		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
+	}
+
+	if !reply.TxID.Equals(pendingTxs[0].ID()) {
+		t.Fatal("Transaction ID returned by Send does not match the transaction found in vm's pending transactions")
+	}
+}
+
+func TestCreateAndListAddresses(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
+
+	createArgs := &CreateAddressArgs{
+		Username: username,
+		Password: password,
+	}
+	createReply := &CreateAddressReply{}
+
+	if err := s.CreateAddress(nil, createArgs, createReply); err != nil {
+		t.Fatalf("Failed to create address: %s", err)
+	}
+
+	newAddr := createReply.Address
+
+	listArgs := &ListAddressesArgs{
+		Username: username,
+		Password: password,
+	}
+	listReply := &ListAddressesResponse{}
+
+	if err := s.ListAddresses(nil, listArgs, listReply); err != nil {
+		t.Fatalf("Failed to list addresses: %s", err)
+	}
+
+	for _, addr := range listReply.Addresses {
+		if addr == newAddr {
+			return
+		}
+	}
+	t.Fatalf("Failed to find newly created address among %d addresses", len(listReply.Addresses))
+}
+
+func TestImportAVA(t *testing.T) {
+	genesisBytes, vm, s := setupWithKeys(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	assetID := genesisTx.ID()
+
+	addr0 := keys[0].PublicKey().Address()
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+
+	// Must set ava assetID to be the correct asset since only AVA can be imported
+	vm.ava = assetID
+	utxo := &ava.UTXO{
+		UTXOID: ava.UTXOID{TxID: ids.Empty},
+		Asset:  ava.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 7,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr0},
+			},
+		},
+	}
+
+	state := ava.NewPrefixedState(smDB, vm.codec)
+	if err := state.FundPlatformUTXO(utxo); err != nil {
+		t.Fatal(err)
+	}
+	vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+
+	importArgs := &ImportAVAArgs{
+		Username: username,
+		Password: password,
+		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+	}
+	importReply := &ImportAVAReply{}
+	if err := s.ImportAVA(nil, importArgs, importReply); err != nil {
+		t.Fatalf("Failed to import AVA due to %s", err)
 	}
 }

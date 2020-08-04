@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/gecko/api"
@@ -58,7 +59,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -66,7 +67,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ExportKey called")
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
 	if address, err := service.vm.ParseAddress(args.Address); err != nil {
@@ -74,7 +75,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	} else if sk, err := user.getKey(address); err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	} else {
-		reply.PrivateKey.Bytes = sk.Bytes()
+		reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
 		return nil
 	}
 }
@@ -82,7 +83,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
 	api.UserPass
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ImportKeyReply is the response for ImportKey
@@ -102,9 +103,19 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	user := user{db: db}
 
 	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(args.PrivateKey.Bytes)
+
+	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
+		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	}
+	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
+	formattedPrivateKey := formatting.CB58{}
+	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+
+	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
 	if err != nil {
-		return fmt.Errorf("problem parsing private key %s: %w", args.PrivateKey, err)
+		return fmt.Errorf("problem parsing private key: %w", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
@@ -174,7 +185,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving data: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
 	factory := crypto.FactorySECP256K1R{}
@@ -194,7 +205,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving data: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
 	addresses, err := user.getAddresses()
@@ -495,7 +506,7 @@ type SampleValidatorsArgs struct {
 
 // SampleValidatorsReply are the results from calling Sample
 type SampleValidatorsReply struct {
-	Validators []ids.ShortID `json:"validators"`
+	Validators []string `json:"validators"`
 }
 
 // SampleValidators returns a sampling of the list of current validators
@@ -515,11 +526,15 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		return fmt.Errorf("current number of validators (%d) is insufficient to sample %d validators", setLen, args.Size)
 	}
 
-	reply.Validators = make([]ids.ShortID, int(args.Size))
+	validatorIDs := make([]ids.ShortID, int(args.Size))
 	for i, vdr := range sample {
-		reply.Validators[i] = vdr.ID()
+		validatorIDs[i] = vdr.ID()
 	}
-	ids.SortShortIDs(reply.Validators)
+	ids.SortShortIDs(validatorIDs)
+	reply.Validators = make([]string, int(args.Size))
+	for i, vdrID := range validatorIDs {
+		reply.Validators[i] = vdrID.PrefixedString(constants.NodeIDPrefix)
+	}
 
 	return nil
 }
@@ -595,7 +610,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 
 // AddDefaultSubnetDelegatorArgs are the arguments to AddDefaultSubnetDelegator
 type AddDefaultSubnetDelegatorArgs struct {
-	APIValidator
+	FormattedAPIValidator
 	api.UserPass
 	Destination string `json:"destination"`
 }
@@ -606,12 +621,21 @@ type AddDefaultSubnetDelegatorArgs struct {
 func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
 	switch {
-	case args.ID.IsZero(): // If ID unspecified, use this node's ID as validator ID
-		args.ID = service.vm.Ctx.NodeID
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
 	case args.Destination == "":
 		return errNoDestination
+	}
+
+	var nodeID ids.ShortID
+	if args.ID == "" { // If ID unspecified, use this node's ID as validator ID
+		nodeID = service.vm.Ctx.NodeID
+	} else {
+		nID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+		nodeID = nID
 	}
 
 	destination, err := service.vm.ParseAddress(args.Destination)
@@ -635,7 +659,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		uint64(args.weight()),  // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
-		args.ID,                // Node ID
+		nodeID,                 // Node ID
 		destination,            // Destination
 		privKeys,               // Private keys
 	)
@@ -649,7 +673,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 
 // AddNonDefaultSubnetValidatorArgs are the arguments to AddNonDefaultSubnetValidator
 type AddNonDefaultSubnetValidatorArgs struct {
-	APIValidator
+	FormattedAPIValidator
 	api.UserPass
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
@@ -662,6 +686,11 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
+	}
+
+	nodeID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+	if err != nil {
+		return fmt.Errorf("Error parsing nodeID: '%s': %w", args.ID, err)
 	}
 
 	subnetID, err := ids.FromString(args.SubnetID)
@@ -688,7 +717,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 		uint64(args.weight()),  // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
-		args.ID,                // Node ID
+		nodeID,                 // Node ID
 		subnetID,               // Subnet ID
 		keys,                   // Keys
 	)
@@ -996,7 +1025,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	service.vm.Ctx.Log.Info("Platform: ValidatedBy called")
 	chain, err := service.vm.getChain(service.vm.DB, args.BlockchainID)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving blockchain '%s': %w", args.BlockchainID, err)
 	}
 	response.SubnetID = chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).SubnetID
 	return nil
@@ -1018,12 +1047,12 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	// Verify that the Subnet exists
 	// Ignore lookup error if it's the DefaultSubnetID
 	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.DefaultSubnetID) {
-		return err
+		return fmt.Errorf("problem retrieving subnet '%s': %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
 	chains, err := service.vm.getChains(service.vm.DB)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving chains for subnet '%s': %w", args.SubnetID, err)
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {

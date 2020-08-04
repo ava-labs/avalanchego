@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -137,21 +139,21 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	for _, addr := range args.Addresses {
 		addrBytes, err := service.vm.Parse(addr)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
 		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
 	}
 
 	utxos, err := service.vm.GetUTXOs(addrSet)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
 	reply.UTXOs = []formatting.CB58{}
 	for _, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
 		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: b})
 	}
@@ -176,21 +178,21 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 	for _, addr := range args.Addresses {
 		addrBytes, err := service.vm.Parse(addr)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
 		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
 	}
 
 	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
 
 	reply.UTXOs = []formatting.CB58{}
 	for _, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem marshalling atomic UTXO: %w", err)
 		}
 		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: b})
 	}
@@ -260,14 +262,14 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
 		assetID, err = ids.FromString(args.AssetID)
 		if err != nil {
-			return err
+			return fmt.Errorf("problem parsing assetID '%s': %w", args.AssetID, err)
 		}
 	}
 
@@ -276,7 +278,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 
 	utxos, err := service.vm.GetUTXOs(addrSet)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
 	reply.UTXOIDs = make([]ava.UTXOID, 0, len(utxos))
@@ -325,7 +327,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
-		return fmt.Errorf("couldn't parse given address: %s", err)
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 	addrAsSet := ids.Set{}
 	addrAsSet.Add(ids.NewID(hashing.ComputeHash256Array(address)))
@@ -731,7 +733,7 @@ func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, 
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
 	user := userState{vm: service.vm}
@@ -777,7 +779,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, 
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
 	response.Addresses = []string{}
@@ -804,7 +806,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -813,16 +815,16 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	address, err := service.vm.Parse(args.Address)
 	if err != nil {
-		return fmt.Errorf("problem parsing address: %w", err)
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 	addr, err := ids.ToShortID(address)
 	if err != nil {
-		return fmt.Errorf("problem parsing address: %w", err)
+		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("problem retrieving user: %w", err)
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
 	user := userState{vm: service.vm}
@@ -832,15 +834,15 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
 
-	reply.PrivateKey.Bytes = sk.Bytes()
+	reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
 	return nil
 }
 
 // ImportKeyArgs are arguments for ImportKey
 type ImportKeyArgs struct {
-	Username   string          `json:"username"`
-	Password   string          `json:"password"`
-	PrivateKey formatting.CB58 `json:"privateKey"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ImportKeyReply is the response for ImportKey
@@ -860,10 +862,19 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 
 	user := userState{vm: service.vm}
 
+	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
+		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	}
+	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
+	formattedPrivateKey := formatting.CB58{}
+	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+
 	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(args.PrivateKey.Bytes)
+	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
 	if err != nil {
-		return fmt.Errorf("problem parsing private key %s: %w", args.PrivateKey, err)
+		return fmt.Errorf("problem parsing private key: %w", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
@@ -1237,7 +1248,7 @@ type MintNFTReply struct {
 	TxID ids.ID `json:"txID"`
 }
 
-// MintNFT returns the newly created unsigned transaction
+// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *MintNFTReply) error {
 	service.vm.ctx.Log.Info("AVM: MintNFT called with username: %s", args.Username)
 

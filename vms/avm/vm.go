@@ -583,7 +583,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	if !ok {
 		return false
 	}
-	// TODO: This could be a binary search to import performance... Or perhaps
+	// TODO: This could be a binary search to improve performance... Or perhaps
 	// make a map
 	for _, state := range createAssetTx.States {
 		if state.FxID == uint32(fxID) {
