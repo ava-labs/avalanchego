@@ -125,11 +125,13 @@ func (s *State) IDs(key []byte, start []byte, limit int) ([]ids.ID, error) {
 	iter := prefixdb.NewNested(key, s.DB).NewIteratorWithStart(start)
 	defer iter.Release()
 
-	for i := 0; i < limit && iter.Next(); i++ {
+	numFetched := 0
+	for numFetched < limit && iter.Next() {
 		if keyID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
 		} else if !bytes.Equal(keyID.Bytes(), start) { // don't return [start]
 			idSlice = append(idSlice, keyID)
+			numFetched++
 		}
 	}
 	return idSlice, nil

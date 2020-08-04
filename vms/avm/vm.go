@@ -414,19 +414,22 @@ func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.
 		} else if toFetch <= 0 {
 			break
 		}
-		utxoIDs, _ := vm.state.Funds(addr, startUtxo, toFetch) // Get UTXOs associated with [addr]
+		utxoIDs, _ := vm.state.Funds(addr, startUtxo, toFetch)         // Get UTXOs associated with [addr]
+		vm.ctx.Log.Fatal("utxoIDs: %s. toFetch: %v", utxoIDs, toFetch) // TODO delete
 		for _, utxoID := range utxoIDs {
-			if toFetch <= 0 { // We fetched enough UTXOs; stop.
-				break
-			} else if seen.Contains(utxoID) { // Already have this UTXO in the list
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
-			} else if utxo, err := vm.state.UTXO(utxoID); err != nil {
+			}
+			utxo, err := vm.state.UTXO(utxoID)
+			if err != nil {
 				return nil, ids.ShortEmpty, ids.Empty, err
-			} else {
-				utxos = append(utxos, utxo)
-				seen.Add(utxoID)
-				lastIndex = utxoID
-				toFetch--
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			lastIndex = utxoID
+			toFetch--
+			if toFetch <= 0 {
+				break // Found [limit] utxos; stop.
 			}
 		}
 		lastAddr = addr
