@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-// IPCs maintains the IPCs
+// IPCServer maintains the IPCs
 type IPCServer struct {
 	httpServer   *api.Server
 	chainManager chains.Manager
@@ -57,17 +57,17 @@ type PublishBlockchainReply struct {
 }
 
 // PublishBlockchain publishes the finalized accepted transactions from the blockchainID over the IPC
-func (ipcServer *IPCServer) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
-	ipcServer.log.Info("IPCs: PublishBlockchain called with BlockchainID: %s", args.BlockchainID)
-	chainID, err := ipcServer.chainManager.Lookup(args.BlockchainID)
+func (ipc *IPCServer) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
+	ipc.log.Info("IPCs: PublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
-		ipcServer.log.Error("unknown blockchainID: %s", err)
+		ipc.log.Error("unknown blockchainID: %s", err)
 		return err
 	}
 
-	ipcs, err := ipcServer.ipcs.Publish(chainID)
+	ipcs, err := ipc.ipcs.Publish(chainID)
 	if err != nil {
-		ipcServer.log.Error("couldn't publish blockchainID: %s", err)
+		ipc.log.Error("couldn't publish blockchainID: %s", err)
 		return err
 	}
 
