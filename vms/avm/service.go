@@ -862,8 +862,9 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 
 	user := userState{vm: service.vm}
 
-	// TODO TrimPrefix returns the original string if the prefix is not present
-	// make the prefix non-optional by checking for the prefix explicitly
+	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
+		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	}
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
 	formattedPrivateKey := formatting.CB58{}
 	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
@@ -873,7 +874,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	factory := crypto.FactorySECP256K1R{}
 	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
 	if err != nil {
-		return fmt.Errorf("problem parsing private key %s: %w", args.PrivateKey, err)
+		return fmt.Errorf("problem parsing private key: %w", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
