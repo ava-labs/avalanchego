@@ -133,13 +133,14 @@ func (n *Node) initNetworking() error {
 			return err
 		}
 
-		// #nosec G402
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
 			// We do not use TLS's CA functionality, we just require an
 			// authenticated channel. Therefore, we can safely skip verification
 			// here.
+			//
+			// TODO: Security audit required
 			InsecureSkipVerify: true,
 		}
 
