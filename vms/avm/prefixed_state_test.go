@@ -183,7 +183,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	funds, err = state.Funds([]byte{0}, ids.Empty, -1)
+	funds, err = state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
