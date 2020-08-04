@@ -564,6 +564,86 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 }
 
+func TestNFTWorkflow(t *testing.T) {
+	_, vm, s := setupWithKeys(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
+
+	// Test minting of the created variable cap asset
+	createArgs := &CreateNFTAssetArgs{
+		Username: username,
+		Password: password,
+		Name:     "BIG COIN",
+		Symbol:   "COIN",
+		MinterSets: []Owners{
+			Owners{
+				Threshold: 1,
+				Minters: []string{
+					vm.Format(keys[0].PublicKey().Address().Bytes()),
+				},
+			},
+		},
+	}
+	createReply := &CreateNFTAssetReply{}
+	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
+		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
+	}
+
+	assetID := createReply.AssetID
+	createNFTTx := UniqueTx{
+		vm:   vm,
+		txID: createReply.AssetID,
+	}
+	if createNFTTx.Status() != choices.Processing {
+		t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
+	}
+
+	// Accept the transaction so that we can Mint NFTs for the test
+	if err := createNFTTx.Accept(); err != nil {
+		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
+	}
+
+	mintArgs := &MintNFTArgs{
+		Username: username,
+		Password: password,
+		AssetID:  assetID.String(),
+		Payload:  formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
+		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+	}
+	mintReply := &MintNFTReply{}
+
+	if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
+		t.Fatalf("MintNFT returned an error: %s", err)
+	}
+
+	mintNFTTx := UniqueTx{
+		vm:   vm,
+		txID: mintReply.TxID,
+	}
+	if mintNFTTx.Status() != choices.Processing {
+		t.Fatal("MintNFTTx should have been processing after minting the NFT")
+	}
+
+	// Accept the transaction so that we can send the newly minted NFT
+	if err := mintNFTTx.Accept(); err != nil {
+		t.Fatalf("Failed to accept MintNFTTx: %s", err)
+	}
+
+	sendArgs := &SendNFTArgs{
+		Username: username,
+		Password: password,
+		AssetID:  assetID.String(),
+		GroupID:  0,
+		To:       vm.Format(keys[2].PublicKey().Address().Bytes()),
+	}
+	sendReply := &SendNFTReply{}
+	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
+		t.Fatalf("Failed to send NFT due to: %s", err)
+	}
+}
+
 func TestImportExportKey(t *testing.T) {
 	_, vm, s := setup(t)
 	defer func() {
