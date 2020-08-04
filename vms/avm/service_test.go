@@ -393,32 +393,37 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	addr0 := keys[0].PublicKey().Address()
-	smDB := vm.ctx.SharedMemory.GetDatabase(ids.Empty)
+	addr1 := ids.GenerateTestShortID()
+	addr2 := ids.GenerateTestShortID()
 
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{TxID: ids.Empty},
-		Asset:  ava.Asset{ID: ids.Empty},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 7,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addr0},
-			},
-		},
-	}
-
+	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
 	state := ava.NewPrefixedState(smDB, vm.codec)
-	if err := state.FundPlatformUTXO(utxo); err != nil {
-		t.Fatal(err)
+	numUtxos := 10
+	// Put a bunch of UTXOs that reference both addr1 and addr2
+	for i := 0; i < numUtxos; i++ {
+		if err := state.FundPlatformUTXO(&ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID: ids.GenerateTestID(),
+			},
+			Asset: ava.Asset{ID: vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr1, addr2},
+				},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}
-	vm.ctx.SharedMemory.ReleaseDatabase(ids.Empty)
+	vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
 
 	tests := []struct {
-		label     string
-		args      *GetAtomicUTXOsArgs
-		count     int
-		shouldErr bool
+		label         string
+		args          *GetAtomicUTXOsArgs
+		expectedCount int
+		shouldErr     bool
 	}{
 		{
 			"Empty",
@@ -427,10 +432,8 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 			false,
 		},
 		{
-			"[<ChainID>-<unrelated address>]",
+			"[<ChainID>-<invalid address>]",
 			&GetAtomicUTXOsArgs{[]string{
-				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
-				//		 longer than addr0.String()
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			},
 				0,
@@ -440,26 +443,26 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 			true,
 		},
 		{
-			"[<ChainID>-<addr0>]",
+			"[<ChainID>-<addr1>]",
 			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String()),
 			},
 				0,
 				Index{},
 			},
-			1,
+			numUtxos,
 			false,
 		},
 		{
-			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
+			"[<ChainID>-<add1r>,<ChainID>-<addr2>]",
 			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr2.String()),
 			},
 				0,
 				Index{},
 			},
-			1,
+			numUtxos,
 			false,
 		},
 	}
@@ -470,10 +473,46 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 				t.Error(err)
 			} else if err == nil && tt.shouldErr {
 				t.Error("should have errored")
-			} else if tt.count != len(utxosReply.UTXOs) {
-				t.Errorf("Expected %d utxos, got %#v", tt.count, len(utxosReply.UTXOs))
+			} else if tt.expectedCount != len(utxosReply.UTXOs) {
+				t.Errorf("Expected %d utxos, got %#v", tt.expectedCount, len(utxosReply.UTXOs))
+			} else if tt.expectedCount != int(utxosReply.NumFetched) {
+				t.Errorf("numFetced is %d but got %d utxos", utxosReply.NumFetched, tt.expectedCount)
 			}
 		})
+	}
+
+	// Test that start index and stop index work
+	// (Assumes numUtxos > 5)
+	reply := &GetAtomicUTXOsReply{}
+	args := &GetAtomicUTXOsArgs{
+		[]string{fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String())},
+		5,
+		Index{},
+	}
+	utxos := ids.Set{}
+	if err := s.GetAtomicUTXOs(nil, args, reply); err != nil {
+		t.Fatal(err)
+	}
+	for _, utxo := range reply.UTXOs { // Remember these UTXOs
+		utxos.Add(ids.NewID(hashing.ComputeHash256Array(utxo.Bytes)))
+	}
+	args = &GetAtomicUTXOsArgs{
+		[]string{fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String())},
+		json.Uint32(numUtxos - 5),
+		reply.EndIndex,
+	}
+	if err := s.GetAtomicUTXOs(nil, args, reply); err != nil {
+		t.Fatal(err)
+	} else if len(reply.UTXOs) != numUtxos-5 {
+		t.Fatalf("got %d utxos but should have %d", len(reply.UTXOs), numUtxos-5)
+	}
+	for _, utxo := range reply.UTXOs { // Remember these UTXOs
+		utxos.Add(ids.NewID(hashing.ComputeHash256Array(utxo.Bytes)))
+	}
+	// Should have gotten all the UTXOs now. None should have been repeats
+	// so length of this set should be numUtxos
+	if utxos.Len() != numUtxos {
+		t.Fatalf("got %d utxos but should have %d", utxos.Len(), numUtxos)
 	}
 }
 

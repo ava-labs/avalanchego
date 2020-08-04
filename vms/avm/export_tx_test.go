@@ -237,7 +237,7 @@ func TestIssueExportTx(t *testing.T) {
 		ava:      avaID,
 		platform: platformID,
 	}
-	err := vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -246,19 +246,16 @@ func TestIssueExportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
-	if err != nil {
+	if err := vm.Bootstrapping(); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
-	if err != nil {
+	if err := vm.Bootstrapped(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -341,8 +338,9 @@ func TestIssueExportTx(t *testing.T) {
 	parsedTx := txs[0]
 	if err := parsedTx.Verify(); err != nil {
 		t.Fatal(err)
+	} else if err := parsedTx.Accept(); err != nil {
+		t.Fatal(err)
 	}
-	parsedTx.Accept()
 
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
@@ -358,7 +356,7 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	utxoIDs, err := state.AVMFunds(key.PublicKey().Address().LongID(), ids.Empty, math.MaxInt32)
+	utxoIDs, err := state.AVMFunds(key.PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -254,15 +254,6 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 		}
 	}
 
-	addrs := ids.ShortSet{}
-	for _, addr := range args.Addresses {
-		addr, err := service.vm.ParseAddress(addr)
-		if err != nil {
-			return err
-		}
-		addrs.Add(addr)
-	}
-
 	utxos, endAddr, endUtxoID, err := service.vm.GetAtomicUTXOs(addrSet, startAddr, startUtxo, int(args.MaxCount))
 	if err != nil {
 		return err

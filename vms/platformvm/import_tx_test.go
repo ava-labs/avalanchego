@@ -105,7 +105,7 @@ func TestNewImportTx(t *testing.T) {
 		tx, err := vm.newImportTx(to, tt.recipientKeys)
 		if err != nil {
 			if !tt.shouldErr {
-				t.Fatalf("test '%s' errored but it shouldn't have", tt.description)
+				t.Fatalf("test '%s' unexpectedly errored with: %s", tt.description, err)
 			}
 			continue
 		} else if tt.shouldErr {
