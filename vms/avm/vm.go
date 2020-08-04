@@ -368,12 +368,12 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtx
 		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
 			continue
 		}
-		utxoIDs, _ := state.AVMFunds(addr.LongID(), startUtxo, toFetch) // TODO: Use LongID()?
+		utxoIDs, _ := state.PlatformFunds(addr.Bytes(), startUtxo, toFetch)
 		for _, utxoID := range utxoIDs {
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
-			utxo, err := state.AVMUTXO(utxoID)
+			utxo, err := state.PlatformUTXO(utxoID)
 			if err != nil {
 				return nil, ids.ShortEmpty, ids.Empty, err
 			}
