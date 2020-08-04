@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/gecko/utils/hashing"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/gecko/api/keystore"
@@ -14,6 +16,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -201,12 +204,33 @@ func TestServiceGetUTXOs(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	addr0 := keys[0].PublicKey().Address()
+	addr := ids.GenerateTestShortID()
+
+	numUtxos := 10
+	// Put a bunch of UTXOs
+	for i := 0; i < numUtxos; i++ {
+		if err := vm.state.FundUTXO(&ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID: ids.GenerateTestID(),
+			},
+			Asset: ava.Asset{ID: vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	tests := []struct {
-		label     string
-		args      *GetUTXOsArgs
-		count     int
-		shouldErr bool
+		label         string
+		args          *GetUTXOsArgs
+		expectedCount int
+		shouldErr     bool
 	}{
 		{
 			"Empty",
@@ -214,10 +238,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 			0,
 			false,
 		}, {
-			"[<ChainID>-<unrelated address>]",
+			"[<ChainID>-<invalid address>]",
 			&GetUTXOsArgs{[]string{
-				// TODO: Should GetUTXOs() raise an error for this? The address portion is
-				//		 longer than addr0.String()
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			},
 				0,
@@ -226,48 +248,59 @@ func TestServiceGetUTXOs(t *testing.T) {
 			0,
 			true,
 		}, {
-			"[<ChainID>-<addr0>]",
+			"[<ChainID>-<addr>]",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String()),
 			},
 				0,
 				Index{},
 			},
-			7,
+			numUtxos,
 			false,
 		},
 		{
-			"[<ChainID>-<addr0>] limit to 5 UTXOs",
+			"[<ChainID>-<addr>] limit to 1 UTXO",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String()),
 			},
-				5,
+				1,
 				Index{},
 			},
-			5,
+			1,
 			false,
 		},
 		{
-			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
+			"[<ChainID>-<addr>] limit greater than number of UTXOs",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String()),
+			},
+				100000,
+				Index{},
+			},
+			numUtxos,
+			false,
+		},
+		{
+			"[<ChainID>-<addr>,<ChainID>-<addr>]",
+			&GetUTXOsArgs{[]string{
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String()),
 			},
 				0,
 				Index{},
 			},
-			7,
+			numUtxos,
 			false,
 		}, {
-			"[<ChainID>-<addr0>,<ChainID>-<addr0>], limit to 5 UTXOs",
+			"[<ChainID>-<addr>,<ChainID>-<addr>], limit to 1 UTXO",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String()),
+				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String()),
 			},
-				5,
+				1,
 				Index{},
 			},
-			5,
+			1,
 			false,
 		},
 	}
@@ -278,10 +311,46 @@ func TestServiceGetUTXOs(t *testing.T) {
 				t.Error(err)
 			} else if err == nil && tt.shouldErr {
 				t.Error("should have errored")
-			} else if tt.count != len(utxosReply.UTXOs) {
-				t.Errorf("Expected %d utxos, got %#v", tt.count, len(utxosReply.UTXOs))
+			} else if tt.expectedCount != len(utxosReply.UTXOs) {
+				t.Errorf("Expected %d utxos, got %#v", tt.expectedCount, len(utxosReply.UTXOs))
+			} else if tt.expectedCount != int(utxosReply.NumFetched) {
+				t.Errorf("numFetced is %d but got %d utxos", utxosReply.NumFetched, tt.expectedCount)
 			}
 		})
+	}
+
+	// Test that start index and stop index work
+	// (Assumes numUtxos > 5)
+	reply := &GetUTXOsReply{}
+	args := &GetUTXOsArgs{
+		[]string{fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String())},
+		5,
+		Index{},
+	}
+	utxos := ids.Set{}
+	if err := s.GetUTXOs(nil, args, reply); err != nil {
+		t.Fatal(err)
+	}
+	for _, utxo := range reply.UTXOs { // Remember these UTXOs
+		utxos.Add(ids.NewID(hashing.ComputeHash256Array(utxo.Bytes)))
+	}
+	args = &GetUTXOsArgs{
+		[]string{fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr.String())},
+		json.Uint32(numUtxos - 5),
+		reply.EndIndex,
+	}
+	if err := s.GetUTXOs(nil, args, reply); err != nil {
+		t.Fatal(err)
+	} else if len(reply.UTXOs) != numUtxos-5 {
+		t.Fatalf("got %d utxos but should have %d", len(reply.UTXOs), numUtxos-5)
+	}
+	for _, utxo := range reply.UTXOs { // Remember these UTXOs
+		utxos.Add(ids.NewID(hashing.ComputeHash256Array(utxo.Bytes)))
+	}
+	// Should have gotten all the UTXOs now. None should have been repeats
+	// so length of this set should be numUtxos
+	if utxos.Len() != numUtxos {
+		t.Fatalf("got %d utxos but should have %d", utxos.Len(), numUtxos)
 	}
 }
 
