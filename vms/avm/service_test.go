@@ -365,19 +365,19 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 	addr0 := keys[0].PublicKey().Address()
 	tests := []struct {
 		label string
-		args  *GetAtomicUTXOsArgs
+		args  *GetUTXOsArgs
 	}{
-		{"[", &GetAtomicUTXOsArgs{[]string{""}, 0, Index{}}},
-		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}, 0, Index{}}},
-		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}, 0, Index{}}},
-		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}, 0, Index{}}},
-		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{ctx.ChainID.String()}, 0, Index{}}},
-		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0, Index{}}},
-		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0, Index{}}},
+		{"[", &GetUTXOsArgs{[]string{""}, 0, Index{}}},
+		{"[-]", &GetUTXOsArgs{[]string{"-"}, 0, Index{}}},
+		{"[foo]", &GetUTXOsArgs{[]string{"foo"}, 0, Index{}}},
+		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}, 0, Index{}}},
+		{"[<ChainID>]", &GetUTXOsArgs{[]string{ctx.ChainID.String()}, 0, Index{}}},
+		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", ctx.ChainID.String())}, 0, Index{}}},
+		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}, 0, Index{}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			utxosReply := &GetAtomicUTXOsReply{}
+			utxosReply := &GetUTXOsReply{}
 			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err == nil {
 				t.Error(err)
 			}
@@ -421,19 +421,19 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 
 	tests := []struct {
 		label         string
-		args          *GetAtomicUTXOsArgs
+		args          *GetUTXOsArgs
 		expectedCount int
 		shouldErr     bool
 	}{
 		{
 			"Empty",
-			&GetAtomicUTXOsArgs{},
+			&GetUTXOsArgs{},
 			0,
 			false,
 		},
 		{
 			"[<ChainID>-<invalid address>]",
-			&GetAtomicUTXOsArgs{[]string{
+			&GetUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
 			},
 				0,
@@ -444,7 +444,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 		},
 		{
 			"[<ChainID>-<addr1>]",
-			&GetAtomicUTXOsArgs{[]string{
+			&GetUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String()),
 			},
 				0,
@@ -455,7 +455,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 		},
 		{
 			"[<ChainID>-<add1r>,<ChainID>-<addr2>]",
-			&GetAtomicUTXOsArgs{[]string{
+			&GetUTXOsArgs{[]string{
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String()),
 				fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr2.String()),
 			},
@@ -468,7 +468,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			utxosReply := &GetAtomicUTXOsReply{}
+			utxosReply := &GetUTXOsReply{}
 			if err := s.GetAtomicUTXOs(nil, tt.args, utxosReply); err != nil && !tt.shouldErr {
 				t.Error(err)
 			} else if err == nil && tt.shouldErr {
@@ -483,8 +483,8 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 
 	// Test that start index and stop index work
 	// (Assumes numUtxos > 5)
-	reply := &GetAtomicUTXOsReply{}
-	args := &GetAtomicUTXOsArgs{
+	reply := &GetUTXOsReply{}
+	args := &GetUTXOsArgs{
 		[]string{fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String())},
 		5,
 		Index{},
@@ -496,7 +496,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	for _, utxo := range reply.UTXOs { // Remember these UTXOs
 		utxos.Add(ids.NewID(hashing.ComputeHash256Array(utxo.Bytes)))
 	}
-	args = &GetAtomicUTXOsArgs{
+	args = &GetUTXOsArgs{
 		[]string{fmt.Sprintf("%s-%s", ctx.ChainID.String(), addr1.String())},
 		json.Uint32(numUtxos - 5),
 		reply.EndIndex,

@@ -222,12 +222,12 @@ type Index struct {
 
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
 // Gets the UTXOs that reference at least one address in [Addresses].
-// Returns at most [MaxCount] addresses.
-// If [MaxCount] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
+// Returns at most [Limit] addresses.
+// If [Limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
 // [StartIndex] defines where to start fetching UTXOs. It's used for pagination.
 type GetUTXOsArgs struct {
 	Addresses  []string    `json:"addresses"`
-	MaxCount   json.Uint32 `json:"maxCount"`
+	Limit      json.Uint32 `json:"limit"`
 	StartIndex Index       `json:"startIndex"`
 }
 
@@ -279,7 +279,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		}
 	}
 
-	utxos, endAddr, endUtxoID, err := service.vm.getUTXOs(service.vm.DB, addrs, startAddr, startUtxo, int(args.MaxCount))
+	utxos, endAddr, endUtxoID, err := service.vm.getUTXOs(service.vm.DB, addrs, startAddr, startUtxo, int(args.Limit))
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXOs: %s", err)
 	}

@@ -132,12 +132,12 @@ type Index struct {
 
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
 // Gets the UTXOs that reference at least one address in [Addresses].
-// Returns at most [MaxCount] addresses.
-// If [MaxCount] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
+// Returns at most [limit] addresses.
+// If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
 // [StartIndex] defines where to start fetching UTXOs. It's used for pagination.
 type GetUTXOsArgs struct {
 	Addresses  []string    `json:"addresses"`
-	MaxCount   json.Uint32 `json:"maxCount"`
+	Limit      json.Uint32 `json:"limit"`
 	StartIndex Index       `json:"startIndex"`
 }
 
@@ -184,7 +184,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		}
 	}
 
-	utxos, endAddr, endUtxoID, err := service.vm.GetUTXOs(addrSet, startAddr, startUtxo, int(args.MaxCount))
+	utxos, endAddr, endUtxoID, err := service.vm.GetUTXOs(addrSet, startAddr, startUtxo, int(args.Limit))
 	if err != nil {
 		return err
 	}
@@ -203,28 +203,8 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	return nil
 }
 
-// GetAtomicUTXOsArgs are arguments for passing into GetAtomicUTXOs requests
-type GetAtomicUTXOsArgs struct {
-	Addresses  []string    `json:"addresses"`
-	MaxCount   json.Uint32 `json:"maxCount"`
-	StartIndex Index       `json:"startIndex"`
-}
-
-// GetAtomicUTXOsReply defines the GetAtomicUTXOs replies returned from the API
-type GetAtomicUTXOsReply struct {
-	// Number of UTXOs returned
-	NumFetched json.Uint64 `json:"numFetched"`
-	// The UTXOs
-	UTXOs []formatting.CB58 `json:"utxos"`
-
-	// The last UTXO that was returned, and the address it corresponds to.
-	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
-	// again and set [StartIndex] to this value.
-	EndIndex Index `json:"endIndex"`
-}
-
 // GetAtomicUTXOs gets all atomic utxos for passed in addresses
-func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs, reply *GetAtomicUTXOsReply) error {
+func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetUTXOsArgs, reply *GetUTXOsReply) error {
 	service.vm.ctx.Log.Info("GetAtomicUTXOs called with %s", args.Addresses)
 
 	if len(args.Addresses) > maxGetUTXOsAddrs {
@@ -254,7 +234,7 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 		}
 	}
 
-	utxos, endAddr, endUtxoID, err := service.vm.GetAtomicUTXOs(addrSet, startAddr, startUtxo, int(args.MaxCount))
+	utxos, endAddr, endUtxoID, err := service.vm.GetAtomicUTXOs(addrSet, startAddr, startUtxo, int(args.Limit))
 	if err != nil {
 		return err
 	}
