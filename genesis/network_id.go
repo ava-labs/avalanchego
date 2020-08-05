@@ -34,7 +34,7 @@ func NetworkID(networkName string) (uint32, error) {
 		}
 		return uint32(id), nil
 	}
-	if validNetworkName.MatchString(networkName) {
+	if constants.ValidNetworkName.MatchString(networkName) {
 		if id, err := strconv.Atoi(networkName[8:]); err == nil {
 			if id > math.MaxUint32 {
 				return 0, fmt.Errorf("NetworkID %s not in [0, 2^32)", networkName)

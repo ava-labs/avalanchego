@@ -5,6 +5,7 @@ package genesis
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 )
 
 // Note that since an AVA network has exactly one Platform Chain,
@@ -509,11 +510,11 @@ var (
 // GetConfig ...
 func GetConfig(networkID uint32) *Config {
 	switch networkID {
-	case EverestID:
+	case constants.EverestID:
 		return &EverestConfig
-	case DenaliID:
+	case constants.DenaliID:
 		return &DenaliConfig
-	case CascadeID:
+	case constants.CascadeID:
 		return &CascadeConfig
 	default:
 		return &DefaultConfig

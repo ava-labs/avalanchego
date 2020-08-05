@@ -34,14 +34,14 @@ var (
 	EverestName  = "everest"
 	TestnetName  = "testnet"
 	LocalName    = "local"
-	UnitTestName = "testing1321"
+	UnitTestName = "testing"
 
 	MainnetHRP  = "avax"
 	CascadeHRP  = "cascade"
 	DenaliHRP   = "denali"
 	EverestHRP  = "everest"
 	LocalHRP    = "local"
-	UnitTestHRP = "testing1321"
+	UnitTestHRP = "testing"
 	FallbackHRP = "custom"
 
 	NetworkIDToNetworkName = map[uint32]string{
@@ -79,5 +79,5 @@ var (
 		UnitTestHRP: UnitTestID,
 	}
 
-	validNetworkName = regexp.MustCompile(`network-[0-9]+`)
+	ValidNetworkName = regexp.MustCompile(`network-[0-9]+`)
 )

@@ -130,14 +130,18 @@ func TestServiceGetBalance(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+	addr := keys[0].PublicKey().Address().Bytes()
+	addrstr, err := vm.Format(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	balanceArgs := &GetBalanceArgs{
-		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+		Address: addrstr,
 		AssetID: assetID.String(),
 	}
 	balanceReply := &GetBalanceReply{}
-	err := s.GetBalance(nil, balanceArgs, balanceReply)
+	err = s.GetBalance(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(balanceReply.Balance), uint64(300000))
 
@@ -153,13 +157,17 @@ func TestServiceGetAllBalances(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+	addr := keys[0].PublicKey().Address().Bytes()
+	addrstr, err := vm.Format(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	balanceArgs := &GetAllBalancesArgs{
-		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+		Address: addrstr,
 	}
 	balanceReply := &GetAllBalancesReply{}
-	err := s.GetAllBalances(nil, balanceArgs, balanceReply)
+	err = s.GetAllBalances(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
 
 	assert.Len(t, balanceReply.Balances, 1)
@@ -224,7 +232,7 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
-	addr0str, err := vm.Format(addr0.Bytes())
+	addr0str, err := vm.FormatBech32(addr0.Bytes())
 	if err != nil {
 		t.Error(err)
 	}
@@ -258,6 +266,14 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0str, err := vm.FormatBech32(addr0.Bytes())
+	if err != nil {
+		t.Error(err)
+	}
+	newAddrStr, err := vm.FormatBech32(ids.NewID([32]byte{20}).Bytes())
+	if err != nil {
+		t.Error(err)
+	}
 	tests := []struct {
 		label string
 		args  *GetUTXOsArgs
@@ -270,22 +286,20 @@ func TestServiceGetUTXOs(t *testing.T) {
 		}, {
 			"[<ChainID>-<unrelated address>]",
 			&GetUTXOsArgs{[]string{
-				// TODO: Should GetUTXOs() raise an error for this? The address portion is
-				//		 longer than addr0.String()
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), newAddrStr),
 			}},
 			0,
 		}, {
 			"[<ChainID>-<addr0>]",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
 			}},
 			7,
 		}, {
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
 			&GetUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
 			}},
 			7,
 		},
@@ -310,6 +324,10 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0str, err := vm.FormatBech32(addr0.Bytes())
+	if err != nil {
+		t.Error(err)
+	}
 	tests := []struct {
 		label string
 		args  *GetAtomicUTXOsArgs
@@ -320,7 +338,7 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}}},
 		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{vm.ctx.ChainID.String()}}},
 		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
-		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0str)}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -340,6 +358,14 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0str, err := vm.FormatBech32(addr0.Bytes())
+	if err != nil {
+		t.Error(err)
+	}
+	newAddrStr, err := vm.FormatBech32(ids.NewID([32]byte{42}).Bytes())
+	if err != nil {
+		t.Error(err)
+	}
 	platformID := ids.Empty.Prefix(0)
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
@@ -376,22 +402,22 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 			&GetAtomicUTXOsArgs{[]string{
 				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
 				//		 longer than addr0.String()
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), newAddrStr),
 			}},
 			0,
 		},
 		{
 			"[<ChainID>-<addr0>]",
 			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
 			}},
 			1,
 		},
 		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
 			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
 			}},
 			1,
 		},
@@ -491,7 +517,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "2CJbAPBPwt9nFd28MbKKJZkincdmvDmP7UYbPT4VP1LJ46Yyip" {
+	if reply.AssetID.String() != "2YD5ovZNEx7cxryCBxDZaYbrQc3v6AxTDiJwCxkZS1YMFU3Sni" {
 		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
 	}
 }
@@ -528,7 +554,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 	createdAssetID := reply.AssetID.String()
 
-	if createdAssetID != "23FV5zQpuG9EZBh7BXKj9wqPAMe7tY9T4jEWpobbMQHLLUf88o" {
+	if createdAssetID != "25BzKomFRYuq52dgoutjDsehgw4v9Uvcgb2fnTBLt8qqTTTAD7" {
 		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 

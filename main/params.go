@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/staking"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -37,7 +38,7 @@ const (
 var (
 	Config             = node.Config{}
 	Err                error
-	defaultNetworkName = genesis.TestnetName
+	defaultNetworkName = constants.TestnetName
 
 	homeDir                = os.ExpandEnv("$HOME")
 	defaultDbDir           = filepath.Join(homeDir, ".gecko", "db")
@@ -59,7 +60,7 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
-	case genesis.DenaliID:
+	case constants.DenaliID:
 		return []string{
 			"18.188.121.35:21001",
 			"3.133.83.66:21001",
@@ -82,7 +83,7 @@ func GetIPs(networkID uint32) []string {
 			"3.12.197.248:21001",
 			"3.17.39.236:21001",
 		}
-	case genesis.CascadeID:
+	case constants.CascadeID:
 		return []string{
 			"3.227.207.132:21001",
 			"34.207.133.167:21001",
@@ -98,7 +99,7 @@ func GetIPs(networkID uint32) []string {
 // GetIDs returns the default IDs for each network
 func GetIDs(networkID uint32) []string {
 	switch networkID {
-	case genesis.DenaliID:
+	case constants.DenaliID:
 		return []string{
 			"NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
 			"2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
@@ -121,7 +122,7 @@ func GetIDs(networkID uint32) []string {
 			"JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
 			"4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
 		}
-	case genesis.CascadeID:
+	case constants.CascadeID:
 		return []string{
 			"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
 			"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",

@@ -6,6 +6,7 @@ package genesis
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/spchainvm"
@@ -13,20 +14,20 @@ import (
 )
 
 func TestNetworkName(t *testing.T) {
-	if name := NetworkName(MainnetID); name != MainnetName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, MainnetName)
+	if name := NetworkName(constants.MainnetID); name != constants.MainnetName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.MainnetName)
 	}
-	if name := NetworkName(CascadeID); name != CascadeName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, CascadeName)
+	if name := NetworkName(constants.CascadeID); name != constants.CascadeName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.CascadeName)
 	}
-	if name := NetworkName(DenaliID); name != DenaliName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, DenaliName)
+	if name := NetworkName(constants.DenaliID); name != constants.DenaliName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.DenaliName)
 	}
-	if name := NetworkName(EverestID); name != EverestName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, EverestName)
+	if name := NetworkName(constants.EverestID); name != constants.EverestName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.EverestName)
 	}
-	if name := NetworkName(TestnetID); name != EverestName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, EverestName)
+	if name := NetworkName(constants.TestnetID); name != constants.EverestName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.EverestName)
 	}
 	if name := NetworkName(4294967295); name != "network-4294967295" {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, "network-4294967295")
@@ -34,52 +35,52 @@ func TestNetworkName(t *testing.T) {
 }
 
 func TestNetworkID(t *testing.T) {
-	id, err := NetworkID(MainnetName)
+	id, err := NetworkID(constants.MainnetName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != MainnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", MainnetID, id)
+	if id != constants.MainnetID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.MainnetID, id)
 	}
 
-	id, err = NetworkID(CascadeName)
+	id, err = NetworkID(constants.CascadeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != CascadeID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", CascadeID, id)
+	if id != constants.CascadeID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.CascadeID, id)
 	}
 
 	id, err = NetworkID("cAsCaDe")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != CascadeID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", CascadeID, id)
+	if id != constants.CascadeID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.CascadeID, id)
 	}
 
-	id, err = NetworkID(DenaliName)
+	id, err = NetworkID(constants.DenaliName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != DenaliID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", DenaliID, id)
+	if id != constants.DenaliID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.DenaliID, id)
 	}
 
 	id, err = NetworkID("dEnAlI")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != DenaliID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", DenaliID, id)
+	if id != constants.DenaliID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.DenaliID, id)
 	}
 
-	id, err = NetworkID(TestnetName)
+	id, err = NetworkID(constants.TestnetName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != TestnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
+	if id != constants.TestnetID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.TestnetID, id)
 	}
 
 	id, err = NetworkID("network-4294967295")
@@ -112,7 +113,7 @@ func TestNetworkID(t *testing.T) {
 }
 
 func TestAliases(t *testing.T) {
-	generalAliases, _, _, _ := Aliases(LocalID)
+	generalAliases, _, _, _ := Aliases(constants.LocalID)
 	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
@@ -127,7 +128,7 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes, _, err := Genesis(LocalID)
+	genesisBytes, _, err := Genesis(constants.LocalID)
 	if err != nil {
 		t.Fatal(err)
 	}

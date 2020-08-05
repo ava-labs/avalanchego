@@ -975,7 +975,7 @@ func splitAddress(addrStr string) (string, string, error) {
 // addrStr is an encoded address, of the form "P-<bech32 encoded bytes>".
 func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
 	networkID := vm.Ctx.NetworkID
-	var hrp string = constants.FallbackHRP
+	hrp := constants.FallbackHRP
 	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
 		hrp = constants.NetworkIDToHRP[networkID]
 	}
@@ -995,9 +995,13 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
 		return ids.ShortID{}, err
 	}
 	if rawHRP != hrp {
-		return ids.ShortID{}, fmt.Errorf("%w: %v", errInvalidAddress, err)
+		return ids.ShortID{}, fmt.Errorf("%w, %q != %q: %v", errInvalidAddress, rawHRP, hrp, err)
 	}
-	return ids.ToShortID(decoded)
+	addr, err := bech32.ConvertBits(decoded, 5, 8, true)
+	if err != nil {
+		return ids.ShortID{}, fmt.Errorf("unable to convert address from 5-bit to 8-bit: %v", err)
+	}
+	return ids.ToShortID(addr)
 }
 
 // FormatAddress returns an encoded Platform Chain address, of the form
@@ -1008,7 +1012,11 @@ func (vm *VM) FormatAddress(addrID ids.ShortID) (string, error) {
 	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
 		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	addr, err := bech32.Encode(hrp, addrID.Bytes())
+	fivebits, err := bech32.ConvertBits(addrID.Bytes(), 8, 5, true)
+	if err != nil {
+		return "", fmt.Errorf("unable to convert address from 8-bit formatting to 5-bit formatting")
+	}
+	addr, err := bech32.Encode(hrp, fivebits)
 	if err != nil {
 		return "", err
 	}
