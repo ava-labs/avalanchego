@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcutil/bech32"
+
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/cache"
@@ -21,8 +23,8 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -593,8 +595,13 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return false
 }
 
-// Parse ...
+// Parse takes in an address string and produces bytes for the address
 func (vm *VM) Parse(addrStr string) ([]byte, error) {
+	networkID := vm.ctx.NetworkID
+	var hrp string = constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
+	}
 	if count := strings.Count(addrStr, addressSep); count != 1 {
 		return nil, errInvalidAddress
 	}
@@ -611,20 +618,35 @@ func (vm *VM) Parse(addrStr string) ([]byte, error) {
 	if !bcID.Equals(vm.ctx.ChainID) {
 		return nil, errWrongBlockchainID
 	}
-	cb58 := formatting.CB58{}
-	err = cb58.FromString(rawAddr)
-	return cb58.Bytes, err
+
+	rawHRP, decoded, err := bech32.Decode(rawAddr)
+	if err != nil {
+		return nil, err
+	}
+	if rawHRP != hrp {
+		return nil, fmt.Errorf("improper Human Readable Part (HRP) of address %q -- found %q, expected %q", addrStr, rawHRP, hrp)
+	}
+	return decoded, nil
 }
 
-// Format ...
-func (vm *VM) Format(b []byte) string {
+// Format takes in a 20-byte slice and produces a string for an address
+func (vm *VM) Format(b []byte) (string, error) {
 	var bcAlias string
 	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
 		bcAlias = alias
 	} else {
 		bcAlias = vm.ctx.ChainID.String()
 	}
-	return fmt.Sprintf("%s%s%s", bcAlias, addressSep, formatting.CB58{Bytes: b})
+	networkID := vm.ctx.NetworkID
+	var hrp string = constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
+	}
+	addr, err := bech32.Encode(hrp, b)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%s%s", bcAlias, addressSep, addr), nil
 }
 
 // LoadUser ...

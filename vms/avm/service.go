@@ -755,8 +755,10 @@ func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, 
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving address: %w", err)
 	}
-
-	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
+	reply.Address, err = service.vm.Format(sk.PublicKey().Address().Bytes())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -791,7 +793,11 @@ func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, 
 	}
 
 	for _, address := range addresses {
-		response.Addresses = append(response.Addresses, service.vm.Format(address.Bytes()))
+		addr, err := service.vm.Format(address.Bytes())
+		if err != nil {
+			return fmt.Errorf("problem formatting address: %w", err)
+		}
+		response.Addresses = append(response.Addresses, addr)
 	}
 	return nil
 }
@@ -885,7 +891,10 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	addresses, _ := user.Addresses(db)
 
 	newAddress := sk.PublicKey().Address()
-	reply.Address = service.vm.Format(newAddress.Bytes())
+	reply.Address, err = service.vm.Format(newAddress.Bytes())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	for _, address := range addresses {
 		if newAddress.Equals(address) {
 			return nil

@@ -123,7 +123,10 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
-	reply.Address = service.vm.FormatAddress(sk.PublicKey().Address())
+	reply.Address, err = service.vm.FormatAddress(sk.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -159,7 +162,11 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 	addrs := [][]byte{address.Bytes()}
 	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
+		addr, err2 := service.vm.FormatAddress(address)
+		if err2 != nil {
+			return fmt.Errorf("problem formatting address: %w", err2)
+		}
+		return fmt.Errorf("couldn't get UTXO set of %s: %w", addr, err)
 	}
 	balance := uint64(0)
 	for _, utxo := range utxos {
@@ -195,7 +202,10 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 	} else if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
-	response.Address = service.vm.FormatAddress(key.PublicKey().Address())
+	response.Address, err = service.vm.FormatAddress(key.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -214,7 +224,10 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	}
 	response.Addresses = make([]string, len(addresses))
 	for i, addr := range addresses {
-		response.Addresses[i] = service.vm.FormatAddress(addr)
+		response.Addresses[i], err = service.vm.FormatAddress(addr)
+		if err != nil {
+			return fmt.Errorf("problem formatting address: %w", err)
+		}
 	}
 	return nil
 }
@@ -308,7 +321,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets[i] = APISubnet{
 				ID:          subnet.ID(),
@@ -333,7 +350,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets = append(response.Subnets,
 				APISubnet{
