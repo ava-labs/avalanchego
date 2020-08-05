@@ -34,7 +34,7 @@ var (
 	}
 
 	// Platform address resulting from the above private key
-	testAddress string = "P-6Y3kysjF9jnHnYkdS9yGAuoHyae2eNmeV"
+	testAddress string = "P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"
 )
 
 func defaultService(t *testing.T) *Service {
@@ -96,7 +96,7 @@ func TestCreateBlockchainArgsParsing(t *testing.T) {
 }
 
 func TestExportKey(t *testing.T) {
-	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","address":"P-6Y3kysjF9jnHnYkdS9yGAuoHyae2eNmeV"}`
+	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","address":"` + testAddress + `"}`
 	args := ExportKeyArgs{}
 	err := json.Unmarshal([]byte(jsonString), &args)
 	if err != nil {
