@@ -434,10 +434,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:            n.Config.AvaTxFee,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			ChainManager: n.chainManager,
-			AVA:          avaxAssetID,
-			Fee:          n.Config.AvaTxFee,
-			ValidChains:  validAVMChains,
+			AVA:         avaxAssetID,
+			Fee:         n.Config.AvaTxFee,
+			ValidChains: validAVMChains,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: path.Join(n.Config.PluginDir, "evm"),

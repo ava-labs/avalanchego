@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/api/keystore"
-	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/mockdb"
@@ -58,6 +57,11 @@ func NewContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
 	ctx.ChainID = chainID
+	aliaser := ctx.BCLookup.(*ids.Aliaser)
+	aliaser.Alias(chainID, "X")
+	aliaser.Alias(chainID, chainID.String())
+	aliaser.Alias(platformChainID, "P")
+	aliaser.Alias(platformChainID, platformChainID.String())
 	return ctx
 }
 
@@ -193,8 +197,7 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
-		ava:          avaID,
-		chainManager: chains.MockManager{},
+		ava: avaID,
 	}
 	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
@@ -1049,6 +1052,11 @@ func TestIssueProperty(t *testing.T) {
 func TestVMFormat(t *testing.T) {
 	_, _, vm := GenesisVM(t)
 	ctx := vm.ctx
+
+	tmpAliases := &ids.Aliaser{}
+	tmpAliases.Initialize()
+	ctx.BCLookup = tmpAliases
+
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -1076,14 +1084,6 @@ func TestVMFormatAliased(t *testing.T) {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
 	}()
-
-	origAliases := ctx.BCLookup
-	defer func() { ctx.BCLookup = origAliases }()
-
-	tmpAliases := &ids.Aliaser{}
-	tmpAliases.Initialize()
-	tmpAliases.Alias(ctx.ChainID, "X")
-	ctx.BCLookup = tmpAliases
 
 	tests := []struct {
 		in       string

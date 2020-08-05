@@ -176,7 +176,7 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 	service.vm.ctx.Log.Info("GetAtomicUTXOs called for chain %s with %s",
 		args.BlockchainID, args.Addresses)
 
-	chainID, err := service.vm.chainManager.Lookup(args.BlockchainID)
+	chainID, err := service.vm.ctx.BCLookup.Lookup(args.BlockchainID)
 	if err != nil {
 		return fmt.Errorf("problem parsing chainID '%s': %w", args.BlockchainID, err)
 	}
@@ -1367,7 +1367,7 @@ type ImportAVAReply struct {
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *ImportAVAReply) error {
 	service.vm.ctx.Log.Info("AVM: ImportAVA called with username: %s", args.Username)
 
-	chainID, err := service.vm.chainManager.Lookup(args.SourceChain)
+	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
 		return fmt.Errorf("problem parsing chainID '%s': %w", args.SourceChain, err)
 	}
@@ -1502,7 +1502,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 		return errInvalidAmount
 	}
 
-	chainID, err := service.vm.chainManager.Lookup(args.DestinationChain)
+	chainID, err := service.vm.ctx.BCLookup.Lookup(args.DestinationChain)
 	if err != nil {
 		return fmt.Errorf("problem parsing chainID '%s': %w", args.DestinationChain, err)
 	}

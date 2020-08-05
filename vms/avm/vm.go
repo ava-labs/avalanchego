@@ -13,7 +13,6 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
@@ -82,9 +81,6 @@ type VM struct {
 
 	// set of chains that are allowed to be transferred to and from
 	validChains ids.Set
-
-	// The node's chain manager
-	chainManager chains.Manager
 
 	// Transaction issuing
 	timer        *timer.Timer

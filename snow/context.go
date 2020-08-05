@@ -65,13 +65,15 @@ func DefaultContextTest() *Context {
 	decisionED.Initialize(logging.NoLog{})
 	consensusED := triggers.EventDispatcher{}
 	consensusED.Initialize(logging.NoLog{})
+	aliaser := &ids.Aliaser{}
+	aliaser.Initialize()
 	return &Context{
 		ChainID:             ids.Empty,
 		NodeID:              ids.ShortEmpty,
 		Log:                 logging.NoLog{},
 		DecisionDispatcher:  &decisionED,
 		ConsensusDispatcher: &consensusED,
-		BCLookup:            &ids.Aliaser{},
+		BCLookup:            aliaser,
 		Metrics:             prometheus.NewRegistry(),
 	}
 }
