@@ -224,6 +224,10 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0str, err := vm.Format(addr0.Bytes())
+	if err != nil {
+		t.Error(err)
+	}
 	tests := []struct {
 		label string
 		args  *GetUTXOsArgs
@@ -234,7 +238,7 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 		{"[foo-bar]", &GetUTXOsArgs{[]string{"foo-bar"}}},
 		{"[<ChainID>]", &GetUTXOsArgs{[]string{vm.ctx.ChainID.String()}}},
 		{"[<ChainID>-]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
-		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+		{"[<Unknown ID>-<addr0>]", &GetUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0str)}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -443,8 +447,12 @@ func TestGetBalance(t *testing.T) {
 	avaAssetID := genesisTx.ID()
 
 	reply := GetBalanceReply{}
-	err := s.GetBalance(nil, &GetBalanceArgs{
-		Address: vm.Format(keys[0].PublicKey().Address().Bytes()),
+	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.GetBalance(nil, &GetBalanceArgs{
+		Address: addrstr,
 		AssetID: avaAssetID.String(),
 	}, &reply)
 	if err != nil {
@@ -464,7 +472,11 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	}()
 
 	reply := CreateFixedCapAssetReply{}
-	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
+	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
 		Username:     username,
 		Password:     password,
 		Name:         "testAsset",
@@ -472,7 +484,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		Denomination: 1,
 		InitialHolders: []*Holder{{
 			Amount:  123456789,
-			Address: vm.Format(keys[0].PublicKey().Address().Bytes()),
+			Address: addrstr,
 		}},
 	}, &reply)
 	if err != nil {
@@ -492,7 +504,11 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}()
 
 	reply := CreateVariableCapAssetReply{}
-	err := s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
+	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
 		Username: username,
 		Password: password,
 		Name:     "test asset",
@@ -501,7 +517,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			{
 				Threshold: 1,
 				Minters: []string{
-					vm.Format(keys[0].PublicKey().Address().Bytes()),
+					addrstr,
 				},
 			},
 		},
@@ -528,12 +544,16 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 
 	// Test minting of the created variable cap asset
+	addrstr, err = vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	mintArgs := &MintArgs{
 		Username: username,
 		Password: password,
 		Amount:   200,
 		AssetID:  createdAssetID,
-		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To:       addrstr,
 	}
 	mintReply := &MintReply{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -551,13 +571,16 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	if err := mintTx.Accept(); err != nil {
 		t.Fatalf("Failed to accept MintTx due to: %s", err)
 	}
-
+	addrstr, err = vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	sendArgs := &SendArgs{
 		Username: username,
 		Password: password,
 		Amount:   200,
 		AssetID:  createdAssetID,
-		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To:       addrstr,
 	}
 	sendReply := &SendReply{}
 	if err := s.Send(nil, sendArgs, sendReply); err != nil {
@@ -573,6 +596,10 @@ func TestNFTWorkflow(t *testing.T) {
 	}()
 
 	// Test minting of the created variable cap asset
+	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	createArgs := &CreateNFTAssetArgs{
 		Username: username,
 		Password: password,
@@ -582,7 +609,7 @@ func TestNFTWorkflow(t *testing.T) {
 			Owners{
 				Threshold: 1,
 				Minters: []string{
-					vm.Format(keys[0].PublicKey().Address().Bytes()),
+					addrstr,
 				},
 			},
 		},
@@ -606,12 +633,16 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
 	}
 
+	addrstr, err = vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	mintArgs := &MintNFTArgs{
 		Username: username,
 		Password: password,
 		AssetID:  assetID.String(),
 		Payload:  formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
-		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To:       addrstr,
 	}
 	mintReply := &MintNFTReply{}
 
@@ -632,12 +663,16 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("Failed to accept MintNFTTx: %s", err)
 	}
 
+	addrstr, err = vm.Format(keys[2].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	sendArgs := &SendNFTArgs{
 		Username: username,
 		Password: password,
 		AssetID:  assetID.String(),
 		GroupID:  0,
-		To:       vm.Format(keys[2].PublicKey().Address().Bytes()),
+		To:       addrstr,
 	}
 	sendReply := &SendNFTReply{}
 	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
@@ -670,10 +705,14 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	addrstr, err := vm.Format(sk.PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	exportArgs := &ExportKeyArgs{
 		Username: username,
 		Password: password,
-		Address:  vm.Format(sk.PublicKey().Address().Bytes()),
+		Address:  addrstr,
 	}
 	exportReply := &ExportKeyReply{}
 	if err = s.ExportKey(nil, exportArgs, exportReply); err != nil {
@@ -718,7 +757,10 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedAddress := vm.Format(sk.PublicKey().Address().Bytes())
+	expectedAddress, err := vm.Format(sk.PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if reply.Address != expectedAddress {
 		t.Fatalf("Reply address: %s did not match expected address: %s", reply.Address, expectedAddress)
@@ -762,12 +804,16 @@ func TestSend(t *testing.T) {
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
 
+	addrstr, err := vm.Format(addr.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	args := &SendArgs{
 		Username: username,
 		Password: password,
 		Amount:   500,
 		AssetID:  assetID.String(),
-		To:       vm.Format(addr.Bytes()),
+		To:       addrstr,
 	}
 	reply := &SendReply{}
 	vm.timer.Cancel()
@@ -853,11 +899,14 @@ func TestImportAVA(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
-
+	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	importArgs := &ImportAVAArgs{
 		Username: username,
 		Password: password,
-		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To:       addrstr,
 	}
 	importReply := &ImportAVAReply{}
 	if err := s.ImportAVA(nil, importArgs, importReply); err != nil {

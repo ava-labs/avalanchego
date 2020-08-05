@@ -1060,8 +1060,12 @@ func TestVMFormat(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			if res := vm.Format([]byte(tt.in)); tt.expected != res {
-				t.Errorf("Expected %q, got %q", tt.expected, res)
+			addrstr, err := vm.Format([]byte(tt.in))
+			if err != nil {
+				t.Error(err)
+			}
+			if tt.expected != addrstr {
+				t.Errorf("Expected %q, got %q", tt.expected, addrstr)
 			}
 		})
 	}
@@ -1091,8 +1095,12 @@ func TestVMFormatAliased(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			if res := vm.Format([]byte(tt.in)); tt.expected != res {
-				t.Errorf("Expected %q, got %q", tt.expected, res)
+			addrstr, err := vm.Format([]byte(tt.in))
+			if err != nil {
+				t.Error(err)
+			}
+			if tt.expected != addrstr {
+				t.Errorf("Expected %q, got %q", tt.expected, addrstr)
 			}
 		})
 	}

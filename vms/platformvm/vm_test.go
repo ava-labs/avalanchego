@@ -1750,7 +1750,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 func TestParseAddress(t *testing.T) {
 	vm := &VM{}
-	if _, err := vm.ParseAddress("P-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH"); err != nil {
+	if _, err := vm.ParseAddress(testAddress); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1766,7 +1766,7 @@ func TestParseAddressInvalid(t *testing.T) {
 		{"P", errInvalidAddressSeperator},
 		{"-", errEmptyAddressPrefix},
 		{"P-", errEmptyAddressSuffix},
-		{"X-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH", errInvalidAddressPrefix},
+		{"X-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5", errInvalidAddressPrefix},
 		{"P-Bg6e45gxCUTLXcfUuoy", errInvalidAddress}, //truncated
 	}
 	for _, tt := range tests {
@@ -1786,11 +1786,15 @@ func TestFormatAddress(t *testing.T) {
 		in    ids.ShortID
 		want  string
 	}{
-		{"keys[0]", keys[0].PublicKey().Address(), "P-Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf"},
+		{"keys[0]", keys[0].PublicKey().Address(), testAddress},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			if addrStr := vm.FormatAddress(tt.in); addrStr != tt.want {
+			addrStr, err := vm.FormatAddress(tt.in)
+			if err != nil {
+				t.Errorf("problem formatting address: %w", err)
+			}
+			if addrStr != tt.want {
 				t.Errorf("want %q, got %q", tt.want, addrStr)
 			}
 		})
