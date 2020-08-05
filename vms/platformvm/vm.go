@@ -645,12 +645,16 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 	if !ok { // in practice should never happen because unmarshalBlockFunc returns a snowman.Block
 		return nil, errors.New("problem parsing block")
 	}
-	// If we have seen this block before, return it with the most up-to-date info
 	if block, err := vm.GetBlock(block.ID()); err == nil {
+		// If we have seen this block before, return it with the most up-to-date info
 		return block, nil
 	}
-	vm.State.PutBlock(vm.DB, block)
-	vm.DB.Commit()
+	if err := vm.State.PutBlock(vm.DB, block); err != nil { // Persist the block
+		return nil, err
+	}
+	if err := vm.DB.Commit(); err != nil {
+		return nil, err
+	}
 	return block, nil
 }
 
