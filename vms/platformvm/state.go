@@ -223,8 +223,11 @@ func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxo
 }
 
 // GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Assumed elements of [addrs] are unique.
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Only returns UTXOs associated with addresses >= [startAddr].
+// For address [startAddr], only returns UTXOs whose IDs are greater than [startUtxoID].
 // Returns:
 // * The fetched of UTXOs
 // * The address associated with the last UTXO fetched
@@ -244,10 +247,13 @@ func (vm *VM) getUTXOs(db database.Database, addrs [][]byte, startAddr []byte, s
 	seen := ids.Set{} // Set of UTXO IDs we've seen
 	utxos := make([]*ava.UTXO, 0, limit)
 	for _, addr := range addrs {
-		if bytes.Compare(addr, startAddr) == -1 { // Skip addresses before startAddr
+		start := ids.Empty
+		if comp := bytes.Compare(addr, startAddr); comp == -1 { // Skip addresses before startAddr
 			continue
+		} else if comp == 0 {
+			start = startUtxo
 		}
-		utxoIDs, err := vm.getReferencingUTXOs(db, addr, startUtxo, toFetch) // Get IDs of UTXOs to fetch
+		utxoIDs, err := vm.getReferencingUTXOs(db, addr, start, toFetch) // Get IDs of UTXOs to fetch
 		if err != nil {
 			return nil, nil, ids.Empty, fmt.Errorf("couldn't get UTXOs for address %s", addr)
 		}

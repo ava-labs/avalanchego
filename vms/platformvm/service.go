@@ -222,9 +222,14 @@ type Index struct {
 
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
 // Gets the UTXOs that reference at least one address in [Addresses].
-// Returns at most [Limit] addresses.
-// If [Limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
-// [StartIndex] defines where to start fetching UTXOs. It's used for pagination.
+// Returns at most [limit] addresses.
+// If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
+// [StartIndex] defines where to start fetching UTXOs (for pagination.)
+// UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
+// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.Utxo] will be returned.
+// If [StartIndex] is omitted, gets all UTXOs.
+// If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
+// that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
 type GetUTXOsArgs struct {
 	Addresses  []string    `json:"addresses"`
 	Limit      json.Uint32 `json:"limit"`

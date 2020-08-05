@@ -393,11 +393,13 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtx
 // GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Only returns UTXOs associated with addresses >= [startAddr].
+// For address [startAddr], only returns UTXOs whose IDs are greater than [startUtxoID].
 // Returns:
 // * The fetched of UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
-func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxoID ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
@@ -410,10 +412,13 @@ func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
 	for _, addr := range addrsList {
-		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
+		start := ids.Empty
+		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
 			continue
+		} else if comp == 0 {
+			start = startUtxoID
 		}
-		utxoIDs, _ := vm.state.Funds(addr.Bytes(), startUtxo, toFetch) // Get UTXOs associated with [addr]
+		utxoIDs, _ := vm.state.Funds(addr.Bytes(), start, toFetch) // Get UTXOs associated with [addr]
 		for _, utxoID := range utxoIDs {
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
