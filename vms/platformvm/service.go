@@ -23,7 +23,7 @@ import (
 
 const (
 	// Max number of addresses that can be passed in as argument to GetUTXOs
-	maxGetUTXOsAddrs = 128
+	maxGetUTXOsAddrs = 1024
 )
 
 var (
