@@ -419,10 +419,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 	}
 
-	validAVMChains := ids.Set{}
-	// TODO: Add in the C-chain when we support swaps to it
-	validAVMChains.Add(constants.PlatformChainID)
-
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
@@ -434,9 +430,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:            n.Config.AvaTxFee,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVA:         avaxAssetID,
-			Fee:         n.Config.AvaTxFee,
-			ValidChains: validAVMChains,
+			AVA: avaxAssetID,
+			Fee: n.Config.AvaTxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: path.Join(n.Config.PluginDir, "evm"),

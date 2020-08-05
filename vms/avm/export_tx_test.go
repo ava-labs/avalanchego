@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
@@ -1000,7 +999,6 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	vm := &VM{
 		ava: avaID,
 	}
-	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -1158,21 +1156,16 @@ func TestIssueExportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
 	avaID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
-
 	ctx.Lock.Lock()
 	vm := &VM{
 		ava: avaID,
 	}
-	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -1281,8 +1274,8 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	parsedTx.Accept()
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
 
@@ -1316,9 +1309,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -1330,7 +1321,6 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	vm := &VM{
 		ava: avaID,
 	}
-	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),

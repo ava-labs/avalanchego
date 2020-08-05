@@ -38,22 +38,28 @@ type AliasLookup interface {
 	PrimaryAlias(id ids.ID) (string, error)
 }
 
+// SubnetLookup ...
+type SubnetLookup interface {
+	SubnetID(chainID ids.ID) (ids.ID, error)
+}
+
 // Context is information about the current execution.
 // [NetworkID] is the ID of the network this context exists within.
 // [ChainID] is the ID of the chain this context exists within.
 // [NodeID] is the ID of this node
 type Context struct {
 	NetworkID           uint32
+	SubnetID            ids.ID
 	ChainID             ids.ID
 	NodeID              ids.ShortID
 	Log                 logging.Logger
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
 	Lock                sync.RWMutex
-	HTTP                Callable
 	Keystore            Keystore
 	SharedMemory        SharedMemory
 	BCLookup            AliasLookup
+	SNLookup            SubnetLookup
 
 	Namespace string
 	Metrics   prometheus.Registerer
@@ -68,12 +74,15 @@ func DefaultContextTest() *Context {
 	aliaser := &ids.Aliaser{}
 	aliaser.Initialize()
 	return &Context{
+		NetworkID:           0,
+		SubnetID:            ids.Empty,
 		ChainID:             ids.Empty,
 		NodeID:              ids.ShortEmpty,
 		Log:                 logging.NoLog{},
 		DecisionDispatcher:  &decisionED,
 		ConsensusDispatcher: &consensusED,
 		BCLookup:            aliaser,
+		Namespace:           "",
 		Metrics:             prometheus.NewRegistry(),
 	}
 }

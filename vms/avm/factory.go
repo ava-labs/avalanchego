@@ -15,16 +15,14 @@ var (
 
 // Factory ...
 type Factory struct {
-	AVA         ids.ID
-	Fee         uint64
-	ValidChains ids.Set
+	AVA ids.ID
+	Fee uint64
 }
 
 // New ...
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
-		ava:         f.AVA,
-		txFee:       f.Fee,
-		validChains: f.ValidChains,
+		ava:   f.AVA,
+		txFee: f.Fee,
 	}, nil
 }

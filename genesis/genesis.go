@@ -20,9 +20,6 @@ import (
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/ava-labs/gecko/vms/spchainvm"
-	"github.com/ava-labs/gecko/vms/spdagvm"
-	"github.com/ava-labs/gecko/vms/timestampvm"
 )
 
 // ID of the EVM VM
@@ -86,41 +83,6 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
-	// Specify the genesis state of the simple payments DAG
-	spdagvmArgs := spdagvm.BuildGenesisArgs{}
-	for _, addr := range config.ParsedFundedAddresses {
-		spdagvmArgs.Outputs = append(spdagvmArgs.Outputs,
-			spdagvm.APIOutput{
-				Amount:    json.Uint64(20 * units.KiloAva),
-				Threshold: 1,
-				Addresses: []ids.ShortID{addr},
-			},
-		)
-	}
-
-	spdagvmReply := spdagvm.BuildGenesisReply{}
-	spdagvmSS := spdagvm.StaticService{}
-	if err := spdagvmSS.BuildGenesis(nil, &spdagvmArgs, &spdagvmReply); err != nil {
-		return nil, ids.ID{}, fmt.Errorf("problem creating simple payments DAG: %w", err)
-	}
-
-	// Specify the genesis state of the simple payments chain
-	spchainvmArgs := spchainvm.BuildGenesisArgs{}
-	for _, addr := range config.ParsedFundedAddresses {
-		spchainvmArgs.Accounts = append(spchainvmArgs.Accounts,
-			spchainvm.APIAccount{
-				Address: addr,
-				Balance: json.Uint64(20 * units.KiloAva),
-			},
-		)
-	}
-	spchainvmReply := spchainvm.BuildGenesisReply{}
-
-	spchainvmSS := spchainvm.StaticService{}
-	if err := spchainvmSS.BuildGenesis(nil, &spchainvmArgs, &spchainvmReply); err != nil {
-		return nil, ids.ID{}, fmt.Errorf("problem creating simple payments chain: %w", err)
-	}
-
 	// Specify the initial state of the Platform Chain
 	platformvmArgs := platformvm.BuildGenesisArgs{
 		NetworkID:   json.Uint32(networkID),
@@ -182,24 +144,6 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 			VMID:        EVMID,
 			Name:        "C-Chain",
 		},
-		{
-			GenesisData: spdagvmReply.Bytes,
-			SubnetID:    constants.DefaultSubnetID,
-			VMID:        spdagvm.ID,
-			Name:        "Simple DAG Payments",
-		},
-		{
-			GenesisData: spchainvmReply.Bytes,
-			SubnetID:    constants.DefaultSubnetID,
-			VMID:        spchainvm.ID,
-			Name:        "Simple Chain Payments",
-		},
-		{
-			GenesisData: formatting.CB58{Bytes: []byte{}}, // There is no genesis data
-			SubnetID:    constants.DefaultSubnetID,
-			VMID:        timestampvm.ID,
-			Name:        "Simple Timestamp Server",
-		},
 	}
 
 	platformvmArgs.Time = json.Uint64(genesisTime.Unix())
@@ -245,7 +189,6 @@ func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.DecisionTx, error) {
 
 // AVAXAssetID ...
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-
 	c := codec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(

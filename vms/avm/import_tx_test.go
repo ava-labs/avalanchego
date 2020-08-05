@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -224,9 +223,7 @@ func TestIssueImportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -238,7 +235,6 @@ func TestIssueImportTx(t *testing.T) {
 	vm := &VM{
 		ava: avaID,
 	}
-	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -385,9 +381,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	platformID := ids.Empty.Prefix(0)
@@ -395,7 +389,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 	vm := &VM{
 		ava: ids.Empty,
 	}
-	vm.validChains.Add(platformChainID)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

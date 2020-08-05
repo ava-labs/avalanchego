@@ -4,7 +4,9 @@
 package chains
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/gecko/api"
@@ -78,6 +80,9 @@ type Manager interface {
 	// Add an alias to a chain
 	Alias(ids.ID, string) error
 
+	// Returns the ID of the subnet that is validating the provided chain
+	SubnetID(chainID ids.ID) (ids.ID, error)
+
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
 
@@ -128,12 +133,13 @@ type manager struct {
 	sharedMemory    *atomic.SharedMemory
 	criticalChains  ids.Set // Chains that can't exit gracefully
 
+	unblocked     bool
+	blockedChains []ChainParameters
+
+	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[[32]byte]*router.Handler
-
-	unblocked     bool
-	blockedChains []ChainParameters
 }
 
 // New returns a new Manager where:
@@ -230,7 +236,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.log.Error("Error while creating new chain: %s", err)
 		return
 	}
-	m.chains[chainParams.ID.Key()] = chain.Handler
+	chainID := chainParams.ID.Key()
+
+	m.chainsLock.Lock()
+	m.chains[chainID] = chain.Handler
+	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
 	m.log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
@@ -259,15 +269,16 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	ctx := &snow.Context{
 		NetworkID:           m.networkID,
+		SubnetID:            chainParams.SubnetID,
 		ChainID:             chainParams.ID,
 		Log:                 chainLog,
 		DecisionDispatcher:  m.decisionEvents,
 		ConsensusDispatcher: m.consensusEvents,
 		NodeID:              m.nodeID,
-		HTTP:                m.server,
 		Keystore:            m.keystore.NewBlockchainKeyStore(chainParams.ID),
 		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chainParams.ID),
 		BCLookup:            m,
+		SNLookup:            m,
 		Namespace:           fmt.Sprintf("gecko_%s_vm", primaryAlias),
 		Metrics:             m.consensusParams.Metrics,
 	}
@@ -566,8 +577,21 @@ func (m *manager) createSnowmanChain(
 	}, nil
 }
 
+func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
+	m.chainsLock.Lock()
+	defer m.chainsLock.Unlock()
+
+	chain, exists := m.chains[chainID.Key()]
+	if !exists {
+		return ids.ID{}, errors.New("unknown chain ID")
+	}
+	return chain.Context().SubnetID, nil
+}
+
 func (m *manager) IsBootstrapped(id ids.ID) bool {
+	m.chainsLock.Lock()
 	chain, exists := m.chains[id.Key()]
+	m.chainsLock.Unlock()
 	if !exists {
 		return false
 	}

@@ -79,9 +79,6 @@ type VM struct {
 	// fee that must be burned by every transaction
 	txFee uint64
 
-	// set of chains that are allowed to be transferred to and from
-	validChains ids.Set
-
 	// Transaction issuing
 	timer        *timer.Timer
 	batchTimeout time.Duration

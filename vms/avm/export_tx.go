@@ -92,9 +92,14 @@ func (t *ExportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is valid to be spent.
 func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
-	if !vm.validChains.Contains(t.DestinationChain) {
+	subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
+	if err != nil {
+		return err
+	}
+	if !vm.ctx.SubnetID.Equals(subnetID) || t.DestinationChain.Equals(vm.ctx.ChainID) {
 		return errWrongBlockchainID
 	}
+
 	for i, in := range t.Ins {
 		cred := creds[i]
 

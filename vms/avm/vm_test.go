@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
@@ -26,7 +28,6 @@ import (
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 var networkID uint32 = 43110
@@ -53,6 +54,18 @@ func init() {
 	}
 }
 
+type snLookup struct {
+	chainsToSubnet map[[32]byte]ids.ID
+}
+
+func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
+	subnetID, ok := sn.chainsToSubnet[chainID.Key()]
+	if !ok {
+		return ids.ID{}, errors.New("")
+	}
+	return subnetID, nil
+}
+
 func NewContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
@@ -62,6 +75,13 @@ func NewContext() *snow.Context {
 	aliaser.Alias(chainID, chainID.String())
 	aliaser.Alias(platformChainID, "P")
 	aliaser.Alias(platformChainID, platformChainID.String())
+
+	sn := &snLookup{
+		chainsToSubnet: make(map[[32]byte]ids.ID),
+	}
+	sn.chainsToSubnet[chainID.Key()] = ctx.SubnetID
+	sn.chainsToSubnet[platformChainID.Key()] = ctx.SubnetID
+	ctx.SNLookup = sn
 	return ctx
 }
 
@@ -199,7 +219,6 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	vm := &VM{
 		ava: avaID,
 	}
-	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),

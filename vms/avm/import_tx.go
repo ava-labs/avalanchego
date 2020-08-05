@@ -123,7 +123,11 @@ func (t *ImportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is well-formed.
 func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
-	if !vm.validChains.Contains(t.SourceChain) {
+	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
+	if err != nil {
+		return err
+	}
+	if !vm.ctx.SubnetID.Equals(subnetID) || t.SourceChain.Equals(vm.ctx.ChainID) {
 		return errWrongBlockchainID
 	}
 
