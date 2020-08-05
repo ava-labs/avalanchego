@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// DefaultBaseURL can be used as a reasonable default value for the base URL
 	DefaultBaseURL = "/tmp"
 
 	ipcIdentifierPrefix    = "ipc"
@@ -29,7 +30,7 @@ type context struct {
 // ChainIPCs maintains IPCs for a set of chains
 type ChainIPCs struct {
 	context
-	chains          map[[32]byte]*eventSockets
+	chains          map[[32]byte]*EventSockets
 	consensusEvents *triggers.EventDispatcher
 	decisionEvents  *triggers.EventDispatcher
 }
@@ -43,7 +44,7 @@ func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusEv
 			networkID: networkID,
 			path:      path,
 		},
-		chains:          make(map[[32]byte]*eventSockets),
+		chains:          make(map[[32]byte]*EventSockets),
 		consensusEvents: consensusEvents,
 		decisionEvents:  decisionEvents,
 	}
@@ -56,7 +57,7 @@ func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusEv
 }
 
 // Publish creates a set of eventSockets for the given chainID
-func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*eventSockets, error) {
+func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
 	chainIDKey := chainID.Key()
 
 	if es, ok := cipcs.chains[chainIDKey]; ok {

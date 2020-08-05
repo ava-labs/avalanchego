@@ -4,8 +4,9 @@
 package ipcs
 
 import (
-	"nanomsg.org/go/mangos/v2"
-	"nanomsg.org/go/mangos/v2/protocol/pub"
+	"go.nanomsg.org/mangos/v3/protocol/pub"
+
+	mangos "go.nanomsg.org/mangos/v3"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/triggers"
@@ -19,14 +20,14 @@ type chainEventDipatcher struct {
 	events  *triggers.EventDispatcher
 }
 
-// eventSockets is a set of named eventSockets
-type eventSockets struct {
+// EventSockets is a set of named eventSockets
+type EventSockets struct {
 	consensusSocket *eventSocket
 	decisionsSocket *eventSocket
 }
 
 // newEventSockets creates a *ChainIPCs with both consensus and decisions IPCs
-func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher) (*eventSockets, error) {
+func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.EventDispatcher, decisionEvents *triggers.EventDispatcher) (*EventSockets, error) {
 	consensusIPC, err := newEventIPCSocket(ctx, chainID, ipcConsensusIdentifier, consensusEvents)
 	if err != nil {
 		return nil, err
@@ -37,14 +38,14 @@ func newEventSockets(ctx context, chainID ids.ID, consensusEvents *triggers.Even
 		return nil, err
 	}
 
-	return &eventSockets{
+	return &EventSockets{
 		consensusSocket: consensusIPC,
 		decisionsSocket: decisionsIPC,
 	}, nil
 }
 
 // Accept delivers a message to the underlying eventSockets
-func (ipcs *eventSockets) Accept(chainID, containerID ids.ID, container []byte) error {
+func (ipcs *EventSockets) Accept(chainID, containerID ids.ID, container []byte) error {
 	if ipcs.consensusSocket != nil {
 		if err := ipcs.consensusSocket.Accept(chainID, containerID, container); err != nil {
 			return err
@@ -61,7 +62,7 @@ func (ipcs *eventSockets) Accept(chainID, containerID ids.ID, container []byte) 
 }
 
 // stop closes the underlying eventSockets
-func (ipcs *eventSockets) stop() error {
+func (ipcs *EventSockets) stop() error {
 	errs := wrappers.Errs{}
 
 	if ipcs.consensusSocket != nil {
@@ -76,12 +77,12 @@ func (ipcs *eventSockets) stop() error {
 }
 
 // ConsensusURL returns the URL of socket receiving consensus events
-func (ipcs *eventSockets) ConsensusURL() string {
+func (ipcs *EventSockets) ConsensusURL() string {
 	return ipcs.consensusSocket.URL()
 }
 
 // DecisionsURL returns the URL of socket receiving decisions events
-func (ipcs *eventSockets) DecisionsURL() string {
+func (ipcs *EventSockets) DecisionsURL() string {
 	return ipcs.decisionsSocket.URL()
 }
 
