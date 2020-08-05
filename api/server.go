@@ -90,10 +90,19 @@ func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
 		if extension != "" && err != nil {
-			s.log.Warn("could not add route to chain's API handler because route is malformed: %s", extension)
+			s.log.Warn("could not add route to chain's API handler because route is malformed: %s", err)
 			continue
 		}
 		s.log.Verbo("adding API endpoint: %s", defaultEndpoint+extension)
+		unwrapperHandler := service.Handler
+		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
+			if !ctx.IsBootstrapped() {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				w.Write([]byte("API call rejected because chain is not done bootstrapping"))
+			} else {
+				unwrapperHandler.ServeHTTP(w, r)
+			}
+		})
 		if err := s.AddRoute(service, &ctx.Lock, defaultEndpoint, extension, httpLogger); err != nil {
 			s.log.Error("error adding route: %s", err)
 		}
