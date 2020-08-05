@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/api/keystore"
+	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/mockdb"
@@ -31,6 +32,7 @@ import (
 
 var networkID uint32 = 43110
 var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
+var platformChainID = ids.Empty.Prefix(0)
 
 var keys []*crypto.PrivateKeySECP256K1R
 var asset = ids.NewID([32]byte{1, 2, 3})
@@ -188,13 +190,13 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
 	avaID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		ava:          avaID,
+		chainManager: chains.MockManager{},
 	}
+	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),

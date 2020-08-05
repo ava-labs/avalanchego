@@ -310,13 +310,13 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 		label string
 		args  *GetAtomicUTXOsArgs
 	}{
-		{"[", &GetAtomicUTXOsArgs{[]string{""}}},
-		{"[-]", &GetAtomicUTXOsArgs{[]string{"-"}}},
-		{"[foo]", &GetAtomicUTXOsArgs{[]string{"foo"}}},
-		{"[foo-bar]", &GetAtomicUTXOsArgs{[]string{"foo-bar"}}},
-		{"[<ChainID>]", &GetAtomicUTXOsArgs{[]string{vm.ctx.ChainID.String()}}},
-		{"[<ChainID>-]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
-		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{[]string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+		{"[", &GetAtomicUTXOsArgs{platformChainID.String(), []string{""}}},
+		{"[-]", &GetAtomicUTXOsArgs{platformChainID.String(), []string{"-"}}},
+		{"[foo]", &GetAtomicUTXOsArgs{platformChainID.String(), []string{"foo"}}},
+		{"[foo-bar]", &GetAtomicUTXOsArgs{platformChainID.String(), []string{"foo-bar"}}},
+		{"[<ChainID>]", &GetAtomicUTXOsArgs{platformChainID.String(), []string{vm.ctx.ChainID.String()}}},
+		{"[<ChainID>-]", &GetAtomicUTXOsArgs{platformChainID.String(), []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
+		{"[<Unknown ID>-<addr0>]", &GetAtomicUTXOsArgs{platformChainID.String(), []string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -336,8 +336,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
-	platformID := ids.Empty.Prefix(0)
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
 
 	utxo := &ava.UTXO{
 		UTXOID: ava.UTXOID{TxID: ids.Empty},
@@ -355,7 +354,7 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	if err := state.FundPlatformUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
+	vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
 
 	tests := []struct {
 		label string
@@ -364,31 +363,39 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}{
 		{
 			"Empty",
-			&GetAtomicUTXOsArgs{},
+			&GetAtomicUTXOsArgs{
+				BlockchainID: platformChainID.String(),
+			},
 			0,
 		},
 		{
 			"[<ChainID>-<unrelated address>]",
-			&GetAtomicUTXOsArgs{[]string{
-				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
-				//		 longer than addr0.String()
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
-			}},
+			&GetAtomicUTXOsArgs{
+				BlockchainID: platformChainID.String(),
+				Addresses: []string{
+					// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
+					//		 longer than addr0.String()
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+				}},
 			0,
 		},
 		{
 			"[<ChainID>-<addr0>]",
-			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-			}},
+			&GetAtomicUTXOsArgs{
+				BlockchainID: platformChainID.String(),
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				}},
 			1,
 		},
 		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
-			&GetAtomicUTXOsArgs{[]string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-			}},
+			&GetAtomicUTXOsArgs{
+				BlockchainID: platformChainID.String(),
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
+				}},
 			1,
 		},
 	}
@@ -832,7 +839,7 @@ func TestImportAVA(t *testing.T) {
 	assetID := genesisTx.ID()
 
 	addr0 := keys[0].PublicKey().Address()
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
 
 	// Must set ava assetID to be the correct asset since only AVA can be imported
 	vm.ava = assetID
@@ -852,12 +859,13 @@ func TestImportAVA(t *testing.T) {
 	if err := state.FundPlatformUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+	vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
 
 	importArgs := &ImportAVAArgs{
-		Username: username,
-		Password: password,
-		To:       vm.Format(keys[0].PublicKey().Address().Bytes()),
+		Username:    username,
+		Password:    password,
+		SourceChain: platformChainID.String(),
+		To:          vm.Format(keys[0].PublicKey().Address().Bytes()),
 	}
 	importReply := &ImportAVAReply{}
 	if err := s.ImportAVA(nil, importArgs, importReply); err != nil {

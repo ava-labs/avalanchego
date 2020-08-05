@@ -162,7 +162,8 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 
 // GetAtomicUTXOsArgs are arguments for passing into GetAtomicUTXOs requests
 type GetAtomicUTXOsArgs struct {
-	Addresses []string `json:"addresses"`
+	BlockchainID string   `json:"blockchainID"`
+	Addresses    []string `json:"addresses"`
 }
 
 // GetAtomicUTXOsReply defines the GetAtomicUTXOs replies returned from the API
@@ -172,7 +173,13 @@ type GetAtomicUTXOsReply struct {
 
 // GetAtomicUTXOs gets all atomic utxos for passed in addresses
 func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs, reply *GetAtomicUTXOsReply) error {
-	service.vm.ctx.Log.Info("GetAtomicUTXOs called with %s", args.Addresses)
+	service.vm.ctx.Log.Info("GetAtomicUTXOs called for chain %s with %s",
+		args.BlockchainID, args.Addresses)
+
+	chainID, err := service.vm.chainManager.Lookup(args.BlockchainID)
+	if err != nil {
+		return fmt.Errorf("problem parsing chainID '%s': %w", args.BlockchainID, err)
+	}
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
@@ -183,7 +190,7 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addrBytes)))
 	}
 
-	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
+	utxos, err := service.vm.GetAtomicUTXOs(chainID, addrSet)
 	if err != nil {
 		return fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
@@ -1344,6 +1351,7 @@ type ImportAVAArgs struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 
+	SourceChain string `json:"sourceChain"`
 	// Address receiving the imported AVA
 	To string `json:"to"`
 }
@@ -1358,6 +1366,11 @@ type ImportAVAReply struct {
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *ImportAVAReply) error {
 	service.vm.ctx.Log.Info("AVM: ImportAVA called with username: %s", args.Username)
+
+	chainID, err := service.vm.chainManager.Lookup(args.SourceChain)
+	if err != nil {
+		return fmt.Errorf("problem parsing chainID '%s': %w", args.SourceChain, err)
+	}
 
 	toBytes, err := service.vm.Parse(args.To)
 	if err != nil {
@@ -1378,7 +1391,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
 	}
 
-	atomicUtxos, err := service.vm.GetAtomicUTXOs(addrs)
+	atomicUtxos, err := service.vm.GetAtomicUTXOs(chainID, addrs)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
@@ -1444,7 +1457,8 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *I
 			Outs:  outs,
 			Ins:   ins,
 		},
-		Ins: importInputs,
+		SourceChain: chainID,
+		Ins:         importInputs,
 	}}
 	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
@@ -1468,6 +1482,7 @@ type ExportAVAArgs struct {
 	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
 
+	DestinationChain string `json:"destinationChain"`
 	// ID of P-Chain account that will receive the AVA
 	To ids.ShortID `json:"to"`
 }
@@ -1485,6 +1500,11 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 
 	if args.Amount == 0 {
 		return errInvalidAmount
+	}
+
+	chainID, err := service.vm.chainManager.Lookup(args.DestinationChain)
+	if err != nil {
+		return fmt.Errorf("problem parsing chainID '%s': %w", args.DestinationChain, err)
 	}
 
 	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
@@ -1546,7 +1566,8 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 			Outs:  outs,
 			Ins:   ins,
 		},
-		Outs: exportOuts,
+		DestinationChain: chainID,
+		Outs:             exportOuts,
 	}}
 	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err

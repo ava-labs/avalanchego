@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms"
-	"github.com/ava-labs/gecko/vms/avm"
 
 	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
 	avaeng "github.com/ava-labs/gecko/snow/engine/avalanche"
@@ -127,6 +126,7 @@ type manager struct {
 	server          *api.Server        // Handles HTTP API calls
 	keystore        *keystore.Keystore
 	sharedMemory    *atomic.SharedMemory
+	criticalChains  ids.Set // Chains that can't exit gracefully
 
 	// Key: Chain's ID
 	// Value: The chain
@@ -158,6 +158,7 @@ func New(
 	server *api.Server,
 	keystore *keystore.Keystore,
 	sharedMemory *atomic.SharedMemory,
+	criticalChains ids.Set,
 ) (Manager, error) {
 	timeoutManager := timeout.Manager{}
 	err := timeoutManager.Initialize(
@@ -189,6 +190,7 @@ func New(
 		server:          server,
 		keystore:        keystore,
 		sharedMemory:    sharedMemory,
+		criticalChains:  criticalChains,
 		chains:          make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
@@ -370,7 +372,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Allows messages to be routed to the new chain
 	m.chainRouter.AddChain(chain.Handler)
 	// If the X or P Chain panics, do not attempt to recover
-	if chainParams.SubnetID.Equals(constants.DefaultSubnetID) && (chainParams.ID.Equals(constants.PlatformChainID) || vmID.Equals(avm.ID)) {
+	if m.criticalChains.Contains(chainParams.ID) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {

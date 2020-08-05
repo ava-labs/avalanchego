@@ -50,6 +50,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -106,6 +107,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -156,6 +158,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -202,6 +205,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			}},
 			Memo: make([]byte, maxMemoSize+1),
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -257,6 +261,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -324,6 +329,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 				},
 			},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -369,6 +375,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -414,6 +421,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{
 			{
 				Asset: ava.Asset{ID: asset},
@@ -491,6 +499,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 				},
 			},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -556,6 +565,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 				},
 			},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -601,6 +611,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
@@ -661,38 +672,51 @@ func TestExportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x04,
 		// Memo:
 		0x00, 0x01, 0x02, 0x03,
+		// Destination Chain ID:
+		0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+		0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+		0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+		0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		// number of exported outs:
 		0x00, 0x00, 0x00, 0x00,
 	}
 
-	tx := &Tx{UnsignedTx: &ExportTx{BaseTx: BaseTx{
-		NetID: 2,
-		BCID: ids.NewID([32]byte{
-			0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
-			0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
-			0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
-			0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
+	tx := &Tx{UnsignedTx: &ExportTx{
+		BaseTx: BaseTx{
+			NetID: 2,
+			BCID: ids.NewID([32]byte{
+				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
+				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
+				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
+				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
+			}),
+			Ins: []*ava.TransferableInput{{
+				UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
+					0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+					0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+					0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+					0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+				})},
+				Asset: ava.Asset{ID: ids.NewID([32]byte{
+					0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
+					0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
+					0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
+					0x19, 0x39, 0x59, 0x79, 0x98, 0xb8, 0xd8, 0xf8,
+				})},
+				In: &secp256k1fx.TransferInput{
+					Amt:   1000,
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}},
+			Memo: []byte{0x00, 0x01, 0x02, 0x03},
+		},
+		DestinationChain: ids.NewID([32]byte{
+			0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+			0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+			0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+			0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		}),
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
-				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-				0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-				0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-			})},
-			Asset: ava.Asset{ID: ids.NewID([32]byte{
-				0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
-				0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
-				0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
-				0x19, 0x39, 0x59, 0x79, 0x98, 0xb8, 0xd8, 0xf8,
-			})},
-			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-			},
-		}},
-		Memo: []byte{0x00, 0x01, 0x02, 0x03},
-	}}}
+	}}
 
 	c := codec.NewDefault()
 	c.RegisterType(&BaseTx{})
@@ -744,6 +768,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
@@ -801,6 +826,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
@@ -858,6 +884,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
@@ -915,6 +942,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: ids.Empty},
 			Out: &secp256k1fx.TransferOutput{
@@ -967,13 +995,12 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
 	avaID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		ava: avaID,
 	}
+	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -1031,6 +1058,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1088,6 +1116,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1141,9 +1170,9 @@ func TestIssueExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		ava: avaID,
 	}
+	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -1187,6 +1216,7 @@ func TestIssueExportTx(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1298,9 +1328,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		ava: avaID,
 	}
+	vm.validChains.Add(platformChainID)
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -1344,6 +1374,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 				},
 			}},
 		},
+		DestinationChain: platformChainID,
 		Outs: []*ava.TransferableOutput{{
 			Asset: ava.Asset{ID: avaID},
 			Out: &secp256k1fx.TransferOutput{

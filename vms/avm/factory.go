@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 )
@@ -15,16 +16,18 @@ var (
 
 // Factory ...
 type Factory struct {
-	AVA      ids.ID
-	Fee      uint64
-	Platform ids.ID
+	ChainManager chains.Manager
+	AVA          ids.ID
+	Fee          uint64
+	ValidChains  ids.Set
 }
 
 // New ...
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
-		ava:      f.AVA,
-		platform: f.Platform,
-		txFee:    f.Fee,
+		chainManager: f.ChainManager,
+		ava:          f.AVA,
+		txFee:        f.Fee,
+		validChains:  f.ValidChains,
 	}, nil
 }

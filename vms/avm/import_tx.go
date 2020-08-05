@@ -17,11 +17,16 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
+var (
+	errNoImportInputs = errors.New("no import inputs")
+)
+
 // ImportTx is a transaction that imports an asset from another blockchain.
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	Ins []*ava.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
+	SourceChain ids.ID                   `serialize:"true" json:"sourceChain"`    // Which chain to consume the funds from
+	Ins         []*ava.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -55,10 +60,6 @@ func (t *ImportTx) AssetIDs() ids.Set {
 // NumCredentials returns the number of expected credentials
 func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ins) }
 
-var (
-	errNoImportInputs = errors.New("no import inputs")
-)
-
 // SyntacticVerify that this transaction is well-formed.
 func (t *ImportTx) SyntacticVerify(
 	ctx *snow.Context,
@@ -76,6 +77,8 @@ func (t *ImportTx) SyntacticVerify(
 		return errWrongChainID
 	case len(t.Memo) > maxMemoSize:
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
+	case t.SourceChain.IsZero():
+		return errWrongBlockchainID
 	case len(t.Ins) == 0:
 		return errNoImportInputs
 	}
@@ -120,12 +123,16 @@ func (t *ImportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is well-formed.
 func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+	if !vm.validChains.Contains(t.SourceChain) {
+		return errWrongBlockchainID
+	}
+
 	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
 		return err
 	}
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+	smDB := vm.ctx.SharedMemory.GetDatabase(t.SourceChain)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(t.SourceChain)
 
 	state := ava.NewPrefixedState(smDB, vm.codec)
 
@@ -175,8 +182,8 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
 func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+	smDB := vm.ctx.SharedMemory.GetDatabase(t.SourceChain)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(t.SourceChain)
 
 	vsmDB := versiondb.New(smDB)
 
