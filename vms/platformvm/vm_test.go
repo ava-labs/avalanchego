@@ -1749,14 +1749,15 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestParseAddress(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
 	if _, err := vm.ParseAddress(testAddress); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestParseAddressInvalid(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
+	checksumBad := "checksum failed. Expected qwqey4, got x5r4ap."
 	tests := []struct {
 		in   string
 		want error
@@ -1766,13 +1767,13 @@ func TestParseAddressInvalid(t *testing.T) {
 		{"P", errInvalidAddressSeperator},
 		{"-", errEmptyAddressPrefix},
 		{"P-", errEmptyAddressSuffix},
-		{"X-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5", errInvalidAddressPrefix},
-		{"P-Bg6e45gxCUTLXcfUuoy", errInvalidAddress}, //truncated
+		{"X-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y", errInvalidAddressPrefix},
+		{"P-testing18jma8ppw3nhx5r4ap", fmt.Errorf(checksumBad)}, //truncated
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
 			_, err := vm.ParseAddress(tt.in)
-			if !errors.Is(err, tt.want) {
+			if err.Error() != tt.want.Error() {
 				t.Errorf("want %q, got %q", tt.want, err)
 			}
 		})
@@ -1780,13 +1781,13 @@ func TestParseAddressInvalid(t *testing.T) {
 }
 
 func TestFormatAddress(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
 	tests := []struct {
 		label string
 		in    ids.ShortID
 		want  string
 	}{
-		{"keys[0]", keys[0].PublicKey().Address(), testAddress},
+		{"keys[3]", ids.ShortID{ID: keys[3].PublicKey().Address().ID}, testAddress},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
