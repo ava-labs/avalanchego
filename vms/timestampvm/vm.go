@@ -5,6 +5,7 @@ package timestampvm
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/gecko/database"
@@ -78,9 +79,13 @@ func (vm *VM) Initialize(
 
 		// Accept the genesis block
 		// Sets [vm.lastAccepted] and [vm.preferred]
-		genesisBlock.Accept()
+		if err := genesisBlock.Accept(); err != nil {
+			return fmt.Errorf("error accepting genesis block: %w", err)
+		}
 
-		vm.SetDBInitialized()
+		if err := vm.SetDBInitialized(); err != nil {
+			return fmt.Errorf("error while setting db to initialized: %w", err)
+		}
 
 		// Flush VM's database to underlying db
 		if err := vm.DB.Commit(); err != nil {
@@ -95,7 +100,8 @@ func (vm *VM) Initialize(
 // Keys: The path extension for this VM's API (empty in this case)
 // Values: The handler for the API
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
-	handler := vm.NewHandler("timestamp", &Service{vm})
+	handler, err := vm.NewHandler("timestamp", &Service{vm})
+	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{
 		"": handler,
 	}

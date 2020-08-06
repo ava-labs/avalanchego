@@ -18,6 +18,7 @@ jobs:
             scripts/ansible/kill_playbook.yml
             scripts/ansible/ping_playbook.yml
             scripts/ansible/restart_playbook.yml
+            scripts/ansible/service_playbook.yml
             scripts/ansible/update_playbook.yml
 
           args:

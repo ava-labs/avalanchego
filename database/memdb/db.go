@@ -142,7 +142,15 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 func (db *Database) Stat(property string) (string, error) { return "", database.ErrNotFound }
 
 // Compact implements the Database interface
-func (db *Database) Compact(start []byte, limit []byte) error { return nil }
+func (db *Database) Compact(start []byte, limit []byte) error {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.db == nil {
+		return database.ErrClosed
+	}
+	return nil
+}
 
 type keyValue struct {
 	key    []byte

@@ -149,9 +149,9 @@ func GetDefaultBootstraps(networkID uint32, count int) ([]string, []string) {
 
 	sampler := random.Uniform{N: len(ips)}
 	for i := 0; i < count; i++ {
-		i := sampler.Sample()
-		sampledIPs = append(sampledIPs, ips[i])
-		sampledIDs = append(sampledIDs, ids[i])
+		s := sampler.Sample()
+		sampledIPs = append(sampledIPs, ips[s])
+		sampledIDs = append(sampledIDs, ids[s])
 	}
 
 	return sampledIPs, sampledIDs
@@ -217,6 +217,7 @@ func init() {
 	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
 	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
+	logDisplayHighlight := fs.String("log-display-highlight", "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
 
 	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 5, "Number of nodes to query for each network poll")
 	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 4, "Alpha value to use for required number positive results")
@@ -426,6 +427,12 @@ func init() {
 		return
 	}
 	loggingConfig.DisplayLevel = displayLevel
+
+	displayHighlight, err := logging.ToHighlight(*logDisplayHighlight, os.Stdout.Fd())
+	if errs.Add(err); err != nil {
+		return
+	}
+	loggingConfig.DisplayHighlight = displayHighlight
 
 	Config.LoggingConfig = loggingConfig
 

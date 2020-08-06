@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/database/meterdb"
+
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
@@ -35,6 +37,7 @@ import (
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/version"
 	"github.com/ava-labs/gecko/vms"
@@ -58,7 +61,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 5, 7)
+	Version       = version.NewDefaultVersion("avalanche", 0, 5, 10)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -180,7 +183,8 @@ func (n *Node) initNetworking() error {
 	}
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		n.Net.Close()
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close()
 	}, os.Interrupt, os.Kill)
 
 	return nil
@@ -203,6 +207,22 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	go n.Log.RecoverAndPanic(func() {
+		if n.Config.EnableHTTPS {
+			n.Log.Debug("Initializing API server with TLS Enabled")
+			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
+			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
+		}
+
+		n.Log.Debug("Initializing API server")
+		err := n.APIServer.Dispatch()
+
+		n.Log.Fatal("API server initialization failed with %s", err)
+
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close()
+	})
+
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP) {
@@ -387,6 +407,30 @@ func (n *Node) initChains() error {
 		CustomBeacons: n.beacons,
 	})
 
+	bootstrapWeight, err := n.beacons.Weight()
+	if err != nil {
+		return fmt.Errorf("Error calculating bootstrap weight of beacons: %s", err)
+	}
+	reqWeight := (3*bootstrapWeight + 3) / 4
+
+	if reqWeight == 0 {
+		return nil
+	}
+
+	connectToBootstrapsTimeout := timer.NewTimer(func() {
+		n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
+		go n.Net.Close()
+	})
+
+	awaiter := chains.NewAwaiter(n.beacons, reqWeight, func() {
+		n.Log.Info("Connected to required bootstrap nodes. Starting Platform Chain...")
+		connectToBootstrapsTimeout.Cancel()
+	})
+
+	go connectToBootstrapsTimeout.Dispatch()
+	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
+
+	n.Net.RegisterHandler(awaiter)
 	return nil
 }
 
@@ -395,20 +439,6 @@ func (n *Node) initAPIServer() {
 	n.Log.Info("Initializing API server")
 
 	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
-
-	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
-			n.Log.Debug("Initializing API server with TLS Enabled")
-			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
-			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
-		}
-
-		n.Log.Debug("Initializing API server")
-		err := n.APIServer.Dispatch()
-
-		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close()
-	})
 }
 
 // Assumes n.DB, n.vdrs all initialized (non-nil)
@@ -448,14 +478,16 @@ func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
 	n.keystoreServer.Initialize(n.Log, keystoreDB)
-	keystoreHandler := n.keystoreServer.CreateHandler()
+	keystoreHandler, err := n.keystoreServer.CreateHandler()
+	if err != nil {
+		return err
+	}
 	if !n.Config.KeystoreAPIEnabled {
 		n.Log.Info("skipping keystore API initializaion because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
 	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
-
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -469,7 +501,15 @@ func (n *Node) initMetricsAPI() error {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil
 	}
+
 	n.Log.Info("initializing metrics API")
+
+	db, err := meterdb.New("gecko_db", registry, n.DB)
+	if err != nil {
+		return err
+	}
+	n.DB = db
+
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "metrics", "", n.HTTPLog)
 }
 
@@ -477,11 +517,14 @@ func (n *Node) initMetricsAPI() error {
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
 func (n *Node) initAdminAPI() error {
 	if !n.Config.AdminAPIEnabled {
-		n.Log.Info("skipping admin API initializaion because it has been disabled")
+		n.Log.Info("skipping admin API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service := admin.NewService(Version, n.ID, n.Config.NetworkID, n.Log, n.chainManager, n.Net, &n.APIServer)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 }
 
@@ -491,9 +534,11 @@ func (n *Node) initInfoAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
-
 }
 
 // initHealthAPI initializes the Health API service
@@ -530,7 +575,11 @@ func (n *Node) initHealthAPI() error {
 	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
+	handler, err := service.Handler()
+	if err != nil {
+		return err
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
 // initIPCAPI initializes the IPC API service
@@ -541,7 +590,10 @@ func (n *Node) initIPCAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
-	service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	service, err := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
@@ -647,7 +699,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 // Shutdown this node
 func (n *Node) Shutdown() {
 	n.Log.Info("shutting down the node")
-	n.Net.Close()
+	// Close already logs its own error if one occurs, so the error is ignored
+	// here
+	_ = n.Net.Close()
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
 	n.Log.Info("node shut down successfully")

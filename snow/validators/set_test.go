@@ -172,3 +172,40 @@ func TestSamplerString(t *testing.T) {
 		t.Fatalf("Got:\n%s\nExpected:\n%s", str, expected)
 	}
 }
+
+func TestSetWeight(t *testing.T) {
+	weight0 := uint64(93)
+	vdr0 := NewValidator(ids.NewShortID([20]byte{1}), weight0)
+	weight1 := uint64(123)
+	vdr1 := NewValidator(ids.NewShortID([20]byte{2}), weight1)
+
+	s := NewSet()
+	s.Add(vdr0)
+	s.Add(vdr1)
+
+	setWeight, err := s.Weight()
+	if err != nil {
+		t.Fatalf("Failed to get weight of validators due to: %w", err)
+	}
+
+	expectedWeight := weight0 + weight1
+	if setWeight != expectedWeight {
+		t.Fatalf("Set weight was: %d, but expected: %d", setWeight, expectedWeight)
+	}
+}
+
+func TestSetWeightErrors(t *testing.T) {
+	weight0 := uint64(math.MaxUint64)
+	vdr0 := NewValidator(ids.NewShortID([20]byte{1}), weight0)
+	weight1 := uint64(123)
+	vdr1 := NewValidator(ids.NewShortID([20]byte{2}), weight1)
+
+	s := NewSet()
+	s.Add(vdr0)
+	s.Add(vdr1)
+
+	_, err := s.Weight()
+	if err == nil {
+		t.Fatalf("Weight should have errored due to math overflow")
+	}
+}

@@ -11,7 +11,9 @@ import (
 func init() { rand.Seed(time.Now().UnixNano()) }
 
 // Rand returns a number inside [min, max). Panics if min >= max
-func Rand(min, max int) int { return rand.Intn(max-min) + min }
+func Rand(min, max int) int {
+	return rand.Intn(max-min) + min
+}
 
 // Subset creates a list of at most k unique numbers sampled from the sampler.
 // Runs in O(k) * O(Sample) time with O(k) space used.
@@ -24,4 +26,6 @@ func Subset(s Sampler, k int) []int {
 }
 
 // Bernoulli ...
-func Bernoulli(p float64) bool { return rand.Float64() < p }
+func Bernoulli(p float64) bool {
+	return rand.Float64() < p
+}

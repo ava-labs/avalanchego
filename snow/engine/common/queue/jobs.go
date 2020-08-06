@@ -46,9 +46,14 @@ func (j *Jobs) SetParser(parser Parser) { j.parser = parser }
 
 // Push ...
 func (j *Jobs) Push(job Job) error {
-	if deps := job.MissingDependencies(); deps.Len() != 0 {
+	deps, err := job.MissingDependencies()
+	if err != nil {
+		return err
+	}
+	if deps.Len() != 0 {
 		return j.block(job, deps)
 	}
+
 	return j.push(job)
 }
 
@@ -89,17 +94,25 @@ func (j *Jobs) Execute(job Job) error {
 	if err != nil {
 		return err
 	}
-	j.state.DeleteBlocking(j.db, jobID, blocking)
+	if err := j.state.DeleteBlocking(j.db, jobID, blocking); err != nil {
+		return err
+	}
 
 	for _, blockedID := range blocking {
 		job, err := j.state.Job(j.db, blockedID)
 		if err != nil {
 			return err
 		}
-		if job.MissingDependencies().Len() > 0 {
+		deps, err := job.MissingDependencies()
+		if err != nil {
+			return err
+		}
+		if deps.Len() > 0 {
 			continue
 		}
-		j.state.DeleteJob(j.db, blockedID)
+		if err := j.state.DeleteJob(j.db, blockedID); err != nil {
+			return err
+		}
 		if err := j.push(job); err != nil {
 			return err
 		}

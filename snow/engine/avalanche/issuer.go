@@ -45,7 +45,11 @@ func (i *issuer) Update() {
 	vtxID := i.vtx.ID()
 	i.t.pending.Remove(vtxID)
 
-	txs := i.vtx.Txs()
+	txs, err := i.vtx.Txs()
+	if err != nil {
+		i.t.errs.Add(err)
+		return
+	}
 	validTxs := []snowstorm.Tx{}
 	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
@@ -58,7 +62,9 @@ func (i *issuer) Update() {
 	if len(validTxs) != len(txs) {
 		i.t.Config.Context.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
 
-		i.t.batch(validTxs, false /*=force*/, false /*=empty*/)
+		if err := i.t.batch(validTxs, false /*=force*/, false /*=empty*/); err != nil {
+			i.t.errs.Add(err)
+		}
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}
@@ -89,7 +95,7 @@ func (i *issuer) Update() {
 	}
 
 	i.t.vtxBlocked.Fulfill(vtxID)
-	for _, tx := range i.vtx.Txs() {
+	for _, tx := range txs {
 		i.t.txBlocked.Fulfill(tx.ID())
 	}
 

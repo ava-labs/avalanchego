@@ -48,6 +48,11 @@ type Logger interface {
 	// that the program logs the error before exiting.
 	RecoverAndPanic(f func())
 
+	// If a function panics, this will log that panic and then call the exit
+	// function, ensuring that the program logs the error, recovers, and
+	// executes the desired exit function
+	RecoverAndExit(f, exit func())
+
 	SetLogLevel(Level)
 	SetDisplayLevel(Level)
 	SetPrefix(string)
@@ -57,4 +62,14 @@ type Logger interface {
 
 	// Stop this logger and write back all meta-data.
 	Stop()
+}
+
+// RotatingWriter allows for rotating a stream writer
+type RotatingWriter interface {
+	Initialize(Config) error
+	Flush() error
+	Write(b []byte) (int, error)
+	WriteString(s string) (int, error)
+	Close() error
+	Rotate() error
 }

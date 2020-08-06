@@ -142,7 +142,9 @@ func (s *prefixedState) removeUTXO(addrs []ids.ShortID, utxoID ids.ID) error {
 // that the address is referenced by [utxo]
 func (s *prefixedState) FundUTXO(utxo *UTXO) error {
 	utxoID := utxo.ID()
-	s.SetUTXO(utxoID, utxo) // Save [utxo]
+	if err := s.SetUTXO(utxoID, utxo); err != nil {
+		return err
+	}
 
 	switch out := utxo.Out().(type) {
 	case *OutputPayment:

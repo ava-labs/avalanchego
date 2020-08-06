@@ -22,7 +22,7 @@ func TestDefaultError(t *testing.T) {
 	if _, err := db.Get([]byte{}); err == nil {
 		t.Fatal("should have errored")
 	}
-	if err := db.Put([]byte{}); err == nil {
+	if err := db.Put([]byte{}, []byte{}); err == nil {
 		t.Fatal("should have errored")
 	}
 	if err := db.Delete([]byte{}); err == nil {
@@ -46,7 +46,7 @@ func TestDefaultError(t *testing.T) {
 	if err := db.Compact([]byte{}, []byte{}); err == nil {
 		t.Fatal("should have errored")
 	}
-	if _, err := db.Stat(); err == nil {
+	if _, err := db.Stat(""); err == nil {
 		t.Fatal("should have errored")
 	}
 }

@@ -1,0 +1,136 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package router
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/engine/common"
+)
+
+func TestHandlerDropsTimedOutMessages(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(true)
+	engine.ContextF = snow.DefaultContextTest
+	called := make(chan struct{})
+
+	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+		t.Fatalf("GetAcceptedFrontier message should have timed out")
+		return nil
+	}
+
+	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+		called <- struct{}{}
+		return nil
+	}
+
+	handler := &Handler{}
+	vdrs := validators.NewSet()
+	vdr0 := validators.GenerateRandomValidator(1)
+	vdrs.Add(vdr0)
+	handler.Initialize(
+		&engine,
+		vdrs,
+		nil,
+		16,
+		"",
+		prometheus.NewRegistry(),
+	)
+
+	receiveTime := time.Now()
+	handler.clock.Set(receiveTime)
+
+	handler.GetAcceptedFrontier(vdr0.ID(), 1)
+	// Set the clock to simulate message timeout
+	handler.clock.Set(receiveTime.Add(2 * handler.dropMessageTimeout))
+	handler.GetAccepted(vdr0.ID(), 1, ids.Set{})
+
+	go handler.Dispatch()
+
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	select {
+	case _, _ = <-ticker.C:
+		t.Fatalf("Calling engine function timed out")
+	case _, _ = <-called:
+	}
+}
+
+func TestHandlerDoesntDrop(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = snow.DefaultContextTest
+
+	called := make(chan struct{}, 1)
+
+	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+		called <- struct{}{}
+		return nil
+	}
+
+	handler := &Handler{}
+	validators := validators.NewSet()
+	handler.Initialize(
+		&engine,
+		validators,
+		nil,
+		16,
+		"",
+		prometheus.NewRegistry(),
+	)
+
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1)
+	go handler.Dispatch()
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	select {
+	case _, _ = <-ticker.C:
+		t.Fatalf("Calling engine function timed out")
+	case _, _ = <-called:
+	}
+}
+
+func TestHandlerClosesOnError(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+
+	closed := make(chan struct{}, 1)
+
+	engine.ContextF = snow.DefaultContextTest
+	engine.GetAcceptedFrontierF = func(validatorID ids.ShortID, requestID uint32) error {
+		return errors.New("Engine error should cause handler to close")
+	}
+
+	handler := &Handler{}
+	handler.Initialize(
+		&engine,
+		validators.NewSet(),
+		nil,
+		16,
+		"",
+		prometheus.NewRegistry(),
+	)
+
+	handler.toClose = func() {
+		closed <- struct{}{}
+	}
+	go handler.Dispatch()
+
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1)
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	select {
+	case _, _ = <-ticker.C:
+		t.Fatalf("Handler shutdown timed out before calling toClose")
+	case _, _ = <-closed:
+	}
+}

@@ -1,0 +1,13 @@
+#!/usr/bin/env ansible-playbook
+---
+- name: Configure AVA service
+  hosts: ava_nodes
+  roles:
+    - name: golang-base
+    - name: gopath
+    - name: ava-base
+    - name: ava-build
+    - name: ava-user
+    - name: ava-install
+    - name: ava-upgrade
+    - name: ava-service

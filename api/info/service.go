@@ -31,20 +31,22 @@ type Info struct {
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID, networkID uint32, chainManager chains.Manager, peers network.Network) *common.HTTPHandler {
+func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID, networkID uint32, chainManager chains.Manager, peers network.Network) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Info{
+	if err := newServer.RegisterService(&Info{
 		version:      version,
 		nodeID:       nodeID,
 		networkID:    networkID,
 		log:          log,
 		chainManager: chainManager,
 		networking:   peers,
-	}, "info")
-	return &common.HTTPHandler{Handler: newServer}
+	}, "info"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{Handler: newServer}, nil
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion

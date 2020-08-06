@@ -4,6 +4,7 @@
 package avalanche
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -11,8 +12,8 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
+	"github.com/ava-labs/gecko/snow/consensus/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/poll"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -44,7 +45,8 @@ type Transitive struct {
 	// txBlocked tracks operations that are blocked on transactions
 	vtxBlocked, txBlocked events.Blocker
 
-	bootstrapped bool
+	bootstrapped       bool
+	atomicBootstrapped *uint32
 
 	errs wrappers.Errs
 }
@@ -57,6 +59,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.metrics.Initialize(config.Context.Log, config.Params.Namespace, config.Params.Metrics)
 
 	t.onFinished = t.finishBootstrapping
+	t.atomicBootstrapped = new(uint32)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
@@ -80,6 +83,7 @@ func (t *Transitive) finishBootstrapping() error {
 	}
 	t.Consensus.Initialize(t.Config.Context, t.Params, frontier)
 	t.bootstrapped = true
+	atomic.StoreUint32(t.atomicBootstrapped, 1)
 
 	t.Config.Context.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
 	return nil
@@ -153,7 +157,11 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		} else { // reached maximum response size
 			break
 		}
-		for _, parent := range vtx.Parents() {
+		parents, err := vtx.Parents()
+		if err != nil {
+			return err
+		}
+		for _, parent := range parents {
 			if parent.Status() == choices.Unknown { // Don't have this vertex;ignore
 				continue
 			}
@@ -356,7 +364,11 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, er
 			continue
 		}
 
-		for _, parent := range vtx.Parents() {
+		parents, err := vtx.Parents()
+		if err != nil {
+			return false, err
+		}
+		for _, parent := range parents {
 			if !parent.Status().Fetched() {
 				t.sendRequest(vdr, parent.ID())
 				issued = false
@@ -383,13 +395,20 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 		vtx: vtx,
 	}
 
-	for _, parent := range vtx.Parents() {
+	parents, err := vtx.Parents()
+	if err != nil {
+		return err
+	}
+	for _, parent := range parents {
 		if !t.Consensus.VertexIssued(parent) {
 			i.vtxDeps.Add(parent.ID())
 		}
 	}
 
-	txs := vtx.Txs()
+	txs, err := vtx.Txs()
+	if err != nil {
+		return err
+	}
 
 	txIDs := ids.Set{}
 	for _, tx := range txs {
@@ -426,7 +445,7 @@ func (t *Transitive) insert(vtx avalanche.Vertex) error {
 }
 
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
-	batch := []snowstorm.Tx(nil)
+	batch := make([]snowstorm.Tx, 0, t.Params.BatchSize)
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
@@ -435,8 +454,10 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 		inputs := tx.InputIDs()
 		overlaps := consumed.Overlaps(inputs)
 		if len(batch) >= t.Params.BatchSize || (force && overlaps) {
-			t.issueBatch(batch)
-			batch = nil
+			if err := t.issueBatch(batch); err != nil {
+				return err
+			}
+			batch = make([]snowstorm.Tx, 0, t.Params.BatchSize)
 			consumed.Clear()
 			issued = true
 			overlaps = false
@@ -524,5 +545,5 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
-	return t.bootstrapped
+	return atomic.LoadUint32(t.atomicBootstrapped) > 0
 }

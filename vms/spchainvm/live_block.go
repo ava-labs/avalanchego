@@ -59,7 +59,9 @@ func (lb *LiveBlock) Accept() error {
 	}
 
 	for _, child := range lb.children {
-		child.setBaseDatabase(lb.vm.baseDB)
+		if err := child.setBaseDatabase(lb.vm.baseDB); err != nil {
+			return err
+		}
 	}
 
 	delete(lb.vm.currentBlocks, bID.Key())
@@ -246,4 +248,4 @@ func (lb *LiveBlock) database() database.Database {
 	return lb.db
 }
 
-func (lb *LiveBlock) setBaseDatabase(db database.Database) { lb.db.SetDatabase(db) }
+func (lb *LiveBlock) setBaseDatabase(db database.Database) error { return lb.db.SetDatabase(db) }

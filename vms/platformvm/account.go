@@ -44,7 +44,7 @@ type Account struct {
 func (a Account) Remove(amount, nonce uint64) (Account, error) {
 	// Ensure account is in a valid state
 	if err := a.Verify(); err != nil {
-		return Account{}, err
+		return a, err
 	}
 
 	// Ensure account's nonce isn't used up.
@@ -52,26 +52,26 @@ func (a Account) Remove(amount, nonce uint64) (Account, error) {
 	// at 10k tps for ~ 80 million years
 	newNonce, err := math.Add64(a.Nonce, 1)
 	if err != nil {
-		return Account{}, errOutOfSpends
+		return a, errOutOfSpends
 	}
 
 	if newNonce != nonce {
-		return Account{}, fmt.Errorf("account's last nonce is %d so expected tx nonce to be %d but was %d", a.Nonce, newNonce, nonce)
+		return a, fmt.Errorf("account's last nonce is %d so expected tx nonce to be %d but was %d", a.Nonce, newNonce, nonce)
 	}
 
 	amountWithFee, err := math.Add64(amount, txFee)
 	if err != nil {
-		return Account{}, fmt.Errorf("send amount overflowed: tx fee (%d) + send amount (%d) > maximum value", txFee, amount)
+		return a, fmt.Errorf("send amount overflowed: tx fee (%d) + send amount (%d) > maximum value", txFee, amount)
 	}
 
 	newBalance, err := math.Sub64(a.Balance, amountWithFee)
 	if err != nil {
-		return Account{}, fmt.Errorf("insufficient funds: account balance %d < tx fee (%d) + send amount (%d)", a.Balance, txFee, amount)
+		return a, fmt.Errorf("insufficient funds: account balance %d < tx fee (%d) + send amount (%d)", a.Balance, txFee, amount)
 	}
 
 	// Ensure this tx wouldn't lock funds
 	if newNonce == stdmath.MaxUint64 && newBalance != 0 {
-		return Account{}, fmt.Errorf("transaction would lock %d funds", newBalance)
+		return a, fmt.Errorf("transaction would lock %d funds", newBalance)
 	}
 
 	return Account{
@@ -85,7 +85,7 @@ func (a Account) Remove(amount, nonce uint64) (Account, error) {
 func (a Account) Add(amount uint64) (Account, error) {
 	// Ensure account is in a valid state
 	if err := a.Verify(); err != nil {
-		return Account{}, err
+		return a, err
 	}
 
 	// Ensure account's nonce isn't used up
@@ -119,7 +119,9 @@ func (a Account) Verify() error {
 }
 
 // Bytes returns the byte representation of this account
+// Only safe to call on verified Accounts (where address has been confirmed to be non-nil)
 func (a Account) Bytes() []byte {
+	// If the address is non-nil, Marshal will not error
 	bytes, _ := Codec.Marshal(a)
 	return bytes
 }

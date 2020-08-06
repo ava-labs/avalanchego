@@ -5,11 +5,13 @@ package validators
 
 import (
 	"fmt"
+	stdmath "math"
 	"strings"
 	"sync"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/random"
 )
 
@@ -53,6 +55,9 @@ type Set interface {
 	// List all the ids of validators in this group
 	List() []Validator
 
+	// Weight returns the cumulative weight of all validators in the set.
+	Weight() (uint64, error)
+
 	// Sample returns a collection of validator IDs. If there aren't enough
 	// validators, the length of the returned validators may be less than
 	// [size]. Otherwise, the length of the returned validators will equal
@@ -69,10 +74,12 @@ func NewSet() Set { return &set{vdrMap: make(map[[20]byte]int)} }
 // in O(1) time.
 // set implements Set
 type set struct {
-	lock     sync.Mutex
-	vdrMap   map[[20]byte]int
-	vdrSlice []Validator
-	sampler  random.Weighted
+	lock        sync.Mutex
+	vdrMap      map[[20]byte]int
+	vdrSlice    []Validator
+	sampler     random.Weighted
+	totalWeight uint64
+	weightErr   error
 }
 
 // Set implements the Set interface.
@@ -99,6 +106,7 @@ func (s *set) set(vdrs []Validator) {
 		s.sampler.Weights = s.sampler.Weights[:0]
 	}
 	s.vdrMap = make(map[[20]byte]int, lenVdrs)
+	s.totalWeight = 0
 
 	for _, vdr := range vdrs {
 		s.add(vdr)
@@ -128,6 +136,10 @@ func (s *set) add(vdr Validator) {
 	s.vdrMap[vdrID.Key()] = i
 	s.vdrSlice = append(s.vdrSlice, vdr)
 	s.sampler.Weights = append(s.sampler.Weights, w)
+	s.totalWeight, s.weightErr = math.Add64(s.totalWeight, w)
+	if s.weightErr != nil {
+		s.totalWeight = stdmath.MaxUint64
+	}
 }
 
 // Get implements the Set interface.
@@ -168,6 +180,7 @@ func (s *set) remove(vdrID ids.ShortID) {
 	eKey := eVdr.ID().Key()
 
 	// Move e -> i
+	iElem := s.vdrSlice[i]
 	s.vdrMap[eKey] = i
 	s.vdrSlice[i] = eVdr
 	s.sampler.Weights[i] = s.sampler.Weights[e]
@@ -176,6 +189,12 @@ func (s *set) remove(vdrID ids.ShortID) {
 	delete(s.vdrMap, iKey)
 	s.vdrSlice = s.vdrSlice[:e]
 	s.sampler.Weights = s.sampler.Weights[:e]
+
+	if s.weightErr != nil {
+		s.totalWeight, s.weightErr = s.calculateWeight()
+	} else {
+		s.totalWeight, s.weightErr = math.Sub64(s.totalWeight, iElem.Weight())
+	}
 }
 
 // Contains implements the Set interface.
@@ -232,6 +251,24 @@ func (s *set) sample(size int) []Validator {
 		list = append(list, s.vdrSlice[i])
 	}
 	return list
+}
+
+func (s *set) Weight() (uint64, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.totalWeight, s.weightErr
+}
+
+func (s *set) calculateWeight() (uint64, error) {
+	weight := uint64(0)
+	for _, vdr := range s.vdrSlice {
+		weight, err := math.Add64(weight, vdr.Weight())
+		if err != nil {
+			return weight, err
+		}
+	}
+	return weight, nil
 }
 
 func (s *set) String() string {

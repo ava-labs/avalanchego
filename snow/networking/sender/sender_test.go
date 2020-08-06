@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
@@ -63,6 +64,7 @@ func TestTimeout(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
 		"",
@@ -116,6 +118,7 @@ func TestReliableMessages(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
 		"",
@@ -179,6 +182,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
 		"",
