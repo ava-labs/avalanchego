@@ -52,3 +52,5 @@ keys/staker.*
 !*.proto
 
 plugins/
+
+scripts/ansible/*inventory.yml
