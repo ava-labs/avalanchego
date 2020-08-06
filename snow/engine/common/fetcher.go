@@ -14,9 +14,6 @@ type Fetcher struct {
 	// true if bootstrapping is done
 	Finished bool
 
-	// Non-zero if bootstrapped. Should only be accessed atomically.
-	AtomicBootstrapped uint32
-
 	// Called when bootstrapping is done
 	OnFinished func() error
 }
