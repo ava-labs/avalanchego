@@ -24,6 +24,7 @@ func setup(t *testing.T) ([]byte, *VM, *Service) {
 
 func TestServiceIssueTx(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -49,6 +50,7 @@ func TestServiceIssueTx(t *testing.T) {
 
 func TestServiceGetTxStatus(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -92,6 +94,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 
 func TestServiceGetBalance(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
+	ctx := vm.ctx
 	defer ctx.Lock.Unlock()
 	defer vm.Shutdown()
 
@@ -113,6 +116,7 @@ func TestServiceGetBalance(t *testing.T) {
 
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -132,6 +136,7 @@ func TestServiceGetTx(t *testing.T) {
 
 func TestServiceGetNilTx(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -144,6 +149,7 @@ func TestServiceGetNilTx(t *testing.T) {
 
 func TestServiceGetUnknownTx(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -156,6 +162,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 
 func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -186,6 +193,7 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 
 func TestServiceGetUTXOs(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -238,6 +246,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -265,6 +274,7 @@ func TestGetAssetDescription(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -290,6 +300,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestCreateFixedCapAsset(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -316,6 +327,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 func TestCreateVariableCapAsset(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -345,6 +357,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 func TestImportAvmKey(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -384,6 +397,7 @@ func TestImportAvmKey(t *testing.T) {
 
 func TestImportAvmKeyNoDuplicates(t *testing.T) {
 	_, vm, s := setup(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()

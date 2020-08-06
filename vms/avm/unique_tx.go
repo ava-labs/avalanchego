@@ -48,6 +48,8 @@ type TxState struct {
 }
 
 func (tx *UniqueTx) refresh() {
+	tx.vm.numTxRefreshes.Inc()
+
 	if tx.TxState == nil {
 		tx.TxState = &TxState{}
 	}
@@ -57,6 +59,8 @@ func (tx *UniqueTx) refresh() {
 	unique := tx.vm.state.UniqueTx(tx)
 	prevTx := tx.Tx
 	if unique == tx {
+		tx.vm.numTxRefreshMisses.Inc()
+
 		// If no one was in the cache, make sure that there wasn't an
 		// intermediate object whose state I must reflect
 		if status, err := tx.vm.state.Status(tx.ID()); err == nil {
@@ -64,6 +68,8 @@ func (tx *UniqueTx) refresh() {
 		}
 		tx.unique = true
 	} else {
+		tx.vm.numTxRefreshHits.Inc()
+
 		// If someone is in the cache, they must be up to date
 
 		// This ensures that every unique tx object points to the same tx state
@@ -75,6 +81,7 @@ func (tx *UniqueTx) refresh() {
 	}
 
 	if prevTx == nil {
+		// TODO: register hits/misses for this
 		if innerTx, err := tx.vm.state.Tx(tx.ID()); err == nil {
 			tx.Tx = innerTx
 		}
@@ -305,7 +312,9 @@ func (tx *UniqueTx) SyntacticVerify() error {
 
 // SemanticVerify the validity of this transaction
 func (tx *UniqueTx) SemanticVerify() error {
-	tx.SyntacticVerify()
+	// SyntacticVerify sets the error on validity and is checked in the next
+	// statement
+	_ = tx.SyntacticVerify()
 
 	if tx.validity != nil || tx.verifiedState {
 		return tx.validity

@@ -185,6 +185,7 @@ func (p *peer) WriteMessages() {
 
 		p.net.stateLock.Lock()
 		p.pendingBytes -= len(msg)
+		p.net.pendingBytes -= len(msg)
 		p.net.stateLock.Unlock()
 
 		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
@@ -325,8 +326,11 @@ func (p *peer) close() {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
+	if err := p.conn.Close(); err != nil {
+		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
+	}
+
 	p.closed = true
-	p.conn.Close()
 	close(p.sender)
 	p.net.disconnected(p)
 }

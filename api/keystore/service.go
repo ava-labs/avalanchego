@@ -57,7 +57,7 @@ const (
 var (
 	errEmptyUsername     = errors.New("username can't be the empty string")
 	errUserPassMaxLength = fmt.Errorf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen)
-	errWeakPassword      = errors.New("Failed to create user as the given password is too weak. A stronger password is one of 8 or more characters containing attributes of upper and lowercase letters, numbers, and/or special characters")
+	errWeakPassword      = errors.New("Failed to create user as the given password is too weak")
 )
 
 // KeyValuePair ...
@@ -105,13 +105,15 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
-func (ks *Keystore) CreateHandler() *common.HTTPHandler {
+func (ks *Keystore) CreateHandler() (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(ks, "keystore")
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}
+	if err := newServer.RegisterService(ks, "keystore"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}, nil
 }
 
 // Get the user whose name is [username]
@@ -281,7 +283,9 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	userDataDB := prefixdb.New([]byte(args.Username), ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
-		dataBatch.Put(kvp.Key, kvp.Value)
+		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
+			return fmt.Errorf("error on database put: %w", err)
+		}
 	}
 
 	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {

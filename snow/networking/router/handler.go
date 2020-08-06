@@ -123,13 +123,14 @@ func (h *Handler) Initialize(
 	namespace string,
 	metrics prometheus.Registerer,
 ) {
-	h.metrics.Initialize(namespace, metrics)
+	h.ctx = engine.Context()
+	if err := h.metrics.Initialize(namespace, metrics); err != nil {
+		h.ctx.Log.Warn("initializing handler metrics errored with: %s", err)
+	}
 	h.reliableMsgsSema = make(chan struct{}, 1)
 	h.closed = make(chan struct{})
 	h.msgChan = msgChan
 	h.dropMessageTimeout = timeout.DefaultRequestTimeout
-
-	h.ctx = engine.Context()
 
 	// Defines the maximum current percentage of expected CPU utilization for
 	// a message to be placed in the queue at the corresponding index
@@ -169,6 +170,9 @@ func (h *Handler) Context() *snow.Context { return h.engine.Context() }
 
 // Engine returns the engine this handler dispatches to
 func (h *Handler) Engine() common.Engine { return h.engine }
+
+// SetEngine sets the engine for this handler to dispatch to
+func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
 
 // Dispatch waits for incoming messages from the network
 // and, when they arrive, sends them to the consensus engine

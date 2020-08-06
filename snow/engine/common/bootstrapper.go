@@ -80,8 +80,7 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 // GetAcceptedFrontierFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
-	b.AcceptedFrontier(validatorID, requestID, ids.Set{})
-	return nil
+	return b.AcceptedFrontier(validatorID, requestID, ids.Set{})
 }
 
 // AcceptedFrontier implements the Engine interface.

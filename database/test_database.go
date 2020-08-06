@@ -164,7 +164,9 @@ func TestBatchPut(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Fatalf("Error while closing the database: %s", err)
+	}
 
 	if err := batch.Write(); err != ErrClosed {
 		t.Fatalf("Expected %s on batch.Write", ErrClosed)
@@ -729,13 +731,17 @@ func TestStatNoPanic(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
-	db.Stat("")
+	// Stat could error or not redpending on the implementation, but it
+	// shouldn't panic
+	_, _ = db.Stat("")
 
 	if err := db.Close(); err != nil {
 		t.Fatalf("Unexpected error on db.Close: %s", err)
 	}
 
-	db.Stat("")
+	// Stat could error or not redpending on the implementation, but it
+	// shouldn't panic
+	_, _ = db.Stat("")
 }
 
 // TestCompactNoPanic ...
@@ -757,11 +763,15 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
-	db.Compact(nil, nil)
+	if err := db.Compact(nil, nil); err != nil {
+		t.Fatalf("Unexpected error on db.Compact")
+	}
 
 	if err := db.Close(); err != nil {
 		t.Fatalf("Unexpected error on db.Close: %s", err)
 	}
 
-	db.Compact(nil, nil)
+	if err := db.Compact(nil, nil); err != ErrClosed {
+		t.Fatalf("Expected error %s on db.Close but got %s", ErrClosed, err)
+	}
 }

@@ -17,6 +17,7 @@ import (
 
 func TestPrefixedSetsAndGets(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -116,6 +117,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 
 func TestPrefixedFundingNoAddresses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -144,6 +146,7 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 
 func TestPrefixedFundingAddresses(t *testing.T) {
 	_, _, vm := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
