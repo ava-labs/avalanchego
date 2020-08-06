@@ -6,7 +6,8 @@ package constants
 import "github.com/ava-labs/gecko/ids"
 
 const (
-	NodeIDPrefix string = "NodeID-"
+	NodeIDPrefix    string = "NodeID-"
+	SecretKeyPrefix string = "PrivateKey-"
 )
 
 var (

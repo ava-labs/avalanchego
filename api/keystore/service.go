@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"testing"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -432,7 +431,7 @@ func (ks *Keystore) AddUser(username, password string) error {
 }
 
 // CreateTestKeystore returns a new keystore that can be utilized for testing
-func CreateTestKeystore(t *testing.T) *Keystore {
+func CreateTestKeystore() *Keystore {
 	ks := &Keystore{}
 	ks.Initialize(logging.NoLog{}, memdb.New())
 	return ks

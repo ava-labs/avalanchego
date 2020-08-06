@@ -242,7 +242,12 @@ func (s *set) Sample(size int) []Validator {
 	return s.sample(size)
 }
 
+// Sample [size] elements from this set.
+// Returns nil if size <= 0
 func (s *set) sample(size int) []Validator {
+	if size <= 0 {
+		return nil
+	}
 	list := make([]Validator, size)[:0]
 
 	s.sampler.Replace() // Must replace, otherwise changes won't be reflected

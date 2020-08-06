@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
@@ -116,5 +117,5 @@ func (iss innerSortInitialState) Swap(i, j int)      { iss[j], iss[i] = iss[i], 
 
 func sortInitialStates(iss []*InitialState) { sort.Sort(innerSortInitialState(iss)) }
 func isSortedAndUniqueInitialStates(iss []*InitialState) bool {
-	return sort.IsSorted(innerSortInitialState(iss))
+	return utils.IsSortedAndUnique(innerSortInitialState(iss))
 }

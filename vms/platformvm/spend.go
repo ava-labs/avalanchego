@@ -382,6 +382,7 @@ var (
 	errUnknownOwners                = errors.New("unknown owners")
 )
 
+// Removes the UTXOs consumed by [ins] from the UTXO set
 func (vm *VM) consumeInputs(
 	db database.Database,
 	ins []*ava.TransferableInput,
@@ -395,6 +396,8 @@ func (vm *VM) consumeInputs(
 	return nil
 }
 
+// Adds the UTXOs created by [outs] to the UTXO set.
+// [txID] is the ID of the tx that created [outs].
 func (vm *VM) produceOutputs(
 	db database.Database,
 	txID ids.ID,
@@ -415,7 +418,9 @@ func (vm *VM) produceOutputs(
 	return nil
 }
 
-// Verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
+// Verify that [tx] is semantically valid.
+// [ins] and [outs] are the inputs and outputs of [tx].
+// [creds] are the credentials of [tx], which allow [ins] to be spent.
 // [db] should not be committed if an error is returned
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
@@ -438,7 +443,10 @@ func (vm *VM) semanticVerifySpend(
 	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, outs, creds)
 }
 
-// Verify that the UTXOs spent by [tx] exist and are spendable with the given credentials
+// Verify that [tx] is semantically valid.
+// [ins] and [outs] are the inputs and outputs of [tx].
+// [creds] are the credentials of [tx], which allow [ins] to be spent.
+// [utxos[i]] is the UTXO being consumed by [ins[i]]
 // [db] should not be committed if an error is returned
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
@@ -456,7 +464,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		return permError{fmt.Errorf("there are %d inputs but %d utxos. Should be same number",
 			len(ins), len(utxos))}
 	}
-	for _, cred := range creds {
+	for _, cred := range creds { // Verify credentials are well-formed.
 		if err := cred.Verify(); err != nil {
 			return permError{err}
 		}
@@ -467,25 +475,30 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	produced := make(map[uint64]map[[32]byte]uint64)
 	consumed := make(map[uint64]map[[32]byte]uint64)
 	for index, input := range ins {
-		utxo := utxos[index]
+		utxo := utxos[index] // The UTXO consumed by [input]
 
 		out := utxo.Out
 		locktime := uint64(0)
+		// Set [locktime] to this UTXO's locktime, if applicable
 		if inner, ok := out.(*StakeableLockOut); ok {
 			out = inner.TransferableOut
 			locktime = inner.Locktime
 		}
 
 		in := input.In
+		// The UTXO says it's locked until [locktime], but this input, which consumes it,
+		// is not locked even though [locktime] hasn't passed. This is invalid.
 		if inner, ok := in.(*StakeableLockIn); now < locktime && !ok {
 			return permError{errLockedFundsNotMarkedAsLocked}
 		} else if ok {
 			if inner.Locktime != locktime {
+				// This input is locked, but its locktime is wrong
 				return permError{errWrongLocktime}
 			}
 			in = inner.TransferableIn
 		}
 
+		// Verify that this tx's credentials allow [in] to be spent
 		if err := vm.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 			return permError{err}
 		}
@@ -500,10 +513,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return tempError{err}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
-		owners, ok := produced[locktime]
+		owners, ok := consumed[locktime]
 		if !ok {
 			owners = make(map[[32]byte]uint64)
-			produced[locktime] = owners
+			consumed[locktime] = owners
 		}
 		newAmount, err := safemath.Add64(owners[ownerID], in.Amount())
 		if err != nil {
@@ -514,6 +527,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	for _, out := range outs {
 		output := out.Output()
 		locktime := uint64(0)
+		// Set [locktime] to this output's locktime, if applicable
 		if inner, ok := output.(*StakeableLockOut); ok {
 			output = inner.TransferableOut
 			locktime = inner.Locktime
@@ -529,10 +543,10 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return tempError{err}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
-		owners, ok := consumed[locktime]
+		owners, ok := produced[locktime]
 		if !ok {
 			owners = make(map[[32]byte]uint64)
-			consumed[locktime] = owners
+			produced[locktime] = owners
 		}
 		newAmount, err := safemath.Add64(owners[ownerID], output.Amount())
 		if err != nil {
@@ -541,6 +555,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		owners[ownerID] = newAmount
 	}
 
+	// [unlockedProduced] is the amount of unlocked tokens produced by [outs]
 	unlockedProduced := uint64(0)
 	for _, amount := range produced[0] {
 		newAmount, err := safemath.Add64(unlockedProduced, amount)
@@ -551,6 +566,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	}
 	delete(produced, 0)
 
+	// [unlockedConsumed] is the amount of unlocked tokens consumed by [ins]
 	unlockedConsumed := uint64(0)
 	for _, amount := range consumed[0] {
 		newAmount, err := safemath.Add64(unlockedConsumed, amount)
@@ -561,14 +577,15 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	}
 	delete(consumed, 0)
 
-	if unlockedProduced < unlockedConsumed {
+	if unlockedProduced > unlockedConsumed { // More unlocked tokens produced than consumed. Invalid.
 		return permError{errInvalidAmount}
 	}
 
-	for locktime, consumedAmounts := range consumed {
-		producedAmounts := produced[locktime]
-		for ownerID, amount := range consumedAmounts {
-			if producedAmounts[ownerID] < amount {
+	// Make sure that for each locktime, tokens produced <= tokens consumed
+	for locktime, producedAmounts := range produced {
+		consumedAmounts := consumed[locktime]
+		for ownerID, amount := range producedAmounts {
+			if amount > consumedAmounts[ownerID] {
 				return permError{errInvalidAmount}
 			}
 		}

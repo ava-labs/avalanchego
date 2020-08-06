@@ -16,14 +16,18 @@ import (
 )
 
 const (
+	minNameLen      = 1
 	maxNameLen      = 128
+	minSymbolLen    = 1
 	maxSymbolLen    = 4
 	maxDenomination = 32
 )
 
 var (
 	errInitialStatesNotSortedUnique = errors.New("initial states not sorted and unique")
+	errNameTooShort                 = fmt.Errorf("name is too short, minimum size is %d", minNameLen)
 	errNameTooLong                  = fmt.Errorf("name is too long, maximum size is %d", maxNameLen)
+	errSymbolTooShort               = fmt.Errorf("symbol is too short, minimum size is %d", minSymbolLen)
 	errSymbolTooLong                = fmt.Errorf("symbol is too long, maximum size is %d", maxSymbolLen)
 	errNoFxs                        = errors.New("assets must support at least one Fx")
 	errIllegalNameCharacter         = errors.New("asset's name must be made up of only letters and numbers")
@@ -79,8 +83,12 @@ func (t *CreateAssetTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
+	case len(t.Name) < minNameLen:
+		return errNameTooShort
 	case len(t.Name) > maxNameLen:
 		return errNameTooLong
+	case len(t.Symbol) < minSymbolLen:
+		return errSymbolTooShort
 	case len(t.Symbol) > maxSymbolLen:
 		return errSymbolTooLong
 	case len(t.States) == 0:
@@ -88,8 +96,6 @@ func (t *CreateAssetTx) SyntacticVerify(
 	case t.Denomination > maxDenomination:
 		return errDenominationTooLarge
 	case strings.TrimSpace(t.Name) != t.Name:
-		return errUnexpectedWhitespace
-	case strings.TrimSpace(t.Symbol) != t.Symbol:
 		return errUnexpectedWhitespace
 	}
 

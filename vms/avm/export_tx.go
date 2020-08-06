@@ -77,11 +77,7 @@ func (t *ExportTx) SyntacticVerify(
 		return errInputsNotSortedUnique
 	}
 
-	if err := fc.Verify(); err != nil {
-		return err
-	}
-
-	return t.Metadata.Verify()
+	return verify.All(fc, &t.Metadata)
 }
 
 // SemanticVerify that this transaction is valid to be spent.
@@ -115,9 +111,27 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 	}
 
+	for _, out := range t.BaseTx.Outs {
+		fxIndex, err := vm.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
+			return errIncompatibleFx
+		}
+	}
+
 	for _, out := range t.Outs {
+		fxIndex, err := vm.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+		assetID := out.AssetID()
 		if !out.AssetID().Equals(vm.ava) {
 			return errWrongAssetID
+		}
+		if !vm.verifyFxUsage(fxIndex, assetID) {
+			return errIncompatibleFx
 		}
 	}
 

@@ -20,7 +20,7 @@ var (
 )
 
 func TestServiceListNoUsers(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	reply := ListUsersReply{}
 	if err := ks.ListUsers(nil, &ListUsersArgs{}, &reply); err != nil {
@@ -32,7 +32,7 @@ func TestServiceListNoUsers(t *testing.T) {
 }
 
 func TestServiceCreateUser(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
 		reply := CreateUserReply{}
@@ -71,7 +71,7 @@ func genStr(n int) string {
 // TestServiceCreateUserArgsChecks generates excessively long usernames or
 // passwords to assure the santity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
 		reply := CreateUserReply{}
@@ -112,7 +112,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
 		reply := CreateUserReply{}
@@ -132,7 +132,7 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
 		reply := CreateUserReply{}
@@ -159,7 +159,7 @@ func TestServiceCreateDuplicate(t *testing.T) {
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	reply := CreateUserReply{}
 	if err := ks.CreateUser(nil, &CreateUserArgs{
@@ -170,7 +170,7 @@ func TestServiceCreateUserNoName(t *testing.T) {
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
 		reply := CreateUserReply{}
@@ -209,7 +209,7 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 }
 
 func TestServiceExportImport(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
 		reply := CreateUserReply{}
@@ -242,7 +242,7 @@ func TestServiceExportImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newKS := CreateTestKeystore(t)
+	newKS := CreateTestKeystore()
 
 	{
 		reply := ImportUserReply{}
@@ -347,7 +347,7 @@ func TestServiceDeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ks := CreateTestKeystore(t)
+			ks := CreateTestKeystore()
 
 			if tt.setup != nil {
 				if err := tt.setup(ks); err != nil {
