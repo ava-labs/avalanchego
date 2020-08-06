@@ -128,7 +128,7 @@ func TestExportKey(t *testing.T) {
 }
 
 func TestImportKey(t *testing.T) {
-	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","privateKey":"SECRETKEY-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
+	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","privateKey":"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
 	args := ImportKeyArgs{}
 	err := json.Unmarshal([]byte(jsonString), &args)
 	if err != nil {

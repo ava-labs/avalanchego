@@ -4,6 +4,7 @@
 package admin
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -14,6 +15,14 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
+)
+
+const (
+	maxAliasLength = 512
+)
+
+var (
+	errAliasTooLong = errors.New("alias length is too long")
 )
 
 // Admin is the API service for node admin management
@@ -104,6 +113,10 @@ type AliasReply struct {
 func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *AliasReply) error {
 	service.log.Info("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 
+	if len(args.Alias) > maxAliasLength {
+		return errAliasTooLong
+	}
+
 	reply.Success = true
 	return service.httpServer.AddAliasesWithReadLock(args.Endpoint, args.Alias)
 }
@@ -123,6 +136,9 @@ type AliasChainReply struct {
 func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *AliasChainReply) error {
 	service.log.Info("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
 
+	if len(args.Alias) > maxAliasLength {
+		return errAliasTooLong
+	}
 	chainID, err := service.chainManager.Lookup(args.Chain)
 	if err != nil {
 		return err

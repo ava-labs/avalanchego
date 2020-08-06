@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -61,8 +62,20 @@ type Context struct {
 	BCLookup            AliasLookup
 	SNLookup            SubnetLookup
 
-	Namespace string
-	Metrics   prometheus.Registerer
+	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
+	bootstrapped uint32
+	Namespace    string
+	Metrics      prometheus.Registerer
+}
+
+// IsBootstrapped returns true iff this chain is done bootstrapping
+func (ctx *Context) IsBootstrapped() bool {
+	return atomic.LoadUint32(&ctx.bootstrapped) > 0
+}
+
+// Bootstrapped marks this chain as done bootstrapping
+func (ctx *Context) Bootstrapped() {
+	atomic.StoreUint32(&ctx.bootstrapped, 1)
 }
 
 // DefaultContextTest ...
