@@ -90,57 +90,78 @@ func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
 		if extension != "" && err != nil {
-			s.log.Warn("could not add route to chain's API handler because route is malformed: %s", err)
+			s.log.Error("could not add route to chain's API handler because route is malformed: %s", err)
 			continue
 		}
-		s.log.Verbo("adding API endpoint: %s", defaultEndpoint+extension)
-		unwrapperHandler := service.Handler
-		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
-			if !ctx.IsBootstrapped() {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				w.Write([]byte("API call rejected because chain is not done bootstrapping"))
-			} else {
-				unwrapperHandler.ServeHTTP(w, r)
-			}
-		})
-		if err := s.AddRoute(service, &ctx.Lock, defaultEndpoint, extension, httpLogger); err != nil {
+		if err := s.AddChainRoute(service, ctx, defaultEndpoint, extension, httpLogger); err != nil {
 			s.log.Error("error adding route: %s", err)
 		}
 	}
 }
 
-// AddRoute registers the appropriate endpoint for the vm given an endpoint
-func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, log logging.Logger) error {
+// AddChainRoute registers a route to a chain's handler
+func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.Context, base, endpoint string, log logging.Logger) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
 	s.log.Info("adding route %s%s", url, endpoint)
-	h, err := s.createMiddlewareHandler(handler, lock, log)
+	// Apply logging middleware
+	h := handlers.CombinedLoggingHandler(log, handler.Handler)
+	// Apply middleware to grab/release chain's lock before/after calling API method
+	h, err := lockMiddleware(h, handler.LockOptions, &ctx.Lock)
 	if err != nil {
 		return err
 	}
-
+	// Apply middleware to reject calls to the handler before the chain finishes bootstrapping
+	h = rejectMiddleware(h, ctx)
 	return s.router.AddRouter(url, endpoint, h)
 }
 
-func (s *Server) createMiddlewareHandler(handler *common.HTTPHandler, lock *sync.RWMutex, log logging.Logger) (http.Handler, error) {
+// AddRoute registers a route to a handler.
+func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, log logging.Logger) error {
+	url := fmt.Sprintf("%s/%s", baseURL, base)
+	s.log.Info("adding route %s%s", url, endpoint)
+	// Apply logging middleware
 	h := handlers.CombinedLoggingHandler(log, handler.Handler)
-	switch handler.LockOptions {
+	// Apply middleware to grab/release chain's lock before/after calling API method
+	h, err := lockMiddleware(h, handler.LockOptions, lock)
+	if err != nil {
+		return err
+	}
+	return s.router.AddRouter(url, endpoint, h)
+}
+
+// Wraps a handler by grabbing and releasing a lock before calling the handler.
+func lockMiddleware(handler http.Handler, lockOption common.LockOption, lock *sync.RWMutex) (http.Handler, error) {
+	switch lockOption {
 	case common.WriteLock:
 		return middlewareHandler{
 			before:  lock.Lock,
 			after:   lock.Unlock,
-			handler: h,
+			handler: handler,
 		}, nil
 	case common.ReadLock:
 		return middlewareHandler{
 			before:  lock.RLock,
 			after:   lock.RUnlock,
-			handler: h,
+			handler: handler,
 		}, nil
 	case common.NoLock:
-		return h, nil
+		return handler, nil
 	default:
 		return nil, errUnknownLockOption
 	}
+}
+
+// Reject middleware wraps a handler. If the chain that the context describes is not done
+// bootstrapping, writes back an error/
+func rejectMiddleware(handler http.Handler, ctx *snow.Context) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
+		if !ctx.IsBootstrapped() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("API call rejected because chain is not done bootstrapping"))
+		} else {
+			handler.ServeHTTP(w, r)
+		}
+	})
 }
 
 // AddAliases registers aliases to the server
