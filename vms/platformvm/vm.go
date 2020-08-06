@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
@@ -30,7 +31,6 @@ import (
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/btcsuite/btcutil/bech32"
 
 	safemath "github.com/ava-labs/gecko/utils/math"
 )
@@ -979,28 +979,17 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
 	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
 		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	if addrStr == "" {
-		return ids.ShortID{}, errEmptyAddress
-	}
-	prefix, suffix, err := splitAddress(addrStr)
-	if err != nil {
-		return ids.ShortID{}, err
-	}
-	if prefix != platformAlias {
-		return ids.ShortID{}, errInvalidAddressPrefix
+
+	chainPrefixes := []string{vm.Ctx.ChainID.String()}
+	if alias, err := vm.Ctx.BCLookup.PrimaryAlias(vm.Ctx.ChainID); err == nil {
+		chainPrefixes = append(chainPrefixes, alias)
 	}
 
-	rawHRP, decoded, err := bech32.Decode(suffix)
+	addr, err := formatting.ParseAddress(addrStr, chainPrefixes, addressSep, hrp)
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	if rawHRP != hrp {
-		return ids.ShortID{}, fmt.Errorf("%w, %q != %q: %v", errInvalidAddress, rawHRP, hrp, err)
-	}
-	addr, err := bech32.ConvertBits(decoded, 5, 8, true)
-	if err != nil {
-		return ids.ShortID{}, fmt.Errorf("unable to convert address from 5-bit to 8-bit: %v", err)
-	}
+
 	return ids.ToShortID(addr)
 }
 
@@ -1008,17 +997,19 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
 // "P-<bech32 encoded bytes>".
 func (vm *VM) FormatAddress(addrID ids.ShortID) (string, error) {
 	networkID := vm.Ctx.NetworkID
-	var hrp string = constants.FallbackHRP
+	hrp := constants.FallbackHRP
 	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
 		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	fivebits, err := bech32.ConvertBits(addrID.Bytes(), 8, 5, true)
-	if err != nil {
-		return "", fmt.Errorf("unable to convert address from 8-bit formatting to 5-bit formatting")
+
+	chainPrefix := vm.Ctx.ChainID.String()
+	if alias, err := vm.Ctx.BCLookup.PrimaryAlias(vm.Ctx.ChainID); err == nil {
+		chainPrefix = alias
 	}
-	addr, err := bech32.Encode(hrp, fivebits)
+	addrstr, err := formatting.FormatAddress(addrID.Bytes(), chainPrefix, addressSep, hrp)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s%s%s", platformAlias, addressSep, addr), nil
+
+	return addrstr, nil
 }

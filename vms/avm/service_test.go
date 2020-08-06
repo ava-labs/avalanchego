@@ -131,7 +131,7 @@ func TestServiceGetBalance(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address().Bytes()
-	addrstr, err := vm.Format(addr)
+	addrstr, err := vm.FormatAddress(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address().Bytes()
-	addrstr, err := vm.Format(addr)
+	addrstr, err := vm.FormatAddress(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,8 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
-	addr0str, err := vm.FormatBech32(addr0.Bytes())
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
 	if err != nil {
 		t.Error(err)
 	}
@@ -266,14 +267,18 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
-	addr0str, err := vm.FormatBech32(addr0.Bytes())
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
 	if err != nil {
 		t.Error(err)
 	}
-	newAddrStr, err := vm.FormatBech32(ids.NewID([32]byte{20}).Bytes())
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
+
+	newAddrFullStr, err := vm.FormatAddress(ids.NewID([32]byte{20}).Bytes())
 	if err != nil {
 		t.Error(err)
 	}
+	newAddrStr := strings.SplitN(newAddrFullStr, addressSep, 2)[1]
+
 	tests := []struct {
 		label string
 		args  *GetUTXOsArgs
@@ -324,7 +329,8 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
-	addr0str, err := vm.FormatBech32(addr0.Bytes())
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
 	if err != nil {
 		t.Error(err)
 	}
@@ -358,14 +364,18 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
-	addr0str, err := vm.FormatBech32(addr0.Bytes())
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
 	if err != nil {
 		t.Error(err)
 	}
-	newAddrStr, err := vm.FormatBech32(ids.NewID([32]byte{42}).Bytes())
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
+
+	newAddrFullStr, err := vm.FormatAddress(ids.NewID([32]byte{20}).Bytes())
 	if err != nil {
 		t.Error(err)
 	}
+	newAddrStr := strings.SplitN(newAddrFullStr, addressSep, 2)[1]
+
 	platformID := ids.Empty.Prefix(0)
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
@@ -473,7 +483,7 @@ func TestGetBalance(t *testing.T) {
 	avaAssetID := genesisTx.ID()
 
 	reply := GetBalanceReply{}
-	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +508,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	}()
 
 	reply := CreateFixedCapAssetReply{}
-	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -530,7 +540,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}()
 
 	reply := CreateVariableCapAssetReply{}
-	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,7 +580,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 
 	// Test minting of the created variable cap asset
-	addrstr, err = vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err = vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -597,7 +607,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	if err := mintTx.Accept(); err != nil {
 		t.Fatalf("Failed to accept MintTx due to: %s", err)
 	}
-	addrstr, err = vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err = vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,7 +632,7 @@ func TestNFTWorkflow(t *testing.T) {
 	}()
 
 	// Test minting of the created variable cap asset
-	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -659,7 +669,7 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
 	}
 
-	addrstr, err = vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err = vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -689,7 +699,7 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("Failed to accept MintNFTTx: %s", err)
 	}
 
-	addrstr, err = vm.Format(keys[2].PublicKey().Address().Bytes())
+	addrstr, err = vm.FormatAddress(keys[2].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -731,7 +741,7 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	addrstr, err := vm.Format(sk.PublicKey().Address().Bytes())
+	addrstr, err := vm.FormatAddress(sk.PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -783,7 +793,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedAddress, err := vm.Format(sk.PublicKey().Address().Bytes())
+	expectedAddress, err := vm.FormatAddress(sk.PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -830,7 +840,7 @@ func TestSend(t *testing.T) {
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
 
-	addrstr, err := vm.Format(addr.Bytes())
+	addrstr, err := vm.FormatAddress(addr.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -925,7 +935,7 @@ func TestImportAVA(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
-	addrstr, err := vm.Format(keys[0].PublicKey().Address().Bytes())
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

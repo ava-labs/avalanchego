@@ -1060,7 +1060,7 @@ func TestVMFormat(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			addrstr, err := vm.Format([]byte(tt.in))
+			addrstr, err := vm.FormatAddress([]byte(tt.in))
 			if err != nil {
 				t.Error(err)
 			}
@@ -1095,7 +1095,7 @@ func TestVMFormatAliased(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			addrstr, err := vm.Format([]byte(tt.in))
+			addrstr, err := vm.FormatAddress([]byte(tt.in))
 			if err != nil {
 				t.Error(err)
 			}

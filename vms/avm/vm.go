@@ -7,10 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
-
-	"github.com/btcsuite/btcutil/bech32"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -25,6 +22,7 @@ import (
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -595,84 +593,42 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return false
 }
 
-// ParseBech32 takes a bech32 address as input and returns the HRP and data section of a bech32 address
-func (vm *VM) ParseBech32(addrStr string) (string, []byte, error) {
+// ParseAddress takes in an address string and produces bytes for the address
+func (vm *VM) ParseAddress(addrStr string) ([]byte, error) {
 	networkID := vm.ctx.NetworkID
-	var hrp string = constants.FallbackHRP
+	hrp := constants.FallbackHRP
 	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
 		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	rawHRP, decoded, err := bech32.Decode(addrStr)
-	if err != nil {
-		return "", nil, err
-	}
-	if rawHRP != hrp {
-		return "", nil, fmt.Errorf("improper Human Readable Part (HRP) of address %q -- found %q, expected %q", addrStr, rawHRP, hrp)
-	}
-	addrbuff, err := bech32.ConvertBits(decoded, 5, 8, true)
-	if err != nil {
-		fmt.Errorf("unable to convert address from 5-bit to 8-bit formatting")
-	}
-	return hrp, addrbuff, nil
-}
 
-// FormatBech32 takes an address's bytes as input and returns a bech32 address
-func (vm *VM) FormatBech32(b []byte) (string, error) {
-	networkID := vm.ctx.NetworkID
-	var hrp string = constants.FallbackHRP
-	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
-		hrp = constants.NetworkIDToHRP[networkID]
+	chainPrefixes := []string{vm.ctx.ChainID.String()}
+	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
+		chainPrefixes = append(chainPrefixes, alias)
 	}
-	fivebits, err := bech32.ConvertBits(b, 8, 5, true)
-	if err != nil {
-		return "", fmt.Errorf("unable to convert address from 8-bit to 5-bit formatting")
-	}
-	addr, err := bech32.Encode(hrp, fivebits)
-	if err != nil {
-		return "", err
-	}
-	return addr, nil
-}
-
-// Parse takes in an address string and produces bytes for the address
-func (vm *VM) Parse(addrStr string) ([]byte, error) {
-
-	if count := strings.Count(addrStr, addressSep); count < 1 {
-		return nil, errInvalidAddress
-	}
-	addressParts := strings.SplitN(addrStr, addressSep, 2)
-	bcAlias := addressParts[0]
-	rawAddr := addressParts[1]
-	bcID, err := vm.ctx.BCLookup.Lookup(bcAlias)
-	if err != nil {
-		bcID, err = ids.FromString(bcAlias)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if !bcID.Equals(vm.ctx.ChainID) {
-		return nil, errWrongBlockchainID
-	}
-	_, addr, err := vm.ParseBech32(rawAddr)
+	addr, err := formatting.ParseAddress(addrStr, chainPrefixes, addressSep, hrp)
 	if err != nil {
 		return nil, err
 	}
 	return addr, nil
 }
 
-// Format takes in a 20-byte slice and produces a string for an address
-func (vm *VM) Format(b []byte) (string, error) {
-	var bcAlias string
-	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
-		bcAlias = alias
-	} else {
-		bcAlias = vm.ctx.ChainID.String()
+// FormatAddress takes in a 20-byte slice and produces a string for an address
+func (vm *VM) FormatAddress(b []byte) (string, error) {
+	networkID := vm.ctx.NetworkID
+	hrp := constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	addrstr, err := vm.FormatBech32(b)
+
+	chainPrefix := vm.ctx.ChainID.String()
+	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
+		chainPrefix = alias
+	}
+	addrstr, err := formatting.FormatAddress(b, chainPrefix, addressSep, hrp)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s%s%s", bcAlias, addressSep, addrstr), nil
+	return addrstr, nil
 }
 
 // LoadUser ...

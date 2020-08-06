@@ -137,7 +137,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
-		addrBytes, err := service.vm.Parse(addr)
+		addrBytes, err := service.vm.ParseAddress(addr)
 		if err != nil {
 			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
@@ -176,7 +176,7 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *GetAtomicUTXOsArgs
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
-		addrBytes, err := service.vm.Parse(addr)
+		addrBytes, err := service.vm.ParseAddress(addr)
 		if err != nil {
 			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
@@ -260,7 +260,7 @@ type GetBalanceReply struct {
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
 	service.vm.ctx.Log.Info("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
 
-	address, err := service.vm.Parse(args.Address)
+	address, err := service.vm.ParseAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -325,7 +325,7 @@ type GetAllBalancesReply struct {
 func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
 	service.vm.ctx.Log.Info("AVM: GetAllBalances called with address: %s", args.Address)
 
-	address, err := service.vm.Parse(args.Address)
+	address, err := service.vm.ParseAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -444,7 +444,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		Outs: make([]verify.State, 0, len(args.InitialHolders)),
 	}
 	for _, holder := range args.InitialHolders {
-		address, err := service.vm.Parse(holder.Address)
+		address, err := service.vm.ParseAddress(holder.Address)
 		if err != nil {
 			return err
 		}
@@ -565,7 +565,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 			},
 		}
 		for _, address := range owner.Minters {
-			addrBytes, err := service.vm.Parse(address)
+			addrBytes, err := service.vm.ParseAddress(address)
 			if err != nil {
 				return err
 			}
@@ -676,7 +676,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 			},
 		}
 		for _, address := range owner.Minters {
-			addrBytes, err := service.vm.Parse(address)
+			addrBytes, err := service.vm.ParseAddress(address)
 			if err != nil {
 				return err
 			}
@@ -755,7 +755,7 @@ func (service *Service) CreateAddress(r *http.Request, args *CreateAddressArgs, 
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving address: %w", err)
 	}
-	reply.Address, err = service.vm.Format(sk.PublicKey().Address().Bytes())
+	reply.Address, err = service.vm.FormatAddress(sk.PublicKey().Address().Bytes())
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -793,7 +793,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *ListAddressesArgs, 
 	}
 
 	for _, address := range addresses {
-		addr, err := service.vm.Format(address.Bytes())
+		addr, err := service.vm.FormatAddress(address.Bytes())
 		if err != nil {
 			return fmt.Errorf("problem formatting address: %w", err)
 		}
@@ -819,7 +819,7 @@ type ExportKeyReply struct {
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Info("AVM: ExportKey called for user '%s'", args.Username)
 
-	address, err := service.vm.Parse(args.Address)
+	address, err := service.vm.ParseAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -891,7 +891,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 	addresses, _ := user.Addresses(db)
 
 	newAddress := sk.PublicKey().Address()
-	reply.Address, err = service.vm.Format(newAddress.Bytes())
+	reply.Address, err = service.vm.FormatAddress(newAddress.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -939,7 +939,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *SendReply) 
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1062,7 +1062,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *MintReply) 
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address '%s': %w", args.To, err)
 	}
@@ -1165,7 +1165,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *SendN
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1269,7 +1269,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *MintN
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1368,7 +1368,7 @@ type ImportAVAReply struct {
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *ImportAVAReply) error {
 	service.vm.ctx.Log.Info("AVM: ImportAVA called with username: %s", args.Username)
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
