@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -36,12 +37,13 @@ import (
 )
 
 const (
-	batchTimeout   = time.Second
-	batchSize      = 30
-	stateCacheSize = 30000
-	idCacheSize    = 30000
-	txCacheSize    = 30000
-	addressSep     = "-"
+	batchTimeout    = time.Second
+	batchSize       = 30
+	stateCacheSize  = 30000
+	idCacheSize     = 30000
+	txCacheSize     = 30000
+	addressSep      = "-"
+	maxUTXOsToFetch = 1024
 )
 
 var (
@@ -338,49 +340,103 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
-// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetAtomicUTXOs(chainID ids.ID, addrs ids.Set) ([]*ava.UTXO, error) {
+// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Returns at most [limit] UTXOs.
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Returns:
+// * The fetched of UTXOs
+// * true if all there are no more UTXOs in this range to fetch
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+func (vm *VM) GetAtomicUTXOs(chainID ids.ID, addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
+	}
+	toFetch := limit
+
+	seen := ids.Set{} // IDs of UTXOs already in the list
+	utxos := make([]*ava.UTXO, 0, limit)
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
 	smDB := vm.ctx.SharedMemory.GetDatabase(chainID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(chainID)
-
 	state := ava.NewPrefixedState(smDB, vm.codec)
-
-	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
-		utxos, _ := state.PlatformFunds(addr)
-		utxoIDs.Add(utxos...)
-	}
-
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := state.PlatformUTXO(utxoID)
-		if err != nil {
-			return nil, err
+		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
+			continue
 		}
-		utxos = append(utxos, utxo)
+		utxoIDs, _ := state.PlatformFunds(addr.Bytes(), startUtxo, toFetch)
+		for _, utxoID := range utxoIDs {
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+			utxo, err := state.PlatformUTXO(utxoID)
+			if err != nil {
+				return nil, ids.ShortEmpty, ids.Empty, err
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			lastAddr = addr
+			lastIndex = utxoID
+			toFetch--
+			if toFetch <= 0 { // We fetched enough UTXOs; stop.
+				break
+			}
+		}
 	}
-	return utxos, nil
+	return utxos, lastAddr, lastIndex, nil
 }
 
-// GetUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
-	utxoIDs := ids.Set{}
-	for _, addr := range addrs.List() {
-		utxos, _ := vm.state.Funds(addr)
-		utxoIDs.Add(utxos...)
+// GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Returns at most [limit] UTXOs.
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Only returns UTXOs associated with addresses >= [startAddr].
+// For address [startAddr], only returns UTXOs whose IDs are greater than [startUtxoID].
+// Returns:
+// * The fetched of UTXOs
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxoID ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
 	}
+	toFetch := limit
 
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := vm.state.UTXO(utxoID)
-		if err != nil {
-			return nil, err
+	seen := ids.Set{} // IDs of UTXOs already in the list
+	utxos := make([]*ava.UTXO, 0, limit)
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+	for _, addr := range addrsList {
+		start := ids.Empty
+		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
+			continue
+		} else if comp == 0 {
+			start = startUtxoID
 		}
-		utxos = append(utxos, utxo)
+		utxoIDs, _ := vm.state.Funds(addr.Bytes(), start, toFetch) // Get UTXOs associated with [addr]
+		for _, utxoID := range utxoIDs {
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+			utxo, err := vm.state.UTXO(utxoID)
+			if err != nil {
+				return nil, ids.ShortEmpty, ids.Empty, err
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			lastAddr = addr
+			lastIndex = utxoID
+			toFetch--
+			if toFetch <= 0 {
+				break // Found [limit] utxos; stop.
+			}
+		}
 	}
-	return utxos, nil
+	return utxos, lastAddr, lastIndex, nil
 }
 
 /*
@@ -592,10 +648,10 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return false
 }
 
-// Parse ...
-func (vm *VM) Parse(addrStr string) ([]byte, error) {
+// ParseAddress ...
+func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
 	if count := strings.Count(addrStr, addressSep); count != 1 {
-		return nil, errInvalidAddress
+		return ids.ShortEmpty, errInvalidAddress
 	}
 	addressParts := strings.SplitN(addrStr, addressSep, 2)
 	bcAlias := addressParts[0]
@@ -604,15 +660,17 @@ func (vm *VM) Parse(addrStr string) ([]byte, error) {
 	if err != nil {
 		bcID, err = ids.FromString(bcAlias)
 		if err != nil {
-			return nil, err
+			return ids.ShortEmpty, err
 		}
 	}
 	if !bcID.Equals(vm.ctx.ChainID) {
-		return nil, errWrongBlockchainID
+		return ids.ShortEmpty, errWrongBlockchainID
 	}
 	cb58 := formatting.CB58{}
-	err = cb58.FromString(rawAddr)
-	return cb58.Bytes, err
+	if err := cb58.FromString(rawAddr); err != nil {
+		return ids.ShortEmpty, err
+	}
+	return ids.ToShortID(cb58.Bytes)
 }
 
 // Format ...
@@ -642,15 +700,14 @@ func (vm *VM) LoadUser(
 
 	user := userState{vm: vm}
 
-	// The error is explicitly dropped, as it may just mean that there are no
-	// addresses.
+	// The error is explicitly dropped, as it may just mean that there are no addresses.
 	addresses, _ := user.Addresses(db)
 
-	addrs := ids.Set{}
+	addrs := ids.ShortSet{}
 	for _, addr := range addresses {
-		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+		addrs.Add(addr)
 	}
-	utxos, err := vm.GetUTXOs(addrs)
+	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
 	}

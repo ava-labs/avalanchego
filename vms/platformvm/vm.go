@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -77,6 +78,8 @@ const (
 	MaximumStakingDuration = 365 * 24 * time.Hour
 
 	droppedTxCacheSize = 50
+
+	maxUTXOsToFetch = 1024
 )
 
 var (
@@ -931,32 +934,53 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 // Logger ...
 func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 
-// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Returns at most [limit] UTXOs.
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Returns:
+// * The fetched of UTXOs
+// * true if all there are no more UTXOs in this range to fetch
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+func (vm *VM) GetAtomicUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
+	}
+	toFetch := limit
+
+	seen := ids.Set{} // IDs of UTXOs already in the list
+	utxos := make([]*ava.UTXO, 0, limit)
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
 	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
 	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
-
 	state := ava.NewPrefixedState(smDB, vm.codec)
-
-	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
-		utxos, err := state.AVMFunds(addr)
-		if err != nil {
-			return nil, err
+		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
+			continue
 		}
-		utxoIDs.Add(utxos...)
-	}
-
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := state.AVMUTXO(utxoID)
-		if err != nil {
-			return nil, err
+		utxoIDs, _ := state.AVMFunds(addr.Bytes(), startUtxo, toFetch)
+		for _, utxoID := range utxoIDs {
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+			utxo, err := state.AVMUTXO(utxoID)
+			if err != nil {
+				return nil, ids.ShortEmpty, ids.Empty, err
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			lastAddr = addr
+			lastIndex = utxoID
+			toFetch--
+			if toFetch <= 0 { // We fetched enough UTXOs; stop.
+				break
+			}
 		}
-		utxos = append(utxos, utxo)
 	}
-	return utxos, nil
+	return utxos, lastAddr, lastIndex, nil
 }
 
 func splitAddress(addrStr string) (string, string, error) {

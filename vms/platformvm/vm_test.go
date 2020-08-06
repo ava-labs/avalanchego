@@ -252,7 +252,7 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		utxos, err := vm.getUTXOs(vm.DB, [][]byte{utxo.Address.Bytes()})
+		utxos, _, _, err := vm.getUTXOs(vm.DB, [][]byte{utxo.Address.Bytes()}, nil, ids.Empty, -1)
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {

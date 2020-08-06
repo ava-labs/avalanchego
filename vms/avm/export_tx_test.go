@@ -5,6 +5,7 @@ package avm
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/gecko/api/keystore"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/components/verify"
@@ -1166,7 +1166,7 @@ func TestIssueExportTx(t *testing.T) {
 	vm := &VM{
 		ava: avaID,
 	}
-	err := vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -1175,19 +1175,16 @@ func TestIssueExportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
-	if err != nil {
+	if err := vm.Bootstrapping(); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
-	if err != nil {
+	if err := vm.Bootstrapped(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1271,8 +1268,9 @@ func TestIssueExportTx(t *testing.T) {
 	parsedTx := txs[0]
 	if err := parsedTx.Verify(); err != nil {
 		t.Fatal(err)
+	} else if err := parsedTx.Accept(); err != nil {
+		t.Fatal(err)
 	}
-	parsedTx.Accept()
 
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
@@ -1288,9 +1286,7 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	addrID := ids.NewID(hashing.ComputeHash256Array(key.PublicKey().Address().Bytes()))
-
-	utxoIDs, err := state.AVMFunds(addrID)
+	utxoIDs, err := state.AVMFunds(key.PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}

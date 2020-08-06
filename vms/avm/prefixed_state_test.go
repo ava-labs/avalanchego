@@ -4,12 +4,12 @@
 package avm
 
 import (
+	"math"
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -170,7 +170,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	funds, err := state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
+	funds, err := state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	funds, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
+	funds, err = state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}

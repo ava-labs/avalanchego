@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"bytes"
 	"sort"
 )
 
@@ -28,3 +29,19 @@ func SortUint32(u32 []uint32) { sort.Sort(innerSortUint32(u32)) }
 
 // IsSortedAndUniqueUint32 returns true if the array of uint32s are sorted and unique
 func IsSortedAndUniqueUint32(u32 []uint32) bool { return IsSortedAndUnique(innerSortUint32(u32)) }
+
+type innerSortBytes [][]byte
+
+func (arr innerSortBytes) Less(i, j int) bool {
+	return bytes.Compare(arr[i], arr[j]) == -1
+}
+
+func (arr innerSortBytes) Len() int      { return len(arr) }
+func (arr innerSortBytes) Swap(i, j int) { arr[j], arr[i] = arr[i], arr[j] }
+
+// Sort2DBytes sorts a 2D byte array
+// Each byte array is not sorted internally; the byte arrays are sorted relative to another.
+func Sort2DBytes(arr [][]byte) { sort.Sort(innerSortBytes(arr)) }
+
+// IsSorted2DBytes returns true iff [arr] is sorted
+func IsSorted2DBytes(arr [][]byte) bool { return sort.IsSorted(innerSortBytes(arr)) }
