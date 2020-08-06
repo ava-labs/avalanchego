@@ -105,6 +105,10 @@ func init() {
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
+	aliaser := &ids.Aliaser{}
+	aliaser.Initialize()
+	aliaser.Alias(constants.PlatformChainID, "P")
+	ctx.BCLookup = aliaser
 	return ctx
 }
 
@@ -1760,20 +1764,20 @@ func TestParseAddressInvalid(t *testing.T) {
 	checksumBad := "checksum failed. Expected qwqey4, got x5r4ap."
 	tests := []struct {
 		in   string
-		want error
+		want string
 	}{
-		{"", errEmptyAddress},
-		{"+", errInvalidAddressSeperator},
-		{"P", errInvalidAddressSeperator},
-		{"-", errEmptyAddressPrefix},
-		{"P-", errEmptyAddressSuffix},
-		{"X-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y", errInvalidAddressPrefix},
-		{"P-testing18jma8ppw3nhx5r4ap", fmt.Errorf(checksumBad)}, //truncated
+		{"", "no separator found in address"},
+		{"+", "no separator found in address"},
+		{"P", "no separator found in address"},
+		{"-", "invalid chainID in address"},
+		{"P-", "invalid bech32 string length 0"},
+		{"X-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y", "invalid chainID in address"},
+		{"P-testing18jma8ppw3nhx5r4ap", checksumBad}, //truncated
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
 			_, err := vm.ParseAddress(tt.in)
-			if err.Error() != tt.want.Error() {
+			if err.Error() != tt.want {
 				t.Errorf("want %q, got %q", tt.want, err)
 			}
 		})

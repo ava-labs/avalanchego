@@ -50,14 +50,14 @@ func FormatBech32(hrp string, b []byte) (string, error) {
 func ParseAddress(addrStr string, chainPrefixes []string, addressSep string, hrp string) ([]byte, error) {
 
 	if count := strings.Count(addrStr, addressSep); count < 1 {
-		return nil, fmt.Errorf("address is missing a chainID")
+		return nil, fmt.Errorf("no separator found in address")
 	}
 	addressParts := strings.SplitN(addrStr, addressSep, 2)
 	bcID := addressParts[0]
 	rawAddr := addressParts[1]
 
 	if !stringInSlice(bcID, chainPrefixes) {
-		return nil, fmt.Errorf("invalid chainID in address, needed %v", chainPrefixes)
+		return nil, fmt.Errorf("invalid chainID in address")
 	}
 	_, addr, err := ParseBech32(rawAddr)
 	if err != nil {
