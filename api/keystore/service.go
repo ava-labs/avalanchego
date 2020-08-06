@@ -13,6 +13,7 @@ import (
 
 	zxcvbn "github.com/nbutton23/zxcvbn-go"
 
+	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/encdb"
@@ -130,19 +131,8 @@ func (ks *Keystore) getUser(username string) (*User, error) {
 	return usr, ks.codec.Unmarshal(usrBytes, usr)
 }
 
-// CreateUserArgs are arguments for passing into CreateUser requests
-type CreateUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// CreateUserReply is the response from calling CreateUser
-type CreateUserReply struct {
-	Success bool `json:"success"`
-}
-
 // CreateUser creates an empty user with the provided username and password
-func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *CreateUserReply) error {
+func (ks *Keystore) CreateUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -155,16 +145,13 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	return nil
 }
 
-// ListUsersArgs are the arguments to ListUsers
-type ListUsersArgs struct{}
-
 // ListUsersReply is the reply from ListUsers
 type ListUsersReply struct {
 	Users []string `json:"users"`
 }
 
 // ListUsers lists all the registered usernames
-func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListUsersReply) error {
+func (ks *Keystore) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersReply) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -180,19 +167,13 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListU
 	return it.Error()
 }
 
-// ExportUserArgs are the arguments to ExportUser
-type ExportUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
 // ExportUserReply is the reply from ExportUser
 type ExportUserReply struct {
 	User formatting.CB58 `json:"user"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
-func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *ExportUserReply) error {
+func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *ExportUserReply) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -234,18 +215,13 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
-	Username string          `json:"username"`
-	Password string          `json:"password"`
-	User     formatting.CB58 `json:"user"`
+	api.UserPass
+	User formatting.CB58 `json:"user"`
 }
 
-// ImportUserReply is the response for ImportUser
-type ImportUserReply struct {
-	Success bool `json:"success"`
-}
-
-// ImportUser imports a serialized encoding of a user's information complete with encrypted database values, integrity checks the password, and adds it to the database
-func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *ImportUserReply) error {
+// ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
+// integrity checks the password, and adds it to the database
+func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -293,19 +269,8 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	return nil
 }
 
-// DeleteUserArgs are arguments for passing into DeleteUser requests
-type DeleteUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// DeleteUserReply is the response from calling DeleteUser
-type DeleteUserReply struct {
-	Success bool `json:"success"`
-}
-
 // DeleteUser deletes user with the provided username and password.
-func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *DeleteUserReply) error {
+func (ks *Keystore) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 

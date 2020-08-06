@@ -110,13 +110,8 @@ type UnpublishBlockchainArgs struct {
 	BlockchainID string `json:"blockchainID"`
 }
 
-// UnpublishBlockchainReply are the results from calling UnpublishBlockchain
-type UnpublishBlockchainReply struct {
-	Success bool `json:"success"`
-}
-
 // UnpublishBlockchain closes publishing of a blockchainID
-func (ipc *IPCs) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, reply *UnpublishBlockchainReply) error {
+func (ipc *IPCs) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, reply *api.SuccessResponse) error {
 	ipc.log.Info("IPCs: UnpublishBlockchain called with BlockchainID: %s", args.BlockchainID)
 	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
