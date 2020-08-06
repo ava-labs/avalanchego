@@ -637,7 +637,7 @@ func (vm *VM) FormatBech32(b []byte) (string, error) {
 // Parse takes in an address string and produces bytes for the address
 func (vm *VM) Parse(addrStr string) ([]byte, error) {
 
-	if count := strings.Count(addrStr, addressSep); count != 1 {
+	if count := strings.Count(addrStr, addressSep); count < 1 {
 		return nil, errInvalidAddress
 	}
 	addressParts := strings.SplitN(addrStr, addressSep, 2)

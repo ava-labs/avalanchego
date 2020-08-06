@@ -956,7 +956,7 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 }
 
 func splitAddress(addrStr string) (string, string, error) {
-	if count := strings.Count(addrStr, addressSep); count != 1 {
+	if count := strings.Count(addrStr, addressSep); count < 1 {
 		return "", "", errInvalidAddressSeperator
 	}
 	addrParts := strings.SplitN(addrStr, addressSep, 2)
