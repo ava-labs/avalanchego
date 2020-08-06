@@ -65,9 +65,8 @@ func (s *Server) DispatchTLS(certFile, keyFile string) error {
 	return http.ServeTLS(listener, handler, certFile, keyFile)
 }
 
-// RegisterChain registers the API endpoints associated with this chain That
-// is, add <route, handler> pairs to server so that http calls can be made to
-// the vm
+// RegisterChain registers the API endpoints associated with this chain That is,
+// add <route, handler> pairs to server so that http calls can be made to the vm
 func (s *Server) RegisterChain(ctx *snow.Context, vmIntf interface{}) {
 	vm, ok := vmIntf.(common.VM)
 	if !ok {
@@ -151,8 +150,8 @@ func lockMiddleware(handler http.Handler, lockOption common.LockOption, lock *sy
 	}
 }
 
-// Reject middleware wraps a handler. If the chain that the context describes is not done
-// bootstrapping, writes back an error/
+// Reject middleware wraps a handler. If the chain that the context describes is
+// not done bootstrapping, writes back an error.
 func rejectMiddleware(handler http.Handler, ctx *snow.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if !ctx.IsBootstrapped() {
