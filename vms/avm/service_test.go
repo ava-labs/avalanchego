@@ -419,6 +419,144 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 }
 
+func TestServiceGetUTXOsFromPlatform(t *testing.T) {
+	_, vm, s := setup(t)
+	defer func() {
+		vm.Shutdown()
+		vm.ctx.Lock.Unlock()
+	}()
+
+	addr1 := ids.GenerateTestShortID()
+	addr2 := ids.GenerateTestShortID()
+
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
+	state := ava.NewPrefixedState(smDB, vm.codec)
+	numUtxos := 10
+	// Put a bunch of UTXOs that reference both addr1 and addr2
+	for i := 0; i < numUtxos; i++ {
+		if err := state.FundPlatformUTXO(&ava.UTXO{
+			UTXOID: ava.UTXOID{
+				TxID: ids.GenerateTestID(),
+			},
+			Asset: ava.Asset{ID: vm.ava},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr1, addr2},
+				},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
+
+	tests := []struct {
+		label         string
+		args          *GetUTXOsArgs
+		expectedCount int
+		shouldErr     bool
+	}{
+		{
+			"Empty",
+			&GetUTXOsArgs{},
+			0,
+			false,
+		},
+		{
+			"[<ChainID>-<invalid address>]",
+			&GetUTXOsArgs{
+				ChainID: platformChainID.String(),
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
+				},
+				Limit:      0,
+				StartIndex: Index{},
+			},
+			0,
+			true,
+		},
+		{
+			"[<ChainID>-<addr1>]",
+			&GetUTXOsArgs{
+				ChainID: platformChainID.String(),
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr1.String()),
+				},
+				Limit:      0,
+				StartIndex: Index{},
+			},
+			numUtxos,
+			false,
+		},
+		{
+			"[<ChainID>-<add1r>,<ChainID>-<addr2>]",
+			&GetUTXOsArgs{
+				ChainID: platformChainID.String(),
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr1.String()),
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr2.String()),
+				},
+				Limit:      0,
+				StartIndex: Index{},
+			},
+			numUtxos,
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			utxosReply := &GetUTXOsReply{}
+			if err := s.GetUTXOs(nil, tt.args, utxosReply); err != nil && !tt.shouldErr {
+				t.Error(err)
+			} else if err == nil && tt.shouldErr {
+				t.Error("should have errored")
+			} else if tt.expectedCount != len(utxosReply.UTXOs) {
+				t.Errorf("Expected %d utxos, got %#v", tt.expectedCount, len(utxosReply.UTXOs))
+			} else if tt.expectedCount != int(utxosReply.NumFetched) {
+				t.Errorf("numFetced is %d but got %d utxos", utxosReply.NumFetched, tt.expectedCount)
+			}
+		})
+	}
+
+	// Test that start index and stop index work
+	// (Assumes numUtxos > 5)
+	reply := &GetUTXOsReply{}
+	args := &GetUTXOsArgs{
+		ChainID:    platformChainID.String(),
+		Addresses:  []string{fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr1.String())},
+		Limit:      5,
+		StartIndex: Index{},
+	}
+	utxos := ids.Set{}
+	if err := s.GetUTXOs(nil, args, reply); err != nil {
+		t.Fatal(err)
+	}
+	for _, utxo := range reply.UTXOs { // Remember these UTXOs
+		utxos.Add(ids.NewID(hashing.ComputeHash256Array(utxo.Bytes)))
+	}
+	args = &GetUTXOsArgs{
+		platformChainID.String(),
+		[]string{fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr1.String())},
+		json.Uint32(numUtxos - 5),
+		reply.EndIndex,
+	}
+	if err := s.GetUTXOs(nil, args, reply); err != nil {
+		t.Fatal(err)
+	} else if len(reply.UTXOs) != numUtxos-5 {
+		t.Fatalf("got %d utxos but should have %d", len(reply.UTXOs), numUtxos-5)
+	}
+	for _, utxo := range reply.UTXOs { // Remember these UTXOs
+		utxos.Add(ids.NewID(hashing.ComputeHash256Array(utxo.Bytes)))
+	}
+	// Should have gotten all the UTXOs now. None should have been repeats
+	// so length of this set should be numUtxos
+	if utxos.Len() != numUtxos {
+		t.Fatalf("got %d utxos but should have %d", utxos.Len(), numUtxos)
+	}
+}
+
 func TestGetAssetDescription(t *testing.T) {
 	genesisBytes, vm, s := setup(t)
 	defer func() {
