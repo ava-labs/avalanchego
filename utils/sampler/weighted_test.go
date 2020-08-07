@@ -11,27 +11,27 @@ import (
 )
 
 var (
-	tests = []func(*testing.T, Weighted){
-		InitializeOverflowTest,
-		OutOfRangeTest,
-		SingletonTest,
-		WithZeroTest,
-		DistributionTest,
+	weightedTests = []func(*testing.T, Weighted){
+		WeightedInitializeOverflowTest,
+		WeightedOutOfRangeTest,
+		WeightedSingletonTest,
+		WeightedWithZeroTest,
+		WeightedDistributionTest,
 	}
 )
 
 func WeightedTest(t *testing.T, s Weighted) {
-	for _, test := range tests {
+	for _, test := range weightedTests {
 		test(t, s)
 	}
 }
 
-func InitializeOverflowTest(t *testing.T, s Weighted) {
+func WeightedInitializeOverflowTest(t *testing.T, s Weighted) {
 	err := s.Initialize([]uint64{1, math.MaxUint64})
 	assert.Error(t, err, "should have reported an overflow error")
 }
 
-func OutOfRangeTest(t *testing.T, s Weighted) {
+func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
 	err := s.Initialize([]uint64{1})
 	assert.NoError(t, err)
 
@@ -39,7 +39,7 @@ func OutOfRangeTest(t *testing.T, s Weighted) {
 	assert.Error(t, err, "should have reported an out of range error")
 }
 
-func SingletonTest(t *testing.T, s Weighted) {
+func WeightedSingletonTest(t *testing.T, s Weighted) {
 	err := s.Initialize([]uint64{1})
 	assert.NoError(t, err)
 
@@ -48,7 +48,7 @@ func SingletonTest(t *testing.T, s Weighted) {
 	assert.Equal(t, 0, index, "should have selected the first element")
 }
 
-func WithZeroTest(t *testing.T, s Weighted) {
+func WeightedWithZeroTest(t *testing.T, s Weighted) {
 	err := s.Initialize([]uint64{0, 1})
 	assert.NoError(t, err)
 
@@ -57,7 +57,7 @@ func WithZeroTest(t *testing.T, s Weighted) {
 	assert.Equal(t, 1, index, "should have selected the second element")
 }
 
-func DistributionTest(t *testing.T, s Weighted) {
+func WeightedDistributionTest(t *testing.T, s Weighted) {
 	err := s.Initialize([]uint64{1, 1, 2})
 	assert.NoError(t, err)
 

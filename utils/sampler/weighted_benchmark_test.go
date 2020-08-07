@@ -5,9 +5,8 @@ package sampler
 
 import (
 	"math"
+	"math/rand"
 	"testing"
-
-	"github.com/ava-labs/gecko/utils/random"
 
 	safemath "github.com/ava-labs/gecko/utils/math"
 )
@@ -25,7 +24,7 @@ func WeightedUniformBenchmark(b *testing.B, s Weighted, size int) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sample(uint64(random.Rand(0, len(weights))))
+		s.Sample(uint64(rand.Int63n(int64(len(weights)))))
 	}
 }
 
@@ -53,7 +52,7 @@ func WeightedPowBenchmark(b *testing.B, s Weighted, exponent float64, size int) 
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sample(uint64(random.Rand(0, int(maxWeight))))
+		s.Sample(uint64(rand.Int63n(int64(maxWeight))))
 	}
 }
 
@@ -71,6 +70,6 @@ func WeightedSingletonBenchmark(b *testing.B, s Weighted, size int) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sample(uint64(random.Rand(0, math.MaxInt64)))
+		s.Sample(uint64(rand.Int63n(math.MaxInt64)))
 	}
 }

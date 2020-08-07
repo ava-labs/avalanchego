@@ -28,3 +28,15 @@ func SortUint32(u32 []uint32) { sort.Sort(innerSortUint32(u32)) }
 
 // IsSortedAndUniqueUint32 returns true if the array of uint32s are sorted and unique
 func IsSortedAndUniqueUint32(u32 []uint32) bool { return IsSortedAndUnique(innerSortUint32(u32)) }
+
+type innerSortUint64 []uint64
+
+func (su64 innerSortUint64) Less(i, j int) bool { return su64[i] < su64[j] }
+func (su64 innerSortUint64) Len() int           { return len(su64) }
+func (su64 innerSortUint64) Swap(i, j int)      { su64[j], su64[i] = su64[i], su64[j] }
+
+// SortUint64 sorts an uint64 array
+func SortUint64(u64 []uint64) { sort.Sort(innerSortUint64(u64)) }
+
+// IsSortedAndUniqueUint64 returns true if the array of uint64s are sorted and unique
+func IsSortedAndUniqueUint64(u64 []uint64) bool { return IsSortedAndUnique(innerSortUint64(u64)) }
