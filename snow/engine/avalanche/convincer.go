@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
+// Sends chits after all dependencies are met
 type convincer struct {
 	consensus avalanche.Consensus
 	sender    common.Sender

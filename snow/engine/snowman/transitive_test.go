@@ -69,7 +69,7 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 	}
 
 	te.finishBootstrapping()
-	te.Finished = true
+	te.Context().Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -403,7 +403,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	te.finishBootstrapping()
-	te.Finished = true
+	te.Context().Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -814,7 +814,7 @@ func TestVoteCanceling(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Finished = true
+	te.Context().Bootstrapped()
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
@@ -893,7 +893,7 @@ func TestEngineNoQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Finished = true
+	te.Context().Bootstrapped()
 
 	blk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -931,7 +931,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Finished = true
+	te.Context().Bootstrapped()
 
 	te.repoll()
 }
@@ -1544,7 +1544,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	te.finishBootstrapping()
-	te.Finished = true
+	te.Context().Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -1654,7 +1654,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Finished = true
+	te.Context().Bootstrapped()
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true

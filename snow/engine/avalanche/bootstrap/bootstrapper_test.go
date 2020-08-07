@@ -819,7 +819,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 
 	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes1}); err != nil { // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	} else if bs.Finished {
+	} else if bs.Context.IsBootstrapped() {
 		t.Fatalf("should not have finished")
 	} else if !requested.Equals(vtxID0) {
 		t.Fatal("should hae requested vtx0")
@@ -829,7 +829,7 @@ func TestBootstrapperIncompleteMultiPut(t *testing.T) {
 
 	if err := bs.MultiPut(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil { // Provide vtx0; can finish now
 		t.Fatal(err)
-	} else if !bs.Finished {
+	} else if !bs.Context.IsBootstrapped() {
 		t.Fatal("should have finished")
 	} else if vtx0.Status() != choices.Accepted {
 		t.Fatal("should be accepted")

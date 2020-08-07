@@ -342,7 +342,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 // Finish bootstrapping
 func (b *Bootstrapper) finish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	if b.Finished || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
+	if b.Context.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
 		return nil
 	}
 
@@ -366,7 +366,6 @@ func (b *Bootstrapper) finish() error {
 	if err := b.OnFinished(); err != nil {
 		return err
 	}
-	b.Finished = true
 	b.Context.Bootstrapped()
 
 	return nil

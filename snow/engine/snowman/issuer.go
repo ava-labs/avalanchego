@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 )
 
+// issuer delivers a block to consensus after all its dependencies are met
 type issuer struct {
 	t         *Transitive
 	blk       snowman.Block
@@ -22,6 +23,7 @@ func (i *issuer) Fulfill(id ids.ID) {
 	i.Update()
 }
 
+// Abandon the attempt to issue [i.block]
 func (i *issuer) Abandon(ids.ID) {
 	if !i.abandoned {
 		blkID := i.blk.ID()

@@ -234,7 +234,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 }
 
 func (b *Bootstrapper) finish() error {
-	if b.Finished {
+	if b.Context.IsBootstrapped() {
 		return nil
 	}
 	b.Config.Context.Log.Info("bootstrapping finished fetching %d blocks. executing state transitions...",
@@ -253,7 +253,6 @@ func (b *Bootstrapper) finish() error {
 	if err := b.OnFinished(); err != nil {
 		return err
 	}
-	b.Finished = true
 	b.Context.Bootstrapped()
 
 	if b.Bootstrapped != nil {
