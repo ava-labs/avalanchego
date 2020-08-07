@@ -86,14 +86,8 @@ type ImportKeyArgs struct {
 	PrivateKey string `json:"privateKey"`
 }
 
-// ImportKeyReply is the response for ImportKey
-type ImportKeyReply struct {
-	// The address controlled by the PrivateKey provided in the arguments
-	Address string `json:"address"`
-}
-
 // ImportKey adds a private key to the provided user
-func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ImportKeyReply) error {
+func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -187,7 +181,7 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 
 // CreateAddress creates an address controlled by [args.Username]
 // Returns the newly created address
-func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.AddressResponse) error {
+func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -210,7 +204,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 }
 
 // ListAddresses returns the addresses controlled by [args.Username]
-func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.AddressesResponse) error {
+func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JsonAddresses) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -575,7 +569,7 @@ type AddDefaultSubnetValidatorArgs struct {
 
 // AddDefaultSubnetValidator returns an unsigned transaction to add a validator to the default subnet
 // The returned unsigned transaction should be signed using Sign()
-func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.TxIDResponse) error {
+func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
 	switch {
 	case args.Destination == "":
@@ -639,7 +633,7 @@ type AddDefaultSubnetDelegatorArgs struct {
 // AddDefaultSubnetDelegator returns an unsigned transaction to add a delegator
 // to the default subnet
 // The returned unsigned transaction should be signed using Sign()
-func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.TxIDResponse) error {
+func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
 	switch {
 	case int64(args.StartTime) < time.Now().Unix():
@@ -702,7 +696,7 @@ type AddNonDefaultSubnetValidatorArgs struct {
 
 // AddNonDefaultSubnetValidator adds a validator to a subnet other than the default subnet
 // Returns the unsigned transaction, which must be signed using Sign
-func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *api.TxIDResponse) error {
+func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *api.JsonTxID) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddNonDefaultSubnetValidator called")
 	switch {
 	case args.SubnetID == "":
@@ -759,7 +753,7 @@ type CreateSubnetArgs struct {
 
 // CreateSubnet returns an unsigned transaction to create a new subnet.
 // The unsigned transaction must be signed with the key of [args.Payer]
-func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.TxIDResponse) error {
+func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
 	controlKeys := []ids.ShortID{}
@@ -808,7 +802,7 @@ type ExportAVAArgs struct {
 
 // ExportAVA exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.TxIDResponse) error {
+func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
@@ -848,7 +842,7 @@ type ImportAVAArgs struct {
 
 // ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
 // The AVA must have already been exported from the X-Chain.
-func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.TxIDResponse) error {
+func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
 
 	// Get the user's info
@@ -900,7 +894,7 @@ type CreateBlockchainArgs struct {
 
 // CreateBlockchain returns an unsigned transaction to create a new blockchain
 // Must be signed with the Subnet's control keys and with a key that pays the transaction fee before issuance
-func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.TxIDResponse) error {
+func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 	switch {
 	case args.Name == "":

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 
@@ -140,7 +141,7 @@ func TestImportKey(t *testing.T) {
 	service.vm.Ctx.Lock.Lock()
 	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
 
-	reply := ImportKeyReply{}
+	reply := api.JsonAddress{}
 	if err := service.ImportKey(nil, &args, &reply); err != nil {
 		t.Fatal(err)
 	}

@@ -9,8 +9,8 @@ type SuccessResponse struct {
 	Success bool `json:"success"`
 }
 
-// TxIDResponse contains the ID of a transaction
-type TxIDResponse struct {
+// JsonTxID contains the ID of a transaction
+type JsonTxID struct {
 	TxID ids.ID `json:"txID"`
 }
 
@@ -20,12 +20,12 @@ type UserPass struct {
 	Password string `json:"password"`
 }
 
-// AddressResponse contains an address
-type AddressResponse struct {
+// JsonAddress contains an address
+type JsonAddress struct {
 	Address string `json:"address"`
 }
 
-// AddressesResponse contains a list of address
-type AddressesResponse struct {
+// JsonAddresses contains a list of address
+type JsonAddresses struct {
 	Addresses []string `json:"addresses"`
 }
