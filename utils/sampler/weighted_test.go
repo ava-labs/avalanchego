@@ -16,6 +16,7 @@ var (
 		OutOfRangeTest,
 		SingletonTest,
 		WithZeroTest,
+		DistributionTest,
 	}
 )
 
@@ -54,4 +55,17 @@ func WithZeroTest(t *testing.T, s Weighted) {
 	index, err := s.Sample(0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, index, "should have selected the second element")
+}
+
+func DistributionTest(t *testing.T, s Weighted) {
+	err := s.Initialize([]uint64{1, 1, 2})
+	assert.NoError(t, err)
+
+	counts := make([]int, 3)
+	for i := uint64(0); i < 4; i++ {
+		index, err := s.Sample(i)
+		assert.NoError(t, err)
+		counts[index]++
+	}
+	assert.Equal(t, []int{1, 1, 2}, counts, "wrong distribution returned")
 }

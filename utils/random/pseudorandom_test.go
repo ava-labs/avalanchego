@@ -4,6 +4,7 @@
 package random
 
 import (
+	"math/rand"
 	"sort"
 	"testing"
 )
@@ -23,6 +24,7 @@ func TestSubsetUniform(t *testing.T) {
 	}
 }
 func TestSubsetWeighted(t *testing.T) {
+	rand.Seed(5)
 	s := &Weighted{Weights: []uint64{1, 2, 3, 4, 5}}
 	subset := Subset(s, 5)
 	if len(subset) != 5 {

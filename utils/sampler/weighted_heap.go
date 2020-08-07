@@ -15,6 +15,15 @@ type weightedHeapElement struct {
 	index            int
 }
 
+// weightedHeap implements the Weighted interface.
+//
+// Sampling is performed by executing a search over a tree of elements in the
+// order of their probabilistic occurrence.
+//
+// Initialization takes O(n * log(n)) time, where n is the number of elements
+// that can be sampled.
+// Sampling can take up to O(log(n)) time. As the distribution becomes more
+// biased, sampling will become faster in expectation.
 type weightedHeap struct {
 	heap []weightedHeapElement
 }

@@ -14,6 +14,17 @@ type weightedArrayElement struct {
 	index            int
 }
 
+// weightedArray implements the Weighted interface.
+//
+// Sampling is performed by executing a modified binary search over the provided
+// elements. Rather than cutting the remaining dataset in half, the algorithm
+// attempt to just in to where it think the value will be assuming a linear
+// distribution of the element weights.
+//
+// Initialization takes O(n * log(n)) time, where n is the number of elements
+// that can be sampled.
+// Sampling can take up to O(n) time. If the distribution is linearly
+// distributed, then the runtime is constant.
 type weightedArray struct {
 	arr          []weightedArrayElement
 	minIndex     int

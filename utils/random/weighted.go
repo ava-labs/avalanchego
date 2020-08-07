@@ -103,6 +103,7 @@ func (s *Weighted) Replace() {
 }
 
 func (s *Weighted) decreaseWeight(i int, change int64) {
+	s.weights[i] -= change
 	for {
 		// decrease the current weight
 		s.cumWeights[i] -= change

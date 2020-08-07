@@ -17,7 +17,11 @@ func WeightedUniformBenchmark(b *testing.B, s Weighted, size int) {
 	for i := range weights {
 		weights[i] = 1
 	}
-	s.Initialize(weights)
+
+	err := s.Initialize(weights)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -42,7 +46,10 @@ func WeightedPowBenchmark(b *testing.B, s Weighted, exponent float64, size int) 
 		b.Fatalf("overflow error")
 	}
 
-	s.Initialize(weights)
+	err := s.Initialize(weights)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -56,7 +63,11 @@ func WeightedSingletonBenchmark(b *testing.B, s Weighted, size int) {
 	for i := 1; i < len(weights); i++ {
 		weights[i] = 1
 	}
-	s.Initialize(weights)
+
+	err := s.Initialize(weights)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
