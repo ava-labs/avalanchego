@@ -9,7 +9,7 @@ var (
 	errOutOfRange = errors.New("out of range")
 )
 
-// Weighted defines how to sampling a specified valued based on a provided
+// Weighted defines how to sample a specified valued based on a provided
 // weighted distribution
 type Weighted interface {
 	Initialize(weights []uint64) error

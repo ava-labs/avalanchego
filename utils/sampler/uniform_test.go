@@ -57,7 +57,12 @@ func UniformDistributionTest(t *testing.T, s Uniform) {
 	assert.NoError(t, err)
 
 	utils.SortUint64(val)
-	assert.Equal(t, []uint64{0, 1, 2}, val, "should have selected the only element")
+	assert.Equal(
+		t,
+		[]uint64{0, 1, 2},
+		val,
+		"should have selected the only element",
+	)
 }
 
 func UniformOverSampleTest(t *testing.T, s Uniform) {

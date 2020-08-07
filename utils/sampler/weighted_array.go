@@ -85,7 +85,8 @@ func (s *weightedArray) Sample(value uint64) (int, error) {
 	}
 	minIndex := 0
 	maxIndex := len(s.arr) - 1
-	index := int((float64(value) * float64(s.maxIndex+1)) / float64(s.arr[len(s.arr)-1].cumulativeWeight))
+	maxCumulativeWeight := float64(s.arr[len(s.arr)-1].cumulativeWeight)
+	index := int((float64(value) * float64(s.maxIndex+1)) / maxCumulativeWeight)
 
 	for {
 		previousWeight := uint64(0)
@@ -115,8 +116,9 @@ func (s *weightedArray) Sample(value uint64) (int, error) {
 		valueRange := maxWeight - minWeight
 		adjustedLookupValue := value - minWeight
 		indexRange := maxIndex - minIndex + 1
+		lookupMass := float64(adjustedLookupValue) * float64(indexRange)
 
-		index = int((float64(adjustedLookupValue)*float64(indexRange))/float64(valueRange)) + minIndex
+		index = int(lookupMass/float64(valueRange)) + minIndex
 	}
 }
 
@@ -125,6 +127,12 @@ type innerSortWeightedArray []weightedArrayElement
 func (lst innerSortWeightedArray) Less(i, j int) bool {
 	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
 }
-func (lst innerSortWeightedArray) Len() int        { return len(lst) }
-func (lst innerSortWeightedArray) Swap(i, j int)   { lst[j], lst[i] = lst[i], lst[j] }
-func sortWeightedArray(lst []weightedArrayElement) { sort.Sort(innerSortWeightedArray(lst)) }
+func (lst innerSortWeightedArray) Len() int {
+	return len(lst)
+}
+func (lst innerSortWeightedArray) Swap(i, j int) {
+	lst[j], lst[i] = lst[i], lst[j]
+}
+func sortWeightedArray(lst []weightedArrayElement) {
+	sort.Sort(innerSortWeightedArray(lst))
+}

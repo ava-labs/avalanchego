@@ -12,17 +12,27 @@ func BenchmarkUniformReplacer1(b *testing.B) {
 	UniformBenchmark(b, &uniformReplacer{}, 1000000, 1)
 }
 
-// BenchmarkUniformReplacer10
-func BenchmarkUniformReplacer10(b *testing.B) {
-	UniformBenchmark(b, &uniformReplacer{}, 1000000, 10)
+// BenchmarkUniformReplacer5
+func BenchmarkUniformReplacer5(b *testing.B) {
+	UniformBenchmark(b, &uniformReplacer{}, 1000000, 5)
 }
 
-// BenchmarkUniformReplacer1000
-func BenchmarkUniformReplacer1000(b *testing.B) {
-	UniformBenchmark(b, &uniformReplacer{}, 1000000, 1000)
+// BenchmarkUniformReplacer25
+func BenchmarkUniformReplacer25(b *testing.B) {
+	UniformBenchmark(b, &uniformReplacer{}, 1000000, 25)
 }
 
-// BenchmarkUniformReplacer100000
-func BenchmarkUniformReplacer100000(b *testing.B) {
-	UniformBenchmark(b, &uniformReplacer{}, 1000000, 100000)
+// BenchmarkUniformReplacer50
+func BenchmarkUniformReplacer50(b *testing.B) {
+	UniformBenchmark(b, &uniformReplacer{}, 1000000, 50)
+}
+
+// BenchmarkUniformReplacer75
+func BenchmarkUniformReplacer75(b *testing.B) {
+	UniformBenchmark(b, &uniformReplacer{}, 1000000, 75)
+}
+
+// BenchmarkUniformReplacer100
+func BenchmarkUniformReplacer100(b *testing.B) {
+	UniformBenchmark(b, &uniformReplacer{}, 1000000, 100)
 }

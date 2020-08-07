@@ -9,22 +9,22 @@ import (
 
 // BenchmarkWeightedLinear1
 func BenchmarkWeightedLinear1(b *testing.B) {
-	WeightedUniformBenchmark(b, &weightedLinear{}, 1)
+	WeightedPowBenchmark(b, &weightedLinear{}, 0, 1)
 }
 
 // BenchmarkWeightedLinearUniform10
 func BenchmarkWeightedLinearUniform10(b *testing.B) {
-	WeightedUniformBenchmark(b, &weightedLinear{}, 10)
+	WeightedPowBenchmark(b, &weightedLinear{}, 0, 10)
 }
 
 // BenchmarkWeightedLinearUniform1000
 func BenchmarkWeightedLinearUniform1000(b *testing.B) {
-	WeightedUniformBenchmark(b, &weightedLinear{}, 1000)
+	WeightedPowBenchmark(b, &weightedLinear{}, 0, 1000)
 }
 
 // BenchmarkWeightedLinearUniform100000
 func BenchmarkWeightedLinearUniform100000(b *testing.B) {
-	WeightedUniformBenchmark(b, &weightedLinear{}, 100000)
+	WeightedPowBenchmark(b, &weightedLinear{}, 0, 100000)
 }
 
 // BenchmarkWeightedLinearLinear10

@@ -4,6 +4,7 @@
 package sampler
 
 import (
+	"errors"
 	"math"
 	"math/rand"
 	"testing"
@@ -11,48 +12,42 @@ import (
 	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
-func WeightedUniformBenchmark(b *testing.B, s Weighted, size int) {
+func CalcWeightedPoW(exponent float64, size int) (uint64, []uint64, error) {
 	weights := make([]uint64, size)
-	for i := range weights {
-		weights[i] = 1
-	}
-
-	err := s.Initialize(weights)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		s.Sample(uint64(rand.Int63n(int64(len(weights)))))
-	}
-}
-
-func WeightedPowBenchmark(b *testing.B, s Weighted, exponent float64, size int) {
-	weights := make([]uint64, size)
-	maxWeight := uint64(0)
+	totalWeight := uint64(0)
 	for i := range weights {
 		weight := uint64(math.Pow(float64(i+1), exponent))
 		weights[i] = weight
 
-		newWeight, err := safemath.Add64(maxWeight, weight)
+		newWeight, err := safemath.Add64(totalWeight, weight)
 		if err != nil {
-			b.Fatal(err)
+			return 0, nil, err
 		}
-		maxWeight = newWeight
+		totalWeight = newWeight
 	}
-	if maxWeight > math.MaxInt64 {
-		b.Fatalf("overflow error")
+	if totalWeight > math.MaxInt64 {
+		return 0, nil, errors.New("overflow error")
 	}
+	return totalWeight, weights, nil
+}
 
-	err := s.Initialize(weights)
+func WeightedPowBenchmark(
+	b *testing.B,
+	s Weighted,
+	exponent float64,
+	size int,
+) {
+	totalWeight, weights, err := CalcWeightedPoW(exponent, size)
 	if err != nil {
+		b.Fatal(err)
+	}
+	if err := s.Initialize(weights); err != nil {
 		b.Fatal(err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sample(uint64(rand.Int63n(int64(maxWeight))))
+		_, _ = s.Sample(uint64(rand.Int63n(int64(totalWeight))))
 	}
 }
 
@@ -70,6 +65,6 @@ func WeightedSingletonBenchmark(b *testing.B, s Weighted, size int) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sample(uint64(rand.Int63n(math.MaxInt64)))
+		_, _ = s.Sample(uint64(rand.Int63n(math.MaxInt64)))
 	}
 }

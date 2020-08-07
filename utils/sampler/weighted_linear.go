@@ -67,8 +67,8 @@ func (s *weightedLinear) Sample(value uint64) (int, error) {
 
 	index := 0
 	for {
-		if currentElement := s.arr[index]; value < currentElement.cumulativeWeight {
-			return currentElement.index, nil
+		if elem := s.arr[index]; value < elem.cumulativeWeight {
+			return elem.index, nil
 		}
 		index++
 	}
@@ -79,6 +79,12 @@ type innerSortWeightedLinear []weightedLinearElement
 func (lst innerSortWeightedLinear) Less(i, j int) bool {
 	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
 }
-func (lst innerSortWeightedLinear) Len() int         { return len(lst) }
-func (lst innerSortWeightedLinear) Swap(i, j int)    { lst[j], lst[i] = lst[i], lst[j] }
-func sortWeightedLinear(lst []weightedLinearElement) { sort.Sort(innerSortWeightedLinear(lst)) }
+func (lst innerSortWeightedLinear) Len() int {
+	return len(lst)
+}
+func (lst innerSortWeightedLinear) Swap(i, j int) {
+	lst[j], lst[i] = lst[i], lst[j]
+}
+func sortWeightedLinear(lst []weightedLinearElement) {
+	sort.Sort(innerSortWeightedLinear(lst))
+}
