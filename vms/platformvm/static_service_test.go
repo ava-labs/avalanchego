@@ -6,14 +6,23 @@ package platformvm
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/utils/constants"
+
+	"github.com/ava-labs/gecko/utils/formatting"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/json"
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  0,
 	}
 	weight := json.Uint64(987654321)
@@ -23,7 +32,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 			Weight:  &weight,
 			ID:      id,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{
@@ -45,8 +54,13 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  123456789,
 	}
 	weight := json.Uint64(0)
@@ -57,7 +71,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{
@@ -79,8 +93,13 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  123456789,
 	}
 
@@ -92,7 +111,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{
@@ -114,8 +133,13 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	id := ids.NewShortID([20]byte{1})
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  123456789,
 	}
 
@@ -127,7 +151,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	validator2 := APIDefaultSubnetValidator{
@@ -137,7 +161,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	validator3 := APIDefaultSubnetValidator{
@@ -147,7 +171,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{

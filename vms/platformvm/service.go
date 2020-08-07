@@ -799,9 +799,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 // ExportAVAArgs are the arguments to ExportAVA
 type ExportAVAArgs struct {
 	api.UserPass
-	// X-Chain address (without prepended X-) that will receive the exported AVA
-	// TODO: Allow user to prepend X-
-	To ids.ShortID `json:"to"`
+	To string `json:"to"`
 	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
 }
@@ -810,6 +808,22 @@ type ExportAVAArgs struct {
 // It must be imported on the X-Chain to complete the transfer
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.TxIDResponse) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
+	xchainID := service.vm.avm
+	chainPrefixes := []string{xchainID.String()}
+	if alias, err := service.vm.Ctx.BCLookup.PrimaryAlias(xchainID); err == nil {
+		chainPrefixes = append(chainPrefixes, alias)
+	}
+
+	ToBytes, err := formatting.ParseAddress(args.To, chainPrefixes, addressSep, service.vm.GetHRP())
+	if err != nil {
+		return err
+	}
+
+	ToID, err := ids.ToShortID(ToBytes)
+	if err != nil {
+		return err
+	}
+
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
 	}
@@ -828,7 +842,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		uint64(args.Amount), // Amount
-		args.To,             // X-Chain address
+		ToID,                // X-Chain address
 		privKeys,            // Private keys
 	)
 	if err != nil {

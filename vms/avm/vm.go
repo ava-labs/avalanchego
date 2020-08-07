@@ -593,13 +593,19 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return false
 }
 
-// ParseAddress takes in an address string and produces bytes for the address
-func (vm *VM) ParseAddress(addrStr string) ([]byte, error) {
+// GetHRP returns the Human-Readable-Part of addresses for this VM
+func (vm *VM) GetHRP() string {
 	networkID := vm.ctx.NetworkID
 	hrp := constants.FallbackHRP
 	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
 		hrp = constants.NetworkIDToHRP[networkID]
 	}
+	return hrp
+}
+
+// ParseAddress takes in an address string and produces bytes for the address
+func (vm *VM) ParseAddress(addrStr string) ([]byte, error) {
+	hrp := vm.GetHRP()
 
 	chainPrefixes := []string{vm.ctx.ChainID.String()}
 	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
@@ -614,11 +620,7 @@ func (vm *VM) ParseAddress(addrStr string) ([]byte, error) {
 
 // FormatAddress takes in a 20-byte slice and produces a string for an address
 func (vm *VM) FormatAddress(b []byte) (string, error) {
-	networkID := vm.ctx.NetworkID
-	hrp := constants.FallbackHRP
-	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
-		hrp = constants.NetworkIDToHRP[networkID]
-	}
+	hrp := vm.GetHRP()
 
 	chainPrefix := vm.ctx.ChainID.String()
 	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {

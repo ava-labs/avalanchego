@@ -143,25 +143,36 @@ func defaultGenesisUTXOs() []*ava.UTXO {
 func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]APIUTXO, len(keys))
 	for i, key := range keys {
+		id := key.PublicKey().Address()
+		hrp := constants.NetworkIDToHRP[testNetworkID]
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		genesisUTXOs[i] = APIUTXO{
 			Amount:  json.Uint64(defaultStakeAmount),
-			Address: key.PublicKey().Address(),
+			Address: addr,
 		}
 	}
 
 	genesisValidators := make([]APIDefaultSubnetValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
-		address := key.PublicKey().Address()
+		id := key.PublicKey().Address()
+		hrp := constants.NetworkIDToHRP[testNetworkID]
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		genesisValidators[i] = APIDefaultSubnetValidator{
 			APIValidator: APIValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				Address:   &address,
-				ID:        address,
+				Address:   addr,
+				ID:        id,
 			},
-			Destination:       address,
+			Destination:       addr,
 			DelegationFeeRate: NumberOfShares,
 		}
 	}
@@ -256,7 +267,11 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		utxos, err := vm.getUTXOs(vm.DB, [][]byte{utxo.Address.Bytes()})
+		_, addrBytes, err := formatting.ParseBech32(utxo.Address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		utxos, err := vm.getUTXOs(vm.DB, [][]byte{addrBytes})
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -264,7 +279,13 @@ func TestGenesis(t *testing.T) {
 		} else if out, ok := utxos[0].Out.(*secp256k1fx.TransferOutput); !ok {
 			t.Fatal("expected utxo output to be type *secp256k1fx.TransferOutput")
 		} else if out.Amount() != uint64(utxo.Amount) {
-			if utxo.Address.Equals(keys[0].PublicKey().Address()) { // Address that paid tx fee to create testSubnet1 has less tokens
+			id := keys[0].PublicKey().Address()
+			hrp := constants.NetworkIDToHRP[testNetworkID]
+			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if utxo.Address == addr { // Address that paid tx fee to create testSubnet1 has less tokens
 				if out.Amount() != uint64(utxo.Amount)-vm.txFee {
 					t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount)-vm.txFee, out.Amount())
 				}

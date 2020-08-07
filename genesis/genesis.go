@@ -136,7 +136,11 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		NetworkID:   json.Uint32(networkID),
 		AvaxAssetID: avaxAssetID,
 	}
-	for _, addr := range config.ParsedFundedAddresses {
+	funded, err := formatting.CB58ToBech32Addresses(hrp, config.FundedAddresses)
+	if err != nil {
+		return nil, ids.ID{}, err
+	}
+	for _, addr := range funded {
 		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
 			platformvm.APIUTXO{
 				Address: addr,
@@ -160,6 +164,11 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 
 	for i, validatorID := range config.ParsedStakerIDs {
 		weight := json.Uint64(20 * units.KiloAva)
+		funded, err := formatting.CB58ToBech32Addresses(hrp, config.FundedAddresses)
+		if err != nil {
+			return nil, ids.ID{}, err
+		}
+		destAddr := funded[i%len(funded)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
 			platformvm.APIDefaultSubnetValidator{
 				APIValidator: platformvm.APIValidator{
@@ -168,7 +177,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 					Weight:    &weight,
 					ID:        validatorID,
 				},
-				Destination: config.ParsedFundedAddresses[i%len(config.ParsedFundedAddresses)],
+				Destination: destAddr,
 			},
 		)
 	}

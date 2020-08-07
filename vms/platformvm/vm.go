@@ -958,6 +958,16 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	return utxos, nil
 }
 
+// GetHRP returns the Human-Readable-Part of addresses for this VM
+func (vm *VM) GetHRP() string {
+	networkID := vm.Ctx.NetworkID
+	hrp := constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
+	}
+	return hrp
+}
+
 // ParseAddress returns a decoded Platform Chain address.
 // addrStr is an encoded address, of the form "P-<bech32 encoded bytes>".
 func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {

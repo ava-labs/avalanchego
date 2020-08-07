@@ -1477,8 +1477,8 @@ type ExportAVAArgs struct {
 	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
 
-	// ID of P-Chain account that will receive the AVA
-	To ids.ShortID `json:"to"`
+	// Address of P-Chain account that will receive the AVA
+	To string `json:"to"`
 }
 
 // ExportAVAReply defines the Send replies returned from the API
@@ -1491,6 +1491,21 @@ type ExportAVAReply struct {
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *ExportAVAReply) error {
 	service.vm.ctx.Log.Info("AVM: ExportAVA called with username: %s", args.Username)
+	pchainID := service.vm.platform
+	chainPrefixes := []string{pchainID.String()}
+	if alias, err := service.vm.ctx.BCLookup.PrimaryAlias(pchainID); err == nil {
+		chainPrefixes = append(chainPrefixes, alias)
+	}
+
+	ToBytes, err := formatting.ParseAddress(args.To, chainPrefixes, addressSep, service.vm.GetHRP())
+	if err != nil {
+		return err
+	}
+
+	ToID, err := ids.ToShortID(ToBytes)
+	if err != nil {
+		return err
+	}
 
 	if args.Amount == 0 {
 		return errInvalidAmount
@@ -1527,7 +1542,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 			OutputOwners: secp256k1fx.OutputOwners{
 				Locktime:  0,
 				Threshold: 1,
-				Addrs:     []ids.ShortID{args.To},
+				Addrs:     []ids.ShortID{ToID},
 			},
 		},
 	}}
