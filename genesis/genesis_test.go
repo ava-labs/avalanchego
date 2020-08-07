@@ -113,7 +113,10 @@ func TestNetworkID(t *testing.T) {
 }
 
 func TestAliases(t *testing.T) {
-	generalAliases, _, _, _ := Aliases(constants.LocalID)
+	generalAliases, _, _, err := Aliases(constants.LocalID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {

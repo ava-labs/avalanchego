@@ -46,6 +46,8 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, err
 	}
 
+	hrp := constants.NetworkIDToHRP[networkID]
+
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
@@ -57,12 +59,20 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		}
 
 		if len(config.MintAddresses) > 0 {
+			minters, err := formatting.CB58ToBech32Addresses(hrp, config.MintAddresses)
+			if err != nil {
+				return nil, ids.ID{}, err
+			}
 			ava.InitialState["variableCap"] = []interface{}{avm.Owners{
 				Threshold: 1,
-				Minters:   config.MintAddresses,
+				Minters:   minters,
 			}}
 		}
-		for _, addr := range config.FundedAddresses {
+		funded, err := formatting.CB58ToBech32Addresses(hrp, config.FundedAddresses)
+		if err != nil {
+			return nil, ids.ID{}, err
+		}
+		for _, addr := range funded {
 			ava.InitialState["fixedCap"] = append(ava.InitialState["fixedCap"], avm.Holder{
 				Amount:  json.Uint64(45 * units.MegaAva),
 				Address: addr,

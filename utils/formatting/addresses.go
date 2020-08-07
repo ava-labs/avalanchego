@@ -74,3 +74,31 @@ func FormatAddress(b []byte, chainPrefix string, addressSep string, hrp string) 
 	}
 	return fmt.Sprintf("%s%s%s", chainPrefix, addressSep, addrstr), nil
 }
+
+// BytesToBech32Addresses takes a slice of byte slices string and converts them to a Bech32 addresses
+func BytesToBech32Addresses(hrp string, addresses [][]byte) ([]string, error) {
+	var result = []string{}
+	for _, addr := range addresses {
+		bech32addr, err := FormatBech32(hrp, addr)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, bech32addr)
+	}
+	return result, nil
+}
+
+// CB58ToBech32Addresses takes a slice of cb58 strings and converts them to a Bech32 addresses
+func CB58ToBech32Addresses(hrp string, addresses []string) ([]string, error) {
+	var result = []string{}
+	for _, addr := range addresses {
+		cb58 := CB58{}
+		cb58.FromString(addr)
+		bech32addr, err := FormatBech32(hrp, cb58.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, bech32addr)
+	}
+	return result, nil
+}

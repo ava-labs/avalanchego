@@ -6,7 +6,6 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"math"
@@ -953,22 +952,6 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 		utxos = append(utxos, utxo)
 	}
 	return utxos, nil
-}
-
-func splitAddress(addrStr string) (string, string, error) {
-	if count := strings.Count(addrStr, addressSep); count < 1 {
-		return "", "", errInvalidAddressSeperator
-	}
-	addrParts := strings.SplitN(addrStr, addressSep, 2)
-	prefix := addrParts[0]
-	if prefix == "" {
-		return "", "", errEmptyAddressPrefix
-	}
-	suffix := addrParts[1]
-	if suffix == "" {
-		return "", "", errEmptyAddressSuffix
-	}
-	return prefix, suffix, nil
 }
 
 // ParseAddress returns a decoded Platform Chain address.

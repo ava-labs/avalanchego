@@ -90,9 +90,9 @@ func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 func BuildGenesisTest(t *testing.T) []byte {
 	ss := StaticService{}
 
-	addr0 := keys[0].PublicKey().Address()
-	addr1 := keys[1].PublicKey().Address()
-	addr2 := keys[2].PublicKey().Address()
+	addr0, _ := formatting.FormatBech32(testHRP, keys[0].PublicKey().Address().Bytes())
+	addr1, _ := formatting.FormatBech32(testHRP, keys[1].PublicKey().Address().Bytes())
+	addr2, _ := formatting.FormatBech32(testHRP, keys[2].PublicKey().Address().Bytes())
 
 	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
@@ -102,19 +102,19 @@ func BuildGenesisTest(t *testing.T) []byte {
 				"fixedCap": {
 					Holder{
 						Amount:  100000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  100000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  50000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  50000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 				},
 			},
@@ -127,16 +127,16 @@ func BuildGenesisTest(t *testing.T) []byte {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							addr0.String(),
-							addr1.String(),
+							addr0,
+							addr1,
 						},
 					},
 					Owners{
 						Threshold: 2,
 						Minters: []string{
-							addr0.String(),
-							addr1.String(),
-							addr2.String(),
+							addr0,
+							addr1,
+							addr2,
 						},
 					},
 				},
@@ -149,7 +149,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							addr0.String(),
+							addr0,
 						},
 					},
 				},
