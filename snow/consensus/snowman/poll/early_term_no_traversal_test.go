@@ -16,7 +16,7 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 
 	vdr1 := ids.NewShortID([20]byte{1}) // k = 1
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(vdr1)
 
 	factory := NewEarlyTermNoTraversalFactory(alpha)
@@ -45,7 +45,7 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 	vdr1 := ids.NewShortID([20]byte{1})
 	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -56,7 +56,8 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 
 	poll.Vote(vdr1, vtxID)
 
-	expected := "waiting on {BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp}"
+	expected := "waiting on Bag: (Size = 1)\n" +
+		"    ID[BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp]: Count = 1"
 	if result := poll.String(); expected != result {
 		t.Fatalf("Poll should have returned %s but returned %s", expected, result)
 	}
@@ -70,7 +71,7 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	vdr1 := ids.NewShortID([20]byte{1})
 	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -104,7 +105,7 @@ func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
 	vdr4 := ids.NewShortID([20]byte{4})
 	vdr5 := ids.NewShortID([20]byte{5}) // k = 5
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -148,7 +149,7 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	vdr3 := ids.NewShortID([20]byte{3})
 	vdr4 := ids.NewShortID([20]byte{4})
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -184,7 +185,7 @@ func TestEarlyTermNoTraversalWithFastDrops(t *testing.T) {
 	vdr2 := ids.NewShortID([20]byte{2})
 	vdr3 := ids.NewShortID([20]byte{3}) // k = 3
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -198,6 +199,61 @@ func TestEarlyTermNoTraversalWithFastDrops(t *testing.T) {
 	if poll.Finished() {
 		t.Fatalf("Poll finished early after dropping one vote")
 	}
+	poll.Drop(vdr2)
+	if !poll.Finished() {
+		t.Fatalf("Poll did not terminate after dropping two votes")
+	}
+}
+
+func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
+	alpha := 2
+
+	vtxID := ids.NewID([32]byte{1})
+
+	vdr1 := ids.NewShortID([20]byte{2})
+	vdr2 := ids.NewShortID([20]byte{3})
+
+	vdrs := ids.ShortBag{}
+	vdrs.Add(
+		vdr1,
+		vdr2,
+		vdr2,
+	) // k = 3
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
+	poll := factory.New(vdrs)
+
+	poll.Vote(vdr2, vtxID)
+	if !poll.Finished() {
+		t.Fatalf("Poll did not terminate after receiving two votes")
+	}
+
+	result := poll.Result()
+	if list := result.List(); len(list) != 1 {
+		t.Fatalf("Wrong number of vertices returned")
+	} else if retVtxID := list[0]; !retVtxID.Equals(vtxID) {
+		t.Fatalf("Wrong vertex returned")
+	} else if result.Count(vtxID) != 2 {
+		t.Fatalf("Wrong number of votes returned")
+	}
+}
+
+func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
+	alpha := 2
+
+	vdr1 := ids.NewShortID([20]byte{1})
+	vdr2 := ids.NewShortID([20]byte{2})
+
+	vdrs := ids.ShortBag{}
+	vdrs.Add(
+		vdr1,
+		vdr2,
+		vdr2,
+	) // k = 3
+
+	factory := NewEarlyTermNoTraversalFactory(alpha)
+	poll := factory.New(vdrs)
+
 	poll.Drop(vdr2)
 	if !poll.Finished() {
 		t.Fatalf("Poll did not terminate after dropping two votes")

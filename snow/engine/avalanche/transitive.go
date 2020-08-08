@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/sampler"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow"
@@ -17,7 +19,6 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/random"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -97,8 +98,15 @@ func (t *Transitive) Gossip() error {
 		return nil
 	}
 
-	sampler := random.Uniform{N: len(edge)}
-	vtxID := edge[sampler.Sample()]
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(edge))); err != nil {
+		return err // Should never really happen
+	}
+	indices, err := s.Sample(1)
+	if err != nil {
+		return err // Also should never really happen because the edge has positive length
+	}
+	vtxID := edge[int(indices[0])]
 	vtx, err := t.Config.State.GetVertex(vtxID)
 	if err != nil {
 		t.Config.Context.Log.Warn("dropping gossip request as %s couldn't be loaded due to: %s", vtxID, err)
@@ -489,24 +497,31 @@ func (t *Transitive) issueRepoll() {
 		return
 	}
 
-	sampler := random.Uniform{N: len(preferredIDs)}
-	vtxID := preferredIDs[sampler.Sample()]
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(preferredIDs))); err != nil {
+		return // Should never really happen
+	}
+	indices, err := s.Sample(1)
+	if err != nil {
+		return // Also should never really happen because the edge has positive length
+	}
+	vtxID := preferredIDs[int(indices[0])]
 
 	p := t.Consensus.Parameters()
-	vdrs := t.Config.Validators.Sample(p.K) // Validators to sample
+	vdrs, err := t.Config.Validators.Sample(p.K) // Validators to sample
 
-	vdrSet := ids.ShortSet{} // Validators to sample repr. as a set
+	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
-		vdrSet.Add(vdr.ID())
+		vdrBag.Add(vdr.ID())
 	}
 
-	vdrCopy := ids.ShortSet{}
-	vdrCopy.Union((vdrSet))
+	vdrSet := ids.ShortSet{}
+	vdrSet.Add(vdrBag.List()...)
 
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrCopy) {
+	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
 		t.Config.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
-	} else if numVdrs < p.K {
+	} else if err != nil {
 		t.Config.Context.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 }
@@ -515,10 +530,23 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 	t.Config.Context.Log.Verbo("batching %d transactions into a new vertex", len(txs))
 
 	virtuousIDs := t.Consensus.Virtuous().List()
-	sampler := random.Uniform{N: len(virtuousIDs)}
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(virtuousIDs))); err != nil {
+		return err
+	}
+
+	count := len(virtuousIDs)
+	if count > t.Params.Parents {
+		count = t.Params.Parents
+	}
+	indices, err := s.Sample(count)
+	if err != nil {
+		return err
+	}
+
 	parentIDs := ids.Set{}
-	for i := 0; i < t.Params.Parents && sampler.CanSample(); i++ {
-		parentIDs.Add(virtuousIDs[sampler.Sample()])
+	for _, index := range indices {
+		parentIDs.Add(virtuousIDs[int(index)])
 	}
 
 	vtx, err := t.Config.State.BuildVertex(parentIDs, txs)

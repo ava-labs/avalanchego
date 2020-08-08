@@ -551,19 +551,19 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 func (t *Transitive) pullSample(blkID ids.ID) {
 	t.Config.Context.Log.Verbo("about to sample from: %s", t.Config.Validators)
 	p := t.Consensus.Parameters()
-	vdrs := t.Config.Validators.Sample(p.K)
-	vdrSet := ids.ShortSet{}
+	vdrs, err := t.Config.Validators.Sample(p.K)
+	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
-		vdrSet.Add(vdr.ID())
+		vdrBag.Add(vdr.ID())
 	}
 
-	toSample := ids.ShortSet{}
-	toSample.Union(vdrSet)
+	vdrSet := ids.ShortSet{}
+	vdrSet.Add(vdrBag.List()...)
 
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
-		t.Config.Sender.PullQuery(toSample, t.RequestID, blkID)
-	} else if numVdrs < p.K {
+	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
+		t.Config.Sender.PullQuery(vdrSet, t.RequestID, blkID)
+	} else if err != nil {
 		t.Config.Context.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
 }
@@ -572,19 +572,19 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 func (t *Transitive) pushSample(blk snowman.Block) {
 	t.Config.Context.Log.Verbo("about to sample from: %s", t.Config.Validators)
 	p := t.Consensus.Parameters()
-	vdrs := t.Config.Validators.Sample(p.K)
-	vdrSet := ids.ShortSet{}
+	vdrs, err := t.Config.Validators.Sample(p.K)
+	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
-		vdrSet.Add(vdr.ID())
+		vdrBag.Add(vdr.ID())
 	}
 
-	toSample := ids.ShortSet{}
-	toSample.Union(vdrSet)
+	vdrSet := ids.ShortSet{}
+	vdrSet.Add(vdrBag.List()...)
 
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
-		t.Config.Sender.PushQuery(toSample, t.RequestID, blk.ID(), blk.Bytes())
-	} else if numVdrs < p.K {
+	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
+		t.Config.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+	} else if err != nil {
 		t.Config.Context.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
 }

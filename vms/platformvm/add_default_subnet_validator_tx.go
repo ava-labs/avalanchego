@@ -151,7 +151,10 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 		return nil, nil, nil, nil, permError{err}
 	}
 	currentValidators := validators.NewSet()
-	currentValidators.Set(tx.vm.getValidators(currentEvents))
+	if err := currentValidators.Set(tx.vm.getValidators(currentEvents)); err != nil {
+		return nil, nil, nil, nil, permError{fmt.Errorf("failed to initialize the new current validator set due to: %w",
+			err)}
+	}
 	if currentValidators.Contains(tx.NodeID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the current default validator set",
 			tx.NodeID)}
@@ -163,7 +166,10 @@ func (tx *addDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (*ve
 		return nil, nil, nil, nil, permError{err}
 	}
 	pendingValidators := validators.NewSet()
-	pendingValidators.Set(tx.vm.getValidators(pendingEvents))
+	if err := pendingValidators.Set(tx.vm.getValidators(pendingEvents)); err != nil {
+		return nil, nil, nil, nil, permError{fmt.Errorf("failed to initialize the new pending validator set due to: %w",
+			err)}
+	}
 	if pendingValidators.Contains(tx.NodeID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the pending default validator set",
 			tx.NodeID)}

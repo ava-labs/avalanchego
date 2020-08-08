@@ -13,7 +13,7 @@ import (
 type Set interface {
 	fmt.Stringer
 
-	Add(requestID uint32, vdrs ids.ShortSet) bool
+	Add(requestID uint32, vdrs ids.ShortBag) bool
 	Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) (ids.Bag, bool)
 	Drop(requestID uint32, vdr ids.ShortID) (ids.Bag, bool)
 	Len() int
@@ -22,6 +22,7 @@ type Set interface {
 // Poll is an outstanding poll
 type Poll interface {
 	fmt.Stringer
+	PrefixedString(string) string
 
 	Vote(vdr ids.ShortID, vote ids.ID)
 	Drop(vdr ids.ShortID)
@@ -31,5 +32,5 @@ type Poll interface {
 
 // Factory creates a new Poll
 type Factory interface {
-	New(vdrs ids.ShortSet) Poll
+	New(vdrs ids.ShortBag) Poll
 }

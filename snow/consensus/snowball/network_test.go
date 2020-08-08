@@ -4,8 +4,10 @@
 package snowball
 
 import (
+	"math/rand"
+
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 )
 
 type Network struct {
@@ -22,10 +24,12 @@ func (n *Network) Initialize(params Parameters, numColors int) {
 }
 
 func (n *Network) AddNode(sb Consensus) {
-	s := random.Uniform{N: len(n.colors)}
-	sb.Initialize(n.params, n.colors[s.Sample()])
-	for s.CanSample() {
-		sb.Add(n.colors[s.Sample()])
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(n.colors)))
+	indices, _ := s.Sample(len(n.colors))
+	sb.Initialize(n.params, n.colors[int(indices[0])])
+	for _, index := range indices[1:] {
+		sb.Add(n.colors[int(index)])
 	}
 
 	n.nodes = append(n.nodes, sb)
@@ -52,13 +56,19 @@ func (n *Network) Finalized() bool {
 
 func (n *Network) Round() {
 	if len(n.running) > 0 {
-		runningInd := random.Rand(0, len(n.running))
+		runningInd := rand.Intn(len(n.running))
 		running := n.running[runningInd]
 
-		sampler := random.Uniform{N: len(n.nodes)}
+		s := sampler.NewUniform()
+		_ = s.Initialize(uint64(len(n.nodes)))
+		count := len(n.nodes)
+		if count > n.params.K {
+			count = n.params.K
+		}
+		indices, _ := s.Sample(count)
 		sampledColors := ids.Bag{}
-		for i := 0; i < n.params.K; i++ {
-			peer := n.nodes[sampler.Sample()]
+		for _, index := range indices {
+			peer := n.nodes[int(index)]
 			sampledColors.Add(peer.Preference())
 		}
 

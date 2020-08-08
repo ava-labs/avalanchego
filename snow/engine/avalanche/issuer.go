@@ -77,20 +77,20 @@ func (i *issuer) Update() {
 	}
 
 	p := i.t.Consensus.Parameters()
-	vdrs := i.t.Config.Validators.Sample(p.K) // Validators to sample
+	vdrs, err := i.t.Config.Validators.Sample(p.K) // Validators to sample
 
-	vdrSet := ids.ShortSet{} // Validators to sample repr. as a set
+	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
-		vdrSet.Add(vdr.ID())
+		vdrBag.Add(vdr.ID())
 	}
 
-	toSample := ids.ShortSet{} // Copy to a new variable because we may remove an element in sender.Sender
-	toSample.Union(vdrSet)     // and we don't want that to affect the set of validators we wait for [ie vdrSet]
+	vdrSet := ids.ShortSet{}
+	vdrSet.Add(vdrBag.List()...)
 
 	i.t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet) {
-		i.t.Config.Sender.PushQuery(toSample, i.t.RequestID, vtxID, i.vtx.Bytes())
-	} else if numVdrs < p.K {
+	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {
+		i.t.Config.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+	} else if err != nil {
 		i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 

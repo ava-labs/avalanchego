@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -147,11 +147,12 @@ func GetDefaultBootstraps(networkID uint32, count int) ([]string, []string) {
 	sampledIPs := make([]string, 0, count)
 	sampledIDs := make([]string, 0, count)
 
-	sampler := random.Uniform{N: len(ips)}
-	for i := 0; i < count; i++ {
-		s := sampler.Sample()
-		sampledIPs = append(sampledIPs, ips[s])
-		sampledIDs = append(sampledIDs, ids[s])
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(ips)))
+	indices, _ := s.Sample(count)
+	for _, index := range indices {
+		sampledIPs = append(sampledIPs, ips[int(index)])
+		sampledIDs = append(sampledIDs, ids[int(index)])
 	}
 
 	return sampledIPs, sampledIDs

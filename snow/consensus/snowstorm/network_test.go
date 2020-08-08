@@ -4,11 +4,13 @@
 package snowstorm
 
 import (
+	"math/rand"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 )
 
 type Network struct {
@@ -19,10 +21,12 @@ type Network struct {
 }
 
 func (n *Network) shuffleConsumers() {
-	s := random.Uniform{N: len(n.consumers)}
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(n.consumers)))
+	indices, _ := s.Sample(len(n.consumers))
 	consumers := []*TestTx(nil)
-	for s.CanSample() {
-		consumers = append(consumers, n.consumers[s.Sample()])
+	for _, index := range indices {
+		consumers = append(consumers, n.consumers[int(index)])
 	}
 	n.consumers = consumers
 }
@@ -44,9 +48,15 @@ func (n *Network) Initialize(params snowball.Parameters, numColors, colorsPerCon
 	count := map[[32]byte]int{}
 	for len(colors) > 0 {
 		selected := []ids.ID{}
-		sampler := random.Uniform{N: len(colors)}
-		for i := 0; i < colorsPerConsumer && sampler.CanSample(); i++ {
-			selected = append(selected, colors[sampler.Sample()])
+		s := sampler.NewUniform()
+		_ = s.Initialize(uint64(len(colors)))
+		size := len(colors)
+		if size > colorsPerConsumer {
+			size = colorsPerConsumer
+		}
+		indices, _ := s.Sample(size)
+		for _, index := range indices {
+			selected = append(selected, colors[int(index)])
 		}
 
 		for _, sID := range selected {
@@ -104,29 +114,26 @@ func (n *Network) Finalized() bool {
 
 func (n *Network) Round() {
 	if len(n.running) > 0 {
-		runningInd := random.Rand(0, len(n.running))
+		runningInd := rand.Intn(len(n.running))
 		running := n.running[runningInd]
 
-		sampler := random.Uniform{N: len(n.nodes)}
+		s := sampler.NewUniform()
+		_ = s.Initialize(uint64(len(n.nodes)))
+		indices, _ := s.Sample(n.params.K)
 		sampledColors := ids.Bag{}
 		sampledColors.SetThreshold(n.params.Alpha)
-		for i := 0; i < n.params.K; i++ {
-			sample := sampler.Sample()
-			peer := n.nodes[sample]
-			peerTxs := n.nodeTxs[sample]
+		for _, index := range indices {
+			peer := n.nodes[int(index)]
+			peerTxs := n.nodeTxs[int(index)]
 
-			if peer != running {
-				preferences := peer.Preferences()
-				for _, color := range preferences.List() {
-					sampledColors.Add(color)
+			preferences := peer.Preferences()
+			for _, color := range preferences.List() {
+				sampledColors.Add(color)
+			}
+			for _, tx := range peerTxs {
+				if tx.Status() == choices.Accepted {
+					sampledColors.Add(tx.ID())
 				}
-				for _, tx := range peerTxs {
-					if tx.Status() == choices.Accepted {
-						sampledColors.Add(tx.ID())
-					}
-				}
-			} else {
-				i-- // So that we still sample k people
 			}
 		}
 

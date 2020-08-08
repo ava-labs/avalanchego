@@ -6,7 +6,10 @@ package sampler
 import (
 	"math"
 	"math/rand"
+	"time"
 )
+
+func init() { rand.Seed(time.Now().UnixNano()) }
 
 type defaultMap map[uint64]uint64
 
@@ -31,6 +34,9 @@ func (m defaultMap) get(key uint64, defaultVal uint64) uint64 {
 type uniformReplacer struct {
 	length uint64
 }
+
+// NewUniform returns a new sampler
+func NewUniform() Uniform { return &uniformReplacer{} }
 
 func (s *uniformReplacer) Initialize(length uint64) error {
 	if length > math.MaxInt64 {
