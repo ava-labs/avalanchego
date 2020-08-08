@@ -118,7 +118,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.JsonAddresses, reply
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
-		addrBytes, err := service.vm.Parse(addr)
+		addrBytes, err := service.vm.ParseAddress(addr)
 		if err != nil {
 			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
@@ -147,7 +147,7 @@ func (service *Service) GetAtomicUTXOs(r *http.Request, args *api.JsonAddresses,
 
 	addrSet := ids.Set{}
 	for _, addr := range args.Addresses {
-		addrBytes, err := service.vm.Parse(addr)
+		addrBytes, err := service.vm.ParseAddress(addr)
 		if err != nil {
 			return fmt.Errorf("problem parsing address '%s': %w", addr, err)
 		}
@@ -231,7 +231,7 @@ type GetBalanceReply struct {
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
 	service.vm.ctx.Log.Info("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
 
-	address, err := service.vm.Parse(args.Address)
+	address, err := service.vm.ParseAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -291,7 +291,7 @@ type GetAllBalancesReply struct {
 func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, reply *GetAllBalancesReply) error {
 	service.vm.ctx.Log.Info("AVM: GetAllBalances called with address: %s", args.Address)
 
-	address, err := service.vm.Parse(args.Address)
+	address, err := service.vm.ParseAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -404,7 +404,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		Outs: make([]verify.State, 0, len(args.InitialHolders)),
 	}
 	for _, holder := range args.InitialHolders {
-		address, err := service.vm.Parse(holder.Address)
+		address, err := service.vm.ParseAddress(holder.Address)
 		if err != nil {
 			return err
 		}
@@ -449,8 +449,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 
 // CreateVariableCapAssetArgs are arguments for passing into CreateVariableCapAsset requests
 type CreateVariableCapAssetArgs struct {
-	Username     string   `json:"username"`
-	Password     string   `json:"password"`
+	api.UserPass
 	Name         string   `json:"name"`
 	Symbol       string   `json:"symbol"`
 	Denomination byte     `json:"denomination"`
@@ -520,7 +519,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 			},
 		}
 		for _, address := range owner.Minters {
-			addrBytes, err := service.vm.Parse(address)
+			addrBytes, err := service.vm.ParseAddress(address)
 			if err != nil {
 				return err
 			}
@@ -562,8 +561,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 
 // CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
 type CreateNFTAssetArgs struct {
-	Username   string   `json:"username"`
-	Password   string   `json:"password"`
+	api.UserPass
 	Name       string   `json:"name"`
 	Symbol     string   `json:"symbol"`
 	MinterSets []Owners `json:"minterSets"`
@@ -626,7 +624,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 			},
 		}
 		for _, address := range owner.Minters {
-			addrBytes, err := service.vm.Parse(address)
+			addrBytes, err := service.vm.ParseAddress(address)
 			if err != nil {
 				return err
 			}
@@ -694,8 +692,10 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 	if err := user.SetAddresses(db, addresses); err != nil {
 		return fmt.Errorf("problem saving address: %w", err)
 	}
-
-	reply.Address = service.vm.Format(sk.PublicKey().Address().Bytes())
+	reply.Address, err = service.vm.FormatAddress(sk.PublicKey().Address().Bytes())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -717,7 +717,11 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	}
 
 	for _, address := range addresses {
-		response.Addresses = append(response.Addresses, service.vm.Format(address.Bytes()))
+		addr, err := service.vm.FormatAddress(address.Bytes())
+		if err != nil {
+			return fmt.Errorf("problem formatting address: %w", err)
+		}
+		response.Addresses = append(response.Addresses, addr)
 	}
 	return nil
 }
@@ -738,7 +742,7 @@ type ExportKeyReply struct {
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Info("AVM: ExportKey called for user '%s'", args.Username)
 
-	address, err := service.vm.Parse(args.Address)
+	address, err := service.vm.ParseAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
@@ -809,7 +813,10 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	addresses, _ := user.Addresses(db)
 
 	newAddress := sk.PublicKey().Address()
-	reply.Address = service.vm.Format(newAddress.Bytes())
+	reply.Address, err = service.vm.FormatAddress(newAddress.Bytes())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	for _, address := range addresses {
 		if newAddress.Equals(address) {
 			return nil
@@ -848,7 +855,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -965,7 +972,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address '%s': %w", args.To, err)
 	}
@@ -1062,7 +1069,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1160,7 +1167,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		}
 	}
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1253,7 +1260,7 @@ type ImportAVAArgs struct {
 func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: ImportAVA called with username: %s", args.Username)
 
-	toBytes, err := service.vm.Parse(args.To)
+	toBytes, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
@@ -1360,8 +1367,8 @@ type ExportAVAArgs struct {
 	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
 
-	// ID of P-Chain account that will receive the AVA
-	To ids.ShortID `json:"to"`
+	// Address of P-Chain account that will receive the AVA
+	To string `json:"to"`
 }
 
 // ExportAVA sends AVA from this chain to the P-Chain.
@@ -1369,6 +1376,21 @@ type ExportAVAArgs struct {
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: ExportAVA called with username: %s", args.Username)
+	pchainID := service.vm.platform
+	chainPrefixes := []string{pchainID.String()}
+	if alias, err := service.vm.ctx.BCLookup.PrimaryAlias(pchainID); err == nil {
+		chainPrefixes = append(chainPrefixes, alias)
+	}
+
+	ToBytes, err := formatting.ParseAddress(args.To, chainPrefixes, addressSep, service.vm.GetHRP())
+	if err != nil {
+		return err
+	}
+
+	ToID, err := ids.ToShortID(ToBytes)
+	if err != nil {
+		return err
+	}
 
 	if args.Amount == 0 {
 		return errInvalidAmount
@@ -1405,7 +1427,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *a
 			OutputOwners: secp256k1fx.OutputOwners{
 				Locktime:  0,
 				Threshold: 1,
-				Addrs:     []ids.ShortID{args.To},
+				Addrs:     []ids.ShortID{ToID},
 			},
 		},
 	}}

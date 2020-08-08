@@ -117,7 +117,10 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
-	reply.Address = service.vm.FormatAddress(sk.PublicKey().Address())
+	reply.Address, err = service.vm.FormatAddress(sk.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -153,7 +156,11 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 	addrs := [][]byte{address.Bytes()}
 	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
+		addr, err2 := service.vm.FormatAddress(address)
+		if err2 != nil {
+			return fmt.Errorf("problem formatting address: %w", err2)
+		}
+		return fmt.Errorf("couldn't get UTXO set of %s: %w", addr, err)
 	}
 	balance := uint64(0)
 	for _, utxo := range utxos {
@@ -189,7 +196,10 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 	} else if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
-	response.Address = service.vm.FormatAddress(key.PublicKey().Address())
+	response.Address, err = service.vm.FormatAddress(key.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -208,7 +218,10 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	}
 	response.Addresses = make([]string, len(addresses))
 	for i, addr := range addresses {
-		response.Addresses[i] = service.vm.FormatAddress(addr)
+		response.Addresses[i], err = service.vm.FormatAddress(addr)
+		if err != nil {
+			return fmt.Errorf("problem formatting address: %w", err)
+		}
 	}
 	return nil
 }
@@ -302,7 +315,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets[i] = APISubnet{
 				ID:          subnet.ID(),
@@ -327,7 +344,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets = append(response.Subnets,
 				APISubnet{
@@ -772,9 +793,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 // ExportAVAArgs are the arguments to ExportAVA
 type ExportAVAArgs struct {
 	api.UserPass
-	// X-Chain address (without prepended X-) that will receive the exported AVA
-	// TODO: Allow user to prepend X-
-	To ids.ShortID `json:"to"`
+	To string `json:"to"`
 	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
 }
@@ -783,6 +802,22 @@ type ExportAVAArgs struct {
 // It must be imported on the X-Chain to complete the transfer
 func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
+	xchainID := service.vm.avm
+	chainPrefixes := []string{xchainID.String()}
+	if alias, err := service.vm.Ctx.BCLookup.PrimaryAlias(xchainID); err == nil {
+		chainPrefixes = append(chainPrefixes, alias)
+	}
+
+	ToBytes, err := formatting.ParseAddress(args.To, chainPrefixes, addressSep, service.vm.GetHRP())
+	if err != nil {
+		return err
+	}
+
+	ToID, err := ids.ToShortID(ToBytes)
+	if err != nil {
+		return err
+	}
+
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
 	}
@@ -801,7 +836,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		uint64(args.Amount), // Amount
-		args.To,             // X-Chain address
+		ToID,                // X-Chain address
 		privKeys,            // Private keys
 	)
 	if err != nil {
@@ -1106,9 +1141,7 @@ type GetTxArgs struct {
 // GetTxResponse ...
 type GetTxResponse struct {
 	// Raw byte representation of the transaction
-	RawTx formatting.CB58 `json:"rawTx"`
-	// JSON representation of the transaction
-	JSON interface{} `json:"json"`
+	Tx formatting.CB58 `json:"tx"`
 }
 
 // GetTx gets a tx
@@ -1118,25 +1151,7 @@ func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxR
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.RawTx.Bytes = txBytes
-
-	// Parse the raw bytes to a struct so we can get the JSON representation
-	// We don't know what kind of tx this is, so we go through the possibilities
-	// until we find the right one
-	var (
-		proposalTx ProposalTx
-		decisionTx DecisionTx
-		atomicTx   AtomicTx
-	)
-	if err := service.vm.codec.Unmarshal(txBytes, &proposalTx); err == nil {
-		response.JSON = &proposalTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &decisionTx); err == nil {
-		response.JSON = &decisionTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &atomicTx); err == nil {
-		response.JSON = &atomicTx
-	} else {
-		return errUnexpectedTxType
-	}
+	response.Tx.Bytes = txBytes
 	return nil
 }
 

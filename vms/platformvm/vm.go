@@ -6,7 +6,6 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"math"
@@ -959,45 +958,55 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 	return utxos, nil
 }
 
-func splitAddress(addrStr string) (string, string, error) {
-	if count := strings.Count(addrStr, addressSep); count != 1 {
-		return "", "", errInvalidAddressSeperator
+// GetHRP returns the Human-Readable-Part of addresses for this VM
+func (vm *VM) GetHRP() string {
+	networkID := vm.Ctx.NetworkID
+	hrp := constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	addrParts := strings.SplitN(addrStr, addressSep, 2)
-	prefix := addrParts[0]
-	if prefix == "" {
-		return "", "", errEmptyAddressPrefix
-	}
-	suffix := addrParts[1]
-	if suffix == "" {
-		return "", "", errEmptyAddressSuffix
-	}
-	return prefix, suffix, nil
+	return hrp
 }
 
 // ParseAddress returns a decoded Platform Chain address.
-// addrStr is an encoded address, of the form "P-<CB58 encoded bytes>".
+// addrStr is an encoded address, of the form "P-<bech32 encoded bytes>".
 func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
-	if addrStr == "" {
-		return ids.ShortID{}, errEmptyAddress
+	networkID := vm.Ctx.NetworkID
+	hrp := constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	prefix, suffix, err := splitAddress(addrStr)
+
+	chainPrefixes := []string{vm.Ctx.ChainID.String()}
+	if alias, err := vm.Ctx.BCLookup.PrimaryAlias(vm.Ctx.ChainID); err == nil {
+		chainPrefixes = append(chainPrefixes, alias)
+	}
+
+	addr, err := formatting.ParseAddress(addrStr, chainPrefixes, addressSep, hrp)
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-	if prefix != platformAlias {
-		return ids.ShortID{}, errInvalidAddressPrefix
-	}
-	cb58 := formatting.CB58{}
-	err = cb58.FromString(suffix)
-	if err != nil {
-		return ids.ShortID{}, fmt.Errorf("%w: %v", errInvalidAddress, err)
-	}
-	return ids.ToShortID(cb58.Bytes)
+
+	return ids.ToShortID(addr)
 }
 
 // FormatAddress returns an encoded Platform Chain address, of the form
-// "P-<CB58 encoded bytes>".
-func (vm *VM) FormatAddress(addrID ids.ShortID) string {
-	return fmt.Sprintf("%s%s%s", platformAlias, addressSep, addrID.String())
+// "P-<bech32 encoded bytes>".
+func (vm *VM) FormatAddress(addrID ids.ShortID) (string, error) {
+	networkID := vm.Ctx.NetworkID
+	hrp := constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
+	}
+
+	chainPrefix := vm.Ctx.ChainID.String()
+	if alias, err := vm.Ctx.BCLookup.PrimaryAlias(vm.Ctx.ChainID); err == nil {
+		chainPrefix = alias
+	}
+	addrstr, err := formatting.FormatAddress(addrID.Bytes(), chainPrefix, addressSep, hrp)
+	if err != nil {
+		return "", err
+	}
+
+	return addrstr, nil
 }

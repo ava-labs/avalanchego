@@ -105,6 +105,10 @@ func init() {
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
+	aliaser := &ids.Aliaser{}
+	aliaser.Initialize()
+	aliaser.Alias(constants.PlatformChainID, "P")
+	ctx.BCLookup = aliaser
 	return ctx
 }
 
@@ -139,25 +143,36 @@ func defaultGenesisUTXOs() []*ava.UTXO {
 func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]APIUTXO, len(keys))
 	for i, key := range keys {
+		id := key.PublicKey().Address()
+		hrp := constants.NetworkIDToHRP[testNetworkID]
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		genesisUTXOs[i] = APIUTXO{
 			Amount:  json.Uint64(defaultStakeAmount),
-			Address: key.PublicKey().Address(),
+			Address: addr,
 		}
 	}
 
 	genesisValidators := make([]APIDefaultSubnetValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
-		address := key.PublicKey().Address()
+		id := key.PublicKey().Address()
+		hrp := constants.NetworkIDToHRP[testNetworkID]
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		genesisValidators[i] = APIDefaultSubnetValidator{
 			APIValidator: APIValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				Address:   &address,
-				ID:        address,
+				Address:   addr,
+				ID:        id,
 			},
-			Destination:       address,
+			Destination:       addr,
 			DelegationFeeRate: NumberOfShares,
 		}
 	}
@@ -252,7 +267,11 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		utxos, err := vm.getUTXOs(vm.DB, [][]byte{utxo.Address.Bytes()})
+		_, addrBytes, err := formatting.ParseBech32(utxo.Address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		utxos, err := vm.getUTXOs(vm.DB, [][]byte{addrBytes})
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -260,7 +279,13 @@ func TestGenesis(t *testing.T) {
 		} else if out, ok := utxos[0].Out.(*secp256k1fx.TransferOutput); !ok {
 			t.Fatal("expected utxo output to be type *secp256k1fx.TransferOutput")
 		} else if out.Amount() != uint64(utxo.Amount) {
-			if utxo.Address.Equals(keys[0].PublicKey().Address()) { // Address that paid tx fee to create testSubnet1 has less tokens
+			id := keys[0].PublicKey().Address()
+			hrp := constants.NetworkIDToHRP[testNetworkID]
+			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if utxo.Address == addr { // Address that paid tx fee to create testSubnet1 has less tokens
 				if out.Amount() != uint64(utxo.Amount)-vm.txFee {
 					t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount)-vm.txFee, out.Amount())
 				}
@@ -1749,30 +1774,31 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestParseAddress(t *testing.T) {
-	vm := &VM{}
-	if _, err := vm.ParseAddress("P-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH"); err != nil {
+	vm := defaultVM()
+	if _, err := vm.ParseAddress(testAddress); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestParseAddressInvalid(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
+	checksumBad := "checksum failed. Expected qwqey4, got x5r4ap."
 	tests := []struct {
 		in   string
-		want error
+		want string
 	}{
-		{"", errEmptyAddress},
-		{"+", errInvalidAddressSeperator},
-		{"P", errInvalidAddressSeperator},
-		{"-", errEmptyAddressPrefix},
-		{"P-", errEmptyAddressSuffix},
-		{"X-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH", errInvalidAddressPrefix},
-		{"P-Bg6e45gxCUTLXcfUuoy", errInvalidAddress}, //truncated
+		{"", "no separator found in address"},
+		{"+", "no separator found in address"},
+		{"P", "no separator found in address"},
+		{"-", "invalid chainID in address"},
+		{"P-", "invalid bech32 string length 0"},
+		{"X-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y", "invalid chainID in address"},
+		{"P-testing18jma8ppw3nhx5r4ap", checksumBad}, //truncated
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
 			_, err := vm.ParseAddress(tt.in)
-			if !errors.Is(err, tt.want) {
+			if err.Error() != tt.want {
 				t.Errorf("want %q, got %q", tt.want, err)
 			}
 		})
@@ -1780,17 +1806,21 @@ func TestParseAddressInvalid(t *testing.T) {
 }
 
 func TestFormatAddress(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
 	tests := []struct {
 		label string
 		in    ids.ShortID
 		want  string
 	}{
-		{"keys[0]", keys[0].PublicKey().Address(), "P-Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf"},
+		{"keys[3]", ids.ShortID{ID: keys[3].PublicKey().Address().ID}, testAddress},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			if addrStr := vm.FormatAddress(tt.in); addrStr != tt.want {
+			addrStr, err := vm.FormatAddress(tt.in)
+			if err != nil {
+				t.Errorf("problem formatting address: %w", err)
+			}
+			if addrStr != tt.want {
 				t.Errorf("want %q, got %q", tt.want, addrStr)
 			}
 		})

@@ -131,14 +131,18 @@ func TestServiceGetBalance(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+	addr := keys[0].PublicKey().Address().Bytes()
+	addrstr, err := vm.FormatAddress(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	balanceArgs := &GetBalanceArgs{
-		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+		Address: addrstr,
 		AssetID: assetID.String(),
 	}
 	balanceReply := &GetBalanceReply{}
-	err := s.GetBalance(nil, balanceArgs, balanceReply)
+	err = s.GetBalance(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(balanceReply.Balance), uint64(300000))
 
@@ -154,13 +158,17 @@ func TestServiceGetAllBalances(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+	addr := keys[0].PublicKey().Address().Bytes()
+	addrstr, err := vm.FormatAddress(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	balanceArgs := &api.JsonAddress{
-		Address: fmt.Sprintf("%s-%s", vm.ctx.ChainID, addr),
+		Address: addrstr,
 	}
 	balanceReply := &GetAllBalancesReply{}
-	err := s.GetAllBalances(nil, balanceArgs, balanceReply)
+	err = s.GetAllBalances(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
 
 	assert.Len(t, balanceReply.Balances, 1)
@@ -225,6 +233,11 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
+	if err != nil {
+		t.Error(err)
+	}
 	tests := []struct {
 		label string
 		args  *api.JsonAddresses
@@ -235,7 +248,7 @@ func TestServiceGetUTXOsInvalidAddress(t *testing.T) {
 		{"[foo-bar]", &api.JsonAddresses{Addresses: []string{"foo-bar"}}},
 		{"[<ChainID>]", &api.JsonAddresses{Addresses: []string{vm.ctx.ChainID.String()}}},
 		{"[<ChainID>-]", &api.JsonAddresses{Addresses: []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
-		{"[<Unknown ID>-<addr0>]", &api.JsonAddresses{Addresses: []string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+		{"[<Unknown ID>-<addr0>]", &api.JsonAddresses{Addresses: []string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0str)}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -255,6 +268,18 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
+	if err != nil {
+		t.Error(err)
+	}
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
+
+	newAddrFullStr, err := vm.FormatAddress(ids.NewID([32]byte{20}).Bytes())
+	if err != nil {
+		t.Error(err)
+	}
+	newAddrStr := strings.SplitN(newAddrFullStr, addressSep, 2)[1]
+
 	tests := []struct {
 		label string
 		args  *api.JsonAddresses
@@ -264,26 +289,33 @@ func TestServiceGetUTXOs(t *testing.T) {
 			"Empty",
 			&api.JsonAddresses{},
 			0,
-		}, {
+		},
+		{
 			"[<ChainID>-<unrelated address>]",
-			&api.JsonAddresses{Addresses: []string{
-				// TODO: Should GetUTXOs() raise an error for this? The address portion is
-				//		 longer than addr0.String()
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
-			}},
+			&api.JsonAddresses{
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), newAddrStr),
+				},
+			},
 			0,
-		}, {
+		},
+		{
 			"[<ChainID>-<addr0>]",
-			&api.JsonAddresses{Addresses: []string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-			}},
+			&api.JsonAddresses{
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+				},
+			},
 			7,
-		}, {
+		},
+		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
-			&api.JsonAddresses{Addresses: []string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-			}},
+			&api.JsonAddresses{
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+				},
+			},
 			7,
 		},
 	}
@@ -307,6 +339,11 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
+	if err != nil {
+		t.Error(err)
+	}
 	tests := []struct {
 		label string
 		args  *api.JsonAddresses
@@ -317,7 +354,7 @@ func TestServiceGetAtomicUTXOsInvalidAddress(t *testing.T) {
 		{"[foo-bar]", &api.JsonAddresses{Addresses: []string{"foo-bar"}}},
 		{"[<ChainID>]", &api.JsonAddresses{Addresses: []string{vm.ctx.ChainID.String()}}},
 		{"[<ChainID>-]", &api.JsonAddresses{Addresses: []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())}}},
-		{"[<Unknown ID>-<addr0>]", &api.JsonAddresses{Addresses: []string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0.String())}}},
+		{"[<Unknown ID>-<addr0>]", &api.JsonAddresses{Addresses: []string{fmt.Sprintf("%s-%s", ids.NewID([32]byte{42}).String(), addr0str)}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -337,6 +374,18 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 	}()
 
 	addr0 := keys[0].PublicKey().Address()
+	addr0fullstr, err := vm.FormatAddress(addr0.Bytes())
+	if err != nil {
+		t.Error(err)
+	}
+	addr0str := strings.SplitN(addr0fullstr, addressSep, 2)[1]
+
+	newAddrFullStr, err := vm.FormatAddress(ids.NewID([32]byte{20}).Bytes())
+	if err != nil {
+		t.Error(err)
+	}
+	newAddrStr := strings.SplitN(newAddrFullStr, addressSep, 2)[1]
+
 	platformID := ids.Empty.Prefix(0)
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
@@ -370,26 +419,32 @@ func TestServiceGetAtomicUTXOs(t *testing.T) {
 		},
 		{
 			"[<ChainID>-<unrelated address>]",
-			&api.JsonAddresses{Addresses: []string{
-				// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
-				//		 longer than addr0.String()
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), ids.NewID([32]byte{42}).String()),
-			}},
+			&api.JsonAddresses{
+				Addresses: []string{
+					// TODO: Should GetAtomicUTXOs() raise an error for this? The address portion is
+					//		 longer than addr0.String()
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), newAddrStr),
+				},
+			},
 			0,
 		},
 		{
 			"[<ChainID>-<addr0>]",
-			&api.JsonAddresses{Addresses: []string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-			}},
+			&api.JsonAddresses{
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+				},
+			},
 			1,
 		},
 		{
 			"[<ChainID>-<addr0>,<ChainID>-<addr0>]",
-			&api.JsonAddresses{Addresses: []string{
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-				fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0.String()),
-			}},
+			&api.JsonAddresses{
+				Addresses: []string{
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+					fmt.Sprintf("%s-%s", vm.ctx.ChainID.String(), addr0str),
+				},
+			},
 			1,
 		},
 	}
@@ -444,8 +499,12 @@ func TestGetBalance(t *testing.T) {
 	avaAssetID := genesisTx.ID()
 
 	reply := GetBalanceReply{}
-	err := s.GetBalance(nil, &GetBalanceArgs{
-		Address: vm.Format(keys[0].PublicKey().Address().Bytes()),
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.GetBalance(nil, &GetBalanceArgs{
+		Address: addrstr,
 		AssetID: avaAssetID.String(),
 	}, &reply)
 	if err != nil {
@@ -465,7 +524,11 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	}()
 
 	reply := FormattedAssetID{}
-	err := s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
@@ -475,14 +538,14 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		Denomination: 1,
 		InitialHolders: []*Holder{{
 			Amount:  123456789,
-			Address: vm.Format(keys[0].PublicKey().Address().Bytes()),
+			Address: addrstr,
 		}},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if reply.AssetID.String() != "2CJbAPBPwt9nFd28MbKKJZkincdmvDmP7UYbPT4VP1LJ46Yyip" {
+	if reply.AssetID.String() != "2YD5ovZNEx7cxryCBxDZaYbrQc3v6AxTDiJwCxkZS1YMFU3Sni" {
 		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
 	}
 }
@@ -495,16 +558,22 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}()
 
 	reply := FormattedAssetID{}
-	err := s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
-		Username: username,
-		Password: password,
-		Name:     "test asset",
-		Symbol:   "TEST",
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
+		UserPass: api.UserPass{
+			Username: username,
+			Password: password,
+		},
+		Name:   "test asset",
+		Symbol: "TEST",
 		MinterSets: []Owners{
 			{
 				Threshold: 1,
 				Minters: []string{
-					vm.Format(keys[0].PublicKey().Address().Bytes()),
+					addrstr,
 				},
 			},
 		},
@@ -515,7 +584,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 	createdAssetID := reply.AssetID.String()
 
-	if createdAssetID != "23FV5zQpuG9EZBh7BXKj9wqPAMe7tY9T4jEWpobbMQHLLUf88o" {
+	if createdAssetID != "25BzKomFRYuq52dgoutjDsehgw4v9Uvcgb2fnTBLt8qqTTTAD7" {
 		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 
@@ -531,6 +600,10 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 
 	// Test minting of the created variable cap asset
+	addrstr, err = vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	mintArgs := &MintArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -538,7 +611,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Amount:  200,
 		AssetID: createdAssetID,
-		To:      vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To:      addrstr,
 	}
 	mintReply := &api.JsonTxID{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -556,7 +629,10 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	if err := mintTx.Accept(); err != nil {
 		t.Fatalf("Failed to accept MintTx due to: %s", err)
 	}
-
+	addrstr, err = vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	sendArgs := &SendArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -564,7 +640,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Amount:  200,
 		AssetID: createdAssetID,
-		To:      vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To:      addrstr,
 	}
 	sendReply := &api.JsonTxID{}
 	if err := s.Send(nil, sendArgs, sendReply); err != nil {
@@ -580,16 +656,22 @@ func TestNFTWorkflow(t *testing.T) {
 	}()
 
 	// Test minting of the created variable cap asset
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	createArgs := &CreateNFTAssetArgs{
-		Username: username,
-		Password: password,
-		Name:     "BIG COIN",
-		Symbol:   "COIN",
+		UserPass: api.UserPass{
+			Username: username,
+			Password: password,
+		},
+		Name:   "BIG COIN",
+		Symbol: "COIN",
 		MinterSets: []Owners{
 			Owners{
 				Threshold: 1,
 				Minters: []string{
-					vm.Format(keys[0].PublicKey().Address().Bytes()),
+					addrstr,
 				},
 			},
 		},
@@ -613,6 +695,10 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
 	}
 
+	addrstr, err = vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	mintArgs := &MintNFTArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -620,7 +706,7 @@ func TestNFTWorkflow(t *testing.T) {
 		},
 		AssetID: assetID.String(),
 		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
-		To:      vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To:      addrstr,
 	}
 	mintReply := &api.JsonTxID{}
 
@@ -641,6 +727,10 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatalf("Failed to accept MintNFTTx: %s", err)
 	}
 
+	addrstr, err = vm.FormatAddress(keys[2].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	sendArgs := &SendNFTArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -648,7 +738,7 @@ func TestNFTWorkflow(t *testing.T) {
 		},
 		AssetID: assetID.String(),
 		GroupID: 0,
-		To:      vm.Format(keys[2].PublicKey().Address().Bytes()),
+		To:      addrstr,
 	}
 	sendReply := &api.JsonTxID{}
 	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
@@ -683,12 +773,16 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	addrstr, err := vm.FormatAddress(sk.PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	exportArgs := &ExportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		Address: vm.Format(sk.PublicKey().Address().Bytes()),
+		Address: addrstr,
 	}
 	exportReply := &ExportKeyReply{}
 	if err = s.ExportKey(nil, exportArgs, exportReply); err != nil {
@@ -735,7 +829,10 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedAddress := vm.Format(sk.PublicKey().Address().Bytes())
+	expectedAddress, err := vm.FormatAddress(sk.PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if reply.Address != expectedAddress {
 		t.Fatalf("Reply address: %s did not match expected address: %s", reply.Address, expectedAddress)
@@ -779,6 +876,10 @@ func TestSend(t *testing.T) {
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
 
+	addrstr, err := vm.FormatAddress(addr.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	args := &SendArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -786,7 +887,7 @@ func TestSend(t *testing.T) {
 		},
 		Amount:  500,
 		AssetID: assetID.String(),
-		To:      vm.Format(addr.Bytes()),
+		To:      addrstr,
 	}
 	reply := &api.JsonTxID{}
 	vm.timer.Cancel()
@@ -872,13 +973,16 @@ func TestImportAVA(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
-
+	addrstr, err := vm.FormatAddress(keys[0].PublicKey().Address().Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	importArgs := &ImportAVAArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		To: vm.Format(keys[0].PublicKey().Address().Bytes()),
+		To: addrstr,
 	}
 	importReply := &api.JsonTxID{}
 	if err := s.ImportAVA(nil, importArgs, importReply); err != nil {

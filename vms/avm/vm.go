@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -593,38 +593,44 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return false
 }
 
-// Parse ...
-func (vm *VM) Parse(addrStr string) ([]byte, error) {
-	if count := strings.Count(addrStr, addressSep); count != 1 {
-		return nil, errInvalidAddress
+// GetHRP returns the Human-Readable-Part of addresses for this VM
+func (vm *VM) GetHRP() string {
+	networkID := vm.ctx.NetworkID
+	hrp := constants.FallbackHRP
+	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
+		hrp = constants.NetworkIDToHRP[networkID]
 	}
-	addressParts := strings.SplitN(addrStr, addressSep, 2)
-	bcAlias := addressParts[0]
-	rawAddr := addressParts[1]
-	bcID, err := vm.ctx.BCLookup.Lookup(bcAlias)
-	if err != nil {
-		bcID, err = ids.FromString(bcAlias)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if !bcID.Equals(vm.ctx.ChainID) {
-		return nil, errWrongBlockchainID
-	}
-	cb58 := formatting.CB58{}
-	err = cb58.FromString(rawAddr)
-	return cb58.Bytes, err
+	return hrp
 }
 
-// Format ...
-func (vm *VM) Format(b []byte) string {
-	var bcAlias string
+// ParseAddress takes in an address string and produces bytes for the address
+func (vm *VM) ParseAddress(addrStr string) ([]byte, error) {
+	hrp := vm.GetHRP()
+
+	chainPrefixes := []string{vm.ctx.ChainID.String()}
 	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
-		bcAlias = alias
-	} else {
-		bcAlias = vm.ctx.ChainID.String()
+		chainPrefixes = append(chainPrefixes, alias)
 	}
-	return fmt.Sprintf("%s%s%s", bcAlias, addressSep, formatting.CB58{Bytes: b})
+	addr, err := formatting.ParseAddress(addrStr, chainPrefixes, addressSep, hrp)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+// FormatAddress takes in a 20-byte slice and produces a string for an address
+func (vm *VM) FormatAddress(b []byte) (string, error) {
+	hrp := vm.GetHRP()
+
+	chainPrefix := vm.ctx.ChainID.String()
+	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
+		chainPrefix = alias
+	}
+	addrstr, err := formatting.FormatAddress(b, chainPrefix, addressSep, hrp)
+	if err != nil {
+		return "", err
+	}
+	return addrstr, nil
 }
 
 // LoadUser ...
