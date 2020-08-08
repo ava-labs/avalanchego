@@ -1141,9 +1141,7 @@ type GetTxArgs struct {
 // GetTxResponse ...
 type GetTxResponse struct {
 	// Raw byte representation of the transaction
-	RawTx formatting.CB58 `json:"rawTx"`
-	// JSON representation of the transaction
-	JSON interface{} `json:"json"`
+	Tx formatting.CB58 `json:"tx"`
 }
 
 // GetTx gets a tx
@@ -1153,25 +1151,7 @@ func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxR
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.RawTx.Bytes = txBytes
-
-	// Parse the raw bytes to a struct so we can get the JSON representation
-	// We don't know what kind of tx this is, so we go through the possibilities
-	// until we find the right one
-	var (
-		proposalTx ProposalTx
-		decisionTx DecisionTx
-		atomicTx   AtomicTx
-	)
-	if err := service.vm.codec.Unmarshal(txBytes, &proposalTx); err == nil {
-		response.JSON = &proposalTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &decisionTx); err == nil {
-		response.JSON = &decisionTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &atomicTx); err == nil {
-		response.JSON = &atomicTx
-	} else {
-		return errUnexpectedTxType
-	}
+	response.Tx.Bytes = txBytes
 	return nil
 }
 

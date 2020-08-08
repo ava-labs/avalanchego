@@ -301,7 +301,7 @@ func TestGetTx(t *testing.T) {
 			}
 		} else if err := service.GetTx(nil, arg, &response); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else if !bytes.Equal(response.RawTx.Bytes, test.toBytes(tx)) {
+		} else if !bytes.Equal(response.Tx.Bytes, test.toBytes(tx)) {
 			t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
 		}
 	}
