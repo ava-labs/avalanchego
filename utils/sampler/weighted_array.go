@@ -26,11 +26,7 @@ type weightedArrayElement struct {
 // Sampling can take up to O(n) time. If the distribution is linearly
 // distributed, then the runtime is constant.
 type weightedArray struct {
-	arr          []weightedArrayElement
-	minIndex     int
-	currentIndex int
-	maxIndex     int
-	value        uint64
+	arr []weightedArrayElement
 }
 
 func (s *weightedArray) Initialize(weights []uint64) error {
@@ -50,17 +46,13 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 	// Optimize so that the array is closer to the uniform distribution
 	sortWeightedArray(s.arr)
 
-	arrCopy := make([]weightedArrayElement, len(weights))
-	copy(arrCopy, s.arr)
-
-	midpoint := (len(s.arr) + 1) / 2
-	for i := 0; i < midpoint; i++ {
-		start := 2 * i
-		end := len(s.arr) - 1 - i
-		s.arr[start] = arrCopy[i]
-		if start+1 < len(s.arr) {
-			s.arr[start+1] = arrCopy[end]
-		}
+	maxIndex := len(s.arr) - 1
+	oneIfOdd := 1 & maxIndex
+	oneIfEven := 1 - oneIfOdd
+	end := maxIndex - oneIfEven
+	for i := 1; i < end; i += 2 {
+		s.arr[i], s.arr[end] = s.arr[end], s.arr[i]
+		end -= 2
 	}
 
 	cumulativeWeight := uint64(0)
@@ -86,7 +78,7 @@ func (s *weightedArray) Sample(value uint64) (int, error) {
 	minIndex := 0
 	maxIndex := len(s.arr) - 1
 	maxCumulativeWeight := float64(s.arr[len(s.arr)-1].cumulativeWeight)
-	index := int((float64(value) * float64(s.maxIndex+1)) / maxCumulativeWeight)
+	index := int((float64(value) * float64(maxIndex+1)) / maxCumulativeWeight)
 
 	for {
 		previousWeight := uint64(0)

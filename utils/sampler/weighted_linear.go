@@ -24,9 +24,7 @@ type weightedLinearElement struct {
 // Sampling can take up to O(n) time. As the distribution becomes more biased,
 // sampling will become faster in expectation.
 type weightedLinear struct {
-	arr          []weightedLinearElement
-	currentIndex int
-	value        uint64
+	arr []weightedLinearElement
 }
 
 func (s *weightedLinear) Initialize(weights []uint64) error {
