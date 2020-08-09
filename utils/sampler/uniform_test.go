@@ -15,6 +15,7 @@ var (
 	uniformTests = []func(*testing.T, Uniform){
 		UniformInitializeOverflowTest,
 		UniformOutOfRangeTest,
+		UniformEmptyTest,
 		UniformSingletonTest,
 		UniformDistributionTest,
 		UniformOverSampleTest,
@@ -38,6 +39,15 @@ func UniformOutOfRangeTest(t *testing.T, s Uniform) {
 
 	_, err = s.Sample(1)
 	assert.Error(t, err, "should have reported an out of range error")
+}
+
+func UniformEmptyTest(t *testing.T, s Uniform) {
+	err := s.Initialize(1)
+	assert.NoError(t, err)
+
+	val, err := s.Sample(0)
+	assert.NoError(t, err)
+	assert.Len(t, val, 0, "shouldn't have selected any element")
 }
 
 func UniformSingletonTest(t *testing.T, s Uniform) {

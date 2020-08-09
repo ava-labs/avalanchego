@@ -47,7 +47,7 @@ func (s *uniformReplacer) Initialize(length uint64) error {
 }
 
 func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
-	if count <= 0 || s.length < uint64(count) {
+	if count < 0 || s.length < uint64(count) {
 		return nil, errOutOfRange
 	}
 

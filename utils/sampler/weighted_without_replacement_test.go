@@ -18,6 +18,8 @@ var (
 	){
 		WeightedWithoutReplacementInitializeOverflowTest,
 		WeightedWithoutReplacementOutOfRangeTest,
+		WeightedWithoutReplacementEmptyWithoutWeightTest,
+		WeightedWithoutReplacementEmptyTest,
 		WeightedWithoutReplacementSingletonTest,
 		WeightedWithoutReplacementWithZeroTest,
 		WeightedWithoutReplacementDistributionTest,
@@ -50,6 +52,30 @@ func WeightedWithoutReplacementOutOfRangeTest(
 
 	_, err = s.Sample(2)
 	assert.Error(t, err, "should have reported an out of range error")
+}
+
+func WeightedWithoutReplacementEmptyWithoutWeightTest(
+	t *testing.T,
+	s WeightedWithoutReplacement,
+) {
+	err := s.Initialize(nil)
+	assert.NoError(t, err)
+
+	indices, err := s.Sample(0)
+	assert.NoError(t, err)
+	assert.Len(t, indices, 0, "shouldn't have selected any elements")
+}
+
+func WeightedWithoutReplacementEmptyTest(
+	t *testing.T,
+	s WeightedWithoutReplacement,
+) {
+	err := s.Initialize([]uint64{1})
+	assert.NoError(t, err)
+
+	indices, err := s.Sample(0)
+	assert.NoError(t, err)
+	assert.Len(t, indices, 0, "shouldn't have selected any elements")
 }
 
 func WeightedWithoutReplacementSingletonTest(

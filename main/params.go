@@ -52,8 +52,9 @@ var (
 )
 
 var (
-	errBootstrapMismatch  = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errStakingRequiresTLS = errors.New("if staking is enabled, network TLS must also be enabled")
+	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
+	errStakingRequiresTLS   = errors.New("if staking is enabled, network TLS must also be enabled")
+	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
 // GetIPs returns the default IPs for each network
@@ -210,6 +211,7 @@ func init() {
 	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
+	fs.Uint64Var(&Config.DisabledStakingWeight, "staking-disabled-weight", 1, "Weight to provide to each peer when staking is disabled")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Ava VMs")
@@ -340,6 +342,10 @@ func init() {
 	if Config.EnableStaking && !Config.EnableP2PTLS {
 		errs.Add(errStakingRequiresTLS)
 		return
+	}
+
+	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
+		errs.Add(errInvalidStakerWeights)
 	}
 
 	if Config.EnableP2PTLS {

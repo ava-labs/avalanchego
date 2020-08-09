@@ -16,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/database/meterdb"
-
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
@@ -28,6 +26,7 @@ import (
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/meterdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
@@ -153,11 +152,6 @@ func (n *Node) initNetworking() error {
 
 	// Initialize validator manager and default subnet's validator set
 	defaultSubnetValidators := validators.NewSet()
-	if !n.Config.EnableStaking {
-		if err := defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
-			return err
-		}
-	}
 	n.vdrs = validators.NewManager()
 	n.vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 
@@ -180,7 +174,8 @@ func (n *Node) initNetworking() error {
 
 	if !n.Config.EnableStaking {
 		n.Net.RegisterHandler(&insecureValidatorManager{
-			vdrs: defaultSubnetValidators,
+			vdrs:   defaultSubnetValidators,
+			weight: n.Config.DisabledStakingWeight,
 		})
 	}
 
@@ -193,12 +188,12 @@ func (n *Node) initNetworking() error {
 }
 
 type insecureValidatorManager struct {
-	vdrs validators.Set
+	vdrs   validators.Set
+	weight uint64
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
-	// will only error if 2^64 peers are connected
-	_ = i.vdrs.Add(validators.NewValidator(vdrID, 1))
+	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight))
 	return false
 }
 
