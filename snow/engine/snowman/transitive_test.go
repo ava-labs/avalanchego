@@ -437,7 +437,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	te.insert(blk0)
+	te.issue(blk0)
 
 	blk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -553,10 +553,10 @@ func TestEngineBlockedIssue(t *testing.T) {
 		BytesV:  []byte{2},
 	}
 
-	te.insert(blk1)
+	te.issue(blk1)
 
 	blk0.StatusV = choices.Processing
-	te.insert(blk0)
+	te.issue(blk0)
 
 	if !blk1.ID().Equals(te.consensus.Preference()) {
 		t.Fatalf("Should have issued blk1")
@@ -578,7 +578,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 	te.QueryFailed(vdr.ID(), 1)
 
 	if len(te.blocked) != 0 {
@@ -847,7 +847,7 @@ func TestVoteCanceling(t *testing.T) {
 		}
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 
 	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
@@ -905,7 +905,7 @@ func TestEngineNoQuery(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
@@ -988,7 +988,7 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	te.insert(blk)
+	te.issue(blk)
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
@@ -1054,7 +1054,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		BytesV:  []byte{3},
 	}
 
-	te.insert(parentBlk)
+	te.issue(parentBlk)
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
@@ -1085,7 +1085,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantChits = false
 
 	missingBlk.StatusV = choices.Processing
-	te.insert(missingBlk)
+	te.issue(missingBlk)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1125,7 +1125,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		BytesV:  []byte{3},
 	}
 
-	te.insert(blockingBlk)
+	te.issue(blockingBlk)
 
 	queryRequestID := new(uint32)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
@@ -1140,7 +1140,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	te.insert(issuedBlk)
+	te.issue(issuedBlk)
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
@@ -1163,7 +1163,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.CantPushQuery = false
 
 	missingBlk.StatusV = choices.Processing
-	te.insert(missingBlk)
+	te.issue(missingBlk)
 }
 
 func TestEngineRetryFetch(t *testing.T) {
@@ -1245,11 +1245,11 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		*reqID = requestID
 	}
 
-	te.insert(validBlk)
+	te.issue(validBlk)
 
 	sender.PushQueryF = nil
 
-	te.insert(invalidBlk)
+	te.issue(invalidBlk)
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
@@ -1687,7 +1687,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		}
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch {

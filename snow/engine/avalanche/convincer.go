@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
-// Sends chits after all dependencies are met
+// convincer sends chits to [vdr] after its dependencies are met.
 type convincer struct {
 	consensus avalanche.Consensus
 	sender    common.Sender
@@ -23,11 +23,13 @@ type convincer struct {
 
 func (c *convincer) Dependencies() ids.Set { return c.deps }
 
+// Mark that a dependency has been met.
 func (c *convincer) Fulfill(id ids.ID) {
 	c.deps.Remove(id)
 	c.Update()
 }
 
+// Abandon this attempt to send chits.
 func (c *convincer) Abandon(ids.ID) { c.abandoned = true }
 
 func (c *convincer) Update() {

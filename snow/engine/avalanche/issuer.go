@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
-// issuer issues a poll after all the dependencies of vtx are met
+// issuer issues [vtx] into consensus after its dependencies are met.
 type issuer struct {
 	t                 *Transitive
 	vtx               avalanche.Vertex
@@ -17,13 +17,13 @@ type issuer struct {
 	vtxDeps, txDeps   ids.Set
 }
 
-// Register that a vertex we were waiting on has been added to consensus.
+// Register that a vertex we were waiting on has been issued to consensus.
 func (i *issuer) FulfillVtx(id ids.ID) {
 	i.vtxDeps.Remove(id)
 	i.Update()
 }
 
-// Register that a transaction we were waiting on has been added to consensus.
+// Register that a transaction we were waiting on has been issued to consensus.
 func (i *issuer) FulfillTx(id ids.ID) {
 	i.txDeps.Remove(id)
 	i.Update()

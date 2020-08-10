@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+// Voter records chits received from [vdr] once its dependencies are met.
 type voter struct {
 	t         *Transitive
 	vdr       ids.ShortID
@@ -17,11 +18,13 @@ type voter struct {
 
 func (v *voter) Dependencies() ids.Set { return v.deps }
 
+// Mark that a dependency has been met.
 func (v *voter) Fulfill(id ids.ID) {
 	v.deps.Remove(id)
 	v.Update()
 }
 
+// Abandon this attempt to record chits.
 func (v *voter) Abandon(id ids.ID) { v.Fulfill(id) }
 
 func (v *voter) Update() {

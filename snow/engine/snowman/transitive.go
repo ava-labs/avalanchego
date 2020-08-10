@@ -42,7 +42,7 @@ type Transitive struct {
 	// blocks that have we have sent get requests for but haven't yet receieved
 	blkReqs common.Requests
 
-	// blocks that are queued to be added to consensus once missing dependencies are fetched
+	// blocks that are queued to be issued to consensus once missing dependencies are fetched
 	pending ids.Set
 
 	// operations that are blocked on a block being issued. This could be
@@ -86,14 +86,14 @@ func (t *Transitive) finishBootstrapping() error {
 	lastAcceptedID := t.VM.LastAccepted()
 	t.consensus.Initialize(t.Context(), t.params, lastAcceptedID)
 
-	tail, err := t.VM.GetBlock(lastAcceptedID)
+	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Context().Log.Error("failed to get last accepted block due to: %s", err)
 		return err
 	}
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	switch blk := tail.(type) {
+	switch blk := lastAccepted.(type) {
 	case OracleBlock:
 		options, err := blk.Options()
 		if err != nil {
@@ -123,7 +123,6 @@ func (t *Transitive) Gossip() error {
 		t.Context().Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
 		return nil
 	}
-
 	t.Context().Log.Verbo("gossiping %s as accepted to the network", blkID)
 	t.Sender.Gossip(blkID, blk.Bytes())
 	return nil
@@ -209,12 +208,12 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 		return t.GetFailed(vdr, requestID)
 	}
 
-	// insert the block into consensus. If the block has already been issued,
+	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	_, err = t.insertFrom(vdr, blk)
+	_, err = t.issueFrom(vdr, blk)
 	return err
 }
 
@@ -226,31 +225,28 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 		return nil
 	}
 
-	// we don't use the assumption that this function is called after a failed
-	// Get message. So we first check to see if we have an outstanding request
-	// and also get what the request was for if it exists
+	// We don't assume that this function is called after a failed Get message.
+	// Check to see if we have an outstanding request and also get what the request was for if it exists.
 	blkID, ok := t.blkReqs.Remove(vdr, requestID)
 	if !ok {
 		t.Context().Log.Debug("getFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
 		return nil
 	}
 
-	// because the get request was dropped, we no longer are expected blkID to
-	// be issued.
+	// Because the get request was dropped, we no longer expect blkID to be issued.
 	t.blocked.Abandon(blkID)
 	return t.errs.Err
 }
 
 // PullQuery implements the Engine interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	// if the engine hasn't been bootstrapped, we aren't ready to respond to
-	// queries
+	// If the engine hasn't been bootstrapped, we aren't ready to respond to queries
 	if !t.Context().IsBootstrapped() {
 		t.Context().Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
 		return nil
 	}
 
-	// Will send chits once we have all the dependencies for block [blkID]
+	// Will send chits once we've issued block [blkID] into consensus
 	c := &convincer{
 		consensus: t.consensus,
 		sender:    t.Sender,
@@ -259,13 +255,14 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 		errs:      &t.errs,
 	}
 
-	added, err := t.fetchOrInsert(vdr, blkID)
+	// Try to issue [blkID] to consensus.
+	// If we're missing an ancestor, request it from [vdr]
+	added, err := t.issueFromByID(vdr, blkID)
 	if err != nil {
 		return err
 	}
 
-	// if we aren't able to have issued this block, then it is a dependency for
-	// this reply
+	// Wait until we've issued block [blkID] before sending chits.
 	if !added {
 		c.deps.Add(blkID)
 	}
@@ -276,27 +273,26 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 
 // PushQuery implements the Engine interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkBytes []byte) error {
-	// if the engine hasn't been bootstrapped, we aren't ready to respond to
-	// queries
+	// if the engine hasn't been bootstrapped, we aren't ready to respond to queries
 	if !t.Context().IsBootstrapped() {
 		t.Context().Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, blkID)
 		return nil
 	}
 
 	blk, err := t.VM.ParseBlock(blkBytes)
-	// If the parsing fails, we just drop the request, as we didn't ask for it
+	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
 		t.Context().Log.Debug("failed to parse block %s: %s", blkID, err)
 		t.Context().Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
 		return nil
 	}
 
-	// insert the block into consensus. If the block has already been issued,
+	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.insertFrom(vdr, blk); err != nil {
+	if _, err := t.issueFrom(vdr, blk); err != nil {
 		return err
 	}
 
@@ -312,7 +308,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 		return nil
 	}
 
-	// Since this is snowman, there should only be one ID in the vote set
+	// Since this is a linear chain, there should only be one ID in the vote set
 	if votes.Len() != 1 {
 		t.Context().Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, votes.Len())
 		// because QueryFailed doesn't utilize the assumption that we actually
@@ -320,26 +316,26 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 		// potentially abandon the request.
 		return t.QueryFailed(vdr, requestID)
 	}
-	vote := votes.List()[0]
+	blkID := votes.List()[0]
 
-	t.Context().Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, vote)
+	t.Context().Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
 
+	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
 		t:         t,
 		vdr:       vdr,
 		requestID: requestID,
-		response:  vote,
+		response:  blkID,
 	}
 
-	added, err := t.fetchOrInsert(vdr, vote)
+	added, err := t.issueFromByID(vdr, blkID)
 	if err != nil {
 		return err
 	}
 
-	// if we aren't able to have issued the vote's block, then it is a
-	// dependency for applying the vote
+	// Wait until [blkID] has been issued to consensus before for applying this chit.
 	if !added {
-		v.deps.Add(vote)
+		v.deps.Add(blkID)
 	}
 
 	t.blocked.Register(v)
@@ -348,7 +344,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
-	// if the engine hasn't been bootstrapped, we won't have sent a query
+	// If the engine hasn't been bootstrapped, we didn't issue a query
 	if !t.Context().IsBootstrapped() {
 		t.Context().Log.Warn("dropping QueryFailed(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
@@ -364,7 +360,7 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 
 // Notify implements the Engine interface
 func (t *Transitive) Notify(msg common.Message) error {
-	// if the engine hasn't been bootstrapped, we shouldn't issuing blocks
+	// if the engine hasn't been bootstrapped, we shouldn't build/issue blocks from the VM
 	if !t.Context().IsBootstrapped() {
 		t.Context().Log.Debug("dropping Notify due to bootstrapping")
 		return nil
@@ -386,24 +382,23 @@ func (t *Transitive) Notify(msg common.Message) error {
 			t.Context().Log.Warn("attempting to issue a block with status: %s, expected Processing", status)
 		}
 
-		// the newly created block should be built on top of the preferred
-		// block. Otherwise, the new block doesn't have the best chance of being
-		// confirmed.
+		// The newly created block should be built on top of the preferred block.
+		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent().ID()
 		if pref := t.consensus.Preference(); !parentID.Equals(pref) {
 			t.Context().Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
 
-		added, err := t.insertAll(blk)
+		added, err := t.issueWithAncestors(blk)
 		if err != nil {
 			return err
 		}
 
-		// inserting the block shouldn't have any missing dependencies
+		// issuing the block shouldn't have any missing dependencies
 		if added {
 			t.Context().Log.Verbo("successfully issued new block from the VM")
 		} else {
-			t.Context().Log.Warn("VM.BuildBlock returned a block that is pending for ancestors")
+			t.Context().Log.Warn("VM.BuildBlock returned a block with unissued ancestors")
 		}
 	default:
 		t.Context().Log.Warn("unexpected message from the VM: %s", msg)
@@ -411,6 +406,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 	return nil
 }
 
+// Issue another poll to the network, asking what it prefers given the block we prefer.
+// Helps move consensus along.
 func (t *Transitive) repoll() {
 	// if we are issuing a repoll, we should gossip our current preferences to
 	// propagate the most likely branch as quickly as possible
@@ -421,30 +418,28 @@ func (t *Transitive) repoll() {
 	}
 }
 
-// fetchOrInsert attempts to issue the branch ending with a block [blkID] into consensus.
+// issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
 // If we do not have [blkID], request it.
 // Returns true if the block was issued, now or previously, to consensus.
-func (t *Transitive) fetchOrInsert(vdr ids.ShortID, blkID ids.ID) (bool, error) {
+func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
 	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
 		t.sendRequest(vdr, blkID)
 		return false, nil
 	}
-	return t.insertFrom(vdr, blk)
+	return t.issueFrom(vdr, blk)
 }
 
-// insertFrom attempts to issue the branch ending with block [blkID] to consensus.
+// issueFrom attempts to issue the branch ending with block [blkID] to consensus.
 // Returns true if the block was issued, now or previously, to consensus.
-// This is useful to check the local DB before requesting a block in case we
-// have the block for some reason. If a dependency is missing, the validator
-// will be sent a Get message.
-func (t *Transitive) insertFrom(vdr ids.ShortID, blk snowman.Block) (bool, error) {
+// If a dependency is missing, request it from [vdr].
+func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
-	// Issue [blk] and its ancestors to consensus.
-	// If the block has been issued, we don't need to insert it.
-	// If the block is queued to be issued, we don't need to insert it.
+	// issue [blk] and its ancestors to consensus.
+	// If the block has been issued, we don't need to issue it.
+	// If the block is queued to be issued, we don't need to issue it.
 	for !t.consensus.Issued(blk) && !t.pending.Contains(blkID) {
-		if err := t.insert(blk); err != nil {
+		if err := t.issue(blk); err != nil {
 			return false, err
 		}
 
@@ -460,50 +455,48 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, blk snowman.Block) (bool, error
 	return t.consensus.Issued(blk), nil
 }
 
-// insertAll attempts to issue the branch ending with [blk] to consensus.
+// issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
 // Returns true if [blk] was issued, now or previously, to consensus.
-// This is useful to check the local DB before requesting a block in case we don't
-// have the block for some reason. If a dependency is missing and the dependency
-// hasn't been requested, the issuance will be abandoned.
-func (t *Transitive) insertAll(blk snowman.Block) (bool, error) {
+// If a dependency is missing and the dependency hasn't been requested, the issuance will be abandoned.
+func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
-	// Insert all of [blk]'s ancestors into consensus
+	// issue [blk] and its ancestors into consensus
 	for blk.Status().Fetched() && !t.consensus.Issued(blk) && !t.pending.Contains(blkID) {
-		if err := t.insert(blk); err != nil {
+		if err := t.issue(blk); err != nil {
 			return false, err
 		}
-
 		blk = blk.Parent()
 		blkID = blk.ID()
 	}
 
-	// if issuance the block was successful, this is the happy path
+	// The block was issued into consensus. This is the happy path.
 	if t.consensus.Issued(blk) {
 		return true, nil
 	}
 
-	// if this branch is waiting on a block that we supposedly have a source of,
-	// we can just wait for that request to succeed or fail
+	// There's an outstanding request for this block.
+	// We can just wait for that request to succeed or fail.
 	if t.blkReqs.Contains(blkID) {
 		return false, nil
 	}
 
-	// if we have no reason to expect that this block will be inserted, we
-	// should abandon the block to avoid a memory leak
+	// We don't have this block and have no reason to expect that we will get it.
+	// Abandon the block to avoid a memory leak.
 	t.blocked.Abandon(blkID)
 	return false, t.errs.Err
 }
 
-// Attempt to insert [blk] to consensus once its parent has been issued or abandoned.
-func (t *Transitive) insert(blk snowman.Block) error {
+// Issue [blk] to consensus once its ancestors have been issued.
+func (t *Transitive) issue(blk snowman.Block) error {
 	blkID := blk.ID()
 
-	// mark that the block has been fetched but is pending
+	// mark that the block is queued to be added to consensus once its ancestors have been
 	t.pending.Add(blkID)
 
-	// if we have any outstanding requests for this block, remove the pending requests
+	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
 
+	// Will add [blk] to consensus once its ancestors have been
 	i := &issuer{
 		t:   t,
 		blk: blk,
@@ -512,7 +505,7 @@ func (t *Transitive) insert(blk snowman.Block) error {
 	// block on the parent if needed
 	if parent := blk.Parent(); !t.consensus.Issued(parent) {
 		parentID := parent.ID()
-		t.Context().Log.Verbo("block %s waiting for parent %s", blkID, parentID)
+		t.Context().Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
 	}
 
@@ -524,8 +517,9 @@ func (t *Transitive) insert(blk snowman.Block) error {
 	return t.errs.Err
 }
 
+// Request that [vdr] send us block [blkID]
 func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
-	// only send one request at a time for a block
+	// There is already an outstanding request for this block
 	if t.blkReqs.Contains(blkID) {
 		return
 	}
@@ -542,20 +536,22 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 // send a pull request for this block ID
 func (t *Transitive) pullSample(blkID ids.ID) {
 	t.Context().Log.Verbo("about to sample from: %s", t.Config.Validators)
-	p := t.consensus.Parameters()
-	vdrs := t.Config.Validators.Sample(p.K)
+	k := t.consensus.Parameters().K // consensus parameter
+	// The validators we will query
+	vdrs := t.Config.Validators.Sample(k)
 	vdrSet := ids.ShortSet{}
 	for _, vdr := range vdrs {
 		vdrSet.Add(vdr.ID())
 	}
 
+	// Copy this set because [vdrSet] may be modified
 	toSample := ids.ShortSet{}
 	toSample.Union(vdrSet)
 
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
+	if numVdrs := len(vdrs); numVdrs == k && t.polls.Add(t.RequestID, vdrSet) {
 		t.Sender.PullQuery(toSample, t.RequestID, blkID)
-	} else if numVdrs < p.K {
+	} else if numVdrs < k {
 		t.Context().Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
 }
@@ -563,24 +559,26 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 // send a push request for this block
 func (t *Transitive) pushSample(blk snowman.Block) {
 	t.Context().Log.Verbo("about to sample from: %s", t.Config.Validators)
-	p := t.consensus.Parameters()
-	vdrs := t.Config.Validators.Sample(p.K)
+	k := t.consensus.Parameters().K
+	vdrs := t.Config.Validators.Sample(k)
 	vdrSet := ids.ShortSet{}
 	for _, vdr := range vdrs {
 		vdrSet.Add(vdr.ID())
 	}
 
+	// Copy this set because [vdrSet] may be modified
 	toSample := ids.ShortSet{}
 	toSample.Union(vdrSet)
 
 	t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrSet) {
+	if numVdrs := len(vdrs); numVdrs == k && t.polls.Add(t.RequestID, vdrSet) {
 		t.Sender.PushQuery(toSample, t.RequestID, blk.ID(), blk.Bytes())
-	} else if numVdrs < p.K {
+	} else if numVdrs < k {
 		t.Context().Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
 }
 
+// issue [blk] to consensus
 func (t *Transitive) deliver(blk snowman.Block) error {
 	if t.consensus.Issued(blk) {
 		return nil
@@ -590,6 +588,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	blkID := blk.ID()
 	t.pending.Remove(blkID)
 
+	// Make sure this block is valid
 	if err := blk.Verify(); err != nil {
 		t.Context().Log.Debug("block failed verification due to %s, dropping block", err)
 
@@ -626,7 +625,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	t.VM.SetPreference(t.consensus.Preference())
 
-	// launch a query for the newly added block
+	// Query the network for its preferences given this new block
 	t.pushSample(blk)
 
 	t.blocked.Fulfill(blkID)

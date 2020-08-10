@@ -488,7 +488,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	te.insert(vtx0)
+	te.issue(vtx0)
 
 	vtx1 := &avalanche.TestVertex{
 		TestDecidable: choices.TestDecidable{
@@ -616,10 +616,10 @@ func TestEngineBlockedIssue(t *testing.T) {
 	te.finishBootstrapping()
 	te.Context().Bootstrapped()
 
-	te.insert(vtx1)
+	te.issue(vtx1)
 
 	vtx1.ParentsV[0] = vtx0
-	te.insert(vtx0)
+	te.issue(vtx0)
 
 	if prefs := te.consensus.Preferences(); prefs.Len() != 1 || !prefs.Contains(vtx1.ID()) {
 		t.Fatalf("Should have issued vtx1")
@@ -754,7 +754,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 		*requestID = reqID
 	}
 
-	te.insert(vtx)
+	te.issue(vtx)
 
 	sender.PushQueryF = nil
 
@@ -1426,7 +1426,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 		*queried = true
 	}
 
-	te.insert(vtx)
+	te.issue(vtx)
 
 	if *queried {
 		t.Fatalf("Unknown query")
@@ -1578,7 +1578,7 @@ func TestEngineSingleQuery(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantPullQuery = false
 
-	te.insert(vtx)
+	te.issue(vtx)
 }
 
 func TestEngineParentBlockingInsert(t *testing.T) {
@@ -1659,8 +1659,8 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	te.finishBootstrapping()
 	te.Context().Bootstrapped()
 
-	te.insert(parentVtx)
-	te.insert(blockingVtx)
+	te.issue(parentVtx)
+	te.issue(blockingVtx)
 
 	if len(te.vtxBlocked) != 2 {
 		t.Fatalf("Both inserts should be blocking")
@@ -1669,7 +1669,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	sender.CantPushQuery = false
 
 	missingVtx.StatusV = choices.Processing
-	te.insert(missingVtx)
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1754,7 +1754,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	te.finishBootstrapping()
 	te.Context().Bootstrapped()
 
-	te.insert(parentVtx)
+	te.issue(parentVtx)
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -1783,7 +1783,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantChits = false
 
 	missingVtx.StatusV = choices.Processing
-	te.insert(missingVtx)
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1868,7 +1868,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	te.finishBootstrapping()
 	te.Context().Bootstrapped()
 
-	te.insert(blockingVtx)
+	te.issue(blockingVtx)
 
 	queryRequestID := new(uint32)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
@@ -1883,7 +1883,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	te.insert(issuedVtx)
+	te.issue(issuedVtx)
 
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -1907,7 +1907,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.CantChits = false
 
 	missingVtx.StatusV = choices.Processing
-	te.insert(missingVtx)
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1992,7 +1992,7 @@ func TestEngineMissingTx(t *testing.T) {
 	te.finishBootstrapping()
 	te.Context().Bootstrapped()
 
-	te.insert(blockingVtx)
+	te.issue(blockingVtx)
 
 	queryRequestID := new(uint32)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
@@ -2007,7 +2007,7 @@ func TestEngineMissingTx(t *testing.T) {
 		}
 	}
 
-	te.insert(issuedVtx)
+	te.issue(issuedVtx)
 
 	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -2031,7 +2031,7 @@ func TestEngineMissingTx(t *testing.T) {
 	sender.CantChits = false
 
 	missingVtx.StatusV = choices.Processing
-	te.insert(missingVtx)
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -2089,7 +2089,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 	te.finishBootstrapping()
 	te.Context().Bootstrapped()
 
-	te.insert(vtx)
+	te.issue(vtx)
 
 	if prefs := te.consensus.Preferences(); !prefs.Contains(vtx.ID()) {
 		t.Fatalf("Vertex should be preferred")
@@ -2541,13 +2541,13 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		*reqID = requestID
 	}
 
-	te.insert(vtx0)
+	te.issue(vtx0)
 
 	sender.PushQueryF = func(ids.ShortSet, uint32, ids.ID, []byte) {
 		t.Fatalf("should have failed verification")
 	}
 
-	te.insert(vtx1)
+	te.issue(vtx1)
 
 	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
@@ -2643,7 +2643,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 		}
 	}
 
-	te.insert(vtx)
+	te.issue(vtx)
 }
 
 func TestEngineGossip(t *testing.T) {
@@ -3271,7 +3271,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te.insert(vtx)
+	te.issue(vtx)
 
 	votes := ids.Set{}
 	votes.Add(vtx.ID())

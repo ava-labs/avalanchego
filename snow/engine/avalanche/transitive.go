@@ -46,7 +46,7 @@ type Transitive struct {
 	// missingTxs tracks transaction that are missing
 	missingTxs ids.Set
 
-	// IDs of vertices that are queued up to be added to consensus but haven't yet been
+	// IDs of vertices that are queued to be added to consensus but haven't yet been
 	// because of missing dependencies
 	pending ids.Set
 
@@ -206,7 +206,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 		t.Context().Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
 		return t.GetFailed(vdr, requestID)
 	}
-	_, err = t.insertFrom(vdr, vtx)
+	_, err = t.issueFrom(vdr, vtx)
 	return err
 }
 
@@ -256,7 +256,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 	// If we have [vtxID], put it into consensus if we haven't already.
 	// If not, fetch it.
-	inConsensus, err := t.fetchOrInsert(vdr, vtxID)
+	inConsensus, err := t.issueFromByID(vdr, vtxID)
 	if err != nil {
 		return err
 	}
@@ -286,7 +286,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 		return nil
 	}
 
-	if _, err := t.insertFrom(vdr, vtx); err != nil {
+	if _, err := t.issueFrom(vdr, vtx); err != nil {
 		return err
 	}
 
@@ -308,7 +308,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 	}
 	voteList := votes.List()
 	for _, vote := range voteList {
-		if added, err := t.fetchOrInsert(vdr, vote); err != nil {
+		if added, err := t.issueFromByID(vdr, vote); err != nil {
 			return err
 		} else if !added {
 			v.deps.Add(vote)
@@ -359,27 +359,27 @@ func (t *Transitive) repoll() error {
 	return nil
 }
 
-// fetchOrInsert inserts the branch ending with vertex [vtxID] to consensus.
+// issueFromByID issues the branch ending with vertex [vtxID] to consensus.
 // Fetches [vtxID] if we don't have it locally.
 // Returns true if [vtx] has been added to consensus (now or previously)
-func (t *Transitive) fetchOrInsert(vdr ids.ShortID, vtxID ids.ID) (bool, error) {
+func (t *Transitive) issueFromByID(vdr ids.ShortID, vtxID ids.ID) (bool, error) {
 	vtx, err := t.Manager.GetVertex(vtxID)
 	if err != nil {
 		// We don't have [vtxID]. Request it.
 		t.sendRequest(vdr, vtxID)
 		return false, nil
 	}
-	return t.insertFrom(vdr, vtx)
+	return t.issueFrom(vdr, vtx)
 }
 
-// insertFrom inserts the branch ending with [vtx] to consensus.
+// issueFrom issues the branch ending with [vtx] to consensus.
 // Assumes we have [vtx] locally
 // Returns true if [vtx] has been added to consensus (now or previously)
-func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, error) {
+func (t *Transitive) issueFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, error) {
 	issued := true
-	// Before we insert [vtx] into consensus, we have to insert its ancestors.
-	// Go through [vtx] and its ancestors. Insert each ancestor that hasn't yet been inserted.
-	// If we find a missing ancestor, fetch it and note that we can't insert [vtx] yet.
+	// Before we issue [vtx] into consensus, we have to issue its ancestors.
+	// Go through [vtx] and its ancestors. issue each ancestor that hasn't yet been issued.
+	// If we find a missing ancestor, fetch it and note that we can't issue [vtx] yet.
 	ancestry := vertex.NewHeap()
 	ancestry.Push(vtx)
 	for ancestry.Len() > 0 {
@@ -387,7 +387,7 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, er
 
 		if t.consensus.VertexIssued(vtx) {
 			// This vertex has been issued --> its ancestors have been issued.
-			// No need to try to insert it or its ancestors
+			// No need to try to issue it or its ancestors
 			continue
 		}
 		if t.pending.Contains(vtx.ID()) {
@@ -407,25 +407,25 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, er
 				// We're missing an ancestor so we can't have issued the vtx in this method's argument
 				issued = false
 			} else {
-				// Come back to this vertex later to make sure it and its ancestors have been fetched/inserted
+				// Come back to this vertex later to make sure it and its ancestors have been fetched/issued
 				ancestry.Push(parent)
 			}
 		}
 
-		// Queue up this vertex to be inserted once its dependencies are met
-		if err := t.insert(vtx); err != nil {
+		// Queue up this vertex to be issued once its dependencies are met
+		if err := t.issue(vtx); err != nil {
 			return false, err
 		}
 	}
 	return issued, nil
 }
 
-// insert queues [vtx] to be put into consensus after its dependencies are met.
+// issue queues [vtx] to be put into consensus after its dependencies are met.
 // Assumes we have [vtx].
-func (t *Transitive) insert(vtx avalanche.Vertex) error {
+func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	vtxID := vtx.ID()
 
-	// Add to set of vertices that have been queued up to be inserted but haven't been yet
+	// Add to set of vertices that have been queued up to be issued but haven't been yet
 	t.pending.Add(vtxID)
 	t.outstandingVtxReqs.RemoveAny(vtxID)
 
@@ -560,7 +560,7 @@ func (t *Transitive) issueRepoll() {
 	}
 }
 
-// Puts a batch of transactions into a vertex and inserts it into consensus.
+// Puts a batch of transactions into a vertex and issues it into consensus.
 func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 	t.Context().Log.Verbo("batching %d transactions into a new vertex", len(txs))
 
@@ -577,7 +577,7 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 		t.Context().Log.Warn("error building new vertex with %d parents and %d transactions", len(parentIDs), len(txs))
 		return nil
 	}
-	return t.insert(vtx)
+	return t.issue(vtx)
 }
 
 // Send a request to [vdr] asking them to send us vertex [vtxID]
