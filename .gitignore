@@ -26,8 +26,6 @@ awscpu
 .vscode*
 
 *.pb*
-*.ava
-*.avax
 
 db*
 
