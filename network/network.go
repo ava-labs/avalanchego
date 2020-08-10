@@ -5,7 +5,6 @@ package network
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"net"
 	"sync"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/random"
@@ -45,10 +45,6 @@ const (
 	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = time.Minute
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
-
-	// Request ID used when sending a Put message to gossip an accepted container
-	// (ie not sent in response to a Get)
-	GossipMsgRequestID = math.MaxUint32
 )
 
 // Network defines the functionality of the networking library.
@@ -725,7 +721,7 @@ func (n *network) Track(ip utils.IPDesc) {
 
 // assumes the stateLock is not held.
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
-	msg, err := n.b.Put(chainID, GossipMsgRequestID, containerID, container)
+	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
