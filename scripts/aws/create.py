@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Start a number of AVA nodes on Amazon EC2
+Start a number of Avalanche nodes on Amazon EC2
 """
 
 import boto3
@@ -22,7 +22,7 @@ def runInstances(ec2, num: int, name: str):
                 {"ResourceType": "instance", "Tags": [{"Key": "Name", "Value": name}]}
             ],
             SecurityGroupIds=["sg-0d6172e416170b426"],
-            KeyName="stephen_ava",
+            KeyName="stephen_ava", # TODO rename key
         )
 
 

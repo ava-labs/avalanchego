@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -21,11 +21,11 @@ import (
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	Ins []*ava.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
+	Ins []*avax.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *ImportTx) InputUTXOs() []*ava.UTXOID {
+func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, in := range t.Ins {
 		in.Symbol = true
@@ -80,7 +80,7 @@ func (t *ImportTx) SyntacticVerify(
 		return errNoImportInputs
 	}
 
-	fc := ava.NewFlowChecker()
+	fc := avax.NewFlowChecker()
 
 	// The txFee must be burned
 	fc.Produce(txFeeAssetID, txFee)
@@ -91,7 +91,7 @@ func (t *ImportTx) SyntacticVerify(
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
+	if !avax.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -101,7 +101,7 @@ func (t *ImportTx) SyntacticVerify(
 		}
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(t.BaseTx.Ins) {
+	if !avax.IsSortedAndUniqueTransferableInputs(t.BaseTx.Ins) {
 		return errInputsNotSortedUnique
 	}
 
@@ -111,7 +111,7 @@ func (t *ImportTx) SyntacticVerify(
 		}
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
+	if !avax.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 
@@ -127,7 +127,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec)
 
 	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.Ins {
@@ -149,7 +149,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		if !utxoAssetID.Equals(inAssetID) {
 			return errAssetIDMismatch
 		}
-		if !utxoAssetID.Equals(vm.ava) {
+		if !utxoAssetID.Equals(vm.avax) {
 			return errWrongAssetID
 		}
 
@@ -180,7 +180,7 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 
 	vsmDB := versiondb.New(smDB)
 
-	state := ava.NewPrefixedState(vsmDB, vm.codec)
+	state := avax.NewPrefixedState(vsmDB, vm.codec)
 	for _, in := range t.Ins {
 		utxoID := in.UTXOID.InputID()
 		if err := state.SpendPlatformUTXO(utxoID); err != nil {

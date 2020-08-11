@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -46,8 +46,8 @@ func (mt MockTransferable) Amount() uint64 {
 
 type MockSpendTx struct {
 	IDF    func() ids.ID
-	InsF   func() []*ava.TransferableInput
-	OutsF  func() []*ava.TransferableOutput
+	InsF   func() []*avax.TransferableInput
+	OutsF  func() []*avax.TransferableOutput
 	CredsF func() []verify.Verifiable
 }
 
@@ -58,14 +58,14 @@ func (tx MockSpendTx) ID() ids.ID {
 	return ids.ID{}
 }
 
-func (tx MockSpendTx) Ins() []*ava.TransferableInput {
+func (tx MockSpendTx) Ins() []*avax.TransferableInput {
 	if tx.InsF != nil {
 		return tx.InsF()
 	}
 	return nil
 }
 
-func (tx MockSpendTx) Outs() []*ava.TransferableOutput {
+func (tx MockSpendTx) Outs() []*avax.TransferableOutput {
 	if tx.OutsF != nil {
 		return tx.OutsF()
 	}
@@ -83,12 +83,12 @@ func TestSyntacticVerifySpend(t *testing.T) {
 	avaxAssetID := ids.NewID([32]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	otherAssetID := ids.NewID([32]byte{1, 2, 3})
 	txID1 := ids.NewID([32]byte{1})
-	utxoID1 := ava.UTXOID{
+	utxoID1 := avax.UTXOID{
 		TxID:        txID1,
 		OutputIndex: 0,
 		Symbol:      false,
 	}
-	utxoID2 := ava.UTXOID{
+	utxoID2 := avax.UTXOID{
 		TxID:        txID1,
 		OutputIndex: 1,
 		Symbol:      false,
@@ -96,9 +96,9 @@ func TestSyntacticVerifySpend(t *testing.T) {
 
 	type spendTest struct {
 		description     string
-		ins             []*ava.TransferableInput
-		unlockedOuts    []*ava.TransferableOutput
-		lockedOuts      []*ava.TransferableOutput
+		ins             []*avax.TransferableInput
+		unlockedOuts    []*avax.TransferableOutput
+		lockedOuts      []*avax.TransferableOutput
 		lockedAmt       uint64
 		unlockedBurnAmt uint64
 		shouldErr       bool
@@ -106,167 +106,167 @@ func TestSyntacticVerifySpend(t *testing.T) {
 	tests := []spendTest{
 		{
 			"no inputs, no unlocked outputs, no locked outputs, no locked, no burn",
-			[]*ava.TransferableInput{},
-			[]*ava.TransferableOutput{},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableInput{},
+			[]*avax.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			0,
 			false,
 		},
 		{
 			"no inputs, no unlocked outputs, no locked outputs, no locked, non-zero burn",
-			[]*ava.TransferableInput{},
-			[]*ava.TransferableOutput{},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableInput{},
+			[]*avax.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			1,
 			true,
 		},
 		{
 			"one input, no unlocked outputs, no locked outputs, no locked, sufficient burn",
-			[]*ava.TransferableInput{{
+			[]*avax.TransferableInput{{
 				UTXOID: utxoID1,
-				Asset:  ava.Asset{ID: avaxAssetID},
+				Asset:  avax.Asset{ID: avaxAssetID},
 				In:     MockTransferable{AmountVal: 1},
 			}},
-			[]*ava.TransferableOutput{},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			1,
 			false,
 		},
 		{
 			"one input, no unlocked outputs, no locked outputs, no locked, insufficient burn",
-			[]*ava.TransferableInput{{
+			[]*avax.TransferableInput{{
 				UTXOID: utxoID1,
-				Asset:  ava.Asset{ID: avaxAssetID},
+				Asset:  avax.Asset{ID: avaxAssetID},
 				In:     MockTransferable{AmountVal: 1},
 			}},
-			[]*ava.TransferableOutput{},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			2,
 			true,
 		},
 		{
 			"one input, one unlocked output, no locked outputs, no locked, sufficient burn",
-			[]*ava.TransferableInput{{
+			[]*avax.TransferableInput{{
 				UTXOID: utxoID1,
-				Asset:  ava.Asset{ID: avaxAssetID},
+				Asset:  avax.Asset{ID: avaxAssetID},
 				In:     MockTransferable{AmountVal: 2},
 			}},
-			[]*ava.TransferableOutput{{
-				Asset: ava.Asset{ID: avaxAssetID},
+			[]*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: avaxAssetID},
 				Out:   MockTransferable{AmountVal: 1},
 			}},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			1,
 			false,
 		},
 		{
 			"multiple inputs, multiple unlocked outputs, no locked outputs, no locked, insufficient burn",
-			[]*ava.TransferableInput{
+			[]*avax.TransferableInput{
 				{
 					UTXOID: utxoID1,
-					Asset:  ava.Asset{ID: avaxAssetID},
+					Asset:  avax.Asset{ID: avaxAssetID},
 					In:     MockTransferable{AmountVal: 1},
 				},
 				{
 					UTXOID: utxoID2,
-					Asset:  ava.Asset{ID: avaxAssetID},
+					Asset:  avax.Asset{ID: avaxAssetID},
 					In:     MockTransferable{AmountVal: 1},
 				},
 			},
-			[]*ava.TransferableOutput{
+			[]*avax.TransferableOutput{
 				{
-					Asset: ava.Asset{ID: avaxAssetID},
+					Asset: avax.Asset{ID: avaxAssetID},
 					Out:   MockTransferable{AmountVal: 1},
 				},
 				{
-					Asset: ava.Asset{ID: avaxAssetID},
+					Asset: avax.Asset{ID: avaxAssetID},
 					Out:   MockTransferable{AmountVal: 1},
 				},
 			},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			1,
 			true,
 		},
 		{
 			"multiple inputs, multiple unlocked outputs, no locked outputs, no locked, sufficient burn",
-			[]*ava.TransferableInput{
+			[]*avax.TransferableInput{
 				{
 					UTXOID: utxoID1,
-					Asset:  ava.Asset{ID: avaxAssetID},
+					Asset:  avax.Asset{ID: avaxAssetID},
 					In:     MockTransferable{AmountVal: 2},
 				},
 				{
 					UTXOID: utxoID2,
-					Asset:  ava.Asset{ID: avaxAssetID},
+					Asset:  avax.Asset{ID: avaxAssetID},
 					In:     MockTransferable{AmountVal: 1},
 				},
 			},
-			[]*ava.TransferableOutput{
+			[]*avax.TransferableOutput{
 				{
-					Asset: ava.Asset{ID: avaxAssetID},
+					Asset: avax.Asset{ID: avaxAssetID},
 					Out:   MockTransferable{AmountVal: 1},
 				},
 				{
-					Asset: ava.Asset{ID: avaxAssetID},
+					Asset: avax.Asset{ID: avaxAssetID},
 					Out:   MockTransferable{AmountVal: 1},
 				},
 			},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			1,
 			false,
 		},
 		{
 			"wrong asset ID for input",
-			[]*ava.TransferableInput{{
+			[]*avax.TransferableInput{{
 				UTXOID: utxoID1,
-				Asset:  ava.Asset{ID: otherAssetID},
+				Asset:  avax.Asset{ID: otherAssetID},
 				In:     MockTransferable{AmountVal: 1},
 			}},
-			[]*ava.TransferableOutput{},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			1,
 			true,
 		},
 		{
 			"wrong asset ID for output",
-			[]*ava.TransferableInput{{
+			[]*avax.TransferableInput{{
 				UTXOID: utxoID1,
-				Asset:  ava.Asset{ID: avaxAssetID},
+				Asset:  avax.Asset{ID: avaxAssetID},
 				In:     MockTransferable{AmountVal: 1},
 			}},
-			[]*ava.TransferableOutput{{
-				Asset: ava.Asset{ID: otherAssetID},
+			[]*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: otherAssetID},
 				Out:   MockTransferable{AmountVal: 1},
 			}},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			1,
 			true,
 		},
 		{
 			"input amount overflow",
-			[]*ava.TransferableInput{
+			[]*avax.TransferableInput{
 				{
 					UTXOID: utxoID1,
-					Asset:  ava.Asset{ID: avaxAssetID},
+					Asset:  avax.Asset{ID: avaxAssetID},
 					In:     MockTransferable{AmountVal: math.MaxUint64},
 				},
 				{
 					UTXOID: utxoID2,
-					Asset:  ava.Asset{ID: avaxAssetID},
+					Asset:  avax.Asset{ID: avaxAssetID},
 					In:     MockTransferable{AmountVal: 1},
 				},
 			},
-			[]*ava.TransferableOutput{},
-			[]*ava.TransferableOutput{},
+			[]*avax.TransferableOutput{},
+			[]*avax.TransferableOutput{},
 			0,
 			0,
 			true,

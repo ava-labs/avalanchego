@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/utils/wrappers"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/database"
@@ -227,7 +228,7 @@ func (s *state) uniqueID(ID ids.ID, typeID uint64) ids.ID {
 }
 
 // NewState returns a new State
-func NewState() State {
+func NewState() (State, error) {
 	state := &state{
 		marshallers:    make(map[uint64]func(interface{}) ([]byte, error)),
 		unmarshallers:  make(map[uint64]func([]byte) (interface{}, error)),
@@ -236,9 +237,12 @@ func NewState() State {
 
 	// Register ID, Status and time.Time so they can be put/get without client code
 	// having to register them
-	state.RegisterType(IDTypeID, marshalID, unmarshalID)
-	state.RegisterType(StatusTypeID, marshalStatus, unmarshalStatus)
-	state.RegisterType(TimeTypeID, marshalTime, unmarshalTime)
 
-	return state
+	errs := wrappers.Errs{}
+	errs.Add(
+		state.RegisterType(IDTypeID, marshalID, unmarshalID),
+		state.RegisterType(StatusTypeID, marshalStatus, unmarshalStatus),
+		state.RegisterType(TimeTypeID, marshalTime, unmarshalTime),
+	)
+	return state, errs.Err
 }

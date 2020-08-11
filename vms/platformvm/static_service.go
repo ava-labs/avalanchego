@@ -10,11 +10,11 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-// Note that since an AVA network has exactly one Platform Chain,
+// Note that since an Avalanche network has exactly one Platform Chain,
 // and the Platform Chain defines the genesis state of the network
 // (who is staking, which chains exist, etc.), defining the genesis
 // state of the Platform Chain is the same as defining the genesis
@@ -31,21 +31,21 @@ type StaticService struct{}
 // APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type APIUTXO struct {
 	Amount  json.Uint64 `json:"amount"`
-	Address ids.ShortID `json:"address"`
+	Address string      `json:"address"`
 }
 
 // APIValidator is a validator.
 // [Amount] is the amount of tokens being staked.
 // [Endtime] is the Unix time repr. of when they are done staking
 // [ID] is the node ID of the staker
-// [Address] is the address where the staked AVA (and, if applicable, reward)
+// [Address] is the address where the staked $AVAX (and, if applicable, reward)
 // is sent when this staker is done staking.
 type APIValidator struct {
 	StartTime   json.Uint64  `json:"startTime"`
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	Address     *ids.ShortID `json:"address,omitempty"`
+	Address     string       `json:"address,omitempty"`
 	ID          ids.ShortID  `json:"id"`
 }
 
@@ -64,7 +64,7 @@ func (v *APIValidator) weight() uint64 {
 type APIDefaultSubnetValidator struct {
 	APIValidator
 
-	Destination       ids.ShortID `json:"destination"`
+	Destination       string      `json:"destination"`
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
@@ -134,7 +134,7 @@ type BuildGenesisReply struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs      []*ava.UTXO   `serialize:"true"`
+	UTXOs      []*avax.UTXO  `serialize:"true"`
 	Validators *EventHeap    `serialize:"true"`
 	Chains     []*DecisionTx `serialize:"true"`
 	Timestamp  uint64        `serialize:"true"`
@@ -157,26 +157,39 @@ func (g *Genesis) Initialize() error {
 	return nil
 }
 
-// BuildGenesis build the genesis state of the Platform Chain (and thereby the AVA network.)
+// beck32ToID takes bech32 address and produces a shortID
+func bech32ToID(address string) (ids.ShortID, error) {
+	_, addr, err := formatting.ParseBech32(address)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return ids.ToShortID(addr)
+}
+
+// BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
-	utxos := make([]*ava.UTXO, 0, len(args.UTXOs))
+	utxos := make([]*avax.UTXO, 0, len(args.UTXOs))
 	for i, utxo := range args.UTXOs {
 		if utxo.Amount == 0 {
 			return errUTXOHasNoValue
 		}
-		utxos = append(utxos, &ava.UTXO{
-			UTXOID: ava.UTXOID{
+		addrID, err := bech32ToID(utxo.Address)
+		if err != nil {
+			return err
+		}
+		utxos = append(utxos, &avax.UTXO{
+			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: uint32(i),
 			},
-			Asset: ava.Asset{ID: args.AvaxAssetID},
+			Asset: avax.Asset{ID: args.AvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: uint64(utxo.Amount),
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
-					Addrs:     []ids.ShortID{utxo.Address},
+					Addrs:     []ids.ShortID{addrID},
 				},
 			},
 		})
@@ -192,7 +205,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if uint64(validator.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
-
+		addrID, err := bech32ToID(validator.Destination)
+		if err != nil {
+			return err
+		}
 		tx := &ProposalTx{
 			UnsignedProposalTx: &UnsignedAddDefaultSubnetValidatorTx{
 				BaseTx: BaseTx{
@@ -207,20 +223,20 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					Start: uint64(args.Time),
 					End:   uint64(validator.EndTime),
 				},
-				Stake: []*ava.TransferableOutput{{
-					Asset: ava.Asset{ID: args.AvaxAssetID},
+				Stake: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: args.AvaxAssetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: weight,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Locktime:  0,
 							Threshold: 1,
-							Addrs:     []ids.ShortID{validator.Destination},
+							Addrs:     []ids.ShortID{addrID},
 						},
 					},
 				}},
 				RewardsOwner: &secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{validator.Destination},
+					Addrs:     []ids.ShortID{addrID},
 				},
 			},
 		}

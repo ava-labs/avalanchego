@@ -21,7 +21,7 @@ func TestTxVerifyBadChainID(t *testing.T) {
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 15
-	ctx.ChainID = avaChainID
+	ctx.ChainID = avaxChainID
 
 	builder := Builder{
 		NetworkID: ctx.NetworkID,
@@ -32,13 +32,13 @@ func TestTxVerifyBadChainID(t *testing.T) {
 			builder.NewInputPayment(
 				/*txID=*/ genesisTx.ID(),
 				/*txIndex=*/ 0,
-				/*amount=*/ 5*units.Ava,
+				/*amount=*/ 5*units.Avax,
 				/*sigs=*/ []*Sig{builder.NewSig(0 /*=index*/)},
 			),
 		},
 		/*outs=*/ []Output{
 			builder.NewOutputPayment(
-				/*amount=*/ 3*units.Ava,
+				/*amount=*/ 3*units.Avax,
 				/*locktime=*/ 0,
 				/*threshold=*/ 0,
 				/*addresses=*/ nil,

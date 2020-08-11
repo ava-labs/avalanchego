@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/timestampvm"
@@ -105,20 +105,24 @@ func init() {
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
+	aliaser := &ids.Aliaser{}
+	aliaser.Initialize()
+	aliaser.Alias(constants.PlatformChainID, "P")
+	ctx.BCLookup = aliaser
 	return ctx
 }
 
 // The UTXOs that exist at genesis in the default VM
-func defaultGenesisUTXOs() []*ava.UTXO {
-	utxos := []*ava.UTXO(nil)
+func defaultGenesisUTXOs() []*avax.UTXO {
+	utxos := []*avax.UTXO(nil)
 	for i, key := range keys {
 		utxos = append(utxos,
-			&ava.UTXO{
-				UTXOID: ava.UTXOID{
+			&avax.UTXO{
+				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: uint32(i),
 				},
-				Asset: ava.Asset{ID: avaxAssetID},
+				Asset: avax.Asset{ID: avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: defaultBalance,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -139,25 +143,36 @@ func defaultGenesisUTXOs() []*ava.UTXO {
 func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]APIUTXO, len(keys))
 	for i, key := range keys {
+		id := key.PublicKey().Address()
+		hrp := constants.NetworkIDToHRP[testNetworkID]
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		genesisUTXOs[i] = APIUTXO{
 			Amount:  json.Uint64(defaultStakeAmount),
-			Address: key.PublicKey().Address(),
+			Address: addr,
 		}
 	}
 
 	genesisValidators := make([]APIDefaultSubnetValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
-		address := key.PublicKey().Address()
+		id := key.PublicKey().Address()
+		hrp := constants.NetworkIDToHRP[testNetworkID]
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		genesisValidators[i] = APIDefaultSubnetValidator{
 			APIValidator: APIValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				Address:   &address,
-				ID:        address,
+				Address:   addr,
+				ID:        id,
 			},
-			Destination:       address,
+			Destination:       addr,
 			DelegationFeeRate: NumberOfShares,
 		}
 	}
@@ -252,7 +267,11 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		utxos, err := vm.getUTXOs(vm.DB, [][]byte{utxo.Address.Bytes()})
+		_, addrBytes, err := formatting.ParseBech32(utxo.Address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		utxos, err := vm.getUTXOs(vm.DB, [][]byte{addrBytes})
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -260,7 +279,13 @@ func TestGenesis(t *testing.T) {
 		} else if out, ok := utxos[0].Out.(*secp256k1fx.TransferOutput); !ok {
 			t.Fatal("expected utxo output to be type *secp256k1fx.TransferOutput")
 		} else if out.Amount() != uint64(utxo.Amount) {
-			if utxo.Address.Equals(keys[0].PublicKey().Address()) { // Address that paid tx fee to create testSubnet1 has less tokens
+			id := keys[0].PublicKey().Address()
+			hrp := constants.NetworkIDToHRP[testNetworkID]
+			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if utxo.Address == addr { // Address that paid tx fee to create testSubnet1 has less tokens
 				if out.Amount() != uint64(utxo.Amount)-vm.txFee {
 					t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount)-vm.txFee, out.Amount())
 				}
@@ -1153,7 +1178,7 @@ func TestAtomicImport(t *testing.T) {
 
 	avmID := ids.Empty.Prefix(0)
 	vm.avm = avmID
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
@@ -1173,9 +1198,9 @@ func TestAtomicImport(t *testing.T) {
 
 	// Provide the avm UTXO
 	smDB := vm.Ctx.SharedMemory.GetDatabase(avmID)
-	utxo := &ava.UTXO{
+	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  ava.Asset{ID: avaxAssetID},
+		Asset:  avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1184,7 +1209,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	state := ava.NewPrefixedState(smDB, Codec)
+	state := avax.NewPrefixedState(smDB, Codec)
 	if err := state.FundAVMUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
@@ -1214,7 +1239,7 @@ func TestAtomicImport(t *testing.T) {
 
 	smDB = vm.Ctx.SharedMemory.GetDatabase(avmID)
 	defer vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
-	state = ava.NewPrefixedState(smDB, vm.codec)
+	state = avax.NewPrefixedState(smDB, vm.codec)
 	if _, err := state.AVMUTXO(utxoID.InputID()); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
@@ -1232,7 +1257,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	}()
 
 	avmID := ids.Empty.Prefix(0)
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
@@ -1248,9 +1273,9 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	tx, err := vm.newImportTx(
 		defaultNonce+1,
 		testNetworkID,
-		[]*ava.TransferableInput{&ava.TransferableInput{
+		[]*avax.TransferableInput{&avax.TransferableInput{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: assetID},
+			Asset:  avax.Asset{ID: assetID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   amount,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1263,7 +1288,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ava = assetID
+	vm.avax = assetID
 	vm.avm = avmID
 
 	blk, err := vm.newAtomicBlock(vm.Preferred(), tx)
@@ -1749,30 +1774,31 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestParseAddress(t *testing.T) {
-	vm := &VM{}
-	if _, err := vm.ParseAddress("P-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH"); err != nil {
+	vm := defaultVM()
+	if _, err := vm.ParseAddress(testAddress); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestParseAddressInvalid(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
+	checksumBad := "checksum failed. Expected qwqey4, got x5r4ap."
 	tests := []struct {
 		in   string
-		want error
+		want string
 	}{
-		{"", errEmptyAddress},
-		{"+", errInvalidAddressSeperator},
-		{"P", errInvalidAddressSeperator},
-		{"-", errEmptyAddressPrefix},
-		{"P-", errEmptyAddressSuffix},
-		{"X-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH", errInvalidAddressPrefix},
-		{"P-Bg6e45gxCUTLXcfUuoy", errInvalidAddress}, //truncated
+		{"", "no separator found in address"},
+		{"+", "no separator found in address"},
+		{"P", "no separator found in address"},
+		{"-", "invalid chainID in address"},
+		{"P-", "invalid bech32 string length 0"},
+		{"X-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y", "invalid chainID in address"},
+		{"P-testing18jma8ppw3nhx5r4ap", checksumBad}, //truncated
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
 			_, err := vm.ParseAddress(tt.in)
-			if !errors.Is(err, tt.want) {
+			if err.Error() != tt.want {
 				t.Errorf("want %q, got %q", tt.want, err)
 			}
 		})
@@ -1780,17 +1806,21 @@ func TestParseAddressInvalid(t *testing.T) {
 }
 
 func TestFormatAddress(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
 	tests := []struct {
 		label string
 		in    ids.ShortID
 		want  string
 	}{
-		{"keys[0]", keys[0].PublicKey().Address(), "P-Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf"},
+		{"keys[3]", ids.ShortID{ID: keys[3].PublicKey().Address().ID}, testAddress},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			if addrStr := vm.FormatAddress(tt.in); addrStr != tt.want {
+			addrStr, err := vm.FormatAddress(tt.in)
+			if err != nil {
+				t.Errorf("problem formatting address: %w", err)
+			}
+			if addrStr != tt.want {
 				t.Errorf("want %q, got %q", tt.want, addrStr)
 			}
 		})

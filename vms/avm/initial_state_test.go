@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -53,12 +53,12 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&ava.TestVerifiable{})
+	c.RegisterType(&avax.TestVerifiable{})
 	numFxs := 1
 
 	is := InitialState{
 		FxID: 0,
-		Outs: []verify.State{&ava.TestVerifiable{Err: errors.New("")}},
+		Outs: []verify.State{&avax.TestVerifiable{Err: errors.New("")}},
 	}
 	if err := is.Verify(c, numFxs); err == nil {
 		t.Fatalf("Should have errored due to an invalid output")
@@ -67,14 +67,14 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	c := codec.NewDefault()
-	c.RegisterType(&ava.TestTransferable{})
+	c.RegisterType(&avax.TestTransferable{})
 	numFxs := 1
 
 	is := InitialState{
 		FxID: 0,
 		Outs: []verify.State{
-			&ava.TestTransferable{Val: 1},
-			&ava.TestTransferable{Val: 0},
+			&avax.TestTransferable{Val: 1},
+			&avax.TestTransferable{Val: 0},
 		},
 	}
 	if err := is.Verify(c, numFxs); err == nil {

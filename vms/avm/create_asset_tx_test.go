@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -30,8 +30,8 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Outs: []*ava.TransferableOutput{{
-				Asset: ava.Asset{ID: asset},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -40,8 +40,8 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 					},
 				},
 			}},
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -50,7 +50,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 					}),
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -178,8 +178,8 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
 			Memo: []byte{0x00, 0x01, 0x02, 0x03},
-			Outs: []*ava.TransferableOutput{{
-				Asset: ava.Asset{
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{
 					ID: ids.NewID([32]byte{
 						0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 						0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -207,8 +207,8 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 					},
 				},
 			}},
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xf1, 0xe1, 0xd1, 0xc1, 0xb1, 0xa1, 0x91, 0x81,
 						0x71, 0x61, 0x51, 0x41, 0x31, 0x21, 0x11, 0x01,
@@ -217,7 +217,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 					}),
 					OutputIndex: 5,
 				},
-				Asset: ava.Asset{
+				Asset: avax.Asset{
 					ID: ids.NewID([32]byte{
 						0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 						0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -649,7 +649,7 @@ func TestCreateAssetTxSyntacticVerifyName(t *testing.T) {
 func TestCreateAssetTxSyntacticVerifySymbol(t *testing.T) {
 	tx, c, ctx := validCreateAssetTx(t)
 
-	tx.Symbol = "FIVES"
+	tx.Symbol = symbolTooLong
 	if err := tx.SyntacticVerify(ctx, c, asset, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to symbol too long")
 	}

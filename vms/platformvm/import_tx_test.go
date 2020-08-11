@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -50,13 +50,13 @@ func TestNewImportTx(t *testing.T) {
 		return MockSharedMemory{
 			GetDatabaseF: func(ids.ID) database.Database {
 				db := memdb.New()
-				state := ava.NewPrefixedState(db, Codec)
-				if err := state.FundAVMUTXO(&ava.UTXO{
-					UTXOID: ava.UTXOID{
+				state := avax.NewPrefixedState(db, Codec)
+				if err := state.FundAVMUTXO(&avax.UTXO{
+					UTXOID: avax.UTXOID{
 						TxID:        ids.GenerateTestID(),
 						OutputIndex: rand.Uint32(),
 					},
-					Asset: ava.Asset{ID: avaxAssetID},
+					Asset: avax.Asset{ID: avaxAssetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: amt,
 						OutputOwners: secp256k1fx.OutputOwners{

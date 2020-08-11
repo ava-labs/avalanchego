@@ -41,15 +41,16 @@ func (s *state) Vertex(id ids.ID) *innerVertex {
 	return nil
 }
 
-func (s *state) SetVertex(id ids.ID, vtx *innerVertex) {
+// SetVertex persists the vertex to the database and returns an error if it
+// fails to write to the db
+func (s *state) SetVertex(id ids.ID, vtx *innerVertex) error {
 	s.dbCache.Put(id, vtx)
 
 	if vtx == nil {
-		s.db.Delete(id.Bytes())
-		return
+		return s.db.Delete(id.Bytes())
 	}
 
-	s.db.Put(id.Bytes(), vtx.bytes)
+	return s.db.Put(id.Bytes(), vtx.bytes)
 }
 
 func (s *state) Status(id ids.ID) choices.Status {
@@ -75,12 +76,12 @@ func (s *state) Status(id ids.ID) choices.Status {
 	return choices.Unknown
 }
 
-func (s *state) SetStatus(id ids.ID, status choices.Status) {
+// SetStatus sets the status of the vertex and returns an error if it fails to write to the db
+func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 	s.dbCache.Put(id, status)
 
 	if status == choices.Unknown {
-		s.db.Delete(id.Bytes())
-		return
+		return s.db.Delete(id.Bytes())
 	}
 
 	p := wrappers.Packer{Bytes: make([]byte, 4)}
@@ -90,7 +91,7 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) {
 	s.serializer.ctx.Log.AssertNoError(p.Err)
 	s.serializer.ctx.Log.AssertTrue(p.Offset == len(p.Bytes), "Wrong offset after packing")
 
-	s.db.Put(id.Bytes(), p.Bytes)
+	return s.db.Put(id.Bytes(), p.Bytes)
 }
 
 func (s *state) Edge(id ids.ID) []ids.ID {
@@ -121,12 +122,12 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 	return nil
 }
 
-func (s *state) SetEdge(id ids.ID, frontier []ids.ID) {
+// SetEdge sets the frontier and returns an error if it fails to write to the db
+func (s *state) SetEdge(id ids.ID, frontier []ids.ID) error {
 	s.dbCache.Put(id, frontier)
 
 	if len(frontier) == 0 {
-		s.db.Delete(id.Bytes())
-		return
+		return s.db.Delete(id.Bytes())
 	}
 
 	size := wrappers.IntLen + hashing.HashLen*len(frontier)
@@ -140,5 +141,5 @@ func (s *state) SetEdge(id ids.ID, frontier []ids.ID) {
 	s.serializer.ctx.Log.AssertNoError(p.Err)
 	s.serializer.ctx.Log.AssertTrue(p.Offset == len(p.Bytes), "Wrong offset after packing")
 
-	s.db.Put(id.Bytes(), p.Bytes)
+	return s.db.Put(id.Bytes(), p.Bytes)
 }

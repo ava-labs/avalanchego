@@ -2,7 +2,7 @@
   become: true
   apt:
     name:
-      # AVA (in May 2020) requires Go 1.13. On Ubuntu 20.04 LTS this package,
+      # Avalanche (in May 2020) requires Go 1.13. On Ubuntu 20.04 LTS this package,
       # provides the appropriate version.
       - golang-go
   tags:

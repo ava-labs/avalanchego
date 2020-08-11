@@ -106,8 +106,8 @@ type network struct {
 	dialer         Dialer
 	serverUpgrader Upgrader
 	clientUpgrader Upgrader
-	vdrs           validators.Set // set of current validators in the AVAnet
-	beacons        validators.Set // set of beacons in the AVAnet
+	vdrs           validators.Set // set of current validators in the Avalanche network
+	beacons        validators.Set // set of beacons in the Avalanche network
 	router         router.Router  // router must be thread safe
 
 	nodeID uint32
@@ -230,7 +230,7 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
-	net := &network{
+	netw := &network{
 		log:                                log,
 		id:                                 id,
 		ip:                                 ip,
@@ -260,17 +260,18 @@ func NewNetwork(
 		gossipSize:                         gossipSize,
 		pingPongTimeout:                    pingPongTimeout,
 		pingFrequency:                      pingFrequency,
-
-		disconnectedIPs: make(map[string]struct{}),
-		connectedIPs:    make(map[string]struct{}),
-		retryDelay:      make(map[string]time.Duration),
-		myIPs:           map[string]struct{}{ip.String(): {}},
-		peers:           make(map[[20]byte]*peer),
+		disconnectedIPs:                    make(map[string]struct{}),
+		connectedIPs:                       make(map[string]struct{}),
+		retryDelay:                         make(map[string]time.Duration),
+		myIPs:                              map[string]struct{}{ip.String(): {}},
+		peers:                              make(map[[20]byte]*peer),
 	}
-	net.initialize(registerer)
-	net.executor.Initialize()
-	net.heartbeat()
-	return net
+	if err := netw.initialize(registerer); err != nil {
+		log.Warn("initializing network metrics failed with: %s", err)
+	}
+	netw.executor.Initialize()
+	netw.heartbeat()
+	return netw
 }
 
 // GetAcceptedFrontier implements the Sender interface.
@@ -401,7 +402,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
 	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	if err != nil {
-		n.log.Error("failed to build GetAncestors message: %w", err)
+		n.log.Error("failed to build GetAncestors message: %s", err)
 		return
 	}
 
@@ -704,6 +705,9 @@ func (n *network) Close() error {
 
 	n.closed = true
 	err := n.listener.Close()
+	if err != nil {
+		n.log.Debug("closing network listener failed with: %s", err)
+	}
 
 	peersToClose := []*peer(nil)
 	for _, peer := range n.peers {
@@ -849,6 +853,8 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = n.initialReconnectDelay
 		}
 
+		// Ignore weak randomness warnings in calculating timeouts because true
+		// randomness is unnecessary here
 		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
@@ -920,7 +926,9 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	defer n.stateLock.Unlock()
 
 	if n.closed {
-		p.conn.Close()
+		// the network is closing, so make sure that no further reconnect
+		// attempts are made.
+		_ = p.conn.Close()
 		return nil
 	}
 
@@ -939,17 +947,23 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
-		p.conn.Close()
+		// don't attempt to reconnect to myself, so return nil even if closing
+		// returns an error
+		_ = p.conn.Close()
 		return nil
 	}
 
+	// If I am already connected to this peer, then I should close this new
+	// connection.
 	if _, ok := n.peers[key]; ok {
 		if !p.ip.IsZero() {
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		p.conn.Close()
+		// I'm already connected to this peer, so don't attempt to reconnect to
+		// this ip, even if an error occurres during closing
+		_ = p.conn.Close()
 		return nil
 	}
 

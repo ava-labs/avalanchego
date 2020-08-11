@@ -80,19 +80,25 @@ func (NoLog) SetContextualDisplayingEnabled(bool) {}
 // NoIOWriter is a mock Writer that does not write to any underlying source
 type NoIOWriter struct{}
 
+// Initialize ...
 func (nw *NoIOWriter) Initialize(Config) error { return nil }
 
+// Flush ...
 func (nw *NoIOWriter) Flush() error { return nil }
 
+// Write ...
 func (nw *NoIOWriter) Write(p []byte) (int, error) { return len(p), nil }
 
+// WriteString ...
 func (nw *NoIOWriter) WriteString(s string) (int, error) { return len(s), nil }
 
+// Close ...
 func (nw *NoIOWriter) Close() error { return nil }
 
+// Rotate ...
 func (nw *NoIOWriter) Rotate() error { return nil }
 
-// NewTestLog...
+// NewTestLog ...
 func NewTestLog(config Config) (*Log, error) {
 	l := &Log{
 		config: config,

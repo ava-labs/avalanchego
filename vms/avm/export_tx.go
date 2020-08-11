@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -20,7 +20,7 @@ import (
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
-	Outs []*ava.TransferableOutput `serialize:"true" json:"exportedOutputs"` // The outputs this transaction is sending to the other chain
+	Outs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"` // The outputs this transaction is sending to the other chain
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -42,7 +42,7 @@ func (t *ExportTx) SyntacticVerify(
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	}
 
-	fc := ava.NewFlowChecker()
+	fc := avax.NewFlowChecker()
 
 	// The txFee must be burned
 	fc.Produce(txFeeAssetID, txFee)
@@ -53,7 +53,7 @@ func (t *ExportTx) SyntacticVerify(
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !ava.IsSortedTransferableOutputs(t.BaseTx.Outs, c) {
+	if !avax.IsSortedTransferableOutputs(t.BaseTx.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -63,7 +63,7 @@ func (t *ExportTx) SyntacticVerify(
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
+	if !avax.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -73,7 +73,7 @@ func (t *ExportTx) SyntacticVerify(
 		}
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
+	if !avax.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 
@@ -127,7 +127,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 			return err
 		}
 		assetID := out.AssetID()
-		if !out.AssetID().Equals(vm.ava) {
+		if !out.AssetID().Equals(vm.avax) {
 			return errWrongAssetID
 		}
 		if !vm.verifyFxUsage(fxIndex, assetID) {
@@ -147,14 +147,14 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 
 	vsmDB := versiondb.New(smDB)
 
-	state := ava.NewPrefixedState(vsmDB, vm.codec)
+	state := avax.NewPrefixedState(vsmDB, vm.codec)
 	for i, out := range t.Outs {
-		utxo := &ava.UTXO{
-			UTXOID: ava.UTXOID{
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(len(t.BaseTx.Outs) + i),
 			},
-			Asset: ava.Asset{ID: out.AssetID()},
+			Asset: avax.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		}
 		if err := state.FundAVMUTXO(utxo); err != nil {

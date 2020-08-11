@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/snow/networking/router"
@@ -37,7 +38,7 @@ const (
 var (
 	Config             = node.Config{}
 	Err                error
-	defaultNetworkName = genesis.TestnetName
+	defaultNetworkName = constants.TestnetName
 
 	homeDir                = os.ExpandEnv("$HOME")
 	defaultDbDir           = filepath.Join(homeDir, ".gecko", "db")
@@ -59,7 +60,7 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
-	case genesis.DenaliID:
+	case constants.DenaliID:
 		return []string{
 			"18.188.121.35:21001",
 			"3.133.83.66:21001",
@@ -82,7 +83,7 @@ func GetIPs(networkID uint32) []string {
 			"3.12.197.248:21001",
 			"3.17.39.236:21001",
 		}
-	case genesis.CascadeID:
+	case constants.CascadeID:
 		return []string{
 			"3.227.207.132:21001",
 			"34.207.133.167:21001",
@@ -98,7 +99,7 @@ func GetIPs(networkID uint32) []string {
 // GetIDs returns the default IDs for each network
 func GetIDs(networkID uint32) []string {
 	switch networkID {
-	case genesis.DenaliID:
+	case constants.DenaliID:
 		return []string{
 			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
 			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
@@ -121,7 +122,7 @@ func GetIDs(networkID uint32) []string {
 			"NodeID-JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
 			"NodeID-4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
 		}
-	case genesis.CascadeID:
+	case constants.CascadeID:
 		return []string{
 			"NodeID-NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
 			"NodeID-CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
@@ -175,8 +176,8 @@ func init() {
 	// NetworkID:
 	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
-	// Ava fees:
-	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
+	// AVAX fees:
+	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", 0, "AVAX transaction fee, in nAVAX")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
@@ -186,7 +187,7 @@ func init() {
 
 	// Database:
 	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Ava state")
+	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Avalanche state")
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
@@ -211,10 +212,10 @@ func init() {
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
 	// Plugins:
-	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Ava VMs")
+	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
 
 	// Logging:
-	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
+	logsDir := fs.String("log-dir", "", "Logging directory for Avalanche")
 	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayHighlight := fs.String("log-display-highlight", "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
@@ -233,11 +234,15 @@ func init() {
 	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
 	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
-	fs.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
+	fs.BoolVar(&Config.IPCAPIEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
 
 	// Throughput Server
 	throughputPort := fs.Uint("xput-server-port", 9652, "Port of the deprecated throughput test server")
 	fs.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
+
+	// IPC
+	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
+	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -435,4 +440,9 @@ func init() {
 
 	// Router used for consensus
 	Config.ConsensusRouter = &router.ChainRouter{}
+
+	// IPCs
+	if *ipcsChainIDs != "" {
+		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
+	}
 }

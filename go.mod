@@ -7,6 +7,7 @@ require (
 	github.com/aristanetworks/goarista v0.0.0-20200609010056-95bcf8053598 // indirect
 	github.com/ava-labs/coreth v0.2.10 // indirect
 	github.com/ava-labs/go-ethereum v1.9.3
+	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/handlers v1.4.2
@@ -23,11 +24,11 @@ require (
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/cors v1.7.0
+	github.com/securego/gosec v0.0.0-20200401082031-e946c8c39989 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
-	go.uber.org/atomic v1.6.0
+	go.nanomsg.org/mangos/v3 v3.0.1
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
 	google.golang.org/grpc v1.29.1
-	nanomsg.org/go/mangos/v2 v2.0.8
 )

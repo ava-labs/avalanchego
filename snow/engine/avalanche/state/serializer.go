@@ -14,12 +14,11 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
-
-	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
 )
 
 const (
@@ -60,7 +59,7 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm vertex.DAGVM, db database.
 }
 
 // ParseVertex implements the avalanche.State interface
-func (s *Serializer) ParseVertex(b []byte) (avacon.Vertex, error) {
+func (s *Serializer) ParseVertex(b []byte) (avalanche.Vertex, error) {
 	vtx, err := s.parseVertex(b)
 	if err != nil {
 		return nil, err
@@ -73,15 +72,16 @@ func (s *Serializer) ParseVertex(b []byte) (avacon.Vertex, error) {
 		vtxID:      vtx.ID(),
 	}
 	if uVtx.Status() == choices.Unknown {
-		uVtx.setVertex(vtx)
+		if err := uVtx.setVertex(vtx); err != nil {
+			return nil, err
+		}
 	}
 
-	s.db.Commit()
-	return uVtx, nil
+	return uVtx, s.db.Commit()
 }
 
 // BuildVertex implements the avalanche.State interface
-func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avacon.Vertex, error) {
+func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 	if len(txs) == 0 {
 		return nil, errNoTxs
 	}
@@ -120,15 +120,16 @@ func (s *Serializer) BuildVertex(parentSet ids.Set, txs []snowstorm.Tx) (avacon.
 	// It is possible this vertex already exists in the database, even though we
 	// just made it.
 	if uVtx.Status() == choices.Unknown {
-		uVtx.setVertex(vtx)
+		if err := uVtx.setVertex(vtx); err != nil {
+			return nil, err
+		}
 	}
 
-	s.db.Commit()
-	return uVtx, nil
+	return uVtx, s.db.Commit()
 }
 
 // GetVertex implements the avalanche.State interface
-func (s *Serializer) GetVertex(vtxID ids.ID) (avacon.Vertex, error) { return s.getVertex(vtxID) }
+func (s *Serializer) GetVertex(vtxID ids.ID) (avalanche.Vertex, error) { return s.getVertex(vtxID) }
 
 // Edge implements the avalanche.State interface
 func (s *Serializer) Edge() []ids.ID { return s.edge.List() }

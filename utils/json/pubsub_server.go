@@ -202,12 +202,19 @@ type Connection struct {
 func (c *Connection) readPump() {
 	defer func() {
 		c.s.removeConnection(c)
-		c.conn.Close()
+		// close is called by both the writePump and the readPump so one of them
+		// will always error
+		_ = c.conn.Close()
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	// SetReadDeadline returns an error if the connection is corrupted
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		return
+	}
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
 
 	for {
 		msg := subscribe{}
@@ -235,15 +242,21 @@ func (c *Connection) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		// close is called by both the writePump and the readPump so one of them
+		// will always error
+		_ = c.conn.Close()
 	}()
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				c.s.ctx.Log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				return
+			}
 			if !ok {
-				// The hub closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				// The hub closed the channel. Attempt to close the connection
+				// gracefully.
+				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
@@ -251,7 +264,10 @@ func (c *Connection) writePump() {
 				return
 			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				c.s.ctx.Log.Debug("failed to set the write deadline, closing the connection due to %s", err)
+				return
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

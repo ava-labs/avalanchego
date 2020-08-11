@@ -34,64 +34,46 @@ type Admin struct {
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api.Server) *common.HTTPHandler {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api.Server) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Admin{
+	if err := newServer.RegisterService(&Admin{
 		log:          log,
 		chainManager: chainManager,
 		httpServer:   httpServer,
-	}, "admin")
-	return &common.HTTPHandler{Handler: newServer}
-}
-
-// StartCPUProfilerReply are the results from calling StartCPUProfiler
-type StartCPUProfilerReply struct {
-	Success bool `json:"success"`
+	}, "admin"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{Handler: newServer}, nil
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (service *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, reply *StartCPUProfilerReply) error {
+func (service *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: StartCPUProfiler called")
 	reply.Success = true
 	return service.performance.StartCPUProfiler()
 }
 
-// StopCPUProfilerReply are the results from calling StopCPUProfiler
-type StopCPUProfilerReply struct {
-	Success bool `json:"success"`
-}
-
 // StopCPUProfiler stops the cpu profile
-func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *StopCPUProfilerReply) error {
+func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: StopCPUProfiler called")
 
 	reply.Success = true
 	return service.performance.StopCPUProfiler()
 }
 
-// MemoryProfileReply are the results from calling MemoryProfile
-type MemoryProfileReply struct {
-	Success bool `json:"success"`
-}
-
 // MemoryProfile runs a memory profile writing to the specified file
-func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *MemoryProfileReply) error {
+func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: MemoryProfile called")
 
 	reply.Success = true
 	return service.performance.MemoryProfile()
 }
 
-// LockProfileReply are the results from calling LockProfile
-type LockProfileReply struct {
-	Success bool `json:"success"`
-}
-
 // LockProfile runs a mutex profile writing to the specified file
-func (service *Admin) LockProfile(_ *http.Request, _ *struct{}, reply *LockProfileReply) error {
+func (service *Admin) LockProfile(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: LockProfile called")
 
 	reply.Success = true
@@ -104,13 +86,8 @@ type AliasArgs struct {
 	Alias    string `json:"alias"`
 }
 
-// AliasReply are the results from calling Alias
-type AliasReply struct {
-	Success bool `json:"success"`
-}
-
 // Alias attempts to alias an HTTP endpoint to a new name
-func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *AliasReply) error {
+func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {
@@ -127,13 +104,8 @@ type AliasChainArgs struct {
 	Alias string `json:"alias"`
 }
 
-// AliasChainReply are the results from calling AliasChain
-type AliasChainReply struct {
-	Success bool `json:"success"`
-}
-
 // AliasChain attempts to alias a chain to a new name
-func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *AliasChainReply) error {
+func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {

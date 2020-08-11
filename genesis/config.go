@@ -5,13 +5,13 @@ package genesis
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 )
 
-// Note that since an AVA network has exactly one Platform Chain,
-// and the Platform Chain defines the genesis state of the network
-// (who is staking, which chains exist, etc.), defining the genesis
-// state of the Platform Chain is the same as defining the genesis
-// state of the network.
+// Note that since an Avalanche network has exactly one Platform Chain, and the
+// Platform Chain defines the genesis state of the network (who is staking,
+// which chains exist, etc.), defining the genesis state of the Platform Chain
+// is the same as defining the genesis state of the network.
 
 // Config contains the genesis addresses used to construct a genesis
 type Config struct {
@@ -509,11 +509,11 @@ var (
 // GetConfig ...
 func GetConfig(networkID uint32) *Config {
 	switch networkID {
-	case EverestID:
+	case constants.EverestID:
 		return &EverestConfig
-	case DenaliID:
+	case constants.DenaliID:
 		return &DenaliConfig
-	case CascadeID:
+	case constants.CascadeID:
 		return &CascadeConfig
 	default:
 		return &DefaultConfig

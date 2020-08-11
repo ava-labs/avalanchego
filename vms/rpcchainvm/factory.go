@@ -5,12 +5,13 @@ package rpcchainvm
 
 import (
 	"errors"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
 	"io/ioutil"
 	"log"
 	"os/exec"
+
+	"github.com/ava-labs/gecko/snow"
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
 )
 
 var (
@@ -22,6 +23,9 @@ type Factory struct{ Path string }
 
 // New ...
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
+	// Ignore warning from launching an executable with a variable command
+	// because the command is a controlled and required input
+	// #nosec G204
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
