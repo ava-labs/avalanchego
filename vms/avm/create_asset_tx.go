@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 const (
@@ -50,18 +50,18 @@ type CreateAssetTx struct {
 func (t *CreateAssetTx) InitialStates() []*InitialState { return t.States }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *CreateAssetTx) UTXOs() []*ava.UTXO {
+func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, state := range t.States {
 		for _, out := range state.Outs {
-			utxos = append(utxos, &ava.UTXO{
-				UTXOID: ava.UTXOID{
+			utxos = append(utxos, &avax.UTXO{
+				UTXOID: avax.UTXOID{
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: ava.Asset{
+				Asset: avax.Asset{
 					ID: txID,
 				},
 				Out: out,

@@ -235,7 +235,7 @@ func TestGenesis(t *testing.T) {
 // 			t.Fatal(err)
 // 		}
 // 		if result := avaxAssetID.String(); test.expectedID != result {
-// 			t.Fatalf("AVA assetID with networkID %d was expected to be %s but was %s",
+// 			t.Fatalf("AVAX assetID with networkID %d was expected to be %s but was %s",
 // 				test.networkID,
 // 				test.expectedID,
 // 				result)

@@ -31,10 +31,12 @@ var (
 )
 
 // Genesis returns the genesis data of the Platform Chain.
-// Since an AVA network has exactly one Platform Chain, and the Platform Chain
-// defines the genesis state of the network (who is staking, which chains exist,
-// etc.), defining the genesis state of the Platform Chain is the same as
+//
+// Since an Avalanche network has exactly one Platform Chain, and the Platform
+// Chain defines the genesis state of the network (who is staking, which chains
+// exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
+//
 // The ID of the new network is [networkID].
 
 // FromConfig returns:
@@ -51,9 +53,9 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
-		ava := avm.AssetDefinition{
-			Name:         "AVA",
-			Symbol:       "AVA",
+		avax := avm.AssetDefinition{
+			Name:         "AVAX",
+			Symbol:       "AVAX",
 			Denomination: 9,
 			InitialState: map[string][]interface{}{},
 		}
@@ -63,7 +65,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 			if err != nil {
 				return nil, ids.ID{}, err
 			}
-			ava.InitialState["variableCap"] = []interface{}{avm.Owners{
+			avax.InitialState["variableCap"] = []interface{}{avm.Owners{
 				Threshold: 1,
 				Minters:   minters,
 			}}
@@ -73,14 +75,14 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.ID{}, err
 		}
 		for _, addr := range funded {
-			ava.InitialState["fixedCap"] = append(ava.InitialState["fixedCap"], avm.Holder{
-				Amount:  json.Uint64(45 * units.MegaAva),
+			avax.InitialState["fixedCap"] = append(avax.InitialState["fixedCap"], avm.Holder{
+				Amount:  json.Uint64(45 * units.MegaAvax),
 				Address: addr,
 			})
 		}
 
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
-			"AVA": ava, // The AVM starts out with one asset: AVAX
+			"AVAX": avax, // The AVM starts out with one asset: AVAX
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}
@@ -101,7 +103,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 	for _, addr := range config.ParsedFundedAddresses {
 		spdagvmArgs.Outputs = append(spdagvmArgs.Outputs,
 			spdagvm.APIOutput{
-				Amount:    json.Uint64(20 * units.KiloAva),
+				Amount:    json.Uint64(20 * units.KiloAvax),
 				Threshold: 1,
 				Addresses: []ids.ShortID{addr},
 			},
@@ -120,7 +122,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		spchainvmArgs.Accounts = append(spchainvmArgs.Accounts,
 			spchainvm.APIAccount{
 				Address: addr,
-				Balance: json.Uint64(20 * units.KiloAva),
+				Balance: json.Uint64(20 * units.KiloAvax),
 			},
 		)
 	}
@@ -144,7 +146,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
 			platformvm.APIUTXO{
 				Address: addr,
-				Amount:  json.Uint64(20 * units.KiloAva),
+				Amount:  json.Uint64(20 * units.KiloAvax),
 			},
 		)
 	}
@@ -163,7 +165,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 	endStakingTime := genesisTime.Add(stakingDuration)
 
 	for i, validatorID := range config.ParsedStakerIDs {
-		weight := json.Uint64(20 * units.KiloAva)
+		weight := json.Uint64(20 * units.KiloAvax)
 		funded, err := formatting.CB58ToBech32Addresses(hrp, config.FundedAddresses)
 		if err != nil {
 			return nil, ids.ID{}, err

@@ -12,7 +12,7 @@ borealis_bootstrap:
     api_admin_enabled: true
     api_keystore_enabled: true
     api_metrics_enabled: true
-    ava_tx_fee: 0
+    avax_tx_fee: 0
     assertions_enabled: true
     signature_verification_enabled: true
     db_enabled: true
@@ -67,7 +67,7 @@ borealis_node:
     api_admin_enabled: true
     api_keystore_enabled: true
     api_metrics_enabled: true
-    ava_tx_fee: 0
+    avax_tx_fee: 0
     assertions_enabled: true
     signature_verification_enabled: true
     db_enabled: true

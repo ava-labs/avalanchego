@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-// Config contains all of the configurations of an Ava node.
+// Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	// protocol to use for opening the network interface
 	Nat nat.Router
@@ -21,7 +21,7 @@ type Config struct {
 	NetworkID uint32
 
 	// Transaction fee configuration
-	AvaTxFee uint64
+	AvaxTxFee uint64
 
 	// Assertions configuration
 	EnableAssertions bool

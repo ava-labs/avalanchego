@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/gecko/vms/spdagvm"
 )
 
-// Wallet is a holder for keys and UTXOs for the Ava DAG.
+// Wallet is a holder for keys and UTXOs for the Avalanche DAG.
 type Wallet struct {
 	networkID uint32
 	chainID   ids.ID

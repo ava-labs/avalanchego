@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 const (
@@ -45,12 +45,12 @@ func (s *prefixedState) SetTx(id ids.ID, tx *Tx) error {
 }
 
 // UTXO attempts to load a utxo from storage.
-func (s *prefixedState) UTXO(id ids.ID) (*ava.UTXO, error) {
+func (s *prefixedState) UTXO(id ids.ID) (*avax.UTXO, error) {
 	return s.state.UTXO(uniqueID(id, utxoID, s.utxo))
 }
 
 // SetUTXO saves the provided utxo to storage.
-func (s *prefixedState) SetUTXO(id ids.ID, utxo *ava.UTXO) error {
+func (s *prefixedState) SetUTXO(id ids.ID, utxo *avax.UTXO) error {
 	return s.state.SetUTXO(uniqueID(id, utxoID, s.utxo), utxo)
 }
 
@@ -87,7 +87,7 @@ func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 		return err
 	}
 
-	addressable, ok := utxo.Out.(ava.Addressable)
+	addressable, ok := utxo.Out.(avax.Addressable)
 	if !ok {
 		return nil
 	}
@@ -106,13 +106,13 @@ func (s *prefixedState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 }
 
 // FundUTXO adds the provided utxo to the database
-func (s *prefixedState) FundUTXO(utxo *ava.UTXO) error {
+func (s *prefixedState) FundUTXO(utxo *avax.UTXO) error {
 	utxoID := utxo.InputID()
 	if err := s.SetUTXO(utxoID, utxo); err != nil {
 		return err
 	}
 
-	addressable, ok := utxo.Out.(ava.Addressable)
+	addressable, ok := utxo.Out.(avax.Addressable)
 	if !ok {
 		return nil
 	}

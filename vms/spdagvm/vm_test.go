@@ -18,18 +18,18 @@ import (
 
 var keys []*crypto.PrivateKeySECP256K1R
 var ctx *snow.Context
-var avaChainID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
+var avaxChainID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
 var defaultInitBalances = make(map[string]uint64)
 
 const txFeeTest = 0 // Tx fee to use for tests
 
 const (
-	defaultInitBalance = uint64(5000000000) // Measured in NanoAva
+	defaultInitBalance = uint64(5000000000) // Measured in NanoAvax
 )
 
 func init() {
 	ctx = snow.DefaultContextTest()
-	ctx.ChainID = avaChainID
+	ctx.ChainID = avaxChainID
 	cb58 := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
 
@@ -51,11 +51,11 @@ func init() {
 // GenesisTx is the genesis transaction
 // The amount given to each address is determined by [initBalances]
 // [initBalances] keys are string reprs. of addresses
-// [initBalances] values are the amount of NanoAva they have at genesis
+// [initBalances] values are the amount of NanoAvax they have at genesis
 func GenesisTx(initBalances map[string]uint64) *Tx {
 	builder := Builder{
 		NetworkID: 0,
-		ChainID:   avaChainID,
+		ChainID:   avaxChainID,
 	}
 
 	outputs := []Output(nil)
@@ -82,7 +82,7 @@ func GenesisTx(initBalances map[string]uint64) *Tx {
 	return result
 }
 
-func TestAva(t *testing.T) {
+func TestAvax(t *testing.T) {
 	// Give
 	genesisTx := GenesisTx(defaultInitBalances)
 
@@ -97,20 +97,20 @@ func TestAva(t *testing.T) {
 
 	builder := Builder{
 		NetworkID: 0,
-		ChainID:   avaChainID,
+		ChainID:   avaxChainID,
 	}
 	tx1, err := builder.NewTx(
 		/*ins=*/ []Input{
 			builder.NewInputPayment(
 				/*txID=*/ genesisTx.ID(),
 				/*txIndex=*/ 0,
-				/*amount=*/ 5*units.Ava,
+				/*amount=*/ 5*units.Avax,
 				/*sigs=*/ []*Sig{builder.NewSig(0 /*=index*/)},
 			),
 		},
 		/*outs=*/ []Output{
 			builder.NewOutputPayment(
-				/*amount=*/ 3*units.Ava,
+				/*amount=*/ 3*units.Avax,
 				/*locktime=*/ 0,
 				/*threshold=*/ 0,
 				/*addresses=*/ nil,
@@ -146,7 +146,7 @@ func TestAva(t *testing.T) {
 			builder.NewInputPayment(
 				/*txID=*/ tx1.ID(),
 				/*txIndex=*/ 0,
-				/*amount=*/ 3*units.Ava,
+				/*amount=*/ 3*units.Avax,
 				/*sigs=*/ []*Sig{},
 			),
 		},
@@ -181,20 +181,20 @@ func TestInvalidSpentTx(t *testing.T) {
 
 	builder := Builder{
 		NetworkID: 0,
-		ChainID:   avaChainID,
+		ChainID:   avaxChainID,
 	}
 	tx1, _ := builder.NewTx(
 		/*ins=*/ []Input{
 			builder.NewInputPayment(
 				/*txID=*/ genesisTx.ID(),
 				/*txIndex=*/ 0,
-				/*amount=*/ 5*units.Ava,
+				/*amount=*/ 5*units.Avax,
 				/*sigs=*/ []*Sig{builder.NewSig(0 /*=index*/)},
 			),
 		},
 		/*outs=*/ []Output{
 			builder.NewOutputPayment(
-				/*amount=*/ 3*units.Ava,
+				/*amount=*/ 3*units.Avax,
 				/*locktime=*/ 0,
 				/*threshold=*/ 0,
 				/*addresses=*/ nil,
@@ -211,13 +211,13 @@ func TestInvalidSpentTx(t *testing.T) {
 			builder.NewInputPayment(
 				/*txID=*/ genesisTx.ID(),
 				/*txIndex=*/ 0,
-				/*amount=*/ 5*units.Ava,
+				/*amount=*/ 5*units.Avax,
 				/*sigs=*/ []*Sig{builder.NewSig(0 /*=index*/)},
 			),
 		},
 		/*outs=*/ []Output{
 			builder.NewOutputPayment(
-				/*amount=*/ 2*units.Ava,
+				/*amount=*/ 2*units.Avax,
 				/*locktime=*/ 0,
 				/*threshold=*/ 0,
 				/*addresses=*/ nil,
@@ -268,7 +268,7 @@ func TestInvalidTxVerification(t *testing.T) {
 
 	builder := Builder{
 		NetworkID: 0,
-		ChainID:   avaChainID,
+		ChainID:   avaxChainID,
 	}
 	tx, _ := builder.NewTx(
 		/*ins=*/ []Input{
@@ -317,7 +317,7 @@ func TestInvalidTxVerification(t *testing.T) {
 }
 
 func TestRPCAPI(t *testing.T) {
-	// Initialize ava vm with the genesis transaction
+	// Initialize avm vm with the genesis transaction
 	genesisTx := GenesisTx(defaultInitBalances)
 	vmDB := memdb.New()
 	msgChan := make(chan common.Message, 1)
@@ -385,7 +385,7 @@ func TestRPCAPI(t *testing.T) {
 		t.Fatalf("GetBalance(%q): %s", addr1, err)
 	} else if testbal != 0 {
 		t.Fatalf("GetBalance(%q,%q): Balance Not Equal(%d,%d)", addr1, "", 0, testbal)
-		// The only valid asset ID is ava
+		// The only valid asset ID is avax
 	} else if _, err = vm.GetBalance(addr1, "thisshouldfail"); err == nil {
 		t.Fatalf("GetBalance(%q): passed when it should have failed on bad assetID", addr1)
 	} else if _, err = vm.Send(100, "thisshouldfail", addr1, pks); err == nil || err != errAsset {
@@ -393,7 +393,7 @@ func TestRPCAPI(t *testing.T) {
 		// Ensure we can't send more funds from this address than the address has
 	} else if _, err = vm.Send(4000000000000000, "", addr1, pks); err == nil || err != errInsufficientFunds {
 		t.Fatalf("Send(%d,%q,%q,%v): passed when it should have failed on insufficient funds", 4000000000000000, "", addr1, pks)
-		// Send [send1Amt] NanoAva from [pks[0]] to [addr1]
+		// Send [send1Amt] NanoAvax from [pks[0]] to [addr1]
 	} else if _, err = vm.Send(send1Amt, "", addr1, []string{pks[0]}); err != nil {
 		t.Fatalf("Send(%d,%q,%q,%v): failed with error - %s", send1Amt, "", addr1, []string{pks[0]}, err)
 	}
@@ -646,20 +646,20 @@ func TestIssuePendingDependency(t *testing.T) {
 
 	builder := Builder{
 		NetworkID: 0,
-		ChainID:   avaChainID,
+		ChainID:   avaxChainID,
 	}
 	tx1, _ := builder.NewTx(
 		/*ins=*/ []Input{
 			builder.NewInputPayment(
 				/*txID=*/ genesisTx.ID(),
 				/*txIndex=*/ 0,
-				/*amount=*/ 5*units.Ava,
+				/*amount=*/ 5*units.Avax,
 				/*sigs=*/ []*Sig{builder.NewSig(0 /*=index*/)},
 			),
 		},
 		/*outs=*/ []Output{
 			builder.NewOutputPayment(
-				/*amount=*/ 3*units.Ava,
+				/*amount=*/ 3*units.Avax,
 				/*locktime=*/ 0,
 				/*threshold=*/ 0,
 				/*addresses=*/ nil,
@@ -678,13 +678,13 @@ func TestIssuePendingDependency(t *testing.T) {
 			builder.NewInputPayment(
 				/*txID=*/ tx1.ID(),
 				/*txIndex=*/ 0,
-				/*amount=*/ 3*units.Ava,
+				/*amount=*/ 3*units.Avax,
 				/*sigs=*/ nil,
 			),
 		},
 		/*outs=*/ []Output{
 			builder.NewOutputPayment(
-				/*amount=*/ 1*units.Ava,
+				/*amount=*/ 1*units.Avax,
 				/*locktime=*/ 0,
 				/*threshold=*/ 0,
 				/*addresses=*/ nil,

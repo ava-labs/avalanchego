@@ -3,7 +3,7 @@ package platformvm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 var (
@@ -13,7 +13,7 @@ var (
 // StakeableLockOut ...
 type StakeableLockOut struct {
 	Locktime            uint64 `serialize:"true" json:"locktime"`
-	ava.TransferableOut `serialize:"true"`
+	avax.TransferableOut `serialize:"true"`
 }
 
 // Verify ...
@@ -30,7 +30,7 @@ func (s *StakeableLockOut) Verify() error {
 // StakeableLockIn ...
 type StakeableLockIn struct {
 	Locktime           uint64 `serialize:"true" json:"locktime"`
-	ava.TransferableIn `serialize:"true"`
+	avax.TransferableIn `serialize:"true"`
 }
 
 // Verify ...

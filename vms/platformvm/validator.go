@@ -80,7 +80,7 @@ func (v *DurationValidator) Verify() error {
 	}
 }
 
-// SubnetValidator validates a blockchain on the AVA network.
+// SubnetValidator validates a blockchain on the Avalanche network.
 type SubnetValidator struct {
 	DurationValidator `serialize:"true"`
 

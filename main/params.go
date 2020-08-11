@@ -176,8 +176,8 @@ func init() {
 	// NetworkID:
 	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
-	// Ava fees:
-	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
+	// AVAX fees:
+	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", 0, "AVAX transaction fee, in nAVAX")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
@@ -187,7 +187,7 @@ func init() {
 
 	// Database:
 	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Ava state")
+	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Avalanche state")
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
@@ -212,10 +212,10 @@ func init() {
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
 	// Plugins:
-	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Ava VMs")
+	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
 
 	// Logging:
-	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
+	logsDir := fs.String("log-dir", "", "Logging directory for Avalanche")
 	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayHighlight := fs.String("log-display-highlight", "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")

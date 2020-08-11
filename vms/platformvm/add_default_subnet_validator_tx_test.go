@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -108,8 +108,8 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).Stake = []*ava.TransferableOutput{{
-		Asset: ava.Asset{ID: avaxAssetID},
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).Stake = []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: MinimumStakeAmount,
 			OutputOwners: secp256k1fx.OutputOwners{
