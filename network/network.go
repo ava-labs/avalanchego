@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/constants"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/api/health"
@@ -682,7 +684,7 @@ func (n *network) Peers() []PeerID {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.ip.String(),
-				ID:           peer.id,
+				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr,
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
