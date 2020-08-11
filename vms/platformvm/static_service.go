@@ -92,8 +92,10 @@ func (v *FormattedAPIValidator) weight() uint64 {
 type FormattedAPIDefaultSubnetValidator struct {
 	FormattedAPIValidator
 
-	RewardAddress     string      `json:"rewardAddress"`
-	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
+	RewardAddress string `json:"rewardAddress"`
+
+	// Delegation fee rate as a percentage. Must be in [0,100].
+	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
 // APIChain defines a chain that exists

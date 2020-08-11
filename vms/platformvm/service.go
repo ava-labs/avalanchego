@@ -23,13 +23,14 @@ import (
 )
 
 var (
-	errMissingDecisionBlock = errors.New("should have a decision block within the past two blocks")
-	errNoFunds              = errors.New("no spendable funds were found")
-	errNoUsername           = errors.New("argument 'username' not provided")
-	errNoPassword           = errors.New("argument 'password' not provided")
-	errNoSubnetID           = errors.New("argument 'subnetID' not provided")
-	errNoRewardAddress      = errors.New("argument 'rewardAddress' not provided")
-	errUnexpectedTxType     = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
+	errMissingDecisionBlock  = errors.New("should have a decision block within the past two blocks")
+	errNoFunds               = errors.New("no spendable funds were found")
+	errNoUsername            = errors.New("argument 'username' not provided")
+	errNoPassword            = errors.New("argument 'password' not provided")
+	errNoSubnetID            = errors.New("argument 'subnetID' not provided")
+	errNoRewardAddress       = errors.New("argument 'rewardAddress' not provided")
+	errUnexpectedTxType      = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
+	errInvalidDelegationRate = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -576,6 +577,8 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		return errNoRewardAddress
 	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
+	case args.DelegationFeeRate < 0 || args.DelegationFeeRate > 100:
+		return errInvalidDelegationRate
 	}
 
 	var nodeID ids.ShortID
@@ -607,13 +610,13 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 
 	// Create the transaction
 	tx, err := service.vm.newAddDefaultSubnetValidatorTx(
-		uint64(args.weight()),          // Stake amount
-		uint64(args.StartTime),         // Start time
-		uint64(args.EndTime),           // End time
-		nodeID,                         // Node ID
-		rewardAddress,                  // Reward Address
-		uint32(args.DelegationFeeRate), // Shares
-		privKeys,                       // Private keys
+		uint64(args.weight()),                // Stake amount
+		uint64(args.StartTime),               // Start time
+		uint64(args.EndTime),                 // End time
+		nodeID,                               // Node ID
+		rewardAddress,                        // Reward Address
+		uint32(10000*args.DelegationFeeRate), // Shares
+		privKeys,                             // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
