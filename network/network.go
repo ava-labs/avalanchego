@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/random"
@@ -683,7 +684,7 @@ func (n *network) Peers() []PeerID {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.ip.String(),
-				ID:           peer.id,
+				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr,
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
