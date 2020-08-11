@@ -36,11 +36,11 @@ func (vm *VM) spend(
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	addrs := make([][]byte, len(keys)) // The addresses controlled by [keys]
-	for i, key := range keys {
-		addrs[i] = key.PublicKey().Address().Bytes()
+	addrs := ids.ShortSet{} // The addresses controlled by [keys]
+	for _, key := range keys {
+		addrs.Add(key.PublicKey().Address())
 	}
-	utxos, _, _, err := vm.getUTXOs(db, addrs, nil, ids.Empty, -1) // The UTXOs controlled by [keys]
+	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}

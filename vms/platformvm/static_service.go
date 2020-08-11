@@ -31,7 +31,7 @@ type StaticService struct{}
 // APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type APIUTXO struct {
 	Amount  json.Uint64 `json:"amount"`
-	Address ids.ShortID `json:"address"`
+	Address string      `json:"address"`
 }
 
 // APIValidator is a validator.
@@ -45,7 +45,7 @@ type APIValidator struct {
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	Address     *ids.ShortID `json:"address,omitempty"`
+	Address     string       `json:"address,omitempty"`
 	ID          ids.ShortID  `json:"id"`
 }
 
@@ -64,7 +64,7 @@ func (v *APIValidator) weight() uint64 {
 type APIDefaultSubnetValidator struct {
 	APIValidator
 
-	Destination       ids.ShortID `json:"destination"`
+	Destination       string      `json:"destination"`
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
@@ -157,6 +157,15 @@ func (g *Genesis) Initialize() error {
 	return nil
 }
 
+// beck32ToID takes bech32 address and produces a shortID
+func bech32ToID(address string) (ids.ShortID, error) {
+	_, addr, err := formatting.ParseBech32(address)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return ids.ToShortID(addr)
+}
+
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the AVA network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
@@ -164,6 +173,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	for i, utxo := range args.UTXOs {
 		if utxo.Amount == 0 {
 			return errUTXOHasNoValue
+		}
+		addrID, err := bech32ToID(utxo.Address)
+		if err != nil {
+			return err
 		}
 		utxos = append(utxos, &ava.UTXO{
 			UTXOID: ava.UTXOID{
@@ -176,7 +189,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
-					Addrs:     []ids.ShortID{utxo.Address},
+					Addrs:     []ids.ShortID{addrID},
 				},
 			},
 		})
@@ -192,7 +205,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if uint64(validator.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
-
+		addrID, err := bech32ToID(validator.Destination)
+		if err != nil {
+			return err
+		}
 		tx := &ProposalTx{
 			UnsignedProposalTx: &UnsignedAddDefaultSubnetValidatorTx{
 				BaseTx: BaseTx{
@@ -214,13 +230,13 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 						OutputOwners: secp256k1fx.OutputOwners{
 							Locktime:  0,
 							Threshold: 1,
-							Addrs:     []ids.ShortID{validator.Destination},
+							Addrs:     []ids.ShortID{addrID},
 						},
 					},
 				}},
 				RewardsOwner: &secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{validator.Destination},
+					Addrs:     []ids.ShortID{addrID},
 				},
 			},
 		}

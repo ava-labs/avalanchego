@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
@@ -22,6 +21,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -348,11 +348,16 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 // * true if all there are no more UTXOs in this range to fetch
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
-func (vm *VM) GetAtomicUTXOs(chainID ids.ID, addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+func (vm *VM) GetAtomicUTXOs(
+	chainID ids.ID,
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
-	toFetch := limit
 
 	seen := ids.Set{} // IDs of UTXOs already in the list
 	utxos := make([]*ava.UTXO, 0, limit)
@@ -367,7 +372,10 @@ func (vm *VM) GetAtomicUTXOs(chainID ids.ID, addrs ids.ShortSet, startAddr ids.S
 		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
 			continue
 		}
-		utxoIDs, _ := state.PlatformFunds(addr.Bytes(), startUtxo, toFetch)
+		utxoIDs, err := state.PlatformFunds(addr.Bytes(), startUTXOID, limit)
+		if err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+		}
 		for _, utxoID := range utxoIDs {
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
@@ -380,8 +388,8 @@ func (vm *VM) GetAtomicUTXOs(chainID ids.ID, addrs ids.ShortSet, startAddr ids.S
 			seen.Add(utxoID)
 			lastAddr = addr
 			lastIndex = utxoID
-			toFetch--
-			if toFetch <= 0 { // We fetched enough UTXOs; stop.
+			limit--
+			if limit <= 0 { // We fetched enough UTXOs; stop.
 				break
 			}
 		}
@@ -398,11 +406,15 @@ func (vm *VM) GetAtomicUTXOs(chainID ids.ID, addrs ids.ShortSet, startAddr ids.S
 // * The fetched of UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
-func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxoID ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+func (vm *VM) GetUTXOs(
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
-	toFetch := limit
 
 	seen := ids.Set{} // IDs of UTXOs already in the list
 	utxos := make([]*ava.UTXO, 0, limit)
@@ -415,23 +427,26 @@ func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxoID id
 		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
 			continue
 		} else if comp == 0 {
-			start = startUtxoID
+			start = startUTXOID
 		}
-		utxoIDs, _ := vm.state.Funds(addr.Bytes(), start, toFetch) // Get UTXOs associated with [addr]
+		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
+		if err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+		}
 		for _, utxoID := range utxoIDs {
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
 			utxo, err := vm.state.UTXO(utxoID)
 			if err != nil {
-				return nil, ids.ShortEmpty, ids.Empty, err
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
 			}
 			utxos = append(utxos, utxo)
 			seen.Add(utxoID)
 			lastAddr = addr
 			lastIndex = utxoID
-			toFetch--
-			if toFetch <= 0 {
+			limit--
+			if limit <= 0 {
 				break // Found [limit] utxos; stop.
 			}
 		}
@@ -646,42 +661,6 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 		}
 	}
 	return false
-}
-
-// ParseAddress ...
-func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
-	if count := strings.Count(addrStr, addressSep); count != 1 {
-		return ids.ShortEmpty, errInvalidAddress
-	}
-	addressParts := strings.SplitN(addrStr, addressSep, 2)
-	bcAlias := addressParts[0]
-	rawAddr := addressParts[1]
-	bcID, err := vm.ctx.BCLookup.Lookup(bcAlias)
-	if err != nil {
-		bcID, err = ids.FromString(bcAlias)
-		if err != nil {
-			return ids.ShortEmpty, err
-		}
-	}
-	if !bcID.Equals(vm.ctx.ChainID) {
-		return ids.ShortEmpty, errWrongBlockchainID
-	}
-	cb58 := formatting.CB58{}
-	if err := cb58.FromString(rawAddr); err != nil {
-		return ids.ShortEmpty, err
-	}
-	return ids.ToShortID(cb58.Bytes)
-}
-
-// Format ...
-func (vm *VM) Format(b []byte) string {
-	var bcAlias string
-	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
-		bcAlias = alias
-	} else {
-		bcAlias = vm.ctx.ChainID.String()
-	}
-	return fmt.Sprintf("%s%s%s", bcAlias, addressSep, formatting.CB58{Bytes: b})
 }
 
 // LoadUser ...
@@ -1121,4 +1100,59 @@ func (vm *VM) SignNFTFx(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
 	}
 	tx.Initialize(b)
 	return nil
+}
+
+// ParseLocalAddress takes in an address for this chain and produces the ID
+func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
+	chainID, addr, err := vm.ParseAddress(addrStr)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	if !chainID.Equals(vm.ctx.ChainID) {
+		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
+			vm.ctx.ChainID, chainID)
+	}
+	return addr, nil
+}
+
+// ParseAddress takes in an address and produces the ID of the chain it's for
+// the ID of the address
+func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
+	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+
+	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+
+	expectedHRP := constants.GetHRP(vm.ctx.NetworkID)
+	if hrp != expectedHRP {
+		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
+			expectedHRP, hrp)
+	}
+
+	addr, err := ids.ToShortID(addrBytes)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+	return chainID, addr, nil
+}
+
+// FormatLocalAddress takes in a raw address and produces the formatted address
+func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
+	return vm.FormatAddress(vm.ctx.ChainID, addr)
+}
+
+// FormatAddress takes in a chainID and a raw address and produces the formatted
+// address
+func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
+	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
+	if err != nil {
+		return "", err
+	}
+	hrp := constants.GetHRP(vm.ctx.NetworkID)
+	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }

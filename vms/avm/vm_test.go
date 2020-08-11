@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-var networkID uint32 = 43110
+var networkID uint32 = 10
 var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
 var platformChainID = ids.Empty.Prefix(0)
 
@@ -115,9 +115,9 @@ func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 func BuildGenesisTest(t *testing.T) []byte {
 	ss := StaticService{}
 
-	addr0 := keys[0].PublicKey().Address()
-	addr1 := keys[1].PublicKey().Address()
-	addr2 := keys[2].PublicKey().Address()
+	addr0, _ := formatting.FormatBech32(testHRP, keys[0].PublicKey().Address().Bytes())
+	addr1, _ := formatting.FormatBech32(testHRP, keys[1].PublicKey().Address().Bytes())
+	addr2, _ := formatting.FormatBech32(testHRP, keys[2].PublicKey().Address().Bytes())
 
 	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
@@ -127,19 +127,19 @@ func BuildGenesisTest(t *testing.T) []byte {
 				"fixedCap": {
 					Holder{
 						Amount:  100000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  100000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  50000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  50000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 				},
 			},
@@ -152,16 +152,16 @@ func BuildGenesisTest(t *testing.T) []byte {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							addr0.String(),
-							addr1.String(),
+							addr0,
+							addr1,
 						},
 					},
 					Owners{
 						Threshold: 2,
 						Minters: []string{
-							addr0.String(),
-							addr1.String(),
-							addr2.String(),
+							addr0,
+							addr1,
+							addr2,
 						},
 					},
 				},
@@ -174,7 +174,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							addr0.String(),
+							addr0,
 						},
 					},
 				},
@@ -307,7 +307,7 @@ func TestTxSerialization(t *testing.T) {
 		// txID:
 		0x00, 0x00, 0x00, 0x01,
 		// networkID:
-		0x00, 0x00, 0xa8, 0x66,
+		0x00, 0x00, 0x00, 0x0a,
 		// chainID:
 		0x05, 0x04, 0x03, 0x02, 0x01, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1068,50 +1068,25 @@ func TestIssueProperty(t *testing.T) {
 
 func TestVMFormat(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	ctx := vm.ctx
-
-	tmpAliases := &ids.Aliaser{}
-	tmpAliases.Initialize()
-	ctx.BCLookup = tmpAliases
-
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	tests := []struct {
-		in       string
+		in       ids.ShortID
 		expected string
 	}{
-		{"", "3D7sudhzUKTYFkYj4Zoe7GgSKhuyP9bYwXunHwhZsmQe1z9Mp-45PJLL"},
+		{ids.ShortEmpty, "X-testing1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqtu2yas"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			if res := vm.Format([]byte(tt.in)); tt.expected != res {
-				t.Errorf("Expected %q, got %q", tt.expected, res)
+	for _, test := range tests {
+		t.Run(test.in.String(), func(t *testing.T) {
+			addrStr, err := vm.FormatLocalAddress(test.in)
+			if err != nil {
+				t.Error(err)
 			}
-		})
-	}
-}
-
-func TestVMFormatAliased(t *testing.T) {
-	_, _, vm := GenesisVM(t)
-	ctx := vm.ctx
-	defer func() {
-		vm.Shutdown()
-		ctx.Lock.Unlock()
-	}()
-
-	tests := []struct {
-		in       string
-		expected string
-	}{
-		{"", "X-45PJLL"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			if res := vm.Format([]byte(tt.in)); tt.expected != res {
-				t.Errorf("Expected %q, got %q", tt.expected, res)
+			if test.expected != addrStr {
+				t.Errorf("Expected %q, got %q", test.expected, addrStr)
 			}
 		})
 	}

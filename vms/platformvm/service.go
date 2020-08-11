@@ -35,6 +35,7 @@ var (
 	errNoSubnetID           = errors.New("argument 'subnetID' not provided")
 	errNoDestination        = errors.New("argument 'destination' not provided")
 	errUnexpectedTxType     = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
+	errNoAddresses          = errors.New("no addresses provided")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -75,7 +76,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	if address, err := service.vm.ParseAddress(args.Address); err != nil {
+	if address, err := service.vm.ParseLocalAddress(args.Address); err != nil {
 		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
 	} else if sk, err := user.getKey(address); err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
@@ -91,14 +92,8 @@ type ImportKeyArgs struct {
 	PrivateKey string `json:"privateKey"`
 }
 
-// ImportKeyReply is the response for ImportKey
-type ImportKeyReply struct {
-	// The address controlled by the PrivateKey provided in the arguments
-	Address string `json:"address"`
-}
-
 // ImportKey adds a private key to the provided user
-func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ImportKeyReply) error {
+func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -128,7 +123,10 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *I
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
-	reply.Address = service.vm.FormatAddress(sk.PublicKey().Address())
+	reply.Address, err = service.vm.FormatLocalAddress(sk.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -156,16 +154,22 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
 
 	// Parse to address
-	address, err := service.vm.ParseAddress(args.Address)
+	addr, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
 
-	addrs := [][]byte{address.Bytes()}
-	utxos, _, _, err := service.vm.getUTXOs(service.vm.DB, addrs, nil, ids.Empty, -1)
+	addrs := ids.ShortSet{}
+	addrs.Add(addr)
+	utxos, _, _, err := service.vm.GetUTXOs(service.vm.DB, addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
+		addr, err2 := service.vm.FormatLocalAddress(addr)
+		if err2 != nil {
+			return fmt.Errorf("problem formatting address: %w", err2)
+		}
+		return fmt.Errorf("couldn't get UTXO set of %s: %w", addr, err)
 	}
+
 	balance := uint64(0)
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -185,7 +189,7 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 
 // CreateAddress creates an address controlled by [args.Username]
 // Returns the newly created address
-func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.AddressResponse) error {
+func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, response *api.JsonAddress) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: CreateAddress called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -200,12 +204,15 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 	} else if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
-	response.Address = service.vm.FormatAddress(key.PublicKey().Address())
+	response.Address, err = service.vm.FormatLocalAddress(key.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
 // ListAddresses returns the addresses controlled by [args.Username]
-func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.AddressesResponse) error {
+func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JsonAddresses) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
 	db, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -219,7 +226,10 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	}
 	response.Addresses = make([]string, len(addresses))
 	for i, addr := range addresses {
-		response.Addresses[i] = service.vm.FormatAddress(addr)
+		response.Addresses[i], err = service.vm.FormatLocalAddress(addr)
+		if err != nil {
+			return fmt.Errorf("problem formatting address: %w", err)
+		}
 	}
 	return nil
 }
@@ -263,41 +273,81 @@ type GetUTXOsResponse struct {
 func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *GetUTXOsResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
+	if len(args.Addresses) == 0 {
+		return errNoAddresses
+	}
 	if len(args.Addresses) > maxGetUTXOsAddrs {
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	addrsSet := ids.ShortSet{} // Put in a set for de-duplication
+	chainID := ids.ID{}
+
+	addrSet := ids.ShortSet{} // Put in a set for de-duplication
 	for _, addrStr := range args.Addresses {
-		if addr, err := service.vm.ParseAddress(addrStr); err == nil {
-			addrsSet.Add(addr)
-		} else {
-			return err
+		addrChainID, addr, err := service.vm.ParseAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("problem parsing address %q: %w", addrStr, err)
 		}
+		if chainID.IsZero() {
+			chainID = addrChainID
+		}
+		if !chainID.Equals(addrChainID) {
+			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
+				chainID, addrChainID)
+		}
+		addrSet.Add(addr)
 	}
-	addrs := make([][]byte, addrsSet.Len())
-	for i, addr := range addrsSet.List() {
+
+	addrs := make([][]byte, addrSet.Len())
+	for i, addr := range addrSet.List() {
 		addrs[i] = addr.Bytes()
 	}
 
-	var startAddr []byte
-	startUtxo := ids.Empty
-	var err error
+	startAddr := ids.ShortEmpty
+	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.Utxo != "" {
-		startAddrID, err := service.vm.ParseAddress(args.StartIndex.Address)
+		addrChainID, addr, err := service.vm.ParseAddress(args.StartIndex.Address)
 		if err != nil {
-			return fmt.Errorf("couldn't parse start index address: %s", err)
+			return fmt.Errorf("couldn't parse start index address: %w", err)
 		}
-		startAddr = startAddrID.Bytes()
-		startUtxo, err = ids.FromString(args.StartIndex.Utxo)
+		if !chainID.Equals(addrChainID) {
+			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
+				chainID, addrChainID)
+		}
+		utxo, err := ids.FromString(args.StartIndex.Utxo)
 		if err != nil {
-			return fmt.Errorf("couldn't parse start index utxo: %s", err)
+			return fmt.Errorf("couldn't parse start index utxo: %w", err)
 		}
+
+		startAddr = addr
+		startUTXO = utxo
 	}
 
-	utxos, endAddr, endUtxoID, err := service.vm.getUTXOs(service.vm.DB, addrs, startAddr, startUtxo, int(args.Limit))
+	var (
+		utxos     []*ava.UTXO
+		endAddr   ids.ShortID
+		endUTXOID ids.ID
+		err       error
+	)
+	if chainID.Equals(service.vm.Ctx.ChainID) {
+		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
+			service.vm.DB,
+			addrSet,
+			startAddr,
+			startUTXO,
+			int(args.Limit),
+		)
+	} else {
+		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
+			chainID,
+			addrSet,
+			startAddr,
+			startUTXO,
+			int(args.Limit),
+		)
+	}
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXOs: %s", err)
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
 	response.UTXOs = make([]formatting.CB58, len(utxos))
@@ -308,14 +358,14 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		}
 		response.UTXOs[i] = formatting.CB58{Bytes: bytes}
 	}
-	response.NumFetched = json.Uint64(len(response.UTXOs))
-	endAddrID, err := ids.ToShortID(endAddr)
-	if err == nil {
-		response.EndIndex.Address = service.vm.FormatAddress(endAddrID)
-	} else {
-		response.EndIndex.Address = ids.ShortEmpty.String()
+
+	endAddress, err := service.vm.FormatAddress(chainID, endAddr)
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
 	}
-	response.EndIndex.Utxo = endUtxoID.String()
+
+	response.EndIndex.Address = endAddress
+	response.EndIndex.Utxo = endUTXOID.String()
 	return nil
 }
 
@@ -369,7 +419,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatLocalAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets[i] = APISubnet{
 				ID:          subnet.ID(),
@@ -394,7 +448,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatLocalAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets = append(response.Subnets,
 				APISubnet{
@@ -615,7 +673,7 @@ type AddDefaultSubnetValidatorArgs struct {
 
 // AddDefaultSubnetValidator returns an unsigned transaction to add a validator to the default subnet
 // The returned unsigned transaction should be signed using Sign()
-func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.TxIDResponse) error {
+func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
 	switch {
 	case args.Destination == "":
@@ -635,7 +693,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		nodeID = nID
 	}
 
-	destination, err := service.vm.ParseAddress(args.Destination)
+	destination, err := service.vm.ParseLocalAddress(args.Destination)
 	if err != nil {
 		return fmt.Errorf("problem while parsing destination: %w", err)
 	}
@@ -679,7 +737,7 @@ type AddDefaultSubnetDelegatorArgs struct {
 // AddDefaultSubnetDelegator returns an unsigned transaction to add a delegator
 // to the default subnet
 // The returned unsigned transaction should be signed using Sign()
-func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.TxIDResponse) error {
+func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
 	switch {
 	case int64(args.StartTime) < time.Now().Unix():
@@ -699,7 +757,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		nodeID = nID
 	}
 
-	destination, err := service.vm.ParseAddress(args.Destination)
+	destination, err := service.vm.ParseLocalAddress(args.Destination)
 	if err != nil {
 		return fmt.Errorf("problem parsing 'destination': %w", err)
 	}
@@ -742,7 +800,7 @@ type AddNonDefaultSubnetValidatorArgs struct {
 
 // AddNonDefaultSubnetValidator adds a validator to a subnet other than the default subnet
 // Returns the unsigned transaction, which must be signed using Sign
-func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *api.TxIDResponse) error {
+func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *api.JsonTxID) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddNonDefaultSubnetValidator called")
 	switch {
 	case args.SubnetID == "":
@@ -799,12 +857,12 @@ type CreateSubnetArgs struct {
 
 // CreateSubnet returns an unsigned transaction to create a new subnet.
 // The unsigned transaction must be signed with the key of [args.Payer]
-func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.TxIDResponse) error {
+func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
 	controlKeys := []ids.ShortID{}
 	for _, controlKey := range args.ControlKeys {
-		controlKeyID, err := service.vm.ParseAddress(controlKey)
+		controlKeyID, err := service.vm.ParseLocalAddress(controlKey)
 		if err != nil {
 			return fmt.Errorf("problem parsing control key '%s': %w", controlKey, err)
 		}
@@ -839,19 +897,27 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 // ExportAVAArgs are the arguments to ExportAVA
 type ExportAVAArgs struct {
 	api.UserPass
-	// X-Chain address (without prepended X-) that will receive the exported AVA
-	// TODO: Allow user to prepend X-
-	To ids.ShortID `json:"to"`
+
 	// Amount of nAVA to send
 	Amount json.Uint64 `json:"amount"`
+
+	// ID of the address that will receive the AVA. This address includes the
+	// chainID, which is used to determine what the destination chain is.
+	To string `json:"to"`
 }
 
 // ExportAVA exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.TxIDResponse) error {
+func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
+
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
+	}
+
+	chainID, to, err := service.vm.ParseAddress(args.To)
+	if err != nil {
+		return err
 	}
 
 	// Get this user's data
@@ -868,7 +934,8 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		uint64(args.Amount), // Amount
-		args.To,             // X-Chain address
+		chainID,             // ID of the chain to send the funds to
+		to,                  // Address
 		privKeys,            // Private keys
 	)
 	if err != nil {
@@ -882,14 +949,23 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 // ImportAVAArgs are the arguments to ImportAVA
 type ImportAVAArgs struct {
 	api.UserPass
+
+	// Chain the funds are coming from
+	SourceChain string `json:"sourceChain"`
+
 	// The address that will receive the imported funds
 	To string `json:"to"`
 }
 
 // ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
 // The AVA must have already been exported from the X-Chain.
-func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.TxIDResponse) error {
+func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
+
+	chainID, err := service.vm.Ctx.BCLookup.Lookup(args.SourceChain)
+	if err != nil {
+		return fmt.Errorf("problem parsing chainID %q: %w", args.SourceChain, err)
+	}
 
 	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -898,7 +974,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	}
 	user := user{db: db}
 
-	to, err := service.vm.ParseAddress(args.To)
+	to, err := service.vm.ParseLocalAddress(args.To)
 	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
 	}
@@ -908,7 +984,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
 	}
 
-	tx, err := service.vm.newImportTx(to, privKeys)
+	tx, err := service.vm.newImportTx(chainID, to, privKeys)
 	if err != nil {
 		return err
 	}
@@ -940,7 +1016,7 @@ type CreateBlockchainArgs struct {
 
 // CreateBlockchain returns an unsigned transaction to create a new blockchain
 // Must be signed with the Subnet's control keys and with a key that pays the transaction fee before issuance
-func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.TxIDResponse) error {
+func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 	switch {
 	case args.Name == "":
@@ -1173,9 +1249,7 @@ type GetTxArgs struct {
 // GetTxResponse ...
 type GetTxResponse struct {
 	// Raw byte representation of the transaction
-	RawTx formatting.CB58 `json:"rawTx"`
-	// JSON representation of the transaction
-	JSON interface{} `json:"json"`
+	Tx formatting.CB58 `json:"tx"`
 }
 
 // GetTx gets a tx
@@ -1185,25 +1259,7 @@ func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxR
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.RawTx.Bytes = txBytes
-
-	// Parse the raw bytes to a struct so we can get the JSON representation
-	// We don't know what kind of tx this is, so we go through the possibilities
-	// until we find the right one
-	var (
-		proposalTx ProposalTx
-		decisionTx DecisionTx
-		atomicTx   AtomicTx
-	)
-	if err := service.vm.codec.Unmarshal(txBytes, &proposalTx); err == nil {
-		response.JSON = &proposalTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &decisionTx); err == nil {
-		response.JSON = &decisionTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &atomicTx); err == nil {
-		response.JSON = &atomicTx
-	} else {
-		return errUnexpectedTxType
-	}
+	response.Tx.Bytes = txBytes
 	return nil
 }
 

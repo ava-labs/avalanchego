@@ -13,11 +13,9 @@ import (
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/ava"
-
 	safemath "github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 // This file contains methods of VM that deal with getting/putting values from database
@@ -232,30 +230,33 @@ func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxo
 // * The fetched of UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
-func (vm *VM) getUTXOs(db database.Database, addrs [][]byte, startAddr []byte, startUtxo ids.ID, limit int) (
-	[]*ava.UTXO, []byte, ids.ID, error) {
-
+func (vm *VM) GetUTXOs(
+	db database.Database,
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch { // Don't fetch more than [maxUTXOsToFetch]
 		limit = maxUTXOsToFetch
 	}
-	toFetch := limit
 
-	utils.Sort2DBytes(addrs) // Sort addresses
-
-	var lastAddr []byte
-	lastIndex := ids.Empty
-	seen := ids.Set{} // Set of UTXO IDs we've seen
+	seen := ids.Set{} // IDs of UTXOs already in the list
 	utxos := make([]*ava.UTXO, 0, limit)
-	for _, addr := range addrs {
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+	for _, addr := range addrs.List() {
 		start := ids.Empty
-		if comp := bytes.Compare(addr, startAddr); comp == -1 { // Skip addresses before startAddr
+		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
 			continue
 		} else if comp == 0 {
-			start = startUtxo
+			start = startUTXOID
 		}
-		utxoIDs, err := vm.getReferencingUTXOs(db, addr, start, toFetch) // Get IDs of UTXOs to fetch
+		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
 		if err != nil {
-			return nil, nil, ids.Empty, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
 		}
 		for _, utxoID := range utxoIDs.List() { // Get the UTXOs
 			if seen.Contains(utxoID) { // already have this UTXO in the list
@@ -263,71 +264,24 @@ func (vm *VM) getUTXOs(db database.Database, addrs [][]byte, startAddr []byte, s
 			}
 			utxo, err := vm.getUTXO(db, utxoID)
 			if err != nil {
-				return nil, nil, ids.Empty, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
 			}
 			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
 			lastAddr = addr
 			lastIndex = utxoID
-			toFetch--
-			if toFetch <= 0 {
-				break // Got [limit] UTXOs; stop.
+			limit--
+			if limit <= 0 {
+				break // Found [limit] utxos; stop.
 			}
-			seen.Add(utxoID)
 		}
 	}
 	return utxos, lastAddr, lastIndex, nil
 }
 
-// GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
-// Returns at most [limit] UTXOs.
-// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
-// Returns:
-// * The fetched of UTXOs
-// * The address associated with the last UTXO fetched
-// * The ID of the last UTXO fetched
-// func (vm *VM) GetUTXOs(addrs ids.ShortSet, startAddr ids.ShortID, startUtxo ids.ID, limit int) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
-// if limit <= 0 || limit > maxUTXOsToFetch {
-// 	limit = maxUTXOsToFetch
-// }
-// toFetch := limit
-
-// 	seen := ids.Set{} // IDs of UTXOs already in the list
-// 	utxos := make([]*ava.UTXO, 0, limit)
-// 	lastAddr := ids.ShortEmpty
-// 	lastIndex := ids.Empty
-// 	addrsList := addrs.List()
-// 	ids.SortShortIDs(addrsList)
-// 	for _, addr := range addrsList {
-// 		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
-// 			continue
-// 		} else if toFetch <= 0 {
-// 			break
-// 		}
-// 		utxoIDs, _ := vm.state.Funds(addr.Bytes(), startUtxo, toFetch) // Get UTXOs associated with [addr]
-// 		for _, utxoID := range utxoIDs {
-// 			if seen.Contains(utxoID) { // Already have this UTXO in the list
-// 				continue
-// 			}
-// 			utxo, err := vm.state.UTXO(utxoID)
-// 			if err != nil {
-// 				return nil, ids.ShortEmpty, ids.Empty, err
-// 			}
-// 			utxos = append(utxos, utxo)
-// 			seen.Add(utxoID)
-// 			lastAddr = addr
-// 			lastIndex = utxoID
-// 			toFetch--
-// 			if toFetch <= 0 {
-// 				break // Found [limit] utxos; stop.
-// 			}
-// 		}
-// 	}
-// 	return utxos, lastAddr, lastIndex, nil
-// }
-
 // getBalance returns the balance of [addrs]
-func (vm *VM) getBalance(db database.Database, addrs [][]byte) (uint64, error) {
-	utxos, _, _, err := vm.getUTXOs(db, addrs, nil, ids.Empty, -1)
+func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, error) {
+	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}

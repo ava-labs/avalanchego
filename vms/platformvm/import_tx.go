@@ -178,15 +178,20 @@ func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
 
 // Create a new transaction
 func (vm *VM) newImportTx(
+	chainID ids.ID,
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*AtomicTx, error) {
+	if !vm.avm.Equals(chainID) {
+		return nil, errWrongBlockchainID
+	}
+
 	kc := secp256k1fx.NewKeychain()
 	for _, key := range keys {
 		kc.Add(key)
 	}
 
-	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
+	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
