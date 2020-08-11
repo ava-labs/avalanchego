@@ -142,9 +142,9 @@ func defaultGenesisUTXOs() []*avax.UTXO {
 // 2) The byte representation of the default genesis for tests
 func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]APIUTXO, len(keys))
+	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		hrp := constants.NetworkIDToHRP[testNetworkID]
 		addr, err := formatting.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			panic(err)
@@ -155,22 +155,20 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]APIDefaultSubnetValidator, len(keys))
+	genesisValidators := make([]FormattedAPIDefaultSubnetValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
 		id := key.PublicKey().Address()
-		hrp := constants.NetworkIDToHRP[testNetworkID]
 		addr, err := formatting.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = APIDefaultSubnetValidator{
-			APIValidator: APIValidator{
+		genesisValidators[i] = FormattedAPIDefaultSubnetValidator{
+			FormattedAPIValidator: FormattedAPIValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				Address:   addr,
-				ID:        id,
+				ID:        id.PrefixedString(constants.NodeIDPrefix),
 			},
 			Destination:       addr,
 			DelegationFeeRate: NumberOfShares,
