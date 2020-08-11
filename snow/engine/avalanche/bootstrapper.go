@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -291,12 +292,12 @@ func (b *bootstrapper) finish() error {
 
 	b.BootstrapConfig.Context.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
 		b.numFetched)
-	if err := b.executeAll(b.TxBlocked, b.numBSBlockedTx); err != nil {
+	if err := b.executeAll(b.TxBlocked, b.numBSBlockedTx, b.BootstrapConfig.Config.Context.DecisionDispatcher); err != nil {
 		return err
 	}
 
 	b.BootstrapConfig.Context.Log.Info("executing vertex state transitions...")
-	if err := b.executeAll(b.VtxBlocked, b.numBSBlockedVtx); err != nil {
+	if err := b.executeAll(b.VtxBlocked, b.numBSBlockedVtx, b.BootstrapConfig.Config.Context.ConsensusDispatcher); err != nil {
 		return err
 	}
 
@@ -313,8 +314,10 @@ func (b *bootstrapper) finish() error {
 	return nil
 }
 
-func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
+func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge, events *triggers.EventDispatcher) error {
 	numExecuted := 0
+
+	ctx := b.BootstrapConfig.Config.Context
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		b.BootstrapConfig.Context.Log.Debug("Executing: %s", job.ID())
@@ -329,6 +332,8 @@ func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge)
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
 			b.BootstrapConfig.Context.Log.Info("executed %d operations", numExecuted)
 		}
+
+		events.Accept(ctx.ChainID, job.ID(), job.Bytes())
 	}
 	b.BootstrapConfig.Context.Log.Info("executed %d operations", numExecuted)
 	return nil

@@ -50,5 +50,4 @@ require (
 	google.golang.org/grpc v1.29.1
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20200316214253-d7b0ff38cac9 // indirect
 	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
-	nanomsg.org/go/mangos/v2 v2.0.8
 )
