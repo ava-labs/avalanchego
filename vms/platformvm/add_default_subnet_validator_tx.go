@@ -213,7 +213,7 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
 	nodeID ids.ShortID, // ID of the node we are delegating to
-	destination ids.ShortID, // Address to returned staked tokens (and maybe reward) to
+	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
 ) (*ProposalTx, error) {
@@ -241,7 +241,7 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
-			Addrs:     []ids.ShortID{destination},
+			Addrs:     []ids.ShortID{rewardAddress},
 		},
 		Shares: shares,
 	}

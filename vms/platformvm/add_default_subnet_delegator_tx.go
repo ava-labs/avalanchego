@@ -215,7 +215,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
 	nodeID ids.ShortID, // ID of the node we are delegating to
-	destination ids.ShortID, // Address to returned staked tokens (and maybe reward) to
+	rewardAddress ids.ShortID, // Address to returned staked tokens (and maybe reward) to
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
 ) (*ProposalTx, error) {
 	ins, unlockedOuts, lockedOuts, signers, err := vm.spend(vm.DB, keys, stakeAmt, vm.txFee)
@@ -242,7 +242,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
-			Addrs:     []ids.ShortID{destination},
+			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
 	tx := &ProposalTx{UnsignedProposalTx: utx}

@@ -32,7 +32,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 			Weight:  &weight,
 			ID:      id,
 		},
-		Destination: addr,
+		RewardAddress: addr,
 	}
 
 	args := BuildGenesisArgs{
@@ -71,7 +71,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: addr,
+		RewardAddress: addr,
 	}
 
 	args := BuildGenesisArgs{
@@ -111,7 +111,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: addr,
+		RewardAddress: addr,
 	}
 
 	args := BuildGenesisArgs{
@@ -151,7 +151,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: addr,
+		RewardAddress: addr,
 	}
 
 	validator2 := APIDefaultSubnetValidator{
@@ -161,7 +161,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: addr,
+		RewardAddress: addr,
 	}
 
 	validator3 := APIDefaultSubnetValidator{
@@ -171,7 +171,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			ID:        id,
 		},
-		Destination: addr,
+		RewardAddress: addr,
 	}
 
 	args := BuildGenesisArgs{

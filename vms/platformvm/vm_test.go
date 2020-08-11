@@ -172,7 +172,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 				Address:   addr,
 				ID:        id,
 			},
-			Destination:       addr,
+			RewardAddress:     addr,
 			DelegationFeeRate: NumberOfShares,
 		}
 	}

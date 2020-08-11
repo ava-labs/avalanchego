@@ -171,7 +171,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		vdrStartTime,
 		vdrEndTime,
 		vdrDestination, // node ID
-		vdrDestination, // destination
+		vdrDestination, // reward address
 		NumberOfShares/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
@@ -188,7 +188,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		delStartTime,
 		delEndTime,
 		vdrDestination,                          // node ID
-		delDestination,                          // destination
+		delDestination,                          // reward address
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
 	if err != nil {
@@ -223,8 +223,8 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 	expectedReward := reward(
 		time.Unix(int64(delEndTime), 0).Sub(time.Unix(int64(delStartTime), 0)), // duration
-		unsignedDelTx.Weight(),                                                 // amount
-		InflationRate,                                                          // inflation rate
+		unsignedDelTx.Weight(), // amount
+		InflationRate,          // inflation rate
 	)
 
 	// If tx is committed, delegator and delegatee should get reward

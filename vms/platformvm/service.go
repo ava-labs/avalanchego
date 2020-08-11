@@ -28,7 +28,7 @@ var (
 	errNoUsername           = errors.New("argument 'username' not provided")
 	errNoPassword           = errors.New("argument 'password' not provided")
 	errNoSubnetID           = errors.New("argument 'subnetID' not provided")
-	errNoDestination        = errors.New("argument 'destination' not provided")
+	errNoRewardAddress      = errors.New("argument 'rewardAddress' not provided")
 	errUnexpectedTxType     = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
 )
 
@@ -424,7 +424,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					StakeAmount: &weight,
 				}
 			default: // Shouldn't happen
-				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
+				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
 			}
 		}
 	} else {
@@ -491,7 +491,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 					StakeAmount: &weight,
 				}
 			default: // Shouldn't happen
-				return fmt.Errorf("couldn't get the destination address of %s", tx.ID())
+				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
 			}
 		} else {
 			utx := tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
@@ -572,8 +572,8 @@ type AddDefaultSubnetValidatorArgs struct {
 func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
 	switch {
-	case args.Destination == "":
-		return errNoDestination
+	case args.RewardAddress == "":
+		return errNoRewardAddress
 	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
 	}
@@ -589,9 +589,9 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		nodeID = nID
 	}
 
-	destination, err := service.vm.ParseAddress(args.Destination)
+	rewardAddress, err := service.vm.ParseAddress(args.RewardAddress)
 	if err != nil {
-		return fmt.Errorf("problem while parsing destination: %w", err)
+		return fmt.Errorf("problem while parsing reward address: %w", err)
 	}
 
 	// Get the keys controlled by the user
@@ -611,7 +611,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		uint64(args.StartTime),         // Start time
 		uint64(args.EndTime),           // End time
 		nodeID,                         // Node ID
-		destination,                    // Destination
+		rewardAddress,                  // Reward Address
 		uint32(args.DelegationFeeRate), // Shares
 		privKeys,                       // Private keys
 	)
@@ -627,7 +627,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 type AddDefaultSubnetDelegatorArgs struct {
 	FormattedAPIValidator
 	api.UserPass
-	Destination string `json:"destination"`
+	RewardAddress string `json:"rewardAddress"`
 }
 
 // AddDefaultSubnetDelegator returns an unsigned transaction to add a delegator
@@ -638,8 +638,8 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 	switch {
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
-	case args.Destination == "":
-		return errNoDestination
+	case args.RewardAddress == "":
+		return errNoRewardAddress
 	}
 
 	var nodeID ids.ShortID
@@ -653,9 +653,9 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		nodeID = nID
 	}
 
-	destination, err := service.vm.ParseAddress(args.Destination)
+	rewardAddress, err := service.vm.ParseAddress(args.RewardAddress)
 	if err != nil {
-		return fmt.Errorf("problem parsing 'destination': %w", err)
+		return fmt.Errorf("problem parsing 'rewardAddress': %w", err)
 	}
 
 	// Get the keys controlled by the user
@@ -675,7 +675,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
-		destination,            // Destination
+		rewardAddress,          // Reward Address
 		privKeys,               // Private keys
 	)
 	if err != nil {

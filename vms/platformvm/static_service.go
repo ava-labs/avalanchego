@@ -64,7 +64,7 @@ func (v *APIValidator) weight() uint64 {
 type APIDefaultSubnetValidator struct {
 	APIValidator
 
-	Destination       string      `json:"destination"`
+	RewardAddress     string      `json:"rewardAddress"`
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
@@ -92,7 +92,7 @@ func (v *FormattedAPIValidator) weight() uint64 {
 type FormattedAPIDefaultSubnetValidator struct {
 	FormattedAPIValidator
 
-	Destination       string      `json:"destination"`
+	RewardAddress     string      `json:"rewardAddress"`
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
@@ -205,7 +205,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if uint64(validator.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
-		addrID, err := bech32ToID(validator.Destination)
+		addrID, err := bech32ToID(validator.RewardAddress)
 		if err != nil {
 			return err
 		}

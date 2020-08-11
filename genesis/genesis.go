@@ -177,7 +177,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 					Weight:    &weight,
 					ID:        validatorID,
 				},
-				Destination: destAddr,
+				RewardAddress: destAddr,
 			},
 		)
 	}
