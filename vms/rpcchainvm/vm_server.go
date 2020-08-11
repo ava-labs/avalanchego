@@ -54,7 +54,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}
 	msgConn, err := vm.broker.Dial(req.EngineServer)
 	if err != nil {
-		dbConn.Close()
+		// Ignore DB closing error to return the original error
+		_ = dbConn.Close()
 		return nil, err
 	}
 
@@ -64,7 +65,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	toEngine := make(chan common.Message, 1)
 	go func() {
 		for msg := range toEngine {
-			msgClient.Notify(msg)
+			// Nothing to do with the error within the goroutine
+			_ = msgClient.Notify(msg)
 		}
 	}()
 
@@ -72,8 +74,9 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	ctx := snow.DefaultContextTest()
 
 	if err := vm.vm.Initialize(ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
-		dbConn.Close()
-		msgConn.Close()
+		// Ignore errors closing resources to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
 		close(toEngine)
 		return nil, err
 	}
@@ -230,7 +233,9 @@ func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptReque
 	if err != nil {
 		return nil, err
 	}
-	blk.Accept()
+	if err := blk.Accept(); err != nil {
+		return nil, err
+	}
 	return &vmproto.BlockAcceptResponse{}, nil
 }
 
@@ -244,6 +249,8 @@ func (vm *VMServer) BlockReject(_ context.Context, req *vmproto.BlockRejectReque
 	if err != nil {
 		return nil, err
 	}
-	blk.Reject()
+	if err := blk.Reject(); err != nil {
+		return nil, err
+	}
 	return &vmproto.BlockRejectResponse{}, nil
 }

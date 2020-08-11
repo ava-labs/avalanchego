@@ -34,17 +34,19 @@ type Admin struct {
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api.Server) *common.HTTPHandler {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api.Server) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Admin{
+	if err := newServer.RegisterService(&Admin{
 		log:          log,
 		chainManager: chainManager,
 		httpServer:   httpServer,
-	}, "admin")
-	return &common.HTTPHandler{Handler: newServer}
+	}, "admin"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{Handler: newServer}, nil
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file

@@ -262,7 +262,8 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	codec := cjson.NewCodec()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterService(&Service{vm: vm}, "avm") // name this service "avm"
+	// name this service "avm"
+	vm.ctx.Log.AssertNoError(rpcServer.RegisterService(&Service{vm: vm}, "avm"))
 
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
@@ -276,7 +277,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&StaticService{}, "avm") // name this service "avm"
+	// name this service "avm"
+	_ = newServer.RegisterService(&StaticService{}, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}

@@ -304,10 +304,12 @@ func (vm *VM) Initialize(
 		}
 		genesisBlock.onAcceptDB = versiondb.New(vm.DB)
 		if err := genesisBlock.CommonBlock.Accept(); err != nil {
-			return err
+			return fmt.Errorf("error accepting genesis block: %w", err)
 		}
 
-		vm.SetDBInitialized()
+		if err := vm.SetDBInitialized(); err != nil {
+			return fmt.Errorf("error while setting db to initialized: %w", err)
+		}
 
 		if err := vm.DB.Commit(); err != nil {
 			return err
@@ -649,12 +651,10 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 		return block, nil
 	}
 	if err := vm.State.PutBlock(vm.DB, block); err != nil { // Persist the block
-		return nil, err
+		return nil, fmt.Errorf("failed to put block due to %w", err)
 	}
-	if err := vm.DB.Commit(); err != nil {
-		return nil, err
-	}
-	return block, nil
+
+	return block, vm.DB.Commit()
 }
 
 // GetBlock implements the snowman.ChainVM interface
@@ -690,15 +690,18 @@ func (vm *VM) SetPreference(blkID ids.ID) {
 // See API documentation for more information
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	// Create a service with name "platform"
-	handler := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
+	handler, err := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
+	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{"": handler}
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	// Static service's name is platform
-	handler := vm.SnowmanVM.NewHandler("platform", &StaticService{})
-	return map[string]*common.HTTPHandler{"": handler}
+	handler, _ := vm.SnowmanVM.NewHandler("platform", &StaticService{})
+	return map[string]*common.HTTPHandler{
+		"": handler,
+	}
 }
 
 // Check if there is a block ready to be added to consensus

@@ -546,11 +546,11 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		validatorIDs[i] = vdr.ID()
 	}
 	ids.SortShortIDs(validatorIDs)
+
 	reply.Validators = make([]string, int(args.Size))
 	for i, vdrID := range validatorIDs {
 		reply.Validators[i] = vdrID.PrefixedString(constants.NodeIDPrefix)
 	}
-
 	return nil
 }
 
