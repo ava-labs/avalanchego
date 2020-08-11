@@ -112,10 +112,9 @@ func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.
 		return tempError{err}
 	}
 	// Produce the UTXOS
-	if err := tx.vm.produceOutputs(db, txID, outs); err != nil {
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
 		return tempError{err}
 	}
-
 	return nil
 }
 

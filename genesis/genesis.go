@@ -38,12 +38,10 @@ var (
 // 1) The byte representation of the genesis state of the platform chain
 //    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
-func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
+func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err := config.init(); err != nil {
 		return nil, ids.ID{}, err
 	}
-
-	hrp := constants.NetworkIDToHRP[networkID]
 
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
@@ -56,20 +54,12 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		}
 
 		if len(config.MintAddresses) > 0 {
-			minters, err := formatting.CB58ToBech32Addresses(hrp, config.MintAddresses)
-			if err != nil {
-				return nil, ids.ID{}, err
-			}
 			ava.InitialState["variableCap"] = []interface{}{avm.Owners{
 				Threshold: 1,
-				Minters:   minters,
+				Minters:   config.MintAddresses,
 			}}
 		}
-		funded, err := formatting.CB58ToBech32Addresses(hrp, config.FundedAddresses)
-		if err != nil {
-			return nil, ids.ID{}, err
-		}
-		for _, addr := range funded {
+		for _, addr := range config.FundedAddresses {
 			ava.InitialState["fixedCap"] = append(ava.InitialState["fixedCap"], avm.Holder{
 				Amount:  json.Uint64(45 * units.MegaAva),
 				Address: addr,
@@ -95,14 +85,10 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 
 	// Specify the initial state of the Platform Chain
 	platformvmArgs := platformvm.BuildGenesisArgs{
-		NetworkID:   json.Uint32(networkID),
+		NetworkID:   json.Uint32(config.NetworkID),
 		AvaxAssetID: avaxAssetID,
 	}
-	funded, err := formatting.CB58ToBech32Addresses(hrp, config.FundedAddresses)
-	if err != nil {
-		return nil, ids.ID{}, err
-	}
-	for _, addr := range funded {
+	for _, addr := range config.FundedAddresses {
 		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
 			platformvm.APIUTXO{
 				Address: addr,
@@ -126,11 +112,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 
 	for i, validatorID := range config.ParsedStakerIDs {
 		weight := json.Uint64(20 * units.KiloAva)
-		funded, err := formatting.CB58ToBech32Addresses(hrp, config.FundedAddresses)
-		if err != nil {
-			return nil, ids.ID{}, err
-		}
-		destAddr := funded[i%len(funded)]
+		destAddr := config.FundedAddresses[i%len(config.FundedAddresses)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
 			platformvm.APIDefaultSubnetValidator{
 				APIValidator: platformvm.APIValidator{
@@ -181,7 +163,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 //    (ie the genesis state of the network)
 // 2) The asset ID of AVAX
 func Genesis(networkID uint32) ([]byte, ids.ID, error) {
-	return FromConfig(networkID, GetConfig(networkID))
+	return FromConfig(GetConfig(networkID))
 }
 
 // VMGenesis ...
