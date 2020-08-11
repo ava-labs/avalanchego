@@ -172,12 +172,12 @@ func FromConfig(networkID uint32, config *Config) ([]byte, ids.ID, error) {
 		}
 		destAddr := funded[i%len(funded)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.APIDefaultSubnetValidator{
-				APIValidator: platformvm.APIValidator{
+			platformvm.FormattedAPIDefaultSubnetValidator{
+				FormattedAPIValidator: platformvm.FormattedAPIValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					Weight:    &weight,
-					ID:        validatorID,
+					ID:        validatorID.PrefixedString(constants.NodeIDPrefix),
 				},
 				Destination: destAddr,
 			},

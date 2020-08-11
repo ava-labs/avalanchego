@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/vms/components/avax"
@@ -119,12 +120,12 @@ type APIChain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID ids.ID                      `json:"avaxAssetID"`
-	NetworkID   json.Uint32                 `json:"address"`
-	UTXOs       []APIUTXO                   `json:"utxos"`
-	Validators  []APIDefaultSubnetValidator `json:"defaultSubnetValidators"`
-	Chains      []APIChain                  `json:"chains"`
-	Time        json.Uint64                 `json:"time"`
+	AvaxAssetID ids.ID                               `json:"avaxAssetID"`
+	NetworkID   json.Uint32                          `json:"address"`
+	UTXOs       []APIUTXO                            `json:"utxos"`
+	Validators  []FormattedAPIDefaultSubnetValidator `json:"defaultSubnetValidators"`
+	Chains      []APIChain                           `json:"chains"`
+	Time        json.Uint64                          `json:"time"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -209,6 +210,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if err != nil {
 			return err
 		}
+		nodeID, err := ids.ShortFromPrefixedString(validator.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+
 		tx := &ProposalTx{
 			UnsignedProposalTx: &UnsignedAddDefaultSubnetValidatorTx{
 				BaseTx: BaseTx{
@@ -217,7 +223,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				},
 				DurationValidator: DurationValidator{
 					Validator: Validator{
-						NodeID: validator.ID,
+						NodeID: nodeID,
 						Wght:   weight,
 					},
 					Start: uint64(args.Time),

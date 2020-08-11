@@ -39,7 +39,7 @@ func (c *Config) init() error {
 	}
 	c.ParsedStakerIDs = nil
 	for _, addrStr := range c.StakerIDs {
-		addr, err := ids.ShortFromString(addrStr)
+		addr, err := ids.ShortFromPrefixedString(addrStr, constants.NodeIDPrefix)
 		if err != nil {
 			return err
 		}
@@ -67,11 +67,11 @@ var (
 			"6cesTteH62Y5mLoDBUASaBvCXuL2AthL",
 		},
 		StakerIDs: []string{
-			"LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
-			"hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
-			"2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
-			"4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
-			"NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
+			"NodeID-LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
+			"NodeID-hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
+			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
+			"NodeID-4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
+			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
@@ -183,11 +183,11 @@ var (
 			"6cesTteH62Y5mLoDBUASaBvCXuL2AthL",
 		},
 		StakerIDs: []string{
-			"LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
-			"hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
-			"2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
-			"4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
-			"NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
+			"NodeID-LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
+			"NodeID-hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
+			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
+			"NodeID-4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
+			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
@@ -299,11 +299,11 @@ var (
 			"6cesTteH62Y5mLoDBUASaBvCXuL2AthL",
 		},
 		StakerIDs: []string{
-			"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
-			"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
-			"DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
-			"N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
-			"EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
+			"NodeID-NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
+			"NodeID-CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
+			"NodeID-DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
+			"NodeID-N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
+			"NodeID-EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
@@ -405,11 +405,11 @@ var (
 			"6Y3kysjF9jnHnYkdS9yGAuoHyae2eNmeV",
 		},
 		StakerIDs: []string{
-			"7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
-			"MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
-			"NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
-			"GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
-			"P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
+			"NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+			"NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
+			"NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
+			"NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
+			"NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
