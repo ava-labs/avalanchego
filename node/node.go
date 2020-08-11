@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
 	"github.com/ava-labs/gecko/api/info"
-	"github.com/ava-labs/gecko/api/ipcs"
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
 	"github.com/ava-labs/gecko/chains"
@@ -31,6 +30,7 @@ import (
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
@@ -50,6 +50,8 @@ import (
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
+
+	ipcsapi "github.com/ava-labs/gecko/api/ipcs"
 )
 
 // Networking constants
@@ -93,6 +95,8 @@ type Node struct {
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
+
+	IPCs *ipcs.ChainIPCs
 
 	// Net runs the networking stack
 	Net network.Network
@@ -352,6 +356,21 @@ func (n *Node) initEventDispatcher() {
 	n.Log.AssertNoError(n.ConsensusDispatcher.Register("gossip", n.Net))
 }
 
+func (n *Node) initIPCs() error {
+	chainIDs := make([]ids.ID, len(n.Config.IPCDefaultChainIDs))
+	for i, chainID := range n.Config.IPCDefaultChainIDs {
+		id, err := ids.FromString(chainID)
+		if err != nil {
+			return err
+		}
+		chainIDs[i] = id
+	}
+
+	var err error
+	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
+	return err
+}
+
 // Initializes the Platform chain.
 // Its genesis data specifies the other chains that should
 // be created.
@@ -585,12 +604,12 @@ func (n *Node) initHealthAPI() error {
 // initIPCAPI initializes the IPC API service
 // Assumes n.log and n.chainManager already initialized
 func (n *Node) initIPCAPI() error {
-	if !n.Config.IPCEnabled {
+	if !n.Config.IPCAPIEnabled {
 		n.Log.Info("skipping ipc API initializaion because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
-	service, err := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	service, err := ipcsapi.NewService(n.Log, n.chainManager, &n.APIServer, n.IPCs)
 	if err != nil {
 		return err
 	}
@@ -692,6 +711,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 	if err := n.initChains(); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
+	}
+	if err := n.initIPCs(); err != nil { // Start the IPCs
+		return fmt.Errorf("couldn't initialize IPCs: %w", err)
 	}
 	return nil
 }

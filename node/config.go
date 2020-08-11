@@ -70,8 +70,10 @@ type Config struct {
 	ThroughputPort          uint16
 	ThroughputServerEnabled bool
 
-	// IPCEnabled configuration
-	IPCEnabled bool
+	// IPC configuration
+	IPCAPIEnabled      bool
+	IPCPath            string
+	IPCDefaultChainIDs []string
 
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter router.Router

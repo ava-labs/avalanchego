@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/snow/networking/router"
@@ -233,11 +234,15 @@ func init() {
 	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
 	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
-	fs.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
+	fs.BoolVar(&Config.IPCAPIEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
 
 	// Throughput Server
 	throughputPort := fs.Uint("xput-server-port", 9652, "Port of the deprecated throughput test server")
 	fs.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
+
+	// IPC
+	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
+	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -441,4 +446,9 @@ func init() {
 
 	// Router used for consensus
 	Config.ConsensusRouter = &router.ChainRouter{}
+
+	// IPCs
+	if *ipcsChainIDs != "" {
+		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
+	}
 }

@@ -26,8 +26,8 @@ require (
 	github.com/securego/gosec v0.0.0-20200401082031-e946c8c39989 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
+	go.nanomsg.org/mangos/v3 v3.0.1
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/net v0.0.0-20200625001655-4c5254603344
-	google.golang.org/grpc v1.30.0
-	nanomsg.org/go/mangos/v2 v2.0.8
+	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
+	google.golang.org/grpc v1.29.1
 )
