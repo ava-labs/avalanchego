@@ -19,7 +19,7 @@
       --bootstrap-ids="{{ bootstrap_ids }}"
       --public-ip="{{ ansible_host }}"
       --staking-port="{{ staking_port }}"
-      --staking-tls-enabled="{{ staking_tls_enabled }}"
+      --staking-enabled="{{ staking_enabled }}"
       --staking-tls-key-file="{{ staking_tls_key_file }}"
       --staking-tls-cert-file="{{ staking_tls_cert_file }}"
       --plugin-dir="{{ plugin_dir }}"
