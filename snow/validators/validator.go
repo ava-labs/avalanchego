@@ -13,6 +13,7 @@ type Validator interface {
 	ID() ids.ShortID
 
 	// Weight that can be used for weighted sampling.
-	// If this validator is validating the default subnet, returns the amount of $AVAX staked
+	// If this validator is validating the default subnet, returns the amount of
+	// AVAX staked
 	Weight() uint64
 }

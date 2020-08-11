@@ -176,8 +176,8 @@ func init() {
 	// NetworkID:
 	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
-	// $AVAX fees:
-	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", 0, "AVAX transaction fee, in $nAVAX")
+	// AVAX fees:
+	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", 0, "AVAX transaction fee, in nAVAX")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")

@@ -31,10 +31,12 @@ var (
 )
 
 // Genesis returns the genesis data of the Platform Chain.
-// Since an Avalanche network has exactly one Platform Chain, and the Platform Chain
-// defines the genesis state of the network (who is staking, which chains exist,
-// etc.), defining the genesis state of the Platform Chain is the same as
+//
+// Since an Avalanche network has exactly one Platform Chain, and the Platform
+// Chain defines the genesis state of the network (who is staking, which chains
+// exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
+//
 // The ID of the new network is [networkID].
 
 // FromConfig returns:

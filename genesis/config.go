@@ -8,11 +8,10 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 )
 
-// Note that since an Avalanche network has exactly one Platform Chain,
-// and the Platform Chain defines the genesis state of the network
-// (who is staking, which chains exist, etc.), defining the genesis
-// state of the Platform Chain is the same as defining the genesis
-// state of the network.
+// Note that since an Avalanche network has exactly one Platform Chain, and the
+// Platform Chain defines the genesis state of the network (who is staking,
+// which chains exist, etc.), defining the genesis state of the Platform Chain
+// is the same as defining the genesis state of the network.
 
 // Config contains the genesis addresses used to construct a genesis
 type Config struct {
