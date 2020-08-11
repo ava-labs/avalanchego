@@ -37,7 +37,7 @@ func (i *issuer) Abandon() {
 }
 
 func (i *issuer) Update() {
-	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
+	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
 	i.issued = true
@@ -71,12 +71,12 @@ func (i *issuer) Update() {
 
 	i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
 
-	if err := i.t.consensus.Add(i.vtx); err != nil {
+	if err := i.t.Consensus.Add(i.vtx); err != nil {
 		i.t.errs.Add(err)
 		return
 	}
 
-	p := i.t.consensus.Parameters()
+	p := i.t.Consensus.Parameters()
 	vdrs := i.t.Config.Validators.Sample(p.K) // Validators to sample
 
 	vdrSet := ids.ShortSet{} // Validators to sample repr. as a set
