@@ -46,9 +46,6 @@ const (
 	txTypeID
 	statusTypeID
 
-	platformAlias = "P"
-	addressSep    = "-"
-
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
 

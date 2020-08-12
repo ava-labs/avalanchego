@@ -42,7 +42,6 @@ const (
 	stateCacheSize  = 30000
 	idCacheSize     = 30000
 	txCacheSize     = 30000
-	addressSep      = "-"
 	maxUTXOsToFetch = 1024
 )
 
