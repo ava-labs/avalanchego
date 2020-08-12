@@ -257,9 +257,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
-	state := avax.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
 	for i := 0; i < numUTXOs; i++ {
-		if err := state.FundPlatformUTXO(&avax.UTXO{
+		if err := state.FundUTXO(&avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
@@ -935,8 +935,8 @@ func TestImportAVAX(t *testing.T) {
 		},
 	}
 
-	state := avax.NewPrefixedState(smDB, vm.codec)
-	if err := state.FundPlatformUTXO(utxo); err != nil {
+	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
+	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)

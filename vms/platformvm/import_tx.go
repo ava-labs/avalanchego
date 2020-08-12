@@ -32,7 +32,11 @@ var (
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
 	BaseTx `serialize:"true"`
-	// Inputs that consume UTXOs produced on the X-Chain
+
+	// Which chain to consume the funds from
+	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
+
+	// Inputs that consume UTXOs produced on the chain
 	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
@@ -68,6 +72,11 @@ func (tx *UnsignedImportTx) Verify() error {
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.SourceChain.IsZero():
+		return errWrongBlockchainID
+	case !tx.SourceChain.Equals(tx.vm.avm):
+		// TODO: remove this check if we allow for P->C swaps
+		return errWrongBlockchainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	}
@@ -103,8 +112,8 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 	}
 
 	// Verify (but don't spend) imported inputs
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
 
 	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
@@ -116,10 +125,10 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 		utxos[index] = utxo
 	}
 
-	state := avax.NewPrefixedState(smDB, Codec)
+	state := avax.NewPrefixedState(smDB, Codec, tx.vm.Ctx.ChainID, tx.SourceChain)
 	for index, input := range tx.ImportedInputs {
 		utxoID := input.UTXOID.InputID()
-		utxo, err := state.AVMUTXO(utxoID)
+		utxo, err := state.UTXO(utxoID)
 		if err != nil { // Get the UTXO
 			return tempError{err}
 		}
@@ -155,16 +164,16 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
 func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
 
 	vsmDB := versiondb.New(smDB)
-	state := avax.NewPrefixedState(vsmDB, Codec)
+	state := avax.NewPrefixedState(vsmDB, Codec, tx.vm.Ctx.ChainID, tx.SourceChain)
 
 	// Spend imported UTXOs
 	for _, in := range tx.ImportedInputs {
 		utxoID := in.InputID()
-		if err := state.SpendAVMUTXO(utxoID); err != nil {
+		if err := state.SpendUTXO(utxoID); err != nil {
 			return err
 		}
 	}
@@ -178,7 +187,7 @@ func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
 
 // Create a new transaction
 func (vm *VM) newImportTx(
-	chainID ids.ID,
+	chainID ids.ID, // chain to import from
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*AtomicTx, error) {
@@ -261,6 +270,7 @@ func (vm *VM) newImportTx(
 			Outs:         outs,
 			Ins:          ins,
 		},
+		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
 	}
 	tx := &AtomicTx{UnsignedAtomicTx: utx}

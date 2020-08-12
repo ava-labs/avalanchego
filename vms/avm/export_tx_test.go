@@ -1276,18 +1276,19 @@ func TestIssueExportTx(t *testing.T) {
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
 
-	state := avax.NewPrefixedState(smDB, vm.codec)
+	// check from the peer chain side
+	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
 
 	utxo := avax.UTXOID{
 		TxID:        tx.ID(),
 		OutputIndex: 0,
 	}
 	utxoID := utxo.InputID()
-	if _, err := state.AVMUTXO(utxoID); err != nil {
+	if _, err := state.UTXO(utxoID); err != nil {
 		t.Fatal(err)
 	}
 
-	utxoIDs, err := state.AVMFunds(key.PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
+	utxoIDs, err := state.Funds(key.PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1427,14 +1428,14 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
-	state := avax.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
 
 	utxo := avax.UTXOID{
 		TxID:        tx.ID(),
 		OutputIndex: 0,
 	}
 	utxoID := utxo.InputID()
-	if err := state.SpendAVMUTXO(utxoID); err != nil {
+	if err := state.SpendUTXO(utxoID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1445,9 +1446,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	state = avax.NewPrefixedState(smDB, vm.codec)
+	state = avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
 
-	if _, err := state.AVMUTXO(utxoID); err == nil {
+	if _, err := state.UTXO(utxoID); err == nil {
 		t.Fatalf("should have failed to read the utxo")
 	}
 }
