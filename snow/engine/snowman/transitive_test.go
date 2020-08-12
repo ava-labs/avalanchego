@@ -69,7 +69,7 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 	}
 
 	te.finishBootstrapping()
-	te.Context().Bootstrapped()
+	te.Ctx.Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -92,7 +92,7 @@ func TestEngineShutdown(t *testing.T) {
 func TestEngineAdd(t *testing.T) {
 	vdr, _, sender, vm, te, _ := setup(t)
 
-	if !te.Context().ChainID.Equals(ids.Empty) {
+	if !te.Ctx.ChainID.Equals(ids.Empty) {
 		t.Fatalf("Wrong chain ID")
 	}
 
@@ -403,7 +403,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	te.finishBootstrapping()
-	te.Context().Bootstrapped()
+	te.Ctx.Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -814,7 +814,7 @@ func TestVoteCanceling(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Context().Bootstrapped()
+	te.Ctx.Bootstrapped()
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
@@ -893,7 +893,7 @@ func TestEngineNoQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Context().Bootstrapped()
+	te.Ctx.Bootstrapped()
 
 	blk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -931,7 +931,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Context().Bootstrapped()
+	te.Ctx.Bootstrapped()
 
 	te.repoll()
 }
@@ -1544,7 +1544,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	te.finishBootstrapping()
-	te.Context().Bootstrapped()
+	te.Ctx.Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -1654,7 +1654,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
-	te.Context().Bootstrapped()
+	te.Ctx.Bootstrapped()
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true

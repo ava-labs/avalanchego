@@ -60,7 +60,7 @@ func (b *Bootstrapper) Initialize(config Config) {
 // Startup implements the Engine interface.
 func (b *Bootstrapper) Startup() error {
 	if b.pendingAcceptedFrontier.Len() == 0 {
-		b.Context.Log.Info("Bootstrapping skipped due to no provided bootstraps")
+		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
 		return b.Bootstrapable.ForceAccepted(ids.Set{})
 	}
 
@@ -82,14 +82,13 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 // GetAcceptedFrontierFailed implements the Engine interface.
 func (b *Bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
-	b.AcceptedFrontier(validatorID, requestID, ids.Set{})
-	return nil
+	return b.AcceptedFrontier(validatorID, requestID, ids.Set{})
 }
 
 // AcceptedFrontier implements the Engine interface.
 func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
 	if !b.pendingAcceptedFrontier.Contains(validatorID) {
-		b.Context.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
+		b.Ctx.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
 		return nil
 	}
 	// Mark that we received a response from [validatorID]
@@ -128,7 +127,7 @@ func (b *Bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint
 // Accepted implements the Engine interface.
 func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
 	if !b.pendingAccepted.Contains(validatorID) {
-		b.Context.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
+		b.Ctx.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
 		return nil
 	}
 	// Mark that we received a response from [validatorID]
@@ -157,15 +156,15 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	// Accept all containers that have a sufficient weight behind them
 	accepted := ids.Set{}
 	for key, weight := range b.acceptedVotes {
-		if weight >= b.Config.Alpha {
+		if weight >= b.Alpha {
 			accepted.Add(ids.NewID(key))
 		}
 	}
 
-	if size := accepted.Len(); size == 0 && b.Config.Beacons.Len() > 0 {
-		b.Context.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet")
+	if size := accepted.Len(); size == 0 && b.Beacons.Len() > 0 {
+		b.Ctx.Log.Info("Bootstrapping finished with no accepted frontier. This is likely a result of failing to be able to connect to the specified bootstraps, or no transactions have been issued on this chain yet")
 	} else {
-		b.Context.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
 	}
 
 	return b.Bootstrapable.ForceAccepted(accepted)

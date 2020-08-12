@@ -20,7 +20,7 @@ type Factory struct {
 	ChainManager   chains.Manager
 	Validators     validators.Manager
 	StakingEnabled bool
-	AVA            ids.ID
+	AVAX           ids.ID
 	AVM            ids.ID
 	Fee            uint64
 }
@@ -31,7 +31,7 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		chainManager:   f.ChainManager,
 		validators:     f.Validators,
 		stakingEnabled: f.StakingEnabled,
-		avaxAssetID:    f.AVA,
+		avaxAssetID:    f.AVAX,
 		avm:            f.AVM,
 		txFee:          f.Fee,
 	}, nil

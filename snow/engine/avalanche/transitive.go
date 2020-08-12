@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/sampler"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche/poll"
@@ -18,8 +19,8 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/events"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/random"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -59,14 +60,14 @@ type Transitive struct {
 
 // Initialize implements the Engine interface
 func (t *Transitive) Initialize(config Config) error {
-	config.Context.Log.Info("Initializing consensus engine")
+	config.Ctx.Log.Info("Initializing consensus engine")
 
 	t.params = config.Params
 	t.consensus = config.Consensus
 
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
-		config.Context.Log,
+		config.Ctx.Log,
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
@@ -91,12 +92,12 @@ func (t *Transitive) finishBootstrapping() error {
 		if vtx, err := t.Manager.GetVertex(vtxID); err == nil {
 			frontier = append(frontier, vtx)
 		} else {
-			t.Context().Log.Error("vertex %s failed to be loaded from the frontier with %s", vtxID, err)
+			t.Ctx.Log.Error("vertex %s failed to be loaded from the frontier with %s", vtxID, err)
 		}
 	}
-	t.consensus.Initialize(t.Context(), t.params, frontier)
+	t.consensus.Initialize(t.Ctx, t.params, frontier)
 
-	t.Context().Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
+	t.Ctx.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
 	return nil
 }
 
@@ -104,31 +105,35 @@ func (t *Transitive) finishBootstrapping() error {
 func (t *Transitive) Gossip() error {
 	edge := t.Manager.Edge()
 	if len(edge) == 0 {
-		t.Context().Log.Verbo("dropping gossip request as no vertices have been accepted")
+		t.Ctx.Log.Verbo("dropping gossip request as no vertices have been accepted")
 		return nil
 	}
 
-	sampler := random.Uniform{N: len(edge)}
-	vtxID := edge[sampler.Sample()]
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(edge))); err != nil {
+		return err // Should never really happen
+	}
+	indices, err := s.Sample(1)
+	if err != nil {
+		return err // Also should never really happen because the edge has positive length
+	}
+	vtxID := edge[int(indices[0])]
 	vtx, err := t.Manager.GetVertex(vtxID)
 	if err != nil {
-		t.Context().Log.Warn("dropping gossip request as %s couldn't be loaded due to: %s", vtxID, err)
+		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to: %s", vtxID, err)
 		return nil
 	}
 
-	t.Context().Log.Verbo("gossiping %s as accepted to the network", vtxID)
+	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", vtxID)
 	t.Sender.Gossip(vtxID, vtx.Bytes())
 	return nil
 }
 
 // Shutdown implements the Engine interface
 func (t *Transitive) Shutdown() error {
-	t.Context().Log.Info("shutting down consensus engine")
+	t.Ctx.Log.Info("shutting down consensus engine")
 	return t.VM.Shutdown()
 }
-
-// Context implements the Engine interface
-func (t *Transitive) Context() *snow.Context { return t.Config.Context }
 
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
@@ -142,10 +147,10 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
-	t.Context().Log.Verbo("GetAncestors(%s, %d, %s) called", vdr, requestID, vtxID)
+	t.Ctx.Log.Verbo("GetAncestors(%s, %d, %s) called", vdr, requestID, vtxID)
 	vertex, err := t.Manager.GetVertex(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
-		t.Context().Log.Verbo("dropping getAncestors")
+		t.Ctx.Log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
@@ -189,21 +194,21 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 
 // Put implements the Engine interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
-	t.Context().Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
+	t.Ctx.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
 
-	if !t.Context().IsBootstrapped() { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
-		if requestID == network.GossipMsgRequestID {
-			t.Context().Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+	if !t.Ctx.IsBootstrapped() { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
+		if requestID == constants.GossipMsgRequestID {
+			t.Ctx.Log.Verbo("dropping gossip Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
 		} else {
-			t.Context().Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+			t.Ctx.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
 		}
 		return nil
 	}
 
 	vtx, err := t.Manager.ParseVertex(vtxBytes)
 	if err != nil {
-		t.Context().Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
-		t.Context().Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
+		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
+		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
 		return t.GetFailed(vdr, requestID)
 	}
 	_, err = t.issueFrom(vdr, vtx)
@@ -212,14 +217,14 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 
 // GetFailed implements the Engine interface
 func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
-	if !t.Context().IsBootstrapped() { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
-		t.Context().Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping", vdr, requestID)
+	if !t.Ctx.IsBootstrapped() { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
+		t.Ctx.Log.Debug("dropping GetFailed(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
 
 	vtxID, ok := t.outstandingVtxReqs.Remove(vdr, requestID)
 	if !ok {
-		t.Context().Log.Debug("GetFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
+		t.Ctx.Log.Debug("GetFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
 		return nil
 	}
 
@@ -240,8 +245,9 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 // PullQuery implements the Engine interface
 func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
-	if !t.Context().IsBootstrapped() {
-		t.Context().Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping PullQuery(%s, %d, %s) due to bootstrapping",
+			vdr, requestID, vtxID)
 		return nil
 	}
 
@@ -273,16 +279,16 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 // PushQuery implements the Engine interface
 func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
-	if !t.Context().IsBootstrapped() {
+	if !t.Ctx.IsBootstrapped() {
 		// We're bootstrapping, so ignore this query.
-		t.Context().Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
+		t.Ctx.Log.Debug("dropping PushQuery(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
 		return nil
 	}
 
 	vtx, err := t.Manager.ParseVertex(vtxBytes)
 	if err != nil {
-		t.Context().Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
-		t.Context().Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
+		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
+		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
 		return nil
 	}
 
@@ -295,8 +301,8 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 
 // Chits implements the Engine interface
 func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) error {
-	if !t.Context().IsBootstrapped() {
-		t.Context().Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping Chits(%s, %d) due to bootstrapping", vdr, requestID)
 		return nil
 	}
 
@@ -326,8 +332,8 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 
 // Notify implements the Engine interface
 func (t *Transitive) Notify(msg common.Message) error {
-	if !t.Context().IsBootstrapped() {
-		t.Context().Log.Debug("dropping Notify due to bootstrapping")
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping Notify due to bootstrapping")
 		return nil
 	}
 
@@ -466,7 +472,8 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 		}
 	}
 
-	t.Context().Log.Verbo("vertex %s is blocking on %d vertices and %d transactions", vtxID, i.vtxDeps.Len(), i.txDeps.Len())
+	t.Ctx.Log.Verbo("vertex %s is blocking on %d vertices and %d transactions",
+		vtxID, i.vtxDeps.Len(), i.txDeps.Len())
 
 	// Wait until all the parents of [vtx] are added to consensus before adding [vtx]
 	t.vtxBlocked.Register(&vtxIssuer{i: i})
@@ -502,10 +509,12 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 		inputs := tx.InputIDs()
 		overlaps := consumed.Overlaps(inputs) // See if this tx shares inputs with another one in this batch
 		if len(batch) >= t.params.BatchSize || (force && overlaps) {
-			// The batch is big enough to issue, or we need to issue this batch because we're forcing each tx
-			// to be issued but adding [tx] to this batch would result in a vertex with conflicting txs
-			// Issue the vertex and reset the batch.
-			t.issueBatch(batch)
+			// The batch is big enough to issue, or we need to issue this batch
+			// because we're forcing each tx to be issued but adding [tx] to
+			// this batch would result in a vertex with conflicting txs.
+			if err := t.issueBatch(batch); err != nil {
+				return err
+			}
 			batch = make([]snowstorm.Tx, 0, t.params.BatchSize)
 			consumed.Clear()
 			issued = true
@@ -534,47 +543,69 @@ func (t *Transitive) issueRepoll() {
 	preferredIDs := t.consensus.Preferences().List()
 	numPreferredIDs := len(preferredIDs)
 	if numPreferredIDs == 0 {
-		t.Context().Log.Error("re-query attempt was dropped due to no pending vertices")
+		t.Ctx.Log.Error("re-query attempt was dropped due to no pending vertices")
 		return
 	}
 
-	sampler := random.Uniform{N: numPreferredIDs}
-	vtxID := preferredIDs[sampler.Sample()] // ID of a preferred vertex
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(numPreferredIDs)); err != nil {
+		return // Should never really happen
+	}
+	indices, err := s.Sample(1)
+	if err != nil {
+		return // Also should never really happen because the edge has positive length
+	}
+	vtxID := preferredIDs[int(indices[0])] // ID of a preferred vertex
 
 	p := t.consensus.Parameters()
-	vdrs := t.Validators.Sample(p.K) // Validators to sample
+	vdrs, err := t.Validators.Sample(p.K) // Validators to sample
 
-	vdrSet := ids.ShortSet{} // IDs of validators to be sampled
+	vdrBag := ids.ShortBag{} // IDs of validators to be sampled
 	for _, vdr := range vdrs {
-		vdrSet.Add(vdr.ID())
+		vdrBag.Add(vdr.ID())
 	}
-	vdrCopy := ids.ShortSet{} // Copy the validator set because this variable will be modified
-	vdrCopy.Union((vdrSet))
 
-	t.RequestID++
+	vdrSet := ids.ShortSet{}
+	vdrSet.Add(vdrBag.List()...)
+
 	// Poll the network
-	if numVdrs := len(vdrs); numVdrs == p.K && t.polls.Add(t.RequestID, vdrCopy) {
-		t.Config.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
-	} else if numVdrs < p.K {
-		t.Context().Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
+	t.RequestID++
+	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
+		t.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
+	} else if err != nil {
+		t.Ctx.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 }
 
 // Puts a batch of transactions into a vertex and issues it into consensus.
 func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
-	t.Context().Log.Verbo("batching %d transactions into a new vertex", len(txs))
+	t.Ctx.Log.Verbo("batching %d transactions into a new vertex", len(txs))
 
 	// Randomly select parents of this vertex from among the virtuous set
 	virtuousIDs := t.consensus.Virtuous().List()
-	sampler := random.Uniform{N: len(virtuousIDs)}
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(virtuousIDs))); err != nil {
+		return err
+	}
+
+	count := len(virtuousIDs)
+	if count > t.params.Parents {
+		count = t.params.Parents
+	}
+	indices, err := s.Sample(count)
+	if err != nil {
+		return err
+	}
+
 	parentIDs := ids.Set{}
-	for i := 0; i < t.params.Parents && sampler.CanSample(); i++ {
-		parentIDs.Add(virtuousIDs[sampler.Sample()])
+	for _, index := range indices {
+		parentIDs.Add(virtuousIDs[int(index)])
 	}
 
 	vtx, err := t.Manager.BuildVertex(parentIDs, txs)
 	if err != nil {
-		t.Context().Log.Warn("error building new vertex with %d parents and %d transactions", len(parentIDs), len(txs))
+		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions",
+			len(parentIDs), len(txs))
 		return nil
 	}
 	return t.issue(vtx)
@@ -583,16 +614,11 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 // Send a request to [vdr] asking them to send us vertex [vtxID]
 func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	if t.outstandingVtxReqs.Contains(vtxID) {
-		t.Context().Log.Debug("not sending request for vertex %s because there is already an outstanding request for it", vtxID)
+		t.Ctx.Log.Debug("not sending request for vertex %s because there is already an outstanding request for it", vtxID)
 		return
 	}
 	t.RequestID++
 	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
-	t.Config.Sender.Get(vdr, t.RequestID, vtxID)
+	t.Sender.Get(vdr, t.RequestID, vtxID)
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
-}
-
-// IsBootstrapped returns true iff this chain is done bootstrapping
-func (t *Transitive) IsBootstrapped() bool {
-	return t.Context().IsBootstrapped()
 }

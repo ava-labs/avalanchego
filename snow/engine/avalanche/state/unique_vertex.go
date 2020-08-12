@@ -61,27 +61,33 @@ func (vtx *uniqueVertex) Evict() {
 	}
 }
 
-func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) {
+func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
 	vtx.refresh()
-	if vtx.v.vtx == nil {
-		vtx.v.vtx = innerVtx
-		vtx.serializer.state.SetVertex(innerVtx)
-		vtx.setStatus(choices.Processing)
+	if vtx.v.vtx != nil {
+		return nil
 	}
+	vtx.v.vtx = innerVtx
+	if err := vtx.serializer.state.SetVertex(innerVtx); err != nil {
+		return err
+	}
+	return vtx.setStatus(choices.Processing)
 }
 
-func (vtx *uniqueVertex) setStatus(status choices.Status) {
+func (vtx *uniqueVertex) setStatus(status choices.Status) error {
 	vtx.refresh()
-	if vtx.v.status != status {
-		vtx.serializer.state.SetStatus(vtx.ID(), status)
-		vtx.v.status = status
+	if vtx.v.status == status {
+		return nil
 	}
+	vtx.v.status = status
+	return vtx.serializer.state.SetStatus(vtx.ID(), status)
 }
 
 func (vtx *uniqueVertex) ID() ids.ID { return vtx.vtxID }
 
 func (vtx *uniqueVertex) Accept() error {
-	vtx.setStatus(choices.Accepted)
+	if err := vtx.setStatus(choices.Accepted); err != nil {
+		return err
+	}
 
 	vtx.serializer.edge.Add(vtx.vtxID)
 	parents, err := vtx.Parents()
@@ -93,7 +99,9 @@ func (vtx *uniqueVertex) Accept() error {
 		vtx.serializer.edge.Remove(parent.ID())
 	}
 
-	vtx.serializer.state.SetEdge(vtx.serializer.edge.List())
+	if err := vtx.serializer.state.SetEdge(vtx.serializer.edge.List()); err != nil {
+		return fmt.Errorf("failed to set edge while accepting vertex %s due to %w", vtx.vtxID, err)
+	}
 
 	// Should never traverse into parents of a decided vertex. Allows for the
 	// parents to be garbage collected
@@ -103,7 +111,9 @@ func (vtx *uniqueVertex) Accept() error {
 }
 
 func (vtx *uniqueVertex) Reject() error {
-	vtx.setStatus(choices.Rejected)
+	if err := vtx.setStatus(choices.Rejected); err != nil {
+		return err
+	}
 
 	// Should never traverse into parents of a decided vertex. Allows for the
 	// parents to be garbage collected

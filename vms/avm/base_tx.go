@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -35,18 +35,18 @@ var (
 // Do not change this struct's serialized fields without doing the same on platformvm.BaseTx
 // TODO: Factor out this and platformvm.BaseTx
 type BaseTx struct {
-	ava.Metadata
+	avax.Metadata
 
 	NetID uint32                    `serialize:"true" json:"networkID"`    // ID of the network this chain lives on
 	BCID  ids.ID                    `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
-	Outs  []*ava.TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
-	Ins   []*ava.TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
+	Outs  []*avax.TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
+	Ins   []*avax.TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
 	Memo  []byte                    `serialize:"true" json:"memo"`         // Memo field contains arbitrary bytes, up to maxMemoSize
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *BaseTx) InputUTXOs() []*ava.UTXOID {
-	utxos := []*ava.UTXOID(nil)
+func (t *BaseTx) InputUTXOs() []*avax.UTXOID {
+	utxos := []*avax.UTXOID(nil)
 	for _, in := range t.Ins {
 		utxos = append(utxos, &in.UTXOID)
 	}
@@ -71,16 +71,16 @@ func (t *BaseTx) AssetIDs() ids.Set {
 func (t *BaseTx) NumCredentials() int { return len(t.Ins) }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *BaseTx) UTXOs() []*ava.UTXO {
+func (t *BaseTx) UTXOs() []*avax.UTXO {
 	txID := t.ID()
-	utxos := make([]*ava.UTXO, len(t.Outs))
+	utxos := make([]*avax.UTXO, len(t.Outs))
 	for i, out := range t.Outs {
-		utxos[i] = &ava.UTXO{
-			UTXOID: ava.UTXOID{
+		utxos[i] = &avax.UTXO{
+			UTXOID: avax.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(i),
 			},
-			Asset: ava.Asset{ID: out.AssetID()},
+			Asset: avax.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		}
 	}
@@ -106,7 +106,7 @@ func (t *BaseTx) SyntacticVerify(
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	}
 
-	fc := ava.NewFlowChecker()
+	fc := avax.NewFlowChecker()
 
 	// The txFee must be burned
 	fc.Produce(txFeeAssetID, txFee)
@@ -117,7 +117,7 @@ func (t *BaseTx) SyntacticVerify(
 		}
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
+	if !avax.IsSortedTransferableOutputs(t.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -127,7 +127,7 @@ func (t *BaseTx) SyntacticVerify(
 		}
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
+	if !avax.IsSortedAndUniqueTransferableInputs(t.Ins) {
 		return errInputsNotSortedUnique
 	}
 

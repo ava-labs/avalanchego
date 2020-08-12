@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
 	"github.com/ava-labs/gecko/api/info"
-	"github.com/ava-labs/gecko/api/ipcs"
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
 	"github.com/ava-labs/gecko/chains"
@@ -30,6 +29,7 @@ import (
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
@@ -50,6 +50,8 @@ import (
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
+
+	ipcsapi "github.com/ava-labs/gecko/api/ipcs"
 )
 
 // Networking constants
@@ -65,7 +67,7 @@ var (
 	versionParser = version.NewDefaultParser()
 )
 
-// Node is an instance of an Ava node.
+// Node is an instance of an Avalanche node.
 type Node struct {
 	Log        logging.Logger
 	LogFactory logging.Factory
@@ -93,6 +95,8 @@ type Node struct {
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
+
+	IPCs *ipcs.ChainIPCs
 
 	// Net runs the networking stack
 	Net network.Network
@@ -153,9 +157,6 @@ func (n *Node) initNetworking() error {
 
 	// Initialize validator manager and default subnet's validator set
 	defaultSubnetValidators := validators.NewSet()
-	if !n.Config.EnableStaking {
-		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
-	}
 	n.vdrs = validators.NewManager()
 	n.vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 
@@ -178,28 +179,33 @@ func (n *Node) initNetworking() error {
 
 	if !n.Config.EnableStaking {
 		n.Net.RegisterHandler(&insecureValidatorManager{
-			vdrs: defaultSubnetValidators,
+			vdrs:   defaultSubnetValidators,
+			weight: n.Config.DisabledStakingWeight,
 		})
 	}
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		n.Net.Close()
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close()
 	}, os.Interrupt, os.Kill)
 
 	return nil
 }
 
 type insecureValidatorManager struct {
-	vdrs validators.Set
+	vdrs   validators.Set
+	weight uint64
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
-	i.vdrs.Add(validators.NewValidator(vdrID, 1))
+	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight))
 	return false
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
-	i.vdrs.Remove(vdrID)
+	// Shouldn't error unless the set previously had an error, which should
+	// never happen as described above
+	_ = i.vdrs.Remove(vdrID)
 	return false
 }
 
@@ -218,7 +224,9 @@ func (n *Node) Dispatch() error {
 		err := n.APIServer.Dispatch()
 
 		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close() // If the server isn't up, shut down the node.
+
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close() // If the server isn't up, shut down the node.
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -302,52 +310,41 @@ func (n *Node) initNodeID() error {
 }
 
 // Create the IDs of the peers this node should first connect to
-func (n *Node) initBeacons() {
+func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
-		n.beacons.Add(validators.NewValidator(peer.ID, 1))
+		if err := n.beacons.Add(validators.NewValidator(peer.ID, 1)); err != nil {
+			return err
+		}
 	}
-}
-
-// Create the vmManager and register the following vms:
-// AVM, Simple Payments DAG, Simple Payments Chain
-// The Platform VM is registered in initChains because
-// its factory needs to reference n.chainManager, which is nil right now
-func (n *Node) initVMManager(avaxAssetID ids.ID) error {
-	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVA:      avaxAssetID,
-			Fee:      n.Config.AvaTxFee,
-			Platform: constants.PlatformChainID,
-		}),
-		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
-			Path: path.Join(n.Config.PluginDir, "evm"),
-		}),
-		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
-			TxFee: n.Config.AvaTxFee,
-		}),
-		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
-		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
-		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
-		n.vmManager.RegisterVMFactory(propertyfx.ID, &propertyfx.Factory{}),
-	)
-	return errs.Err
+	return nil
 }
 
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
-func (n *Node) initEventDispatcher() {
+func (n *Node) initEventDispatcher() error {
 	n.DecisionDispatcher = &triggers.EventDispatcher{}
 	n.DecisionDispatcher.Initialize(n.Log)
 
 	n.ConsensusDispatcher = &triggers.EventDispatcher{}
 	n.ConsensusDispatcher.Initialize(n.Log)
 
-	n.Log.AssertNoError(n.ConsensusDispatcher.Register("gossip", n.Net))
+	return n.ConsensusDispatcher.Register("gossip", n.Net)
+}
+
+func (n *Node) initIPCs() error {
+	chainIDs := make([]ids.ID, len(n.Config.IPCDefaultChainIDs))
+	for i, chainID := range n.Config.IPCDefaultChainIDs {
+		id, err := ids.FromString(chainID)
+		if err != nil {
+			return err
+		}
+		chainIDs[i] = id
+	}
+
+	var err error
+	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
+	return err
 }
 
 // Initializes the Platform chain.
@@ -355,37 +352,6 @@ func (n *Node) initEventDispatcher() {
 // be created.
 func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	n.Log.Info("initializing chains")
-
-	vdrs := n.vdrs
-
-	// If staking is disabled, ignore updates to Subnets' validator sets
-	// Instead of updating node's validator manager, platform chain makes changes
-	// to its own local validator manager (which isn't used for sampling)
-	if !n.Config.EnableStaking {
-		defaultSubnetValidators := validators.NewSet()
-		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
-		vdrs = validators.NewManager()
-		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
-	}
-
-	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
-	if err != nil {
-		return err
-	}
-
-	if err := n.vmManager.RegisterVMFactory(
-		/*vmID=*/ platformvm.ID,
-		/*vmFactory=*/ &platformvm.Factory{
-			ChainManager:   n.chainManager,
-			Validators:     vdrs,
-			StakingEnabled: n.Config.EnableStaking,
-			AVA:            avaxAssetID,
-			AVM:            createAVMTx.ID(),
-			Fee:            n.Config.AvaTxFee,
-		},
-	); err != nil {
-		return err
-	}
 
 	// Create the Platform Chain
 	n.chainManager.ForceCreateChain(chains.ChainParameters{
@@ -396,10 +362,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 		CustomBeacons: n.beacons,
 	})
 
-	bootstrapWeight, err := n.beacons.Weight()
-	if err != nil {
-		return fmt.Errorf("Error calculating bootstrap weight of beacons: %s", err)
-	}
+	bootstrapWeight := n.beacons.Weight()
 	reqWeight := (3*bootstrapWeight + 3) / 4
 
 	if reqWeight == 0 {
@@ -430,9 +393,20 @@ func (n *Node) initAPIServer() {
 	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
 }
 
+// Create the vmManager, chainManager and register the following vms:
+// AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DB, n.vdrs all initialized (non-nil)
-func (n *Node) initChainManager() error {
-	var err error
+func (n *Node) initChainManager(avaxAssetID ids.ID) error {
+	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
+
+	createAVMTx, err := genesis.VMGenesis(n.Config.NetworkID, avm.ID)
+	if err != nil {
+		return err
+	}
+
+	criticalChains := ids.Set{}
+	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
+
 	n.chainManager, err = chains.New(
 		n.Config.EnableStaking,
 		n.Log,
@@ -450,9 +424,52 @@ func (n *Node) initChainManager() error {
 		&n.APIServer,
 		&n.keystoreServer,
 		&n.sharedMemory,
+		criticalChains,
 	)
 	if err != nil {
 		return err
+	}
+
+	vdrs := n.vdrs
+
+	// If staking is disabled, ignore updates to Subnets' validator sets
+	// Instead of updating node's validator manager, platform chain makes changes
+	// to its own local validator manager (which isn't used for sampling)
+	if !n.Config.EnableStaking {
+		defaultSubnetValidators := validators.NewSet()
+		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
+		vdrs = validators.NewManager()
+		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
+			ChainManager:   n.chainManager,
+			Validators:     vdrs,
+			StakingEnabled: n.Config.EnableStaking,
+			AVAX:           avaxAssetID,
+			AVM:            createAVMTx.ID(),
+			Fee:            n.Config.AvaxTxFee,
+		}),
+		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
+			AVAX: avaxAssetID,
+			Fee:  n.Config.AvaxTxFee,
+		}),
+		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
+			Path: path.Join(n.Config.PluginDir, "evm"),
+		}),
+		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
+			TxFee: n.Config.AvaxTxFee,
+		}),
+		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
+		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
+		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
+		n.vmManager.RegisterVMFactory(propertyfx.ID, &propertyfx.Factory{}),
+	)
+	if errs.Errored() {
+		return errs.Err
 	}
 
 	n.chainManager.AddRegistrant(&n.APIServer)
@@ -472,14 +489,16 @@ func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
 	n.keystoreServer.Initialize(n.Log, keystoreDB)
-	keystoreHandler := n.keystoreServer.CreateHandler()
+	keystoreHandler, err := n.keystoreServer.CreateHandler()
+	if err != nil {
+		return err
+	}
 	if !n.Config.KeystoreAPIEnabled {
 		n.Log.Info("skipping keystore API initializaion because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
 	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
-
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -513,7 +532,10 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 }
 
@@ -523,9 +545,11 @@ func (n *Node) initInfoAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
-
 }
 
 // initHealthAPI initializes the Health API service
@@ -562,18 +586,25 @@ func (n *Node) initHealthAPI() error {
 	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
+	handler, err := service.Handler()
+	if err != nil {
+		return err
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
 // initIPCAPI initializes the IPC API service
 // Assumes n.log and n.chainManager already initialized
 func (n *Node) initIPCAPI() error {
-	if !n.Config.IPCEnabled {
+	if !n.Config.IPCAPIEnabled {
 		n.Log.Info("skipping ipc API initializaion because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
-	service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	service, err := ipcsapi.NewService(n.Log, n.chainManager, &n.APIServer, n.IPCs)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
@@ -630,7 +661,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
 
-	n.initBeacons()
+	if err = n.initBeacons(); err != nil { // Configure the beacons
+		return fmt.Errorf("problem initializing node beacons: %w", err)
+	}
 
 	// Start HTTP APIs
 	n.initAPIServer()                           // Start the API Server
@@ -647,16 +680,15 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
-	n.initEventDispatcher() // Set up the event dipatcher
+	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
+		return fmt.Errorf("problem initializing event dispatcher: %w", err)
+	}
 
 	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't create genesis bytes: %w", err)
 	}
-	if err := n.initVMManager(avaxAssetID); err != nil { // Set up the VM manager
-		return fmt.Errorf("problem initializing the VM manager: %w", err)
-	}
-	if err := n.initChainManager(); err != nil { // Set up the chain manager
+	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
@@ -677,13 +709,18 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
 	}
+	if err := n.initIPCs(); err != nil { // Start the IPCs
+		return fmt.Errorf("couldn't initialize IPCs: %w", err)
+	}
 	return nil
 }
 
 // Shutdown this node
 func (n *Node) Shutdown() {
 	n.Log.Info("shutting down the node")
-	n.Net.Close()
+	// Close already logs its own error if one occurs, so the error is ignored
+	// here
+	_ = n.Net.Close()
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
 	n.Log.Info("node shut down successfully")

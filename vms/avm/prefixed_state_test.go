@@ -4,14 +4,14 @@
 package avm
 
 import (
+	"math"
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -25,28 +25,28 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 
 	state := vm.state
 
-	vm.codec.RegisterType(&ava.TestVerifiable{})
+	vm.codec.RegisterType(&avax.TestVerifiable{})
 
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: ava.Asset{ID: ids.Empty},
-		Out:   &ava.TestVerifiable{},
+		Asset: avax.Asset{ID: ids.Empty},
+		Out:   &avax.TestVerifiable{},
 	}
 
 	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: asset},
+			Asset: avax.Asset{ID: asset},
 			In: &secp256k1fx.TransferInput{
-				Amt: 20 * units.KiloAva,
+				Amt: 20 * units.KiloAvax,
 				Input: secp256k1fx.Input{
 					SigIndices: []uint32{
 						0,
@@ -125,15 +125,15 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 
 	state := vm.state
 
-	vm.codec.RegisterType(&ava.TestVerifiable{})
+	vm.codec.RegisterType(&avax.TestVerifiable{})
 
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: ava.Asset{ID: ids.Empty},
-		Out:   &ava.TestVerifiable{},
+		Asset: avax.Asset{ID: ids.Empty},
+		Out:   &avax.TestVerifiable{},
 	}
 
 	if err := state.FundUTXO(utxo); err != nil {
@@ -154,15 +154,15 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 
 	state := vm.state
 
-	vm.codec.RegisterType(&ava.TestAddressable{})
+	vm.codec.RegisterType(&avax.TestAddressable{})
 
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: ava.Asset{ID: ids.Empty},
-		Out: &ava.TestAddressable{
+		Asset: avax.Asset{ID: ids.Empty},
+		Out: &avax.TestAddressable{
 			Addrs: [][]byte{{0}},
 		},
 	}
@@ -170,7 +170,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	funds, err := state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
+	funds, err := state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestPrefixedFundingAddresses(t *testing.T) {
 	if err := state.SpendUTXO(utxo.InputID()); err != nil {
 		t.Fatal(err)
 	}
-	funds, err = state.Funds(ids.NewID(hashing.ComputeHash256Array([]byte{0})))
+	funds, err = state.Funds([]byte{0}, ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}

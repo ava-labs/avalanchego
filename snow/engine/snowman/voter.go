@@ -48,7 +48,7 @@ func (v *voter) Update() {
 	// must be bubbled to the nearest valid block
 	results = v.bubbleVotes(results)
 
-	v.t.Config.Context.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
+	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
 	if err := v.t.consensus.RecordPoll(results); err != nil {
 		v.t.errs.Add(err)
 		return
@@ -57,11 +57,11 @@ func (v *voter) Update() {
 	v.t.VM.SetPreference(v.t.consensus.Preference())
 
 	if v.t.consensus.Finalized() {
-		v.t.Config.Context.Log.Debug("Snowman engine can quiesce")
+		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
 		return
 	}
 
-	v.t.Config.Context.Log.Debug("Snowman engine can't quiesce")
+	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
 	v.t.repoll()
 }
 

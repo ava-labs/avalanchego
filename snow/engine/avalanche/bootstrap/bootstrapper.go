@@ -6,6 +6,8 @@ package bootstrap
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -13,8 +15,8 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -78,14 +80,14 @@ func (b *Bootstrapper) Initialize(
 	}
 
 	b.VtxBlocked.SetParser(&vtxParser{
-		log:         config.Context.Log,
+		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedVts,
 		numDropped:  b.numDroppedVts,
 		manager:     b.Manager,
 	})
 
 	b.TxBlocked.SetParser(&txParser{
-		log:         config.Context.Log,
+		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedTxs,
 		numDropped:  b.numDroppedTxs,
 		vm:          b.VM,
@@ -134,8 +136,8 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 			continue
 		}
 
-		validators := b.Validators.Sample(1) // validator to send request to
-		if len(validators) == 0 {
+		validators, err := b.Validators.Sample(1) // validator to send request to
+		if err != nil {
 			return fmt.Errorf("Dropping request for %s as there are no validators", vtxID)
 		}
 		validatorID := validators[0].ID()
@@ -173,7 +175,7 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			b.needToFetch.Remove(vtxID)
 
 			if err := b.VtxBlocked.Push(&vertexJob{ // Add to queue of vertices to execute when bootstrapping finishes.
-				log:         b.Context.Log,
+				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
@@ -181,10 +183,10 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 				b.numFetchedVts.Inc()
 				b.NumFetched++ // Progress tracker
 				if b.NumFetched%common.StatusUpdateFrequency == 0 {
-					b.Context.Log.Info("fetched %d vertices", b.NumFetched)
+					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
 				}
 			} else {
-				b.Context.Log.Verbo("couldn't push to vtxBlocked: %s", err)
+				b.Ctx.Log.Verbo("couldn't push to vtxBlocked: %s", err)
 			}
 			txs, err := vtx.Txs()
 			if err != nil {
@@ -192,14 +194,14 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 			}
 			for _, tx := range txs { // Add transactions to queue of transactions to execute when bootstrapping finishes.
 				if err := b.TxBlocked.Push(&txJob{
-					log:         b.Context.Log,
+					log:         b.Ctx.Log,
 					numAccepted: b.numAcceptedTxs,
 					numDropped:  b.numDroppedTxs,
 					tx:          tx,
 				}); err == nil {
 					b.numFetchedTxs.Inc()
 				} else {
-					b.Context.Log.Verbo("couldn't push to txBlocked: %s", err)
+					b.Ctx.Log.Verbo("couldn't push to txBlocked: %s", err)
 				}
 			}
 			parents, err := vtx.Parents()
@@ -235,10 +237,10 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
 	if lenVtxs := len(vtxs); lenVtxs > common.MaxContainersPerMultiPut {
-		b.Context.Log.Debug("MultiPut(%s, %d) contains more than maximum number of vertices", vdr, requestID)
+		b.Ctx.Log.Debug("MultiPut(%s, %d) contains more than maximum number of vertices", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	} else if lenVtxs == 0 {
-		b.Context.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
+		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
 
@@ -246,23 +248,23 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	vtx, err := b.Manager.ParseVertex(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
-			b.Context.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
+			b.Ctx.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
 			return nil
 		}
 
-		b.Context.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
-		b.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
+		b.Ctx.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
+		b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
 		return b.fetch(requestedVtxID)
 	}
 
 	vtxID := vtx.ID()
 	// If the vertex is neither the requested vertex nor a needed vertex, return early and re-fetch if necessary
 	if requested && !requestedVtxID.Equals(vtxID) {
-		b.Context.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
+		b.Ctx.Log.Debug("received incorrect vertex from %s with vertexID %s", vdr, vtxID)
 		return b.fetch(requestedVtxID)
 	}
 	if !requested && !b.OutstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
-		b.Context.Log.Debug("received un-needed vertex from %s with vertexID %s", vdr, vtxID)
+		b.Ctx.Log.Debug("received un-needed vertex from %s with vertexID %s", vdr, vtxID)
 		return nil
 	}
 
@@ -286,13 +288,13 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
 		vtx, err := b.Manager.ParseVertex(vtxBytes) // Persists the vtx
 		if err != nil {
-			b.Context.Log.Debug("failed to parse vertex: %s", err)
-			b.Context.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
+			b.Ctx.Log.Debug("failed to parse vertex: %s", err)
+			b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
 			break
 		}
 		vtxID := vtx.ID()
 		if !eligibleVertices.Contains(vtxID) {
-			b.Context.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
+			b.Ctx.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
 			break
 		}
 		eligibleVertices.Remove(vtxID)
@@ -314,7 +316,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
 	vtxID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
-		b.Context.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
+		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
 		return nil
 	}
 	// Send another request for the vertex
@@ -342,18 +344,18 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs ids.Set) error {
 // Finish bootstrapping
 func (b *Bootstrapper) finish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	if b.Context.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
+	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
 		return nil
 	}
 
-	b.Context.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
+	b.Ctx.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
 		b.NumFetched)
-	if err := b.executeAll(b.TxBlocked); err != nil {
+	if err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher); err != nil {
 		return err
 	}
 
-	b.Context.Log.Info("executing vertex state transitions...")
-	if err := b.executeAll(b.VtxBlocked); err != nil {
+	b.Ctx.Log.Info("executing vertex state transitions...")
+	if err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher); err != nil {
 		return err
 	}
 
@@ -366,17 +368,18 @@ func (b *Bootstrapper) finish() error {
 	if err := b.OnFinished(); err != nil {
 		return err
 	}
-	b.Context.Bootstrapped()
+	b.Ctx.Bootstrapped()
 
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events *triggers.EventDispatcher) error {
 	numExecuted := 0
+
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		b.Context.Log.Debug("Executing: %s", job.ID())
+		b.Ctx.Log.Debug("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
-			b.Context.Log.Error("Error executing: %s", err)
+			b.Ctx.Log.Error("Error executing: %s", err)
 			return err
 		}
 		if err := jobs.Commit(); err != nil {
@@ -384,9 +387,11 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Context.Log.Info("executed %d operations", numExecuted)
+			b.Ctx.Log.Info("executed %d operations", numExecuted)
 		}
+
+		events.Accept(b.Ctx.ChainID, job.ID(), job.Bytes())
 	}
-	b.Context.Log.Info("executed %d operations", numExecuted)
+	b.Ctx.Log.Info("executed %d operations", numExecuted)
 	return nil
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 // Max size of memo field
@@ -39,9 +39,9 @@ type BaseTx struct {
 	// This is only here to match avm.BaseTx's format
 	BlockchainID ids.ID `serialize:"true" json:"blockchainID"`
 	// Output UTXOs
-	Outs []*ava.TransferableOutput `serialize:"true" json:"outputs"`
+	Outs []*avax.TransferableOutput `serialize:"true" json:"outputs"`
 	// Inputs consumed by this tx
-	Ins []*ava.TransferableInput `serialize:"true" json:"inputs"`
+	Ins []*avax.TransferableInput `serialize:"true" json:"inputs"`
 	// Memo field contains arbitrary bytes, up to maxMemoSize
 	Memo []byte `serialize:"true" json:"memo"`
 }
@@ -85,9 +85,9 @@ func (tx *BaseTx) Verify() error {
 		}
 	}
 	switch {
-	case !ava.IsSortedTransferableOutputs(tx.Outs, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.Outs, Codec):
 		return errOutputsNotSorted
-	case !ava.IsSortedAndUniqueTransferableInputs(tx.Ins):
+	case !avax.IsSortedAndUniqueTransferableInputs(tx.Ins):
 		return errInputsNotSortedUnique
 	default:
 		return nil

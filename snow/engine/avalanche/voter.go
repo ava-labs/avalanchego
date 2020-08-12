@@ -44,7 +44,7 @@ func (v *voter) Update() {
 		return
 	}
 
-	v.t.Config.Context.Log.Debug("Finishing poll with:\n%s", &results)
+	v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &results)
 	if err := v.t.consensus.RecordPoll(results); err != nil {
 		v.t.errs.Add(err)
 		return
@@ -55,11 +55,11 @@ func (v *voter) Update() {
 		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
-			v.t.Config.Context.Log.Warn("Failed to fetch %s during attempted re-issuance", orphanID)
+			v.t.Ctx.Log.Warn("Failed to fetch %s during attempted re-issuance", orphanID)
 		}
 	}
 	if len(txs) > 0 {
-		v.t.Config.Context.Log.Debug("Re-issuing %d transactions", len(txs))
+		v.t.Ctx.Log.Debug("Re-issuing %d transactions", len(txs))
 	}
 	if err := v.t.batch(txs, true /*=force*/, false /*empty*/); err != nil {
 		v.t.errs.Add(err)
@@ -67,11 +67,11 @@ func (v *voter) Update() {
 	}
 
 	if v.t.consensus.Quiesce() {
-		v.t.Config.Context.Log.Debug("Avalanche engine can quiesce")
+		v.t.Ctx.Log.Debug("Avalanche engine can quiesce")
 		return
 	}
 
-	v.t.Config.Context.Log.Debug("Avalanche engine can't quiesce")
+	v.t.Ctx.Log.Debug("Avalanche engine can't quiesce")
 	v.t.errs.Add(v.t.repoll())
 }
 
@@ -94,22 +94,25 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 		status := vtx.Status()
 
 		if !status.Fetched() {
-			v.t.Config.Context.Log.Verbo("Dropping %d vote(s) for %s because the vertex is unknown", set.Len(), vtxID)
+			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is unknown",
+				set.Len(), vtxID)
 			bubbledVotes.RemoveSet(vtx.ID())
 			continue
 		}
 
 		if status.Decided() {
-			v.t.Config.Context.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided", set.Len(), vtxID)
+			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is decided",
+				set.Len(), vtxID)
 			bubbledVotes.RemoveSet(vtx.ID())
 			continue
 		}
 
 		if v.t.consensus.VertexIssued(vtx) {
-			v.t.Config.Context.Log.Verbo("Applying %d vote(s) for %s", set.Len(), vtx.ID())
+			v.t.Ctx.Log.Verbo("Applying %d vote(s) for %s", set.Len(), vtx.ID())
 			bubbledVotes.UnionSet(vtx.ID(), set)
 		} else {
-			v.t.Config.Context.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued", set.Len(), vtx.ID())
+			v.t.Ctx.Log.Verbo("Bubbling %d vote(s) for %s because the vertex isn't issued",
+				set.Len(), vtx.ID())
 			bubbledVotes.RemoveSet(vtx.ID()) // Remove votes for this vertex because it hasn't been issued
 
 			parents, err := vtx.Parents()

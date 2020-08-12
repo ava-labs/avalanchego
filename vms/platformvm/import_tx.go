@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -32,8 +32,12 @@ var (
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
 	BaseTx `serialize:"true"`
-	// Inputs that consume UTXOs produced on the X-Chain
-	ImportedInputs []*ava.TransferableInput `serialize:"true" json:"importedInputs"`
+
+	// Which chain to consume the funds from
+	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
+
+	// Inputs that consume UTXOs produced on the chain
+	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
@@ -68,6 +72,11 @@ func (tx *UnsignedImportTx) Verify() error {
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.SourceChain.IsZero():
+		return errWrongBlockchainID
+	case !tx.SourceChain.Equals(tx.vm.avm):
+		// TODO: remove this check if we allow for P->C swaps
+		return errWrongBlockchainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	}
@@ -81,11 +90,11 @@ func (tx *UnsignedImportTx) Verify() error {
 			return err
 		}
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
+	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
 
-	allIns := make([]*ava.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+	allIns := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(allIns, tx.Ins)
 	copy(allIns[len(tx.Ins):], tx.ImportedInputs)
 	if err := syntacticVerifySpend(allIns, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
@@ -103,10 +112,10 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 	}
 
 	// Verify (but don't spend) imported inputs
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
 
-	utxos := make([]*ava.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
+	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
 		utxoID := input.UTXOID.InputID()
 		utxo, err := tx.vm.getUTXO(db, utxoID)
@@ -116,17 +125,17 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 		utxos[index] = utxo
 	}
 
-	state := ava.NewPrefixedState(smDB, Codec)
+	state := avax.NewPrefixedState(smDB, Codec, tx.vm.Ctx.ChainID, tx.SourceChain)
 	for index, input := range tx.ImportedInputs {
 		utxoID := input.UTXOID.InputID()
-		utxo, err := state.AVMUTXO(utxoID)
+		utxo, err := state.UTXO(utxoID)
 		if err != nil { // Get the UTXO
 			return tempError{err}
 		}
 		utxos[index+len(tx.Ins)] = utxo
 	}
 
-	ins := make([]*ava.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
@@ -155,16 +164,16 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
 func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
 
 	vsmDB := versiondb.New(smDB)
-	state := ava.NewPrefixedState(vsmDB, Codec)
+	state := avax.NewPrefixedState(vsmDB, Codec, tx.vm.Ctx.ChainID, tx.SourceChain)
 
 	// Spend imported UTXOs
 	for _, in := range tx.ImportedInputs {
 		utxoID := in.InputID()
-		if err := state.SpendAVMUTXO(utxoID); err != nil {
+		if err := state.SpendUTXO(utxoID); err != nil {
 			return err
 		}
 	}
@@ -178,24 +187,25 @@ func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
 
 // Create a new transaction
 func (vm *VM) newImportTx(
+	chainID ids.ID, // chain to import from
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*AtomicTx, error) {
+	if !vm.avm.Equals(chainID) {
+		return nil, errWrongBlockchainID
+	}
+
 	kc := secp256k1fx.NewKeychain()
 	for _, key := range keys {
 		kc.Add(key)
 	}
 
-	addrSet := ids.Set{}
-	for _, addr := range kc.Addresses().List() {
-		addrSet.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
-	}
-	atomicUTXOs, err := vm.GetAtomicUTXOs(addrSet)
+	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
 
-	importedInputs := []*ava.TransferableInput{}
+	importedInputs := []*avax.TransferableInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
 
 	importedAmount := uint64(0)
@@ -208,7 +218,7 @@ func (vm *VM) newImportTx(
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.TransferableIn)
+		input, ok := inputIntf.(avax.TransferableIn)
 		if !ok {
 			continue
 		}
@@ -216,21 +226,21 @@ func (vm *VM) newImportTx(
 		if err != nil {
 			return nil, err
 		}
-		importedInputs = append(importedInputs, &ava.TransferableInput{
+		importedInputs = append(importedInputs, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In:     input,
 		})
 		signers = append(signers, utxoSigners)
 	}
-	ava.SortTransferableInputsWithSigners(importedInputs, signers)
+	avax.SortTransferableInputsWithSigners(importedInputs, signers)
 
 	if importedAmount == 0 {
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
-	ins := []*ava.TransferableInput{}
-	outs := []*ava.TransferableOutput{}
+	ins := []*avax.TransferableInput{}
+	outs := []*avax.TransferableOutput{}
 	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
 		var baseSigners [][]*crypto.PrivateKeySECP256K1R
 		ins, outs, _, baseSigners, err = vm.spend(vm.DB, keys, 0, vm.txFee-importedAmount)
@@ -239,8 +249,8 @@ func (vm *VM) newImportTx(
 		}
 		signers = append(baseSigners, signers...)
 	} else if importedAmount > vm.txFee {
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: vm.avaxAssetID},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: vm.avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: importedAmount - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -260,6 +270,7 @@ func (vm *VM) newImportTx(
 			Outs:         outs,
 			Ins:          ins,
 		},
+		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
 	}
 	tx := &AtomicTx{UnsignedAtomicTx: utx}

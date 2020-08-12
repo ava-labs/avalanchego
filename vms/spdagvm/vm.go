@@ -155,7 +155,8 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Service{vm: vm}, "spdag") // name this service "spdag"
+	// name this service "spdag"
+	vm.ctx.Log.AssertNoError(newServer.RegisterService(&Service{vm: vm}, "spdag"))
 	return map[string]*common.HTTPHandler{
 		"": &common.HTTPHandler{Handler: newServer},
 	}
@@ -167,7 +168,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&StaticService{}, "spdag") // name this service "spdag"
+	// name this service "spdag"
+	_ = newServer.RegisterService(&StaticService{}, "spdag")
 	return map[string]*common.HTTPHandler{
 		// NoLock because the static functions probably wont be stateful (i.e. no
 		// write operations)
@@ -207,7 +209,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	// cache.
 	if err := tx.VerifyState(); err != nil {
 		vm.ctx.Log.Debug("GetTx resulted in fetching a tx that failed verification: %s", err)
-		tx.setStatus(choices.Rejected)
+		if err := tx.setStatus(choices.Rejected); err != nil {
+			return nil, err
+		}
 	}
 
 	return tx, nil
@@ -544,7 +548,9 @@ func (vm *VM) wrapTx(rawTx *Tx, finalized func(choices.Status)) (*UniqueTx, erro
 		if err := vm.state.SetTx(tx.ID(), tx.t.tx); err != nil {
 			return nil, err
 		}
-		tx.setStatus(choices.Processing)
+		if err := tx.setStatus(choices.Processing); err != nil {
+			return nil, err
+		}
 	}
 
 	tx.addEvents(finalized)

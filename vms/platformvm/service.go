@@ -18,8 +18,13 @@ import (
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+)
+
+const (
+	// Max number of addresses that can be passed in as argument to GetUTXOs
+	maxGetUTXOsAddrs = 1024
 )
 
 var (
@@ -30,6 +35,7 @@ var (
 	errNoSubnetID           = errors.New("argument 'subnetID' not provided")
 	errNoDestination        = errors.New("argument 'destination' not provided")
 	errUnexpectedTxType     = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
+	errNoAddresses          = errors.New("no addresses provided")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -70,7 +76,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	if address, err := service.vm.ParseAddress(args.Address); err != nil {
+	if address, err := service.vm.ParseLocalAddress(args.Address); err != nil {
 		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
 	} else if sk, err := user.getKey(address); err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
@@ -117,7 +123,10 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("problem saving key %w", err)
 	}
 
-	reply.Address = service.vm.FormatAddress(sk.PublicKey().Address())
+	reply.Address, err = service.vm.FormatLocalAddress(sk.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -136,8 +145,8 @@ type GetBalanceArgs struct {
 // GetBalanceResponse ...
 type GetBalanceResponse struct {
 	// Balance, in nAVAX, of the address
-	Balance json.Uint64   `json:"balance"`
-	UTXOIDs []*ava.UTXOID `json:"utxoIDs"`
+	Balance json.Uint64    `json:"balance"`
+	UTXOIDs []*avax.UTXOID `json:"utxoIDs"`
 }
 
 // GetBalance gets the balance of an address
@@ -145,16 +154,22 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetBalance called for address %s", args.Address)
 
 	// Parse to address
-	address, err := service.vm.ParseAddress(args.Address)
+	addr, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
 
-	addrs := [][]byte{address.Bytes()}
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
+	addrs := ids.ShortSet{}
+	addrs.Add(addr)
+	utxos, _, _, err := service.vm.GetUTXOs(service.vm.DB, addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXO set of %s: %w", service.vm.FormatAddress(address), err)
+		addr, err2 := service.vm.FormatLocalAddress(addr)
+		if err2 != nil {
+			return fmt.Errorf("problem formatting address: %w", err2)
+		}
+		return fmt.Errorf("couldn't get UTXO set of %s: %w", addr, err)
 	}
+
 	balance := uint64(0)
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -189,7 +204,10 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 	} else if err := user.putAddress(key.(*crypto.PrivateKeySECP256K1R)); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
 	}
-	response.Address = service.vm.FormatAddress(key.PublicKey().Address())
+	response.Address, err = service.vm.FormatLocalAddress(key.PublicKey().Address())
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
 	return nil
 }
 
@@ -208,47 +226,146 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	}
 	response.Addresses = make([]string, len(addresses))
 	for i, addr := range addresses {
-		response.Addresses[i] = service.vm.FormatAddress(addr)
+		response.Addresses[i], err = service.vm.FormatLocalAddress(addr)
+		if err != nil {
+			return fmt.Errorf("problem formatting address: %w", err)
+		}
 	}
 	return nil
 }
 
-// GetUTXOsArgs ...
-type GetUTXOsArgs struct {
-	Addresses []string `json:"addresses"`
+// Index is an address and an associated UTXO.
+// Marks a starting or stopping point when fetching UTXOs. Used for pagination.
+type Index struct {
+	Address string `json:"address"` // The address as a string
+	Utxo    string `json:"utxo"`    // The UTXO ID as a string
 }
 
-// GetUTXOsResponse ...
+// GetUTXOsArgs are arguments for passing into GetUTXOs.
+// Gets the UTXOs that reference at least one address in [Addresses].
+// Returns at most [limit] addresses.
+// If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
+// [StartIndex] defines where to start fetching UTXOs (for pagination.)
+// UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
+// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.Utxo] will be returned.
+// If [StartIndex] is omitted, gets all UTXOs.
+// If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
+// that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
+type GetUTXOsArgs struct {
+	Addresses  []string    `json:"addresses"`
+	Limit      json.Uint32 `json:"limit"`
+	StartIndex Index       `json:"startIndex"`
+}
+
+// GetUTXOsResponse defines the GetUTXOs replies returned from the API
 type GetUTXOsResponse struct {
+	// Number of UTXOs returned
+	NumFetched json.Uint64 `json:"numFetched"`
+	// The UTXOs
 	UTXOs []formatting.CB58 `json:"utxos"`
+	// The last UTXO that was returned, and the address it corresponds to.
+	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
+	// again and set [StartIndex] to this value.
+	EndIndex Index `json:"endIndex"`
 }
 
 // GetUTXOs returns the UTXOs controlled by the given addresses
 func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *GetUTXOsResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: ListAddresses called")
 
-	addrs := [][]byte{}
-	for _, addrStr := range args.Addresses {
-		addr, err := service.vm.ParseAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("can't parse %s to address: %w", addr, err)
-		}
-		addrs = append(addrs, addr.Bytes())
+	if len(args.Addresses) == 0 {
+		return errNoAddresses
+	}
+	if len(args.Addresses) > maxGetUTXOsAddrs {
+		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	utxos, err := service.vm.getUTXOs(service.vm.DB, addrs)
+	chainID := ids.ID{}
+
+	addrSet := ids.ShortSet{} // Put in a set for de-duplication
+	for _, addrStr := range args.Addresses {
+		addrChainID, addr, err := service.vm.ParseAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("problem parsing address %q: %w", addrStr, err)
+		}
+		if chainID.IsZero() {
+			chainID = addrChainID
+		}
+		if !chainID.Equals(addrChainID) {
+			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
+				chainID, addrChainID)
+		}
+		addrSet.Add(addr)
+	}
+
+	addrs := make([][]byte, addrSet.Len())
+	for i, addr := range addrSet.List() {
+		addrs[i] = addr.Bytes()
+	}
+
+	startAddr := ids.ShortEmpty
+	startUTXO := ids.Empty
+	if args.StartIndex.Address != "" || args.StartIndex.Utxo != "" {
+		addrChainID, addr, err := service.vm.ParseAddress(args.StartIndex.Address)
+		if err != nil {
+			return fmt.Errorf("couldn't parse start index address: %w", err)
+		}
+		if !chainID.Equals(addrChainID) {
+			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
+				chainID, addrChainID)
+		}
+		utxo, err := ids.FromString(args.StartIndex.Utxo)
+		if err != nil {
+			return fmt.Errorf("couldn't parse start index utxo: %w", err)
+		}
+
+		startAddr = addr
+		startUTXO = utxo
+	}
+
+	var (
+		utxos     []*avax.UTXO
+		endAddr   ids.ShortID
+		endUTXOID ids.ID
+		err       error
+	)
+	if chainID.Equals(service.vm.Ctx.ChainID) {
+		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
+			service.vm.DB,
+			addrSet,
+			startAddr,
+			startUTXO,
+			int(args.Limit),
+		)
+	} else {
+		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
+			chainID,
+			addrSet,
+			startAddr,
+			startUTXO,
+			int(args.Limit),
+		)
+	}
 	if err != nil {
-		return fmt.Errorf("couldn't get UTXOs: %w", err)
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
 	response.UTXOs = make([]formatting.CB58, len(utxos))
 	for i, utxo := range utxos {
 		bytes, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
-			return fmt.Errorf("couldn't serialize UTXO %s: %w", utxo.InputID(), err)
+			return fmt.Errorf("couldn't serialize UTXO %s: %s", utxo.InputID(), err)
 		}
 		response.UTXOs[i] = formatting.CB58{Bytes: bytes}
 	}
+
+	endAddress, err := service.vm.FormatAddress(chainID, endAddr)
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
+
+	response.EndIndex.Address = endAddress
+	response.EndIndex.Utxo = endUTXOID.String()
 	return nil
 }
 
@@ -302,7 +419,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatLocalAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets[i] = APISubnet{
 				ID:          subnet.ID(),
@@ -327,7 +448,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				controlAddrs = append(controlAddrs, service.vm.FormatAddress(controlKeyID))
+				addr, err := service.vm.FormatLocalAddress(controlKeyID)
+				if err != nil {
+					return fmt.Errorf("problem formatting address: %w", err)
+				}
+				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets = append(response.Subnets,
 				APISubnet{
@@ -515,9 +640,9 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}
 
-	sample := validators.Sample(int(args.Size))
-	if setLen := len(sample); setLen != int(args.Size) {
-		return fmt.Errorf("current number of validators (%d) is insufficient to sample %d validators", setLen, args.Size)
+	sample, err := validators.Sample(int(args.Size))
+	if err != nil {
+		return fmt.Errorf("sampling errored with %w", err)
 	}
 
 	validatorIDs := make([]ids.ShortID, int(args.Size))
@@ -525,11 +650,11 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		validatorIDs[i] = vdr.ID()
 	}
 	ids.SortShortIDs(validatorIDs)
+
 	reply.Validators = make([]string, int(args.Size))
 	for i, vdrID := range validatorIDs {
 		reply.Validators[i] = vdrID.PrefixedString(constants.NodeIDPrefix)
 	}
-
 	return nil
 }
 
@@ -568,7 +693,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		nodeID = nID
 	}
 
-	destination, err := service.vm.ParseAddress(args.Destination)
+	destination, err := service.vm.ParseLocalAddress(args.Destination)
 	if err != nil {
 		return fmt.Errorf("problem while parsing destination: %w", err)
 	}
@@ -632,7 +757,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 		nodeID = nID
 	}
 
-	destination, err := service.vm.ParseAddress(args.Destination)
+	destination, err := service.vm.ParseLocalAddress(args.Destination)
 	if err != nil {
 		return fmt.Errorf("problem parsing 'destination': %w", err)
 	}
@@ -737,7 +862,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 	controlKeys := []ids.ShortID{}
 	for _, controlKey := range args.ControlKeys {
-		controlKeyID, err := service.vm.ParseAddress(controlKey)
+		controlKeyID, err := service.vm.ParseLocalAddress(controlKey)
 		if err != nil {
 			return fmt.Errorf("problem parsing control key '%s': %w", controlKey, err)
 		}
@@ -769,22 +894,30 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	return service.vm.issueTx(tx)
 }
 
-// ExportAVAArgs are the arguments to ExportAVA
-type ExportAVAArgs struct {
+// ExportAVAXArgs are the arguments to ExportAVAX
+type ExportAVAXArgs struct {
 	api.UserPass
-	// X-Chain address (without prepended X-) that will receive the exported AVA
-	// TODO: Allow user to prepend X-
-	To ids.ShortID `json:"to"`
-	// Amount of nAVA to send
+
+	// Amount of AVAX to send
 	Amount json.Uint64 `json:"amount"`
+
+	// ID of the address that will receive the AVAX. This address includes the
+	// chainID, which is used to determine what the destination chain is.
+	To string `json:"to"`
 }
 
-// ExportAVA exports AVAX from the P-Chain to the X-Chain
+// ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: ExportAVAX called")
+
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
+	}
+
+	chainID, to, err := service.vm.ParseAddress(args.To)
+	if err != nil {
+		return err
 	}
 
 	// Get this user's data
@@ -801,7 +934,8 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		uint64(args.Amount), // Amount
-		args.To,             // X-Chain address
+		chainID,             // ID of the chain to send the funds to
+		to,                  // Address
 		privKeys,            // Private keys
 	)
 	if err != nil {
@@ -812,17 +946,26 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	return service.vm.issueTx(tx)
 }
 
-// ImportAVAArgs are the arguments to ImportAVA
-type ImportAVAArgs struct {
+// ImportAVAXArgs are the arguments to ImportAVAX
+type ImportAVAXArgs struct {
 	api.UserPass
+
+	// Chain the funds are coming from
+	SourceChain string `json:"sourceChain"`
+
 	// The address that will receive the imported funds
 	To string `json:"to"`
 }
 
-// ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
-// The AVA must have already been exported from the X-Chain.
-func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
+// ImportAVAX returns an unsigned transaction to import AVAX from the X-Chain.
+// The AVAX must have already been exported from the X-Chain.
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
+
+	chainID, err := service.vm.Ctx.BCLookup.Lookup(args.SourceChain)
+	if err != nil {
+		return fmt.Errorf("problem parsing chainID %q: %w", args.SourceChain, err)
+	}
 
 	// Get the user's info
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
@@ -831,7 +974,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	}
 	user := user{db: db}
 
-	to, err := service.vm.ParseAddress(args.To)
+	to, err := service.vm.ParseLocalAddress(args.To)
 	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
 	}
@@ -841,7 +984,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
 	}
 
-	tx, err := service.vm.newImportTx(to, privKeys)
+	tx, err := service.vm.newImportTx(chainID, to, privKeys)
 	if err != nil {
 		return err
 	}
@@ -1106,9 +1249,7 @@ type GetTxArgs struct {
 // GetTxResponse ...
 type GetTxResponse struct {
 	// Raw byte representation of the transaction
-	RawTx formatting.CB58 `json:"rawTx"`
-	// JSON representation of the transaction
-	JSON interface{} `json:"json"`
+	Tx formatting.CB58 `json:"tx"`
 }
 
 // GetTx gets a tx
@@ -1118,25 +1259,7 @@ func (service *Service) GetTx(_ *http.Request, args *GetTxArgs, response *GetTxR
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
-	response.RawTx.Bytes = txBytes
-
-	// Parse the raw bytes to a struct so we can get the JSON representation
-	// We don't know what kind of tx this is, so we go through the possibilities
-	// until we find the right one
-	var (
-		proposalTx ProposalTx
-		decisionTx DecisionTx
-		atomicTx   AtomicTx
-	)
-	if err := service.vm.codec.Unmarshal(txBytes, &proposalTx); err == nil {
-		response.JSON = &proposalTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &decisionTx); err == nil {
-		response.JSON = &decisionTx
-	} else if err := service.vm.codec.Unmarshal(txBytes, &atomicTx); err == nil {
-		response.JSON = &atomicTx
-	} else {
-		return errUnexpectedTxType
-	}
+	response.Tx.Bytes = txBytes
 	return nil
 }
 

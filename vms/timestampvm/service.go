@@ -85,7 +85,7 @@ func (s *Service) GetBlock(_ *http.Request, args *GetBlockArgs, reply *GetBlockR
 
 	blockInterface, err := s.vm.GetBlock(ID)
 	if err != nil {
-		return errDatabase
+		return errNoSuchBlock
 	}
 
 	block, ok := blockInterface.(*Block)

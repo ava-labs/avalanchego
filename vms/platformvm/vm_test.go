@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/timestampvm"
@@ -70,6 +70,8 @@ var (
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	testSubnet1            *UnsignedCreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
+
+	avmID = ids.Empty.Prefix(0)
 )
 
 var (
@@ -105,20 +107,27 @@ func init() {
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
+	aliaser := &ids.Aliaser{}
+	aliaser.Initialize()
+	aliaser.Alias(constants.PlatformChainID, "P")
+	aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String())
+	aliaser.Alias(avmID, "X")
+	aliaser.Alias(avmID, avmID.String())
+	ctx.BCLookup = aliaser
 	return ctx
 }
 
 // The UTXOs that exist at genesis in the default VM
-func defaultGenesisUTXOs() []*ava.UTXO {
-	utxos := []*ava.UTXO(nil)
+func defaultGenesisUTXOs() []*avax.UTXO {
+	utxos := []*avax.UTXO(nil)
 	for i, key := range keys {
 		utxos = append(utxos,
-			&ava.UTXO{
-				UTXOID: ava.UTXOID{
+			&avax.UTXO{
+				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: uint32(i),
 				},
-				Asset: ava.Asset{ID: avaxAssetID},
+				Asset: avax.Asset{ID: avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: defaultBalance,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -138,26 +147,35 @@ func defaultGenesisUTXOs() []*ava.UTXO {
 // 2) The byte representation of the default genesis for tests
 func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]APIUTXO, len(keys))
+	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
+		id := key.PublicKey().Address()
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		genesisUTXOs[i] = APIUTXO{
 			Amount:  json.Uint64(defaultStakeAmount),
-			Address: key.PublicKey().Address(),
+			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]APIDefaultSubnetValidator, len(keys))
+	genesisValidators := make([]FormattedAPIDefaultSubnetValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
-		address := key.PublicKey().Address()
-		genesisValidators[i] = APIDefaultSubnetValidator{
-			APIValidator: APIValidator{
+		id := key.PublicKey().Address()
+		addr, err := formatting.FormatBech32(hrp, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
+		genesisValidators[i] = FormattedAPIDefaultSubnetValidator{
+			FormattedAPIValidator: FormattedAPIValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				Address:   &address,
-				ID:        address,
+				ID:        id.PrefixedString(constants.NodeIDPrefix),
 			},
-			Destination:       address,
+			Destination:       addr,
 			DelegationFeeRate: NumberOfShares,
 		}
 	}
@@ -184,6 +202,7 @@ func defaultVM() *VM {
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
 		avaxAssetID:  avaxAssetID,
+		avm:          avmID,
 		txFee:        defaultTxFee,
 	}
 
@@ -252,7 +271,17 @@ func TestGenesis(t *testing.T) {
 	genesisState, _ := defaultGenesis()
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
-		utxos, err := vm.getUTXOs(vm.DB, [][]byte{utxo.Address.Bytes()})
+		_, addrBytes, err := formatting.ParseBech32(utxo.Address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr, err := ids.ToShortID(addrBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		addrs := ids.ShortSet{}
+		addrs.Add(addr)
+		utxos, _, _, err := vm.GetUTXOs(vm.DB, addrs, ids.ShortEmpty, ids.Empty, -1)
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -260,7 +289,13 @@ func TestGenesis(t *testing.T) {
 		} else if out, ok := utxos[0].Out.(*secp256k1fx.TransferOutput); !ok {
 			t.Fatal("expected utxo output to be type *secp256k1fx.TransferOutput")
 		} else if out.Amount() != uint64(utxo.Amount) {
-			if utxo.Address.Equals(keys[0].PublicKey().Address()) { // Address that paid tx fee to create testSubnet1 has less tokens
+			id := keys[0].PublicKey().Address()
+			hrp := constants.NetworkIDToHRP[testNetworkID]
+			addr, err := formatting.FormatBech32(hrp, id.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if utxo.Address == addr { // Address that paid tx fee to create testSubnet1 has less tokens
 				if out.Amount() != uint64(utxo.Amount)-vm.txFee {
 					t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount)-vm.txFee, out.Amount())
 				}
@@ -1151,9 +1186,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	avmID := ids.Empty.Prefix(0)
-	vm.avm = avmID
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
@@ -1165,6 +1198,7 @@ func TestAtomicImport(t *testing.T) {
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
 	if _, err := vm.newImportTx(
+		vm.avm,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err == nil {
@@ -1172,10 +1206,10 @@ func TestAtomicImport(t *testing.T) {
 	}
 
 	// Provide the avm UTXO
-	smDB := vm.Ctx.SharedMemory.GetDatabase(avmID)
-	utxo := &ava.UTXO{
+	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
+	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  ava.Asset{ID: avaxAssetID},
+		Asset:  avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1184,13 +1218,14 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	state := ava.NewPrefixedState(smDB, Codec)
-	if err := state.FundAVMUTXO(utxo); err != nil {
+	state := avax.NewPrefixedState(smDB, Codec, vm.avm, vm.Ctx.ChainID)
+	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
+	vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
 
 	tx, err := vm.newImportTx(
+		vm.avm,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 	)
@@ -1212,10 +1247,10 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", status)
 	}
 
-	smDB = vm.Ctx.SharedMemory.GetDatabase(avmID)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(avmID)
-	state = ava.NewPrefixedState(smDB, vm.codec)
-	if _, err := state.AVMUTXO(utxoID.InputID()); err == nil {
+	smDB = vm.Ctx.SharedMemory.GetDatabase(vm.avm)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
+	state = avax.NewPrefixedState(smDB, vm.codec, vm.Ctx.ChainID, vm.avm)
+	if _, err := state.UTXO(utxoID.InputID()); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -1232,7 +1267,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	}()
 
 	avmID := ids.Empty.Prefix(0)
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
@@ -1248,9 +1283,9 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	tx, err := vm.newImportTx(
 		defaultNonce+1,
 		testNetworkID,
-		[]*ava.TransferableInput{&ava.TransferableInput{
+		[]*avax.TransferableInput{&avax.TransferableInput{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: assetID},
+			Asset:  avax.Asset{ID: assetID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   amount,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1263,7 +1298,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ava = assetID
+	vm.avax = assetID
 	vm.avm = avmID
 
 	blk, err := vm.newAtomicBlock(vm.Preferred(), tx)
@@ -1595,7 +1630,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    beacons,
 				Alpha:      uint64(beacons.Len()/2 + 1),
@@ -1749,30 +1784,36 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestParseAddress(t *testing.T) {
-	vm := &VM{}
-	if _, err := vm.ParseAddress("P-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH"); err != nil {
+	vm := defaultVM()
+	if _, err := vm.ParseLocalAddress(testAddress); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestParseAddressInvalid(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
 	tests := []struct {
 		in   string
-		want error
+		want string
 	}{
-		{"", errEmptyAddress},
-		{"+", errInvalidAddressSeperator},
-		{"P", errInvalidAddressSeperator},
-		{"-", errEmptyAddressPrefix},
-		{"P-", errEmptyAddressSuffix},
-		{"X-Bg6e45gxCUTLXcfUuoy3go2U6V3bRZ5jH", errInvalidAddressPrefix},
-		{"P-Bg6e45gxCUTLXcfUuoy", errInvalidAddress}, //truncated
+		{"", "no separator found in address"},
+		{"+", "no separator found in address"},
+		{"P", "no separator found in address"},
+		{"-", "invalid bech32 string length 0"},
+		{"P-", "invalid bech32 string length 0"},
+		{
+			in:   "X-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y",
+			want: "expected chainID to be \"11111111111111111111111111111111LpoYY\" but was \"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"",
+		},
+		{
+			in:   "P-testing18jma8ppw3nhx5r4ap", //truncated
+			want: "checksum failed. Expected qwqey4, got x5r4ap.",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			_, err := vm.ParseAddress(tt.in)
-			if !errors.Is(err, tt.want) {
+			_, err := vm.ParseLocalAddress(tt.in)
+			if err.Error() != tt.want {
 				t.Errorf("want %q, got %q", tt.want, err)
 			}
 		})
@@ -1780,17 +1821,21 @@ func TestParseAddressInvalid(t *testing.T) {
 }
 
 func TestFormatAddress(t *testing.T) {
-	vm := &VM{}
+	vm := defaultVM()
 	tests := []struct {
 		label string
 		in    ids.ShortID
 		want  string
 	}{
-		{"keys[0]", keys[0].PublicKey().Address(), "P-Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf"},
+		{"keys[3]", keys[3].PublicKey().Address(), testAddress},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			if addrStr := vm.FormatAddress(tt.in); addrStr != tt.want {
+			addrStr, err := vm.FormatLocalAddress(tt.in)
+			if err != nil {
+				t.Errorf("problem formatting address: %w", err)
+			}
+			if addrStr != tt.want {
 				t.Errorf("want %q, got %q", tt.want, addrStr)
 			}
 		})

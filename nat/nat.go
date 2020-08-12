@@ -102,7 +102,9 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 				updateTimer.Stop()
 
 				dev.log.Debug("Unmap protocol %s external port %d", protocol, extPort)
-				dev.r.UnmapPort(protocol, intPort, extPort)
+				if err := dev.r.UnmapPort(protocol, intPort, extPort); err != nil {
+					dev.log.Debug("Error unmapping port %d to %d: %s", intPort, extPort, err)
+				}
 
 				dev.wg.Done()
 			}(extPort)

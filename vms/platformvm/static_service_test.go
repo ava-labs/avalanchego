@@ -6,31 +6,41 @@ package platformvm
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/utils/constants"
+
+	"github.com/ava-labs/gecko/utils/formatting"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/json"
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
-	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	id := ids.NewShortID([20]byte{1, 2, 3})
+	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  0,
 	}
 	weight := json.Uint64(987654321)
-	validator := APIDefaultSubnetValidator{
-		APIValidator: APIValidator{
+	validator := FormattedAPIDefaultSubnetValidator{
+		FormattedAPIValidator: FormattedAPIValidator{
 			EndTime: 15,
 			Weight:  &weight,
-			ID:      id,
+			ID:      nodeID,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []APIDefaultSubnetValidator{
+		Validators: []FormattedAPIDefaultSubnetValidator{
 			validator,
 		},
 		Time: 5,
@@ -44,27 +54,33 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 }
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
-	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	id := ids.NewShortID([20]byte{1, 2, 3})
+	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  123456789,
 	}
 	weight := json.Uint64(0)
-	validator := APIDefaultSubnetValidator{
-		APIValidator: APIValidator{
+	validator := FormattedAPIDefaultSubnetValidator{
+		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 0,
 			EndTime:   15,
 			Weight:    &weight,
-			ID:        id,
+			ID:        nodeID,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []APIDefaultSubnetValidator{
+		Validators: []FormattedAPIDefaultSubnetValidator{
 			validator,
 		},
 		Time: 5,
@@ -78,28 +94,34 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 }
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
-	id, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	id := ids.NewShortID([20]byte{1, 2, 3})
+	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  123456789,
 	}
 
 	weight := json.Uint64(987654321)
-	validator := APIDefaultSubnetValidator{
-		APIValidator: APIValidator{
+	validator := FormattedAPIDefaultSubnetValidator{
+		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 0,
 			EndTime:   5,
 			Weight:    &weight,
-			ID:        id,
+			ID:        nodeID,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []APIDefaultSubnetValidator{
+		Validators: []FormattedAPIDefaultSubnetValidator{
 			validator,
 		},
 		Time: 5,
@@ -114,40 +136,46 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	id := ids.NewShortID([20]byte{1})
+	nodeID := id.PrefixedString(constants.NodeIDPrefix)
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	addr, err := formatting.FormatBech32(hrp, id.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	utxo := APIUTXO{
-		Address: id,
+		Address: addr,
 		Amount:  123456789,
 	}
 
 	weight := json.Uint64(987654321)
-	validator1 := APIDefaultSubnetValidator{
-		APIValidator: APIValidator{
+	validator1 := FormattedAPIDefaultSubnetValidator{
+		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 0,
 			EndTime:   20,
 			Weight:    &weight,
-			ID:        id,
+			ID:        nodeID,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
-	validator2 := APIDefaultSubnetValidator{
-		APIValidator: APIValidator{
+	validator2 := FormattedAPIDefaultSubnetValidator{
+		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 3,
 			EndTime:   15,
 			Weight:    &weight,
-			ID:        id,
+			ID:        nodeID,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
-	validator3 := APIDefaultSubnetValidator{
-		APIValidator: APIValidator{
+	validator3 := FormattedAPIDefaultSubnetValidator{
+		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 1,
 			EndTime:   10,
 			Weight:    &weight,
-			ID:        id,
+			ID:        nodeID,
 		},
-		Destination: id,
+		Destination: addr,
 	}
 
 	args := BuildGenesisArgs{
@@ -155,7 +183,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []APIDefaultSubnetValidator{
+		Validators: []FormattedAPIDefaultSubnetValidator{
 			validator1,
 			validator2,
 			validator3,

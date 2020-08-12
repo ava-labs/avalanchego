@@ -5,16 +5,14 @@ package network
 
 import (
 	"time"
-
-	"github.com/ava-labs/gecko/ids"
 )
 
 // PeerID ...
 type PeerID struct {
-	IP           string      `json:"ip"`
-	PublicIP     string      `json:"publicIP"`
-	ID           ids.ShortID `json:"id"`
-	Version      string      `json:"version"`
-	LastSent     time.Time   `json:"lastSent"`
-	LastReceived time.Time   `json:"lastReceived"`
+	IP           string    `json:"ip"`
+	PublicIP     string    `json:"publicIP"`
+	ID           string    `json:"id"`
+	Version      string    `json:"version"`
+	LastSent     time.Time `json:"lastSent"`
+	LastReceived time.Time `json:"lastReceived"`
 }

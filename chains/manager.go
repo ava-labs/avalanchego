@@ -4,7 +4,9 @@
 package chains
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/gecko/api"
@@ -29,11 +31,10 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms"
-	"github.com/ava-labs/gecko/vms/avm"
 
-	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
-	avaeng "github.com/ava-labs/gecko/snow/engine/avalanche"
-	avabootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
+	avcon "github.com/ava-labs/gecko/snow/consensus/avalanche"
+	aveng "github.com/ava-labs/gecko/snow/engine/avalanche"
+	avbootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 
 	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
@@ -79,6 +80,9 @@ type Manager interface {
 	// Add an alias to a chain
 	Alias(ids.ID, string) error
 
+	// Returns the ID of the subnet that is validating the provided chain
+	SubnetID(chainID ids.ID) (ids.ID, error)
+
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
 
@@ -119,7 +123,7 @@ type manager struct {
 	chainRouter     router.Router      // Routes incoming messages to the appropriate chain
 	net             network.Network    // Sends consensus messages to other validators
 	timeoutManager  *timeout.Manager   // Manages request timeouts when sending messages to other validators
-	consensusParams avacon.Parameters  // The consensus parameters (alpha, beta, etc.) for new chains
+	consensusParams avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
 	validators      validators.Manager // Validators validating on this chain
 	registrants     []Registrant       // Those notified when a chain is created
 	nodeID          ids.ShortID        // The ID of this node
@@ -127,13 +131,15 @@ type manager struct {
 	server          *api.Server        // Handles HTTP API calls
 	keystore        *keystore.Keystore
 	sharedMemory    *atomic.SharedMemory
-
-	// Key: Chain's ID
-	// Value: The chain
-	chains map[[32]byte]*router.Handler
+	criticalChains  ids.Set // Chains that can't exit gracefully
 
 	unblocked     bool
 	blockedChains []ChainParameters
+
+	chainsLock sync.Mutex
+	// Key: Chain's ID
+	// Value: The chain
+	chains map[[32]byte]*router.Handler
 }
 
 // New returns a new Manager where:
@@ -151,13 +157,14 @@ func New(
 	db database.Database,
 	rtr router.Router,
 	net network.Network,
-	consensusParams avacon.Parameters,
+	consensusParams avcon.Parameters,
 	validators validators.Manager,
 	nodeID ids.ShortID,
 	networkID uint32,
 	server *api.Server,
 	keystore *keystore.Keystore,
 	sharedMemory *atomic.SharedMemory,
+	criticalChains ids.Set,
 ) (Manager, error) {
 	timeoutManager := timeout.Manager{}
 	err := timeoutManager.Initialize(
@@ -189,6 +196,7 @@ func New(
 		server:          server,
 		keystore:        keystore,
 		sharedMemory:    sharedMemory,
+		criticalChains:  criticalChains,
 		chains:          make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
@@ -228,7 +236,11 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.log.Error("Error while creating new chain: %s", err)
 		return
 	}
-	m.chains[chainParams.ID.Key()] = chain.Handler
+	chainID := chainParams.ID.Key()
+
+	m.chainsLock.Lock()
+	m.chains[chainID] = chain.Handler
+	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
 	m.log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
@@ -257,15 +269,16 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	ctx := &snow.Context{
 		NetworkID:           m.networkID,
+		SubnetID:            chainParams.SubnetID,
 		ChainID:             chainParams.ID,
 		Log:                 chainLog,
 		DecisionDispatcher:  m.decisionEvents,
 		ConsensusDispatcher: m.consensusEvents,
 		NodeID:              m.nodeID,
-		HTTP:                m.server,
 		Keystore:            m.keystore.NewBlockchainKeyStore(chainParams.ID),
 		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chainParams.ID),
 		BCLookup:            m,
+		SNLookup:            m,
 		Namespace:           fmt.Sprintf("gecko_%s_vm", primaryAlias),
 		Metrics:             m.consensusParams.Metrics,
 	}
@@ -328,10 +341,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		beacons = chainParams.CustomBeacons
 	}
 
-	bootstrapWeight, err := beacons.Weight()
-	if err != nil {
-		return nil, fmt.Errorf("Error calculating bootstrap weight: %s", err)
-	}
+	bootstrapWeight := beacons.Weight()
 
 	var chain *chain
 	switch vm := vm.(type) {
@@ -370,7 +380,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	// Allows messages to be routed to the new chain
 	m.chainRouter.AddChain(chain.Handler)
 	// If the X or P Chain panics, do not attempt to recover
-	if chainParams.SubnetID.Equals(constants.DefaultSubnetID) && (chainParams.ID.Equals(constants.PlatformChainID) || vmID.Equals(avm.ID)) {
+	if m.criticalChains.Contains(chainParams.ID) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
@@ -380,12 +390,18 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	reqWeight := (3*bootstrapWeight + 3) / 4
 	if reqWeight == 0 {
-		chain.Engine.Startup()
+		if err := chain.Engine.Startup(); err != nil {
+			chain.Handler.Shutdown()
+			return nil, fmt.Errorf("failed to start consensus engine: %w", err)
+		}
 	} else {
 		awaiter := NewAwaiter(beacons, reqWeight, func() {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
-			chain.Engine.Startup()
+			if err := chain.Engine.Startup(); err != nil {
+				chain.Ctx.Log.Error("failed to start consensus engine: %s", err)
+				chain.Handler.Shutdown()
+			}
 		})
 		go m.net.RegisterHandler(awaiter)
 	}
@@ -413,7 +429,7 @@ func (m *manager) createAvalancheChain(
 	beacons validators.Set,
 	vm vertex.DAGVM,
 	fxs []*common.Fx,
-	consensusParams avacon.Parameters,
+	consensusParams avcon.Parameters,
 	bootstrapWeight uint64,
 ) (*chain, error) {
 	ctx.Lock.Lock()
@@ -452,11 +468,11 @@ func (m *manager) createAvalancheChain(
 	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
 
 	// The engine handles consensus
-	engine := &avaeng.Transitive{}
-	engine.Initialize(avaeng.Config{
-		Config: avabootstrap.Config{
+	engine := &aveng.Transitive{}
+	if err := engine.Initialize(aveng.Config{
+		Config: avbootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: validators,
 				Beacons:    beacons,
 				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
@@ -468,8 +484,10 @@ func (m *manager) createAvalancheChain(
 			VM:         vm,
 		},
 		Params:    consensusParams,
-		Consensus: &avacon.Topological{},
-	})
+		Consensus: &avcon.Topological{},
+	}); err != nil {
+		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -528,10 +546,10 @@ func (m *manager) createSnowmanChain(
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
-	engine.Initialize(smeng.Config{
+	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: validators,
 				Beacons:    beacons,
 				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
@@ -543,7 +561,9 @@ func (m *manager) createSnowmanChain(
 		},
 		Params:    consensusParams,
 		Consensus: &smcon.Topological{},
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -564,8 +584,21 @@ func (m *manager) createSnowmanChain(
 	}, nil
 }
 
+func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
+	m.chainsLock.Lock()
+	defer m.chainsLock.Unlock()
+
+	chain, exists := m.chains[chainID.Key()]
+	if !exists {
+		return ids.ID{}, errors.New("unknown chain ID")
+	}
+	return chain.Context().SubnetID, nil
+}
+
 func (m *manager) IsBootstrapped(id ids.ID) bool {
+	m.chainsLock.Lock()
 	chain, exists := m.chains[id.Key()]
+	m.chainsLock.Unlock()
 	if !exists {
 		return false
 	}

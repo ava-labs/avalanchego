@@ -6,10 +6,10 @@ package ids
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 	"testing"
-
-	"github.com/ava-labs/gecko/utils/random"
+	"time"
 )
 
 func flip(b uint8) uint8 {
@@ -76,8 +76,9 @@ func TestEqualSubsetBadMiddle(t *testing.T) {
 }
 
 func TestEqualSubsetAll3Bytes(t *testing.T) {
-	seed := random.Rand(0, math.MaxInt64)
-	id1 := NewID([32]byte{}).Prefix(uint64(seed))
+	rand.Seed(time.Now().UnixNano())
+	seed := uint64(rand.Int63())
+	id1 := NewID([32]byte{}).Prefix(seed)
 	bytes1 := id1.Bytes()
 
 	for i := 0; i < BitsPerByte; i++ {
