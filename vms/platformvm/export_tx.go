@@ -112,10 +112,9 @@ func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.
 		return tempError{err}
 	}
 	// Produce the UTXOS
-	if err := tx.vm.produceOutputs(db, txID, outs); err != nil {
+	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
 		return tempError{err}
 	}
-
 	return nil
 }
 
@@ -152,9 +151,14 @@ func (tx *UnsignedExportTx) Accept(batch database.Batch) error {
 // Create a new transaction
 func (vm *VM) newExportTx(
 	amount uint64, // Amount of tokens to export
+	chainID ids.ID,
 	to ids.ShortID, // Address of X-Chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*AtomicTx, error) {
+	if !vm.avm.Equals(chainID) {
+		return nil, errWrongBlockchainID
+	}
+
 	toBurn, err := safemath.Add64(amount, vm.txFee)
 	if err != nil {
 		return nil, errOverflowExport

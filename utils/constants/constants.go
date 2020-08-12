@@ -81,3 +81,11 @@ var (
 
 	ValidNetworkName = regexp.MustCompile(`network-[0-9]+`)
 )
+
+// GetHRP returns the Human-Readable-Part of bech32 addresses for a networkID
+func GetHRP(networkID uint32) string {
+	if hrp, ok := NetworkIDToHRP[networkID]; ok {
+		return hrp
+	}
+	return FallbackHRP
+}

@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/gecko/chains/atomic"
@@ -16,11 +17,16 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
+var (
+	errNoExportOutputs = errors.New("no export outputs")
+)
+
 // ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
-	Outs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"` // The outputs this transaction is sending to the other chain
+	DestinationChain ids.ID                     `serialize:"true" json:"destinationChain"` // Which chain to send the funds to
+	Outs             []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`  // The outputs this transaction is sending to the other chain
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -40,6 +46,10 @@ func (t *ExportTx) SyntacticVerify(
 		return errWrongChainID
 	case len(t.Memo) > maxMemoSize:
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
+	case t.DestinationChain.IsZero():
+		return errWrongBlockchainID
+	case len(t.Outs) == 0:
+		return errNoExportOutputs
 	}
 
 	fc := avax.NewFlowChecker()
@@ -82,6 +92,14 @@ func (t *ExportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is valid to be spent.
 func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+	subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
+	if err != nil {
+		return err
+	}
+	if !vm.ctx.SubnetID.Equals(subnetID) || t.DestinationChain.Equals(vm.ctx.ChainID) {
+		return errWrongBlockchainID
+	}
+
 	for i, in := range t.Ins {
 		cred := creds[i]
 
@@ -142,8 +160,8 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	txID := t.ID()
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+	smDB := vm.ctx.SharedMemory.GetDatabase(t.DestinationChain)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(t.DestinationChain)
 
 	vsmDB := versiondb.New(smDB)
 

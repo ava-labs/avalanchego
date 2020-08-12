@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -45,9 +46,6 @@ const (
 	txTypeID
 	statusTypeID
 
-	platformAlias = "P"
-	addressSep    = "-"
-
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
 
@@ -76,6 +74,8 @@ const (
 	MaximumStakingDuration = 365 * 24 * time.Hour
 
 	droppedTxCacheSize = 50
+
+	maxUTXOsToFetch = 1024
 )
 
 var (
@@ -933,83 +933,114 @@ func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 // Logger ...
 func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 
-// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*avax.UTXO, error) {
-	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
+// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Returns at most [limit] UTXOs.
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Returns:
+// * The fetched of UTXOs
+// * true if all there are no more UTXOs in this range to fetch
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+func (vm *VM) GetAtomicUTXOs(
+	chainID ids.ID,
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
+	}
 
+	seen := ids.Set{} // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, limit)
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+	smDB := vm.Ctx.SharedMemory.GetDatabase(chainID)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(chainID)
 	state := avax.NewPrefixedState(smDB, vm.codec)
-
-	utxoIDs := ids.Set{}
 	for _, addr := range addrs.List() {
-		utxos, err := state.AVMFunds(addr)
-		if err != nil {
-			return nil, err
+		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
+			continue
 		}
-		utxoIDs.Add(utxos...)
-	}
-
-	utxos := []*avax.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := state.AVMUTXO(utxoID)
+		utxoIDs, err := state.AVMFunds(addr.Bytes(), startUTXOID, limit)
 		if err != nil {
-			return nil, err
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
 		}
-		utxos = append(utxos, utxo)
+		for _, utxoID := range utxoIDs {
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+			utxo, err := state.AVMUTXO(utxoID)
+			if err != nil {
+				return nil, ids.ShortEmpty, ids.Empty, err
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			lastAddr = addr
+			lastIndex = utxoID
+			limit--
+			if limit <= 0 { // We fetched enough UTXOs; stop.
+				break
+			}
+		}
 	}
-	return utxos, nil
+	return utxos, lastAddr, lastIndex, nil
 }
 
-// GetHRP returns the Human-Readable-Part of addresses for this VM
-func (vm *VM) GetHRP() string {
-	networkID := vm.Ctx.NetworkID
-	hrp := constants.FallbackHRP
-	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
-		hrp = constants.NetworkIDToHRP[networkID]
-	}
-	return hrp
-}
-
-// ParseAddress returns a decoded Platform Chain address.
-// addrStr is an encoded address, of the form "P-<bech32 encoded bytes>".
-func (vm *VM) ParseAddress(addrStr string) (ids.ShortID, error) {
-	networkID := vm.Ctx.NetworkID
-	hrp := constants.FallbackHRP
-	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
-		hrp = constants.NetworkIDToHRP[networkID]
-	}
-
-	chainPrefixes := []string{vm.Ctx.ChainID.String()}
-	if alias, err := vm.Ctx.BCLookup.PrimaryAlias(vm.Ctx.ChainID); err == nil {
-		chainPrefixes = append(chainPrefixes, alias)
-	}
-
-	addr, err := formatting.ParseAddress(addrStr, chainPrefixes, addressSep, hrp)
+// ParseLocalAddress takes in an address for this chain and produces the ID
+func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
+	chainID, addr, err := vm.ParseAddress(addrStr)
 	if err != nil {
 		return ids.ShortID{}, err
 	}
-
-	return ids.ToShortID(addr)
+	if !chainID.Equals(vm.Ctx.ChainID) {
+		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
+			vm.Ctx.ChainID, chainID)
+	}
+	return addr, nil
 }
 
-// FormatAddress returns an encoded Platform Chain address, of the form
-// "P-<bech32 encoded bytes>".
-func (vm *VM) FormatAddress(addrID ids.ShortID) (string, error) {
-	networkID := vm.Ctx.NetworkID
-	hrp := constants.FallbackHRP
-	if _, ok := constants.NetworkIDToHRP[networkID]; ok {
-		hrp = constants.NetworkIDToHRP[networkID]
+// ParseAddress takes in an address and produces the ID of the chain it's for
+// the ID of the address
+func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
+	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
 	}
 
-	chainPrefix := vm.Ctx.ChainID.String()
-	if alias, err := vm.Ctx.BCLookup.PrimaryAlias(vm.Ctx.ChainID); err == nil {
-		chainPrefix = alias
+	chainID, err := vm.Ctx.BCLookup.Lookup(chainIDAlias)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
 	}
-	addrstr, err := formatting.FormatAddress(addrID.Bytes(), chainPrefix, addressSep, hrp)
+
+	expectedHRP := constants.GetHRP(vm.Ctx.NetworkID)
+	if hrp != expectedHRP {
+		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
+			expectedHRP, hrp)
+	}
+
+	addr, err := ids.ToShortID(addrBytes)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+	return chainID, addr, nil
+}
+
+// FormatLocalAddress takes in a raw address and produces the formatted address
+func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
+	return vm.FormatAddress(vm.Ctx.ChainID, addr)
+}
+
+// FormatAddress takes in a chainID and a raw address and produces the formatted
+// address
+func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
+	chainIDAlias, err := vm.Ctx.BCLookup.PrimaryAlias(chainID)
 	if err != nil {
 		return "", err
 	}
-
-	return addrstr, nil
+	hrp := constants.GetHRP(vm.Ctx.NetworkID)
+	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }

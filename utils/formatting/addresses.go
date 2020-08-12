@@ -10,95 +10,62 @@ import (
 	"github.com/btcsuite/btcutil/bech32"
 )
 
-func stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
+const (
+	addressSep = "-"
+)
+
+// ParseAddress takes in an address string and splits returns the corresponding
+// parts. This returns the chain ID alias, bech32 HRP, address bytes, and an
+// error if it occurs.
+func ParseAddress(addrStr string) (string, string, []byte, error) {
+	addressParts := strings.SplitN(addrStr, addressSep, 2)
+	if len(addressParts) < 2 {
+		return "", "", nil, fmt.Errorf("no separator found in address")
 	}
-	return false
+	chainID := addressParts[0]
+	rawAddr := addressParts[1]
+
+	hrp, addr, err := ParseBech32(rawAddr)
+	return chainID, hrp, addr, err
 }
 
-// ParseBech32 takes a bech32 address as input and returns the HRP and data section of a bech32 address
+// FormatAddress takes in a chain prefix, HRP, and byte slice to produce a
+// string for an address.
+func FormatAddress(
+	chainIDAlias string,
+	hrp string,
+	addr []byte,
+) (string, error) {
+	addrStr, err := FormatBech32(hrp, addr)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%s%s", chainIDAlias, addressSep, addrStr), nil
+}
+
+// ParseBech32 takes a bech32 address as input and returns the HRP and data
+// section of a bech32 address
 func ParseBech32(addrStr string) (string, []byte, error) {
 	rawHRP, decoded, err := bech32.Decode(addrStr)
 	if err != nil {
 		return "", nil, err
 	}
-	addrbuff, err := bech32.ConvertBits(decoded, 5, 8, true)
+	addrBytes, err := bech32.ConvertBits(decoded, 5, 8, true)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to convert address from 5-bit to 8-bit formatting")
 	}
-	return rawHRP, addrbuff, nil
+	return rawHRP, addrBytes, nil
 }
 
 // FormatBech32 takes an address's bytes as input and returns a bech32 address
-func FormatBech32(hrp string, b []byte) (string, error) {
-	fivebits, err := bech32.ConvertBits(b, 8, 5, true)
+func FormatBech32(hrp string, payload []byte) (string, error) {
+	fiveBits, err := bech32.ConvertBits(payload, 8, 5, true)
 	if err != nil {
 		return "", fmt.Errorf("unable to convert address from 8-bit to 5-bit formatting")
 	}
-	addr, err := bech32.Encode(hrp, fivebits)
+	addr, err := bech32.Encode(hrp, fiveBits)
 	if err != nil {
 		return "", err
 	}
 	return addr, nil
-}
-
-// ParseAddress takes in an address string, a chain prefix array, a separator, and an HRP, validates against a chain prefix, and
-//    an HRP, to produce bytes for the address
-func ParseAddress(addrStr string, chainPrefixes []string, addressSep string, hrp string) ([]byte, error) {
-
-	if count := strings.Count(addrStr, addressSep); count < 1 {
-		return nil, fmt.Errorf("no separator found in address")
-	}
-	addressParts := strings.SplitN(addrStr, addressSep, 2)
-	bcID := addressParts[0]
-	rawAddr := addressParts[1]
-
-	if !stringInSlice(bcID, chainPrefixes) {
-		return nil, fmt.Errorf("invalid chainID in address")
-	}
-	_, addr, err := ParseBech32(rawAddr)
-	if err != nil {
-		return nil, err
-	}
-	return addr, nil
-}
-
-// FormatAddress takes in a 20-byte slice, a chain prefix, a separator, and an HRP, to produce a string for an address
-func FormatAddress(b []byte, chainPrefix string, addressSep string, hrp string) (string, error) {
-	addrstr, err := FormatBech32(hrp, b)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%s%s", chainPrefix, addressSep, addrstr), nil
-}
-
-// BytesToBech32Addresses takes a slice of byte slices string and converts them to a Bech32 addresses
-func BytesToBech32Addresses(hrp string, addresses [][]byte) ([]string, error) {
-	var result = []string{}
-	for _, addr := range addresses {
-		bech32addr, err := FormatBech32(hrp, addr)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, bech32addr)
-	}
-	return result, nil
-}
-
-// CB58ToBech32Addresses takes a slice of cb58 strings and converts them to a Bech32 addresses
-func CB58ToBech32Addresses(hrp string, addresses []string) ([]string, error) {
-	var result = []string{}
-	for _, addr := range addresses {
-		cb58 := CB58{}
-		cb58.FromString(addr)
-		bech32addr, err := FormatBech32(hrp, cb58.Bytes)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, bech32addr)
-	}
-	return result, nil
 }

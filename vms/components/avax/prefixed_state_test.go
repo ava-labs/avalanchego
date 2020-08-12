@@ -4,11 +4,11 @@
 package avax
 
 import (
+	"math"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,6 +21,9 @@ func TestPrefixedFunds(t *testing.T) {
 
 	st := NewPrefixedState(db, cc)
 
+	addr := ids.GenerateTestShortID()
+	addrBytes := addr.Bytes()
+
 	avmUTXO := &UTXO{
 		UTXOID: UTXOID{
 			TxID:        ids.Empty,
@@ -31,7 +34,7 @@ func TestPrefixedFunds(t *testing.T) {
 		},
 		Out: &TestAddressable{
 			Addrs: [][]byte{
-				[]byte{0},
+				addrBytes,
 			},
 		},
 	}
@@ -46,7 +49,7 @@ func TestPrefixedFunds(t *testing.T) {
 		},
 		Out: &TestAddressable{
 			Addrs: [][]byte{
-				[]byte{0},
+				addrBytes,
 			},
 		},
 	}
@@ -54,19 +57,17 @@ func TestPrefixedFunds(t *testing.T) {
 	assert.NoError(t, st.FundAVMUTXO(avmUTXO))
 	assert.NoError(t, st.FundPlatformUTXO(platformUTXO))
 
-	addrID := ids.NewID(hashing.ComputeHash256Array([]byte{0}))
-
-	avmUTXOIDs, err := st.AVMFunds(addrID)
+	avmUTXOIDs, err := st.AVMFunds(addr.Bytes(), ids.Empty, math.MaxInt32)
 	assert.NoError(t, err)
 	assert.Equal(t, []ids.ID{avmUTXO.InputID()}, avmUTXOIDs)
 
-	platformUTXOIDs, err := st.PlatformFunds(addrID)
+	platformUTXOIDs, err := st.PlatformFunds(addr.Bytes(), ids.Empty, math.MaxInt32)
 	assert.NoError(t, err)
 	assert.Equal(t, []ids.ID{platformUTXO.InputID()}, platformUTXOIDs)
 
 	assert.NoError(t, st.SpendAVMUTXO(avmUTXO.InputID()))
 
-	avmUTXOIDs, err = st.AVMFunds(addrID)
+	avmUTXOIDs, err = st.AVMFunds(addr.Bytes(), ids.Empty, math.MaxInt32)
 	assert.NoError(t, err)
 	assert.Len(t, avmUTXOIDs, 0)
 }
