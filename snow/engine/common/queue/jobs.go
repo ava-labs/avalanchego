@@ -94,7 +94,9 @@ func (j *Jobs) Execute(job Job) error {
 	if err != nil {
 		return err
 	}
-	j.state.DeleteBlocking(j.db, jobID, blocking)
+	if err := j.state.DeleteBlocking(j.db, jobID, blocking); err != nil {
+		return err
+	}
 
 	for _, blockedID := range blocking {
 		job, err := j.state.Job(j.db, blockedID)
@@ -108,7 +110,9 @@ func (j *Jobs) Execute(job Job) error {
 		if deps.Len() > 0 {
 			continue
 		}
-		j.state.DeleteJob(j.db, blockedID)
+		if err := j.state.DeleteJob(j.db, blockedID); err != nil {
+			return err
+		}
 		if err := j.push(job); err != nil {
 			return err
 		}

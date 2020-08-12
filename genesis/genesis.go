@@ -28,10 +28,12 @@ var (
 )
 
 // Genesis returns the genesis data of the Platform Chain.
-// Since an AVA network has exactly one Platform Chain, and the Platform Chain
-// defines the genesis state of the network (who is staking, which chains exist,
-// etc.), defining the genesis state of the Platform Chain is the same as
+//
+// Since an Avalanche network has exactly one Platform Chain, and the Platform
+// Chain defines the genesis state of the network (who is staking, which chains
+// exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
+//
 // The ID of the new network is [networkID].
 
 // FromConfig returns:
@@ -46,28 +48,28 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
-		ava := avm.AssetDefinition{
-			Name:         "AVA",
-			Symbol:       "AVA",
+		avax := avm.AssetDefinition{
+			Name:         "AVAX",
+			Symbol:       "AVAX",
 			Denomination: 9,
 			InitialState: map[string][]interface{}{},
 		}
 
 		if len(config.MintAddresses) > 0 {
-			ava.InitialState["variableCap"] = []interface{}{avm.Owners{
+			avax.InitialState["variableCap"] = []interface{}{avm.Owners{
 				Threshold: 1,
 				Minters:   config.MintAddresses,
 			}}
 		}
 		for _, addr := range config.FundedAddresses {
-			ava.InitialState["fixedCap"] = append(ava.InitialState["fixedCap"], avm.Holder{
-				Amount:  json.Uint64(45 * units.MegaAva),
+			avax.InitialState["fixedCap"] = append(avax.InitialState["fixedCap"], avm.Holder{
+				Amount:  json.Uint64(45 * units.MegaAvax),
 				Address: addr,
 			})
 		}
 
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
-			"AVA": ava, // The AVM starts out with one asset: AVAX
+			"AVAX": avax, // The AVM starts out with one asset: AVAX
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}
@@ -92,7 +94,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
 			platformvm.APIUTXO{
 				Address: addr,
-				Amount:  json.Uint64(20 * units.KiloAva),
+				Amount:  json.Uint64(20 * units.KiloAvax),
 			},
 		)
 	}
@@ -111,15 +113,15 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	endStakingTime := genesisTime.Add(stakingDuration)
 
 	for i, validatorID := range config.ParsedStakerIDs {
-		weight := json.Uint64(20 * units.KiloAva)
+		weight := json.Uint64(20 * units.KiloAvax)
 		destAddr := config.FundedAddresses[i%len(config.FundedAddresses)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.APIDefaultSubnetValidator{
-				APIValidator: platformvm.APIValidator{
+			platformvm.FormattedAPIDefaultSubnetValidator{
+				FormattedAPIValidator: platformvm.FormattedAPIValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					Weight:    &weight,
-					ID:        validatorID,
+					ID:        validatorID.PrefixedString(constants.NodeIDPrefix),
 				},
 				Destination: destAddr,
 			},

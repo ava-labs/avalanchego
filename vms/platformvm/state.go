@@ -14,8 +14,9 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/vms/components/avax"
+
 	safemath "github.com/ava-labs/gecko/utils/math"
-	"github.com/ava-labs/gecko/vms/components/ava"
 )
 
 // This file contains methods of VM that deal with getting/putting values from database
@@ -133,12 +134,12 @@ func (vm *VM) getValidatorsFromDB(
 }
 
 // getUTXO returns the UTXO with the specified ID
-func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
+func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*avax.UTXO, error) {
 	utxoIntf, err := vm.State.Get(db, utxoTypeID, ID)
 	if err != nil {
 		return nil, err
 	}
-	utxo, ok := utxoIntf.(*ava.UTXO)
+	utxo, ok := utxoIntf.(*avax.UTXO)
 	if !ok {
 		err := fmt.Errorf("expected UTXO from database but got %T", utxoIntf)
 		vm.Ctx.Log.Error(err.Error())
@@ -148,14 +149,14 @@ func (vm *VM) getUTXO(db database.Database, ID ids.ID) (*ava.UTXO, error) {
 }
 
 // putUTXO persists the given UTXO
-func (vm *VM) putUTXO(db database.Database, utxo *ava.UTXO) error {
+func (vm *VM) putUTXO(db database.Database, utxo *avax.UTXO) error {
 	utxoID := utxo.InputID()
 	if err := vm.State.Put(db, utxoTypeID, utxoID, utxo); err != nil {
 		return err
 	}
 
 	// If this output lists addresses that it references index it
-	if addressable, ok := utxo.Out.(ava.Addressable); ok {
+	if addressable, ok := utxo.Out.(avax.Addressable); ok {
 		// For each owner of this UTXO, add to list of UTXOs owned by that addr
 		for _, addrBytes := range addressable.Addresses() {
 			if err := vm.putReferencingUTXO(db, addrBytes, utxoID); err != nil {
@@ -177,7 +178,7 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 		return err
 	}
 	// If this output lists addresses that it references remove the indices
-	if addressable, ok := utxo.Out.(ava.Addressable); ok {
+	if addressable, ok := utxo.Out.(avax.Addressable); ok {
 		// For each owner of this UTXO, remove from their list of UTXOs
 		for _, addrBytes := range addressable.Addresses() {
 			if err := vm.removeReferencingUTXO(db, addrBytes, utxoID); err != nil {
@@ -236,13 +237,13 @@ func (vm *VM) GetUTXOs(
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
-) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch { // Don't fetch more than [maxUTXOsToFetch]
 		limit = maxUTXOsToFetch
 	}
 
 	seen := ids.Set{} // IDs of UTXOs already in the list
-	utxos := make([]*ava.UTXO, 0, limit)
+	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
@@ -287,7 +288,7 @@ func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, erro
 	}
 	balance := uint64(0)
 	for _, utxo := range utxos {
-		if out, ok := utxo.Out.(ava.Amounter); ok {
+		if out, ok := utxo.Out.(avax.Amounter); ok {
 			if balance, err = safemath.Add64(out.Amount(), balance); err != nil {
 				return 0, err
 			}
@@ -473,15 +474,15 @@ func (vm *VM) registerDBTypes() {
 	}
 
 	marshalUTXOFunc := func(utxoIntf interface{}) ([]byte, error) {
-		if utxo, ok := utxoIntf.(*ava.UTXO); ok {
+		if utxo, ok := utxoIntf.(*avax.UTXO); ok {
 			return Codec.Marshal(utxo)
-		} else if utxo, ok := utxoIntf.(ava.UTXO); ok {
+		} else if utxo, ok := utxoIntf.(avax.UTXO); ok {
 			return Codec.Marshal(utxo)
 		}
-		return nil, fmt.Errorf("expected *ava.UTXO but got type %T", utxoIntf)
+		return nil, fmt.Errorf("expected *avax.UTXO but got type %T", utxoIntf)
 	}
 	unmarshalUTXOFunc := func(bytes []byte) (interface{}, error) {
-		var utxo ava.UTXO
+		var utxo avax.UTXO
 		if err := Codec.Unmarshal(bytes, &utxo); err != nil {
 			return nil, err
 		}

@@ -13,8 +13,7 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-// main is the primary entry point to Ava. This can either create a CLI to an
-//     existing node or create a new node.
+// main is the primary entry point to Avalanche.
 func main() {
 	// Err is set based on the CLI arguments
 	if Err != nil {

@@ -17,13 +17,13 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/staking"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/random"
@@ -101,34 +101,34 @@ func GetIDs(networkID uint32) []string {
 	switch networkID {
 	case constants.DenaliID:
 		return []string{
-			"NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
-			"2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
-			"LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
-			"hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
-			"4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
-			"HGZ8ae74J3odT8ESreAdCtdnvWG1J4X5n",
-			"4KXitMCoE9p2BHA6VzXtaTxLoEjNDo2Pt",
-			"JyE4P8f4cTryNV8DCz2M81bMtGhFFHexG",
-			"EzGaipqomyK9UKx9DBHV6Ky3y68hoknrF",
-			"CYKruAjwH1BmV3m37sXNuprbr7dGQuJwG",
-			"LegbVf6qaMKcsXPnLStkdc1JVktmmiDxy",
-			"FesGqwKq7z5nPFHa5iwZctHE5EZV9Lpdq",
-			"BFa1padLXBj7VHa2JYvYGzcTBPQGjPhUy",
-			"4B4rc5vdD1758JSBYL1xyvE5NHGzz6xzH",
-			"EDESh4DfZFC15i613pMtWniQ9arbBZRnL",
-			"CZmZ9xpCzkWqjAyS7L4htzh5Lg6kf1k18",
-			"CTtkcXvVdhpNp6f97LEUXPwsRD3A2ZHqP",
-			"84KbQHSDnojroCVY7vQ7u9Tx7pUonPaS",
-			"JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
-			"4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
+			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
+			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
+			"NodeID-LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
+			"NodeID-hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
+			"NodeID-4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
+			"NodeID-HGZ8ae74J3odT8ESreAdCtdnvWG1J4X5n",
+			"NodeID-4KXitMCoE9p2BHA6VzXtaTxLoEjNDo2Pt",
+			"NodeID-JyE4P8f4cTryNV8DCz2M81bMtGhFFHexG",
+			"NodeID-EzGaipqomyK9UKx9DBHV6Ky3y68hoknrF",
+			"NodeID-CYKruAjwH1BmV3m37sXNuprbr7dGQuJwG",
+			"NodeID-LegbVf6qaMKcsXPnLStkdc1JVktmmiDxy",
+			"NodeID-FesGqwKq7z5nPFHa5iwZctHE5EZV9Lpdq",
+			"NodeID-BFa1padLXBj7VHa2JYvYGzcTBPQGjPhUy",
+			"NodeID-4B4rc5vdD1758JSBYL1xyvE5NHGzz6xzH",
+			"NodeID-EDESh4DfZFC15i613pMtWniQ9arbBZRnL",
+			"NodeID-CZmZ9xpCzkWqjAyS7L4htzh5Lg6kf1k18",
+			"NodeID-CTtkcXvVdhpNp6f97LEUXPwsRD3A2ZHqP",
+			"NodeID-84KbQHSDnojroCVY7vQ7u9Tx7pUonPaS",
+			"NodeID-JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
+			"NodeID-4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
 		}
 	case constants.CascadeID:
 		return []string{
-			"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
-			"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
-			"DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
-			"N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
-			"EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
+			"NodeID-NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
+			"NodeID-CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
+			"NodeID-DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
+			"NodeID-N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
+			"NodeID-EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
 		}
 	default:
 		return nil
@@ -176,8 +176,8 @@ func init() {
 	// NetworkID:
 	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
-	// Ava fees:
-	fs.Uint64Var(&Config.AvaTxFee, "ava-tx-fee", 0, "Ava transaction fee, in $nAva")
+	// AVAX fees:
+	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", 0, "AVAX transaction fee, in nAVAX")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
@@ -187,7 +187,7 @@ func init() {
 
 	// Database:
 	db := fs.Bool("db-enabled", true, "Turn on persistent storage")
-	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Ava state")
+	dbDir := fs.String("db-dir", defaultDbDir, "Database directory for Avalanche state")
 
 	// IP:
 	consensusIP := fs.String("public-ip", "", "Public IP of this node")
@@ -212,10 +212,10 @@ func init() {
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
 
 	// Plugins:
-	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Ava VMs")
+	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
 
 	// Logging:
-	logsDir := fs.String("log-dir", "", "Logging directory for Ava")
+	logsDir := fs.String("log-dir", "", "Logging directory for Avalanche")
 	logLevel := fs.String("log-level", "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayHighlight := fs.String("log-display-highlight", "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
@@ -234,11 +234,15 @@ func init() {
 	fs.BoolVar(&Config.KeystoreAPIEnabled, "api-keystore-enabled", true, "If true, this node exposes the Keystore API")
 	fs.BoolVar(&Config.MetricsAPIEnabled, "api-metrics-enabled", true, "If true, this node exposes the Metrics API")
 	fs.BoolVar(&Config.HealthAPIEnabled, "api-health-enabled", true, "If true, this node exposes the Health API")
-	fs.BoolVar(&Config.IPCEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
+	fs.BoolVar(&Config.IPCAPIEnabled, "api-ipcs-enabled", false, "If true, IPCs can be opened")
 
 	// Throughput Server
 	throughputPort := fs.Uint("xput-server-port", 9652, "Port of the deprecated throughput test server")
 	fs.BoolVar(&Config.ThroughputServerEnabled, "xput-server-enabled", false, "If true, throughput test server is created")
+
+	// IPC
+	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
+	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -344,15 +348,9 @@ func init() {
 
 	if Config.EnableP2PTLS {
 		i := 0
-		cb58 := formatting.CB58{}
 		for _, id := range strings.Split(*bootstrapIDs, ",") {
 			if id != "" {
-				err = cb58.FromString(id)
-				if err != nil {
-					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err))
-					return
-				}
-				peerID, err := ids.ToShortID(cb58.Bytes)
+				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
 				if err != nil {
 					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id: %w", err))
 					return
@@ -442,4 +440,9 @@ func init() {
 
 	// Router used for consensus
 	Config.ConsensusRouter = &router.ChainRouter{}
+
+	// IPCs
+	if *ipcsChainIDs != "" {
+		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
+	}
 }

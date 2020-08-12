@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -23,9 +23,9 @@ var (
 
 // Operation ...
 type Operation struct {
-	ava.Asset `serialize:"true"`
+	avax.Asset `serialize:"true"`
 
-	UTXOIDs []*ava.UTXOID `serialize:"true" json:"inputIDs"`
+	UTXOIDs []*avax.UTXOID `serialize:"true" json:"inputIDs"`
 	Op      FxOperation   `serialize:"true" json:"operation"`
 }
 
@@ -36,7 +36,7 @@ func (op *Operation) Verify(c codec.Codec) error {
 		return errNilOperation
 	case op.Op == nil:
 		return errNilFxOperation
-	case !ava.IsSortedAndUniqueUTXOIDs(op.UTXOIDs):
+	case !avax.IsSortedAndUniqueUTXOIDs(op.UTXOIDs):
 		return errNotSortedAndUniqueUTXOIDs
 	default:
 		return verify.All(&op.Asset, op.Op)

@@ -1,0 +1,2 @@
+avalanche_daemon_user: avalanche
+avalanche_daemon_group: "{{ avalanche_daemon_user }}"

@@ -600,14 +600,16 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	if err := blk.Verify(); err != nil {
 		t.Config.Context.Log.Debug("block failed verification due to %s, dropping block", err)
 
-		// if verify fails, then all decedents are also invalid
+		// if verify fails, then all descendants are also invalid
 		t.blocked.Abandon(blkID)
 		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
 		return t.errs.Err
 	}
 
 	t.Config.Context.Log.Verbo("adding block to consensus: %s", blkID)
-	t.consensus.Add(blk)
+	if err := t.consensus.Add(blk); err != nil {
+		return err
+	}
 
 	// Add all the oracle blocks if they exist. We call verify on all the blocks
 	// and add them to consensus before marking anything as fulfilled to avoid
@@ -625,7 +627,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 				t.Config.Context.Log.Debug("block failed verification due to %s, dropping block", err)
 				dropped = append(dropped, blk)
 			} else {
-				t.consensus.Add(blk)
+				if err := t.consensus.Add(blk); err != nil {
+					return err
+				}
 				added = append(added, blk)
 			}
 		}

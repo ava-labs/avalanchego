@@ -64,6 +64,7 @@ type Logger interface {
 	Stop()
 }
 
+// RotatingWriter allows for rotating a stream writer
 type RotatingWriter interface {
 	Initialize(Config) error
 	Flush() error

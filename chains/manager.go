@@ -32,9 +32,9 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms"
 
-	avacon "github.com/ava-labs/gecko/snow/consensus/avalanche"
-	avaeng "github.com/ava-labs/gecko/snow/engine/avalanche"
-	avabootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
+	avcon "github.com/ava-labs/gecko/snow/consensus/avalanche"
+	aveng "github.com/ava-labs/gecko/snow/engine/avalanche"
+	avbootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
 
 	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
@@ -123,7 +123,7 @@ type manager struct {
 	chainRouter     router.Router      // Routes incoming messages to the appropriate chain
 	net             network.Network    // Sends consensus messages to other validators
 	timeoutManager  *timeout.Manager   // Manages request timeouts when sending messages to other validators
-	consensusParams avacon.Parameters  // The consensus parameters (alpha, beta, etc.) for new chains
+	consensusParams avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
 	validators      validators.Manager // Validators validating on this chain
 	registrants     []Registrant       // Those notified when a chain is created
 	nodeID          ids.ShortID        // The ID of this node
@@ -157,7 +157,7 @@ func New(
 	db database.Database,
 	rtr router.Router,
 	net network.Network,
-	consensusParams avacon.Parameters,
+	consensusParams avcon.Parameters,
 	validators validators.Manager,
 	nodeID ids.ShortID,
 	networkID uint32,
@@ -393,12 +393,18 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	reqWeight := (3*bootstrapWeight + 3) / 4
 	if reqWeight == 0 {
-		chain.Engine.Startup()
+		if err := chain.Engine.Startup(); err != nil {
+			chain.Handler.Shutdown()
+			return nil, fmt.Errorf("failed to start consensus engine: %w", err)
+		}
 	} else {
 		awaiter := NewAwaiter(beacons, reqWeight, func() {
 			ctx.Lock.Lock()
 			defer ctx.Lock.Unlock()
-			chain.Engine.Startup()
+			if err := chain.Engine.Startup(); err != nil {
+				chain.Ctx.Log.Error("failed to start consensus engine: %s", err)
+				chain.Handler.Shutdown()
+			}
 		})
 		go m.net.RegisterHandler(awaiter)
 	}
@@ -426,7 +432,7 @@ func (m *manager) createAvalancheChain(
 	beacons validators.Set,
 	vm vertex.DAGVM,
 	fxs []*common.Fx,
-	consensusParams avacon.Parameters,
+	consensusParams avcon.Parameters,
 	bootstrapWeight uint64,
 ) (*chain, error) {
 	ctx.Lock.Lock()
@@ -465,9 +471,9 @@ func (m *manager) createAvalancheChain(
 	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
 
 	// The engine handles consensus
-	engine := &avaeng.Transitive{}
-	engine.Initialize(avaeng.Config{
-		Config: avabootstrap.Config{
+	engine := &aveng.Transitive{}
+	if err := engine.Initialize(aveng.Config{
+		Config: avbootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
 				Validators: validators,
@@ -481,8 +487,10 @@ func (m *manager) createAvalancheChain(
 			VM:         vm,
 		},
 		Params:    consensusParams,
-		Consensus: &avacon.Topological{},
-	})
+		Consensus: &avcon.Topological{},
+	}); err != nil {
+		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -541,7 +549,7 @@ func (m *manager) createSnowmanChain(
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
-	engine.Initialize(smeng.Config{
+	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
 				Context:    ctx,
@@ -556,7 +564,9 @@ func (m *manager) createSnowmanChain(
 		},
 		Params:    consensusParams,
 		Consensus: &smcon.Topological{},
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}

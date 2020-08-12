@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/propertyfx"
@@ -212,11 +212,11 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
-		ava: avaID,
+		avax: avaxID,
 	}
 	err := vm.Initialize(
 		ctx,
@@ -256,12 +256,12 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	newTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt: 50000,
 				Input: secp256k1fx.Input{
@@ -444,10 +444,10 @@ func TestTxSerialization(t *testing.T) {
 	for _, key := range keys {
 		addr := key.PublicKey().Address()
 
-		unsignedTx.Outs = append(unsignedTx.Outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: asset},
+		unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 20 * units.KiloAva,
+				Amt: 20 * units.KiloAvax,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{addr},
@@ -616,12 +616,12 @@ func TestIssueDependentTx(t *testing.T) {
 	firstTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt: 50000,
 				Input: secp256k1fx.Input{
@@ -631,8 +631,8 @@ func TestIssueDependentTx(t *testing.T) {
 				},
 			},
 		}},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: genesisTx.ID()},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -675,12 +675,12 @@ func TestIssueDependentTx(t *testing.T) {
 	secondTx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        firstTx.ID(),
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt: 50000,
 				Input: secp256k1fx.Input{
@@ -736,7 +736,7 @@ func TestIssueDependentTx(t *testing.T) {
 // Test issuing a transaction that creates an NFT family
 func TestIssueNFT(t *testing.T) {
 	vm := &VM{
-		ava: ids.Empty,
+		avax: ids.Empty,
 	}
 	ctx := NewContext()
 	ctx.Lock.Lock()
@@ -823,8 +823,8 @@ func TestIssueNFT(t *testing.T) {
 			BCID:  chainID,
 		},
 		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
 				TxID:        createAssetTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -874,8 +874,8 @@ func TestIssueNFT(t *testing.T) {
 			BCID:  chainID,
 		},
 		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
 				TxID:        mintNFTTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -906,7 +906,7 @@ func TestIssueNFT(t *testing.T) {
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
 	vm := &VM{
-		ava: ids.Empty,
+		avax: ids.Empty,
 	}
 	ctx := NewContext()
 	ctx.Lock.Lock()
@@ -989,8 +989,8 @@ func TestIssueProperty(t *testing.T) {
 			BCID:  chainID,
 		},
 		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
 				TxID:        createAssetTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -1044,8 +1044,8 @@ func TestIssueProperty(t *testing.T) {
 			BCID:  chainID,
 		},
 		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
 				TxID:        mintPropertyTx.ID(),
 				OutputIndex: 1,
 			}},

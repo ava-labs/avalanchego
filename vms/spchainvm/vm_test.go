@@ -50,7 +50,7 @@ func GenesisAccounts() []Account {
 		accounts = append(accounts,
 			Account{
 				id:      key.PublicKey().Address(),
-				balance: 20 * units.KiloAva,
+				balance: 20 * units.KiloAvax,
 			})
 	}
 	return accounts
@@ -143,9 +143,9 @@ func TestPayments(t *testing.T) {
 	queriedVtxIDSet.Add(*queriedVtxID)
 	consensus.Chits(vdr.ID(), *queryRequestID, queriedVtxIDSet)
 
-	if account := vm.GetAccount(vm.baseDB, keys[0].PublicKey().Address()); account.Balance() != 20*units.KiloAva-200 {
+	if account := vm.GetAccount(vm.baseDB, keys[0].PublicKey().Address()); account.Balance() != 20*units.KiloAvax-200 {
 		t.Fatalf("Wrong Balance")
-	} else if account := vm.GetAccount(vm.baseDB, keys[1].PublicKey().Address()); account.Balance() != 20*units.KiloAva+200 {
+	} else if account := vm.GetAccount(vm.baseDB, keys[1].PublicKey().Address()); account.Balance() != 20*units.KiloAvax+200 {
 		t.Fatalf("Wrong Balance")
 	}
 }

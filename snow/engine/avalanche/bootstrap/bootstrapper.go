@@ -6,6 +6,8 @@ package bootstrap
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -13,8 +15,8 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -348,12 +350,12 @@ func (b *Bootstrapper) finish() error {
 
 	b.Context.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
 		b.NumFetched)
-	if err := b.executeAll(b.TxBlocked); err != nil {
+	if err := b.executeAll(b.TxBlocked, b.Config.Context.DecisionDispatcher); err != nil {
 		return err
 	}
 
 	b.Context.Log.Info("executing vertex state transitions...")
-	if err := b.executeAll(b.VtxBlocked); err != nil {
+	if err := b.executeAll(b.VtxBlocked, b.Config.Context.ConsensusDispatcher); err != nil {
 		return err
 	}
 
@@ -372,12 +374,14 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
+func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events *triggers.EventDispatcher) error {
 	numExecuted := 0
+
+	ctx := b.Config.Context
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		b.Context.Log.Debug("Executing: %s", job.ID())
+		ctx.Log.Debug("Executing: %s", job.ID())
 		if err := jobs.Execute(job); err != nil {
-			b.Context.Log.Error("Error executing: %s", err)
+			ctx.Log.Error("Error executing: %s", err)
 			return err
 		}
 		if err := jobs.Commit(); err != nil {
@@ -385,8 +389,10 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Context.Log.Info("executed %d operations", numExecuted)
+			ctx.Log.Info("executed %d operations", numExecuted)
 		}
+
+		events.Accept(ctx.ChainID, job.ID(), job.Bytes())
 	}
 	b.Context.Log.Info("executed %d operations", numExecuted)
 	return nil

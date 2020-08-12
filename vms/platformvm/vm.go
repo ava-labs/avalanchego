@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -66,7 +66,7 @@ const (
 	InflationRate = 1.00
 
 	// MinimumStakeAmount is the minimum amount of tokens one must bond to be a staker
-	MinimumStakeAmount = 10 * units.MicroAva
+	MinimumStakeAmount = 10 * units.MicroAvax
 
 	// MinimumStakingDuration is the shortest amount of time a staker can bond
 	// their funds for.
@@ -173,7 +173,7 @@ type VM struct {
 	// AVAX asset ID
 	avaxAssetID ids.ID
 
-	// AVM is the ID of the ava virtual machine
+	// AVM is the ID of the avm virtual machine
 	avm ids.ID
 
 	fx    Fx
@@ -307,10 +307,12 @@ func (vm *VM) Initialize(
 		}
 		genesisBlock.onAcceptDB = versiondb.New(vm.DB)
 		if err := genesisBlock.CommonBlock.Accept(); err != nil {
-			return err
+			return fmt.Errorf("error accepting genesis block: %w", err)
 		}
 
-		vm.SetDBInitialized()
+		if err := vm.SetDBInitialized(); err != nil {
+			return fmt.Errorf("error while setting db to initialized: %w", err)
+		}
 
 		if err := vm.DB.Commit(); err != nil {
 			return err
@@ -652,12 +654,10 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 		return block, nil
 	}
 	if err := vm.State.PutBlock(vm.DB, block); err != nil { // Persist the block
-		return nil, err
+		return nil, fmt.Errorf("failed to put block due to %w", err)
 	}
-	if err := vm.DB.Commit(); err != nil {
-		return nil, err
-	}
-	return block, nil
+
+	return block, vm.DB.Commit()
 }
 
 // GetBlock implements the snowman.ChainVM interface
@@ -693,15 +693,18 @@ func (vm *VM) SetPreference(blkID ids.ID) {
 // See API documentation for more information
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	// Create a service with name "platform"
-	handler := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
+	handler, err := vm.SnowmanVM.NewHandler("platform", &Service{vm: vm})
+	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{"": handler}
 }
 
 // CreateStaticHandlers implements the snowman.ChainVM interface
 func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	// Static service's name is platform
-	handler := vm.SnowmanVM.NewHandler("platform", &StaticService{})
-	return map[string]*common.HTTPHandler{"": handler}
+	handler, _ := vm.SnowmanVM.NewHandler("platform", &StaticService{})
+	return map[string]*common.HTTPHandler{
+		"": handler,
+	}
 }
 
 // Check if there is a block ready to be added to consensus
@@ -947,20 +950,20 @@ func (vm *VM) GetAtomicUTXOs(
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,
-) ([]*ava.UTXO, ids.ShortID, ids.ID, error) {
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
 
 	seen := ids.Set{} // IDs of UTXOs already in the list
-	utxos := make([]*ava.UTXO, 0, limit)
+	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
 	smDB := vm.Ctx.SharedMemory.GetDatabase(chainID)
 	defer vm.Ctx.SharedMemory.ReleaseDatabase(chainID)
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec)
 	for _, addr := range addrs.List() {
 		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
 			continue

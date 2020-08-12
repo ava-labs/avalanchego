@@ -163,7 +163,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 
 	wantedBlk, err := b.VM.ParseBlock(blks[0]) // the block we requested
 	if err != nil {
-		b.Config.Context.Log.Debug("Failed to parse requested block %s: %w", wantedBlkID, err)
+		b.Config.Context.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
 	} else if actualID := wantedBlk.ID(); !actualID.Equals(wantedBlkID) {
 		b.Config.Context.Log.Debug("expected the first block to be the requested block, %s, but is %s", wantedBlk, actualID)
@@ -172,7 +172,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 
 	for _, blkBytes := range blks {
 		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
-			b.Config.Context.Log.Debug("Failed to parse block: %w", err)
+			b.Config.Context.Log.Debug("Failed to parse block: %s", err)
 			b.Config.Context.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
 		}
 	}
@@ -264,6 +264,7 @@ func (b *Bootstrapper) finish() error {
 
 func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 	numExecuted := 0
+	ctx := b.Config.Context
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		if err := jobs.Execute(job); err != nil {
 			return err
@@ -273,8 +274,11 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Config.Context.Log.Info("executed %d blocks", numExecuted)
+			ctx.Log.Info("executed %d blocks", numExecuted)
 		}
+
+		ctx.ConsensusDispatcher.Accept(ctx.ChainID, job.ID(), job.Bytes())
+		ctx.DecisionDispatcher.Accept(ctx.ChainID, job.ID(), job.Bytes())
 	}
 	b.Config.Context.Log.Info("executed %d blocks", numExecuted)
 	return nil

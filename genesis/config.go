@@ -12,11 +12,10 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 )
 
-// Note that since an AVA network has exactly one Platform Chain,
-// and the Platform Chain defines the genesis state of the network
-// (who is staking, which chains exist, etc.), defining the genesis
-// state of the Platform Chain is the same as defining the genesis
-// state of the network.
+// Note that since an Avalanche network has exactly one Platform Chain, and the
+// Platform Chain defines the genesis state of the network (who is staking,
+// which chains exist, etc.), defining the genesis state of the Platform Chain
+// is the same as defining the genesis state of the network.
 
 // Config contains the genesis addresses used to construct a genesis
 type Config struct {
@@ -60,7 +59,7 @@ func (c *Config) init() error {
 	}
 	c.ParsedStakerIDs = nil
 	for _, addrStr := range c.StakerIDs {
-		addr, err := ids.ShortFromString(addrStr)
+		addr, err := ids.ShortFromPrefixedString(addrStr, constants.NodeIDPrefix)
 		if err != nil {
 			return err
 		}
@@ -89,11 +88,11 @@ var (
 			"everest1qy8awey258pffs4xxl7pjs6mm8yvhhw9nsyut9",
 		},
 		StakerIDs: []string{
-			"LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
-			"hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
-			"2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
-			"4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
-			"NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
+			"NodeID-LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
+			"NodeID-hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
+			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
+			"NodeID-4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
+			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
@@ -206,11 +205,11 @@ var (
 			"denali1qy8awey258pffs4xxl7pjs6mm8yvhhw9haqx7k",
 		},
 		StakerIDs: []string{
-			"LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
-			"hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
-			"2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
-			"4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
-			"NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
+			"NodeID-LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
+			"NodeID-hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
+			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
+			"NodeID-4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
+			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
@@ -323,11 +322,11 @@ var (
 			"cascade1qy8awey258pffs4xxl7pjs6mm8yvhhw9p767nk",
 		},
 		StakerIDs: []string{
-			"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
-			"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
-			"DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
-			"N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
-			"EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
+			"NodeID-NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
+			"NodeID-CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
+			"NodeID-DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
+			"NodeID-N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
+			"NodeID-EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
@@ -430,11 +429,11 @@ var (
 			"local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
 		},
 		StakerIDs: []string{
-			"7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
-			"MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
-			"NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
-			"GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
-			"P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
+			"NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+			"NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
+			"NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
+			"NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
+			"NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
@@ -537,11 +536,11 @@ var (
 			"custom18jma8ppw3nhx5r4ap8clazz0dps7rv5u9xde7p",
 		},
 		StakerIDs: []string{
-			"7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
-			"MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
-			"NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
-			"GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
-			"P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
+			"NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+			"NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ",
+			"NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN",
+			"NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu",
+			"NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5",
 		},
 		EVMBytes: []byte{
 			0x7b, 0x22, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,

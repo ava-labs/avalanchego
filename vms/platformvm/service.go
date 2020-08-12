@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -145,8 +145,8 @@ type GetBalanceArgs struct {
 // GetBalanceResponse ...
 type GetBalanceResponse struct {
 	// Balance, in nAVAX, of the address
-	Balance json.Uint64   `json:"balance"`
-	UTXOIDs []*ava.UTXOID `json:"utxoIDs"`
+	Balance json.Uint64    `json:"balance"`
+	UTXOIDs []*avax.UTXOID `json:"utxoIDs"`
 }
 
 // GetBalance gets the balance of an address
@@ -324,7 +324,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	}
 
 	var (
-		utxos     []*ava.UTXO
+		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
 		err       error
@@ -650,11 +650,11 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		validatorIDs[i] = vdr.ID()
 	}
 	ids.SortShortIDs(validatorIDs)
+
 	reply.Validators = make([]string, int(args.Size))
 	for i, vdrID := range validatorIDs {
 		reply.Validators[i] = vdrID.PrefixedString(constants.NodeIDPrefix)
 	}
-
 	return nil
 }
 
@@ -894,22 +894,22 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	return service.vm.issueTx(tx)
 }
 
-// ExportAVAArgs are the arguments to ExportAVA
-type ExportAVAArgs struct {
+// ExportAVAXArgs are the arguments to ExportAVAX
+type ExportAVAXArgs struct {
 	api.UserPass
 
-	// Amount of nAVA to send
+	// Amount of AVAX to send
 	Amount json.Uint64 `json:"amount"`
 
-	// ID of the address that will receive the AVA. This address includes the
+	// ID of the address that will receive the AVAX. This address includes the
 	// chainID, which is used to determine what the destination chain is.
 	To string `json:"to"`
 }
 
-// ExportAVA exports AVAX from the P-Chain to the X-Chain
+// ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: ExportAVA called")
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: ExportAVAX called")
 
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
@@ -946,8 +946,8 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, response
 	return service.vm.issueTx(tx)
 }
 
-// ImportAVAArgs are the arguments to ImportAVA
-type ImportAVAArgs struct {
+// ImportAVAXArgs are the arguments to ImportAVAX
+type ImportAVAXArgs struct {
 	api.UserPass
 
 	// Chain the funds are coming from
@@ -957,10 +957,10 @@ type ImportAVAArgs struct {
 	To string `json:"to"`
 }
 
-// ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
-// The AVA must have already been exported from the X-Chain.
-func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: ImportAVA called")
+// ImportAVAX returns an unsigned transaction to import AVAX from the X-Chain.
+// The AVAX must have already been exported from the X-Chain.
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
 
 	chainID, err := service.vm.Ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {

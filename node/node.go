@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
 	"github.com/ava-labs/gecko/api/info"
-	"github.com/ava-labs/gecko/api/ipcs"
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/api/metrics"
 	"github.com/ava-labs/gecko/chains"
@@ -30,6 +29,7 @@ import (
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
@@ -50,6 +50,8 @@ import (
 	"github.com/ava-labs/gecko/vms/spchainvm"
 	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
+
+	ipcsapi "github.com/ava-labs/gecko/api/ipcs"
 )
 
 // Networking constants
@@ -65,7 +67,7 @@ var (
 	versionParser = version.NewDefaultParser()
 )
 
-// Node is an instance of an Ava node.
+// Node is an instance of an Avalanche node.
 type Node struct {
 	Log        logging.Logger
 	LogFactory logging.Factory
@@ -93,6 +95,8 @@ type Node struct {
 	// dispatcher for events as they happen in consensus
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher
+
+	IPCs *ipcs.ChainIPCs
 
 	// Net runs the networking stack
 	Net network.Network
@@ -183,7 +187,8 @@ func (n *Node) initNetworking() error {
 	}
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		n.Net.Close()
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close()
 	}, os.Interrupt, os.Kill)
 
 	return nil
@@ -218,7 +223,9 @@ func (n *Node) Dispatch() error {
 		err := n.APIServer.Dispatch()
 
 		n.Log.Fatal("API server initialization failed with %s", err)
-		n.Net.Close() // If the server isn't up, shut down the node.
+
+		// errors are already logged internally if they are meaningful
+		_ = n.Net.Close() // If the server isn't up, shut down the node.
 	})
 
 	// Add bootstrap nodes to the peer network
@@ -311,14 +318,29 @@ func (n *Node) initBeacons() {
 
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
-func (n *Node) initEventDispatcher() {
+func (n *Node) initEventDispatcher() error {
 	n.DecisionDispatcher = &triggers.EventDispatcher{}
 	n.DecisionDispatcher.Initialize(n.Log)
 
 	n.ConsensusDispatcher = &triggers.EventDispatcher{}
 	n.ConsensusDispatcher.Initialize(n.Log)
 
-	n.Log.AssertNoError(n.ConsensusDispatcher.Register("gossip", n.Net))
+	return n.ConsensusDispatcher.Register("gossip", n.Net)
+}
+
+func (n *Node) initIPCs() error {
+	chainIDs := make([]ids.ID, len(n.Config.IPCDefaultChainIDs))
+	for i, chainID := range n.Config.IPCDefaultChainIDs {
+		id, err := ids.FromString(chainID)
+		if err != nil {
+			return err
+		}
+		chainIDs[i] = id
+	}
+
+	var err error
+	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusDispatcher, n.DecisionDispatcher, chainIDs)
+	return err
 }
 
 // Initializes the Platform chain.
@@ -425,19 +447,19 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ChainManager:   n.chainManager,
 			Validators:     vdrs,
 			StakingEnabled: n.Config.EnableStaking,
-			AVA:            avaxAssetID,
+			AVAX:           avaxAssetID,
 			AVM:            createAVMTx.ID(),
-			Fee:            n.Config.AvaTxFee,
+			Fee:            n.Config.AvaxTxFee,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVA: avaxAssetID,
-			Fee: n.Config.AvaTxFee,
+			AVAX: avaxAssetID,
+			Fee:  n.Config.AvaxTxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: path.Join(n.Config.PluginDir, "evm"),
 		}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
-			TxFee: n.Config.AvaTxFee,
+			TxFee: n.Config.AvaxTxFee,
 		}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
@@ -466,14 +488,16 @@ func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := prefixdb.New([]byte("keystore"), n.DB)
 	n.keystoreServer.Initialize(n.Log, keystoreDB)
-	keystoreHandler := n.keystoreServer.CreateHandler()
+	keystoreHandler, err := n.keystoreServer.CreateHandler()
+	if err != nil {
+		return err
+	}
 	if !n.Config.KeystoreAPIEnabled {
 		n.Log.Info("skipping keystore API initializaion because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing keystore API")
 	return n.APIServer.AddRoute(keystoreHandler, &sync.RWMutex{}, "keystore", "", n.HTTPLog)
-
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -507,7 +531,10 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
 }
 
@@ -517,9 +544,11 @@ func (n *Node) initInfoAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "info", "", n.HTTPLog)
-
 }
 
 // initHealthAPI initializes the Health API service
@@ -556,18 +585,25 @@ func (n *Node) initHealthAPI() error {
 	if err := service.RegisterMonotonicCheckFunc("chains.default.bootstrapped", isBootstrappedFunc); err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(service.Handler(), &sync.RWMutex{}, "health", "", n.HTTPLog)
+	handler, err := service.Handler()
+	if err != nil {
+		return err
+	}
+	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "health", "", n.HTTPLog)
 }
 
 // initIPCAPI initializes the IPC API service
 // Assumes n.log and n.chainManager already initialized
 func (n *Node) initIPCAPI() error {
-	if !n.Config.IPCEnabled {
+	if !n.Config.IPCAPIEnabled {
 		n.Log.Info("skipping ipc API initializaion because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing ipc API")
-	service := ipcs.NewService(n.Log, n.chainManager, n.DecisionDispatcher, &n.APIServer)
+	service, err := ipcsapi.NewService(n.Log, n.chainManager, &n.APIServer, n.IPCs)
+	if err != nil {
+		return err
+	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
@@ -641,7 +677,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 
-	n.initEventDispatcher() // Set up the event dipatcher
+	if err = n.initEventDispatcher(); err != nil { // Set up the event dipatcher
+		return fmt.Errorf("problem initializing event dispatcher: %w", err)
+	}
 
 	genesisBytes, avaxAssetID, err := genesis.Genesis(n.Config.NetworkID)
 	if err != nil {
@@ -668,13 +706,18 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
 	}
+	if err := n.initIPCs(); err != nil { // Start the IPCs
+		return fmt.Errorf("couldn't initialize IPCs: %w", err)
+	}
 	return nil
 }
 
 // Shutdown this node
 func (n *Node) Shutdown() {
 	n.Log.Info("shutting down the node")
-	n.Net.Close()
+	// Close already logs its own error if one occurs, so the error is ignored
+	// here
+	_ = n.Net.Close()
 	n.chainManager.Shutdown()
 	utils.ClearSignals(n.nodeCloser)
 	n.Log.Info("node shut down successfully")

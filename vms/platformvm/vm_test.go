@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/gecko/vms/timestampvm"
@@ -118,16 +118,16 @@ func defaultContext() *snow.Context {
 }
 
 // The UTXOs that exist at genesis in the default VM
-func defaultGenesisUTXOs() []*ava.UTXO {
-	utxos := []*ava.UTXO(nil)
+func defaultGenesisUTXOs() []*avax.UTXO {
+	utxos := []*avax.UTXO(nil)
 	for i, key := range keys {
 		utxos = append(utxos,
-			&ava.UTXO{
-				UTXOID: ava.UTXOID{
+			&avax.UTXO{
+				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: uint32(i),
 				},
-				Asset: ava.Asset{ID: avaxAssetID},
+				Asset: avax.Asset{ID: avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: defaultBalance,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -147,9 +147,9 @@ func defaultGenesisUTXOs() []*ava.UTXO {
 // 2) The byte representation of the default genesis for tests
 func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	genesisUTXOs := make([]APIUTXO, len(keys))
+	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		hrp := constants.NetworkIDToHRP[testNetworkID]
 		addr, err := formatting.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			panic(err)
@@ -160,22 +160,20 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]APIDefaultSubnetValidator, len(keys))
+	genesisValidators := make([]FormattedAPIDefaultSubnetValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
 		id := key.PublicKey().Address()
-		hrp := constants.NetworkIDToHRP[testNetworkID]
 		addr, err := formatting.FormatBech32(hrp, id.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = APIDefaultSubnetValidator{
-			APIValidator: APIValidator{
+		genesisValidators[i] = FormattedAPIDefaultSubnetValidator{
+			FormattedAPIValidator: FormattedAPIValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				Address:   addr,
-				ID:        id,
+				ID:        id.PrefixedString(constants.NodeIDPrefix),
 			},
 			Destination:       addr,
 			DelegationFeeRate: NumberOfShares,
@@ -1188,7 +1186,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
@@ -1209,9 +1207,9 @@ func TestAtomicImport(t *testing.T) {
 
 	// Provide the avm UTXO
 	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
-	utxo := &ava.UTXO{
+	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  ava.Asset{ID: avaxAssetID},
+		Asset:  avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1220,7 +1218,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	state := ava.NewPrefixedState(smDB, Codec)
+	state := avax.NewPrefixedState(smDB, Codec)
 	if err := state.FundAVMUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
@@ -1251,7 +1249,7 @@ func TestAtomicImport(t *testing.T) {
 
 	smDB = vm.Ctx.SharedMemory.GetDatabase(vm.avm)
 	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
-	state = ava.NewPrefixedState(smDB, vm.codec)
+	state = avax.NewPrefixedState(smDB, vm.codec)
 	if _, err := state.AVMUTXO(utxoID.InputID()); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
@@ -1269,7 +1267,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	}()
 
 	avmID := ids.Empty.Prefix(0)
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID:        ids.Empty.Prefix(1),
 		OutputIndex: 1,
 	}
@@ -1285,9 +1283,9 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	tx, err := vm.newImportTx(
 		defaultNonce+1,
 		testNetworkID,
-		[]*ava.TransferableInput{&ava.TransferableInput{
+		[]*avax.TransferableInput{&avax.TransferableInput{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: assetID},
+			Asset:  avax.Asset{ID: assetID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   amount,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1300,7 +1298,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ava = assetID
+	vm.avax = assetID
 	vm.avm = avmID
 
 	blk, err := vm.newAtomicBlock(vm.Preferred(), tx)

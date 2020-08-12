@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -251,19 +251,19 @@ func TestStateUTXOs(t *testing.T) {
 
 	state := vm.state.state
 
-	vm.codec.RegisterType(&ava.TestVerifiable{})
+	vm.codec.RegisterType(&avax.TestVerifiable{})
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: ava.Asset{ID: ids.Empty},
-		Out:   &ava.TestVerifiable{},
+		Asset: avax.Asset{ID: ids.Empty},
+		Out:   &avax.TestVerifiable{},
 	}
 
 	if err := state.SetUTXO(ids.Empty, utxo); err != nil {
@@ -298,7 +298,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	if err := state.SetUTXO(ids.Empty, &ava.UTXO{}); err == nil {
+	if err := state.SetUTXO(ids.Empty, &avax.UTXO{}); err == nil {
 		t.Fatalf("Should have errored packing the utxo")
 	}
 
@@ -327,7 +327,7 @@ func TestStateTXs(t *testing.T) {
 
 	state := vm.state.state
 
-	vm.codec.RegisterType(&ava.TestTransferable{})
+	vm.codec.RegisterType(&avax.TestTransferable{})
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")
@@ -336,14 +336,14 @@ func TestStateTXs(t *testing.T) {
 	tx := &Tx{UnsignedTx: &BaseTx{
 		NetID: networkID,
 		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: asset},
+			Asset: avax.Asset{ID: asset},
 			In: &secp256k1fx.TransferInput{
-				Amt: 20 * units.KiloAva,
+				Amt: 20 * units.KiloAvax,
 				Input: secp256k1fx.Input{
 					SigIndices: []uint32{
 						0,

@@ -1,2 +1,0 @@
-ava_daemon_user: ava
-ava_daemon_group: "{{ ava_daemon_user }}"

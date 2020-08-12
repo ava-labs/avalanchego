@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -195,7 +195,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	}
 
 	var (
-		utxos     []*ava.UTXO
+		utxos     []*avax.UTXO
 		endAddr   ids.ShortID
 		endUTXOID ids.ID
 		err       error
@@ -292,8 +292,8 @@ type GetBalanceArgs struct {
 
 // GetBalanceReply defines the GetBalance replies returned from the API
 type GetBalanceReply struct {
-	Balance json.Uint64  `json:"balance"`
-	UTXOIDs []ava.UTXOID `json:"utxoIDs"`
+	Balance json.Uint64   `json:"balance"`
+	UTXOIDs []avax.UTXOID `json:"utxoIDs"`
 }
 
 // GetBalance returns the amount of an asset that an address at least partially owns
@@ -321,12 +321,12 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	reply.UTXOIDs = make([]ava.UTXOID, 0, len(utxos))
+	reply.UTXOIDs = make([]avax.UTXOID, 0, len(utxos))
 	for _, utxo := range utxos {
 		if !utxo.AssetID().Equals(assetID) {
 			continue
 		}
-		transferable, ok := utxo.Out.(ava.TransferableOut)
+		transferable, ok := utxo.Out.(avax.TransferableOut)
 		if !ok {
 			continue
 		}
@@ -375,7 +375,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 	assetIDs := ids.Set{}                    // IDs of assets the address has a non-zero balance of
 	balances := make(map[[32]byte]uint64, 0) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
-		transferable, ok := utxo.Out.(ava.TransferableOut)
+		transferable, ok := utxo.Out.(avax.TransferableOut)
 		if !ok {
 			continue
 		}
@@ -440,23 +440,23 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		return err
 	}
 
-	avaKey := service.vm.ava.Key()
+	avaxKey := service.vm.avax.Key()
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaKey: service.vm.txFee,
+			avaxKey: service.vm.txFee,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	outs := []*ava.TransferableOutput{}
-	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: service.vm.ava},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.avax},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -544,23 +544,23 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		return err
 	}
 
-	avaKey := service.vm.ava.Key()
+	avaxKey := service.vm.avax.Key()
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaKey: service.vm.txFee,
+			avaxKey: service.vm.txFee,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	outs := []*ava.TransferableOutput{}
-	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: service.vm.ava},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.avax},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -645,23 +645,23 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return err
 	}
 
-	avaKey := service.vm.ava.Key()
+	avaxKey := service.vm.avax.Key()
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaKey: service.vm.txFee,
+			avaxKey: service.vm.txFee,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	outs := []*ava.TransferableOutput{}
-	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: service.vm.ava},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.avax},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -926,12 +926,12 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		amountsWithFee[k] = v
 	}
 
-	avaKey := service.vm.ava.Key()
-	amountWithFee, err := safemath.Add64(amountsWithFee[avaKey], service.vm.txFee)
+	avaxKey := service.vm.avax.Key()
+	amountWithFee, err := safemath.Add64(amountsWithFee[avaxKey], service.vm.txFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
-	amountsWithFee[avaKey] = amountWithFee
+	amountsWithFee[avaxKey] = amountWithFee
 
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
@@ -942,15 +942,15 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		return err
 	}
 
-	outs := []*ava.TransferableOutput{}
+	outs := []*avax.TransferableOutput{}
 	for asset, amountWithFee := range amountsWithFee {
 		assetID := ids.NewID(asset)
 		amount := amounts[asset]
 		amountSpent := amountsSpent[asset]
 
 		if amount > 0 {
-			outs = append(outs, &ava.TransferableOutput{
-				Asset: ava.Asset{ID: assetID},
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amount,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -963,8 +963,8 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		}
 		if amountSpent > amountWithFee {
 			changeAddr := kc.Keys[0].PublicKey().Address()
-			outs = append(outs, &ava.TransferableOutput{
-				Asset: ava.Asset{ID: assetID},
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountSpent - amountWithFee,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -976,7 +976,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 			})
 		}
 	}
-	ava.SortTransferableOutputs(outs, service.vm.codec)
+	avax.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{UnsignedTx: &BaseTx{
 		NetID: service.vm.ctx.NetworkID,
@@ -1031,23 +1031,23 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 		return err
 	}
 
-	avaKey := service.vm.ava.Key()
+	avaxKey := service.vm.avax.Key()
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaKey: service.vm.txFee,
+			avaxKey: service.vm.txFee,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	outs := []*ava.TransferableOutput{}
-	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: service.vm.ava},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.avax},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1124,23 +1124,23 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		return err
 	}
 
-	avaKey := service.vm.ava.Key()
+	avaxKey := service.vm.avax.Key()
 	amountsSpent, ins, secpKeys, err := service.vm.Spend(
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaKey: service.vm.txFee,
+			avaxKey: service.vm.txFee,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	outs := []*ava.TransferableOutput{}
-	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: service.vm.ava},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.avax},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1218,23 +1218,23 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return err
 	}
 
-	avaKey := service.vm.ava.Key()
+	avaxKey := service.vm.avax.Key()
 	amountsSpent, ins, secpKeys, err := service.vm.Spend(
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaKey: service.vm.txFee,
+			avaxKey: service.vm.txFee,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	outs := []*ava.TransferableOutput{}
-	if amountSpent := amountsSpent[avaKey]; amountSpent > service.vm.txFee {
+	outs := []*avax.TransferableOutput{}
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: service.vm.ava},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.avax},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1282,23 +1282,23 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	return nil
 }
 
-// ImportAVAArgs are arguments for passing into ImportAVA requests
-type ImportAVAArgs struct {
+// ImportAVAXArgs are arguments for passing into ImportAVAX requests
+type ImportAVAXArgs struct {
 	// User that controls To
 	api.UserPass
 
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
 
-	// Address receiving the imported AVA
+	// Address receiving the imported AVAX
 	To string `json:"to"`
 }
 
-// ImportAVA imports AVA to this chain from the P-Chain.
-// The AVA must have already been exported from the P-Chain.
+// ImportAVAX imports AVAX to this chain from the P-Chain.
+// The AVAX must have already been exported from the P-Chain.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *api.JsonTxID) error {
-	service.vm.ctx.Log.Info("AVM: ImportAVA called with username: %s", args.Username)
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply *api.JsonTxID) error {
+	service.vm.ctx.Log.Info("AVM: ImportAVAX called with username: %s", args.Username)
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
@@ -1325,17 +1325,17 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *a
 		return err
 	}
 
-	ins := []*ava.TransferableInput{}
+	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 
-	avaKey := service.vm.ava.Key()
-	if amountSpent := amountsSpent[avaKey]; amountSpent < service.vm.txFee {
+	avaxKey := service.vm.avax.Key()
+	if amountSpent := amountsSpent[avaxKey]; amountSpent < service.vm.txFee {
 		var localAmountsSpent map[[32]byte]uint64
 		localAmountsSpent, ins, keys, err = service.vm.Spend(
 			utxos,
 			kc,
 			map[[32]byte]uint64{
-				avaKey: service.vm.txFee - amountSpent,
+				avaxKey: service.vm.txFee - amountSpent,
 			},
 		)
 		if err != nil {
@@ -1351,16 +1351,16 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *a
 
 		// Because we ensured that we had enough inputs for the fee, we can
 		// safely just remove it without concern for underflow.
-		amountsSpent[avaKey] -= service.vm.txFee
+		amountsSpent[avaxKey] -= service.vm.txFee
 	}
 	keys = append(keys, importKeys...)
 
-	outs := []*ava.TransferableOutput{}
+	outs := []*avax.TransferableOutput{}
 	for asset, amount := range amountsSpent {
 		assetID := ids.NewID(asset)
 		if amount > 0 {
-			outs = append(outs, &ava.TransferableOutput{
-				Asset: ava.Asset{ID: assetID},
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amount,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -1372,7 +1372,7 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *a
 			})
 		}
 	}
-	ava.SortTransferableOutputs(outs, service.vm.codec)
+	avax.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{UnsignedTx: &ImportTx{
 		BaseTx: BaseTx{
@@ -1397,23 +1397,23 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, reply *a
 	return nil
 }
 
-// ExportAVAArgs are arguments for passing into ExportAVA requests
-type ExportAVAArgs struct {
-	api.UserPass // User providing exported AVA
+// ExportAVAXArgs are arguments for passing into ExportAVA requests
+type ExportAVAXArgs struct {
+	api.UserPass // User providing exported AVAX
 
-	// Amount of nAVA to send
+	// Amount of nAVAX to send
 	Amount json.Uint64 `json:"amount"`
 
-	// ID of the address that will receive the AVA. This address includes the
+	// ID of the address that will receive the AVAX. This address includes the
 	// chainID, which is used to determine what the destination chain is.
 	To string `json:"to"`
 }
 
-// ExportAVA sends AVA from this chain to the P-Chain.
-// After this tx is accepted, the AVA must be imported to the P-chain with an importTx.
+// ExportAVAX sends AVAX from this chain to the P-Chain.
+// After this tx is accepted, the AVAX must be imported to the P-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
-func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *api.JsonTxID) error {
-	service.vm.ctx.Log.Info("AVM: ExportAVA called with username: %s", args.Username)
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JsonTxID) error {
+	service.vm.ctx.Log.Info("AVM: ExportAVAX called with username: %s", args.Username)
 
 	chainID, to, err := service.vm.ParseAddress(args.To)
 	if err != nil {
@@ -1434,22 +1434,22 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *a
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
 
-	avaKey := service.vm.ava.Key()
+	avaxKey := service.vm.avax.Key()
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaKey: amountWithFee,
+			avaxKey: amountWithFee,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	amountSpent := amountsSpent[avaKey]
+	amountSpent := amountsSpent[avaxKey]
 
-	exportOuts := []*ava.TransferableOutput{{
-		Asset: ava.Asset{ID: service.vm.ava},
+	exportOuts := []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: service.vm.avax},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: uint64(args.Amount),
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -1460,11 +1460,11 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *a
 		},
 	}}
 
-	outs := []*ava.TransferableOutput{}
+	outs := []*avax.TransferableOutput{}
 	if amountSpent > amountWithFee {
 		changeAddr := kc.Keys[0].PublicKey().Address()
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: service.vm.ava},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: service.vm.avax},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - amountWithFee,
 				OutputOwners: secp256k1fx.OutputOwners{
