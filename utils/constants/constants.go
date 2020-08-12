@@ -4,6 +4,7 @@
 package constants
 
 import (
+	"math"
 	"regexp"
 
 	"github.com/ava-labs/gecko/ids"
@@ -13,6 +14,9 @@ import (
 const (
 	NodeIDPrefix    string = "NodeID-"
 	SecretKeyPrefix string = "PrivateKey-"
+	// Request ID used when sending a Put message to gossip an accepted container
+	// (ie not sent in response to a Get)
+	GossipMsgRequestID = math.MaxUint32
 )
 
 // Variables to be exported
