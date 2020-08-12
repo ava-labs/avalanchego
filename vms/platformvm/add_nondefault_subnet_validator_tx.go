@@ -255,7 +255,11 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of subnet %s: %v", tx.Subnet, err)}
 	}
 	currentValidators := validators.NewSet()
-	currentValidators.Set(tx.vm.getValidators(currentEvents))
+	if err := currentValidators.Set(tx.vm.getValidators(currentEvents)); err != nil {
+		return nil, nil, nil, nil, permError{fmt.Errorf("failed to initialize the new validator set for subnet %s due to: %w",
+			tx.Subnet,
+			err)}
+	}
 	if currentValidators.Contains(tx.NodeID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the current validator set for subnet with ID %s",
 			tx.NodeID,
@@ -268,7 +272,11 @@ func (tx *addNonDefaultSubnetValidatorTx) SemanticVerify(db database.Database) (
 		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get pending validators of subnet %s: %v", tx.Subnet, err)}
 	}
 	pendingValidators := validators.NewSet()
-	pendingValidators.Set(tx.vm.getValidators(pendingEvents))
+	if err := pendingValidators.Set(tx.vm.getValidators(pendingEvents)); err != nil {
+		return nil, nil, nil, nil, permError{fmt.Errorf("failed to initialize the new validator set for subnet %s due to: %w",
+			tx.Subnet,
+			err)}
+	}
 	if pendingValidators.Contains(tx.NodeID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator with ID %s already in the pending validator set for subnet with ID %s",
 			tx.NodeID,

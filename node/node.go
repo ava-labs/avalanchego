@@ -16,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/database/meterdb"
-
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/api/health"
@@ -27,6 +25,7 @@ import (
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/gecko/database/meterdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/genesis"
 	"github.com/ava-labs/gecko/ids"
@@ -157,9 +156,6 @@ func (n *Node) initNetworking() error {
 
 	// Initialize validator manager and default subnet's validator set
 	defaultSubnetValidators := validators.NewSet()
-	if !n.Config.EnableStaking {
-		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
-	}
 	n.vdrs = validators.NewManager()
 	n.vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 
@@ -182,7 +178,8 @@ func (n *Node) initNetworking() error {
 
 	if !n.Config.EnableStaking {
 		n.Net.RegisterHandler(&insecureValidatorManager{
-			vdrs: defaultSubnetValidators,
+			vdrs:   defaultSubnetValidators,
+			weight: n.Config.DisabledStakingWeight,
 		})
 	}
 
@@ -195,16 +192,19 @@ func (n *Node) initNetworking() error {
 }
 
 type insecureValidatorManager struct {
-	vdrs validators.Set
+	vdrs   validators.Set
+	weight uint64
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
-	i.vdrs.Add(validators.NewValidator(vdrID, 1))
+	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight))
 	return false
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
-	i.vdrs.Remove(vdrID)
+	// Shouldn't error unless the set previously had an error, which should
+	// never happen as described above
+	_ = i.vdrs.Remove(vdrID)
 	return false
 }
 
@@ -308,11 +308,14 @@ func (n *Node) initNodeID() error {
 }
 
 // Create the IDs of the peers this node should first connect to
-func (n *Node) initBeacons() {
+func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
-		n.beacons.Add(validators.NewValidator(peer.ID, 1))
+		if err := n.beacons.Add(validators.NewValidator(peer.ID, 1)); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // Create the vmManager and register the following vms:
@@ -384,7 +387,9 @@ func (n *Node) initChains() error {
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
 		defaultSubnetValidators := validators.NewSet()
-		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
+		if err := defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
+			return err
+		}
 		vdrs = validators.NewManager()
 		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 	}
@@ -426,10 +431,7 @@ func (n *Node) initChains() error {
 		CustomBeacons: n.beacons,
 	})
 
-	bootstrapWeight, err := n.beacons.Weight()
-	if err != nil {
-		return fmt.Errorf("Error calculating bootstrap weight of beacons: %s", err)
-	}
+	bootstrapWeight := n.beacons.Weight()
 	reqWeight := (3*bootstrapWeight + 3) / 4
 
 	if reqWeight == 0 {
@@ -669,7 +671,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 		return fmt.Errorf("problem initializing staker ID: %w", err)
 	}
 
-	n.initBeacons()
+	if err = n.initBeacons(); err != nil { // Configure the beacons
+		return fmt.Errorf("problem initializing node beacons: %w", err)
+	}
 
 	// Start HTTP APIs
 	n.initAPIServer()                           // Start the API Server
