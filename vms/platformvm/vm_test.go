@@ -1218,8 +1218,8 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	state := avax.NewPrefixedState(smDB, Codec)
-	if err := state.FundAVMUTXO(utxo); err != nil {
+	state := avax.NewPrefixedState(smDB, Codec, vm.avm, vm.Ctx.ChainID)
+	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
@@ -1249,8 +1249,8 @@ func TestAtomicImport(t *testing.T) {
 
 	smDB = vm.Ctx.SharedMemory.GetDatabase(vm.avm)
 	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
-	state = avax.NewPrefixedState(smDB, vm.codec)
-	if _, err := state.AVMUTXO(utxoID.InputID()); err == nil {
+	state = avax.NewPrefixedState(smDB, vm.codec, vm.Ctx.ChainID, vm.avm)
+	if _, err := state.UTXO(utxoID.InputID()); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }

@@ -25,8 +25,11 @@ var (
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	SourceChain ids.ID                    `serialize:"true" json:"sourceChain"`    // Which chain to consume the funds from
-	Ins         []*avax.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
+	// Which chain to consume the funds from
+	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
+
+	// The inputs to this transaction
+	Ins []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -138,7 +141,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 	smDB := vm.ctx.SharedMemory.GetDatabase(t.SourceChain)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(t.SourceChain)
 
-	state := avax.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
 
 	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.Ins {
@@ -151,7 +154,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		fx := vm.fxs[fxIndex].Fx
 
 		utxoID := in.UTXOID.InputID()
-		utxo, err := state.PlatformUTXO(utxoID)
+		utxo, err := state.UTXO(utxoID)
 		if err != nil {
 			return err
 		}
@@ -191,10 +194,10 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 
 	vsmDB := versiondb.New(smDB)
 
-	state := avax.NewPrefixedState(vsmDB, vm.codec)
+	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
 	for _, in := range t.Ins {
 		utxoID := in.UTXOID.InputID()
-		if err := state.SpendPlatformUTXO(utxoID); err != nil {
+		if err := state.SpendUTXO(utxoID); err != nil {
 			return err
 		}
 	}

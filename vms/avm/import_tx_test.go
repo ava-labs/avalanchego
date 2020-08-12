@@ -331,8 +331,8 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}
 
-	state := avax.NewPrefixedState(smDB, vm.codec)
-	if err := state.FundPlatformUTXO(utxo); err != nil {
+	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
+	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 
@@ -365,8 +365,8 @@ func TestIssueImportTx(t *testing.T) {
 	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	state = avax.NewPrefixedState(smDB, vm.codec)
-	if _, err := state.PlatformUTXO(utxoID.InputID()); err == nil {
+	state = avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
+	if _, err := state.UTXO(utxoID.InputID()); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -487,9 +487,9 @@ func TestForceAcceptImportTx(t *testing.T) {
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	state := avax.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
 	utxoSource := utxoID.InputID()
-	if _, err := state.PlatformUTXO(utxoSource); err == nil {
+	if _, err := state.UTXO(utxoSource); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }

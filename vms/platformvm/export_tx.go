@@ -29,7 +29,11 @@ var (
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
 	BaseTx `serialize:"true"`
-	// Outputs that are exported to the X-Chain
+
+	// Which chain to send the funds to
+	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
+
+	// Outputs that are exported to the chain
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
@@ -59,6 +63,11 @@ func (tx *UnsignedExportTx) Verify() error {
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.DestinationChain.IsZero():
+		return errWrongBlockchainID
+	case !tx.DestinationChain.Equals(tx.vm.avm):
+		// TODO: remove this check if we allow for P->C swaps
+		return errWrongBlockchainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	}
@@ -121,15 +130,15 @@ func (tx *UnsignedExportTx) SemanticVerify(db database.Database, creds []verify.
 // Accept this transaction.
 func (tx *UnsignedExportTx) Accept(batch database.Batch) error {
 	// Produce exported UTXOs
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
+	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.DestinationChain)
+	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.DestinationChain)
 
 	vsmDB := versiondb.New(smDB)
-	state := avax.NewPrefixedState(vsmDB, Codec)
+	state := avax.NewPrefixedState(vsmDB, Codec, tx.vm.Ctx.ChainID, tx.DestinationChain)
 
 	txID := tx.ID()
 	for i, out := range tx.ExportedOutputs {
-		if err := state.FundPlatformUTXO(&avax.UTXO{
+		if err := state.FundUTXO(&avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(len(tx.BaseTx.Outs) + i),
@@ -151,8 +160,8 @@ func (tx *UnsignedExportTx) Accept(batch database.Batch) error {
 // Create a new transaction
 func (vm *VM) newExportTx(
 	amount uint64, // Amount of tokens to export
-	chainID ids.ID,
-	to ids.ShortID, // Address of X-Chain recipient
+	chainID ids.ID, // Chain to send the UTXOs to
+	to ids.ShortID, // Address of chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*AtomicTx, error) {
 	if !vm.avm.Equals(chainID) {
@@ -176,6 +185,7 @@ func (vm *VM) newExportTx(
 			Ins:          ins,
 			Outs:         outs, // Non-exported outputs
 		},
+		DestinationChain: chainID,
 		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
 			Asset: avax.Asset{ID: vm.avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{

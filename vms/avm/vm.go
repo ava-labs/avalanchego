@@ -368,12 +368,12 @@ func (vm *VM) GetAtomicUTXOs(
 	ids.SortShortIDs(addrsList)
 	smDB := vm.ctx.SharedMemory.GetDatabase(chainID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(chainID)
-	state := avax.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, chainID)
 	for _, addr := range addrs.List() {
 		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
 			continue
 		}
-		utxoIDs, err := state.PlatformFunds(addr.Bytes(), startUTXOID, limit)
+		utxoIDs, err := state.Funds(addr.Bytes(), startUTXOID, limit)
 		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
 		}
@@ -381,7 +381,7 @@ func (vm *VM) GetAtomicUTXOs(
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
-			utxo, err := state.PlatformUTXO(utxoID)
+			utxo, err := state.UTXO(utxoID)
 			if err != nil {
 				return nil, ids.ShortEmpty, ids.Empty, err
 			}

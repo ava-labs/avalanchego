@@ -25,8 +25,11 @@ var (
 type ExportTx struct {
 	BaseTx `serialize:"true"`
 
-	DestinationChain ids.ID                     `serialize:"true" json:"destinationChain"` // Which chain to send the funds to
-	Outs             []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`  // The outputs this transaction is sending to the other chain
+	// Which chain to send the funds to
+	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
+
+	// The outputs this transaction is sending to the other chain
+	Outs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -165,7 +168,7 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 
 	vsmDB := versiondb.New(smDB)
 
-	state := avax.NewPrefixedState(vsmDB, vm.codec)
+	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.DestinationChain)
 	for i, out := range t.Outs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
@@ -175,7 +178,7 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			Asset: avax.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		}
-		if err := state.FundAVMUTXO(utxo); err != nil {
+		if err := state.FundUTXO(utxo); err != nil {
 			return err
 		}
 	}
