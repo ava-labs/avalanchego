@@ -14,7 +14,7 @@ func TestNoEarlyTermResults(t *testing.T) {
 
 	vdr1 := ids.NewShortID([20]byte{1}) // k = 1
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(vdr1)
 
 	factory := NewNoEarlyTermFactory()
@@ -41,7 +41,7 @@ func TestNoEarlyTermString(t *testing.T) {
 	vdr1 := ids.NewShortID([20]byte{1})
 	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -52,7 +52,8 @@ func TestNoEarlyTermString(t *testing.T) {
 
 	poll.Vote(vdr1, vtxID)
 
-	expected := "waiting on {BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp}"
+	expected := "waiting on Bag: (Size = 1)\n" +
+		"    ID[BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp]: Count = 1"
 	if result := poll.String(); expected != result {
 		t.Fatalf("Poll should have returned %s but returned %s", expected, result)
 	}
@@ -64,7 +65,7 @@ func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 	vdr1 := ids.NewShortID([20]byte{1})
 	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,

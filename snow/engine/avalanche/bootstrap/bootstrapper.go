@@ -136,8 +136,8 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 			continue
 		}
 
-		validators := b.Validators.Sample(1) // validator to send request to
-		if len(validators) == 0 {
+		validators, err := b.Validators.Sample(1) // validator to send request to
+		if err != nil {
 			return fmt.Errorf("Dropping request for %s as there are no validators", vtxID)
 		}
 		validatorID := validators[0].ID()

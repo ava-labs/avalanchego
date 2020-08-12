@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -53,8 +53,9 @@ var (
 )
 
 var (
-	errBootstrapMismatch  = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errStakingRequiresTLS = errors.New("if staking is enabled, network TLS must also be enabled")
+	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
+	errStakingRequiresTLS   = errors.New("if staking is enabled, network TLS must also be enabled")
+	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
 // GetIPs returns the default IPs for each network
@@ -148,11 +149,12 @@ func GetDefaultBootstraps(networkID uint32, count int) ([]string, []string) {
 	sampledIPs := make([]string, 0, count)
 	sampledIDs := make([]string, 0, count)
 
-	sampler := random.Uniform{N: len(ips)}
-	for i := 0; i < count; i++ {
-		s := sampler.Sample()
-		sampledIPs = append(sampledIPs, ips[s])
-		sampledIDs = append(sampledIDs, ids[s])
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(ips)))
+	indices, _ := s.Sample(count)
+	for _, index := range indices {
+		sampledIPs = append(sampledIPs, ips[int(index)])
+		sampledIDs = append(sampledIDs, ids[int(index)])
 	}
 
 	return sampledIPs, sampledIDs
@@ -210,6 +212,7 @@ func init() {
 	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
+	fs.Uint64Var(&Config.DisabledStakingWeight, "staking-disabled-weight", 1, "Weight to provide to each peer when staking is disabled")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -344,6 +347,10 @@ func init() {
 	if Config.EnableStaking && !Config.EnableP2PTLS {
 		errs.Add(errStakingRequiresTLS)
 		return
+	}
+
+	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
+		errs.Add(errInvalidStakerWeights)
 	}
 
 	if Config.EnableP2PTLS {

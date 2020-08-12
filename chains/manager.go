@@ -341,10 +341,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		beacons = chainParams.CustomBeacons
 	}
 
-	bootstrapWeight, err := beacons.Weight()
-	if err != nil {
-		return nil, fmt.Errorf("Error calculating bootstrap weight: %s", err)
-	}
+	bootstrapWeight := beacons.Weight()
 
 	var chain *chain
 	switch vm := vm.(type) {

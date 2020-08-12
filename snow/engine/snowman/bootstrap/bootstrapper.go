@@ -131,8 +131,8 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 		return nil
 	}
 
-	validators := b.Config.Validators.Sample(1) // validator to send request to
-	if len(validators) == 0 {
+	validators, err := b.Config.Validators.Sample(1) // validator to send request to
+	if err != nil {
 		return fmt.Errorf("Dropping request for %s as there are no validators", blkID)
 	}
 	validatorID := validators[0].ID()

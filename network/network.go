@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/version"
 )
@@ -748,9 +748,16 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 		numToGossip = len(allPeers)
 	}
 
-	sampler := random.Uniform{N: len(allPeers)}
-	for i := 0; i < numToGossip; i++ {
-		if allPeers[sampler.Sample()].send(msg) {
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(allPeers))); err != nil {
+		return err
+	}
+	indices, err := s.Sample(numToGossip)
+	if err != nil {
+		return err
+	}
+	for _, index := range indices {
+		if allPeers[int(index)].send(msg) {
 			n.put.numSent.Inc()
 		} else {
 			n.put.numFailed.Inc()
@@ -824,14 +831,43 @@ func (n *network) gossip() {
 			numNonStakersToSend = len(nonStakers)
 		}
 
-		sampler := random.Uniform{N: len(stakers)}
-		for i := 0; i < numStakersToSend; i++ {
-			stakers[sampler.Sample()].send(msg)
+		s := sampler.NewUniform()
+		if err := s.Initialize(uint64(len(stakers))); err != nil {
+			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
+				err,
+				len(stakers))
+			n.stateLock.Unlock()
+			continue
 		}
-		sampler.N = len(nonStakers)
-		sampler.Replace()
-		for i := 0; i < numNonStakersToSend; i++ {
-			nonStakers[sampler.Sample()].send(msg)
+		stakerIndices, err := s.Sample(numStakersToSend)
+		if err != nil {
+			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
+				err,
+				len(stakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		for _, index := range stakerIndices {
+			stakers[int(index)].send(msg)
+		}
+
+		if err := s.Initialize(uint64(len(nonStakers))); err != nil {
+			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
+				err,
+				len(nonStakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		nonStakerIndices, err := s.Sample(numNonStakersToSend)
+		if err != nil {
+			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
+				err,
+				len(nonStakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		for _, index := range nonStakerIndices {
+			nonStakers[int(index)].send(msg)
 		}
 		n.stateLock.Unlock()
 	}

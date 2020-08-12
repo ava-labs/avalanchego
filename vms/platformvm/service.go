@@ -640,9 +640,9 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}
 
-	sample := validators.Sample(int(args.Size))
-	if setLen := len(sample); setLen != int(args.Size) {
-		return fmt.Errorf("current number of validators (%d) is insufficient to sample %d validators", setLen, args.Size)
+	sample, err := validators.Sample(int(args.Size))
+	if err != nil {
+		return fmt.Errorf("sampling errored with %w", err)
 	}
 
 	validatorIDs := make([]ids.ShortID, int(args.Size))

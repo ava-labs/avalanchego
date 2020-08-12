@@ -920,8 +920,7 @@ func (vm *VM) updateValidators(subnetID ids.ID) error {
 	}
 
 	validators := vm.getValidators(currentValidators)
-	validatorSet.Set(validators)
-	return nil
+	return validatorSet.Set(validators)
 }
 
 // Codec ...

@@ -40,7 +40,7 @@ func TestCreateAndFinishPoll(t *testing.T) {
 	vdr1 := ids.NewShortID([20]byte{1})
 	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -82,11 +82,12 @@ func TestSetString(t *testing.T) {
 
 	vdr1 := ids.NewShortID([20]byte{1}) // k = 1
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.ShortBag{}
 	vdrs.Add(vdr1)
 
 	expected := "current polls: (Size = 1)\n" +
-		"    0: waiting on {6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt}"
+		"    0: waiting on Bag: (Size = 1)\n" +
+		"        ID[6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1"
 	if !s.Add(0, vdrs) {
 		t.Fatalf("Should have been able to add a new poll")
 	} else if str := s.String(); expected != str {
