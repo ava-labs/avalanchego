@@ -4,27 +4,63 @@
 package sampler
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
-	"github.com/ava-labs/gecko/utils"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/gecko/utils"
 )
 
 var (
-	uniformTests = []func(*testing.T, Uniform){
-		UniformInitializeOverflowTest,
-		UniformOutOfRangeTest,
-		UniformEmptyTest,
-		UniformSingletonTest,
-		UniformDistributionTest,
-		UniformOverSampleTest,
+	uniformSamplers = []struct {
+		name    string
+		sampler Uniform
+	}{
+		{
+			name:    "replacer",
+			sampler: &uniformReplacer{},
+		},
+	}
+	uniformTests = []struct {
+		name string
+		test func(*testing.T, Uniform)
+	}{
+		{
+			name: "initialize overflow",
+			test: UniformInitializeOverflowTest,
+		},
+		{
+			name: "out of range",
+			test: UniformOutOfRangeTest,
+		},
+		{
+			name: "empty",
+			test: UniformEmptyTest,
+		},
+		{
+			name: "singleton",
+			test: UniformSingletonTest,
+		},
+		{
+			name: "distribution",
+			test: UniformDistributionTest,
+		},
+		{
+			name: "over sample",
+			test: UniformOverSampleTest,
+		},
 	}
 )
 
-func UniformTest(t *testing.T, s Uniform) {
-	for _, test := range uniformTests {
-		test(t, s)
+func TestAllUniform(t *testing.T) {
+	for _, s := range uniformSamplers {
+		for _, test := range uniformTests {
+			t.Run(fmt.Sprintf("sampler %s test %s", s.name, test.name), func(t *testing.T) {
+				test.test(t, s.sampler)
+			})
+		}
 	}
 }
 

@@ -4,8 +4,34 @@
 package sampler
 
 import (
+	"fmt"
 	"testing"
 )
+
+// BenchmarkAllWeightedWithoutReplacement
+func BenchmarkAllWeightedWithoutReplacement(b *testing.B) {
+	sizes := []int{
+		1,
+		5,
+		25,
+		50,
+		75,
+		100,
+	}
+	for _, s := range weightedWithoutReplacementSamplers {
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("sampler %s with %d elements", s.name, size), func(b *testing.B) {
+				WeightedWithoutReplacementPowBenchmark(
+					b,
+					s.sampler,
+					0,
+					100000,
+					size,
+				)
+			})
+		}
+	}
+}
 
 func WeightedWithoutReplacementPowBenchmark(
 	b *testing.B,

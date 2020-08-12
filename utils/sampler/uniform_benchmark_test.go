@@ -4,8 +4,28 @@
 package sampler
 
 import (
+	"fmt"
 	"testing"
 )
+
+// BenchmarkAllUniform
+func BenchmarkAllUniform(b *testing.B) {
+	sizes := []int{
+		1,
+		5,
+		25,
+		50,
+		75,
+		100,
+	}
+	for _, s := range uniformSamplers {
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("sampler %s with %d elements uniformly", s.name, size), func(b *testing.B) {
+				UniformBenchmark(b, s.sampler, 1000000, size)
+			})
+		}
+	}
+}
 
 func UniformBenchmark(b *testing.B, s Uniform, size uint64, toSample int) {
 	err := s.Initialize(size)

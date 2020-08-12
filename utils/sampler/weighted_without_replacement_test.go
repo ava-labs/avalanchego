@@ -4,6 +4,7 @@
 package sampler
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"testing"
@@ -12,26 +13,60 @@ import (
 )
 
 var (
-	weightedWithoutReplacementTests = []func(
-		*testing.T,
-		WeightedWithoutReplacement,
-	){
-		WeightedWithoutReplacementInitializeOverflowTest,
-		WeightedWithoutReplacementOutOfRangeTest,
-		WeightedWithoutReplacementEmptyWithoutWeightTest,
-		WeightedWithoutReplacementEmptyTest,
-		WeightedWithoutReplacementSingletonTest,
-		WeightedWithoutReplacementWithZeroTest,
-		WeightedWithoutReplacementDistributionTest,
+	weightedWithoutReplacementSamplers = []struct {
+		name    string
+		sampler WeightedWithoutReplacement
+	}{
+		{
+			name: "generic with replacer and heap",
+			sampler: &weightedWithoutReplacementGeneric{
+				u: &uniformReplacer{},
+				w: &weightedHeap{},
+			},
+		},
+	}
+	weightedWithoutReplacementTests = []struct {
+		name string
+		test func(*testing.T, WeightedWithoutReplacement)
+	}{
+		{
+			name: "initialize overflow",
+			test: WeightedWithoutReplacementInitializeOverflowTest,
+		},
+		{
+			name: "out of range",
+			test: WeightedWithoutReplacementOutOfRangeTest,
+		},
+		{
+			name: "empty without weight",
+			test: WeightedWithoutReplacementEmptyWithoutWeightTest,
+		},
+		{
+			name: "empty",
+			test: WeightedWithoutReplacementEmptyTest,
+		},
+		{
+			name: "singleton",
+			test: WeightedWithoutReplacementSingletonTest,
+		},
+		{
+			name: "with zero",
+			test: WeightedWithoutReplacementWithZeroTest,
+		},
+		{
+			name: "distribution",
+			test: WeightedWithoutReplacementDistributionTest,
+		},
 	}
 )
 
-func WeightedWithoutReplacementTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
-	for _, test := range weightedWithoutReplacementTests {
-		test(t, s)
+func TestAllWeightedWithoutReplacement(t *testing.T) {
+	for _, s := range weightedWithoutReplacementSamplers {
+		for _, test := range weightedWithoutReplacementTests {
+			t.Run(fmt.Sprintf("sampler %s test %s", s.name, test.name), func(t *testing.T) {
+				test.test(t, s.sampler)
+			})
+		}
 	}
 }
 

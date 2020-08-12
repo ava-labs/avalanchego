@@ -5,12 +5,42 @@ package sampler
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"testing"
 
 	safemath "github.com/ava-labs/gecko/utils/math"
 )
+
+// BenchmarkAllWeighted
+func BenchmarkAllWeighted(b *testing.B) {
+	pows := []float64{
+		0,
+		1,
+		2,
+	}
+	sizes := []int{
+		1,
+		10,
+		1000,
+		100000,
+	}
+	for _, s := range weightedSamplers[:len(weightedSamplers)-1] {
+		for _, pow := range pows {
+			for _, size := range sizes {
+				b.Run(fmt.Sprintf("sampler %s with %d elements at x^%.1f", s.name, size, pow), func(b *testing.B) {
+					WeightedPowBenchmark(b, s.sampler, pow, size)
+				})
+			}
+		}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("sampler %s with %d singleton elements", s.name, size), func(b *testing.B) {
+				WeightedSingletonBenchmark(b, s.sampler, size)
+			})
+		}
+	}
+}
 
 func CalcWeightedPoW(exponent float64, size int) (uint64, []uint64, error) {
 	weights := make([]uint64, size)

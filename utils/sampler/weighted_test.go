@@ -4,6 +4,7 @@
 package sampler
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -11,18 +12,61 @@ import (
 )
 
 var (
-	weightedTests = []func(*testing.T, Weighted){
-		WeightedInitializeOverflowTest,
-		WeightedOutOfRangeTest,
-		WeightedSingletonTest,
-		WeightedWithZeroTest,
-		WeightedDistributionTest,
+	weightedSamplers = []struct {
+		name    string
+		sampler Weighted
+	}{
+		{
+			name:    "inverse uniform cdf",
+			sampler: &weightedArray{},
+		},
+		{
+			name:    "heap division",
+			sampler: &weightedHeap{},
+		},
+		{
+			name:    "linear scan",
+			sampler: &weightedLinear{},
+		},
+		{
+			name:    "lookup",
+			sampler: &weightedUniform{},
+		},
+	}
+	weightedTests = []struct {
+		name string
+		test func(*testing.T, Weighted)
+	}{
+		{
+			name: "initialize overflow",
+			test: WeightedInitializeOverflowTest,
+		},
+		{
+			name: "out of range",
+			test: WeightedOutOfRangeTest,
+		},
+		{
+			name: "singleton",
+			test: WeightedSingletonTest,
+		},
+		{
+			name: "with zero",
+			test: WeightedWithZeroTest,
+		},
+		{
+			name: "distribution",
+			test: WeightedDistributionTest,
+		},
 	}
 )
 
-func WeightedTest(t *testing.T, s Weighted) {
-	for _, test := range weightedTests {
-		test(t, s)
+func TestAllWeighted(t *testing.T) {
+	for _, s := range weightedSamplers {
+		for _, test := range weightedTests {
+			t.Run(fmt.Sprintf("sampler %s test %s", s.name, test.name), func(t *testing.T) {
+				test.test(t, s.sampler)
+			})
+		}
 	}
 }
 
