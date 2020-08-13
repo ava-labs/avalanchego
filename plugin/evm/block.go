@@ -50,11 +50,7 @@ func (b *Block) Status() choices.Status {
 // Parent implements the snowman.Block interface
 func (b *Block) Parent() snowman.Block {
 	parentID := ids.NewID(b.ethBlock.ParentHash())
-	block := &Block{
-		id:       parentID,
-		ethBlock: b.vm.getCachedBlock(parentID),
-		vm:       b.vm,
-	}
+	block := b.vm.getBlock(parentID)
 	b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", block.ID(), block.Status())
 	return block
 }
