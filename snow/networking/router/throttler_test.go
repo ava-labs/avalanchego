@@ -49,63 +49,92 @@ func TestEWMAThrottler(t *testing.T) {
 	}
 }
 
-func TestValidatorStopsStaking(t *testing.T) {
+func TestThrottlerPrunesSpenders(t *testing.T) {
 	vdrs := validators.NewSet()
-	validator0 := validators.GenerateRandomValidator(1)
-	validator1 := validators.GenerateRandomValidator(1)
-	nonValidator := validators.GenerateRandomValidator(1)
-	vdrs.Add(validator0)
-	vdrs.Add(validator1)
+	staker0 := validators.GenerateRandomValidator(1)
+	staker1 := validators.GenerateRandomValidator(1)
+	nonStaker0 := ids.NewShortID([20]byte{1})
+	nonStaker1 := ids.NewShortID([20]byte{2})
+	nonStaker2 := ids.NewShortID([20]byte{3})
 
-	maxMessages := uint32(16)
+	vdrs.Add(staker0)
+	vdrs.Add(staker1)
+
+	maxMessages := uint32(1024)
 	stakerPortion := 0.25
 	period := float64(time.Second)
 	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
 
-	throttler.AddMessage(validator0.ID())
-	throttler.AddMessage(validator0.ID())
-	throttler.AddMessage(nonValidator.ID())
-
-	vdrs.Remove(validator0.ID())
-
-	ewmat, ok := throttler.(*ewmaThrottler)
-	if !ok {
-		t.Fatal("Throttler returned by NewEWMAThrottler should have been an instance of ewmaThrottler")
+	throttler.AddMessage(nonStaker2) // nonStaker2 should not be removed with a pending message
+	throttler.UtilizeCPU(nonStaker0, 1.0)
+	throttler.UtilizeCPU(nonStaker1, 1.0)
+	intervalsUntilPruning := int(defaultIntervalsUntilPruning)
+	// Let two intervals pass with no activity to ensure that nonStaker1 can be pruned
+	throttler.EndInterval()
+	throttler.EndInterval()
+	throttler.UtilizeCPU(nonStaker0, 1.0)
+	// Let the required number of intervals elapse to allow nonStaker1 to be pruned
+	for i := 0; i < intervalsUntilPruning; i++ {
+		throttler.EndInterval()
 	}
 
-	ewmat.getSpender(validator0.ID())
-	if ewmat.nonStaker.pendingMessages != 3 {
-		t.Fatalf("nonStaker should have had 3 pending messages after validator0 stopped staking, but had %d", ewmat.nonStaker.pendingMessages)
+	// Ensure that the validators and the non-staker heard from in the past [intervalsUntilPruning] were not pruned
+	ewmat := throttler.(*ewmaThrottler)
+	if _, ok := ewmat.spenders[staker0.ID().Key()]; !ok {
+		t.Fatal("Staker was pruned from the set of spenders")
+	}
+	if _, ok := ewmat.spenders[staker1.ID().Key()]; !ok {
+		t.Fatal("Staker was pruned from the set of spenders")
+	}
+	if _, ok := ewmat.spenders[nonStaker0.Key()]; !ok {
+		t.Fatal("Non-staker heard from recently was pruned from the set of spenders")
+	}
+	if _, ok := ewmat.spenders[nonStaker1.Key()]; ok {
+		t.Fatal("Non-staker not heard from in a long time was not pruned from the set of spenders")
+	}
+	if _, ok := ewmat.spenders[nonStaker2.Key()]; !ok {
+		t.Fatal("Non-staker with a pending message was pruned from the set of spenders")
 	}
 }
 
-func TestValidatorStartsStaking(t *testing.T) {
+func TestThrottleStaker(t *testing.T) {
 	vdrs := validators.NewSet()
-	validator0 := validators.GenerateRandomValidator(1)
-	validator1 := validators.GenerateRandomValidator(1)
-	pendingValidator := validators.GenerateRandomValidator(1)
-	vdrs.Add(validator0)
-	vdrs.Add(validator1)
+	staker0 := validators.GenerateRandomValidator(1)
+	staker1 := validators.GenerateRandomValidator(1)
+	nonStaker0 := ids.NewShortID([20]byte{1})
+
+	vdrs.Add(staker0)
+	vdrs.Add(staker1)
 
 	maxMessages := uint32(16)
 	stakerPortion := 0.25
 	period := float64(time.Second)
 	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
 
-	throttler.AddMessage(validator0.ID())
-	throttler.AddMessage(pendingValidator.ID())
-	throttler.AddMessage(pendingValidator.ID())
+	// Message Allotment: 0.5 * 0.25 * 15 = 2
+	// Message Pool: 12 messages
+	// Validator should be throttled iff it has exceeded its message allotment and the shared
+	// message pool is empty
 
-	vdrs.Add(pendingValidator)
-
-	ewmat, ok := throttler.(*ewmaThrottler)
-	if !ok {
-		t.Fatal("Throttler returned by NewEWMAThrottler should have been an instance of ewmaThrottler")
+	// staker0 consumes its own allotment plus 10 messages from the shared pool
+	for i := 0; i < 12; i++ {
+		throttler.AddMessage(staker0.ID())
 	}
 
-	ewmat.getSpender(pendingValidator.ID())
-	if ewmat.nonStaker.pendingMessages != 0 {
-		t.Fatalf("nonStaker should have had 0 pending messages after pendingValidator started staking, but had %d", ewmat.nonStaker.pendingMessages)
+	for i := 0; i < 3; i++ {
+		throttler.AddMessage(staker1.ID())
+		if _, throttle := throttler.GetUtilization(staker1.ID()); throttle {
+			t.Fatal("Should not throttle message from staker until it has exceeded its own allotment")
+		}
+	}
+
+	// Consume the last message and one extra message from the shared pool
+	throttler.AddMessage(nonStaker0)
+	throttler.AddMessage(nonStaker0)
+	throttler.AddMessage(nonStaker0)
+
+	if _, throttle := throttler.GetUtilization(staker1.ID()); !throttle {
+		t.Fatal("Should have throttled message from staker after it exceeded its own allotment and the shared pool was empty")
 	}
 }
 
@@ -140,11 +169,8 @@ func TestCalculatesEWMA(t *testing.T) {
 		throttler.EndInterval()
 	}
 
-	ewmat, ok := throttler.(*ewmaThrottler)
-	if !ok {
-		t.Fatal("Throttler returned by NewEWMAThrottler should be an instance of ewmaThrottler")
-	}
-	sp, _ := ewmat.getSpender(validator0.ID())
+	ewmat := throttler.(*ewmaThrottler)
+	sp := ewmat.getSpender(validator0.ID())
 	if sp.ewma != ewma {
 		t.Fatalf("EWMA Throttler calculated EWMA incorrectly, expected: %f, but calculated: %f", ewma, sp.ewma)
 	}

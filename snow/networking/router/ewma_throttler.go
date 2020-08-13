@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ava-labs/gecko/ids"
@@ -9,8 +10,9 @@ import (
 )
 
 const (
-	defaultDecayFactor           float64 = 2
-	defaultIntervalsUntilPruning uint32  = 60
+	defaultDecayFactor               float64 = 2
+	defaultIntervalsUntilPruning     uint32  = 60
+	defaultMinimumNonStakerAllotment float64 = 0.0001
 )
 
 type ewmaThrottler struct {
@@ -23,10 +25,14 @@ type ewmaThrottler struct {
 	vdrs      validators.Set
 
 	// Track CPU utilization
-	maxEWMA, period, decayFactor                           float64
-	stakerPortion, stakerCPU, nonStakerCPU                 float64
-	maxMessages, reservedStakerMessages, nonStakerMessages uint32
-	stakingWeight                                          uint64
+	maxEWMA, period, decayFactor           float64
+	stakerPortion, stakerCPU, nonStakerCPU float64
+	expectedNonStakerCPU                   float64
+
+	// Track pending messages
+	maxMessages, reservedStakerMessages     uint32
+	pendingNonReservedMsgs, nonReservedMsgs uint32
+	maxNonStakerPendingMsgs                 uint32
 
 	// Statistics adjusted at every interval
 	currentPeriod            uint32
@@ -40,6 +46,10 @@ type ewmaThrottler struct {
 // [maxMessages] is the maximum number of messages allotted to this chain
 // [stakerPortion] is the portion of CPU utilization and messages to reserve
 // exclusively for stakers should be in the range (0, 1]
+// the rest of the messages will be placed in a shared pool for any validator to
+// use. There is an additional hard cap placed on the number of pending messages for
+// an individual valudator:
+// (number of reserved staker messages) + [(number of non-reserved messages)/(num validators + 1)]
 // [period] is the interval of time to use for the caclulation of EWMA
 //
 // Note: ewmaThrottler uses the period as the total amount of time per
@@ -53,7 +63,7 @@ func NewEWMAThrottler(vdrs validators.Set, maxMessages uint32, stakerPortion, pe
 
 	// Number of messages reserved for Stakers vs. Non-Stakers
 	reservedStakerMessages := uint32(stakerPortion * float64(maxMessages))
-	nonStakerMessages := maxMessages - reservedStakerMessages
+	nonReservedMsgs := maxMessages - reservedStakerMessages
 
 	throttler := &ewmaThrottler{
 		spenders:  make(map[[20]byte]*spender),
@@ -71,10 +81,15 @@ func NewEWMAThrottler(vdrs validators.Set, maxMessages uint32, stakerPortion, pe
 
 		maxMessages:            maxMessages,
 		reservedStakerMessages: reservedStakerMessages,
-		nonStakerMessages:      nonStakerMessages,
+		nonReservedMsgs:        nonReservedMsgs,
 	}
 
-	// Call EndInterval to calculate initial period statistics
+	// Add validators to spenders, so that they will be calculated correctly in EndInterval
+	for _, vdr := range vdrs.List() {
+		throttler.spenders[vdr.ID().Key()] = &spender{}
+	}
+
+	// Call EndInterval to calculate initial period statistics and initial spender values for validators
 	throttler.EndInterval()
 	return throttler
 }
@@ -84,13 +99,15 @@ func (et *ewmaThrottler) AddMessage(validatorID ids.ShortID) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp, staker := et.getSpender(validatorID)
-
-	if !staker {
-		et.nonStaker.pendingMessages++
-	}
+	sp := et.getSpender(validatorID)
 	sp.pendingMessages++
 
+	// If the spender has exceeded its message allotment, then count the new
+	// message as taken from the shared pool
+	if sp.pendingMessages > sp.msgAllotment {
+		sp.pendingPoolMessages++
+		et.pendingNonReservedMsgs++
+	}
 }
 
 // RemoveMessage...
@@ -98,11 +115,14 @@ func (et *ewmaThrottler) RemoveMessage(validatorID ids.ShortID) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp, staking := et.getSpender(validatorID)
+	sp := et.getSpender(validatorID)
 	sp.pendingMessages--
 
-	if !staking {
-		et.nonStaker.pendingMessages--
+	// If the spender has pending messages taken from the pool,
+	// then remove them first
+	if sp.pendingPoolMessages > 0 {
+		sp.pendingPoolMessages--
+		et.pendingNonReservedMsgs--
 	}
 }
 
@@ -111,11 +131,11 @@ func (et *ewmaThrottler) UtilizeCPU(validatorID ids.ShortID, consumption float64
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp, staking := et.getSpender(validatorID)
+	sp := et.getSpender(validatorID)
 	sp.ewma += consumption
 	sp.lastSpend = et.currentPeriod
 
-	if !staking {
+	if !sp.staking {
 		et.nonStaker.ewma += consumption
 		et.nonStaker.lastSpend = et.currentPeriod
 	}
@@ -129,29 +149,24 @@ func (et *ewmaThrottler) GetUtilization(validatorID ids.ShortID) (float64, bool)
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	sp, _ := et.getSpender(validatorID)
-	vdr, exists := et.vdrs.Get(validatorID)
-
-	if !exists {
+	sp := et.getSpender(validatorID)
+	if !sp.staking {
 		cpuUtilization := et.nonStaker.ewma / et.periodNonStakerAllotment
-		exceedsMessageAllotment := et.nonStaker.pendingMessages > et.periodNonStakerMessages
+		// A non-staker will be throttled if the shared message pool has been taken or it has exceeded its own individual message cap
+		exceedsMessageAllotment := et.pendingNonReservedMsgs > et.nonReservedMsgs || sp.pendingMessages > sp.maxMessages
 		if exceedsMessageAllotment {
-			et.log.Verbo("Throttling message from non-staker %s with %d pending messages, cumulative non-staker has %d pending and CPU Utilization: %f",
-				validatorID, sp.pendingMessages, et.nonStaker.pendingMessages, et.nonStaker.ewma)
+			et.log.Verbo("Throttling non-staker %s: %s. Pending pool messages: %d of %d reserved", validatorID, sp, et.pendingNonReservedMsgs, et.nonReservedMsgs)
 		}
 		return cpuUtilization, exceedsMessageAllotment
 	}
 
-	stakingFactor := float64(vdr.Weight()) / float64(et.stakingWeight)
-	stakerAllotment := et.stakerCPU * stakingFactor
-	stakerMessages := uint32(float64(et.reservedStakerMessages) * stakingFactor)
-	cpuUtilization := sp.ewma / (et.periodNonStakerAllotment + stakerAllotment)
-	exceedsMessageAllotment := sp.pendingMessages > stakerMessages+et.periodNonStakerMessages
-
+	// Staker should only be throttled if it has exceede its message allotment and there are either no messages left in the shared pool
+	// or it has exceeded its own maximum message allocation.
+	exceedsMessageAllotment := sp.pendingMessages > sp.msgAllotment && (et.pendingNonReservedMsgs > et.nonReservedMsgs || sp.pendingMessages > sp.maxMessages)
 	if exceedsMessageAllotment {
-		et.log.Debug("Staker %s has exceeded its message allotment with %d messages at CPU Utilization: %f", validatorID, sp.pendingMessages, cpuUtilization)
+		et.log.Debug("Throttling staker %s: %s. Pending pool messages: %d of %d reserved", validatorID, sp.pendingMessages, et.pendingNonReservedMsgs, et.nonReservedMsgs)
 	}
-	return cpuUtilization, exceedsMessageAllotment
+	return (sp.ewma / sp.expectedEWMA), exceedsMessageAllotment
 }
 
 // EndInterval...
@@ -159,67 +174,86 @@ func (et *ewmaThrottler) EndInterval() {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
+	et.currentPeriod++
+
 	et.nonStaker.ewma /= et.decayFactor
+	stakingWeight := et.vdrs.Weight()
+	numPeers := et.vdrs.Len() + 1
+	et.periodNonStakerAllotment = et.nonStakerCPU / float64(numPeers)
+	if et.periodNonStakerAllotment == 0 {
+		et.periodNonStakerAllotment = defaultMinimumNonStakerAllotment
+	}
+	et.maxNonStakerPendingMsgs = et.nonReservedMsgs / uint32(numPeers)
 
 	for key, spender := range et.spenders {
 		spender.ewma /= et.decayFactor
+		if vdr, exists := et.vdrs.Get(ids.NewShortID(key)); exists {
+			// Calculate staker allotment here
+			spender.staking = true
+			stakerPortion := float64(vdr.Weight()) / float64(stakingWeight)
+			spender.msgAllotment = uint32(float64(et.reservedStakerMessages) * stakerPortion)
+			spender.maxMessages = uint32(float64(et.reservedStakerMessages)*stakerPortion) + et.maxNonStakerPendingMsgs
+			spender.expectedEWMA = et.stakerCPU*stakerPortion + et.periodNonStakerAllotment
+			if spender.expectedEWMA == 0 {
+				spender.expectedEWMA = defaultMinimumNonStakerAllotment
+			}
+			continue
+		}
+
 		if spender.lastSpend+defaultIntervalsUntilPruning < et.currentPeriod && spender.pendingMessages == 0 {
 			et.log.Debug("Removing validator from throttler after not hearing from it for %d periods", et.currentPeriod-spender.lastSpend)
 			delete(et.spenders, key)
 		}
+
+		// If the validator is not a staker and was not deleted, set its spender attributes
+		spender.staking = false
+		spender.msgAllotment = 0
+		spender.maxMessages = et.maxNonStakerPendingMsgs
+		spender.expectedEWMA = et.periodNonStakerAllotment
 	}
-	et.stakingWeight = et.vdrs.Weight()
-
-	// Assume all non-validators are a single peer to defend
-	// against Sybil attack
-	numPeers := et.vdrs.Len() + 1
-	et.periodNonStakerAllotment = et.nonStakerCPU / float64(numPeers)
-	et.periodNonStakerMessages = et.nonStakerMessages / uint32(numPeers)
-
-	et.currentPeriod++
 }
 
 // getSpender returns the [spender] corresponding to [validatorID] and whether or not the validator is currently staking
-func (et *ewmaThrottler) getSpender(validatorID ids.ShortID) (*spender, bool) {
+func (et *ewmaThrottler) getSpender(validatorID ids.ShortID) *spender {
 	validatorKey := validatorID.Key()
 	sp, exists := et.spenders[validatorKey]
-	staking := et.vdrs.Contains(validatorID)
 
 	if !exists {
 		// If this validator did not exist in spenders, create it and return
 		sp = &spender{
-			currentPeriod: et.currentPeriod,
-			staking:       staking,
+			staking:             false,
+			maxMessages:         et.maxNonStakerPendingMsgs,
+			ewma:                0.0,
+			expectedEWMA:        et.periodNonStakerAllotment,
+			pendingMessages:     0,
+			pendingPoolMessages: 0,
+			msgAllotment:        0,
+			lastSpend:           0, // Assume never spent before until UtilizeCPU is called
 		}
 		et.spenders[validatorKey] = sp
-		return sp, staking
+		return sp
 	}
 
-	// If this validator has not changed whether or not it is staking
-	// return as is
-	if sp.staking == staking {
-		return sp, staking
-	}
-
-	// If this spender was previously staking and stopped, add its
-	// pending messages to nonStaker's.
-	if sp.staking {
-		sp.staking = false
-		et.nonStaker.pendingMessages += sp.pendingMessages
-
-		return sp, staking
-	}
-
-	// Otherwise, it has started staking, so remove its pending messages
-	// from nonStaker's
-	sp.staking = true
-	et.nonStaker.pendingMessages -= sp.pendingMessages
-
-	return sp, staking
+	return sp
 }
 
 type spender struct {
-	currentPeriod, lastSpend, pendingMessages uint32
-	ewma                                      float64
-	staking                                   bool
+	// Last period that this spender utilized the CPU
+	lastSpend uint32
+
+	pendingMessages uint32
+	// Number of messages allocated to this spender as a staker
+	msgAllotment uint32
+	// Max number of messages this spender can use even if the shared pool is non-empty
+	maxMessages uint32
+	// Number of pending messages this spender has taken from the pool
+	pendingPoolMessages uint32
+
+	// EWMA of this spender's CPU utilization and its expected value calculated at each interval
+	ewma, expectedEWMA float64
+	staking            bool
+}
+
+func (sp *spender) String() string {
+	return fmt.Sprintf("Spender(%d, %d, %d, %d, %f)", sp.pendingMessages, sp.msgAllotment, sp.maxMessages, sp.pendingPoolMessages, sp.ewma/sp.expectedEWMA)
 }
