@@ -1630,7 +1630,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    beacons,
 				Alpha:      uint64(beacons.Len()/2 + 1),

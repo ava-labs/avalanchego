@@ -87,7 +87,7 @@ func TestPayments(t *testing.T) {
 	consensus.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    validators.NewSet(),
 				Sender:     sender,

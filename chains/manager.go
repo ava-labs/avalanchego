@@ -472,7 +472,7 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: validators,
 				Beacons:    beacons,
 				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
@@ -549,7 +549,7 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: validators,
 				Beacons:    beacons,
 				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
