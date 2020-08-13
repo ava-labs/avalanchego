@@ -5,7 +5,6 @@ package network
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"net"
 	"sync"
@@ -21,9 +20,10 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/version"
 )
@@ -45,10 +45,6 @@ const (
 	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = time.Minute
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
-
-	// Request ID used when sending a Put message to gossip an accepted container
-	// (ie not sent in response to a Get)
-	GossipMsgRequestID = math.MaxUint32
 )
 
 // Network defines the functionality of the networking library.
@@ -683,7 +679,7 @@ func (n *network) Peers() []PeerID {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.ip.String(),
-				ID:           peer.id,
+				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr,
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
@@ -729,7 +725,7 @@ func (n *network) Track(ip utils.IPDesc) {
 
 // assumes the stateLock is not held.
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
-	msg, err := n.b.Put(chainID, GossipMsgRequestID, containerID, container)
+	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
@@ -747,9 +743,16 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 		numToGossip = len(allPeers)
 	}
 
-	sampler := random.Uniform{N: len(allPeers)}
-	for i := 0; i < numToGossip; i++ {
-		if allPeers[sampler.Sample()].send(msg) {
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(allPeers))); err != nil {
+		return err
+	}
+	indices, err := s.Sample(numToGossip)
+	if err != nil {
+		return err
+	}
+	for _, index := range indices {
+		if allPeers[int(index)].send(msg) {
 			n.put.numSent.Inc()
 		} else {
 			n.put.numFailed.Inc()
@@ -823,14 +826,43 @@ func (n *network) gossip() {
 			numNonStakersToSend = len(nonStakers)
 		}
 
-		sampler := random.Uniform{N: len(stakers)}
-		for i := 0; i < numStakersToSend; i++ {
-			stakers[sampler.Sample()].send(msg)
+		s := sampler.NewUniform()
+		if err := s.Initialize(uint64(len(stakers))); err != nil {
+			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
+				err,
+				len(stakers))
+			n.stateLock.Unlock()
+			continue
 		}
-		sampler.N = len(nonStakers)
-		sampler.Replace()
-		for i := 0; i < numNonStakersToSend; i++ {
-			nonStakers[sampler.Sample()].send(msg)
+		stakerIndices, err := s.Sample(numStakersToSend)
+		if err != nil {
+			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
+				err,
+				len(stakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		for _, index := range stakerIndices {
+			stakers[int(index)].send(msg)
+		}
+
+		if err := s.Initialize(uint64(len(nonStakers))); err != nil {
+			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
+				err,
+				len(nonStakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		nonStakerIndices, err := s.Sample(numNonStakersToSend)
+		if err != nil {
+			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
+				err,
+				len(nonStakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		for _, index := range nonStakerIndices {
+			nonStakers[int(index)].send(msg)
 		}
 		n.stateLock.Unlock()
 	}

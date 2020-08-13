@@ -73,7 +73,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddDefaultSubnetValidator(t *testing.T) {
-	expectedJSONString := `{"startTime":"0","endTime":"0","id":"","destination":"","delegationFeeRate":"0","username":"","password":""}`
+	expectedJSONString := `{"startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000","username":"","password":""}`
 	args := AddDefaultSubnetValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
@@ -261,6 +261,7 @@ func TestGetTx(t *testing.T) {
 			func() (interface{}, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
+					service.vm.avm,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
 				)

@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -188,18 +189,22 @@ func (vm *VM) removeUTXO(db database.Database, utxoID ids.ID) error {
 	return nil
 }
 
-// return the IDs of UTXOs that reference [addr]
-// Returns nil if no UTXOs reference [addr]
-func (vm *VM) getReferencingUTXOs(db database.Database, addrBytes []byte) (ids.Set, error) {
+// Return the IDs of UTXOs that reference [addr].
+// Only returns UTXOs after [start].
+// Returns at most [limit] UTXO IDs.
+// Returns nil if no UTXOs reference [addr].
+func (vm *VM) getReferencingUTXOs(db database.Database, addr []byte, start ids.ID, limit int) (ids.Set, error) {
+	toFetch := limit
 	utxoIDs := ids.Set{}
-	iter := prefixdb.NewNested(addrBytes, db).NewIterator()
+	iter := prefixdb.NewNested(addr, db).NewIteratorWithStart(start.Bytes())
 	defer iter.Release()
-	for iter.Next() {
-		utxoID, err := ids.ToID(iter.Key())
-		if err != nil {
+	for toFetch > 0 && iter.Next() {
+		if utxoID, err := ids.ToID(iter.Key()); err != nil {
 			return nil, err
+		} else if !utxoID.Equals(start) {
+			utxoIDs.Add(utxoID)
+			toFetch--
 		}
-		utxoIDs.Add(utxoID)
 	}
 	return utxoIDs, nil
 }
@@ -216,30 +221,68 @@ func (vm *VM) removeReferencingUTXO(db database.Database, addrBytes []byte, utxo
 	return prefixedDB.Delete(utxoID.Bytes())
 }
 
-// getUTXOs returns UTXOs that reference at least one of the addresses in [addrs]
-func (vm *VM) getUTXOs(db database.Database, addrs [][]byte) ([]*avax.UTXO, error) {
-	utxoIDs := ids.Set{}
-	for _, addr := range addrs {
-		addrUTXOs, err := vm.getReferencingUTXOs(db, addr)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't get UTXOs for address %s", addr)
-		}
-		utxoIDs.Union(addrUTXOs)
+// GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Assumed elements of [addrs] are unique.
+// Returns at most [limit] UTXOs.
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Only returns UTXOs associated with addresses >= [startAddr].
+// For address [startAddr], only returns UTXOs whose IDs are greater than [startUtxoID].
+// Returns:
+// * The fetched of UTXOs
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+func (vm *VM) GetUTXOs(
+	db database.Database,
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch { // Don't fetch more than [maxUTXOsToFetch]
+		limit = maxUTXOsToFetch
 	}
-	utxos := make([]*avax.UTXO, utxoIDs.Len())
-	for i, utxoID := range utxoIDs.List() {
-		utxo, err := vm.getUTXO(db, utxoID)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+
+	seen := ids.Set{} // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, limit)
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+	for _, addr := range addrs.List() {
+		start := ids.Empty
+		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
+			continue
+		} else if comp == 0 {
+			start = startUTXOID
 		}
-		utxos[i] = utxo
+		utxoIDs, err := vm.getReferencingUTXOs(db, addr.Bytes(), start, limit) // Get IDs of UTXOs to fetch
+		if err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+		}
+		for _, utxoID := range utxoIDs.List() { // Get the UTXOs
+			if seen.Contains(utxoID) { // already have this UTXO in the list
+				continue
+			}
+			utxo, err := vm.getUTXO(db, utxoID)
+			if err != nil {
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			lastAddr = addr
+			lastIndex = utxoID
+			limit--
+			if limit <= 0 {
+				break // Found [limit] utxos; stop.
+			}
+		}
 	}
-	return utxos, nil
+	return utxos, lastAddr, lastIndex, nil
 }
 
 // getBalance returns the balance of [addrs]
-func (vm *VM) getBalance(db database.Database, addrs [][]byte) (uint64, error) {
-	utxos, err := vm.getUTXOs(db, addrs)
+func (vm *VM) getBalance(db database.Database, addrs ids.ShortSet) (uint64, error) {
+	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}

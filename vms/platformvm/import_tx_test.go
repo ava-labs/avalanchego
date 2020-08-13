@@ -29,6 +29,15 @@ func (msm MockSharedMemory) GetDatabase(ID ids.ID) database.Database {
 func (msm MockSharedMemory) ReleaseDatabase(ID ids.ID) {}
 
 func TestNewImportTx(t *testing.T) {
+	vm := defaultVM()
+	avmID := ids.GenerateTestID()
+	vm.avm = avmID
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
 	type test struct {
 		description   string
 		sharedMemory  MockSharedMemory
@@ -50,8 +59,8 @@ func TestNewImportTx(t *testing.T) {
 		return MockSharedMemory{
 			GetDatabaseF: func(ids.ID) database.Database {
 				db := memdb.New()
-				state := avax.NewPrefixedState(db, Codec)
-				if err := state.FundAVMUTXO(&avax.UTXO{
+				state := avax.NewPrefixedState(db, Codec, avmID, vm.Ctx.ChainID)
+				if err := state.FundUTXO(&avax.UTXO{
 					UTXOID: avax.UTXOID{
 						TxID:        ids.GenerateTestID(),
 						OutputIndex: rand.Uint32(),
@@ -73,15 +82,6 @@ func TestNewImportTx(t *testing.T) {
 		}
 	}
 
-	vm := defaultVM()
-	avmID := ids.GenerateTestID()
-	vm.avm = avmID
-	vm.Ctx.Lock.Lock()
-	defer func() {
-		vm.Shutdown()
-		vm.Ctx.Lock.Unlock()
-	}()
-
 	tests := []test{
 		{
 			description:   "recipient key can't pay fee;",
@@ -102,10 +102,10 @@ func TestNewImportTx(t *testing.T) {
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		vm.Ctx.SharedMemory = tt.sharedMemory
-		tx, err := vm.newImportTx(to, tt.recipientKeys)
+		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys)
 		if err != nil {
 			if !tt.shouldErr {
-				t.Fatalf("test '%s' errored but it shouldn't have", tt.description)
+				t.Fatalf("test '%s' unexpectedly errored with: %s", tt.description, err)
 			}
 			continue
 		} else if tt.shouldErr {

@@ -120,15 +120,18 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 	stakeOwners := nextToRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 	// Get old balances, balances if tx abort, balances if tx committed
 	for _, stakeOwner := range stakeOwners.List() {
-		oldBalance, err := vm.getBalance(vm.DB, [][]byte{stakeOwner.Bytes()})
+		stakeOwnerSet := ids.ShortSet{}
+		stakeOwnerSet.Add(stakeOwner)
+
+		oldBalance, err := vm.getBalance(vm.DB, stakeOwnerSet)
 		if err != nil {
 			t.Fatal(err)
 		}
-		onAbortBalance, err := vm.getBalance(onAbortDB, [][]byte{stakeOwner.Bytes()})
+		onAbortBalance, err := vm.getBalance(onAbortDB, stakeOwnerSet)
 		if err != nil {
 			t.Fatal(err)
 		}
-		onCommitBalance, err := vm.getBalance(onCommitDB, [][]byte{stakeOwner.Bytes()})
+		onCommitBalance, err := vm.getBalance(onCommitDB, stakeOwnerSet)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +174,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		vdrStartTime,
 		vdrEndTime,
 		vdrDestination, // node ID
-		vdrDestination, // destination
+		vdrDestination, // reward address
 		NumberOfShares/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
@@ -188,7 +191,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		delStartTime,
 		delEndTime,
 		vdrDestination,                          // node ID
-		delDestination,                          // destination
+		delDestination,                          // reward address
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
 	if err != nil {
@@ -218,26 +221,28 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vdrDestSlice := [][]byte{vdrDestination.Bytes()}
-	delDestSlice := [][]byte{keys[0].PublicKey().Address().Bytes()}
+	vdrDestSet := ids.ShortSet{}
+	vdrDestSet.Add(vdrDestination)
+	delDestSet := ids.ShortSet{}
+	delDestSet.Add(keys[0].PublicKey().Address())
 
 	expectedReward := reward(
 		time.Unix(int64(delEndTime), 0).Sub(time.Unix(int64(delStartTime), 0)), // duration
-		unsignedDelTx.Weight(),                                                 // amount
-		InflationRate,                                                          // inflation rate
+		unsignedDelTx.Weight(), // amount
+		InflationRate,          // inflation rate
 	)
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
-	if oldVdrBalance, err := vm.getBalance(vm.DB, vdrDestSlice); err != nil {
+	if oldVdrBalance, err := vm.getBalance(vm.DB, vdrDestSet); err != nil {
 		t.Fatal(err)
-	} else if commitVdrBalance, err := vm.getBalance(onCommitDB, vdrDestSlice); err != nil {
+	} else if commitVdrBalance, err := vm.getBalance(onCommitDB, vdrDestSet); err != nil {
 		t.Fatal(err)
 	} else if vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance); err != nil || vdrReward == 0 && InflationRate > 1.0 {
 		t.Fatal("expected delgatee balance to increase because of reward")
-	} else if oldDelBalance, err := vm.getBalance(vm.DB, delDestSlice); err != nil {
+	} else if oldDelBalance, err := vm.getBalance(vm.DB, delDestSet); err != nil {
 		t.Fatal(err)
-	} else if commitDelBalance, err := vm.getBalance(onCommitDB, delDestSlice); err != nil {
+	} else if commitDelBalance, err := vm.getBalance(onCommitDB, delDestSet); err != nil {
 		t.Fatal(err)
 	} else if delBalanceChange, err := math.Sub64(commitDelBalance, oldDelBalance); err != nil || delBalanceChange == 0 {
 		t.Fatal("expected delgator balance to increase upon commit")
@@ -247,11 +252,11 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal("the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
 	} else if delReward+vdrReward != expectedReward {
 		t.Fatalf("expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
-	} else if abortVdrBalance, err := vm.getBalance(onAbortDB, vdrDestSlice); err != nil {
+	} else if abortVdrBalance, err := vm.getBalance(onAbortDB, vdrDestSet); err != nil {
 		t.Fatal(err)
 	} else if vdrReward, err = math.Sub64(abortVdrBalance, oldVdrBalance); err != nil || vdrReward != 0 && InflationRate > 1.0 {
 		t.Fatal("expected delgatee balance to stay the same upon abort")
-	} else if abortDelBalance, err := vm.getBalance(onAbortDB, delDestSlice); err != nil {
+	} else if abortDelBalance, err := vm.getBalance(onAbortDB, delDestSet); err != nil {
 		t.Fatal(err)
 	} else if delReward, err = math.Sub64(abortDelBalance, oldDelBalance); err != nil || delReward != unsignedDelTx.Weight() {
 		t.Fatal("expected delgator balance to increase by stake amount upon abort")

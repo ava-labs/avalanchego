@@ -24,10 +24,9 @@ import (
 	"github.com/ava-labs/gecko/staking"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -54,8 +53,9 @@ var (
 )
 
 var (
-	errBootstrapMismatch  = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errStakingRequiresTLS = errors.New("if staking is enabled, network TLS must also be enabled")
+	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
+	errStakingRequiresTLS   = errors.New("if staking is enabled, network TLS must also be enabled")
+	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
 // GetIPs returns the default IPs for each network
@@ -102,34 +102,34 @@ func GetIDs(networkID uint32) []string {
 	switch networkID {
 	case constants.DenaliID:
 		return []string{
-			"NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
-			"2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
-			"LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
-			"hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
-			"4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
-			"HGZ8ae74J3odT8ESreAdCtdnvWG1J4X5n",
-			"4KXitMCoE9p2BHA6VzXtaTxLoEjNDo2Pt",
-			"JyE4P8f4cTryNV8DCz2M81bMtGhFFHexG",
-			"EzGaipqomyK9UKx9DBHV6Ky3y68hoknrF",
-			"CYKruAjwH1BmV3m37sXNuprbr7dGQuJwG",
-			"LegbVf6qaMKcsXPnLStkdc1JVktmmiDxy",
-			"FesGqwKq7z5nPFHa5iwZctHE5EZV9Lpdq",
-			"BFa1padLXBj7VHa2JYvYGzcTBPQGjPhUy",
-			"4B4rc5vdD1758JSBYL1xyvE5NHGzz6xzH",
-			"EDESh4DfZFC15i613pMtWniQ9arbBZRnL",
-			"CZmZ9xpCzkWqjAyS7L4htzh5Lg6kf1k18",
-			"CTtkcXvVdhpNp6f97LEUXPwsRD3A2ZHqP",
-			"84KbQHSDnojroCVY7vQ7u9Tx7pUonPaS",
-			"JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
-			"4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
+			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
+			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
+			"NodeID-LQwRLm4cbJ7T2kxcxp4uXCU5XD8DFrE1C",
+			"NodeID-hArafGhY2HFTbwaaVh1CSCUCUCiJ2Vfb",
+			"NodeID-4QBwET5o8kUhvt9xArhir4d3R25CtmZho",
+			"NodeID-HGZ8ae74J3odT8ESreAdCtdnvWG1J4X5n",
+			"NodeID-4KXitMCoE9p2BHA6VzXtaTxLoEjNDo2Pt",
+			"NodeID-JyE4P8f4cTryNV8DCz2M81bMtGhFFHexG",
+			"NodeID-EzGaipqomyK9UKx9DBHV6Ky3y68hoknrF",
+			"NodeID-CYKruAjwH1BmV3m37sXNuprbr7dGQuJwG",
+			"NodeID-LegbVf6qaMKcsXPnLStkdc1JVktmmiDxy",
+			"NodeID-FesGqwKq7z5nPFHa5iwZctHE5EZV9Lpdq",
+			"NodeID-BFa1padLXBj7VHa2JYvYGzcTBPQGjPhUy",
+			"NodeID-4B4rc5vdD1758JSBYL1xyvE5NHGzz6xzH",
+			"NodeID-EDESh4DfZFC15i613pMtWniQ9arbBZRnL",
+			"NodeID-CZmZ9xpCzkWqjAyS7L4htzh5Lg6kf1k18",
+			"NodeID-CTtkcXvVdhpNp6f97LEUXPwsRD3A2ZHqP",
+			"NodeID-84KbQHSDnojroCVY7vQ7u9Tx7pUonPaS",
+			"NodeID-JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
+			"NodeID-4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
 		}
 	case constants.CascadeID:
 		return []string{
-			"NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
-			"CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
-			"DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
-			"N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
-			"EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
+			"NodeID-NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
+			"NodeID-CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
+			"NodeID-DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
+			"NodeID-N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
+			"NodeID-EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
 		}
 	default:
 		return nil
@@ -149,11 +149,12 @@ func GetDefaultBootstraps(networkID uint32, count int) ([]string, []string) {
 	sampledIPs := make([]string, 0, count)
 	sampledIDs := make([]string, 0, count)
 
-	sampler := random.Uniform{N: len(ips)}
-	for i := 0; i < count; i++ {
-		s := sampler.Sample()
-		sampledIPs = append(sampledIPs, ips[s])
-		sampledIDs = append(sampledIDs, ids[s])
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(ips)))
+	indices, _ := s.Sample(count)
+	for _, index := range indices {
+		sampledIPs = append(sampledIPs, ips[int(index)])
+		sampledIDs = append(sampledIDs, ids[int(index)])
 	}
 
 	return sampledIPs, sampledIDs
@@ -206,11 +207,11 @@ func init() {
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")
-	// TODO - keeping same flag for backwards compatibility, should be changed to "staking-enabled"
-	fs.BoolVar(&Config.EnableStaking, "staking-tls-enabled", true, "Enable staking. If enabled, Network TLS is required.")
+	fs.BoolVar(&Config.EnableStaking, "staking-enabled", true, "Enable staking. If enabled, Network TLS is required.")
 	fs.BoolVar(&Config.EnableP2PTLS, "p2p-tls-enabled", true, "Require TLS to authenticate network communication")
 	fs.StringVar(&Config.StakingKeyFile, "staking-tls-key-file", defaultStakingKeyPath, "TLS private key for staking")
 	fs.StringVar(&Config.StakingCertFile, "staking-tls-cert-file", defaultStakingCertPath, "TLS certificate for staking")
+	fs.Uint64Var(&Config.DisabledStakingWeight, "staking-disabled-weight", 1, "Weight to provide to each peer when staking is disabled")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -347,17 +348,15 @@ func init() {
 		return
 	}
 
+	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
+		errs.Add(errInvalidStakerWeights)
+	}
+
 	if Config.EnableP2PTLS {
 		i := 0
-		cb58 := formatting.CB58{}
 		for _, id := range strings.Split(*bootstrapIDs, ",") {
 			if id != "" {
-				err = cb58.FromString(id)
-				if err != nil {
-					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id to bytes: %w", err))
-					return
-				}
-				peerID, err := ids.ToShortID(cb58.Bytes)
+				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
 				if err != nil {
 					errs.Add(fmt.Errorf("couldn't parse bootstrap peer id: %w", err))
 					return

@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -303,7 +304,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID, // node ID
-		nodeID, // destination
+		nodeID, // reward address
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
@@ -323,8 +324,8 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		MinimumStakeAmount,                                   // stake amount
 		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
-		key2.PublicKey().Address(),                           // node ID
-		nodeID,                                  // destination
+		nodeID, // node ID
+		key2.PublicKey().Address(),              // reward address
 		NumberOfShares,                          // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
@@ -356,7 +357,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove all UTXOs owned by keys[0]
-	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address().Bytes())
+	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}

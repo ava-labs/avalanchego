@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/vms/components/avax"
@@ -64,7 +65,7 @@ func (v *APIValidator) weight() uint64 {
 type APIDefaultSubnetValidator struct {
 	APIValidator
 
-	Destination       string      `json:"destination"`
+	RewardAddress     string      `json:"rewardAddress"`
 	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
 }
 
@@ -74,7 +75,7 @@ type FormattedAPIValidator struct {
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	ID          string       `json:"id"`
+	ID          string       `json:"nodeID"`
 }
 
 func (v *FormattedAPIValidator) weight() uint64 {
@@ -92,8 +93,10 @@ func (v *FormattedAPIValidator) weight() uint64 {
 type FormattedAPIDefaultSubnetValidator struct {
 	FormattedAPIValidator
 
-	Destination       string      `json:"destination"`
-	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
+	RewardAddress string `json:"rewardAddress"`
+
+	// Delegation fee rate as a percentage. Must be in [0,100].
+	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
 // APIChain defines a chain that exists
@@ -119,12 +122,12 @@ type APIChain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID ids.ID                      `json:"avaxAssetID"`
-	NetworkID   json.Uint32                 `json:"address"`
-	UTXOs       []APIUTXO                   `json:"utxos"`
-	Validators  []APIDefaultSubnetValidator `json:"defaultSubnetValidators"`
-	Chains      []APIChain                  `json:"chains"`
-	Time        json.Uint64                 `json:"time"`
+	AvaxAssetID ids.ID                               `json:"avaxAssetID"`
+	NetworkID   json.Uint32                          `json:"address"`
+	UTXOs       []APIUTXO                            `json:"utxos"`
+	Validators  []FormattedAPIDefaultSubnetValidator `json:"defaultSubnetValidators"`
+	Chains      []APIChain                           `json:"chains"`
+	Time        json.Uint64                          `json:"time"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -205,10 +208,15 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if uint64(validator.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
-		addrID, err := bech32ToID(validator.Destination)
+		addrID, err := bech32ToID(validator.RewardAddress)
 		if err != nil {
 			return err
 		}
+		nodeID, err := ids.ShortFromPrefixedString(validator.ID, constants.NodeIDPrefix)
+		if err != nil {
+			return err
+		}
+
 		tx := &ProposalTx{
 			UnsignedProposalTx: &UnsignedAddDefaultSubnetValidatorTx{
 				BaseTx: BaseTx{
@@ -217,7 +225,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				},
 				DurationValidator: DurationValidator{
 					Validator: Validator{
-						NodeID: validator.ID,
+						NodeID: nodeID,
 						Wght:   weight,
 					},
 					Start: uint64(args.Time),

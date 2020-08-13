@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
@@ -18,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/avax"
@@ -26,11 +27,11 @@ import (
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 var networkID uint32 = 10
 var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
+var platformChainID = ids.Empty.Prefix(0)
 
 var keys []*crypto.PrivateKeySECP256K1R
 var asset = ids.NewID([32]byte{1, 2, 3})
@@ -52,10 +53,34 @@ func init() {
 	}
 }
 
+type snLookup struct {
+	chainsToSubnet map[[32]byte]ids.ID
+}
+
+func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
+	subnetID, ok := sn.chainsToSubnet[chainID.Key()]
+	if !ok {
+		return ids.ID{}, errors.New("")
+	}
+	return subnetID, nil
+}
+
 func NewContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
 	ctx.ChainID = chainID
+	aliaser := ctx.BCLookup.(*ids.Aliaser)
+	aliaser.Alias(chainID, "X")
+	aliaser.Alias(chainID, chainID.String())
+	aliaser.Alias(platformChainID, "P")
+	aliaser.Alias(platformChainID, platformChainID.String())
+
+	sn := &snLookup{
+		chainsToSubnet: make(map[[32]byte]ids.ID),
+	}
+	sn.chainsToSubnet[chainID.Key()] = ctx.SubnetID
+	sn.chainsToSubnet[platformChainID.Key()] = ctx.SubnetID
+	ctx.SNLookup = sn
 	return ctx
 }
 
@@ -188,12 +213,10 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
-		avax:      avaxID,
-		platform: platformID,
+		avax: avaxID,
 	}
 	err := vm.Initialize(
 		ctx,
@@ -562,12 +585,11 @@ func TestGenesisGetUTXOs(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	shortAddr := keys[0].PublicKey().Address()
-	addr := ids.NewID(hashing.ComputeHash256Array(shortAddr.Bytes()))
+	addr := keys[0].PublicKey().Address()
 
-	addrs := ids.Set{}
+	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, err := vm.GetUTXOs(addrs)
+	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1046,61 +1068,25 @@ func TestIssueProperty(t *testing.T) {
 
 func TestVMFormat(t *testing.T) {
 	_, _, vm := GenesisVM(t)
-	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	tests := []struct {
-		in       string
+		in       ids.ShortID
 		expected string
 	}{
-		{"", "3D7sudhzUKTYFkYj4Zoe7GgSKhuyP9bYwXunHwhZsmQe1z9Mp-testing15rrusm"},
+		{ids.ShortEmpty, "X-testing1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqtu2yas"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			addrstr, err := vm.FormatAddress([]byte(tt.in))
+	for _, test := range tests {
+		t.Run(test.in.String(), func(t *testing.T) {
+			addrStr, err := vm.FormatLocalAddress(test.in)
 			if err != nil {
 				t.Error(err)
 			}
-			if tt.expected != addrstr {
-				t.Errorf("Expected %q, got %q", tt.expected, addrstr)
-			}
-		})
-	}
-}
-
-func TestVMFormatAliased(t *testing.T) {
-	_, _, vm := GenesisVM(t)
-	ctx := vm.ctx
-	defer func() {
-		vm.Shutdown()
-		ctx.Lock.Unlock()
-	}()
-
-	origAliases := ctx.BCLookup
-	defer func() { ctx.BCLookup = origAliases }()
-
-	tmpAliases := &ids.Aliaser{}
-	tmpAliases.Initialize()
-	tmpAliases.Alias(ctx.ChainID, "X")
-	ctx.BCLookup = tmpAliases
-
-	tests := []struct {
-		in       string
-		expected string
-	}{
-		{"", "X-testing15rrusm"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			addrstr, err := vm.FormatAddress([]byte(tt.in))
-			if err != nil {
-				t.Error(err)
-			}
-			if tt.expected != addrstr {
-				t.Errorf("Expected %q, got %q", tt.expected, addrstr)
+			if test.expected != addrStr {
+				t.Errorf("Expected %q, got %q", test.expected, addrStr)
 			}
 		})
 	}

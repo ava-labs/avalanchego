@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	}()
 
 	nodeID := keys[0].PublicKey().Address()
-	destination := nodeID
+	rewardAddress := nodeID
 
 	// Case : tx is nil
 	var unsignedTx *UnsignedAddDefaultSubnetDelegatorTx
@@ -37,7 +38,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
-		destination,
+		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -56,7 +57,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
-		destination,
+		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -75,7 +76,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
-		destination,
+		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -94,7 +95,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
-		destination,
+		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -113,7 +114,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
 		nodeID,
-		destination,
+		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -132,7 +133,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix()),
 		nodeID,
-		destination,
+		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -150,7 +151,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
-		destination,
+		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -167,7 +168,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 	nodeID := keys[0].PublicKey().Address()
-	destination := nodeID
+	rewardAddress := nodeID
 	vdb := versiondb.New(vm.DB) // so tests don't interfere with one another
 	currentTimestamp, err := vm.getTimestamp(vm.DB)
 	if err != nil {
@@ -189,7 +190,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			newValidatorStartTime,                   // start time
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
-			destination,                             // destination
+			rewardAddress,                           // Reward Address
 			NumberOfShares,                          // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		); err != nil {
@@ -207,15 +208,15 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	type test struct {
-		stakeAmount uint64
-		startTime   uint64
-		endTime     uint64
-		nodeID      ids.ShortID
-		destination ids.ShortID
-		feeKeys     []*crypto.PrivateKeySECP256K1R
-		setup       func(db database.Database)
-		shouldErr   bool
-		description string
+		stakeAmount   uint64
+		startTime     uint64
+		endTime       uint64
+		nodeID        ids.ShortID
+		rewardAddress ids.ShortID
+		feeKeys       []*crypto.PrivateKeySECP256K1R
+		setup         func(db database.Database)
+		shouldErr     bool
+		description   string
 	}
 
 	tests := []test{
@@ -224,7 +225,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
-			destination,
+			rewardAddress,
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
 			nil,
 			true,
@@ -235,7 +236,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
-			destination,
+			rewardAddress,
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
 			nil,
 			true,
@@ -246,7 +247,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
 			uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			newValidatorID,
-			destination,
+			rewardAddress,
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
 			nil,
 			true,
@@ -257,7 +258,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			newValidatorStartTime - 1, // start validating non-default subnet before default subnet
 			newValidatorEndTime,
 			newValidatorID,
-			destination,
+			rewardAddress,
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
 			addValidator,
 			true,
@@ -268,7 +269,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			newValidatorStartTime,
 			newValidatorEndTime + 1, // stop validating non-default subnet after stopping validating default subnet
 			newValidatorID,
-			destination,
+			rewardAddress,
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
 			addValidator,
 			true,
@@ -279,7 +280,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			newValidatorStartTime, // same start time as for default subnet
 			newValidatorEndTime,   // same end time as for default subnet
 			newValidatorID,
-			destination,
+			rewardAddress,
 			[]*crypto.PrivateKeySECP256K1R{keys[0]},
 			addValidator,
 			false,
@@ -290,7 +291,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			uint64(currentTimestamp.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
 			nodeID,                                  // node ID
-			destination,                             // destination
+			rewardAddress,                           // Reward Address
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // tx fee payer
 			nil,
 			true,
@@ -301,10 +302,10 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			uint64(defaultValidateStartTime.Unix()), // start time
 			uint64(defaultValidateEndTime.Unix()),   // end time
 			nodeID,                                  // node ID
-			destination,                             // destination
+			rewardAddress,                           // Reward Address
 			[]*crypto.PrivateKeySECP256K1R{keys[1]}, // tx fee payer
 			func(db database.Database) { // Remove all UTXOs owned by keys[1]
-				utxoIDs, err := vm.getReferencingUTXOs(db, keys[1].PublicKey().Address().Bytes())
+				utxoIDs, err := vm.getReferencingUTXOs(db, keys[1].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -326,7 +327,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			tt.startTime,
 			tt.endTime,
 			tt.nodeID,
-			tt.destination,
+			tt.rewardAddress,
 			tt.feeKeys,
 		)
 		if err != nil {

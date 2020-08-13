@@ -17,11 +17,19 @@ import (
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
+var (
+	errNoImportInputs = errors.New("no import inputs")
+)
+
 // ImportTx is a transaction that imports an asset from another blockchain.
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	Ins []*avax.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
+	// Which chain to consume the funds from
+	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
+
+	// The inputs to this transaction
+	Ins []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -55,10 +63,6 @@ func (t *ImportTx) AssetIDs() ids.Set {
 // NumCredentials returns the number of expected credentials
 func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ins) }
 
-var (
-	errNoImportInputs = errors.New("no import inputs")
-)
-
 // SyntacticVerify that this transaction is well-formed.
 func (t *ImportTx) SyntacticVerify(
 	ctx *snow.Context,
@@ -76,6 +80,8 @@ func (t *ImportTx) SyntacticVerify(
 		return errWrongChainID
 	case len(t.Memo) > maxMemoSize:
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
+	case t.SourceChain.IsZero():
+		return errWrongBlockchainID
 	case len(t.Ins) == 0:
 		return errNoImportInputs
 	}
@@ -120,14 +126,22 @@ func (t *ImportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is well-formed.
 func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
+	if err != nil {
+		return err
+	}
+	if !vm.ctx.SubnetID.Equals(subnetID) || t.SourceChain.Equals(vm.ctx.ChainID) {
+		return errWrongBlockchainID
+	}
+
 	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
 		return err
 	}
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+	smDB := vm.ctx.SharedMemory.GetDatabase(t.SourceChain)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(t.SourceChain)
 
-	state := avax.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
 
 	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.Ins {
@@ -140,7 +154,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		fx := vm.fxs[fxIndex].Fx
 
 		utxoID := in.UTXOID.InputID()
-		utxo, err := state.PlatformUTXO(utxoID)
+		utxo, err := state.UTXO(utxoID)
 		if err != nil {
 			return err
 		}
@@ -175,15 +189,15 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
 func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+	smDB := vm.ctx.SharedMemory.GetDatabase(t.SourceChain)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(t.SourceChain)
 
 	vsmDB := versiondb.New(smDB)
 
-	state := avax.NewPrefixedState(vsmDB, vm.codec)
+	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
 	for _, in := range t.Ins {
 		utxoID := in.UTXOID.InputID()
-		if err := state.SpendPlatformUTXO(utxoID); err != nil {
+		if err := state.SpendUTXO(utxoID); err != nil {
 			return err
 		}
 	}

@@ -1,7 +1,6 @@
 package router
 
 import (
-	"math"
 	"sync"
 
 	"github.com/ava-labs/gecko/ids"
@@ -169,13 +168,7 @@ func (et *ewmaThrottler) EndInterval() {
 			delete(et.spenders, key)
 		}
 	}
-	totalWeight, err := et.vdrs.Weight()
-	if err != nil {
-		et.log.Error("Error calculating cumulative validator weight: %s", err)
-		et.stakingWeight = math.MaxUint64
-	} else {
-		et.stakingWeight = totalWeight
-	}
+	et.stakingWeight = et.vdrs.Weight()
 
 	// Assume all non-validators are a single peer to defend
 	// against Sybil attack
