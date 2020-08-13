@@ -422,10 +422,6 @@ func (vm *VM) updateStatus(blockID ids.ID, status choices.Status) {
 	vm.blockStatusCache.Put(blockID, status)
 }
 
-func (vm *VM) getCachedBlock(blockID ids.ID) *types.Block {
-	return vm.chain.GetBlockByHash(blockID.Key())
-}
-
 func (vm *VM) tryBlockGen() error {
 	vm.bdlock.Lock()
 	defer vm.bdlock.Unlock()
@@ -474,10 +470,11 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 	if statusIntf, ok := vm.blockStatusCache.Get(blockID); ok {
 		status = statusIntf.(choices.Status)
 	} else {
-		blk := vm.chain.GetBlockByHash(blockID.Key())
-		if blk == nil {
+		wrappedBlk := vm.getBlock(blockID)
+		if wrappedBlk == nil {
 			return choices.Unknown
 		}
+		blk := wrappedBlk.ethBlock
 		acceptedBlk := vm.lastAccepted.ethBlock
 
 		// TODO: There must be a better way of doing this.
@@ -488,7 +485,7 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 			highBlock, lowBlock = lowBlock, highBlock
 		}
 		for highBlock.Number().Cmp(lowBlock.Number()) > 0 {
-			highBlock = vm.chain.GetBlockByHash(highBlock.ParentHash())
+			highBlock = vm.getBlock(ids.NewID(highBlock.ParentHash())).ethBlock
 		}
 
 		if highBlock.Hash() == lowBlock.Hash() { // on the same branch
@@ -508,7 +505,7 @@ func (vm *VM) getBlock(id ids.ID) *Block {
 	if blockIntf, ok := vm.blockCache.Get(id); ok {
 		return blockIntf.(*Block)
 	}
-	ethBlock := vm.getCachedBlock(id)
+	ethBlock := vm.chain.GetBlockByHash(id.Key())
 	if ethBlock == nil {
 		return nil
 	}
