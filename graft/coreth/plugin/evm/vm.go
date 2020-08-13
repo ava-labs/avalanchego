@@ -53,6 +53,7 @@ const (
 	minBlockTime = 250 * time.Millisecond
 	maxBlockTime = 1000 * time.Millisecond
 	batchSize    = 250
+	cacheSize    = 1 << 15 // 32768
 )
 
 const (
@@ -183,8 +184,8 @@ func (vm *VM) Initialize(
 	chain.SetOnQueryAcceptedBlock(func() *types.Block {
 		return vm.getLastAccepted().ethBlock
 	})
-	vm.blockCache = cache.LRU{Size: 2048}
-	vm.blockStatusCache = cache.LRU{Size: 1024}
+	vm.blockCache = cache.LRU{Size: cacheSize}
+	vm.blockStatusCache = cache.LRU{Size: cacheSize}
 	vm.newBlockChan = make(chan *Block)
 	vm.networkChan = toEngine
 	vm.blockDelayTimer = timer.NewTimer(func() {
