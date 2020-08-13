@@ -732,6 +732,8 @@ func (bc *BlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
 
 // GetBlockByHash retrieves a block from the database by hash, caching it if found.
 func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	number := bc.hc.GetBlockNumber(hash)
 	if number == nil {
 		return nil
@@ -742,6 +744,8 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *types.Block {
 // GetBlockByNumber retrieves a block from the database by number, caching it
 // (associated with its hash) if found.
 func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (common.Hash{}) {
 		return nil
