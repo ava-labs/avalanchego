@@ -51,7 +51,7 @@ const (
 	minBlockTime = 250 * time.Millisecond
 	maxBlockTime = 1000 * time.Millisecond
 	batchSize    = 250
-	cacheSize    = 1 << 15 // 32768
+	cacheSize    = 1 << 17 // 131072
 )
 
 const (
