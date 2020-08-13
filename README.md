@@ -35,7 +35,7 @@ The Gecko binary, named `avalanche`, is in the `build` directory.
 - Check the built image by `docker image ls`, you should see some image tagged
   `gecko-xxxxxxxx`, where `xxxxxxxx` is the commit id of the Gecko source it was built from.
 - Test Gecko by `docker run -ti -p 9650:9650 -p 9651:9651 gecko-xxxxxxxx /gecko/build/avalanche
-   --public-ip=127.0.0.1 --snow-sample-size=1 --snow-quorum-size=1 --staking-tls-enabled=false`. (For a production deployment,
+   --public-ip=127.0.0.1 --snow-sample-size=1 --snow-quorum-size=1 --staking-enabled=false`. (For a production deployment,
   you may want to extend the docker image with required credentials for
   staking and TLS.)
 
@@ -44,7 +44,7 @@ The Gecko binary, named `avalanche`, is in the `build` directory.
 To create your own local test network, run:
 
 ```sh
-./build/avalanche --public-ip=127.0.0.1 --snow-sample-size=1 --snow-quorum-size=1 --staking-tls-enabled=false
+./build/avalanche --public-ip=127.0.0.1 --snow-sample-size=1 --snow-quorum-size=1 --staking-enabled=false
 ```
 
 This launches an Avalanche network with one node.
