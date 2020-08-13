@@ -304,7 +304,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID, // node ID
-		nodeID, // destination
+		nodeID, // reward address
 		NumberOfShares,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
@@ -321,13 +321,13 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount,       // stake amount
-		uint64(startTime.Unix()), // start time
+		MinimumStakeAmount,                                   // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
-		key2.PublicKey().Address(),                           // node ID
-		nodeID,                                               // destination
-		NumberOfShares,                                       // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},              // key
+		nodeID, // node ID
+		key2.PublicKey().Address(),              // reward address
+		NumberOfShares,                          // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)

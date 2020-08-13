@@ -175,7 +175,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 				Weight:    &weight,
 				ID:        id.PrefixedString(constants.NodeIDPrefix),
 			},
-			Destination:       addr,
+			RewardAddress:     addr,
 			DelegationFeeRate: NumberOfShares,
 		}
 	}

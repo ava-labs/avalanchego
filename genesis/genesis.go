@@ -123,7 +123,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					Weight:    &weight,
 					ID:        validatorID.PrefixedString(constants.NodeIDPrefix),
 				},
-				Destination: destAddr,
+				RewardAddress: destAddr,
 			},
 		)
 	}

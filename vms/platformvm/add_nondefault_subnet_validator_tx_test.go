@@ -258,7 +258,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(DSStartTime.Unix()),              // start time
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
-		nodeID,                                  // destination
+		nodeID,                                  // reward address
 		NumberOfShares,                          // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
@@ -347,8 +347,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                           // weight
-		uint64(newTimestamp.Unix()),                             // start time
+		defaultWeight,               // weight
+		uint64(newTimestamp.Unix()), // start time
 		uint64(newTimestamp.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,         // node ID
 		testSubnet1.id, // subnet ID
@@ -370,8 +370,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		nodeID,         // node ID
-		testSubnet1.id, // subnet ID
+		nodeID,                                  // node ID
+		testSubnet1.id,                          // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
@@ -390,8 +390,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		nodeID,         // node ID
-		testSubnet1.id, // subnet ID
+		nodeID,                                  // node ID
+		testSubnet1.id,                          // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
@@ -408,8 +408,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Too many signatures
 	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                   // weight
-		uint64(defaultGenesisTime.Unix()),                               // start time
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		nodeID,         // node ID
 		testSubnet1.id, // subnet ID
@@ -422,8 +422,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Too few signatures
 	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                 // weight
-		uint64(defaultGenesisTime.Unix()),                             // start time
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,         // node ID
 		testSubnet1.id, // subnet ID
@@ -443,8 +443,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Control Signature from invalid key (keys[3] is not a control key)
 	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                 // weight
-		uint64(defaultGenesisTime.Unix()),                             // start time
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,         // node ID
 		testSubnet1.id, // subnet ID
@@ -466,8 +466,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	// Case: Proposed validator in pending validator set for subnet
 	// First, add validator to pending validator set of subnet
 	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                   // weight
-		uint64(defaultGenesisTime.Unix())+1,                             // start time
+		defaultWeight,                       // weight
+		uint64(defaultGenesisTime.Unix())+1, // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		nodeID,         // node ID
 		testSubnet1.id, // subnet ID
