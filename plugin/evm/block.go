@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/vms/components/missing"
 )
 
 // Block implements the snowman.Block interface
@@ -50,9 +51,12 @@ func (b *Block) Status() choices.Status {
 // Parent implements the snowman.Block interface
 func (b *Block) Parent() snowman.Block {
 	parentID := ids.NewID(b.ethBlock.ParentHash())
-	block := b.vm.getBlock(parentID)
-	b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", block.ID(), block.Status())
-	return block
+	if block := b.vm.getBlock(parentID); block != nil {
+		b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", parentID, block.Status())
+		return block
+	}
+	b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", parentID, choices.Unknown)
+	return &missing.Block{BlkID: parentID}
 }
 
 // Verify implements the snowman.Block interface
