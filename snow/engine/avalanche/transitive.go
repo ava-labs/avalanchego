@@ -346,7 +346,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 }
 
 // If there are pending transactions from the VM, issue them.
-// If not, and we're not already at this limit for number of concurrent polls, issue an empty vertex.
+// If we're not already at the limit for number of concurrent polls, issue a new
+// query.
 func (t *Transitive) repoll() error {
 	if t.polls.Len() >= t.params.ConcurrentRepolls || t.errs.Errored() {
 		return nil
@@ -498,7 +499,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // Batchs [txs] into vertices and issue them.
 // If [force] is true, forces each tx to be issued.
 // Otherwise, some txs may not be put into vertices that are issued.
-// If [empty], will always issue a vertex, even if it's empty.
+// If [empty], will always result in a new poll.
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 	batch := make([]snowstorm.Tx, 0, t.params.BatchSize)
 	issuedTxs := ids.Set{}
