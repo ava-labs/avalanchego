@@ -558,10 +558,8 @@ func (t *Transitive) issueRepoll() {
 	}
 	vtxID := preferredIDs[int(indices[0])] // ID of a preferred vertex
 
-	p := t.Consensus.Parameters()
-	vdrs, err := t.Validators.Sample(p.K) // Validators to sample
-
-	vdrBag := ids.ShortBag{} // IDs of validators to be sampled
+	vdrs, err := t.Validators.Sample(t.Params.K) // Validators to sample
+	vdrBag := ids.ShortBag{}                     // IDs of validators to be sampled
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
