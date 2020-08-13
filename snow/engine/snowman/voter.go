@@ -49,14 +49,14 @@ func (v *voter) Update() {
 	results = v.bubbleVotes(results)
 
 	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
-	if err := v.t.consensus.RecordPoll(results); err != nil {
+	if err := v.t.Consensus.RecordPoll(results); err != nil {
 		v.t.errs.Add(err)
 		return
 	}
 
-	v.t.VM.SetPreference(v.t.consensus.Preference())
+	v.t.VM.SetPreference(v.t.Consensus.Preference())
 
-	if v.t.consensus.Finalized() {
+	if v.t.Consensus.Finalized() {
 		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
 		return
 	}
@@ -74,11 +74,11 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 			continue
 		}
 
-		for blk.Status().Fetched() && !v.t.consensus.Issued(blk) {
+		for blk.Status().Fetched() && !v.t.Consensus.Issued(blk) {
 			blk = blk.Parent()
 		}
 
-		if !blk.Status().Decided() && v.t.consensus.Issued(blk) {
+		if !blk.Status().Decided() && v.t.Consensus.Issued(blk) {
 			bubbledVotes.AddCount(blk.ID(), count)
 		}
 	}

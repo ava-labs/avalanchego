@@ -45,13 +45,13 @@ func (v *voter) Update() {
 	}
 
 	v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &results)
-	if err := v.t.consensus.RecordPoll(results); err != nil {
+	if err := v.t.Consensus.RecordPoll(results); err != nil {
 		v.t.errs.Add(err)
 		return
 	}
 
 	txs := []snowstorm.Tx(nil)
-	for _, orphanID := range v.t.consensus.Orphans().List() {
+	for _, orphanID := range v.t.Consensus.Orphans().List() {
 		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
@@ -66,7 +66,7 @@ func (v *voter) Update() {
 		return
 	}
 
-	if v.t.consensus.Quiesce() {
+	if v.t.Consensus.Quiesce() {
 		v.t.Ctx.Log.Debug("Avalanche engine can quiesce")
 		return
 	}
@@ -107,7 +107,7 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 			continue
 		}
 
-		if v.t.consensus.VertexIssued(vtx) {
+		if v.t.Consensus.VertexIssued(vtx) {
 			v.t.Ctx.Log.Verbo("Applying %d vote(s) for %s", set.Len(), vtx.ID())
 			bubbledVotes.UnionSet(vtx.ID(), set)
 		} else {

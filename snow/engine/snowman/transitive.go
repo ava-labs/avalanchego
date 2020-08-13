@@ -33,13 +33,13 @@ type Transitive struct {
 	bootstrap.Bootstrapper
 	metrics
 
-	params    snowball.Parameters
-	consensus snowman.Consensus
+	Params    snowball.Parameters
+	Consensus snowman.Consensus
 
 	// track outstanding preference requests
 	polls poll.Set
 
-	// blocks that have we have sent get requests for but haven't yet receieved
+	// blocks that have we have sent get requests for but haven't yet received
 	blkReqs common.Requests
 
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
@@ -57,8 +57,8 @@ type Transitive struct {
 func (t *Transitive) Initialize(config Config) error {
 	config.Ctx.Log.Info("initializing consensus engine")
 
-	t.params = config.Params
-	t.consensus = config.Consensus
+	t.Params = config.Params
+	t.Consensus = config.Consensus
 
 	factory := poll.NewEarlyTermNoTraversalFactory(int(config.Params.Alpha))
 	t.polls = poll.NewSet(factory,
@@ -84,7 +84,7 @@ func (t *Transitive) Initialize(config Config) error {
 func (t *Transitive) finishBootstrapping() error {
 	// initialize consensus to the last accepted blockID
 	lastAcceptedID := t.VM.LastAccepted()
-	t.consensus.Initialize(t.Ctx, t.params, lastAcceptedID)
+	t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID)
 
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
@@ -246,7 +246,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 
 	// Will send chits once we've issued block [blkID] into consensus
 	c := &convincer{
-		consensus: t.consensus,
+		consensus: t.Consensus,
 		sender:    t.Sender,
 		vdr:       vdr,
 		requestID: requestID,
@@ -383,7 +383,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent().ID()
-		if pref := t.consensus.Preference(); !parentID.Equals(pref) {
+		if pref := t.Consensus.Preference(); !parentID.Equals(pref) {
 			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
 
@@ -409,9 +409,9 @@ func (t *Transitive) Notify(msg common.Message) error {
 func (t *Transitive) repoll() {
 	// if we are issuing a repoll, we should gossip our current preferences to
 	// propagate the most likely branch as quickly as possible
-	prefID := t.consensus.Preference()
+	prefID := t.Consensus.Preference()
 
-	for i := t.polls.Len(); i < t.params.ConcurrentRepolls; i++ {
+	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
 		t.pullSample(prefID)
 	}
 }
@@ -436,7 +436,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// issue [blk] and its ancestors to consensus.
 	// If the block has been issued, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
-	for !t.consensus.Issued(blk) && !t.pending.Contains(blkID) {
+	for !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -450,7 +450,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 			return false, nil
 		}
 	}
-	return t.consensus.Issued(blk), nil
+	return t.Consensus.Issued(blk), nil
 }
 
 // issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
@@ -459,7 +459,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	for blk.Status().Fetched() && !t.consensus.Issued(blk) && !t.pending.Contains(blkID) {
+	for blk.Status().Fetched() && !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -468,7 +468,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if t.consensus.Issued(blk) {
+	if t.Consensus.Issued(blk) {
 		return true, nil
 	}
 
@@ -501,7 +501,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	}
 
 	// block on the parent if needed
-	if parent := blk.Parent(); !t.consensus.Issued(parent) {
+	if parent := blk.Parent(); !t.Consensus.Issued(parent) {
 		parentID := parent.ID()
 		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
@@ -534,9 +534,8 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 // send a pull request for this block ID
 func (t *Transitive) pullSample(blkID ids.ID) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
-	k := t.consensus.Parameters().K // consensus parameter
 	// The validators we will query
-	vdrs, err := t.Validators.Sample(k)
+	vdrs, err := t.Validators.Sample(t.Params.K)
 	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
@@ -556,8 +555,7 @@ func (t *Transitive) pullSample(blkID ids.ID) {
 // send a push request for this block
 func (t *Transitive) pushSample(blk snowman.Block) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
-	p := t.consensus.Parameters()
-	vdrs, err := t.Validators.Sample(p.K)
+	vdrs, err := t.Validators.Sample(t.Params.K)
 	vdrBag := ids.ShortBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
@@ -576,7 +574,7 @@ func (t *Transitive) pushSample(blk snowman.Block) {
 
 // issue [blk] to consensus
 func (t *Transitive) deliver(blk snowman.Block) error {
-	if t.consensus.Issued(blk) {
+	if t.Consensus.Issued(blk) {
 		return nil
 	}
 
@@ -595,7 +593,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	}
 
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
-	if err := t.consensus.Add(blk); err != nil {
+	if err := t.Consensus.Add(blk); err != nil {
 		return err
 	}
 
@@ -615,7 +613,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 				t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 				dropped = append(dropped, blk)
 			} else {
-				if err := t.consensus.Add(blk); err != nil {
+				if err := t.Consensus.Add(blk); err != nil {
 					return err
 				}
 				added = append(added, blk)
@@ -623,7 +621,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		}
 	}
 
-	t.VM.SetPreference(t.consensus.Preference())
+	t.VM.SetPreference(t.Consensus.Preference())
 
 	// Query the network for its preferences given this new block
 	t.pushSample(blk)

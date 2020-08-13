@@ -41,7 +41,7 @@ func (i *issuer) Abandon() {
 
 // Issue the poll when all dependencies are met
 func (i *issuer) Update() {
-	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
+	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
 	// All dependencies have been met
@@ -79,13 +79,13 @@ func (i *issuer) Update() {
 	i.t.Ctx.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
 
 	// Add this vertex to consensus.
-	if err := i.t.consensus.Add(i.vtx); err != nil {
+	if err := i.t.Consensus.Add(i.vtx); err != nil {
 		i.t.errs.Add(err)
 		return
 	}
 
 	// Issue a poll for this vertex.
-	p := i.t.consensus.Parameters()
+	p := i.t.Consensus.Parameters()
 	vdrs, err := i.t.Validators.Sample(p.K) // Validators to sample
 
 	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
