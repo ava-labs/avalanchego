@@ -41,6 +41,7 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		bufferSize,
 		float64(time.Second),
 		defaultStakerPortion,
+		defaultStakerPortion,
 	)
 
 	return queue, semaChan, vdrs
@@ -167,6 +168,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		bufferSize,
 		float64(time.Second),
 		defaultStakerPortion,
+		defaultStakerPortion,
 	)
 
 	// Utilize CPU such that the next message from validator2 will be placed on a lower
@@ -259,6 +261,7 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		consumptionAllotments,
 		bufferSize,
 		float64(time.Second),
+		defaultStakerPortion,
 		defaultStakerPortion,
 	)
 

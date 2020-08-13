@@ -17,9 +17,10 @@ func TestEWMAThrottler(t *testing.T) {
 	vdrs.Add(validator1)
 
 	maxMessages := uint32(16)
-	stakerPortion := 0.25
+	msgPortion := 0.25
+	cpuPortion := 0.25
 	period := float64(time.Second)
-	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
+	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, cpuPortion, period, logging.NoLog{})
 
 	throttler.UtilizeCPU(validator0.ID(), float64(25*time.Millisecond))
 	throttler.UtilizeCPU(validator1.ID(), float64(50*time.Millisecond))
@@ -61,9 +62,10 @@ func TestThrottlerPrunesSpenders(t *testing.T) {
 	vdrs.Add(staker1)
 
 	maxMessages := uint32(1024)
-	stakerPortion := 0.25
+	cpuPortion := 0.25
+	msgPortion := 0.25
 	period := float64(time.Second)
-	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
+	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, cpuPortion, period, logging.NoLog{})
 
 	throttler.AddMessage(nonStaker2) // nonStaker2 should not be removed with a pending message
 	throttler.UtilizeCPU(nonStaker0, 1.0)
@@ -107,9 +109,10 @@ func TestThrottleStaker(t *testing.T) {
 	vdrs.Add(staker1)
 
 	maxMessages := uint32(16)
-	stakerPortion := 0.25
+	msgPortion := 0.25
+	cpuPortion := 0.25
 	period := float64(time.Second)
-	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
+	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, cpuPortion, period, logging.NoLog{})
 
 	// Message Allotment: 0.5 * 0.25 * 15 = 2
 	// Message Pool: 12 messages
@@ -146,9 +149,10 @@ func TestCalculatesEWMA(t *testing.T) {
 	vdrs.Add(validator1)
 
 	maxMessages := uint32(16)
+	msgPortion := 0.25
 	stakerPortion := 0.25
 	period := float64(time.Second)
-	throttler := NewEWMAThrottler(vdrs, maxMessages, stakerPortion, period, logging.NoLog{})
+	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, stakerPortion, period, logging.NoLog{})
 
 	// Spend x amount in consecutive periods and ensure that EWMA is calcualted correctly
 	spends := []float64{

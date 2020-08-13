@@ -160,6 +160,7 @@ func (h *Handler) Initialize(
 		bufferSize,
 		cpuInterval,
 		defaultStakerPortion,
+		defaultStakerPortion,
 	)
 	h.engine = engine
 	h.validators = validators

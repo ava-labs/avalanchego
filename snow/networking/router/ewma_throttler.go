@@ -20,14 +20,14 @@ type ewmaThrottler struct {
 	log  logging.Logger
 
 	// Track peers
-	spenders  map[[20]byte]*spender
-	nonStaker *spender
-	vdrs      validators.Set
+	spenders       map[[20]byte]*spender
+	cumulativeEWMA float64
+	vdrs           validators.Set
 
 	// Track CPU utilization
-	maxEWMA, period, decayFactor           float64
-	stakerPortion, stakerCPU, nonStakerCPU float64
-	expectedNonStakerCPU                   float64
+	maxEWMA, period, decayFactor       float64
+	stakerMsgPortion, stakerCPUPortion float64
+	stakerCPU, nonReservedCPU          float64
 
 	// Track pending messages
 	maxMessages, reservedStakerMessages     uint32
@@ -35,9 +35,9 @@ type ewmaThrottler struct {
 	maxNonStakerPendingMsgs                 uint32
 
 	// Statistics adjusted at every interval
-	currentPeriod            uint32
-	periodNonStakerAllotment float64
-	periodNonStakerMessages  uint32
+	currentPeriod           uint32
+	periodNonReservedCPU    float64
+	periodNonStakerMessages uint32
 }
 
 // NewEWMAThrottler returns a Throttler that uses exponentially weighted moving
@@ -56,28 +56,28 @@ type ewmaThrottler struct {
 // interval, which is not the limit since it tracks consumption using EWMA.
 // As a result, this aggressiveness should counterbalance the fact that no
 // chain's CPU time will actually consume nearly 100% of real time.
-func NewEWMAThrottler(vdrs validators.Set, maxMessages uint32, stakerPortion, period float64, log logging.Logger) Throttler {
+func NewEWMAThrottler(vdrs validators.Set, maxMessages uint32, stakerMsgPortion, stakerCPUPortion, period float64, log logging.Logger) Throttler {
 	// Amount of CPU time reserved for processing messages from stakers
-	stakerCPU := period * stakerPortion
-	nonStakerCPU := period - stakerCPU
+	stakerCPU := period * stakerCPUPortion
+	nonReservedCPU := period - stakerCPU
 
 	// Number of messages reserved for Stakers vs. Non-Stakers
-	reservedStakerMessages := uint32(stakerPortion * float64(maxMessages))
+	reservedStakerMessages := uint32(stakerMsgPortion * float64(maxMessages))
 	nonReservedMsgs := maxMessages - reservedStakerMessages
 
 	throttler := &ewmaThrottler{
-		spenders:  make(map[[20]byte]*spender),
-		nonStaker: &spender{},
-		vdrs:      vdrs,
-		log:       log,
+		spenders: make(map[[20]byte]*spender),
+		vdrs:     vdrs,
+		log:      log,
 
 		maxEWMA:     period * defaultDecayFactor,
 		period:      period,
 		decayFactor: defaultDecayFactor,
 
-		stakerPortion: stakerPortion,
-		stakerCPU:     stakerCPU,
-		nonStakerCPU:  nonStakerCPU,
+		stakerCPUPortion: stakerCPUPortion,
+		stakerMsgPortion: stakerMsgPortion,
+		stakerCPU:        stakerCPU,
+		nonReservedCPU:   nonReservedCPU,
 
 		maxMessages:            maxMessages,
 		reservedStakerMessages: reservedStakerMessages,
@@ -134,11 +134,7 @@ func (et *ewmaThrottler) UtilizeCPU(validatorID ids.ShortID, consumption float64
 	sp := et.getSpender(validatorID)
 	sp.ewma += consumption
 	sp.lastSpend = et.currentPeriod
-
-	if !sp.staking {
-		et.nonStaker.ewma += consumption
-		et.nonStaker.lastSpend = et.currentPeriod
-	}
+	et.cumulativeEWMA += consumption
 }
 
 // GetUtilization...
@@ -151,7 +147,7 @@ func (et *ewmaThrottler) GetUtilization(validatorID ids.ShortID) (float64, bool)
 
 	sp := et.getSpender(validatorID)
 	if !sp.staking {
-		cpuUtilization := et.nonStaker.ewma / et.periodNonStakerAllotment
+		cpuUtilization := et.cumulativeEWMA / et.periodNonReservedCPU
 		// A non-staker will be throttled if the shared message pool has been taken or it has exceeded its own individual message cap
 		exceedsMessageAllotment := et.pendingNonReservedMsgs > et.nonReservedMsgs || sp.pendingMessages > sp.maxMessages
 		if exceedsMessageAllotment {
@@ -176,12 +172,12 @@ func (et *ewmaThrottler) EndInterval() {
 
 	et.currentPeriod++
 
-	et.nonStaker.ewma /= et.decayFactor
+	et.cumulativeEWMA /= et.decayFactor
 	stakingWeight := et.vdrs.Weight()
 	numPeers := et.vdrs.Len() + 1
-	et.periodNonStakerAllotment = et.nonStakerCPU / float64(numPeers)
-	if et.periodNonStakerAllotment == 0 {
-		et.periodNonStakerAllotment = defaultMinimumNonStakerAllotment
+	et.periodNonReservedCPU = et.nonReservedCPU
+	if et.periodNonReservedCPU == 0 {
+		et.periodNonReservedCPU = defaultMinimumNonStakerAllotment
 	}
 	et.maxNonStakerPendingMsgs = et.nonReservedMsgs / uint32(numPeers)
 
@@ -193,7 +189,7 @@ func (et *ewmaThrottler) EndInterval() {
 			stakerPortion := float64(vdr.Weight()) / float64(stakingWeight)
 			spender.msgAllotment = uint32(float64(et.reservedStakerMessages) * stakerPortion)
 			spender.maxMessages = uint32(float64(et.reservedStakerMessages)*stakerPortion) + et.maxNonStakerPendingMsgs
-			spender.expectedEWMA = et.stakerCPU*stakerPortion + et.periodNonStakerAllotment
+			spender.expectedEWMA = et.stakerCPU*stakerPortion + et.periodNonReservedCPU
 			if spender.expectedEWMA == 0 {
 				spender.expectedEWMA = defaultMinimumNonStakerAllotment
 			}
@@ -209,7 +205,7 @@ func (et *ewmaThrottler) EndInterval() {
 		spender.staking = false
 		spender.msgAllotment = 0
 		spender.maxMessages = et.maxNonStakerPendingMsgs
-		spender.expectedEWMA = et.periodNonStakerAllotment
+		spender.expectedEWMA = et.periodNonReservedCPU
 	}
 }
 
@@ -221,14 +217,8 @@ func (et *ewmaThrottler) getSpender(validatorID ids.ShortID) *spender {
 	if !exists {
 		// If this validator did not exist in spenders, create it and return
 		sp = &spender{
-			staking:             false,
-			maxMessages:         et.maxNonStakerPendingMsgs,
-			ewma:                0.0,
-			expectedEWMA:        et.periodNonStakerAllotment,
-			pendingMessages:     0,
-			pendingPoolMessages: 0,
-			msgAllotment:        0,
-			lastSpend:           0, // Assume never spent before until UtilizeCPU is called
+			maxMessages:  et.maxNonStakerPendingMsgs,
+			expectedEWMA: et.periodNonReservedCPU,
 		}
 		et.spenders[validatorKey] = sp
 		return sp
