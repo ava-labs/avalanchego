@@ -105,13 +105,15 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
-func (ks *Keystore) CreateHandler() *common.HTTPHandler {
+func (ks *Keystore) CreateHandler() (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(ks, "keystore")
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}
+	if err := newServer.RegisterService(ks, "keystore"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}, nil
 }
 
 // Get the user whose name is [username]
@@ -256,7 +258,9 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api
 	userDataDB := prefixdb.New([]byte(args.Username), ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
-		dataBatch.Put(kvp.Key, kvp.Value)
+		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
+			return fmt.Errorf("error on database put: %w", err)
+		}
 	}
 
 	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {

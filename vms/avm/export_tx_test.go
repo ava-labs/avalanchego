@@ -5,6 +5,7 @@ package avm
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/gecko/api/keystore"
@@ -12,13 +13,11 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -31,8 +30,8 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -41,7 +40,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -50,8 +49,9 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -87,8 +87,8 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID + 1,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -97,7 +97,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -106,8 +106,9 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -137,8 +138,8 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 				0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
 			}),
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -147,7 +148,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -156,8 +157,9 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -182,8 +184,8 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -192,7 +194,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -202,8 +204,9 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			}},
 			Memo: make([]byte, maxMemoSize+1),
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -228,8 +231,8 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -238,7 +241,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -246,8 +249,8 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 					},
 				},
 			}},
-			Outs: []*ava.TransferableOutput{{
-				Asset: ava.Asset{ID: asset},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 10000,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -257,8 +260,9 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 2345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -283,8 +287,8 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -293,7 +297,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -301,9 +305,9 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 					},
 				},
 			}},
-			Outs: []*ava.TransferableOutput{
+			Outs: []*avax.TransferableOutput{
 				{
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 10000,
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -313,7 +317,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 					},
 				},
 				{
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 1111,
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -324,8 +328,9 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 				},
 			},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 1234,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -350,8 +355,8 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -360,7 +365,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -369,8 +374,9 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -395,8 +401,8 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -405,7 +411,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -414,9 +420,10 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{
 			{
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 10000,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -426,7 +433,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 				},
 			},
 			{
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 2345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -452,9 +459,9 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{
+			Ins: []*avax.TransferableInput{
 				{
-					UTXOID: ava.UTXOID{
+					UTXOID: avax.UTXOID{
 						TxID: ids.NewID([32]byte{
 							0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 							0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -463,7 +470,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 						}),
 						OutputIndex: 0,
 					},
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 54321,
 						Input: secp256k1fx.Input{
@@ -472,7 +479,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 					},
 				},
 				{
-					UTXOID: ava.UTXOID{
+					UTXOID: avax.UTXOID{
 						TxID: ids.NewID([32]byte{
 							0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 							0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -481,7 +488,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 						}),
 						OutputIndex: 1,
 					},
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 0,
 						Input: secp256k1fx.Input{
@@ -491,8 +498,9 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 				},
 			},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -517,9 +525,9 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{
+			Ins: []*avax.TransferableInput{
 				{
-					UTXOID: ava.UTXOID{
+					UTXOID: avax.UTXOID{
 						TxID: ids.NewID([32]byte{
 							0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 							0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -528,7 +536,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 						}),
 						OutputIndex: 1,
 					},
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 1,
 						Input: secp256k1fx.Input{
@@ -537,7 +545,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 					},
 				},
 				{
-					UTXOID: ava.UTXOID{
+					UTXOID: avax.UTXOID{
 						TxID: ids.NewID([32]byte{
 							0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 							0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -546,7 +554,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 						}),
 						OutputIndex: 0,
 					},
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
 						Amt: 54321,
 						Input: secp256k1fx.Input{
@@ -556,8 +564,9 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 				},
 			},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 12345,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -582,8 +591,8 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -592,7 +601,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 					}),
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
 					Amt: 54321,
 					Input: secp256k1fx.Input{
@@ -601,8 +610,9 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: asset},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 123450,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -661,38 +671,51 @@ func TestExportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x04,
 		// Memo:
 		0x00, 0x01, 0x02, 0x03,
+		// Destination Chain ID:
+		0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+		0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+		0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+		0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		// number of exported outs:
 		0x00, 0x00, 0x00, 0x00,
 	}
 
-	tx := &Tx{UnsignedTx: &ExportTx{BaseTx: BaseTx{
-		NetID: 2,
-		BCID: ids.NewID([32]byte{
-			0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
-			0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
-			0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
-			0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
+	tx := &Tx{UnsignedTx: &ExportTx{
+		BaseTx: BaseTx{
+			NetID: 2,
+			BCID: ids.NewID([32]byte{
+				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
+				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
+				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
+				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
+			}),
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{TxID: ids.NewID([32]byte{
+					0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+					0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+					0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+					0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+				})},
+				Asset: avax.Asset{ID: ids.NewID([32]byte{
+					0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
+					0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
+					0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
+					0x19, 0x39, 0x59, 0x79, 0x98, 0xb8, 0xd8, 0xf8,
+				})},
+				In: &secp256k1fx.TransferInput{
+					Amt:   1000,
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}},
+			Memo: []byte{0x00, 0x01, 0x02, 0x03},
+		},
+		DestinationChain: ids.NewID([32]byte{
+			0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+			0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+			0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+			0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		}),
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
-				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-				0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-				0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-			})},
-			Asset: ava.Asset{ID: ids.NewID([32]byte{
-				0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
-				0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
-				0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
-				0x19, 0x39, 0x59, 0x79, 0x98, 0xb8, 0xd8, 0xf8,
-			})},
-			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-			},
-		}},
-		Memo: []byte{0x00, 0x01, 0x02, 0x03},
-	}}}
+	}}
 
 	c := codec.NewDefault()
 	c.RegisterType(&BaseTx{})
@@ -727,25 +750,26 @@ func TestExportTxSemanticVerify(t *testing.T) {
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: avaID},
+				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: avaID},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -784,25 +808,26 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: avaID},
+				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: avaID},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -841,25 +866,26 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1000,
 				},
-				Asset: ava.Asset{ID: avaID},
+				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: avaID},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -898,25 +924,26 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: ids.Empty},
+				Asset: avax.Asset{ID: ids.Empty},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: ids.Empty},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: ids.Empty},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -966,13 +993,11 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
+	avaxID := genesisTx.ID()
 
 	issuer := make(chan common.Message, 1)
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		avax: avaxID,
 	}
 	err := vm.Initialize(
 		ctx,
@@ -990,7 +1015,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 					InitializeF: func(vmIntf interface{}) error {
 						vm := vmIntf.(*VM)
 						c := vm.Codec()
-						c.RegisterType(&ava.TestVerifiable{})
+						c.RegisterType(&avax.TestVerifiable{})
 						return nil
 					},
 				},
@@ -1019,20 +1044,21 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: avaID},
+				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: avaID},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1057,7 +1083,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx, []verify.Verifiable{&ava.TestVerifiable{}}); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx, []verify.Verifiable{&avax.TestVerifiable{}}); err == nil {
 		t.Fatalf("should have errored due to using an invalid fxID")
 	}
 }
@@ -1071,25 +1097,26 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 	}()
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: avaID},
+				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: avaID},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1129,22 +1156,18 @@ func TestIssueExportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
+	avaxID := genesisTx.ID()
 
 	ctx.Lock.Lock()
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		avax: avaxID,
 	}
-	err := vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
@@ -1153,19 +1176,16 @@ func TestIssueExportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
 
-	err = vm.Bootstrapping()
-	if err != nil {
+	if err := vm.Bootstrapping(); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.Bootstrapped()
-	if err != nil {
+	if err := vm.Bootstrapped(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1175,20 +1195,21 @@ func TestIssueExportTx(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: avaID},
+				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: avaID},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1248,26 +1269,26 @@ func TestIssueExportTx(t *testing.T) {
 	parsedTx := txs[0]
 	if err := parsedTx.Verify(); err != nil {
 		t.Fatal(err)
+	} else if err := parsedTx.Accept(); err != nil {
+		t.Fatal(err)
 	}
-	parsedTx.Accept()
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
+	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
+	defer vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	// check from the peer chain side
+	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
 
-	utxo := ava.UTXOID{
+	utxo := avax.UTXOID{
 		TxID:        tx.ID(),
 		OutputIndex: 0,
 	}
 	utxoID := utxo.InputID()
-	if _, err := state.AVMUTXO(utxoID); err != nil {
+	if _, err := state.UTXO(utxoID); err != nil {
 		t.Fatal(err)
 	}
 
-	addrID := ids.NewID(hashing.ComputeHash256Array(key.PublicKey().Address().Bytes()))
-
-	utxoIDs, err := state.AVMFunds(addrID)
+	utxoIDs, err := state.Funds(key.PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1286,20 +1307,17 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		avax: avaxID,
 	}
 	err := vm.Initialize(
 		ctx,
@@ -1332,20 +1350,21 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
-					TxID:        avaID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxID,
 					OutputIndex: 1,
 				},
-				Asset: ava.Asset{ID: avaID},
+				Asset: avax.Asset{ID: avaxID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   50000,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 				},
 			}},
 		},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: avaID},
+		DestinationChain: platformChainID,
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1409,14 +1428,14 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
 
-	utxo := ava.UTXOID{
+	utxo := avax.UTXOID{
 		TxID:        tx.ID(),
 		OutputIndex: 0,
 	}
 	utxoID := utxo.InputID()
-	if err := state.SpendAVMUTXO(utxoID); err != nil {
+	if err := state.SpendUTXO(utxoID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1427,9 +1446,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	state = ava.NewPrefixedState(smDB, vm.codec)
+	state = avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
 
-	if _, err := state.AVMUTXO(utxoID); err == nil {
+	if _, err := state.UTXO(utxoID); err == nil {
 		t.Fatalf("should have failed to read the utxo")
 	}
 }

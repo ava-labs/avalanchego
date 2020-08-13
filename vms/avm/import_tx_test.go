@@ -11,11 +11,10 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -28,8 +27,8 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Outs: []*ava.TransferableOutput{{
-				Asset: ava.Asset{ID: asset},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -39,8 +38,9 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 				},
 			}},
 		},
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+		SourceChain: platformChainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID: ids.NewID([32]byte{
 					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -49,7 +49,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 				}),
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: asset},
+			Asset: avax.Asset{ID: asset},
 			In: &secp256k1fx.TransferInput{
 				Amt: 54321,
 				Input: secp256k1fx.Input{
@@ -73,8 +73,8 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 		BaseTx: BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Outs: []*ava.TransferableOutput{{
-				Asset: ava.Asset{ID: asset},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -85,8 +85,9 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			}},
 			Memo: make([]byte, maxMemoSize+1),
 		},
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+		SourceChain: platformChainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID: ids.NewID([32]byte{
 					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -95,7 +96,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 				}),
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: asset},
+			Asset: avax.Asset{ID: asset},
 			In: &secp256k1fx.TransferInput{
 				Amt: 54321,
 				Input: secp256k1fx.Input{
@@ -132,6 +133,11 @@ func TestImportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x04,
 		// Memo:
 		0x00, 0x01, 0x02, 0x03,
+		// Source Chain ID:
+		0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+		0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+		0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+		0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		// number of inputs:
 		0x00, 0x00, 0x00, 0x01,
 		// utxoID:
@@ -168,14 +174,20 @@ func TestImportTxSerialization(t *testing.T) {
 			}),
 			Memo: []byte{0x00, 0x01, 0x02, 0x03},
 		},
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
+		SourceChain: ids.NewID([32]byte{
+			0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+			0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+			0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+			0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
+		}),
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
 				0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
 				0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
 			})},
-			Asset: ava.Asset{ID: ids.NewID([32]byte{
+			Asset: avax.Asset{ID: ids.NewID([32]byte{
 				0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
 				0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
 				0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
@@ -211,20 +223,17 @@ func TestIssueImportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
 	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
+		avax: avaxID,
 	}
 	err := vm.Initialize(
 		ctx,
@@ -253,7 +262,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	key := keys[0]
 
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID: ids.NewID([32]byte{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -267,9 +276,10 @@ func TestIssueImportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*ava.TransferableInput{{
+		SourceChain: platformChainID,
+		Ins: []*avax.TransferableInput{{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: avaID},
+			Asset:  avax.Asset{ID: avaxID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   1000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -309,9 +319,9 @@ func TestIssueImportTx(t *testing.T) {
 
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 
-	utxo := &ava.UTXO{
+	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  ava.Asset{ID: avaID},
+		Asset:  avax.Asset{ID: avaxID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1000,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -321,8 +331,8 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
-	if err := state.FundPlatformUTXO(utxo); err != nil {
+	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
+	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 
@@ -355,8 +365,8 @@ func TestIssueImportTx(t *testing.T) {
 	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	state = ava.NewPrefixedState(smDB, vm.codec)
-	if _, err := state.PlatformUTXO(utxoID.InputID()); err == nil {
+	state = avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
+	if _, err := state.UTXO(utxoID.InputID()); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -371,16 +381,13 @@ func TestForceAcceptImportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
+	ctx := NewContext()
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	platformID := ids.Empty.Prefix(0)
 
 	vm := &VM{
-		ava:      ids.Empty,
-		platform: platformID,
+		avax: ids.Empty,
 	}
 	ctx.Lock.Lock()
 	defer func() {
@@ -417,7 +424,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID: ids.NewID([32]byte{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -431,9 +438,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 			NetID: networkID,
 			BCID:  chainID,
 		},
-		Ins: []*ava.TransferableInput{{
+		SourceChain: platformChainID,
+		Ins: []*avax.TransferableInput{{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: genesisTx.ID()},
+			Asset:  avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt:   1000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -479,9 +487,9 @@ func TestForceAcceptImportTx(t *testing.T) {
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
 	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
 	utxoSource := utxoID.InputID()
-	if _, err := state.PlatformUTXO(utxoSource); err == nil {
+	if _, err := state.UTXO(utxoSource); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }

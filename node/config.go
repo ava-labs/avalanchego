@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-// Config contains all of the configurations of an Ava node.
+// Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	// protocol to use for opening the network interface
 	Nat nat.Router
@@ -21,7 +21,7 @@ type Config struct {
 	NetworkID uint32
 
 	// Transaction fee configuration
-	AvaTxFee uint64
+	AvaxTxFee uint64
 
 	// Assertions configuration
 	EnableAssertions bool
@@ -33,12 +33,13 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP        utils.IPDesc
-	StakingLocalPort uint16
-	EnableP2PTLS     bool
-	EnableStaking    bool
-	StakingKeyFile   string
-	StakingCertFile  string
+	StakingIP             utils.IPDesc
+	StakingLocalPort      uint16
+	EnableP2PTLS          bool
+	EnableStaking         bool
+	StakingKeyFile        string
+	StakingCertFile       string
+	DisabledStakingWeight uint64
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
@@ -70,8 +71,10 @@ type Config struct {
 	ThroughputPort          uint16
 	ThroughputServerEnabled bool
 
-	// IPCEnabled configuration
-	IPCEnabled bool
+	// IPC configuration
+	IPCAPIEnabled      bool
+	IPCPath            string
+	IPCDefaultChainIDs []string
 
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter router.Router

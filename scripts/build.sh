@@ -20,7 +20,7 @@ PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 
 "$GECKO_PATH/scripts/build_coreth.sh"
 
-if [[ -f "$BUILD_DIR/ava" && -f "$PLUGIN_DIR/evm" ]]; then
+if [[ -f "$BUILD_DIR/avalanche" && -f "$PLUGIN_DIR/evm" ]]; then
         echo "Build Successful"
 else
         echo "Build failure" 

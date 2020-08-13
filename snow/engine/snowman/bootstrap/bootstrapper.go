@@ -63,7 +63,7 @@ func (b *Bootstrapper) Initialize(
 	}
 
 	b.Blocked.SetParser(&parser{
-		log:         config.Context.Log,
+		log:         config.Ctx.Log,
 		numAccepted: b.numAccepted,
 		numDropped:  b.numDropped,
 		vm:          b.VM,
@@ -131,15 +131,15 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 		return nil
 	}
 
-	validators := b.Config.Validators.Sample(1) // validator to send request to
-	if len(validators) == 0 {
+	validators, err := b.Validators.Sample(1) // validator to send request to
+	if err != nil {
 		return fmt.Errorf("Dropping request for %s as there are no validators", blkID)
 	}
 	validatorID := validators[0].ID()
 	b.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.RequestID, blkID)
-	b.Config.Sender.GetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
+	b.Sender.GetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
 	return nil
 }
 
@@ -147,33 +147,36 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 // with request ID [requestID]
 func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
 	if lenBlks := len(blks); lenBlks > common.MaxContainersPerMultiPut {
-		b.Config.Context.Log.Debug("MultiPut(%s, %d) contains more than maximum number of blocks", vdr, requestID)
+		b.Ctx.Log.Debug("MultiPut(%s, %d) contains more than maximum number of blocks",
+			vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	} else if lenBlks == 0 {
-		b.Config.Context.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
+		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
 
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok { // this message isn't in response to a request we made
-		b.Config.Context.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
+		b.Ctx.Log.Debug("received unexpected MultiPut from %s with ID %d",
+			vdr, requestID)
 		return nil
 	}
 
 	wantedBlk, err := b.VM.ParseBlock(blks[0]) // the block we requested
 	if err != nil {
-		b.Config.Context.Log.Debug("Failed to parse requested block %s: %w", wantedBlkID, err)
+		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
 	} else if actualID := wantedBlk.ID(); !actualID.Equals(wantedBlkID) {
-		b.Config.Context.Log.Debug("expected the first block to be the requested block, %s, but is %s", wantedBlk, actualID)
+		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
+			wantedBlk, actualID)
 		return b.fetch(wantedBlkID)
 	}
 
 	for _, blkBytes := range blks {
 		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
-			b.Config.Context.Log.Debug("Failed to parse block: %w", err)
-			b.Config.Context.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
+			b.Ctx.Log.Debug("Failed to parse block: %s", err)
+			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
 		}
 	}
 
@@ -184,7 +187,8 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok {
-		b.Config.Context.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID", vdr, requestID)
+		b.Ctx.Log.Debug("GetAncestorsFailed(%s, %d) called but there was no outstanding request to this validator with this ID",
+			vdr, requestID)
 		return nil
 	}
 	// Send another request for this
@@ -204,7 +208,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			b.numFetched.Inc()
 			b.NumFetched++                                      // Progress tracker
 			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				b.Config.Context.Log.Info("fetched %d blocks", b.NumFetched)
+				b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
 			}
 		}
 
@@ -234,10 +238,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 }
 
 func (b *Bootstrapper) finish() error {
-	if b.Finished {
+	if b.IsBootstrapped() {
 		return nil
 	}
-	b.Config.Context.Log.Info("bootstrapping finished fetching %d blocks. executing state transitions...",
+	b.Ctx.Log.Info("bootstrapping finished fetching %d blocks. executing state transitions...",
 		b.NumFetched)
 
 	if err := b.executeAll(b.Blocked); err != nil {
@@ -253,8 +257,7 @@ func (b *Bootstrapper) finish() error {
 	if err := b.OnFinished(); err != nil {
 		return err
 	}
-	b.Finished = true
-	b.Context.Bootstrapped()
+	b.Ctx.Bootstrapped()
 
 	if b.Bootstrapped != nil {
 		b.Bootstrapped()
@@ -273,9 +276,12 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Config.Context.Log.Info("executed %d blocks", numExecuted)
+			b.Ctx.Log.Info("executed %d blocks", numExecuted)
 		}
+
+		b.Ctx.ConsensusDispatcher.Accept(b.Ctx.ChainID, job.ID(), job.Bytes())
+		b.Ctx.DecisionDispatcher.Accept(b.Ctx.ChainID, job.ID(), job.Bytes())
 	}
-	b.Config.Context.Log.Info("executed %d blocks", numExecuted)
+	b.Ctx.Log.Info("executed %d blocks", numExecuted)
 	return nil
 }

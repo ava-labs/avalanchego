@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 var (
@@ -26,7 +26,7 @@ func uniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
 
 // state is a thin wrapper around a database to provide, caching, serialization,
 // and de-serialization.
-type state struct{ ava.State }
+type state struct{ avax.State }
 
 // Tx attempts to load a transaction from storage.
 func (s *state) Tx(id ids.ID) (*Tx, error) {

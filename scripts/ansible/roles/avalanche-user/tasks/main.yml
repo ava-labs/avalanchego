@@ -1,0 +1,15 @@
+- name: Create Avalanche daemon group
+  become: true
+  group:
+    name: "{{ avalanche_daemon_group }}"
+    system: true
+
+- name: Create Avalanche daemon user
+  become: true
+  user:
+    name: "{{ avalanche_daemon_user }}"
+    group: "{{ avalanche_daemon_group }}"
+    home: "{{ avalanche_daemon_home_dir }}"
+    shell: /bin/false
+    skeleton: false
+    system: true

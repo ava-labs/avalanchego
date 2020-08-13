@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -108,8 +109,8 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).Stake = []*ava.TransferableOutput{{
-		Asset: ava.Asset{ID: avaxAssetID},
+	tx.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).Stake = []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: MinimumStakeAmount,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -320,13 +321,13 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount,       // stake amount
-		uint64(startTime.Unix()), // start time
+		MinimumStakeAmount,                                   // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
-		key2.PublicKey().Address(),                           // node ID
-		nodeID,                                               // reward address
-		NumberOfShares,                                       // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},              // key
+		nodeID, // node ID
+		key2.PublicKey().Address(),              // reward address
+		NumberOfShares,                          // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -356,7 +357,7 @@ func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove all UTXOs owned by keys[0]
-	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address().Bytes())
+	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}

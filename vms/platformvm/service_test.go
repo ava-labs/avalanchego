@@ -261,6 +261,7 @@ func TestGetTx(t *testing.T) {
 			func() (interface{}, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
+					service.vm.avm,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
 				)

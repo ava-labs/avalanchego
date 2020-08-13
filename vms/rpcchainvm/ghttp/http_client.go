@@ -144,7 +144,8 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	c.client.Handle(r.Context(), req)
+	// TODO: is there a better way to handle this error?
+	_, _ = c.client.Handle(r.Context(), req)
 
 	reader.Stop()
 	writer.Stop()

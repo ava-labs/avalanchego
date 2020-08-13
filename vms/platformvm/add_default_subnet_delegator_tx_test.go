@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -304,7 +305,7 @@ func TestAddDefaultSubnetDelegatorTxSemanticVerify(t *testing.T) {
 			rewardAddress,                           // Reward Address
 			[]*crypto.PrivateKeySECP256K1R{keys[1]}, // tx fee payer
 			func(db database.Database) { // Remove all UTXOs owned by keys[1]
-				utxoIDs, err := vm.getReferencingUTXOs(db, keys[1].PublicKey().Address().Bytes())
+				utxoIDs, err := vm.getReferencingUTXOs(db, keys[1].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 				if err != nil {
 					t.Fatal(err)
 				}

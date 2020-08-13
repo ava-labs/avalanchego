@@ -58,8 +58,12 @@ func (b *Bag) Add(ids ...ID) {
 
 // AddCount increases the nubmer of times the id has been seen by count.
 //
-// count must be >= 1
+// count must be >= 0
 func (b *Bag) AddCount(id ID, count int) {
+	if count <= 0 {
+		return
+	}
+
 	b.init()
 
 	totalCount := b.counts[*id.ID] + count

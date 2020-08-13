@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
@@ -54,20 +54,20 @@ func TestTxEmpty(t *testing.T) {
 func TestTxInvalidCredential(t *testing.T) {
 	ctx := NewContext()
 	c := setupCodec()
-	c.RegisterType(&ava.TestVerifiable{})
+	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{{
-				UTXOID: ava.UTXOID{
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				In: &secp256k1fx.TransferInput{
-					Amt: 20 * units.KiloAva,
+					Amt: 20 * units.KiloAvax,
 					Input: secp256k1fx.Input{
 						SigIndices: []uint32{
 							0,
@@ -76,7 +76,7 @@ func TestTxInvalidCredential(t *testing.T) {
 				},
 			}},
 		},
-		Creds: []verify.Verifiable{&ava.TestVerifiable{Err: errors.New("")}},
+		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
 
 	b, err := c.Marshal(tx)
@@ -93,21 +93,21 @@ func TestTxInvalidCredential(t *testing.T) {
 func TestTxInvalidUnsignedTx(t *testing.T) {
 	ctx := NewContext()
 	c := setupCodec()
-	c.RegisterType(&ava.TestVerifiable{})
+	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{
+			Ins: []*avax.TransferableInput{
 				{
-					UTXOID: ava.UTXOID{
+					UTXOID: avax.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
-						Amt: 20 * units.KiloAva,
+						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
 							SigIndices: []uint32{
 								0,
@@ -116,13 +116,13 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 					},
 				},
 				{
-					UTXOID: ava.UTXOID{
+					UTXOID: avax.UTXOID{
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: ava.Asset{ID: asset},
+					Asset: avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
-						Amt: 20 * units.KiloAva,
+						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
 							SigIndices: []uint32{
 								0,
@@ -133,8 +133,8 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			},
 		},
 		Creds: []verify.Verifiable{
-			&ava.TestVerifiable{},
-			&ava.TestVerifiable{},
+			&avax.TestVerifiable{},
+			&avax.TestVerifiable{},
 		},
 	}
 
@@ -152,18 +152,18 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	ctx := NewContext()
 	c := setupCodec()
-	c.RegisterType(&ava.TestVerifiable{})
+	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
 		UnsignedTx: &BaseTx{
 			NetID: networkID,
 			BCID:  chainID,
-			Ins: []*ava.TransferableInput{
+			Ins: []*avax.TransferableInput{
 				{
-					UTXOID: ava.UTXOID{TxID: ids.Empty, OutputIndex: 0},
-					Asset:  ava.Asset{ID: asset},
+					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 0},
+					Asset:  avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
-						Amt: 20 * units.KiloAva,
+						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
 							SigIndices: []uint32{
 								0,
@@ -172,10 +172,10 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 					},
 				},
 				{
-					UTXOID: ava.UTXOID{TxID: ids.Empty, OutputIndex: 1},
-					Asset:  ava.Asset{ID: asset},
+					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 1},
+					Asset:  avax.Asset{ID: asset},
 					In: &secp256k1fx.TransferInput{
-						Amt: 20 * units.KiloAva,
+						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
 							SigIndices: []uint32{
 								0,
@@ -185,7 +185,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 				},
 			},
 		},
-		Creds: []verify.Verifiable{&ava.TestVerifiable{}},
+		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
 
 	b, err := c.Marshal(tx)

@@ -10,11 +10,11 @@ import (
 )
 
 func TestNewDefaultVersion(t *testing.T) {
-	v := NewDefaultVersion("ava", 1, 2, 3)
+	v := NewDefaultVersion("avalanche", 1, 2, 3)
 
 	assert.NotNil(t, v)
-	assert.Equal(t, "ava/1.2.3", v.String())
-	assert.Equal(t, "ava", v.App())
+	assert.Equal(t, "avalanche/1.2.3", v.String())
+	assert.Equal(t, "avalanche", v.App())
 	assert.Equal(t, 1, v.Major())
 	assert.Equal(t, 2, v.Minor())
 	assert.Equal(t, 3, v.Patch())
@@ -23,11 +23,11 @@ func TestNewDefaultVersion(t *testing.T) {
 }
 
 func TestNewVersion(t *testing.T) {
-	v := NewVersion("ava", ":", ",", 1, 2, 3)
+	v := NewVersion("avalanche", ":", ",", 1, 2, 3)
 
 	assert.NotNil(t, v)
-	assert.Equal(t, "ava:1,2,3", v.String())
-	assert.Equal(t, "ava", v.App())
+	assert.Equal(t, "avalanche:1,2,3", v.String())
+	assert.Equal(t, "avalanche", v.App())
 	assert.Equal(t, 1, v.Major())
 	assert.Equal(t, 2, v.Minor())
 	assert.Equal(t, 3, v.Patch())
@@ -36,8 +36,8 @@ func TestNewVersion(t *testing.T) {
 }
 
 func TestIncompatibleApps(t *testing.T) {
-	v0 := NewDefaultVersion("ava", 1, 2, 3)
-	v1 := NewDefaultVersion("notava", 1, 2, 3)
+	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
+	v1 := NewDefaultVersion("notavalanche", 1, 2, 3)
 
 	assert.NotNil(t, v0)
 	assert.NotNil(t, v1)
@@ -49,8 +49,8 @@ func TestIncompatibleApps(t *testing.T) {
 }
 
 func TestIncompatibleMajor(t *testing.T) {
-	v0 := NewDefaultVersion("ava", 1, 2, 3)
-	v1 := NewDefaultVersion("ava", 2, 2, 3)
+	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
+	v1 := NewDefaultVersion("avalanche", 2, 2, 3)
 
 	assert.NotNil(t, v0)
 	assert.NotNil(t, v1)
@@ -62,8 +62,8 @@ func TestIncompatibleMajor(t *testing.T) {
 }
 
 func TestIncompatibleMinor(t *testing.T) {
-	v0 := NewDefaultVersion("ava", 1, 2, 3)
-	v1 := NewDefaultVersion("ava", 1, 3, 3)
+	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
+	v1 := NewDefaultVersion("avalanche", 1, 3, 3)
 
 	assert.NotNil(t, v0)
 	assert.NotNil(t, v1)
@@ -75,8 +75,8 @@ func TestIncompatibleMinor(t *testing.T) {
 }
 
 func TestCompatiblePatch(t *testing.T) {
-	v0 := NewDefaultVersion("ava", 1, 2, 3)
-	v1 := NewDefaultVersion("ava", 1, 2, 4)
+	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
+	v1 := NewDefaultVersion("avalanche", 1, 2, 4)
 
 	assert.NotNil(t, v0)
 	assert.NotNil(t, v1)

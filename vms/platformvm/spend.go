@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -30,17 +30,17 @@ func (vm *VM) spend(
 	amount uint64,
 	fee uint64,
 ) (
-	[]*ava.TransferableInput,
-	[]*ava.TransferableOutput, // unlocked
-	[]*ava.TransferableOutput, // locked
+	[]*avax.TransferableInput,
+	[]*avax.TransferableOutput, // unlocked
+	[]*avax.TransferableOutput, // locked
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	addrs := make([][]byte, len(keys)) // The addresses controlled by [keys]
-	for i, key := range keys {
-		addrs[i] = key.PublicKey().Address().Bytes()
+	addrs := ids.ShortSet{} // The addresses controlled by [keys]
+	for _, key := range keys {
+		addrs.Add(key.PublicKey().Address())
 	}
-	utxos, err := vm.getUTXOs(db, addrs) // The UTXOs controlled by [keys]
+	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
@@ -53,9 +53,9 @@ func (vm *VM) spend(
 	// Consume locked UTXOs
 	now := uint64(vm.clock.Time().Unix())
 	spentLocked := uint64(0) // amount of AVAX that has been placed into the locked outputs
-	ins := []*ava.TransferableInput{}
-	returnedOuts := []*ava.TransferableOutput{}
-	lockedOuts := []*ava.TransferableOutput{}
+	ins := []*avax.TransferableInput{}
+	returnedOuts := []*avax.TransferableOutput{}
+	lockedOuts := []*avax.TransferableOutput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos { // See which UTXOs we can spend
 		// If we have enough locked AVAX; stop.
@@ -87,9 +87,9 @@ func (vm *VM) spend(
 		if err != nil {
 			continue
 		}
-		in, ok := inIntf.(ava.TransferableIn)
+		in, ok := inIntf.(avax.TransferableIn)
 		if !ok { // should never happen
-			vm.Ctx.Log.Warn("expected input to be ava.TransferableIn but is %T", inIntf)
+			vm.Ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
 			continue
 		}
 
@@ -106,8 +106,8 @@ func (vm *VM) spend(
 		}
 		value -= toReturn
 
-		lockedOuts = append(lockedOuts, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: vm.avaxAssetID},
+		lockedOuts = append(lockedOuts, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: vm.avaxAssetID},
 			Out: &StakeableLockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
@@ -117,8 +117,8 @@ func (vm *VM) spend(
 			},
 		})
 		if toReturn > 0 {
-			returnedOuts = append(returnedOuts, &ava.TransferableOutput{
-				Asset: ava.Asset{ID: vm.avaxAssetID},
+			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
 				Out: &StakeableLockOut{
 					Locktime: out.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
@@ -128,9 +128,9 @@ func (vm *VM) spend(
 				},
 			})
 		}
-		ins = append(ins, &ava.TransferableInput{
+		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  ava.Asset{ID: vm.avaxAssetID},
+			Asset:  avax.Asset{ID: vm.avaxAssetID},
 			In: &StakeableLockIn{
 				Locktime:       out.Locktime,
 				TransferableIn: in,
@@ -164,9 +164,9 @@ func (vm *VM) spend(
 		if err != nil {
 			continue
 		}
-		in, ok := inIntf.(ava.TransferableIn)
+		in, ok := inIntf.(avax.TransferableIn)
 		if !ok { // should never happen
-			vm.Ctx.Log.Warn("expected input to be ava.TransferableIn but is %T", inIntf)
+			vm.Ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
 			continue
 		}
 
@@ -206,8 +206,8 @@ func (vm *VM) spend(
 
 		if amountToLock > 0 {
 			changeAddr := kc.Keys[0].PublicKey().Address()
-			lockedOuts = append(lockedOuts, &ava.TransferableOutput{
-				Asset: ava.Asset{ID: vm.avaxAssetID},
+			lockedOuts = append(lockedOuts, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountToLock,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -220,8 +220,8 @@ func (vm *VM) spend(
 		}
 		if amountToReturn > 0 {
 			changeAddr := kc.Keys[0].PublicKey().Address()
-			returnedOuts = append(returnedOuts, &ava.TransferableOutput{
-				Asset: ava.Asset{ID: vm.avaxAssetID},
+			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountToReturn,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -232,9 +232,9 @@ func (vm *VM) spend(
 				},
 			})
 		}
-		ins = append(ins, &ava.TransferableInput{
+		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  ava.Asset{ID: vm.avaxAssetID},
+			Asset:  avax.Asset{ID: vm.avaxAssetID},
 			In:     in,
 		})
 		signers = append(signers, inSigners)
@@ -245,9 +245,9 @@ func (vm *VM) spend(
 			burned, spentLocked, fee, amount)
 	}
 
-	ava.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
-	ava.SortTransferableOutputs(returnedOuts, vm.codec) // sort outputs
-	ava.SortTransferableOutputs(lockedOuts, vm.codec)   // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, vm.codec) // sort outputs
+	avax.SortTransferableOutputs(lockedOuts, vm.codec)   // sort outputs
 
 	return ins, returnedOuts, lockedOuts, signers, nil
 }
@@ -300,9 +300,9 @@ var (
 // * sum(inputs{unlocked}) >= sum(outputs{unlocked}) + burnAmount{unlocked}
 // * sum(inputs{locked}) >= sum(outputs{locked})
 func syntacticVerifySpend(
-	ins []*ava.TransferableInput,
-	unlockedOuts []*ava.TransferableOutput,
-	lockedOuts []*ava.TransferableOutput,
+	ins []*avax.TransferableInput,
+	unlockedOuts []*avax.TransferableOutput,
+	lockedOuts []*avax.TransferableOutput,
 	locked uint64,
 	burnedUnlocked uint64,
 	avaxAssetID ids.ID,
@@ -385,7 +385,7 @@ var (
 // Removes the UTXOs consumed by [ins] from the UTXO set
 func (vm *VM) consumeInputs(
 	db database.Database,
-	ins []*ava.TransferableInput,
+	ins []*avax.TransferableInput,
 ) error {
 	for _, input := range ins {
 		utxoID := input.UTXOID.InputID()
@@ -401,15 +401,15 @@ func (vm *VM) consumeInputs(
 func (vm *VM) produceOutputs(
 	db database.Database,
 	txID ids.ID,
-	outs []*ava.TransferableOutput,
+	outs []*avax.TransferableOutput,
 ) error {
 	for index, out := range outs {
-		if err := vm.putUTXO(db, &ava.UTXO{
-			UTXOID: ava.UTXOID{
+		if err := vm.putUTXO(db, &avax.UTXO{
+			UTXOID: avax.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(index),
 			},
-			Asset: ava.Asset{ID: vm.avaxAssetID},
+			Asset: avax.Asset{ID: vm.avaxAssetID},
 			Out:   out.Output(),
 		}); err != nil {
 			return err
@@ -426,11 +426,11 @@ func (vm *VM) produceOutputs(
 func (vm *VM) semanticVerifySpend(
 	db database.Database,
 	tx SpendTx,
-	ins []*ava.TransferableInput,
-	outs []*ava.TransferableOutput,
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
 ) TxError {
-	utxos := make([]*ava.UTXO, len(ins))
+	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
 		utxoID := input.UTXOID.InputID()
 		utxo, err := vm.getUTXO(db, utxoID)
@@ -451,9 +451,9 @@ func (vm *VM) semanticVerifySpend(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
 	tx SpendTx,
-	utxos []*ava.UTXO,
-	ins []*ava.TransferableInput,
-	outs []*ava.TransferableOutput,
+	utxos []*avax.UTXO,
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
 ) TxError {
 	if len(ins) != len(creds) {

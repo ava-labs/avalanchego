@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/constants"
+
 	"github.com/ava-labs/gecko/utils/formatting"
 
 	"github.com/ava-labs/gecko/ids"
@@ -254,6 +256,10 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		if chain.Put(validatorID, requestID, containerID, container) {
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
+	} else if requestID == constants.GossipMsgRequestID {
+		sr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
+			validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container},
+		)
 	} else {
 		sr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		sr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})

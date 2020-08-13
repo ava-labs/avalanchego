@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -31,7 +31,7 @@ type UnsignedAddDefaultSubnetDelegatorTx struct {
 	// Describes the delegatee
 	DurationValidator `serialize:"true"`
 	// Where to send staked tokens when done validating
-	Stake []*ava.TransferableOutput `serialize:"true" json:"stake"`
+	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
 	RewardsOwner verify.Verifiable `serialize:"true" json:"rewardsOwner"`
 }
@@ -86,7 +86,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) Verify() error {
 	}
 
 	switch {
-	case !ava.IsSortedTransferableOutputs(tx.Stake, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
 		return errOutputsNotSorted
 	case returnedWeight != tx.Wght:
 		return errInvalidAmount
@@ -160,7 +160,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 		}
 	}
 
-	outs := make([]*ava.TransferableOutput, len(tx.Outs)+len(tx.Stake))
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 

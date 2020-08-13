@@ -35,12 +35,14 @@ func NewService(log logging.Logger) *Health {
 }
 
 // Handler returns an HTTPHandler providing RPC access to the Health service
-func (h *Health) Handler() *common.HTTPHandler {
+func (h *Health) Handler() (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(h, "health")
+	if err := newServer.RegisterService(h, "health"); err != nil {
+		return nil, err
+	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet { // GET request --> return 200 if getLiveness returns true, else 503
 			if _, healthy := h.health.Results(); healthy {
@@ -52,7 +54,7 @@ func (h *Health) Handler() *common.HTTPHandler {
 			newServer.ServeHTTP(w, r) // Other request --> use JSON RPC
 		}
 	})
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}, nil
 }
 
 // RegisterHeartbeat adds a check with default options and a CheckFn that checks

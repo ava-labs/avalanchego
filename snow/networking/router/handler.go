@@ -120,12 +120,13 @@ func (h *Handler) Initialize(
 	namespace string,
 	metrics prometheus.Registerer,
 ) {
-	h.metrics.Initialize(namespace, metrics)
+	h.ctx = engine.Context()
+	if err := h.metrics.Initialize(namespace, metrics); err != nil {
+		h.ctx.Log.Warn("initializing handler metrics errored with: %s", err)
+	}
 	h.reliableMsgsSema = make(chan struct{}, 1)
 	h.closed = make(chan struct{})
 	h.msgChan = msgChan
-
-	h.ctx = engine.Context()
 
 	// Defines the maximum current percentage of expected CPU utilization for
 	// a message to be placed in the queue at the corresponding index
