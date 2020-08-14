@@ -13,7 +13,15 @@ var (
 )
 
 // Factory ...
-type Factory struct{}
+type Factory struct {
+	AVA ids.ID
+	Fee uint64
+}
 
 // New ...
-func (f *Factory) New() interface{} { return &VM{} }
+func (f *Factory) New() interface{} {
+	return &VM{
+		avaxAssetID: f.AVA,
+		txFee:       f.Fee,
+	}
+}

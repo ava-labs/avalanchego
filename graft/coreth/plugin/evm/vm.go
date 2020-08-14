@@ -20,9 +20,10 @@ import (
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
 
-	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/rlp"
+	"github.com/ava-labs/go-ethereum/rpc"
+	avarpc "github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/cache"
@@ -31,7 +32,11 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/utils/codec"
+	avajson "github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/ava"
 
 	commonEng "github.com/ava-labs/gecko/snow/engine/common"
 )
@@ -59,6 +64,10 @@ const (
 	bdTimerStateLong
 )
 
+const (
+	addressSep = "-"
+)
+
 var (
 	errEmptyBlock     = errors.New("empty block")
 	errCreateBlock    = errors.New("couldn't create block")
@@ -66,6 +75,7 @@ var (
 	errBlockFrequency = errors.New("too frequent block issuance")
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 	errInvalidBlock   = errors.New("invalid block")
+	errInvalidAddr    = errors.New("invalid hex address")
 )
 
 func maxDuration(x, y time.Duration) time.Duration {
@@ -73,6 +83,21 @@ func maxDuration(x, y time.Duration) time.Duration {
 		return x
 	}
 	return y
+}
+
+// Codec does serialization and deserialization
+var Codec codec.Codec
+
+func init() {
+	Codec = codec.NewDefault()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		Codec.RegisterType(&UnsignedImportTx{}),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 }
 
 // VM implements the snowman.ChainVM interface
@@ -105,6 +130,11 @@ type VM struct {
 
 	genlock      sync.Mutex
 	txSubmitChan <-chan struct{}
+	codec        codec.Codec
+	clock        timer.Clock
+	avaxAssetID  ids.ID
+	txFee        uint64
+	//atomicTxPool []
 }
 
 /*
@@ -259,6 +289,7 @@ func (vm *VM) Initialize(
 			}
 		}
 	})
+	vm.codec = Codec
 
 	return nil
 }
@@ -356,6 +387,26 @@ func (vm *VM) LastAccepted() ids.ID {
 	return vm.lastAccepted.ID()
 }
 
+// NewHandler returns a new Handler for a service where:
+//   * The handler's functionality is defined by [service]
+//     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)
+//   * The name of the service is [name]
+//   * The LockOption is the first element of [lockOption]
+//     By default the LockOption is WriteLock
+//     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
+func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) *commonEng.HTTPHandler {
+	server := avarpc.NewServer()
+	server.RegisterCodec(avajson.NewCodec(), "application/json")
+	server.RegisterCodec(avajson.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterService(service, name)
+
+	var lock commonEng.LockOption = commonEng.WriteLock
+	if len(lockOption) != 0 {
+		lock = lockOption[0]
+	}
+	return &commonEng.HTTPHandler{LockOptions: lock, Handler: server}
+}
+
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler := vm.chain.NewRPCHandler()
@@ -368,6 +419,7 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
+		"/ava": newHandler("", &AvaAPI{vm}),
 		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}
 }
@@ -530,4 +582,26 @@ func (vm *VM) getLastAccepted() *Block {
 	defer vm.metalock.Unlock()
 
 	return vm.lastAccepted
+}
+
+func (vm *VM) ParseAddress(addrStr string) (common.Address, error) {
+	if !common.IsHexAddress(addrStr) {
+		return common.Address{}, errInvalidAddr
+	}
+	return common.HexToAddress(addrStr), nil
+}
+
+func (vm *VM) FormatAddress(addr common.Address) (string, error) {
+	return addr.Hex(), nil
+}
+
+func (vm *VM) issueTx(tx *AtomicTx) error {
+	return nil
+}
+
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	utxos := []*ava.UTXO{}
+	return utxos, nil
 }

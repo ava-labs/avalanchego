@@ -8,10 +8,14 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"net/http"
+	"strings"
 
 	"github.com/ava-labs/coreth"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/gecko/api"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
 	"github.com/ava-labs/go-ethereum/crypto"
@@ -35,6 +39,8 @@ type SnowmanAPI struct{ vm *VM }
 
 // NetAPI offers network related API methods
 type NetAPI struct{ vm *VM }
+
+type AvaAPI struct{ vm *VM }
 
 // NewNetAPI creates a new net API instance.
 func NewNetAPI(vm *VM) *NetAPI { return &NetAPI{vm} }
@@ -119,4 +125,107 @@ func (api *DebugAPI) IssueBlock(ctx context.Context) error {
 	api.vm.ctx.Log.Info("Issuing a new block")
 
 	return api.vm.tryBlockGen()
+}
+
+// ExportKeyArgs are arguments for ExportKey
+type ExportKeyArgs struct {
+	api.UserPass
+	Address string `json:"address"`
+}
+
+// ExportKeyReply is the response for ExportKey
+type ExportKeyReply struct {
+	// The decrypted PrivateKey for the Address provided in the arguments
+	PrivateKey string `json:"privateKey"`
+}
+
+// ExportKey returns a private key from the provided user
+func (service *AvaAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
+	service.vm.ctx.Log.Info("Platform: ExportKey called")
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+	}
+	user := user{db: db}
+	if address, err := service.vm.ParseAddress(args.Address); err != nil {
+		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
+	} else if sk, err := user.getKey(address); err != nil {
+		return fmt.Errorf("problem retrieving private key: %w", err)
+	} else {
+		reply.PrivateKey = common.ToHex(crypto.FromECDSA(sk))
+		//constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
+		return nil
+	}
+}
+
+// ImportKeyArgs are arguments for ImportKey
+type ImportKeyArgs struct {
+	api.UserPass
+	PrivateKey string `json:"privateKey"`
+}
+
+// ImportKey adds a private key to the provided user
+func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
+	service.vm.ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving data: %w", err)
+	}
+
+	user := user{db: db}
+
+	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
+		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	}
+	sk, err := crypto.ToECDSA(common.FromHex(args.PrivateKey))
+	if err != nil {
+		return fmt.Errorf("invalid private key")
+	}
+	if err = user.putAddress(sk); err != nil {
+		return fmt.Errorf("problem saving key %w", err)
+	}
+
+	reply.Address, err = service.vm.FormatAddress(crypto.PubkeyToAddress(sk.PublicKey))
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
+	return nil
+}
+
+// ImportAVAArgs are the arguments to ImportAVA
+type ImportAVAArgs struct {
+	api.UserPass
+	// The address that will receive the imported funds
+	To string `json:"to"`
+}
+
+// ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
+// The AVA must have already been exported from the X-Chain.
+func (service *AvaAPI) ImportAVA(_ *http.Request, args *ImportAVAArgs, response *api.JsonTxID) error {
+	service.vm.ctx.Log.Info("Platform: ImportAVA called")
+
+	// Get the user's info
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
+	}
+	user := user{db: db}
+
+	to, err := service.vm.ParseAddress(args.To)
+	if err != nil { // Parse address
+		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
+	}
+
+	privKeys, err := user.getKeys()
+	if err != nil { // Get keys
+		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
+	}
+
+	tx, err := service.vm.newImportTx(to, privKeys)
+	if err != nil {
+		return err
+	}
+
+	response.TxID = tx.ID()
+	return service.vm.issueTx(tx)
 }
