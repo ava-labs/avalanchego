@@ -8,9 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	//"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
-	//"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	avacrypto "github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -153,51 +151,7 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 	if err := tx.Verify(); err != nil {
 		return permError{err}
 	}
-
-	//// Verify (but don't spend) imported inputs
-	//smDB := tx.vm.ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	//defer tx.vm.ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
-
-	//utxos := make([]*ava.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
-	//for index, input := range tx.Ins {
-	//	utxoID := input.UTXOID.InputID()
-	//	utxo, err := tx.vm.getUTXO(db, utxoID)
-	//	if err != nil {
-	//		return tempError{err}
-	//	}
-	//	utxos[index] = utxo
-	//}
-
-	//state := ava.NewPrefixedState(smDB, Codec)
-	//for index, input := range tx.ImportedInputs {
-	//	utxoID := input.UTXOID.InputID()
-	//	utxo, err := state.AVMUTXO(utxoID)
-	//	if err != nil { // Get the UTXO
-	//		return tempError{err}
-	//	}
-	//	utxos[index+len(tx.Ins)] = utxo
-	//}
-
-	//ins := make([]*ava.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
-	//copy(ins, tx.Ins)
-	//copy(ins[len(tx.Ins):], tx.ImportedInputs)
-
-	//// Verify the flowcheck
-	//if err := tx.vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, creds); err != nil {
-	//	return err
-	//}
-
-	//txID := tx.ID()
-
-	//// Consume the UTXOS
-	//if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
-	//	return tempError{err}
-	//}
-	//// Produce the UTXOS
-	//if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
-	//	return tempError{err}
-	//}
-
+	// TODO: verify UTXO inputs via gRPC
 	return nil
 }
 
@@ -207,25 +161,7 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
 func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
-	//smDB := tx.vm.ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	//defer tx.vm.ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
-
-	//vsmDB := versiondb.New(smDB)
-	//state := ava.NewPrefixedState(vsmDB, Codec)
-
-	//// Spend imported UTXOs
-	//for _, in := range tx.ImportedInputs {
-	//	utxoID := in.InputID()
-	//	if err := state.SpendAVMUTXO(utxoID); err != nil {
-	//		return err
-	//	}
-	//}
-
-	//sharedBatch, err := vsmDB.CommitBatch()
-	//if err != nil {
-	//	return err
-	//}
-	//return atomic.WriteAll(batch, sharedBatch)
+	// TODO: finish this function via gRPC
 	return nil
 }
 
@@ -290,12 +226,7 @@ func (vm *VM) newImportTx(
 	ins := []*ava.TransferableInput{}
 	outs := []EVMOutput{}
 	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
-		//var baseSigners [][]*avacrypto.PrivateKeySECP256K1R
-		//ins, outs, _, baseSigners, err = vm.spend(vm.DB, keys, 0, vm.txFee-importedAmount)
-		//if err != nil {
-		//	return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-		//}
-		//signers = append(baseSigners, signers...)
+		// TODO: spend EVM balance to compensate vm.txFee-importedAmount
 	} else if importedAmount > vm.txFee {
 		outs = append(outs, EVMOutput{
 			Address: to,
