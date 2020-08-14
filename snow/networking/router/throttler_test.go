@@ -154,7 +154,7 @@ func TestCalculatesEWMA(t *testing.T) {
 	period := float64(time.Second)
 	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, stakerPortion, period, logging.NoLog{})
 
-	// Spend x amount in consecutive periods and ensure that EWMA is calcualted correctly
+	// Spend X CPU time in consecutive intervals and ensure that the throttler correctly calculates EWMA
 	spends := []float64{
 		23.2,
 		23894.5,
