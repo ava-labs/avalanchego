@@ -602,6 +602,7 @@ func (vm *VM) issueTx(tx *AtomicTx) error {
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
 func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+	// TODO: finish this function via gRPC
 	utxos := []*ava.UTXO{}
 	return utxos, nil
 }

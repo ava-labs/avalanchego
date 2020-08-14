@@ -27,6 +27,10 @@ type EVMOutput struct {
 	Amount  uint64         `serialize:"true" json:"amount"`
 }
 
+func (out *EVMOutput) Verify() error {
+	return nil
+}
+
 // BaseTx contains fields common to many transaction types. It should be
 // embedded in transaction implementations. The serialized fields of this struct
 // should be exactly the same as those of avm.BaseTx. Do not change this
@@ -84,11 +88,11 @@ func (tx *BaseTx) Verify() error {
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d",
 			len(tx.Memo), maxMemoSize)
 	}
-	//for _, out := range tx.Outs {
-	//	if err := out.Verify(); err != nil {
-	//		return err
-	//	}
-	//}
+	for _, out := range tx.Outs {
+		if err := out.Verify(); err != nil {
+			return err
+		}
+	}
 	for _, in := range tx.Ins {
 		if err := in.Verify(); err != nil {
 			return err
