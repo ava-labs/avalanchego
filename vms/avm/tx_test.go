@@ -57,9 +57,9 @@ func TestTxInvalidCredential(t *testing.T) {
 	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
@@ -75,7 +75,7 @@ func TestTxInvalidCredential(t *testing.T) {
 					},
 				},
 			}},
-		},
+		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
 
@@ -96,9 +96,9 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{
@@ -131,7 +131,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 		Creds: []verify.Verifiable{
 			&avax.TestVerifiable{},
 			&avax.TestVerifiable{},
@@ -155,9 +155,9 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 0},
@@ -184,7 +184,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
 

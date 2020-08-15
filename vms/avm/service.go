@@ -488,12 +488,12 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: args.Denomination,
@@ -596,12 +596,12 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: args.Denomination,
@@ -697,12 +697,12 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: 0, // NFTs are non-fungible
@@ -978,12 +978,12 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 	}
 	avax.SortTransferableOutputs(outs, service.vm.codec)
 
-	tx := Tx{UnsignedTx: &BaseTx{
-		NetID: service.vm.ctx.NetworkID,
-		BCID:  service.vm.ctx.ChainID,
-		Outs:  outs,
-		Ins:   ins,
-	}}
+	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    service.vm.ctx.NetworkID,
+		BlockchainID: service.vm.ctx.ChainID,
+		Outs:         outs,
+		Ins:          ins,
+	}}}
 	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
 	}
@@ -1073,12 +1073,12 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 	keys = append(keys, opKeys...)
 
 	tx := Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Ops: ops,
 	}}
 	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
@@ -1164,12 +1164,12 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	}
 
 	tx := Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Ops: ops,
 	}}
 	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
@@ -1258,12 +1258,12 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	}
 
 	tx := Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Ops: ops,
 	}}
 	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
@@ -1375,12 +1375,12 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 	avax.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		SourceChain: chainID,
 		ImportedIns: importInputs,
 	}}
@@ -1477,11 +1477,11 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 	}
 
 	tx := Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
+		BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
 		},
 		DestinationChain: chainID,
 		ExportedOuts:     exportOuts,

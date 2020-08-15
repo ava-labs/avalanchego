@@ -253,9 +253,9 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	newTx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
+	newTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        genesisTx.ID(),
@@ -271,7 +271,7 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 				},
 			},
 		}},
-	}}
+	}}}
 
 	unsignedBytes, err := vm.codec.Marshal(&newTx.UnsignedTx)
 	if err != nil {
@@ -418,11 +418,11 @@ func TestTxSerialization(t *testing.T) {
 	}
 
 	unsignedTx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-			Memo:  []byte{0x00, 0x01, 0x02, 0x03},
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Memo:         []byte{0x00, 0x01, 0x02, 0x03},
+		}},
 		Name:         "name",
 		Symbol:       "symb",
 		Denomination: 0,
@@ -613,9 +613,9 @@ func TestIssueDependentTx(t *testing.T) {
 
 	key := keys[0]
 
-	firstTx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
+	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        genesisTx.ID(),
@@ -641,7 +641,7 @@ func TestIssueDependentTx(t *testing.T) {
 				},
 			},
 		}},
-	}}
+	}}}
 
 	unsignedBytes, err := vm.codec.Marshal(&firstTx.UnsignedTx)
 	if err != nil {
@@ -672,9 +672,9 @@ func TestIssueDependentTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	secondTx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
+	secondTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        firstTx.ID(),
@@ -690,7 +690,7 @@ func TestIssueDependentTx(t *testing.T) {
 				},
 			},
 		}},
-	}}
+	}}}
 
 	unsignedBytes, err = vm.codec.Marshal(&secondTx.UnsignedTx)
 	if err != nil {
@@ -779,10 +779,10 @@ func TestIssueNFT(t *testing.T) {
 	}
 
 	createAssetTx := &Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
@@ -818,10 +818,10 @@ func TestIssueNFT(t *testing.T) {
 	}
 
 	mintNFTTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Ops: []*Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
 			UTXOIDs: []*avax.UTXOID{{
@@ -869,10 +869,10 @@ func TestIssueNFT(t *testing.T) {
 	}
 
 	transferNFTTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Ops: []*Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
 			UTXOIDs: []*avax.UTXOID{{
@@ -953,10 +953,10 @@ func TestIssueProperty(t *testing.T) {
 	}
 
 	createAssetTx := &Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
@@ -984,10 +984,10 @@ func TestIssueProperty(t *testing.T) {
 	}
 
 	mintPropertyTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Ops: []*Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
 			UTXOIDs: []*avax.UTXOID{{
@@ -1039,10 +1039,10 @@ func TestIssueProperty(t *testing.T) {
 	}
 
 	burnPropertyTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Ops: []*Operation{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
 			UTXOIDs: []*avax.UTXOID{{

@@ -210,14 +210,12 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 
 	avax.SortTransferableOutputs(outs, w.codec)
 
-	tx := &avm.Tx{
-		UnsignedTx: &avm.BaseTx{
-			NetID: w.networkID,
-			BCID:  w.chainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
-	}
+	tx := &avm.Tx{UnsignedTx: &avm.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    w.networkID,
+		BlockchainID: w.chainID,
+		Outs:         outs,
+		Ins:          ins,
+	}}}
 
 	unsignedBytes, err := w.codec.Marshal(&tx.UnsignedTx)
 	if err != nil {

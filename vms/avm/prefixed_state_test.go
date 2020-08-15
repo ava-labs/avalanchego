@@ -36,9 +36,9 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 		Out:   &avax.TestVerifiable{},
 	}
 
-	tx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
+	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
@@ -54,7 +54,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 				},
 			},
 		}},
-	}}
+	}}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {

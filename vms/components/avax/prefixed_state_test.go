@@ -7,10 +7,11 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestPrefixedFunds(t *testing.T) {

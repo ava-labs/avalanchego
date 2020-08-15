@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	errNilInitialState = errors.New("nil initial state is not valid")
-	errNilFxOutput     = errors.New("nil feature extension output is not valid")
+	errNilInitialState  = errors.New("nil initial state is not valid")
+	errNilFxOutput      = errors.New("nil feature extension output is not valid")
+	errOutputsNotSorted = errors.New("outputs not sorted")
 )
 
 // InitialState ...

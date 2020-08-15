@@ -22,7 +22,7 @@ var (
 
 // ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {
-	BaseTx `serialize:"true"`
+	avax.BaseTx `serialize:"true"`
 
 	// Which chain to send the funds to
 	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`

@@ -27,9 +27,9 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -84,9 +84,9 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID + 1,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID + 1,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -130,9 +130,9 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID: ids.NewID([32]byte{
+		BaseTx: avax.BaseTx{
+			NetworkID: networkID,
+			BlockchainID: ids.NewID([32]byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -181,9 +181,9 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -202,7 +202,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 					},
 				},
 			}},
-			Memo: make([]byte, maxMemoSize+1),
+			Memo: make([]byte, avax.MaxMemoSize+1),
 		},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
@@ -228,9 +228,9 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -284,9 +284,9 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -352,9 +352,9 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -398,9 +398,9 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -456,9 +456,9 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{
@@ -522,9 +522,9 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{
@@ -588,9 +588,9 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID: ids.NewID([32]byte{
@@ -681,9 +681,9 @@ func TestExportTxSerialization(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: 2,
-			BCID: ids.NewID([32]byte{
+		BaseTx: avax.BaseTx{
+			NetworkID: 2,
+			BlockchainID: ids.NewID([32]byte{
 				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
 				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
 				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
@@ -752,9 +752,9 @@ func TestExportTxSemanticVerify(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -810,9 +810,9 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -868,9 +868,9 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -926,9 +926,9 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -1041,9 +1041,9 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	}()
 
 	rawTx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -1099,9 +1099,9 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisTx.ID()
 	rawTx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -1192,9 +1192,9 @@ func TestIssueExportTx(t *testing.T) {
 	key := keys[0]
 
 	tx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,
@@ -1347,9 +1347,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	key := keys[0]
 
 	tx := &Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        avaxID,

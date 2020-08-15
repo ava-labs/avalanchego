@@ -24,9 +24,9 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
@@ -37,7 +37,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 					},
 				},
 			}},
-		},
+		}},
 		SourceChain: platformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
@@ -70,9 +70,9 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
@@ -83,8 +83,8 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 					},
 				},
 			}},
-			Memo: make([]byte, maxMemoSize+1),
-		},
+			Memo: make([]byte, avax.MaxMemoSize+1),
+		}},
 		SourceChain: platformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
@@ -164,16 +164,16 @@ func TestImportTxSerialization(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: 2,
-			BCID: ids.NewID([32]byte{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID: 2,
+			BlockchainID: ids.NewID([32]byte{
 				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
 				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
 				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
 			Memo: []byte{0x00, 0x01, 0x02, 0x03},
-		},
+		}},
 		SourceChain: ids.NewID([32]byte{
 			0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
 			0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
@@ -272,10 +272,10 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		SourceChain: platformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
@@ -434,10 +434,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		SourceChain: platformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,

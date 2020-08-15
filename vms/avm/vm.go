@@ -52,6 +52,7 @@ var (
 	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
+	errInsufficientFunds         = errors.New("insufficient funds")
 )
 
 // VM implements the avalanche.DAGVM interface

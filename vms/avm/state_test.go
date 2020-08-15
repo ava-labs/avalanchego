@@ -333,9 +333,9 @@ func TestStateTXs(t *testing.T) {
 		t.Fatalf("Should have errored when reading tx")
 	}
 
-	tx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
+	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
@@ -351,7 +351,7 @@ func TestStateTXs(t *testing.T) {
 				},
 			},
 		}},
-	}}
+	}}}
 
 	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
 	if err != nil {

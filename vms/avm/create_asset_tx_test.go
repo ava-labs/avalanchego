@@ -27,9 +27,9 @@ var (
 func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Context) {
 	c := setupCodec()
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
@@ -58,7 +58,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 					},
 				},
 			}},
-		},
+		}},
 		Name:         "NormalName",
 		Symbol:       "TICK",
 		Denomination: byte(2),
@@ -169,9 +169,9 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: 2,
-			BCID: ids.NewID([32]byte{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID: 2,
+			BlockchainID: ids.NewID([32]byte{
 				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
 				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
 				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
@@ -232,7 +232,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 					},
 				},
 			}},
-		},
+		}},
 		Name:         "Volatility Index",
 		Symbol:       "VIX",
 		Denomination: 2,
@@ -280,10 +280,10 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 
 func TestCreateAssetTxGetters(t *testing.T) {
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -309,10 +309,10 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -343,10 +343,10 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -366,10 +366,10 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name: "BRADY WINSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" +
 			"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" +
 			"SSS",
@@ -391,10 +391,10 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "",
 		Denomination: 0,
@@ -414,10 +414,10 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "TOM",
 		Symbol:       "BRADY",
 		Denomination: 0,
@@ -437,10 +437,10 @@ func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -457,10 +457,10 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
 		Denomination: 33,
@@ -480,10 +480,10 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY ",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -503,10 +503,10 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY!",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -526,10 +526,10 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM!",
 		Denomination: 0,
@@ -549,10 +549,10 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID + 1,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID + 1,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -572,10 +572,10 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
 		Denomination: 0,
@@ -595,10 +595,10 @@ func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
 		Denomination: 0,
