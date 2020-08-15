@@ -1,4 +1,7 @@
-package router
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package throttler
 
 import (
 	"testing"
@@ -19,11 +22,11 @@ func TestEWMAThrottler(t *testing.T) {
 	maxMessages := uint32(16)
 	msgPortion := 0.25
 	cpuPortion := 0.25
-	period := float64(time.Second)
+	period := time.Second
 	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, cpuPortion, period, logging.NoLog{})
 
-	throttler.UtilizeCPU(validator0.ID(), float64(25*time.Millisecond))
-	throttler.UtilizeCPU(validator1.ID(), float64(50*time.Millisecond))
+	throttler.UtilizeCPU(validator0.ID(), 25*time.Millisecond)
+	throttler.UtilizeCPU(validator1.ID(), 50*time.Millisecond)
 
 	cpu0, throttle0 := throttler.GetUtilization(validator0.ID())
 	cpu1, throttle1 := throttler.GetUtilization(validator1.ID())
@@ -64,7 +67,7 @@ func TestThrottlerPrunesSpenders(t *testing.T) {
 	maxMessages := uint32(1024)
 	cpuPortion := 0.25
 	msgPortion := 0.25
-	period := float64(time.Second)
+	period := time.Second
 	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, cpuPortion, period, logging.NoLog{})
 
 	throttler.AddMessage(nonStaker2) // nonStaker2 should not be removed with a pending message
@@ -111,7 +114,7 @@ func TestThrottleStaker(t *testing.T) {
 	maxMessages := uint32(16)
 	msgPortion := 0.25
 	cpuPortion := 0.25
-	period := float64(time.Second)
+	period := time.Second
 	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, cpuPortion, period, logging.NoLog{})
 
 	// Message Allotment: 0.5 * 0.25 * 15 = 2
@@ -151,23 +154,23 @@ func TestCalculatesEWMA(t *testing.T) {
 	maxMessages := uint32(16)
 	msgPortion := 0.25
 	stakerPortion := 0.25
-	period := float64(time.Second)
+	period := time.Second
 	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, stakerPortion, period, logging.NoLog{})
 
 	// Spend X CPU time in consecutive intervals and ensure that the throttler correctly calculates EWMA
-	spends := []float64{
-		23.2,
-		23894.5,
-		130482349732.12,
-		23984.32,
-		2382.54,
+	spends := []time.Duration{
+		23,
+		23894,
+		130482349732,
+		23984,
+		2382,
 	}
 
-	ewma := 0.0
+	ewma := time.Duration(0)
 	decayFactor := defaultDecayFactor
 	for _, spend := range spends {
 		ewma += spend
-		ewma /= decayFactor
+		ewma = time.Duration(float64(ewma) / decayFactor)
 
 		throttler.UtilizeCPU(validator0.ID(), spend)
 		throttler.EndInterval()
@@ -175,7 +178,7 @@ func TestCalculatesEWMA(t *testing.T) {
 
 	ewmat := throttler.(*ewmaThrottler)
 	sp := ewmat.getSpender(validator0.ID())
-	if sp.ewma != ewma {
-		t.Fatalf("EWMA Throttler calculated EWMA incorrectly, expected: %f, but calculated: %f", ewma, sp.ewma)
+	if sp.cpuEWMA != ewma {
+		t.Fatalf("EWMA Throttler calculated EWMA incorrectly, expected: %s, but calculated: %s", ewma, sp.cpuEWMA)
 	}
 }
