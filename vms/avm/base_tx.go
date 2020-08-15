@@ -87,14 +87,8 @@ func (t *BaseTx) UTXOs() []*avax.UTXO {
 	return utxos
 }
 
-// SyntacticVerify that this transaction is well-formed.
-func (t *BaseTx) SyntacticVerify(
-	ctx *snow.Context,
-	c codec.Codec,
-	txFeeAssetID ids.ID,
-	txFee uint64,
-	_ int,
-) error {
+// MetadataVerify ensures that transaction metadata is valie
+func (t *BaseTx) MetadataVerify(ctx *snow.Context) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -104,9 +98,20 @@ func (t *BaseTx) SyntacticVerify(
 		return errWrongChainID
 	case len(t.Memo) > maxMemoSize:
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
+	default:
+		return t.Metadata.Verify()
 	}
+}
 
-	if err := t.Metadata.Verify(); err != nil {
+// SyntacticVerify that this transaction is well-formed.
+func (t *BaseTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	_ int,
+) error {
+	if err := t.MetadataVerify(ctx); err != nil {
 		return err
 	}
 

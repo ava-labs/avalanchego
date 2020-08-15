@@ -5,7 +5,6 @@ package avm
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -43,19 +42,13 @@ func (t *ExportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.NetID != ctx.NetworkID:
-		return errWrongNetworkID
-	case !t.BCID.Equals(ctx.ChainID):
-		return errWrongChainID
-	case len(t.Memo) > maxMemoSize:
-		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	case t.DestinationChain.IsZero():
 		return errWrongBlockchainID
 	case len(t.Outs) == 0:
 		return errNoExportOutputs
 	}
 
-	if err := t.Metadata.Verify(); err != nil {
+	if err := t.MetadataVerify(ctx); err != nil {
 		return err
 	}
 
