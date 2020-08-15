@@ -1244,7 +1244,7 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	tx.Initialize(b)
 
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1399,7 +1399,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	tx.Initialize(b)
 
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 

@@ -311,7 +311,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 	tx.Initialize(b)
 
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err == nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err == nil {
 		t.Fatal(err)
 	}
 
@@ -338,7 +338,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
 	}
 	ctx.Lock.Unlock()

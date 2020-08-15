@@ -43,8 +43,6 @@ type TxState struct {
 	deps       []snowstorm.Tx
 
 	status choices.Status
-
-	onDecide func(choices.Status)
 }
 
 func (tx *UniqueTx) refresh() {
@@ -163,10 +161,6 @@ func (tx *UniqueTx) Accept() error {
 
 	tx.deps = nil // Needed to prevent a memory leak
 
-	if tx.onDecide != nil {
-		tx.onDecide(choices.Accepted)
-	}
-
 	return nil
 }
 
@@ -190,10 +184,6 @@ func (tx *UniqueTx) Reject() error {
 	tx.vm.pubsub.Publish("rejected", txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
-
-	if tx.onDecide != nil {
-		tx.onDecide(choices.Rejected)
-	}
 
 	return nil
 }

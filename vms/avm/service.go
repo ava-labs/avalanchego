@@ -61,7 +61,7 @@ type FormattedAssetID struct {
 func (service *Service) IssueTx(r *http.Request, args *FormattedTx, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	txID, err := service.vm.IssueTx(args.Tx.Bytes, nil)
+	txID, err := service.vm.IssueTx(args.Tx.Bytes)
 	if err != nil {
 		return err
 	}
@@ -503,7 +503,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -611,7 +611,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -712,7 +712,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -988,7 +988,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1085,7 +1085,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1179,7 +1179,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1273,7 +1273,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1388,7 +1388,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1490,7 +1490,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

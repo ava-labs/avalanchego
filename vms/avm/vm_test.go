@@ -557,7 +557,7 @@ func TestIssueTx(t *testing.T) {
 
 	newTx := NewTx(t, genesisBytes, vm)
 
-	txID, err := vm.IssueTx(newTx.Bytes(), nil)
+	txID, err := vm.IssueTx(newTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -667,7 +667,7 @@ func TestIssueDependentTx(t *testing.T) {
 	}
 	firstTx.Initialize(b)
 
-	_, err = vm.IssueTx(firstTx.Bytes(), nil)
+	_, err = vm.IssueTx(firstTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -716,7 +716,7 @@ func TestIssueDependentTx(t *testing.T) {
 	}
 	secondTx.Initialize(b)
 
-	_, err = vm.IssueTx(secondTx.Bytes(), nil)
+	_, err = vm.IssueTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -813,7 +813,7 @@ func TestIssueNFT(t *testing.T) {
 	}
 	createAssetTx.Initialize(b)
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -864,7 +864,7 @@ func TestIssueNFT(t *testing.T) {
 	}
 	mintNFTTx.Initialize(b)
 
-	if _, err = vm.IssueTx(mintNFTTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(mintNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -898,7 +898,7 @@ func TestIssueNFT(t *testing.T) {
 	}
 	transferNFTTx.Initialize(b)
 
-	if _, err = vm.IssueTx(transferNFTTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(transferNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -979,7 +979,7 @@ func TestIssueProperty(t *testing.T) {
 	}
 	createAssetTx.Initialize(b)
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1034,7 +1034,7 @@ func TestIssueProperty(t *testing.T) {
 	}
 	mintPropertyTx.Initialize(b)
 
-	if _, err = vm.IssueTx(mintPropertyTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1061,7 +1061,7 @@ func TestIssueProperty(t *testing.T) {
 	}
 	burnPropertyTx.Initialize(b)
 
-	if _, err = vm.IssueTx(burnPropertyTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }

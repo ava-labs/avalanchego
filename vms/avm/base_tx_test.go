@@ -1232,7 +1232,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(b, nil)
+	txID, err := vm.IssueTx(b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1367,7 +1367,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(b, nil)
+	txID, err := vm.IssueTx(b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1548,7 +1548,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(b, nil)
+	txID, err := vm.IssueTx(b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1713,7 +1713,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txID, err := vm.IssueTx(b, nil)
+	txID, err := vm.IssueTx(b)
 	if err != nil {
 		t.Fatal(err)
 	}
