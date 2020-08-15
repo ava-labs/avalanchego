@@ -106,7 +106,7 @@ func (ml *multiLevelQueue) PushMessage(msg message) bool {
 	// If the message was added successfully, increment the counting sema
 	// and notify the throttler of the pending message
 	if !ml.pushMessage(msg) {
-		ml.log.Debug("Dropped message during push: %s", msg)
+		ml.log.Verbo("Dropped message during push: %s", msg)
 		ml.metrics.dropped.Inc()
 		return false
 	}
@@ -224,7 +224,6 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	}
 	cpu, throttle := ml.throttler.GetUtilization(validatorID)
 	if throttle {
-		ml.log.Debug("Throttled message from validator: %s with CPU Utilization: %f\nmessage: %s", validatorID, cpu, msg.String())
 		ml.metrics.throttled.Inc()
 		return false
 	}
