@@ -140,13 +140,14 @@ func (h *Handler) Initialize(
 		math.MaxFloat64,
 	}
 
+	cpuInterval := defaultCPUInterval
 	// Defines the percentage of CPU time allotted to processing messages
 	// from the bucket at the corresponding index.
 	consumptionAllotments := []time.Duration{
-		defaultCPUInterval / 4,
-		defaultCPUInterval / 4,
-		defaultCPUInterval / 4,
-		defaultCPUInterval / 4,
+		cpuInterval / 4,
+		cpuInterval / 4,
+		cpuInterval / 4,
+		cpuInterval / 4,
 	}
 
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
@@ -156,7 +157,7 @@ func (h *Handler) Initialize(
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		defaultCPUInterval,
+		cpuInterval,
 		defaultStakerPortion,
 		defaultStakerPortion,
 	)
