@@ -37,11 +37,11 @@ var (
 type BaseTx struct {
 	avax.Metadata
 
-	NetID uint32                    `serialize:"true" json:"networkID"`    // ID of the network this chain lives on
-	BCID  ids.ID                    `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
+	NetID uint32                     `serialize:"true" json:"networkID"`    // ID of the network this chain lives on
+	BCID  ids.ID                     `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
 	Outs  []*avax.TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
 	Ins   []*avax.TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
-	Memo  []byte                    `serialize:"true" json:"memo"`         // Memo field contains arbitrary bytes, up to maxMemoSize
+	Memo  []byte                     `serialize:"true" json:"memo"`         // Memo field contains arbitrary bytes, up to maxMemoSize
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
@@ -106,36 +106,17 @@ func (t *BaseTx) SyntacticVerify(
 		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	}
 
-	fc := avax.NewFlowChecker()
-
-	// The txFee must be burned
-	fc.Produce(txFeeAssetID, txFee)
-
-	for _, out := range t.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !avax.IsSortedTransferableOutputs(t.Outs, c) {
-		return errOutputsNotSorted
-	}
-
-	for _, in := range t.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-	if !avax.IsSortedAndUniqueTransferableInputs(t.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	if err := fc.Verify(); err != nil {
+	if err := t.Metadata.Verify(); err != nil {
 		return err
 	}
 
-	return t.Metadata.Verify()
+	return avax.VerifyTx(
+		txFee,
+		txFeeAssetID,
+		[][]*avax.TransferableInput{t.Ins},
+		[][]*avax.TransferableOutput{t.Outs},
+		c,
+	)
 }
 
 // SemanticVerify that this transaction is valid to be spent.

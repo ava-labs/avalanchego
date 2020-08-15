@@ -55,42 +55,20 @@ func (t *ExportTx) SyntacticVerify(
 		return errNoExportOutputs
 	}
 
-	fc := avax.NewFlowChecker()
-
-	// The txFee must be burned
-	fc.Produce(txFeeAssetID, txFee)
-
-	for _, out := range t.BaseTx.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !avax.IsSortedTransferableOutputs(t.BaseTx.Outs, c) {
-		return errOutputsNotSorted
+	if err := t.Metadata.Verify(); err != nil {
+		return err
 	}
 
-	for _, out := range t.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !avax.IsSortedTransferableOutputs(t.Outs, c) {
-		return errOutputsNotSorted
-	}
-
-	for _, in := range t.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-	if !avax.IsSortedAndUniqueTransferableInputs(t.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	return verify.All(fc, &t.Metadata)
+	return avax.VerifyTx(
+		txFee,
+		txFeeAssetID,
+		[][]*avax.TransferableInput{t.Ins},
+		[][]*avax.TransferableOutput{
+			t.BaseTx.Outs,
+			t.Outs,
+		},
+		c,
+	)
 }
 
 // SemanticVerify that this transaction is valid to be spent.
