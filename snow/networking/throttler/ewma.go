@@ -29,8 +29,8 @@ type ewmaThrottler struct {
 	vdrs           validators.Set
 
 	// Track CPU utilization
-	decayFactor, stakerMsgPortion, stakerCPUPortion float64
-	stakerCPU, nonReservedCPU                       time.Duration
+	decayFactor               float64
+	stakerCPU, nonReservedCPU time.Duration
 
 	// Track pending messages
 	reservedStakerMessages                  uint32
@@ -38,9 +38,8 @@ type ewmaThrottler struct {
 	maxNonStakerPendingMsgs                 uint32
 
 	// Statistics adjusted at every interval
-	currentPeriod           uint32
-	periodNonReservedCPU    time.Duration
-	periodNonStakerMessages uint32
+	currentPeriod        uint32
+	periodNonReservedCPU time.Duration
 }
 
 // NewEWMAThrottler returns a Throttler that uses exponentially weighted moving
@@ -93,10 +92,8 @@ func NewEWMAThrottler(
 
 		decayFactor: defaultDecayFactor,
 
-		stakerCPUPortion: stakerCPUPortion,
-		stakerMsgPortion: stakerMsgPortion,
-		stakerCPU:        stakerCPU,
-		nonReservedCPU:   nonReservedCPU,
+		stakerCPU:      stakerCPU,
+		nonReservedCPU: nonReservedCPU,
 
 		reservedStakerMessages: reservedStakerMessages,
 		nonReservedMsgs:        nonReservedMsgs,
