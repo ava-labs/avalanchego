@@ -39,7 +39,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 			}},
 		},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID: ids.NewID([32]byte{
 					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
@@ -86,7 +86,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			Memo: make([]byte, maxMemoSize+1),
 		},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID: ids.NewID([32]byte{
 					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
@@ -180,7 +180,7 @@ func TestImportTxSerialization(t *testing.T) {
 			0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
 			0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		}),
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -277,7 +277,7 @@ func TestIssueImportTx(t *testing.T) {
 			BCID:  chainID,
 		},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  avax.Asset{ID: avaxID},
 			In: &secp256k1fx.TransferInput{
@@ -439,7 +439,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 			BCID:  chainID,
 		},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{

@@ -1382,7 +1382,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 			Ins:   ins,
 		},
 		SourceChain: chainID,
-		Ins:         importInputs,
+		ImportedIns: importInputs,
 	}}
 	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err
@@ -1484,7 +1484,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 			Ins:   ins,
 		},
 		DestinationChain: chainID,
-		Outs:             exportOuts,
+		ExportedOuts:     exportOuts,
 	}}
 	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
 		return err

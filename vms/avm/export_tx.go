@@ -28,7 +28,7 @@ type ExportTx struct {
 	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
 
 	// The outputs this transaction is sending to the other chain
-	Outs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
+	ExportedOuts []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -44,7 +44,7 @@ func (t *ExportTx) SyntacticVerify(
 		return errNilTx
 	case t.DestinationChain.IsZero():
 		return errWrongBlockchainID
-	case len(t.Outs) == 0:
+	case len(t.ExportedOuts) == 0:
 		return errNoExportOutputs
 	}
 
@@ -57,8 +57,8 @@ func (t *ExportTx) SyntacticVerify(
 		txFeeAssetID,
 		[][]*avax.TransferableInput{t.Ins},
 		[][]*avax.TransferableOutput{
-			t.BaseTx.Outs,
 			t.Outs,
+			t.ExportedOuts,
 		},
 		c,
 	)
@@ -103,7 +103,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 	}
 
-	for _, out := range t.BaseTx.Outs {
+	for _, out := range t.Outs {
 		fxIndex, err := vm.getFx(out.Out)
 		if err != nil {
 			return err
@@ -113,7 +113,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 	}
 
-	for _, out := range t.Outs {
+	for _, out := range t.ExportedOuts {
 		fxIndex, err := vm.getFx(out.Out)
 		if err != nil {
 			return err
@@ -140,11 +140,11 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.DestinationChain)
-	for i, out := range t.Outs {
+	for i, out := range t.ExportedOuts {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(len(t.BaseTx.Outs) + i),
+				OutputIndex: uint32(len(t.Outs) + i),
 			},
 			Asset: avax.Asset{ID: out.AssetID()},
 			Out:   out.Out,

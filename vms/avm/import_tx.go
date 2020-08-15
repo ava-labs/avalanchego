@@ -28,13 +28,13 @@ type ImportTx struct {
 	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
 
 	// The inputs to this transaction
-	Ins []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
+	ImportedIns []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
 func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		in.Symbol = true
 		utxos = append(utxos, &in.UTXOID)
 	}
@@ -44,7 +44,7 @@ func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *ImportTx) ConsumedAssetIDs() ids.Set {
 	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())
 	}
 	return assets
@@ -53,14 +53,14 @@ func (t *ImportTx) ConsumedAssetIDs() ids.Set {
 // AssetIDs returns the IDs of the assets this transaction depends on
 func (t *ImportTx) AssetIDs() ids.Set {
 	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())
 	}
 	return assets
 }
 
 // NumCredentials returns the number of expected credentials
-func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ins) }
+func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.ImportedIns) }
 
 // SyntacticVerify that this transaction is well-formed.
 func (t *ImportTx) SyntacticVerify(
@@ -75,7 +75,7 @@ func (t *ImportTx) SyntacticVerify(
 		return errNilTx
 	case t.SourceChain.IsZero():
 		return errWrongBlockchainID
-	case len(t.Ins) == 0:
+	case len(t.ImportedIns) == 0:
 		return errNoImportInputs
 	}
 
@@ -87,8 +87,8 @@ func (t *ImportTx) SyntacticVerify(
 		txFee,
 		txFeeAssetID,
 		[][]*avax.TransferableInput{
-			t.BaseTx.Ins,
 			t.Ins,
+			t.ImportedIns,
 		},
 		[][]*avax.TransferableOutput{t.Outs},
 		c,
@@ -115,7 +115,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
 
 	offset := t.BaseTx.NumCredentials()
-	for i, in := range t.Ins {
+	for i, in := range t.ImportedIns {
 		cred := creds[i+offset]
 
 		fxIndex, err := vm.getFx(cred)
@@ -166,7 +166,7 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		utxoID := in.UTXOID.InputID()
 		if err := state.SpendUTXO(utxoID); err != nil {
 			return err
