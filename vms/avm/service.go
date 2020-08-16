@@ -1477,12 +1477,12 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 	}
 
 	tx := Tx{UnsignedTx: &ExportTx{
-		BaseTx: avax.BaseTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    service.vm.ctx.NetworkID,
 			BlockchainID: service.vm.ctx.ChainID,
 			Outs:         outs,
 			Ins:          ins,
-		},
+		}},
 		DestinationChain: chainID,
 		ExportedOuts:     exportOuts,
 	}}

@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -658,6 +659,63 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 		}
 	}
 	return false
+}
+
+func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
+	fxIndex, err := vm.getFx(cred)
+	if err != nil {
+		return err
+	}
+	fx := vm.fxs[fxIndex].Fx
+
+	utxoAssetID := utxo.AssetID()
+	inAssetID := in.AssetID()
+	if !utxoAssetID.Equals(inAssetID) {
+		return errAssetIDMismatch
+	}
+
+	if !vm.verifyFxUsage(fxIndex, inAssetID) {
+		return errIncompatibleFx
+	}
+
+	return fx.VerifyTransfer(tx, in.In, cred, utxo.Out)
+}
+
+func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
+	utxo, err := vm.getUTXO(&in.UTXOID)
+	if err != nil {
+		return err
+	}
+	return vm.verifyTransferOfUTXO(tx, in, cred, utxo)
+}
+
+func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
+	opAssetID := op.AssetID()
+
+	utxos := []interface{}{}
+	for _, utxoID := range op.UTXOIDs {
+		utxo, err := vm.getUTXO(utxoID)
+		if err != nil {
+			return err
+		}
+
+		utxoAssetID := utxo.AssetID()
+		if !utxoAssetID.Equals(opAssetID) {
+			return errAssetIDMismatch
+		}
+		utxos = append(utxos, utxo.Out)
+	}
+
+	fxIndex, err := vm.getFx(op.Op)
+	if err != nil {
+		return err
+	}
+	fx := vm.fxs[fxIndex].Fx
+
+	if !vm.verifyFxUsage(fxIndex, opAssetID) {
+		return errIncompatibleFx
+	}
+	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
 // LoadUser ...

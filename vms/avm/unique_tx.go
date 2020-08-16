@@ -310,7 +310,7 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	if err := tx.Tx.SemanticVerify(tx.vm, tx); err != nil {
+	if err := tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx); err != nil {
 		return err
 	}
 

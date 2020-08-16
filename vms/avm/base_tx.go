@@ -48,32 +48,10 @@ func (t *BaseTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *BaseTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
 	for i, in := range t.Ins {
 		cred := creds[i]
-
-		fxIndex, err := vm.getFx(cred)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
-		utxo, err := vm.getUTXO(&in.UTXOID)
-		if err != nil {
-			return err
-		}
-
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-
-		if !vm.verifyFxUsage(fxIndex, inAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
+		if err := vm.verifyTransfer(tx, in, cred); err != nil {
 			return err
 		}
 	}

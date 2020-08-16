@@ -727,7 +727,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err != nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -779,7 +779,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("should have errored due to an unknown feature extension")
 	}
 }
@@ -828,7 +828,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("should have errored due to an asset ID mismatch")
 	}
 }
@@ -910,7 +910,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("should have errored due to an unsupported fx")
 	}
 }
@@ -962,7 +962,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("Invalid credential should have failed verification")
 	}
 }
@@ -1009,7 +1009,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("Unknown UTXO should have failed verification")
 	}
 }
@@ -1056,7 +1056,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("Invalid UTXO should have failed verification")
 	}
 }
@@ -1149,7 +1149,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("Invalid UTXO should have failed verification")
 	}
 }
@@ -1243,7 +1243,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("Wrong asset ID should have failed verification")
 	}
 }
@@ -1387,7 +1387,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("Unsupported feature extension should have failed verification")
 	}
 }
@@ -1532,7 +1532,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("Invalid signature should have failed verification")
 	}
 }
@@ -1638,7 +1638,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 		txID: tx.ID(),
 	}
 
-	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
+	if err := tx.UnsignedTx.SemanticVerify(vm, uTx.UnsignedTx, tx.Creds); err == nil {
 		t.Fatalf("should have errored due to sending funds to an un-authorized fx")
 	}
 }

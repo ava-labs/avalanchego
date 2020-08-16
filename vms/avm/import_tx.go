@@ -96,7 +96,7 @@ func (t *ImportTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
 	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		return errWrongBlockchainID
 	}
 
-	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
 		return err
 	}
 
@@ -118,41 +118,14 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 	for i, in := range t.ImportedIns {
 		cred := creds[i+offset]
 
-		fxIndex, err := vm.getFx(cred)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
 		utxoID := in.UTXOID.InputID()
 		utxo, err := state.UTXO(utxoID)
 		if err != nil {
 			return err
 		}
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-		if !utxoAssetID.Equals(vm.avax) {
-			return errWrongAssetID
-		}
 
-		if !vm.verifyFxUsage(fxIndex, inAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
+		if err := vm.verifyTransferOfUTXO(tx, in, cred, utxo); err != nil {
 			return err
-		}
-	}
-	for _, out := range t.Outs {
-		fxIndex, err := vm.getFx(out.Out)
-		if err != nil {
-			return err
-		}
-		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
-			return errIncompatibleFx
 		}
 	}
 	return nil

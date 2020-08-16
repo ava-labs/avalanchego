@@ -126,40 +126,15 @@ func (t *OperationTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
-	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
+func (t *OperationTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
 		return err
 	}
 
 	offset := t.BaseTx.NumCredentials()
 	for i, op := range t.Ops {
-		opAssetID := op.AssetID()
-
-		utxos := []interface{}{}
-		for _, utxoID := range op.UTXOIDs {
-			utxo, err := vm.getUTXO(utxoID)
-			if err != nil {
-				return err
-			}
-
-			utxoAssetID := utxo.AssetID()
-			if !utxoAssetID.Equals(opAssetID) {
-				return errAssetIDMismatch
-			}
-			utxos = append(utxos, utxo.Out)
-		}
-
-		fxIndex, err := vm.getFx(op.Op)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
-		if !vm.verifyFxUsage(fxIndex, opAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyOperation(uTx, op.Op, creds[offset+i], utxos); err != nil {
+		cred := creds[offset+i]
+		if err := vm.verifyOperation(tx, op, cred); err != nil {
 			return err
 		}
 	}

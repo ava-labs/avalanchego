@@ -38,7 +38,7 @@ type UnsignedTx interface {
 	UTXOs() []*avax.UTXO
 
 	SyntacticVerify(ctx *snow.Context, c codec.Codec, txFeeAssetID ids.ID, txFee uint64, numFxs int) error
-	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error
+	SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error
 	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
 
@@ -87,12 +87,12 @@ func (t *Tx) SyntacticVerify(
 }
 
 // SemanticVerify verifies that this transaction is well-formed.
-func (t *Tx) SemanticVerify(vm *VM, uTx *UniqueTx) error {
+func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx) error {
 	if t == nil {
 		return errNilTx
 	}
 
-	return t.UnsignedTx.SemanticVerify(vm, uTx, t.Creds)
+	return t.UnsignedTx.SemanticVerify(vm, tx, t.Creds)
 }
 
 // SignSECP256K1Fx ...

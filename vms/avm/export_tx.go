@@ -22,7 +22,7 @@ var (
 
 // ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {
-	avax.BaseTx `serialize:"true"`
+	BaseTx `serialize:"true"`
 
 	// Which chain to send the funds to
 	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
@@ -65,52 +65,13 @@ func (t *ExportTx) SyntacticVerify(
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
 	subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
 	if err != nil {
 		return err
 	}
 	if !vm.ctx.SubnetID.Equals(subnetID) || t.DestinationChain.Equals(vm.ctx.ChainID) {
 		return errWrongBlockchainID
-	}
-
-	for i, in := range t.Ins {
-		cred := creds[i]
-
-		fxIndex, err := vm.getFx(cred)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
-		utxo, err := vm.getUTXO(&in.UTXOID)
-		if err != nil {
-			return err
-		}
-
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-
-		if !vm.verifyFxUsage(fxIndex, inAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
-			return err
-		}
-	}
-
-	for _, out := range t.Outs {
-		fxIndex, err := vm.getFx(out.Out)
-		if err != nil {
-			return err
-		}
-		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
-			return errIncompatibleFx
-		}
 	}
 
 	for _, out := range t.ExportedOuts {
@@ -127,7 +88,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 	}
 
-	return nil
+	return t.BaseTx.SemanticVerify(vm, tx, creds)
 }
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
