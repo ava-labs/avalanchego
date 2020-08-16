@@ -55,31 +55,9 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	if err := state.SetUTXO(ids.Empty, utxo); err != nil {
 		t.Fatal(err)

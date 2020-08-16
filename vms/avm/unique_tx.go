@@ -318,10 +318,3 @@ func (tx *UniqueTx) SemanticVerify() error {
 	tx.vm.pubsub.Publish("verified", tx.ID())
 	return nil
 }
-
-// UnsignedBytes returns the unsigned bytes of the transaction
-func (tx *UniqueTx) UnsignedBytes() []byte {
-	b, err := tx.vm.codec.Marshal(&tx.UnsignedTx)
-	tx.vm.ctx.Log.AssertNoError(err)
-	return b
-}

@@ -5,14 +5,17 @@ package avm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -22,8 +25,9 @@ var (
 
 // UnsignedTx ...
 type UnsignedTx interface {
-	Initialize(bytes []byte)
+	Initialize(unsignedBytes, bytes []byte)
 	ID() ids.ID
+	UnsignedBytes() []byte
 	Bytes() []byte
 
 	ConsumedAssetIDs() ids.Set
@@ -91,31 +95,62 @@ func (t *Tx) SemanticVerify(vm *VM, uTx *UniqueTx) error {
 	return t.UnsignedTx.SemanticVerify(vm, uTx, t.Creds)
 }
 
-func (t *Tx) sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
+// SignSECP256K1Fx ...
+func (t *Tx) SignSECP256K1Fx(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := c.Marshal(&t.UnsignedTx)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem creating transaction: %w", err)
 	}
 
-	t.Creds = make([]verify.Verifiable, len(signers))
-	for i, keys := range signers {
+	hash := hashing.ComputeHash256(unsignedBytes)
+	for _, keys := range signers {
 		cred := &secp256k1fx.Credential{
 			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
 		}
-		for j, key := range keys {
-			sig, err := key.Sign(unsignedBytes)
+		for i, key := range keys {
+			sig, err := key.SignHash(hash)
 			if err != nil {
-				return err
+				return fmt.Errorf("problem creating transaction: %w", err)
 			}
-			copy(cred.Sigs[j][:], sig)
+			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds[i] = cred
+		t.Creds = append(t.Creds, cred)
 	}
 
-	b, err := c.Marshal(t)
+	signedBytes, err := c.Marshal(t)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem creating transaction: %w", err)
 	}
-	t.Initialize(b)
+	t.Initialize(unsignedBytes, signedBytes)
+	return nil
+}
+
+// SignNFTFx ...
+func (t *Tx) SignNFTFx(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(&t.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	hash := hashing.ComputeHash256(unsignedBytes)
+	for _, keys := range signers {
+		cred := &nftfx.Credential{Credential: secp256k1fx.Credential{
+			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
+		}}
+		for i, key := range keys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			copy(cred.Sigs[i][:], sig)
+		}
+		t.Creds = append(t.Creds, cred)
+	}
+
+	signedBytes, err := c.Marshal(t)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	t.Initialize(unsignedBytes, signedBytes)
 	return nil
 }

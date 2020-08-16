@@ -58,7 +58,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("should have errored due to memo field being too long")
@@ -161,6 +161,8 @@ func TestImportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01,
 		// sig index[0]:
 		0x00, 0x00, 0x00, 0x00,
+		// number of credentials:
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
@@ -201,11 +203,9 @@ func TestImportTxSerialization(t *testing.T) {
 	}}
 
 	c := setupCodec()
-	b, err := c.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
@@ -286,30 +286,9 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
-
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	if _, err := vm.IssueTx(tx.Bytes()); err == nil {
 		t.Fatal(err)
@@ -448,30 +427,9 @@ func TestForceAcceptImportTx(t *testing.T) {
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
-
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	parsedTx, err := vm.ParseTx(tx.Bytes())
 	if err != nil {

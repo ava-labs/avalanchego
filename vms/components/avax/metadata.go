@@ -17,18 +17,23 @@ var (
 
 // Metadata ...
 type Metadata struct {
-	id    ids.ID // The ID of this data
-	bytes []byte // Byte representation of this data
+	id            ids.ID // The ID of this data
+	unsignedBytes []byte // Unsigned byte representation of this data
+	bytes         []byte // Byte representation of this data
 }
 
 // Initialize set the bytes and ID
-func (md *Metadata) Initialize(bytes []byte) {
+func (md *Metadata) Initialize(unsignedBytes, bytes []byte) {
 	md.id = ids.NewID(hashing.ComputeHash256Array(bytes))
+	md.unsignedBytes = unsignedBytes
 	md.bytes = bytes
 }
 
 // ID returns the unique ID of this data
 func (md *Metadata) ID() ids.ID { return md.id }
+
+// UnsignedBytes returns the unsigned binary representation of this data
+func (md *Metadata) UnsignedBytes() []byte { return md.unsignedBytes }
 
 // Bytes returns the binary representation of this data
 func (md *Metadata) Bytes() []byte { return md.bytes }

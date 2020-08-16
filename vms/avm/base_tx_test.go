@@ -79,6 +79,8 @@ func TestBaseTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x04,
 		// Memo:
 		0x00, 0x01, 0x02, 0x03,
+		// Number of credentials
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -116,12 +118,9 @@ func TestBaseTxSerialization(t *testing.T) {
 	}}}
 
 	c := setupCodec()
-
-	b, err := c.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
@@ -162,7 +161,7 @@ func TestBaseTxGetters(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	txID := tx.ID()
 
@@ -221,7 +220,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err != nil {
 		t.Fatal(err)
@@ -265,7 +264,7 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 		}},
 		Memo: make([]byte, avax.MaxMemoSize+1),
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatal("should have failed because memo is too large")
@@ -318,7 +317,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Wrong networkID should have errored")
@@ -361,7 +360,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Wrong chain ID should have errored")
@@ -395,7 +394,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Invalid output should have errored")
@@ -452,7 +451,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 			},
 		},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Unsorted outputs should have errored")
@@ -478,7 +477,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 		}},
 		Ins: []*avax.TransferableInput{nil},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Invalid input should have errored")
@@ -541,7 +540,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 			},
 		},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Input overflow should have errored")
@@ -596,7 +595,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Output overflow should have errored")
@@ -639,7 +638,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("Insufficient funds should have errored")
@@ -717,31 +716,9 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -750,7 +727,6 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-
 	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err != nil {
 		t.Fatal(err)
 	}
@@ -768,33 +744,33 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        genesisTx.ID(),
-				OutputIndex: 1,
-			},
-			Asset: avax.Asset{ID: genesisTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: 50000,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
+	tx := &Tx{
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 1,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: 50000,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
 					},
 				},
-			},
+			}},
 		}},
-	}}}
-
-	tx.Creds = append(tx.Creds, &avax.TestVerifiable{})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
+		Creds: []verify.Verifiable{
+			&avax.TestVerifiable{},
+		},
+	}
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -803,7 +779,6 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-
 	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
 		t.Fatalf("should have errored due to an unknown feature extension")
 	}
@@ -841,30 +816,9 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		}},
 	}}}
 
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -944,30 +898,9 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		}},
 	}}}
 
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -992,35 +925,35 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        genesisTx.ID(),
-				OutputIndex: 1,
-			},
-			Asset: avax.Asset{ID: genesisTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: 50000,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
+	tx := &Tx{
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        genesisTx.ID(),
+					OutputIndex: 1,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: 50000,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
 					},
 				},
-			},
+			}},
 		}},
-	}}}
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
+		Creds: []verify.Verifiable{
+			&secp256k1fx.Credential{
+				Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+			},
+		},
+	}
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -1029,7 +962,6 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-
 	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
 		t.Fatalf("Invalid credential should have failed verification")
 	}
@@ -1065,30 +997,9 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 		}},
 	}}}
 
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -1133,30 +1044,9 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 		}},
 	}}}
 
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -1207,32 +1097,11 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(&pendingTx.UnsignedTx)
-	if err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	pendingTx.Creds = append(pendingTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(pendingTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	txID, err := vm.IssueTx(b)
+	txID, err := vm.IssueTx(pendingTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1268,30 +1137,9 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err = vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	sig, err = key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig = [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err = vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -1342,32 +1190,11 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(&pendingTx.UnsignedTx)
-	if err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	pendingTx.Creds = append(pendingTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(pendingTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	txID, err := vm.IssueTx(b)
+	txID, err := vm.IssueTx(pendingTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1404,29 +1231,9 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		}},
 	}}}
 
-	unsignedBytes, err = vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	sig, err = key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig = [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err = vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -1523,32 +1330,11 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(&pendingTx.UnsignedTx)
-	if err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	pendingTx.Creds = append(pendingTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(pendingTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	txID, err := vm.IssueTx(b)
+	txID, err := vm.IssueTx(pendingTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1565,33 +1351,33 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 	vm.PendingTxs()
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: genesisTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: 50000,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
+	tx := &Tx{
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: 0,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: 50000,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
 					},
 				},
-			},
+			}},
 		}},
-	}}}
-
-	tx.Creds = append(tx.Creds, &avax.TestVerifiable{})
-
-	b, err = vm.codec.Marshal(tx)
-	if err != nil {
+		Creds: []verify.Verifiable{
+			&avax.TestVerifiable{},
+		},
+	}
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -1688,32 +1474,11 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(&pendingTx.UnsignedTx)
-	if err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	pendingTx.Creds = append(pendingTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(pendingTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	txID, err := vm.IssueTx(b)
+	txID, err := vm.IssueTx(pendingTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1730,35 +1495,35 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 
 	vm.PendingTxs()
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: genesisTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: 50000,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
+	tx := &Tx{
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: 0,
+				},
+				Asset: avax.Asset{ID: genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: 50000,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
 					},
 				},
-			},
+			}},
 		}},
-	}}}
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
-	})
-
-	b, err = vm.codec.Marshal(tx)
-	if err != nil {
+		Creds: []verify.Verifiable{
+			&secp256k1fx.Credential{
+				Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+			},
+		},
+	}
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	uTx := &UniqueTx{
 		TxState: &TxState{
@@ -1767,7 +1532,6 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		vm:   vm,
 		txID: tx.ID(),
 	}
-
 	if err := tx.UnsignedTx.SemanticVerify(vm, uTx, tx.Creds); err == nil {
 		t.Fatalf("Invalid signature should have failed verification")
 	}
@@ -1862,8 +1626,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 			},
 		}},
 	}}}
-
-	if err := tx.sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 

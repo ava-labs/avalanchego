@@ -78,14 +78,13 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 		},
 	}
 
-	b, err := c.Marshal(&tx)
+	unsignedBytes, err := c.Marshal(tx)
 	if err != nil {
-		t.Fatalf("Failed to marshal CreateAssetTx: %s", err)
+		t.Fatal(err)
 	}
+	tx.Initialize(unsignedBytes, unsignedBytes)
+
 	ctx := NewContext()
-
-	tx.Initialize(b)
-
 	if err := tx.SyntacticVerify(ctx, c, asset, 0, 1); err != nil {
 		t.Fatalf("Valid CreateAssetTx failed syntactic verification due to: %s", err)
 	}
@@ -166,6 +165,8 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 		0xc3, 0x34, 0x41, 0x28, 0xe0, 0x60, 0x12, 0x8e,
 		0xde, 0x35, 0x23, 0xa2, 0x4a, 0x46, 0x1c, 0x89,
 		0x43, 0xab, 0x08, 0x59,
+		// number of credentials:
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	tx := &Tx{UnsignedTx: &CreateAssetTx{
@@ -265,12 +266,9 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 	}}
 
 	c := setupCodec()
-
-	b, err := c.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
@@ -291,7 +289,7 @@ func TestCreateAssetTxGetters(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if initialStates := tx.InitialStates(); len(initialStates) != 1 {
 		t.Fatalf("Wrong number of assets returned")
@@ -320,7 +318,7 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err != nil {
 		t.Fatal(err)
@@ -354,7 +352,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Too short name should have errored")
@@ -379,7 +377,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Too long name should have errored")
@@ -402,7 +400,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Too short symbol should have errored")
@@ -425,7 +423,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Too long symbol should have errored")
@@ -445,7 +443,7 @@ func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("No Fxs should have errored")
@@ -468,7 +466,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Too large denomination should have errored")
@@ -491,7 +489,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Whitespace at the end of the name should have errored")
@@ -514,7 +512,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Name with an invalid character should have errored")
@@ -537,7 +535,7 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Symbol with an invalid character should have errored")
@@ -560,7 +558,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 			FxID: 0,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Invalid BaseTx should have errored")
@@ -583,7 +581,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 			FxID: 1,
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Invalid InitialState should have errored")
@@ -611,7 +609,7 @@ func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
 			},
 		},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 2); err == nil {
 		t.Fatalf("Unsorted InitialStates should have errored")

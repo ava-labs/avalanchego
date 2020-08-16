@@ -499,7 +499,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		Denomination: args.Denomination,
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
@@ -607,7 +607,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		Denomination: args.Denomination,
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
@@ -708,7 +708,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		Denomination: 0, // NFTs are non-fungible
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
@@ -984,7 +984,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		Outs:         outs,
 		Ins:          ins,
 	}}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
@@ -1081,7 +1081,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 		}},
 		Ops: ops,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
@@ -1172,10 +1172,10 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		}},
 		Ops: ops,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, secpKeys); err != nil {
 		return err
 	}
-	if err := service.vm.SignNFTFx(&tx, nftKeys); err != nil {
+	if err := tx.SignNFTFx(service.vm.codec, nftKeys); err != nil {
 		return err
 	}
 
@@ -1266,10 +1266,10 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		}},
 		Ops: ops,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, secpKeys); err != nil {
 		return err
 	}
-	if err := service.vm.SignNFTFx(&tx, nftKeys); err != nil {
+	if err := tx.SignNFTFx(service.vm.codec, nftKeys); err != nil {
 		return err
 	}
 
@@ -1384,7 +1384,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 		SourceChain: chainID,
 		ImportedIns: importInputs,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
@@ -1486,7 +1486,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 		DestinationChain: chainID,
 		ExportedOuts:     exportOuts,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 

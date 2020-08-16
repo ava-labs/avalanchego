@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -509,15 +508,12 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		txBytes, err := vm.codec.Marshal(&tx)
-		if err != nil {
+		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 			return err
 		}
-		tx.Initialize(txBytes)
 
 		txID := tx.ID()
-
-		if err = vm.Alias(txID, genesisTx.Alias); err != nil {
+		if err := vm.Alias(txID, genesisTx.Alias); err != nil {
 			return err
 		}
 	}
@@ -539,16 +535,12 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		txBytes, err := vm.codec.Marshal(&tx)
-		if err != nil {
+		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 			return err
 		}
-		tx.Initialize(txBytes)
 
 		txID := tx.ID()
-
 		vm.ctx.Log.Info("Initializing with AssetID %s", txID)
-
 		if err := vm.state.SetTx(txID, &tx); err != nil {
 			return err
 		}
@@ -565,13 +557,17 @@ func (vm *VM) initState(genesisBytes []byte) error {
 	return vm.state.SetDBInitialized(choices.Processing)
 }
 
-func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
+func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	rawTx := &Tx{}
-	err := vm.codec.Unmarshal(b, rawTx)
+	err := vm.codec.Unmarshal(bytes, rawTx)
 	if err != nil {
 		return nil, err
 	}
-	rawTx.Initialize(b)
+	unsignedBytes, err := vm.codec.Marshal(&rawTx.UnsignedTx)
+	if err != nil {
+		return nil, err
+	}
+	rawTx.Initialize(unsignedBytes, bytes)
 
 	tx := &UniqueTx{
 		TxState: &TxState{
@@ -1039,68 +1035,6 @@ func (vm *VM) MintNFT(
 
 	sortOperationsWithSigners(ops, keys, vm.codec)
 	return ops, keys, nil
-}
-
-// SignSECP256K1Fx ...
-func (vm *VM) SignSECP256K1Fx(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	for _, credKeys := range keys {
-		cred := &secp256k1fx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return fmt.Errorf("problem creating transaction: %w", err)
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
-	}
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	tx.Initialize(b)
-	return nil
-}
-
-// SignNFTFx ...
-func (vm *VM) SignNFTFx(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	for _, credKeys := range keys {
-		cred := &nftfx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return fmt.Errorf("problem creating transaction: %w", err)
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
-	}
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	tx.Initialize(b)
-	return nil
 }
 
 // ParseLocalAddress takes in an address for this chain and produces the ID

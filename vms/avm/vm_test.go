@@ -99,11 +99,9 @@ func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		txBytes, err := c.Marshal(&tx)
-		if err != nil {
+		if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 			t.Fatal(err)
 		}
-		tx.Initialize(txBytes)
 
 		return &tx
 	}
@@ -272,31 +270,9 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(&newTx.UnsignedTx)
-	if err != nil {
+	if err := newTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	newTx.Creds = append(newTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(newTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	newTx.Initialize(b)
 	return newTx
 }
 
@@ -457,11 +433,9 @@ func TestTxSerialization(t *testing.T) {
 	}
 
 	c := setupCodec()
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
@@ -642,33 +616,11 @@ func TestIssueDependentTx(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err := vm.codec.Marshal(&firstTx.UnsignedTx)
-	if err != nil {
+	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	firstTx.Creds = append(firstTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(firstTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstTx.Initialize(b)
-
-	_, err = vm.IssueTx(firstTx.Bytes())
-	if err != nil {
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -691,33 +643,11 @@ func TestIssueDependentTx(t *testing.T) {
 			},
 		}},
 	}}}
-
-	unsignedBytes, err = vm.codec.Marshal(&secondTx.UnsignedTx)
-	if err != nil {
+	if err := secondTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
-	sig, err = key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig = [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	secondTx.Creds = append(secondTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err = vm.codec.Marshal(secondTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondTx.Initialize(b)
-
-	_, err = vm.IssueTx(secondTx.Bytes())
-	if err != nil {
+	if _, err := vm.IssueTx(secondTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Lock.Unlock()
@@ -806,12 +736,9 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-
-	b, err := vm.codec.Marshal(createAssetTx)
-	if err != nil {
+	if err := createAssetTx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	createAssetTx.Initialize(b)
 
 	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
@@ -838,65 +765,43 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&mintNFTTx.UnsignedTx)
-	if err != nil {
+	if err := mintNFTTx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	mintNFTTx.Creds = append(mintNFTTx.Creds, &nftfx.Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		}},
-	})
-
-	b, err = vm.codec.Marshal(mintNFTTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mintNFTTx.Initialize(b)
 
 	if _, err = vm.IssueTx(mintNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	transferNFTTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		}},
-		Ops: []*Operation{{
-			Asset: avax.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*avax.UTXOID{{
-				TxID:        mintNFTTx.ID(),
-				OutputIndex: 0,
+	transferNFTTx := &Tx{
+		UnsignedTx: &OperationTx{
+			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
 			}},
-			Op: &nftfx.TransferOperation{
-				Input: secp256k1fx.Input{},
-				Output: nftfx.TransferOutput{
-					GroupID:      1,
-					Payload:      []byte{'h', 'e', 'l', 'l', 'o'},
-					OutputOwners: secp256k1fx.OutputOwners{},
+			Ops: []*Operation{{
+				Asset: avax.Asset{ID: createAssetTx.ID()},
+				UTXOIDs: []*avax.UTXOID{{
+					TxID:        mintNFTTx.ID(),
+					OutputIndex: 0,
+				}},
+				Op: &nftfx.TransferOperation{
+					Input: secp256k1fx.Input{},
+					Output: nftfx.TransferOutput{
+						GroupID:      1,
+						Payload:      []byte{'h', 'e', 'l', 'l', 'o'},
+						OutputOwners: secp256k1fx.OutputOwners{},
+					},
 				},
-			},
-		}},
-	}}
-
-	transferNFTTx.Creds = append(transferNFTTx.Creds, &nftfx.Credential{})
-
-	b, err = vm.codec.Marshal(transferNFTTx)
-	if err != nil {
+			}},
+		},
+		Creds: []verify.Verifiable{
+			&nftfx.Credential{},
+		},
+	}
+	if err := transferNFTTx.SignNFTFx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	transferNFTTx.Initialize(b)
 
 	if _, err = vm.IssueTx(transferNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
@@ -972,12 +877,9 @@ func TestIssueProperty(t *testing.T) {
 			},
 		}},
 	}}
-
-	b, err := vm.codec.Marshal(createAssetTx)
-	if err != nil {
+	if err := createAssetTx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	createAssetTx.Initialize(b)
 
 	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
@@ -1028,11 +930,11 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	})
 
-	b, err = vm.codec.Marshal(mintPropertyTx)
+	signedBytes, err := vm.codec.Marshal(mintPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mintPropertyTx.Initialize(b)
+	mintPropertyTx.Initialize(unsignedBytes, signedBytes)
 
 	if _, err = vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
@@ -1055,11 +957,15 @@ func TestIssueProperty(t *testing.T) {
 
 	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
 
-	b, err = vm.codec.Marshal(burnPropertyTx)
+	unsignedBytes, err = vm.codec.Marshal(burnPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	burnPropertyTx.Initialize(b)
+	signedBytes, err = vm.codec.Marshal(burnPropertyTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	burnPropertyTx.Initialize(unsignedBytes, signedBytes)
 
 	if _, err = vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)

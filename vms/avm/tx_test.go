@@ -78,12 +78,9 @@ func TestTxInvalidCredential(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
@@ -137,12 +134,9 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			&avax.TestVerifiable{},
 		},
 	}
-
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
@@ -187,12 +181,9 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
-
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
