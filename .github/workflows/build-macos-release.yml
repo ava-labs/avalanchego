@@ -1,0 +1,44 @@
+# Build a macos release from the avalanche repo 
+
+name: build-macos-release
+
+# Controls when the action will run.
+on:
+  push:
+    tags:
+      - '*' # Push events to every tag
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: macos-10.15 
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v2
+
+    # Runs a single command using the runners shell
+    - name: Build the avalanche binaries 
+      run: ./scripts/build.sh 
+
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      shell: bash
+
+    - name: Install aws cli
+      run: |
+        curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+        sudo installer -pkg AWSCLIV2.pkg -target /
+
+    - name: Create zip file
+      run: 7z a avalanche-macos-${{ steps.get_version.outputs.VERSION }}.zip build/avalanche build/plugins
+
+    - name: Upload file to S3 
+      run: aws s3 cp avalanche-macos-${{ steps.get_version.outputs.VERSION }}.zip s3://avalanche-public-builds/macos/ 
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
