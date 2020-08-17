@@ -136,9 +136,9 @@ func (h *Handler) Initialize(
 	// Defines the maximum current percentage of expected CPU utilization for
 	// a message to be placed in the queue at the corresponding index
 	consumptionRanges := []float64{
+		0.125,
 		0.5,
-		0.75,
-		1.5,
+		1,
 		math.MaxFloat64,
 	}
 
