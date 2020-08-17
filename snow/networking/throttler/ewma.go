@@ -222,9 +222,13 @@ func (et *ewmaThrottler) EndInterval() {
 
 		// If the validator is not a staker and was not deleted, set its spender
 		// attributes
+		maxNonStakerMsgs := et.maxNonStakerPendingMsgs
+		if maxNonStakerMsgs > 10 {
+			maxNonStakerMsgs = 10
+		}
 		spender.staking = false
 		spender.msgAllotment = 0
-		spender.maxMessages = et.maxNonStakerPendingMsgs
+		spender.maxMessages = maxNonStakerMsgs
 		spender.expectedCPU = defaultMinimumCPUAllotment
 	}
 }
