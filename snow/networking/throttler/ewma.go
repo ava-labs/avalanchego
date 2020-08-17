@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	defaultDecayFactor           float64 = 2
-	defaultIntervalsUntilPruning uint32  = 60
-	defaultMinimumCPUAllotment           = time.Nanosecond
+	defaultDecayFactor             float64 = 2
+	defaultIntervalsUntilPruning   uint32  = 60
+	defaultMaxNonStakerPendingMsgs uint32  = 5
+	defaultMinimumCPUAllotment             = time.Nanosecond
 )
 
 type ewmaThrottler struct {
@@ -222,13 +223,9 @@ func (et *ewmaThrottler) EndInterval() {
 
 		// If the validator is not a staker and was not deleted, set its spender
 		// attributes
-		maxNonStakerMsgs := et.maxNonStakerPendingMsgs
-		if maxNonStakerMsgs > 10 {
-			maxNonStakerMsgs = 10
-		}
 		spender.staking = false
 		spender.msgAllotment = 0
-		spender.maxMessages = maxNonStakerMsgs
+		spender.maxMessages = et.maxNonStakerPendingMsgs
 		spender.expectedCPU = defaultMinimumCPUAllotment
 	}
 }
