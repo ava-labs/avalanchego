@@ -39,6 +39,8 @@ func TestShutdown(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -95,6 +97,8 @@ func TestShutdownTimesOut(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

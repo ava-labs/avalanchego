@@ -26,7 +26,7 @@ func TestEWMAThrottler(t *testing.T) {
 	throttler := NewEWMAThrottler(vdrs, maxMessages, msgPortion, cpuPortion, period, logging.NoLog{})
 
 	throttler.UtilizeCPU(validator0.ID(), 25*time.Millisecond)
-	throttler.UtilizeCPU(validator1.ID(), 50*time.Millisecond)
+	throttler.UtilizeCPU(validator1.ID(), 5*time.Second)
 
 	cpu0, throttle0 := throttler.GetUtilization(validator0.ID())
 	cpu1, throttle1 := throttler.GetUtilization(validator1.ID())

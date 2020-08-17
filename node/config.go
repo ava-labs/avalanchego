@@ -40,6 +40,8 @@ type Config struct {
 	StakingKeyFile        string
 	StakingCertFile       string
 	DisabledStakingWeight uint64
+	StakerMsgPortion      float64
+	StakerCPUPortion      float64
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer

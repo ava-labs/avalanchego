@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultStakerPortion float64 = 0.2
+	DefaultStakerPortion float64 = 0.2
 )
 
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
@@ -119,6 +119,8 @@ func (h *Handler) Initialize(
 	validators validators.Set,
 	msgChan <-chan common.Message,
 	bufferSize int,
+	stakerMsgPortion,
+	stakerCPUPortion float64,
 	namespace string,
 	metrics prometheus.Registerer,
 ) {
@@ -158,8 +160,8 @@ func (h *Handler) Initialize(
 		consumptionAllotments,
 		bufferSize,
 		cpuInterval,
-		defaultStakerPortion,
-		defaultStakerPortion,
+		stakerMsgPortion,
+		stakerCPUPortion,
 	)
 	h.engine = engine
 	h.validators = validators
