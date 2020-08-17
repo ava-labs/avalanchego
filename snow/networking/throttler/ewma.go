@@ -15,10 +15,9 @@ import (
 )
 
 const (
-	defaultDecayFactor             float64 = 2
-	defaultIntervalsUntilPruning   uint32  = 60
-	defaultMaxNonStakerPendingMsgs uint32  = 5
-	defaultMinimumCPUAllotment             = time.Nanosecond
+	defaultDecayFactor           float64 = 2
+	defaultIntervalsUntilPruning uint32  = 60
+	defaultMinimumCPUAllotment           = time.Nanosecond
 )
 
 type ewmaThrottler struct {
@@ -113,8 +112,8 @@ func (et *ewmaThrottler) AddMessage(validatorID ids.ShortID) {
 	sp := et.getSpender(validatorID)
 	sp.pendingMessages++
 
-	// If the spender has exceeded its message allotment, then count the new
-	// message as taken from the shared pool
+	// If the spender has exceeded its message allotment, then the additional
+	// message is taken from the pool
 	if sp.pendingMessages > sp.msgAllotment {
 		sp.pendingPoolMessages++
 		et.pendingNonReservedMsgs++
@@ -129,7 +128,7 @@ func (et *ewmaThrottler) RemoveMessage(validatorID ids.ShortID) {
 	sp.pendingMessages--
 
 	// If the spender has pending messages taken from the pool,
-	// then remove them first
+	// they are the first messages to be removed.
 	if sp.pendingPoolMessages > 0 {
 		sp.pendingPoolMessages--
 		et.pendingNonReservedMsgs--

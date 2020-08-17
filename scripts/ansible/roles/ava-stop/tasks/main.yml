@@ -2,6 +2,10 @@
   command: killall -SIGTERM ava
   ignore_errors: true
 
+- name: Kill Node
+  command: killall -SIGTERM avalanche
+  ignore_errors: true
+
 - name: Kill EVM
   command: killall -SIGTERM evm
   ignore_errors: true
