@@ -559,7 +559,7 @@ func (n *Node) initInfoAPI() error {
 // Assumes n.Log, n.Net, n.APIServer, n.HTTPLog already initialized
 func (n *Node) initHealthAPI() error {
 	if !n.Config.HealthAPIEnabled {
-		n.Log.Info("skipping health API initializaion because it has been disabled")
+		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing Health API")

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
@@ -23,6 +25,7 @@ import (
 	"github.com/ava-labs/gecko/vms/components/missing"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
@@ -40,6 +43,7 @@ type VMClient struct {
 
 	db        *rpcdb.DatabaseServer
 	messenger *messenger.Server
+	keystore  *gkeystore.Server
 
 	lock    sync.Mutex
 	closed  bool
@@ -48,6 +52,8 @@ type VMClient struct {
 
 	ctx  *snow.Context
 	blks map[[32]byte]*BlockClient
+
+	lastAccepted ids.ID
 }
 
 // NewClient returns a database instance connected to a remote database instance
@@ -80,6 +86,7 @@ func (vm *VMClient) Initialize(
 
 	vm.db = rpcdb.NewServer(db)
 	vm.messenger = messenger.NewServer(toEngine)
+	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
 
 	// start the db server
 	dbBrokerID := vm.broker.NextId()
@@ -89,12 +96,27 @@ func (vm *VMClient) Initialize(
 	messengerBrokerID := vm.broker.NextId()
 	go vm.broker.AcceptAndServe(messengerBrokerID, vm.startMessengerServer)
 
-	_, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		DbServer:     dbBrokerID,
-		GenesisBytes: genesisBytes,
-		EngineServer: messengerBrokerID,
+	// start the keystore server
+	keystoreBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(keystoreBrokerID, vm.startKeystoreServer)
+
+	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
+		GenesisBytes:   genesisBytes,
+		DbServer:       dbBrokerID,
+		EngineServer:   messengerBrokerID,
+		KeystoreServer: keystoreBrokerID,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	lastAccepted, err := ids.ToID(resp.LastAcceptedID)
+	if err != nil {
+		return err
+	}
+
+	vm.lastAccepted = lastAccepted
+	return nil
 }
 
 func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
@@ -126,6 +148,22 @@ func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server 
 	}
 
 	messengerproto.RegisterMessengerServer(server, vm.messenger)
+	return server
+}
+
+func (vm *VMClient) startKeystoreServer(opts []grpc.ServerOption) *grpc.Server {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+
+	server := grpc.NewServer(opts...)
+
+	if vm.closed {
+		server.Stop()
+	} else {
+		vm.servers = append(vm.servers, server)
+	}
+
+	gkeystoreproto.RegisterKeystoreServer(server, vm.keystore)
 	return server
 }
 
@@ -282,15 +320,7 @@ func (vm *VMClient) SetPreference(id ids.ID) {
 }
 
 // LastAccepted ...
-func (vm *VMClient) LastAccepted() ids.ID {
-	resp, err := vm.client.LastAccepted(context.Background(), &vmproto.LastAcceptedRequest{})
-	vm.ctx.Log.AssertNoError(err)
-
-	id, err := ids.ToID(resp.Id)
-	vm.ctx.Log.AssertNoError(err)
-
-	return id
-}
+func (vm *VMClient) LastAccepted() ids.ID { return vm.lastAccepted }
 
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
@@ -312,7 +342,12 @@ func (b *BlockClient) Accept() error {
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
 		Id: b.id.Bytes(),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	b.vm.lastAccepted = b.id
+	return nil
 }
 
 // Reject ...

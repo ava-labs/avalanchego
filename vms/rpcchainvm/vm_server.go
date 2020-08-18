@@ -7,6 +7,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
@@ -20,6 +22,7 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
@@ -58,9 +61,17 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		_ = dbConn.Close()
 		return nil, err
 	}
+	keystoreConn, err := vm.broker.Dial(req.KeystoreServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
+		return nil, err
+	}
 
 	dbClient := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
 	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
+	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(keystoreConn), vm.broker)
 
 	toEngine := make(chan common.Message, 1)
 	go func() {
@@ -72,6 +83,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 
 	// TODO: Needs to populate a real context
 	ctx := snow.DefaultContextTest()
+	ctx.Keystore = keystoreClient
 
 	if err := vm.vm.Initialize(ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
 		// Ignore errors closing resources to return the original error
@@ -84,7 +96,9 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	vm.conns = append(vm.conns, dbConn)
 	vm.conns = append(vm.conns, msgConn)
 	vm.toEngine = toEngine
-	return &vmproto.InitializeResponse{}, nil
+	return &vmproto.InitializeResponse{
+		LastAcceptedID: vm.vm.LastAccepted().Bytes(),
+	}, nil
 }
 
 // Bootstrapping ...
@@ -203,11 +217,6 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceR
 	}
 	vm.vm.SetPreference(id)
 	return &vmproto.SetPreferenceResponse{}, nil
-}
-
-// LastAccepted ...
-func (vm *VMServer) LastAccepted(_ context.Context, _ *vmproto.LastAcceptedRequest) (*vmproto.LastAcceptedResponse, error) {
-	return &vmproto.LastAcceptedResponse{Id: vm.vm.LastAccepted().Bytes()}, nil
 }
 
 // BlockVerify ...
