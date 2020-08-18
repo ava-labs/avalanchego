@@ -453,6 +453,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			AVAX:           avaxAssetID,
 			AVM:            createAVMTx.ID(),
 			Fee:            n.Config.AvaxTxFee,
+			MinStake:       n.Config.MinStake,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			AVAX: avaxAssetID,

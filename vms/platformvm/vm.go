@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
@@ -61,9 +60,6 @@ const (
 	// InflationRate is the inflation rate from staking
 	// TODO: make inflation rate non-zero
 	InflationRate = 1.00
-
-	// MinimumStakeAmount is the minimum amount of tokens one must bond to be a staker
-	MinimumStakeAmount = 10 * units.MicroAvax
 
 	// MinimumStakingDuration is the shortest amount of time a staker can bond
 	// their funds for.
@@ -193,6 +189,9 @@ type VM struct {
 
 	// Tx fee burned by a transaction
 	txFee uint64
+
+	// The minimum amount of tokens one must bond to be a staker
+	minStake uint64
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block

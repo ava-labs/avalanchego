@@ -23,6 +23,7 @@ type Factory struct {
 	AVAX           ids.ID
 	AVM            ids.ID
 	Fee            uint64
+	MinStake       uint64
 }
 
 // New returns a new instance of the Platform Chain
@@ -34,5 +35,6 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		avaxAssetID:    f.AVAX,
 		avm:            f.AVM,
 		txFee:          f.Fee,
+		minStake:       f.MinStake,
 	}, nil
 }

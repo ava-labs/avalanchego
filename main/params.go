@@ -182,6 +182,9 @@ func init() {
 	// AVAX fees:
 	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", units.MilliAvax, "AVAX transaction fee, in nAVAX")
 
+	// Minimum stake, in nAVAX, required to validate the Default Subnet
+	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the Default Subnet")
+
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
 

@@ -23,6 +23,9 @@ type Config struct {
 	// Transaction fee configuration
 	AvaxTxFee uint64
 
+	// Minimum stake, in nAVAX, required to validate the Default Subnet
+	MinStake uint64
+
 	// Assertions configuration
 	EnableAssertions bool
 
