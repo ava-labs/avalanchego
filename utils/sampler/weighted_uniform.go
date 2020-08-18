@@ -26,7 +26,8 @@ var (
 // Sampling is performed in O(1) time. However, if the Sum(weights) is large,
 // this operation can still be relatively slow due to poor cache locality.
 type weightedUniform struct {
-	indices []int
+	indices   []int
+	maxWeight uint64
 }
 
 func (s *weightedUniform) Initialize(weights []uint64) error {
@@ -38,7 +39,7 @@ func (s *weightedUniform) Initialize(weights []uint64) error {
 		}
 		totalWeight = newWeight
 	}
-	if totalWeight > math.MaxInt32 {
+	if totalWeight > s.maxWeight || totalWeight > math.MaxInt32 {
 		return errWeightsTooLarge
 	}
 	size := int(totalWeight)

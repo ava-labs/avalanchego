@@ -409,6 +409,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager, err = chains.New(
 		n.Config.EnableStaking,
+		n.Config.StakerMsgPortion,
+		n.Config.StakerCPUPortion,
 		n.Log,
 		n.LogFactory,
 		n.vmManager,

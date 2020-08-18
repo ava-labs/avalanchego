@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package router
 
 import (
@@ -22,14 +25,14 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		math.MaxFloat64,
 	}
 
-	cpuInterval := float64(defaultCPUInterval)
+	cpuInterval := defaultCPUInterval
 	// Defines the percentage of CPU time allotted to processing messages
 	// from the bucket at the corresponding index.
-	consumptionAllotments := []float64{
-		cpuInterval * 0.25,
-		cpuInterval * 0.25,
-		cpuInterval * 0.25,
-		cpuInterval * 0.25,
+	consumptionAllotments := []time.Duration{
+		cpuInterval / 4,
+		cpuInterval / 4,
+		cpuInterval / 4,
+		cpuInterval / 4,
 	}
 
 	queue, semaChan := newMultiLevelQueue(
@@ -39,8 +42,9 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		float64(time.Second),
-		defaultStakerPortion,
+		time.Second,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 	)
 
 	return queue, semaChan, vdrs
@@ -150,9 +154,9 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		tier3,
 	}
 
-	perTier := float64(time.Second)
+	perTier := time.Second
 	// Give each tier 1 second of processing time
-	consumptionAllotments := []float64{
+	consumptionAllotments := []time.Duration{
 		perTier,
 		perTier,
 		perTier,
@@ -165,8 +169,9 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		float64(time.Second),
-		defaultStakerPortion,
+		time.Second,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 	)
 
 	// Utilize CPU such that the next message from validator2 will be placed on a lower
@@ -243,9 +248,9 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		tier3,
 	}
 
-	perTier := float64(time.Second)
+	perTier := time.Second
 	// Give each tier 1 second of processing time
-	consumptionAllotments := []float64{
+	consumptionAllotments := []time.Duration{
 		perTier,
 		perTier,
 		perTier,
@@ -258,8 +263,9 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		float64(time.Second),
-		defaultStakerPortion,
+		time.Second,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 	)
 
 	queue.PushMessage(message{
@@ -287,7 +293,7 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	// Utilize enough CPU so that messages from vdr0 will be placed in a lower
 	// priority queue, but not exhaust the time spent processing messages from
 	// the highest priority queue
-	queue.UtilizeCPU(vdr0.ID(), float64(time.Second)/2)
+	queue.UtilizeCPU(vdr0.ID(), time.Second/2)
 
 	<-semaChan
 	msg, err = queue.PopMessage()

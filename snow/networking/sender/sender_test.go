@@ -67,6 +67,8 @@ func TestTimeout(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -121,6 +123,8 @@ func TestReliableMessages(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -185,6 +189,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

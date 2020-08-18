@@ -41,6 +41,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		vdrs,
 		nil,
 		16,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -81,6 +83,8 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		validators,
 		nil,
 		16,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -114,6 +118,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		16,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

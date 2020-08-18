@@ -17,6 +17,8 @@
       --http-tls-cert-file="{{ http_tls_cert_file }}"
       --bootstrap-ips="{{ bootstrap_ips }}"
       --bootstrap-ids="{{ bootstrap_ids }}"
+      --staker-msg-reserved="{{ staker_msg_reserved }}"
+      --staker-cpu-reserved="{{ staker_cpu_reserved }}"
       --public-ip="{{ ansible_host }}"
       --staking-port="{{ staking_port }}"
       --staking-enabled="{{ staking_enabled }}"

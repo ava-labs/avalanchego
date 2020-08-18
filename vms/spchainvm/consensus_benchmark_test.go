@@ -111,6 +111,8 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 			vdrs,
 			msgChan,
 			1000,
+			router.DefaultStakerPortion,
+			router.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)
@@ -251,6 +253,8 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 			vdrs,
 			msgChan,
 			1000,
+			router.DefaultStakerPortion,
+			router.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)
