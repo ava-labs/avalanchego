@@ -123,7 +123,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
 	vdrDestination := key1.PublicKey().Address()
 	vdrTx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount, // stakeAmt
+		vm.minStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
 		vdrDestination, // node ID
@@ -140,7 +140,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	delEndTime := vdrEndTime - 1
 	delDestination := key2.PublicKey().Address()
 	delTx, err := vm.newAddDefaultSubnetDelegatorTx(
-		MinimumStakeAmount, // stakeAmt
+		vm.minStake, // stakeAmt
 		delStartTime,
 		delEndTime,
 		vdrDestination,                          // node ID
