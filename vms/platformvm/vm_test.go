@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -60,11 +61,13 @@ var (
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys []*crypto.PrivateKeySECP256K1R
 
+	minStake = 5 * units.MilliAvax
+
 	// balance of addresses that exist at genesis in defaultVM
-	defaultBalance = 100 * MinimumStakeAmount
+	defaultBalance = 100 * minStake
 
 	// amount all genesis validators stake in defaultVM
-	defaultStakeAmount uint64 = 100 * MinimumStakeAmount
+	defaultStakeAmount uint64 = 100 * minStake
 
 	// non-default Subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -204,6 +207,7 @@ func defaultVM() *VM {
 		avaxAssetID:  avaxAssetID,
 		avm:          avmID,
 		txFee:        defaultTxFee,
+		minStake:     minStake,
 	}
 
 	defaultSubnet := validators.NewSet() // TODO do we need this?
@@ -361,7 +365,7 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount,
+		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -437,7 +441,7 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 	// create invalid tx
 	if tx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount,
+		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -483,7 +487,7 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		MinimumStakeAmount,
+		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,

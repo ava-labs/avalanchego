@@ -58,6 +58,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) Verify(
 	c codec.Codec,
 	feeAmount uint64,
 	feeAssetID ids.ID,
+	minStake uint64,
 ) error {
 	switch {
 	case tx == nil:
@@ -90,7 +91,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) Verify(
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
-	case tx.Validator.Wght < MinimumStakeAmount:
+	case tx.Validator.Wght < minStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
@@ -113,7 +114,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -245,5 +246,5 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake)
 }
