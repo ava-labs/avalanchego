@@ -85,6 +85,8 @@ func (t msgType) String() string {
 		return "Get Message"
 	case getAncestorsMsg:
 		return "Get Ancestors Message"
+	case getAncestorsFailedMsg:
+		return "Get Ancestors Failed Message"
 	case putMsg:
 		return "Put Message"
 	case multiPutMsg:
