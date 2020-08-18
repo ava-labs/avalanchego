@@ -236,7 +236,7 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddDefaultSubnetValidatorTx( // Test GetTx works for proposal blocks
-					MinimumStakeAmount,
+					service.vm.minStake,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
 					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
