@@ -9,98 +9,6 @@ import (
 	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
-func TestBaseTxVerify(t *testing.T) {
-	type test struct {
-		description string
-		tx          *BaseTx
-		shouldErr   bool
-	}
-
-	vm := defaultVM()
-	vm.Ctx.Lock.Lock()
-	defer func() {
-		vm.Shutdown()
-		vm.Ctx.Lock.Unlock()
-	}()
-
-	nilID := ids.ID{ID: nil}
-	tests := []test{
-		{
-			"tx is nil",
-			nil,
-			true,
-		},
-		{
-			"vm is nil",
-			&BaseTx{
-				vm:           nil,
-				id:           ids.GenerateTestID(),
-				BlockchainID: vm.Ctx.ChainID,
-				NetworkID:    vm.Ctx.NetworkID + 1,
-			},
-			true,
-		},
-		{
-			"Blockchain ID is wrong",
-			&BaseTx{
-				vm:           vm,
-				id:           ids.GenerateTestID(),
-				BlockchainID: ids.GenerateTestID(),
-				NetworkID:    vm.Ctx.NetworkID + 1,
-			},
-			true,
-		},
-		{
-			"tx ID is nil",
-			&BaseTx{
-				vm:           vm,
-				id:           nilID,
-				BlockchainID: vm.Ctx.ChainID,
-				NetworkID:    vm.Ctx.NetworkID + 1,
-			},
-			true,
-		},
-		{
-			"network ID is wrong",
-			&BaseTx{
-				vm:           vm,
-				id:           ids.GenerateTestID(),
-				BlockchainID: vm.Ctx.ChainID,
-				NetworkID:    vm.Ctx.NetworkID + 1,
-			},
-			true,
-		},
-		{
-			"memo is too long",
-			&BaseTx{
-				vm:           vm,
-				BlockchainID: ids.Empty,
-				Memo:         make([]byte, maxMemoSize+1),
-			},
-			true,
-		},
-		{
-			"valid",
-			&BaseTx{
-				vm:           vm,
-				id:           ids.GenerateTestID(),
-				BlockchainID: vm.Ctx.ChainID,
-				NetworkID:    vm.Ctx.NetworkID,
-				Memo:         make([]byte, maxMemoSize),
-			},
-			false,
-		},
-	}
-
-	for _, test := range tests {
-		if err := test.tx.Verify(); err == nil && test.shouldErr {
-			t.Errorf("expected test '%s' to error but got none", test.description)
-		} else if err != nil && !test.shouldErr {
-			t.Errorf("test '%s' shouldn't have errored but got %s", test.description, err)
-		}
-	}
-}
-
 func TestBaseTxMarshalJSON(t *testing.T) {
 	vm := defaultVM()
 	vm.Ctx.Lock.Lock()
@@ -112,9 +20,7 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 	blockchainID := ids.NewID([32]byte{1})
 	utxoTxID := ids.NewID([32]byte{2})
 	assetID := ids.NewID([32]byte{3})
-	tx := &BaseTx{
-		vm:           vm,
-		id:           ids.NewID([32]byte{'i', 'd'}),
+	tx := &BaseTx{BaseTx: avax.BaseTx{
 		BlockchainID: blockchainID,
 		NetworkID:    4,
 		Ins: []*avax.TransferableInput{
@@ -131,7 +37,8 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 			},
 		},
 		Memo: []byte{1, 2, 3},
-	}
+	}}
+
 	txBytes, err := json.Marshal(tx)
 	if err != nil {
 		t.Fatal(err)

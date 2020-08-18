@@ -159,7 +159,7 @@ func TestGetTxStatus(t *testing.T) {
 
 	// create a tx
 	tx, err := service.vm.newCreateChainTx(
-		testSubnet1.id,
+		testSubnet1.ID(),
 		nil,
 		avm.ID,
 		nil,
@@ -178,7 +178,7 @@ func TestGetTxStatus(t *testing.T) {
 		// put the chain in existing chain list
 	} else if err := service.vm.issueTx(tx); err != nil {
 		t.Fatal(err)
-	} else if err := service.vm.putChains(service.vm.DB, []*DecisionTx{tx}); err != nil {
+	} else if err := service.vm.putChains(service.vm.DB, []*Tx{tx}); err != nil {
 		t.Fatal(err)
 	} else if _, err := service.vm.BuildBlock(); err == nil {
 		t.Fatal("should have errored because chain already exists")
@@ -187,7 +187,7 @@ func TestGetTxStatus(t *testing.T) {
 	} else if status != Dropped {
 		t.Fatalf("status should be Dropped but is %s", status)
 		// remove the chain from existing chain list
-	} else if err := service.vm.putChains(service.vm.DB, []*DecisionTx{}); err != nil {
+	} else if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
 		t.Fatal(err)
 	} else if err := service.vm.issueTx(tx); err != nil {
 		t.Fatal(err)
@@ -215,17 +215,15 @@ func TestGetTx(t *testing.T) {
 
 	type test struct {
 		description string
-		createTx    func() (interface{}, error)
-		ID          func(interface{}) ids.ID
-		toBytes     func(interface{}) []byte
+		createTx    func() (*Tx, error)
 	}
 
 	tests := []test{
 		test{
 			"standard block",
-			func() (interface{}, error) {
+			func() (*Tx, error) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
-					testSubnet1.id,
+					testSubnet1.ID(),
 					nil,
 					avm.ID,
 					nil,
@@ -233,14 +231,10 @@ func TestGetTx(t *testing.T) {
 					[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 				)
 			},
-			func(tx interface{}) ids.ID { return tx.(*DecisionTx).ID() },
-			func(tx interface{}) []byte {
-				return tx.(*DecisionTx).UnsignedDecisionTx.(*UnsignedCreateChainTx).Bytes()
-			},
 		},
 		test{
 			"proposal block",
-			func() (interface{}, error) {
+			func() (*Tx, error) {
 				return service.vm.newAddDefaultSubnetValidatorTx( // Test GetTx works for proposal blocks
 					MinimumStakeAmount,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
@@ -251,24 +245,16 @@ func TestGetTx(t *testing.T) {
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
 				)
 			},
-			func(tx interface{}) ids.ID { return tx.(*ProposalTx).ID() },
-			func(tx interface{}) []byte {
-				return tx.(*ProposalTx).UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx).Bytes()
-			},
 		},
 		test{
 			"atomic block",
-			func() (interface{}, error) {
+			func() (*Tx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.avm,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
 				)
-			},
-			func(tx interface{}) ids.ID { return tx.(*AtomicTx).ID() },
-			func(tx interface{}) []byte {
-				return tx.(*AtomicTx).UnsignedAtomicTx.(*UnsignedExportTx).Bytes()
 			},
 		},
 	}
@@ -278,7 +264,7 @@ func TestGetTx(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		}
-		arg := &GetTxArgs{TxID: test.ID(tx)}
+		arg := &GetTxArgs{TxID: tx.ID()}
 		var response GetTxResponse
 		if err := service.GetTx(nil, arg, &response); err == nil {
 			t.Fatalf("failed test '%s': haven't issued tx yet so shouldn't be able to get it", test.description)
@@ -302,7 +288,7 @@ func TestGetTx(t *testing.T) {
 			}
 		} else if err := service.GetTx(nil, arg, &response); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
-		} else if !bytes.Equal(response.Tx.Bytes, test.toBytes(tx)) {
+		} else if !bytes.Equal(response.Tx.Bytes, tx.Bytes()) {
 			t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
 		}
 	}

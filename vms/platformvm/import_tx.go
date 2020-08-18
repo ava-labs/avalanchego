@@ -11,11 +11,11 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -27,6 +27,8 @@ var (
 	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
 	errUnknownAsset               = errors.New("unknown asset ID")
+
+	_ UnsignedAtomicTx = &UnsignedImportTx{}
 )
 
 // UnsignedImportTx is an unsigned ImportTx
@@ -40,22 +42,6 @@ type UnsignedImportTx struct {
 	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
-// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
-func (tx *UnsignedImportTx) initialize(vm *VM, bytes []byte) error {
-	if tx.vm != nil { // already been initialized
-		return nil
-	}
-	tx.vm = vm
-	tx.bytes = bytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
-	var err error
-	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
-	if err != nil {
-		return fmt.Errorf("couldn't marshal UnsignedImportTx: %w", err)
-	}
-	return nil
-}
-
 // InputUTXOs returns the UTXOIDs of the imported funds
 func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	set := ids.Set{}
@@ -66,22 +52,28 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 }
 
 // Verify this transaction is well-formed
-func (tx *UnsignedImportTx) Verify() error {
+func (tx *UnsignedImportTx) Verify(
+	avmID ids.ID,
+	ctx *snow.Context,
+	c codec.Codec,
+	feeAmount uint64,
+	feeAssetID ids.ID,
+) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.SourceChain.IsZero():
-		return errWrongBlockchainID
-	case !tx.SourceChain.Equals(tx.vm.avm):
+		return errWrongChainID
+	case !tx.SourceChain.Equals(avmID):
 		// TODO: remove this check if we allow for P->C swaps
-		return errWrongBlockchainID
+		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	}
 
-	if err := tx.BaseTx.Verify(); err != nil {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
 		return err
 	}
 
@@ -97,7 +89,7 @@ func (tx *UnsignedImportTx) Verify() error {
 	allIns := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
 	copy(allIns, tx.Ins)
 	copy(allIns[len(tx.Ins):], tx.ImportedInputs)
-	if err := syntacticVerifySpend(allIns, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := syntacticVerifySpend(allIns, tx.Outs, nil, 0, feeAmount, feeAssetID); err != nil {
 		return err
 	}
 
@@ -106,26 +98,30 @@ func (tx *UnsignedImportTx) Verify() error {
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.Verifiable) TxError {
-	if err := tx.Verify(); err != nil {
+func (tx *UnsignedImportTx) SemanticVerify(
+	vm *VM,
+	db database.Database,
+	stx *Tx,
+) TxError {
+	if err := tx.Verify(vm.avm, vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
 		return permError{err}
 	}
 
 	// Verify (but don't spend) imported inputs
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
+	smDB := vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
 
 	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
 		utxoID := input.UTXOID.InputID()
-		utxo, err := tx.vm.getUTXO(db, utxoID)
+		utxo, err := vm.getUTXO(db, utxoID)
 		if err != nil {
 			return tempError{err}
 		}
 		utxos[index] = utxo
 	}
 
-	state := avax.NewPrefixedState(smDB, Codec, tx.vm.Ctx.ChainID, tx.SourceChain)
+	state := avax.NewPrefixedState(smDB, vm.codec, vm.Ctx.ChainID, tx.SourceChain)
 	for index, input := range tx.ImportedInputs {
 		utxoID := input.UTXOID.InputID()
 		utxo, err := state.UTXO(utxoID)
@@ -140,18 +136,18 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 	// Verify the flowcheck
-	if err := tx.vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, creds); err != nil {
+	if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds); err != nil {
 		return err
 	}
 
 	txID := tx.ID()
 
 	// Consume the UTXOS
-	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+	if err := vm.consumeInputs(db, tx.Ins); err != nil {
 		return tempError{err}
 	}
 	// Produce the UTXOS
-	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
 		return tempError{err}
 	}
 
@@ -163,12 +159,12 @@ func (tx *UnsignedImportTx) SemanticVerify(db database.Database, creds []verify.
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
+func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+	smDB := ctx.SharedMemory.GetDatabase(tx.SourceChain)
+	defer ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
 
 	vsmDB := versiondb.New(smDB)
-	state := avax.NewPrefixedState(vsmDB, Codec, tx.vm.Ctx.ChainID, tx.SourceChain)
+	state := avax.NewPrefixedState(vsmDB, Codec, ctx.ChainID, tx.SourceChain)
 
 	// Spend imported UTXOs
 	for _, in := range tx.ImportedInputs {
@@ -190,9 +186,9 @@ func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
-) (*AtomicTx, error) {
+) (*Tx, error) {
 	if !vm.avm.Equals(chainID) {
-		return nil, errWrongBlockchainID
+		return nil, errWrongChainID
 	}
 
 	kc := secp256k1fx.NewKeychain()
@@ -264,18 +260,18 @@ func (vm *VM) newImportTx(
 
 	// Create the transaction
 	utx := &UnsignedImportTx{
-		BaseTx: BaseTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
 			Outs:         outs,
 			Ins:          ins,
-		},
+		}},
 		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
 	}
-	tx := &AtomicTx{UnsignedAtomicTx: utx}
-	if err := vm.signAtomicTx(tx, signers); err != nil {
+	tx := &Tx{UnsignedTx: utx}
+	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify()
+	return tx, utx.Verify(vm.avm, vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
 }

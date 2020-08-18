@@ -14,7 +14,7 @@ import (
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
 
-	Txs []*DecisionTx `serialize:"true" json:"txs"`
+	Txs []*Tx `serialize:"true" json:"txs"`
 }
 
 // initialize this block
@@ -23,11 +23,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 		return err
 	}
 	for _, tx := range sb.Txs {
-		txBytes, err := vm.codec.Marshal(tx)
-		if err != nil {
-			return err
-		}
-		if err := tx.initialize(vm, txBytes); err != nil {
+		if err := tx.Sign(vm.codec, nil); err != nil {
 			return err
 		}
 	}
@@ -60,7 +56,11 @@ func (sb *StandardBlock) Verify() error {
 	sb.onAcceptDB = versiondb.New(pdb)
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		onAccept, err := tx.SemanticVerify(sb.onAcceptDB, tx)
+		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
+		if !ok {
+			return errWrongTxType
+		}
+		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptDB, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
 			if err := sb.Reject(); err == nil {
@@ -103,7 +103,7 @@ func (sb *StandardBlock) Verify() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*DecisionTx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		SingleDecisionBlock: SingleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{

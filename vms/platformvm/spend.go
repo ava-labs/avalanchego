@@ -252,6 +252,13 @@ func (vm *VM) spend(
 	return ins, returnedOuts, lockedOuts, signers, nil
 }
 
+var (
+	errUnknownOwner   = errors.New("unknown owner type")
+	errCantSign       = errors.New("can't sign")
+	errInputOverflow  = errors.New("inputs overflowed uint64")
+	errOutputOverflow = errors.New("outputs overflowed uint64")
+)
+
 // authorize ...
 func (vm *VM) authorize(
 	db database.Database,
@@ -269,7 +276,7 @@ func (vm *VM) authorize(
 	}
 
 	// Make sure the owners of the subnet match the provided keys
-	owner, ok := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx).Owner.(*secp256k1fx.OutputOwners)
+	owner, ok := subnet.UnsignedTx.(*UnsignedCreateSubnetTx).Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
 		return nil, nil, errUnknownOwner
 	}
@@ -289,11 +296,6 @@ func (vm *VM) authorize(
 
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
-
-var (
-	errInputOverflow  = errors.New("inputs overflowed uint64")
-	errOutputOverflow = errors.New("outputs overflowed uint64")
-)
 
 // Verify that:
 // * inputs and outputs are all AVAX
@@ -425,7 +427,7 @@ func (vm *VM) produceOutputs(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	db database.Database,
-	tx SpendTx,
+	tx UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -450,7 +452,7 @@ func (vm *VM) semanticVerifySpend(
 // [db] should not be committed if an error is returned
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
-	tx SpendTx,
+	tx UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,

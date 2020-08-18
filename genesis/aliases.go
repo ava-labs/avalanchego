@@ -55,7 +55,7 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 	}
 
 	for _, chain := range genesis.Chains {
-		uChain := chain.UnsignedDecisionTx.(*platformvm.UnsignedCreateChainTx)
+		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
 		switch {
 		case avm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}

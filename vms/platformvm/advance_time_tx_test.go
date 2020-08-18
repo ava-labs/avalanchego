@@ -11,39 +11,6 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 )
 
-func TestAdvanceTimeTxSyntacticVerify(t *testing.T) {
-	// Case: Tx is nil
-	var unsignedTx *UnsignedAdvanceTimeTx
-	if err := unsignedTx.Verify(); err == nil {
-		t.Fatal("should have failed verification because tx is nil")
-	}
-
-	// Case: Timestamp is ahead of synchrony bound
-	vm := defaultVM()
-	vm.Ctx.Lock.Lock()
-	defer func() {
-		vm.Shutdown()
-		vm.Ctx.Lock.Unlock()
-	}()
-
-	tx := &UnsignedAdvanceTimeTx{
-		Time: uint64(defaultGenesisTime.Add(Delta).Add(1 * time.Second).Unix()),
-		vm:   vm,
-	}
-
-	err := tx.Verify()
-	if err == nil {
-		t.Fatal("should've failed verification because timestamp is ahead of synchrony bound")
-	}
-
-	// Case 3: Valid
-	tx.Time = uint64(defaultGenesisTime.Add(Delta).Unix())
-	err = tx.Verify()
-	if err != nil {
-		t.Fatalf("should've passed verification but got: %v", err)
-	}
-}
-
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	vm := defaultVM()
@@ -55,7 +22,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 	if tx, err := vm.newAdvanceTimeTx(defaultGenesisTime); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.SemanticVerify(vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
 	}
 }
@@ -88,7 +55,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		vm.DB,
 		&EventHeap{
 			SortByStartTime: true,
-			Txs:             []*ProposalTx{addPendingValidatorTx},
+			Txs:             []*Tx{addPendingValidatorTx},
 		},
 		constants.DefaultSubnetID,
 	)
@@ -99,7 +66,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	tx, err := vm.newAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
 	if err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.SemanticVerify(vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 	vm.Shutdown()
@@ -119,7 +86,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Proposes advancing timestamp to 1 second after genesis validators stop validating
 	if tx, err := vm.newAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second)); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.SemanticVerify(vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
 	}
 }
@@ -156,7 +123,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		vm.DB,
 		&EventHeap{
 			SortByStartTime: true,
-			Txs:             []*ProposalTx{addPendingValidatorTx},
+			Txs:             []*Tx{addPendingValidatorTx},
 		},
 		constants.DefaultSubnetID,
 	); err != nil {
@@ -167,7 +134,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	onCommit, onAbort, _, _, err := tx.SemanticVerify(vm.DB, tx)
+	onCommit, onAbort, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,13 +179,13 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tx.InitiallyPrefersCommit() {
+	if tx.UnsignedTx.(UnsignedProposalTx).InitiallyPrefersCommit(vm) {
 		t.Fatal("should not prefer to commit this tx because its proposed timestamp is after wall clock time")
 	}
 
 	// advance wall clock time
 	vm.clock.Set(defaultGenesisTime.Add(2 * time.Second))
-	if !tx.InitiallyPrefersCommit() {
+	if !tx.UnsignedTx.(UnsignedProposalTx).InitiallyPrefersCommit(vm) {
 		t.Fatal("should prefer to commit this tx because its proposed timestamp is before wall clock time")
 	}
 }
@@ -242,10 +209,10 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var unmarshaledTx *ProposalTx
+	var unmarshaledTx Tx
 	if err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
-	} else if tx.UnsignedProposalTx.(*UnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedProposalTx.(*UnsignedAdvanceTimeTx).Time {
+	} else if tx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")
 	}
 }

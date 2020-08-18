@@ -187,9 +187,9 @@ type VM struct {
 	currentBlocks map[[32]byte]Block
 
 	// Transactions that have not been put into blocks yet
-	unissuedEvents      *EventHeap
-	unissuedDecisionTxs []*DecisionTx
-	unissuedAtomicTxs   []*AtomicTx
+	unissuedProposalTxs *EventHeap
+	unissuedDecisionTxs []*Tx
+	unissuedAtomicTxs   []*Tx
 
 	// Tx fee burned by a transaction
 	txFee uint64
@@ -256,15 +256,15 @@ func (vm *VM) Initialize(
 		}
 
 		// Persist the subnets that exist at genesis (none do)
-		if err := vm.putSubnets(vm.DB, []*DecisionTx{}); err != nil {
+		if err := vm.putSubnets(vm.DB, []*Tx{}); err != nil {
 			return fmt.Errorf("error putting genesis subnets: %v", err)
 		}
 
 		// Ensure all chains that the genesis bytes say to create
 		// have the right network ID
-		filteredChains := []*DecisionTx{}
+		filteredChains := []*Tx{}
 		for _, chain := range genesis.Chains {
-			unsignedChain, ok := chain.UnsignedDecisionTx.(*UnsignedCreateChainTx)
+			unsignedChain, ok := chain.UnsignedTx.(*UnsignedCreateChainTx)
 			if !ok {
 				vm.Ctx.Log.Warn("invalid tx type in genesis chains")
 				continue
@@ -318,7 +318,7 @@ func (vm *VM) Initialize(
 
 	// Transactions from clients that have not yet been put into blocks
 	// and added to consensus
-	vm.unissuedEvents = &EventHeap{SortByStartTime: true}
+	vm.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
 
 	vm.currentBlocks = make(map[[32]byte]Block)
 	vm.timer = timer.NewTimer(func() {
@@ -361,34 +361,17 @@ func (vm *VM) Initialize(
 }
 
 // Queue [tx] to be put into a block
-func (vm *VM) issueTx(tx interface{}) error {
-	switch tx := tx.(type) {
-	case *ProposalTx:
-		txBytes, err := vm.codec.Marshal(tx)
-		if err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		if err := tx.initialize(vm, txBytes); err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		vm.unissuedEvents.Add(tx)
-	case *DecisionTx:
-		txBytes, err := vm.codec.Marshal(tx)
-		if err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		if err := tx.initialize(vm, txBytes); err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
+func (vm *VM) issueTx(tx *Tx) error {
+	// Initialize the transaction
+	if err := tx.Sign(vm.codec, nil); err != nil {
+		return err
+	}
+	switch tx.UnsignedTx.(type) {
+	case TimedTx:
+		vm.unissuedProposalTxs.Add(tx)
+	case UnsignedDecisionTx:
 		vm.unissuedDecisionTxs = append(vm.unissuedDecisionTxs, tx)
-	case *AtomicTx:
-		txBytes, err := vm.codec.Marshal(tx)
-		if err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
-		if err := tx.initialize(vm, txBytes); err != nil {
-			return fmt.Errorf("error initializing tx: %s", err)
-		}
+	case UnsignedAtomicTx:
 		vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
 	default:
 		return errors.New("Could not parse given tx. Provided tx needs to be a ProposalTx, DecisionTx, or AtomicTx")
@@ -435,8 +418,8 @@ func (vm *VM) initSubnets() error {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the Subnet that validates the chain
-func (vm *VM) createChain(tx *DecisionTx) {
-	unsignedTx, ok := tx.UnsignedDecisionTx.(*UnsignedCreateChainTx)
+func (vm *VM) createChain(tx *Tx) {
+	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
 	if !ok {
 		// Invalid tx type
 		return
@@ -503,7 +486,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if numTxs > len(vm.unissuedDecisionTxs) {
 			numTxs = len(vm.unissuedDecisionTxs)
 		}
-		var txs []*DecisionTx
+		var txs []*Tx
 		txs, vm.unissuedDecisionTxs = vm.unissuedDecisionTxs[:numTxs], vm.unissuedDecisionTxs[numTxs:]
 		blk, err := vm.newStandardBlock(preferredID, preferredHeight+1, txs)
 		if err != nil {
@@ -569,7 +552,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 	nextValidatorEndtime := maxTime
 	if currentValidators.Len() > 0 {
-		nextValidatorEndtime = currentValidators.Peek().UnsignedProposalTx.(TimedTx).EndTime()
+		nextValidatorEndtime = currentValidators.Peek().UnsignedTx.(TimedTx).EndTime()
 	}
 	if currentChainTimestamp.Equal(nextValidatorEndtime) {
 		stakerTx := currentValidators.Peek()
@@ -616,9 +599,9 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	// Propose adding a new validator but only if their start time is in the
 	// future relative to local time (plus Delta)
 	syncTime := localTime.Add(Delta)
-	for vm.unissuedEvents.Len() > 0 {
-		tx := vm.unissuedEvents.Remove()
-		utx := tx.UnsignedProposalTx.(TimedTx)
+	for vm.unissuedProposalTxs.Len() > 0 {
+		tx := vm.unissuedProposalTxs.Remove()
+		utx := tx.UnsignedTx.(TimedTx)
 		if !syncTime.After(utx.StartTime()) {
 			blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
 			if err != nil {
@@ -765,13 +748,13 @@ func (vm *VM) resetTimer() {
 	}
 
 	syncTime := localTime.Add(Delta)
-	for vm.unissuedEvents.Len() > 0 {
-		if !syncTime.After(vm.unissuedEvents.Peek().UnsignedProposalTx.(TimedTx).StartTime()) {
+	for vm.unissuedProposalTxs.Len() > 0 {
+		if !syncTime.After(vm.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()) {
 			vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
-		vm.unissuedEvents.Remove()
+		vm.unissuedProposalTxs.Remove()
 		vm.Ctx.Log.Debug("dropping tx to add validator because its start time has passed")
 	}
 
@@ -835,12 +818,12 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 	}
 	if !subnetID.Equals(constants.DefaultSubnetID) { // validators of default subnet removed in rewardValidatorTxs, not here
 		for current.Len() > 0 {
-			next := current.Peek().UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx) // current validator with earliest end time
+			next := current.Peek().UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx) // current validator with earliest end time
 			if timestamp.Before(next.EndTime()) {
 				break
 			}
 			current.Remove()
-			stopped.Add(next.Vdr().ID())
+			stopped.Add(next.Validator.Vdr().ID())
 		}
 	}
 	pending, err = vm.getPendingValidators(db, subnetID)
@@ -849,21 +832,21 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 	}
 	for pending.Len() > 0 {
 		nextTx := pending.Peek() // pending staker with earliest start time
-		switch tx := nextTx.UnsignedProposalTx.(type) {
+		switch tx := nextTx.UnsignedTx.(type) {
 		case *UnsignedAddDefaultSubnetValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				break
 			}
 			current.Add(nextTx)
 			pending.Remove()
-			started.Add(tx.Vdr().ID())
+			started.Add(tx.Validator.Vdr().ID())
 		case *UnsignedAddNonDefaultSubnetValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				break
 			}
 			current.Add(nextTx)
 			pending.Remove()
-			started.Add(tx.Vdr().ID())
+			started.Add(tx.Validator.Vdr().ID())
 		}
 	}
 	return current, pending, started, stopped, nil
@@ -873,13 +856,13 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 	vdrMap := make(map[[20]byte]*Validator, validatorEvents.Len())
 	for _, event := range validatorEvents.Txs {
 		var vdr validators.Validator
-		switch tx := event.UnsignedProposalTx.(type) {
+		switch tx := event.UnsignedTx.(type) {
 		case *UnsignedAddDefaultSubnetValidatorTx:
-			vdr = tx.Vdr()
+			vdr = tx.Validator.Vdr()
 		case *UnsignedAddDefaultSubnetDelegatorTx:
-			vdr = tx.Vdr()
+			vdr = tx.Validator.Vdr()
 		case *UnsignedAddNonDefaultSubnetValidatorTx:
-			vdr = tx.Vdr()
+			vdr = tx.Validator.Vdr()
 		default:
 			continue
 		}

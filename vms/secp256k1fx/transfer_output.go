@@ -27,7 +27,7 @@ func (out *TransferOutput) Verify() error {
 	case out == nil:
 		return errNilOutput
 	case out.Amt == 0:
-		return errNoValueInput
+		return errNoValueOutput
 	default:
 		return out.OutputOwners.Verify()
 	}

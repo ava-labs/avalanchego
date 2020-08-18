@@ -137,23 +137,21 @@ type BuildGenesisReply struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs      []*avax.UTXO  `serialize:"true"`
-	Validators *EventHeap    `serialize:"true"`
-	Chains     []*DecisionTx `serialize:"true"`
-	Timestamp  uint64        `serialize:"true"`
+	UTXOs      []*avax.UTXO `serialize:"true"`
+	Validators *EventHeap   `serialize:"true"`
+	Chains     []*Tx        `serialize:"true"`
+	Timestamp  uint64       `serialize:"true"`
 }
 
 // Initialize ...
 func (g *Genesis) Initialize() error {
 	for _, tx := range g.Validators.Txs {
-		if err := tx.initialize(nil, nil); err != nil {
+		if err := tx.Sign(Codec, nil); err != nil {
 			return err
 		}
 	}
-	for _, chain := range g.Chains {
-		if chainBytes, err := Codec.Marshal(chain); err != nil {
-			return err
-		} else if err := chain.initialize(nil, chainBytes); err != nil {
+	for _, tx := range g.Chains {
+		if err := tx.Sign(Codec, nil); err != nil {
 			return err
 		}
 	}
@@ -217,38 +215,36 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			return err
 		}
 
-		tx := &ProposalTx{
-			UnsignedProposalTx: &UnsignedAddDefaultSubnetValidatorTx{
-				BaseTx: BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
+		tx := &Tx{UnsignedTx: &UnsignedAddDefaultSubnetValidatorTx{
+			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}},
+			Validator: DurationValidator{
+				Validator: Validator{
+					NodeID: nodeID,
+					Wght:   weight,
 				},
-				DurationValidator: DurationValidator{
-					Validator: Validator{
-						NodeID: nodeID,
-						Wght:   weight,
-					},
-					Start: uint64(args.Time),
-					End:   uint64(validator.EndTime),
-				},
-				Stake: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: args.AvaxAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: weight,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{addrID},
-						},
-					},
-				}},
-				RewardsOwner: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addrID},
-				},
+				Start: uint64(args.Time),
+				End:   uint64(validator.EndTime),
 			},
-		}
-		if err := tx.initialize(nil, nil); err != nil {
+			Stake: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: args.AvaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: weight,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addrID},
+					},
+				},
+			}},
+			RewardsOwner: &secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addrID},
+			},
+		}}
+		if err := tx.Sign(Codec, nil); err != nil {
 			return err
 		}
 
@@ -256,26 +252,21 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the chains that exist at genesis.
-	chains := []*DecisionTx{}
+	chains := []*Tx{}
 	for _, chain := range args.Chains {
-		// Ordinarily we sign a createChainTx. For genesis, there is no key.
-		// We generate the ID of this tx by hashing the bytes of the unsigned transaction
-		// TODO: Should we just sign this tx with a private key that we share publicly?
-		tx := &DecisionTx{
-			UnsignedDecisionTx: &UnsignedCreateChainTx{
-				BaseTx: BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				},
-				SubnetID:    chain.SubnetID,
-				ChainName:   chain.Name,
-				VMID:        chain.VMID,
-				FxIDs:       chain.FxIDs,
-				GenesisData: chain.GenesisData.Bytes,
-				SubnetAuth:  &secp256k1fx.OutputOwners{},
-			},
-		}
-		if err := tx.initialize(nil, nil); err != nil {
+		tx := &Tx{UnsignedTx: &UnsignedCreateChainTx{
+			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}},
+			SubnetID:    chain.SubnetID,
+			ChainName:   chain.Name,
+			VMID:        chain.VMID,
+			FxIDs:       chain.FxIDs,
+			GenesisData: chain.GenesisData.Bytes,
+			SubnetAuth:  &secp256k1fx.OutputOwners{},
+		}}
+		if err := tx.Sign(Codec, nil); err != nil {
 			return err
 		}
 

@@ -205,9 +205,9 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	if validators.Len() == 0 {
 		t.Fatal("Validators should contain 3 validators")
 	}
-	currentValidator := validators.Remove().UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+	currentValidator := validators.Remove().UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
 	for validators.Len() > 0 {
-		nextValidator := validators.Remove().UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		nextValidator := validators.Remove().UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
 		if currentValidator.EndTime().Unix() > nextValidator.EndTime().Unix() {
 			t.Fatalf("Validators returned by genesis should be a min heap sorted by end time")
 		}
