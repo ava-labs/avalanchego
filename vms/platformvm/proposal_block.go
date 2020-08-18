@@ -22,7 +22,7 @@ import (
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx ProposalTx `serialize:"true" json:"tx"`
+	Tx Tx `serialize:"true" json:"tx"`
 
 	// The database that the chain will have if this block's proposal is committed
 	onCommitDB *versiondb.Database
@@ -47,11 +47,17 @@ func (pb *ProposalBlock) Accept() error {
 func (pb *ProposalBlock) initialize(vm *VM, bytes []byte) error {
 	pb.vm = vm
 	pb.Block.Initialize(bytes, vm.SnowmanVM)
-	txBytes, err := pb.vm.codec.Marshal(&pb.Tx)
+
+	unsignedBytes, err := pb.vm.codec.Marshal(&pb.Tx.UnsignedTx)
 	if err != nil {
 		return err
 	}
-	return pb.Tx.initialize(vm, txBytes)
+	signedBytes, err := pb.vm.codec.Marshal(&pb.Tx)
+	if err != nil {
+		return err
+	}
+	pb.Tx.Initialize(unsignedBytes, signedBytes)
+	return nil
 }
 
 // setBaseDatabase sets this block's base database to [db]
@@ -89,6 +95,11 @@ func (pb *ProposalBlock) onAbort() (*versiondb.Database, func() error) {
 //
 // If this block is valid, this function also sets pas.onCommit and pas.onAbort.
 func (pb *ProposalBlock) Verify() error {
+	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
+	if !ok {
+		return errWrongTxType
+	}
+
 	parentIntf := pb.parentBlock()
 
 	// The parent of a proposal block (ie this block) must be a decision block
@@ -107,10 +118,10 @@ func (pb *ProposalBlock) Verify() error {
 	// pdb is the database if this block's parent is accepted
 	pdb := parent.onAccept()
 
-	txID := pb.Tx.ID()
+	txID := tx.ID()
 
 	var err TxError
-	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = pb.Tx.SemanticVerify(pdb, &pb.Tx)
+	pb.onCommitDB, pb.onAbortDB, pb.onCommitFunc, pb.onAbortFunc, err = tx.SemanticVerify(pb.vm, pdb, &pb.Tx)
 	if err != nil {
 		pb.vm.droppedTxCache.Put(txID, nil) // cache tx as dropped
 		// If this block's transaction proposes to advance the timestamp, the transaction may fail
@@ -127,11 +138,7 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	txBytes, tErr := pb.vm.codec.Marshal(pb.Tx)
-	if tErr != nil {
-		return tErr
-	}
-
+	txBytes := tx.Bytes()
 	if err := pb.vm.putTx(pb.onCommitDB, txID, txBytes); err != nil {
 		return err
 	}
@@ -174,7 +181,12 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		return [2]snowman.Block{}, err
 	}
 
-	if pb.Tx.InitiallyPrefersCommit() {
+	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
+	if !ok {
+		return [2]snowman.Block{}, errWrongTxType
+	}
+
+	if tx.InitiallyPrefersCommit(pb.vm) {
 		return [2]snowman.Block{commit, abort}, nil
 	}
 	return [2]snowman.Block{abort, commit}, nil
@@ -183,7 +195,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 // newProposalBlock creates a new block that proposes to issue a transaction.
 // The parent of this block has ID [parentID]. The parent must be a decision block.
 // Returns nil if there's an error while creating this block
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx ProposalTx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			Block: core.NewBlock(parentID, height),

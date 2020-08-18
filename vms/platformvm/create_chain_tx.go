@@ -10,9 +10,11 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
@@ -23,6 +25,8 @@ var (
 	errNameTooLong                   = errors.New("name too long")
 	errGenesisTooLong                = errors.New("genesis too long")
 	errIllegalNameCharacter          = errors.New("illegal name character")
+
+	_ UnsignedDecisionTx = &UnsignedCreateChainTx{}
 )
 
 const (
@@ -48,24 +52,13 @@ type UnsignedCreateChainTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
-func (tx *UnsignedCreateChainTx) initialize(vm *VM, bytes []byte) error {
-	if tx.vm != nil { // already been initialized
-		return nil
-	}
-	tx.vm = vm
-	tx.bytes = bytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
-	var err error
-	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
-	if err != nil {
-		return fmt.Errorf("couldn't marshal UnsignedCreateChainTx: %w", err)
-	}
-	return nil
-}
-
 // Verify this transaction is well-formed
-func (tx *UnsignedCreateChainTx) Verify() error {
+func (tx *UnsignedCreateChainTx) Verify(
+	ctx *snow.Context,
+	c codec.Codec,
+	feeAmount uint64,
+	feeAssetID ids.ID,
+) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -91,10 +84,10 @@ func (tx *UnsignedCreateChainTx) Verify() error {
 		}
 	}
 
-	if err := verify.All(&tx.BaseTx, tx.SubnetAuth); err != nil {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
 		return err
 	}
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
+	if err := tx.SubnetAuth.Verify(); err != nil {
 		return err
 	}
 
@@ -104,53 +97,54 @@ func (tx *UnsignedCreateChainTx) Verify() error {
 
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedCreateChainTx) SemanticVerify(
+	vm *VM,
 	db database.Database,
-	stx *DecisionTx,
+	stx *Tx,
 ) (
 	func() error,
 	TxError,
 ) {
 	// Make sure this transaction is well formed.
-	if len(stx.Credentials) == 0 {
+	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, permError{err}
 	}
 
 	// Select the credentials for each purpose
-	baseTxCredsLen := len(stx.Credentials) - 1
-	baseTxCreds := stx.Credentials[:baseTxCredsLen]
-	subnetCred := stx.Credentials[baseTxCredsLen]
+	baseTxCredsLen := len(stx.Creds) - 1
+	baseTxCreds := stx.Creds[:baseTxCredsLen]
+	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, err
 	}
 
 	txID := tx.ID()
 
 	// Consume the UTXOS
-	if err := tx.vm.consumeInputs(db, tx.Ins); err != nil {
+	if err := vm.consumeInputs(db, tx.Ins); err != nil {
 		return nil, tempError{err}
 	}
 	// Produce the UTXOS
-	if err := tx.vm.produceOutputs(db, txID, tx.Outs); err != nil {
+	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
 		return nil, tempError{err}
 	}
 
 	// Verify that this chain is authorized by the subnet
-	subnet, err := tx.vm.getSubnet(db, tx.SubnetID)
+	subnet, err := vm.getSubnet(db, tx.SubnetID)
 	if err != nil {
 		return nil, err
 	}
-	unsignedSubnet := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
-	if err := tx.vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {
+	unsignedSubnet := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
+	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {
 		return nil, permError{err}
 	}
 
 	// Attempt to add the new chain to the database
-	currentChains, sErr := tx.vm.getChains(db) // chains that currently exist
+	currentChains, sErr := vm.getChains(db) // chains that currently exist
 	if err != nil {
 		return nil, tempError{fmt.Errorf("couldn't get list of blockchains: %w", sErr)}
 	}
@@ -160,13 +154,13 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 		}
 	}
 	currentChains = append(currentChains, stx) // add this new chain
-	if err := tx.vm.putChains(db, currentChains); err != nil {
+	if err := vm.putChains(db, currentChains); err != nil {
 		return nil, tempError{err}
 	}
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { tx.vm.createChain(stx); return nil }
+	onAccept := func() error { vm.createChain(stx); return nil }
 	return onAccept, nil
 }
 
@@ -178,8 +172,8 @@ func (vm *VM) newCreateChainTx(
 	fxIDs []ids.ID, // fxs this chain supports
 	chainName string, // Name of the chain
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
-) (*DecisionTx, error) {
-	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
+) (*Tx, error) {
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -194,19 +188,23 @@ func (vm *VM) newCreateChainTx(
 	ids.SortIDs(fxIDs)
 
 	// Create the tx
-	tx := &DecisionTx{UnsignedDecisionTx: &UnsignedCreateChainTx{
-		BaseTx: BaseTx{
+	utx := &UnsignedCreateChainTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
 			Ins:          ins,
 			Outs:         outs,
-		},
+		}},
 		SubnetID:    subnetID,
 		ChainName:   chainName,
 		VMID:        vmID,
 		FxIDs:       fxIDs,
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
-	}}
-	return tx, vm.signDecisionTx(tx, signers)
+	}
+	tx := &Tx{UnsignedTx: utx}
+	if err := tx.Sign(vm.codec, signers); err != nil {
+		return nil, err
+	}
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
 }

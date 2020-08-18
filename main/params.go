@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/sampler"
+	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
@@ -179,7 +180,7 @@ func init() {
 	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
 	// AVAX fees:
-	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", 0, "AVAX transaction fee, in nAVAX")
+	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", units.MilliAvax, "AVAX transaction fee, in nAVAX")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")

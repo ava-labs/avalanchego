@@ -134,9 +134,9 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx.UnsignedDecisionTx.(*UnsignedCreateChainTx).syntacticallyVerified = false
-		tx.UnsignedDecisionTx = test.setup(tx.UnsignedDecisionTx.(*UnsignedCreateChainTx))
-		if err := tx.UnsignedDecisionTx.(*UnsignedCreateChainTx).Verify(); err != nil && !test.shouldErr {
+		tx.UnsignedTx.(*UnsignedCreateChainTx).syntacticallyVerified = false
+		tx.UnsignedTx = test.setup(tx.UnsignedTx.(*UnsignedCreateChainTx))
+		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)
@@ -154,7 +154,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	}()
 
 	tx, err := vm.newCreateChainTx(
-		testSubnet1.id,
+		testSubnet1.ID(),
 		nil,
 		avm.ID,
 		nil,
@@ -166,8 +166,8 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	}
 
 	// Remove a signature
-	tx.Credentials[0].(*secp256k1fx.Credential).Sigs = tx.Credentials[0].(*secp256k1fx.Credential).Sigs[1:]
-	if _, err := tx.SemanticVerify(vm.DB, tx); err == nil {
+	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
+	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should have errored because a sig is missing")
 	}
 }
@@ -182,7 +182,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}()
 
 	tx, err := vm.newCreateChainTx( // create a tx
-		testSubnet1.id,
+		testSubnet1.ID(),
 		nil,
 		avm.ID,
 		nil,
@@ -201,12 +201,12 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}
 
 	// Replace a valid signature with one from another key
-	sig, err := key.SignHash(hashing.ComputeHash256(tx.UnsignedDecisionTx.(*UnsignedCreateChainTx).unsignedBytes))
+	sig, err := key.SignHash(hashing.ComputeHash256(tx.UnsignedBytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	copy(tx.Credentials[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	if _, err = tx.SemanticVerify(vm.DB, tx); err == nil {
+	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
+	if _, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should have failed verification because a sig is invalid")
 	}
 }
@@ -232,8 +232,8 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedDecisionTx.(*UnsignedCreateChainTx).SubnetID = ids.GenerateTestID()
-	if _, err := tx.SemanticVerify(vm.DB, tx); err == nil {
+	tx.UnsignedTx.(*UnsignedCreateChainTx).SubnetID = ids.GenerateTestID()
+	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should have failed because subent doesn't exist")
 	}
 }
@@ -248,7 +248,7 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 
 	// create a tx
 	tx, err := vm.newCreateChainTx(
-		testSubnet1.id,
+		testSubnet1.ID(),
 		nil,
 		avm.ID,
 		nil,
@@ -260,11 +260,11 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := vm.putChains(vm.DB, []*DecisionTx{tx}); err != nil {
+	if err := vm.putChains(vm.DB, []*Tx{tx}); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = tx.SemanticVerify(vm.DB, tx)
+	_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx)
 	if err == nil {
 		t.Fatalf("should have failed because the chain already exists")
 	}
@@ -281,7 +281,7 @@ func TestCreateChainTxValid(t *testing.T) {
 
 	// create a valid tx
 	tx, err := vm.newCreateChainTx(
-		testSubnet1.id,
+		testSubnet1.ID(),
 		nil,
 		avm.ID,
 		nil,
@@ -292,7 +292,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = tx.SemanticVerify(vm.DB, tx)
+	_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vm.DB, tx)
 	if err != nil {
 		t.Fatalf("expected tx to pass verification but got error: %v", err)
 	}

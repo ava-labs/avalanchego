@@ -6,13 +6,15 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -27,6 +29,9 @@ var (
 	errStakeTooShort  = errors.New("staking period is too short")
 	errStakeTooLong   = errors.New("staking period is too long")
 	errTooManyShares  = fmt.Errorf("a staker can only require at most %d shares from delegators", NumberOfShares)
+
+	_ UnsignedProposalTx = &UnsignedAddDefaultSubnetValidatorTx{}
+	_ TimedTx            = &UnsignedAddDefaultSubnetValidatorTx{}
 )
 
 // UnsignedAddDefaultSubnetValidatorTx is an unsigned addDefaultSubnetValidatorTx
@@ -34,7 +39,7 @@ type UnsignedAddDefaultSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	DurationValidator `serialize:"true"`
+	Validator DurationValidator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
@@ -44,24 +49,23 @@ type UnsignedAddDefaultSubnetValidatorTx struct {
 	Shares uint32 `serialize:"true" json:"shares"`
 }
 
-// initialize [tx]. Sets [tx.vm], [tx.unsignedBytes], [tx.bytes], [tx.id]
-func (tx *UnsignedAddDefaultSubnetValidatorTx) initialize(vm *VM, bytes []byte) error {
-	if tx.vm != nil { // Already been initialized
-		return nil
-	}
-	tx.vm = vm
-	tx.bytes = bytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(bytes))
-	var err error
-	tx.unsignedBytes, err = Codec.Marshal(interface{}(tx))
-	if err != nil {
-		return fmt.Errorf("couldn't marshal UnsignedAddDefaultSubnetValidatorTx: %w", err)
-	}
-	return nil
+// StartTime of this validator
+func (tx *UnsignedAddDefaultSubnetValidatorTx) StartTime() time.Time {
+	return tx.Validator.StartTime()
+}
+
+// EndTime of this validator
+func (tx *UnsignedAddDefaultSubnetValidatorTx) EndTime() time.Time {
+	return tx.Validator.EndTime()
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddDefaultSubnetValidatorTx) Verify() error {
+func (tx *UnsignedAddDefaultSubnetValidatorTx) Verify(
+	ctx *snow.Context,
+	c codec.Codec,
+	feeAmount uint64,
+	feeAssetID ids.ID,
+) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -69,40 +73,34 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) Verify() error {
 		return nil
 	}
 
-	if err := verify.All(
-		&tx.BaseTx,
-		&tx.DurationValidator,
-		tx.RewardsOwner,
-	); err != nil {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+		return err
+	}
+	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
 		return err
 	}
 
-	returnedWeight := uint64(0)
+	totalStakeWeight := uint64(0)
 	for _, out := range tx.Stake {
 		if err := out.Verify(); err != nil {
 			return err
 		}
-		newWeight, err := safemath.Add64(returnedWeight, out.Output().Amount())
+		newWeight, err := safemath.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}
-		returnedWeight = newWeight
+		totalStakeWeight = newWeight
 	}
 
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
 		return errOutputsNotSorted
-	case returnedWeight != tx.Wght:
+	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
-	case tx.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
+	case tx.Validator.Wght < MinimumStakeAmount: // Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	case tx.Shares > NumberOfShares: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
-	}
-
-	// verify the flow check
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.Stake, tx.Wght, tx.vm.txFee, tx.vm.avaxAssetID); err != nil {
-		return err
 	}
 
 	// cache that this is valid
@@ -112,8 +110,9 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) Verify() error {
 
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
+	vm *VM,
 	db database.Database,
-	stx *ProposalTx,
+	stx *Tx,
 ) (
 	*versiondb.Database,
 	*versiondb.Database,
@@ -122,12 +121,12 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
 	// Ensure the proposed validator starts after the current time
-	if currentTime, err := tx.vm.getTimestamp(db); err != nil {
+	if currentTime, err := vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
@@ -136,26 +135,26 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	}
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
-	currentValidators, err := tx.vm.getCurrentValidators(db, constants.DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
-	for _, currentVdr := range tx.vm.getValidators(currentValidators) {
-		if currentVdr.ID().Equals(tx.NodeID) {
+	for _, currentVdr := range vm.getValidators(currentValidators) {
+		if currentVdr.ID().Equals(tx.Validator.NodeID) {
 			return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a Default Subnet validator",
-				tx.NodeID)}
+				tx.Validator.NodeID)}
 		}
 	}
 
 	// Ensure the proposed validator is not already slated to validate for the specified subnet
-	pendingValidators, err := tx.vm.getPendingValidators(db, constants.DefaultSubnetID)
+	pendingValidators, err := vm.getPendingValidators(db, constants.DefaultSubnetID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
-	for _, pendingVdr := range tx.vm.getValidators(pendingValidators) {
-		if pendingVdr.ID().Equals(tx.NodeID) {
+	for _, pendingVdr := range vm.getValidators(pendingValidators) {
+		if pendingVdr.ID().Equals(tx.Validator.NodeID) {
 			return nil, nil, nil, nil, tempError{fmt.Errorf("validator %s is already a pending Default Subnet validator",
-				tx.NodeID)}
+				tx.Validator.NodeID)}
 		}
 	}
 
@@ -164,7 +163,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	// Verify the flowcheck
-	if err := tx.vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Credentials); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -173,28 +172,28 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	// Verify inputs/outputs and update the UTXO set
 	onCommitDB := versiondb.New(db)
 	// Consume the UTXOS
-	if err := tx.vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
+	if err := vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 	// Produce the UTXOS
-	if err := tx.vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
+	if err := vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// Add validator to set of pending validators
 	pendingValidators.Add(stx)
 	// If this proposal is committed, update the pending validator set to include the validator
-	if err := tx.vm.putPendingValidators(onCommitDB, pendingValidators, constants.DefaultSubnetID); err != nil {
+	if err := vm.putPendingValidators(onCommitDB, pendingValidators, constants.DefaultSubnetID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	onAbortDB := versiondb.New(db)
 	// Consume the UTXOS
-	if err := tx.vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
+	if err := vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 	// Produce the UTXOS
-	if err := tx.vm.produceOutputs(onAbortDB, txID, tx.Outs); err != nil {
+	if err := vm.produceOutputs(onAbortDB, txID, tx.Outs); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
@@ -203,8 +202,8 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *UnsignedAddDefaultSubnetValidatorTx) InitiallyPrefersCommit() bool {
-	return tx.StartTime().After(tx.vm.clock.Time())
+func (tx *UnsignedAddDefaultSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
+	return tx.StartTime().After(vm.clock.Time())
 }
 
 // NewAddDefaultSubnetValidatorTx returns a new NewAddDefaultSubnetValidatorTx
@@ -216,20 +215,20 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
-) (*ProposalTx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.spend(vm.DB, keys, stakeAmt, vm.txFee)
+) (*Tx, error) {
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 	// Create the tx
 	utx := &UnsignedAddDefaultSubnetValidatorTx{
-		BaseTx: BaseTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
 			Ins:          ins,
 			Outs:         unlockedOuts,
-		},
-		DurationValidator: DurationValidator{
+		}},
+		Validator: DurationValidator{
 			Validator: Validator{
 				NodeID: nodeID,
 				Wght:   stakeAmt,
@@ -245,9 +244,9 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 		},
 		Shares: shares,
 	}
-	tx := &ProposalTx{UnsignedProposalTx: utx}
-	if err := vm.signProposalTx(tx, signers); err != nil {
+	tx := &Tx{UnsignedTx: utx}
+	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify()
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
 }

@@ -28,14 +28,14 @@ type TimedTx interface {
 // Transactions must be syntactically verified before adding to EventHeap to
 // ensure that EventHeap can always by marshalled.
 type EventHeap struct {
-	SortByStartTime bool          `serialize:"true"`
-	Txs             []*ProposalTx `serialize:"true"`
+	SortByStartTime bool  `serialize:"true"`
+	Txs             []*Tx `serialize:"true"`
 }
 
 func (h *EventHeap) Len() int { return len(h.Txs) }
 func (h *EventHeap) Less(i, j int) bool {
-	iTx := h.Txs[i].UnsignedProposalTx.(TimedTx)
-	jTx := h.Txs[j].UnsignedProposalTx.(TimedTx)
+	iTx := h.Txs[i].UnsignedTx.(TimedTx)
+	jTx := h.Txs[j].UnsignedTx.(TimedTx)
 
 	iTime := iTx.EndTime()
 	jTime := jTx.EndTime()
@@ -63,7 +63,7 @@ func (h *EventHeap) Swap(i, j int) { h.Txs[i], h.Txs[j] = h.Txs[j], h.Txs[i] }
 
 // Timestamp returns the timestamp on the top transaction on the heap
 func (h *EventHeap) Timestamp() time.Time {
-	tx := h.Txs[0].UnsignedProposalTx.(TimedTx)
+	tx := h.Txs[0].UnsignedTx.(TimedTx)
 	if h.SortByStartTime {
 		return tx.StartTime()
 	}
@@ -71,16 +71,16 @@ func (h *EventHeap) Timestamp() time.Time {
 }
 
 // Add ...
-func (h *EventHeap) Add(tx *ProposalTx) { heap.Push(h, tx) }
+func (h *EventHeap) Add(tx *Tx) { heap.Push(h, tx) }
 
 // Peek ...
-func (h *EventHeap) Peek() *ProposalTx { return h.Txs[0] }
+func (h *EventHeap) Peek() *Tx { return h.Txs[0] }
 
 // Remove ...
-func (h *EventHeap) Remove() *ProposalTx { return heap.Pop(h).(*ProposalTx) }
+func (h *EventHeap) Remove() *Tx { return heap.Pop(h).(*Tx) }
 
 // Push implements the heap interface
-func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(*ProposalTx)) }
+func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(*Tx)) }
 
 // Pop implements the heap interface
 func (h *EventHeap) Pop() interface{} {
@@ -96,13 +96,13 @@ func (h *EventHeap) Bytes() ([]byte, error) {
 }
 
 // getDefaultSubnetStaker ...
-func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*ProposalTx, error) {
+func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*Tx, error) {
 	for _, txIntf := range h.Txs {
-		tx, ok := txIntf.UnsignedProposalTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		tx, ok := txIntf.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
 		if !ok {
 			continue
 		}
-		if id.Equals(tx.NodeID) {
+		if id.Equals(tx.Validator.NodeID) {
 			return txIntf, nil
 		}
 	}

@@ -111,10 +111,10 @@ func TestNewImportTx(t *testing.T) {
 		} else if tt.shouldErr {
 			t.Fatalf("test '%s' didn't error but it should have", tt.description)
 		}
-		unsignedTx := tx.UnsignedAtomicTx.(*UnsignedImportTx)
+		unsignedTx := tx.UnsignedTx.(*UnsignedImportTx)
 		if len(unsignedTx.ImportedInputs) == 0 {
 			t.Fatalf("in test '%s', tx has no imported inputs", tt.description)
-		} else if len(tx.Credentials) != len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs) {
+		} else if len(tx.Creds) != len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs) {
 			t.Fatalf("in test '%s', should have same number of credentials as inputs", tt.description)
 		}
 		totalIn := uint64(0)

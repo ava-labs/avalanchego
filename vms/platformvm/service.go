@@ -416,7 +416,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	if getAll {
 		response.Subnets = make([]APISubnet, len(subnets)+1)
 		for i, subnet := range subnets {
-			unsignedTx := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+			unsignedTx := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
@@ -445,7 +445,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 	idsSet.Add(args.IDs...)
 	for _, subnet := range subnets {
 		if idsSet.Contains(subnet.ID()) {
-			unsignedTx := subnet.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+			unsignedTx := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
@@ -473,6 +473,34 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			},
 		)
 	}
+	return nil
+}
+
+// GetStakingAssetIDArgs are the arguments to GetStakingAssetID
+type GetStakingAssetIDArgs struct {
+	SubnetID ids.ID `json:"subnetID"`
+}
+
+// GetStakingAssetIDResponse is the response from calling GetStakingAssetID
+type GetStakingAssetIDResponse struct {
+	AssetID ids.ID `json:"assetID"`
+}
+
+// GetStakingAssetID returns the assetID of the token used to stake on the
+// provided subnet
+func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAssetIDArgs, response *GetStakingAssetIDResponse) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetStakingAssetID called")
+
+	if args.SubnetID.IsZero() {
+		args.SubnetID = constants.DefaultSubnetID
+	}
+
+	if !args.SubnetID.Equals(constants.DefaultSubnetID) {
+		return fmt.Errorf("Subnet %s doesn't have a valid staking token",
+			args.SubnetID)
+	}
+
+	response.AssetID = service.vm.avaxAssetID
 	return nil
 }
 
@@ -509,9 +537,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
 	if args.SubnetID.Equals(constants.DefaultSubnetID) {
 		for i, tx := range validators.Txs {
-			switch tx := tx.UnsignedProposalTx.(type) {
+			switch tx := tx.UnsignedTx.(type) {
 			case *UnsignedAddDefaultSubnetValidatorTx:
-				vdr := tx.Vdr()
+				vdr := tx.Validator.Vdr()
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
@@ -520,7 +548,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					StakeAmount: &weight,
 				}
 			case *UnsignedAddDefaultSubnetDelegatorTx:
-				vdr := tx.Vdr()
+				vdr := tx.Validator.Vdr()
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
@@ -534,8 +562,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		}
 	} else {
 		for i, tx := range validators.Txs {
-			utx := tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
-			vdr := utx.Vdr()
+			utx := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
+			vdr := utx.Validator.Vdr()
 			weight := json.Uint64(vdr.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
@@ -576,9 +604,9 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
 	for i, tx := range validators.Txs {
 		if args.SubnetID.Equals(constants.DefaultSubnetID) {
-			switch tx := tx.UnsignedProposalTx.(type) {
+			switch tx := tx.UnsignedTx.(type) {
 			case *UnsignedAddDefaultSubnetValidatorTx:
-				vdr := tx.Vdr()
+				vdr := tx.Validator.Vdr()
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
@@ -587,7 +615,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 					StakeAmount: &weight,
 				}
 			case *UnsignedAddDefaultSubnetDelegatorTx:
-				vdr := tx.Vdr()
+				vdr := tx.Validator.Vdr()
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
@@ -599,8 +627,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
 			}
 		} else {
-			utx := tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
-			vdr := utx.Vdr()
+			utx := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
+			vdr := utx.Validator.Vdr()
 			weight := json.Uint64(vdr.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
@@ -1167,7 +1195,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 	if err != nil {
 		return fmt.Errorf("problem retrieving blockchain '%s': %w", args.BlockchainID, err)
 	}
-	response.SubnetID = chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).SubnetID
+	response.SubnetID = chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID
 	return nil
 }
 
@@ -1196,7 +1224,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 	// Filter to get the chains validated by the specified Subnet
 	for _, chain := range chains {
-		if chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).SubnetID.Equals(args.SubnetID) {
+		if chain.UnsignedTx.(*UnsignedCreateChainTx).SubnetID.Equals(args.SubnetID) {
 			response.BlockchainIDs = append(response.BlockchainIDs, chain.ID())
 		}
 	}
@@ -1233,7 +1261,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	}
 
 	for _, chain := range chains {
-		uChain := chain.UnsignedDecisionTx.(*UnsignedCreateChainTx)
+		uChain := chain.UnsignedTx.(*UnsignedCreateChainTx)
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       uChain.ID(),
 			Name:     uChain.ChainName,
@@ -1241,6 +1269,33 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			VMID:     uChain.VMID,
 		})
 	}
+	return nil
+}
+
+// IssueTxArgs ...
+type IssueTxArgs struct {
+	// Raw byte representation of the transaction
+	Tx formatting.CB58 `json:"tx"`
+}
+
+// IssueTxResponse ...
+type IssueTxResponse struct {
+	TxID ids.ID `json:"txID"`
+}
+
+// IssueTx issues a tx
+func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *IssueTxResponse) error {
+	service.vm.Ctx.Log.Info("Platform: IssueTx called")
+
+	tx := &Tx{}
+	if err := service.vm.codec.Unmarshal(args.Tx.Bytes, tx); err != nil {
+		return fmt.Errorf("couldn't parse tx: %w", err)
+	}
+	if err := service.vm.issueTx(tx); err != nil {
+		return fmt.Errorf("couldn't issue tx: %w", err)
+	}
+
+	response.TxID = tx.ID()
 	return nil
 }
 

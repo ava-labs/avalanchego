@@ -21,7 +21,7 @@ var (
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx AtomicTx `serialize:"true" json:"tx"`
+	Tx Tx `serialize:"true" json:"tx"`
 
 	inputs ids.Set
 }
@@ -31,11 +31,16 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
-	txBytes, err := ab.vm.codec.Marshal(&ab.Tx)
+	unsignedBytes, err := vm.codec.Marshal(&ab.Tx.UnsignedTx)
 	if err != nil {
 		return err
 	}
-	return ab.Tx.initialize(vm, txBytes)
+	signedBytes, err := ab.vm.codec.Marshal(&ab.Tx)
+	if err != nil {
+		return err
+	}
+	ab.Tx.Initialize(unsignedBytes, signedBytes)
+	return nil
 }
 
 // Reject implements the snowman.Block interface
@@ -55,10 +60,13 @@ func (ab *AtomicBlock) conflicts(s ids.Set) bool {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
+	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	if !ok {
+		return errWrongTxType
+	}
+	ab.inputs = tx.InputUTXOs()
+
 	parentBlock := ab.parentBlock()
-
-	ab.inputs = ab.Tx.InputUTXOs()
-
 	if parentBlock.conflicts(ab.inputs) {
 		return errConflictingParentTxs
 	}
@@ -73,7 +81,7 @@ func (ab *AtomicBlock) Verify() error {
 	pdb := parent.onAccept()
 
 	ab.onAcceptDB = versiondb.New(pdb)
-	if err := ab.Tx.SemanticVerify(ab.onAcceptDB, ab.Tx.Credentials); err != nil {
+	if err := tx.SemanticVerify(ab.vm, ab.onAcceptDB, &ab.Tx); err != nil {
 		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
 		return err
 	} else if txBytes, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
@@ -93,6 +101,11 @@ func (ab *AtomicBlock) Verify() error {
 func (ab *AtomicBlock) Accept() error {
 	ab.vm.Ctx.Log.Verbo("Accepting block with ID %s", ab.ID())
 
+	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	if !ok {
+		return errWrongTxType
+	}
+
 	if err := ab.CommonBlock.Accept(); err != nil {
 		return err
 	}
@@ -110,7 +123,7 @@ func (ab *AtomicBlock) Accept() error {
 	}
 	defer ab.vm.DB.Abort()
 
-	if err := ab.Tx.Accept(batch); err != nil {
+	if err := tx.Accept(ab.vm.Ctx, batch); err != nil {
 		ab.vm.Ctx.Log.Error("unable to atomically commit block")
 		return err
 	}
@@ -119,7 +132,9 @@ func (ab *AtomicBlock) Accept() error {
 		child.setBaseDatabase(ab.vm.DB)
 	}
 	if ab.onAcceptFunc != nil {
-		ab.onAcceptFunc()
+		if err := ab.onAcceptFunc(); err != nil {
+			return err
+		}
 	}
 
 	ab.free()
@@ -128,7 +143,7 @@ func (ab *AtomicBlock) Accept() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx AtomicTx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{

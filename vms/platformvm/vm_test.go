@@ -241,7 +241,7 @@ func defaultVM() *VM {
 	} else if err := blk.Accept(); err != nil {
 		panic(err)
 	} else {
-		testSubnet1 = tx.UnsignedDecisionTx.(*UnsignedCreateSubnetTx)
+		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
 
 	vm.Ctx.SharedMemory = MockSharedMemory{
@@ -565,7 +565,7 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		testSubnet1.id,
+		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	)
 	if err != nil {
@@ -613,7 +613,7 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 	}
 
 	// Verify that new validator is in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.id)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -646,7 +646,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		keys[0].PublicKey().Address(),
-		testSubnet1.id,
+		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 	)
 	if err != nil {
@@ -694,7 +694,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 	}
 
 	// Verify that new validator NOT in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.id)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, testSubnet1.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -912,7 +912,7 @@ func TestCreateChain(t *testing.T) {
 	}()
 
 	tx, err := vm.newCreateChainTx(
-		testSubnet1.id,
+		testSubnet1.ID(),
 		nil,
 		timestampvm.ID,
 		nil,
@@ -942,7 +942,7 @@ func TestCreateChain(t *testing.T) {
 	}
 	foundNewChain := false
 	for _, chain := range chains {
-		if bytes.Equal(chain.UnsignedDecisionTx.(*UnsignedCreateChainTx).Bytes(), tx.UnsignedDecisionTx.(*UnsignedCreateChainTx).Bytes()) {
+		if bytes.Equal(chain.Bytes(), tx.Bytes()) {
 			foundNewChain = true
 		}
 	}
@@ -1053,7 +1053,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 	foundNewValidator := false
 	for _, tx := range pendingValidators.Txs {
-		if tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.Vdr().ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1118,7 +1118,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 	foundNewValidator = false
 	for _, tx := range currentValidators.Txs {
-		if tx.UnsignedProposalTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.Vdr().ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
