@@ -24,11 +24,11 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
@@ -52,6 +52,7 @@ var (
 	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
+	errInsufficientFunds         = errors.New("insufficient funds")
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -325,7 +326,7 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 // If onDecide is specified, the function will be called when the transaction is
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
-func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
+func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if !vm.bootstrapped {
 		return ids.ID{}, errBootstrapping
 	}
@@ -337,7 +338,6 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
-	tx.onDecide = onDecide
 	return tx.ID(), nil
 }
 
@@ -509,15 +509,12 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		txBytes, err := vm.codec.Marshal(&tx)
-		if err != nil {
+		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 			return err
 		}
-		tx.Initialize(txBytes)
 
 		txID := tx.ID()
-
-		if err = vm.Alias(txID, genesisTx.Alias); err != nil {
+		if err := vm.Alias(txID, genesisTx.Alias); err != nil {
 			return err
 		}
 	}
@@ -539,16 +536,12 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		txBytes, err := vm.codec.Marshal(&tx)
-		if err != nil {
+		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 			return err
 		}
-		tx.Initialize(txBytes)
 
 		txID := tx.ID()
-
 		vm.ctx.Log.Info("Initializing with AssetID %s", txID)
-
 		if err := vm.state.SetTx(txID, &tx); err != nil {
 			return err
 		}
@@ -565,13 +558,17 @@ func (vm *VM) initState(genesisBytes []byte) error {
 	return vm.state.SetDBInitialized(choices.Processing)
 }
 
-func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
+func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	rawTx := &Tx{}
-	err := vm.codec.Unmarshal(b, rawTx)
+	err := vm.codec.Unmarshal(bytes, rawTx)
 	if err != nil {
 		return nil, err
 	}
-	rawTx.Initialize(b)
+	unsignedBytes, err := vm.codec.Marshal(&rawTx.UnsignedTx)
+	if err != nil {
+		return nil, err
+	}
+	rawTx.Initialize(unsignedBytes, bytes)
 
 	tx := &UniqueTx{
 		TxState: &TxState{
@@ -662,6 +659,63 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 		}
 	}
 	return false
+}
+
+func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
+	fxIndex, err := vm.getFx(cred)
+	if err != nil {
+		return err
+	}
+	fx := vm.fxs[fxIndex].Fx
+
+	utxoAssetID := utxo.AssetID()
+	inAssetID := in.AssetID()
+	if !utxoAssetID.Equals(inAssetID) {
+		return errAssetIDMismatch
+	}
+
+	if !vm.verifyFxUsage(fxIndex, inAssetID) {
+		return errIncompatibleFx
+	}
+
+	return fx.VerifyTransfer(tx, in.In, cred, utxo.Out)
+}
+
+func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
+	utxo, err := vm.getUTXO(&in.UTXOID)
+	if err != nil {
+		return err
+	}
+	return vm.verifyTransferOfUTXO(tx, in, cred, utxo)
+}
+
+func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
+	opAssetID := op.AssetID()
+
+	utxos := []interface{}{}
+	for _, utxoID := range op.UTXOIDs {
+		utxo, err := vm.getUTXO(utxoID)
+		if err != nil {
+			return err
+		}
+
+		utxoAssetID := utxo.AssetID()
+		if !utxoAssetID.Equals(opAssetID) {
+			return errAssetIDMismatch
+		}
+		utxos = append(utxos, utxo.Out)
+	}
+
+	fxIndex, err := vm.getFx(op.Op)
+	if err != nil {
+		return err
+	}
+	fx := vm.fxs[fxIndex].Fx
+
+	if !vm.verifyFxUsage(fxIndex, opAssetID) {
+		return errIncompatibleFx
+	}
+	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
 // LoadUser ...
@@ -1039,68 +1093,6 @@ func (vm *VM) MintNFT(
 
 	sortOperationsWithSigners(ops, keys, vm.codec)
 	return ops, keys, nil
-}
-
-// SignSECP256K1Fx ...
-func (vm *VM) SignSECP256K1Fx(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	for _, credKeys := range keys {
-		cred := &secp256k1fx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return fmt.Errorf("problem creating transaction: %w", err)
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
-	}
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	tx.Initialize(b)
-	return nil
-}
-
-// SignNFTFx ...
-func (vm *VM) SignNFTFx(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	for _, credKeys := range keys {
-		cred := &nftfx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return fmt.Errorf("problem creating transaction: %w", err)
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
-	}
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
-	}
-	tx.Initialize(b)
-	return nil
 }
 
 // ParseLocalAddress takes in an address for this chain and produces the ID

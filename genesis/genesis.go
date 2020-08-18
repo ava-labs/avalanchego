@@ -221,11 +221,15 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := avm.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
-	txBytes, err := c.Marshal(&tx)
+	unsignedBytes, err := c.Marshal(tx.UnsignedTx)
 	if err != nil {
 		return ids.ID{}, err
 	}
-	tx.Initialize(txBytes)
+	signedBytes, err := c.Marshal(&tx)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	tx.Initialize(unsignedBytes, signedBytes)
 
 	return tx.ID(), nil
 }

@@ -24,9 +24,9 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
@@ -37,9 +37,9 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 					},
 				},
 			}},
-		},
+		}},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID: ids.NewID([32]byte{
 					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
@@ -58,7 +58,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err != nil {
 		t.Fatal(err)
@@ -70,9 +70,9 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	c := setupCodec()
 
 	tx := &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: asset},
 				Out: &secp256k1fx.TransferOutput{
@@ -83,10 +83,10 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 					},
 				},
 			}},
-			Memo: make([]byte, maxMemoSize+1),
-		},
+			Memo: make([]byte, avax.MaxMemoSize+1),
+		}},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID: ids.NewID([32]byte{
 					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
@@ -105,7 +105,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize([]byte{})
+	tx.Initialize(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
 		t.Fatalf("should have errored due to memo field being too long")
@@ -161,26 +161,28 @@ func TestImportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01,
 		// sig index[0]:
 		0x00, 0x00, 0x00, 0x00,
+		// number of credentials:
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: 2,
-			BCID: ids.NewID([32]byte{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID: 2,
+			BlockchainID: ids.NewID([32]byte{
 				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
 				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
 				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
 			Memo: []byte{0x00, 0x01, 0x02, 0x03},
-		},
+		}},
 		SourceChain: ids.NewID([32]byte{
 			0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
 			0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
 			0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
 			0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		}),
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -201,11 +203,9 @@ func TestImportTxSerialization(t *testing.T) {
 	}}
 
 	c := setupCodec()
-	b, err := c.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
@@ -272,12 +272,12 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  avax.Asset{ID: avaxID},
 			In: &secp256k1fx.TransferInput{
@@ -286,32 +286,11 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
-
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err == nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err == nil {
 		t.Fatal(err)
 	}
 
@@ -338,7 +317,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
 
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
 	}
 	ctx.Lock.Unlock()
@@ -434,12 +413,12 @@ func TestForceAcceptImportTx(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		SourceChain: platformChainID,
-		Ins: []*avax.TransferableInput{{
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
@@ -448,30 +427,9 @@ func TestForceAcceptImportTx(t *testing.T) {
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
-
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	parsedTx, err := vm.ParseTx(tx.Bytes())
 	if err != nil {

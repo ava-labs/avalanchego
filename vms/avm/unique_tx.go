@@ -43,8 +43,6 @@ type TxState struct {
 	deps       []snowstorm.Tx
 
 	status choices.Status
-
-	onDecide func(choices.Status)
 }
 
 func (tx *UniqueTx) refresh() {
@@ -163,10 +161,6 @@ func (tx *UniqueTx) Accept() error {
 
 	tx.deps = nil // Needed to prevent a memory leak
 
-	if tx.onDecide != nil {
-		tx.onDecide(choices.Accepted)
-	}
-
 	return nil
 }
 
@@ -190,10 +184,6 @@ func (tx *UniqueTx) Reject() error {
 	tx.vm.pubsub.Publish("rejected", txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
-
-	if tx.onDecide != nil {
-		tx.onDecide(choices.Rejected)
-	}
 
 	return nil
 }
@@ -320,18 +310,11 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	if err := tx.Tx.SemanticVerify(tx.vm, tx); err != nil {
+	if err := tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx); err != nil {
 		return err
 	}
 
 	tx.verifiedState = true
 	tx.vm.pubsub.Publish("verified", tx.ID())
 	return nil
-}
-
-// UnsignedBytes returns the unsigned bytes of the transaction
-func (tx *UniqueTx) UnsignedBytes() []byte {
-	b, err := tx.vm.codec.Marshal(&tx.UnsignedTx)
-	tx.vm.ctx.Log.AssertNoError(err)
-	return b
 }

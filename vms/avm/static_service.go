@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
@@ -69,9 +70,9 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		asset := GenesisAsset{
 			Alias: assetAlias,
 			CreateAssetTx: CreateAssetTx{
-				BaseTx: BaseTx{
-					BCID: ids.Empty,
-				},
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					BlockchainID: ids.Empty,
+				}},
 				Name:         assetDefinition.Name,
 				Symbol:       assetDefinition.Symbol,
 				Denomination: byte(assetDefinition.Denomination),

@@ -5,7 +5,6 @@ package avm
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -29,7 +28,7 @@ type ExportTx struct {
 	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
 
 	// The outputs this transaction is sending to the other chain
-	Outs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
+	ExportedOuts []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
 // SyntacticVerify that this transaction is well-formed.
@@ -43,58 +42,30 @@ func (t *ExportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.NetID != ctx.NetworkID:
-		return errWrongNetworkID
-	case !t.BCID.Equals(ctx.ChainID):
-		return errWrongChainID
-	case len(t.Memo) > maxMemoSize:
-		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	case t.DestinationChain.IsZero():
 		return errWrongBlockchainID
-	case len(t.Outs) == 0:
+	case len(t.ExportedOuts) == 0:
 		return errNoExportOutputs
 	}
 
-	fc := avax.NewFlowChecker()
-
-	// The txFee must be burned
-	fc.Produce(txFeeAssetID, txFee)
-
-	for _, out := range t.BaseTx.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !avax.IsSortedTransferableOutputs(t.BaseTx.Outs, c) {
-		return errOutputsNotSorted
+	if err := t.MetadataVerify(ctx); err != nil {
+		return err
 	}
 
-	for _, out := range t.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !avax.IsSortedTransferableOutputs(t.Outs, c) {
-		return errOutputsNotSorted
-	}
-
-	for _, in := range t.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-	if !avax.IsSortedAndUniqueTransferableInputs(t.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	return verify.All(fc, &t.Metadata)
+	return avax.VerifyTx(
+		txFee,
+		txFeeAssetID,
+		[][]*avax.TransferableInput{t.Ins},
+		[][]*avax.TransferableOutput{
+			t.Outs,
+			t.ExportedOuts,
+		},
+		c,
+	)
 }
 
 // SemanticVerify that this transaction is valid to be spent.
-func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
 	subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
 	if err != nil {
 		return err
@@ -103,46 +74,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		return errWrongBlockchainID
 	}
 
-	for i, in := range t.Ins {
-		cred := creds[i]
-
-		fxIndex, err := vm.getFx(cred)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
-		utxo, err := vm.getUTXO(&in.UTXOID)
-		if err != nil {
-			return err
-		}
-
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-
-		if !vm.verifyFxUsage(fxIndex, inAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
-			return err
-		}
-	}
-
-	for _, out := range t.BaseTx.Outs {
-		fxIndex, err := vm.getFx(out.Out)
-		if err != nil {
-			return err
-		}
-		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
-			return errIncompatibleFx
-		}
-	}
-
-	for _, out := range t.Outs {
+	for _, out := range t.ExportedOuts {
 		fxIndex, err := vm.getFx(out.Out)
 		if err != nil {
 			return err
@@ -156,7 +88,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		}
 	}
 
-	return nil
+	return t.BaseTx.SemanticVerify(vm, tx, creds)
 }
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
@@ -169,11 +101,11 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.DestinationChain)
-	for i, out := range t.Outs {
+	for i, out := range t.ExportedOuts {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(len(t.BaseTx.Outs) + i),
+				OutputIndex: uint32(len(t.Outs) + i),
 			},
 			Asset: avax.Asset{ID: out.AssetID()},
 			Out:   out.Out,

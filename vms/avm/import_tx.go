@@ -5,7 +5,6 @@ package avm
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
@@ -29,13 +28,13 @@ type ImportTx struct {
 	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
 
 	// The inputs to this transaction
-	Ins []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
+	ImportedIns []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
 func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		in.Symbol = true
 		utxos = append(utxos, &in.UTXOID)
 	}
@@ -45,7 +44,7 @@ func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *ImportTx) ConsumedAssetIDs() ids.Set {
 	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())
 	}
 	return assets
@@ -54,14 +53,14 @@ func (t *ImportTx) ConsumedAssetIDs() ids.Set {
 // AssetIDs returns the IDs of the assets this transaction depends on
 func (t *ImportTx) AssetIDs() ids.Set {
 	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())
 	}
 	return assets
 }
 
 // NumCredentials returns the number of expected credentials
-func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ins) }
+func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.ImportedIns) }
 
 // SyntacticVerify that this transaction is well-formed.
 func (t *ImportTx) SyntacticVerify(
@@ -74,58 +73,30 @@ func (t *ImportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.NetID != ctx.NetworkID:
-		return errWrongNetworkID
-	case !t.BCID.Equals(ctx.ChainID):
-		return errWrongChainID
-	case len(t.Memo) > maxMemoSize:
-		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d", len(t.Memo), maxMemoSize)
 	case t.SourceChain.IsZero():
 		return errWrongBlockchainID
-	case len(t.Ins) == 0:
+	case len(t.ImportedIns) == 0:
 		return errNoImportInputs
 	}
 
-	fc := avax.NewFlowChecker()
-
-	// The txFee must be burned
-	fc.Produce(txFeeAssetID, txFee)
-
-	for _, out := range t.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !avax.IsSortedTransferableOutputs(t.Outs, c) {
-		return errOutputsNotSorted
+	if err := t.MetadataVerify(ctx); err != nil {
+		return err
 	}
 
-	for _, in := range t.BaseTx.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-	if !avax.IsSortedAndUniqueTransferableInputs(t.BaseTx.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	for _, in := range t.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-	if !avax.IsSortedAndUniqueTransferableInputs(t.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	return fc.Verify()
+	return avax.VerifyTx(
+		txFee,
+		txFeeAssetID,
+		[][]*avax.TransferableInput{
+			t.Ins,
+			t.ImportedIns,
+		},
+		[][]*avax.TransferableOutput{t.Outs},
+		c,
+	)
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
+func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
 	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
 	if err != nil {
 		return err
@@ -134,7 +105,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 		return errWrongBlockchainID
 	}
 
-	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
 		return err
 	}
 
@@ -144,44 +115,17 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
 
 	offset := t.BaseTx.NumCredentials()
-	for i, in := range t.Ins {
+	for i, in := range t.ImportedIns {
 		cred := creds[i+offset]
-
-		fxIndex, err := vm.getFx(cred)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
 
 		utxoID := in.UTXOID.InputID()
 		utxo, err := state.UTXO(utxoID)
 		if err != nil {
 			return err
 		}
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-		if !utxoAssetID.Equals(vm.avax) {
-			return errWrongAssetID
-		}
 
-		if !vm.verifyFxUsage(fxIndex, inAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
+		if err := vm.verifyTransferOfUTXO(tx, in, cred, utxo); err != nil {
 			return err
-		}
-	}
-	for _, out := range t.Outs {
-		fxIndex, err := vm.getFx(out.Out)
-		if err != nil {
-			return err
-		}
-		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
-			return errIncompatibleFx
 		}
 	}
 	return nil
@@ -195,7 +139,7 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	vsmDB := versiondb.New(smDB)
 
 	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		utxoID := in.UTXOID.InputID()
 		if err := state.SpendUTXO(utxoID); err != nil {
 			return err

@@ -57,9 +57,9 @@ func TestTxInvalidCredential(t *testing.T) {
 	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
 					TxID:        ids.Empty,
@@ -75,15 +75,12 @@ func TestTxInvalidCredential(t *testing.T) {
 					},
 				},
 			}},
-		},
+		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
@@ -96,9 +93,9 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{
@@ -131,18 +128,15 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 		Creds: []verify.Verifiable{
 			&avax.TestVerifiable{},
 			&avax.TestVerifiable{},
 		},
 	}
-
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
@@ -155,9 +149,9 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	c.RegisterType(&avax.TestVerifiable{})
 
 	tx := &Tx{
-		UnsignedTx: &BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
+		UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 0},
@@ -184,15 +178,12 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 					},
 				},
 			},
-		},
+		}},
 		Creds: []verify.Verifiable{&avax.TestVerifiable{}},
 	}
-
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")

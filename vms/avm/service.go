@@ -61,7 +61,7 @@ type FormattedAssetID struct {
 func (service *Service) IssueTx(r *http.Request, args *FormattedTx, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	txID, err := service.vm.IssueTx(args.Tx.Bytes, nil)
+	txID, err := service.vm.IssueTx(args.Tx.Bytes)
 	if err != nil {
 		return err
 	}
@@ -488,22 +488,22 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: args.Denomination,
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -596,22 +596,22 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: args.Denomination,
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -697,22 +697,22 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	initialState.Sort(service.vm.codec)
 
 	tx := Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Name:         args.Name,
 		Symbol:       args.Symbol,
 		Denomination: 0, // NFTs are non-fungible
 		States:       []*InitialState{initialState},
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
-	assetID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	assetID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -978,17 +978,17 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 	}
 	avax.SortTransferableOutputs(outs, service.vm.codec)
 
-	tx := Tx{UnsignedTx: &BaseTx{
-		NetID: service.vm.ctx.NetworkID,
-		BCID:  service.vm.ctx.ChainID,
-		Outs:  outs,
-		Ins:   ins,
-	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    service.vm.ctx.NetworkID,
+		BlockchainID: service.vm.ctx.ChainID,
+		Outs:         outs,
+		Ins:          ins,
+	}}}
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1073,19 +1073,19 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 	keys = append(keys, opKeys...)
 
 	tx := Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Ops: ops,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1164,22 +1164,22 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	}
 
 	tx := Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Ops: ops,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, secpKeys); err != nil {
 		return err
 	}
-	if err := service.vm.SignNFTFx(&tx, nftKeys); err != nil {
+	if err := tx.SignNFTFx(service.vm.codec, nftKeys); err != nil {
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1258,22 +1258,22 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	}
 
 	tx := Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		Ops: ops,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, secpKeys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, secpKeys); err != nil {
 		return err
 	}
-	if err := service.vm.SignNFTFx(&tx, nftKeys); err != nil {
+	if err := tx.SignNFTFx(service.vm.codec, nftKeys); err != nil {
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1375,20 +1375,20 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 	avax.SortTransferableOutputs(outs, service.vm.codec)
 
 	tx := Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		SourceChain: chainID,
-		Ins:         importInputs,
+		ImportedIns: importInputs,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}
@@ -1477,20 +1477,20 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 	}
 
 	tx := Tx{UnsignedTx: &ExportTx{
-		BaseTx: BaseTx{
-			NetID: service.vm.ctx.NetworkID,
-			BCID:  service.vm.ctx.ChainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    service.vm.ctx.NetworkID,
+			BlockchainID: service.vm.ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
 		DestinationChain: chainID,
-		Outs:             exportOuts,
+		ExportedOuts:     exportOuts,
 	}}
-	if err := service.vm.SignSECP256K1Fx(&tx, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
 	}
 
-	txID, err := service.vm.IssueTx(tx.Bytes(), nil)
+	txID, err := service.vm.IssueTx(tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem issuing transaction: %w", err)
 	}

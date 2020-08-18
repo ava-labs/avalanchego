@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -210,43 +209,13 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 
 	avax.SortTransferableOutputs(outs, w.codec)
 
-	tx := &avm.Tx{
-		UnsignedTx: &avm.BaseTx{
-			NetID: w.networkID,
-			BCID:  w.chainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
-	}
-
-	unsignedBytes, err := w.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return nil, err
-	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	for _, credKeys := range keys {
-		cred := &secp256k1fx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return nil, err
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
-	}
-
-	b, err := w.codec.Marshal(tx)
-	if err != nil {
-		return nil, err
-	}
-	tx.Initialize(b)
-
-	return tx, nil
+	tx := &avm.Tx{UnsignedTx: &avm.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    w.networkID,
+		BlockchainID: w.chainID,
+		Outs:         outs,
+		Ins:          ins,
+	}}}
+	return tx, tx.SignSECP256K1Fx(w.codec, keys)
 }
 
 // GenerateTxs generates the transactions that will be sent

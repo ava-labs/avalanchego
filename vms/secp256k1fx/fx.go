@@ -30,7 +30,7 @@ var (
 	errTooManySigners                 = errors.New("input has more signers than expected")
 	errTooFewSigners                  = errors.New("input has less signers than expected")
 	errInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
-	errWrongSigner                    = errors.New("credential does not produce expected signer")
+	errWrongSigner                    = errors.New("credential does not include expected signer")
 )
 
 // Fx describes the secp256k1 feature extension

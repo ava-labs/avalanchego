@@ -47,7 +47,11 @@ func (s *state) Tx(id ids.ID) (*Tx, error) {
 	if err := s.Codec.Unmarshal(bytes, tx); err != nil {
 		return nil, err
 	}
-	tx.Initialize(bytes)
+	unsignedBytes, err := s.Codec.Marshal(&tx.UnsignedTx)
+	if err != nil {
+		return nil, err
+	}
+	tx.Initialize(unsignedBytes, bytes)
 
 	s.Cache.Put(id, tx)
 	return tx, nil

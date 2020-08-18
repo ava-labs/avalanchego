@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
@@ -17,9 +18,11 @@ import (
 var (
 	errNilTransferableOutput   = errors.New("nil transferable output is not valid")
 	errNilTransferableFxOutput = errors.New("nil transferable feature extension output is not valid")
+	errOutputsNotSorted        = errors.New("outputs not sorted")
 
 	errNilTransferableInput   = errors.New("nil transferable input is not valid")
 	errNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
+	errInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
 )
 
 // Amounter is a data structure that has an amount of something associated with it
@@ -190,4 +193,46 @@ func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*cr
 // sorted and unique
 func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
 	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
+}
+
+// VerifyTx verifies that the inputs and outputs flowcheck, including a fee.
+// Additionally, this verifies that the inputs and outputs are sorted.
+func VerifyTx(
+	feeAmount uint64,
+	feeAssetID ids.ID,
+	allIns [][]*TransferableInput,
+	allOuts [][]*TransferableOutput,
+	c codec.Codec,
+) error {
+	fc := NewFlowChecker()
+
+	fc.Produce(feeAssetID, feeAmount) // The txFee must be burned
+
+	// Add all the outputs to the flow checker and make sure they are sorted
+	for _, outs := range allOuts {
+		for _, out := range outs {
+			if err := out.Verify(); err != nil {
+				return err
+			}
+			fc.Produce(out.AssetID(), out.Output().Amount())
+		}
+		if !IsSortedTransferableOutputs(outs, c) {
+			return errOutputsNotSorted
+		}
+	}
+
+	// Add all the inputs to the flow checker and make sure they are sorted
+	for _, ins := range allIns {
+		for _, in := range ins {
+			if err := in.Verify(); err != nil {
+				return err
+			}
+			fc.Consume(in.AssetID(), in.Input().Amount())
+		}
+		if !IsSortedAndUniqueTransferableInputs(ins) {
+			return errInputsNotSortedUnique
+		}
+	}
+
+	return fc.Verify()
 }
