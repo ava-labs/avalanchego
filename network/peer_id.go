@@ -11,7 +11,7 @@ import (
 type PeerID struct {
 	IP           string    `json:"ip"`
 	PublicIP     string    `json:"publicIP"`
-	ID           string    `json:"id"`
+	ID           string    `json:"nodeID"`
 	Version      string    `json:"version"`
 	LastSent     time.Time `json:"lastSent"`
 	LastReceived time.Time `json:"lastReceived"`
