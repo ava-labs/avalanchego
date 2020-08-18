@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package router
 
 import (
@@ -6,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,10 +20,10 @@ var (
 )
 
 type messageQueue interface {
-	PopMessage() (message, error)    // Pop the next message from the queue
-	PushMessage(message) bool        // Push a message to the queue
-	UtilizeCPU(ids.ShortID, float64) // Registers consumption of CPU time
-	EndInterval()                    // Register end of an interval of real time
+	PopMessage() (message, error)          // Pop the next message from the queue
+	PushMessage(message) bool              // Push a message to the queue
+	UtilizeCPU(ids.ShortID, time.Duration) // Registers consumption of CPU time
+	EndInterval()                          // Register end of an interval of real time
 	Shutdown()
 }
 
@@ -28,16 +32,16 @@ type multiLevelQueue struct {
 	lock sync.Mutex
 
 	validators validators.Set
-	throttler  Throttler
+	throttler  throttler.Throttler
 
 	// Tracks total CPU consumption
-	intervalConsumption, tierConsumption, cpuInterval float64
+	intervalConsumption, tierConsumption, cpuInterval time.Duration
 
 	bufferSize, pendingMessages, currentTier int
 
 	queues        []singleLevelQueue
-	cpuRanges     []float64 // CPU Utilization ranges that should be attributed to a corresponding queue
-	cpuAllotments []float64 // Allotments of CPU time per cycle that should be spent on each level of queue
+	cpuRanges     []float64       // CPU Utilization ranges that should be attributed to a corresponding queue
+	cpuAllotments []time.Duration // Allotments of CPU time per cycle that should be spent on each level of queue
 
 	semaChan chan struct{}
 
@@ -54,14 +58,15 @@ func newMultiLevelQueue(
 	log logging.Logger,
 	metrics *metrics,
 	consumptionRanges []float64,
-	consumptionAllotments []float64,
+	consumptionAllotments []time.Duration,
 	bufferSize int,
-	cpuInterval float64,
-	stakerPortion float64,
+	cpuInterval time.Duration,
+	msgPortion,
+	cpuPortion float64,
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
 	singleLevelSize := bufferSize / len(consumptionRanges)
-	throttler := NewEWMAThrottler(vdrs, uint32(bufferSize), stakerPortion, cpuInterval, log)
+	throttler := throttler.NewEWMAThrottler(vdrs, uint32(bufferSize), msgPortion, cpuPortion, cpuInterval, log)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)
@@ -136,13 +141,13 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 }
 
 // UtilizeCPU...
-func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, time float64) {
+func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.throttler.UtilizeCPU(vdr, time)
-	ml.intervalConsumption += time
-	ml.tierConsumption += time
+	ml.throttler.UtilizeCPU(vdr, duration)
+	ml.intervalConsumption += duration
+	ml.tierConsumption += duration
 	if ml.tierConsumption > ml.cpuAllotments[ml.currentTier] {
 		ml.tierConsumption = 0
 		ml.currentTier++
@@ -156,7 +161,7 @@ func (ml *multiLevelQueue) EndInterval() {
 	defer ml.lock.Unlock()
 
 	ml.throttler.EndInterval()
-	ml.metrics.cpu.Observe(ml.intervalConsumption / float64(time.Millisecond))
+	ml.metrics.cpu.Observe(float64(ml.intervalConsumption.Milliseconds()))
 	ml.intervalConsumption = 0
 }
 

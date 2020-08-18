@@ -1710,6 +1710,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		vdrs,
 		msgChan,
 		1000,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

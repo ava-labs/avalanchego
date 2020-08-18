@@ -105,24 +105,25 @@ type manager struct {
 	// That is, [chainID].String() is an alias for the chain, too
 	ids.Aliaser
 
-	stakingEnabled  bool // True iff the network has staking enabled
-	log             logging.Logger
-	logFactory      logging.Factory
-	vmManager       vms.Manager // Manage mappings from vm ID --> vm
-	decisionEvents  *triggers.EventDispatcher
-	consensusEvents *triggers.EventDispatcher
-	db              database.Database
-	chainRouter     router.Router      // Routes incoming messages to the appropriate chain
-	net             network.Network    // Sends consensus messages to other validators
-	timeoutManager  *timeout.Manager   // Manages request timeouts when sending messages to other validators
-	consensusParams avacon.Parameters  // The consensus parameters (alpha, beta, etc.) for new chains
-	validators      validators.Manager // Validators validating on this chain
-	registrants     []Registrant       // Those notified when a chain is created
-	nodeID          ids.ShortID        // The ID of this node
-	networkID       uint32             // ID of the network this node is connected to
-	server          *api.Server        // Handles HTTP API calls
-	keystore        *keystore.Keystore
-	sharedMemory    *atomic.SharedMemory
+	stakingEnabled                     bool // True iff the network has staking enabled
+	stakerMsgPortion, stakerCPUPortion float64
+	log                                logging.Logger
+	logFactory                         logging.Factory
+	vmManager                          vms.Manager // Manage mappings from vm ID --> vm
+	decisionEvents                     *triggers.EventDispatcher
+	consensusEvents                    *triggers.EventDispatcher
+	db                                 database.Database
+	chainRouter                        router.Router      // Routes incoming messages to the appropriate chain
+	net                                network.Network    // Sends consensus messages to other validators
+	timeoutManager                     *timeout.Manager   // Manages request timeouts when sending messages to other validators
+	consensusParams                    avacon.Parameters  // The consensus parameters (alpha, beta, etc.) for new chains
+	validators                         validators.Manager // Validators validating on this chain
+	registrants                        []Registrant       // Those notified when a chain is created
+	nodeID                             ids.ShortID        // The ID of this node
+	networkID                          uint32             // ID of the network this node is connected to
+	server                             *api.Server        // Handles HTTP API calls
+	keystore                           *keystore.Keystore
+	sharedMemory                       *atomic.SharedMemory
 
 	// Key: Chain's ID
 	// Value: The chain
@@ -139,6 +140,8 @@ type manager struct {
 // TODO: Make this function take less arguments
 func New(
 	stakingEnabled bool,
+	stakerMsgPortion,
+	stakerCPUPortion float64,
 	log logging.Logger,
 	logFactory logging.Factory,
 	vmManager vms.Manager,
@@ -162,24 +165,26 @@ func New(
 	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
 
 	m := &manager{
-		stakingEnabled:  stakingEnabled,
-		log:             log,
-		logFactory:      logFactory,
-		vmManager:       vmManager,
-		decisionEvents:  decisionEvents,
-		consensusEvents: consensusEvents,
-		db:              db,
-		chainRouter:     rtr,
-		net:             net,
-		timeoutManager:  &timeoutManager,
-		consensusParams: consensusParams,
-		validators:      validators,
-		nodeID:          nodeID,
-		networkID:       networkID,
-		server:          server,
-		keystore:        keystore,
-		sharedMemory:    sharedMemory,
-		chains:          make(map[[32]byte]*router.Handler),
+		stakingEnabled:   stakingEnabled,
+		stakerMsgPortion: stakerMsgPortion,
+		stakerCPUPortion: stakerCPUPortion,
+		log:              log,
+		logFactory:       logFactory,
+		vmManager:        vmManager,
+		decisionEvents:   decisionEvents,
+		consensusEvents:  consensusEvents,
+		db:               db,
+		chainRouter:      rtr,
+		net:              net,
+		timeoutManager:   &timeoutManager,
+		consensusParams:  consensusParams,
+		validators:       validators,
+		nodeID:           nodeID,
+		networkID:        networkID,
+		server:           server,
+		keystore:         keystore,
+		sharedMemory:     sharedMemory,
+		chains:           make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
 	return m
@@ -473,6 +478,8 @@ func (m *manager) createAvalancheChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.stakerMsgPortion,
+		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
@@ -549,6 +556,8 @@ func (m *manager) createSnowmanChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.stakerMsgPortion,
+		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)

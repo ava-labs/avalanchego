@@ -466,6 +466,8 @@ func (n *Node) initAPIServer() {
 func (n *Node) initChainManager() {
 	n.chainManager = chains.New(
 		n.Config.EnableStaking,
+		n.Config.StakerMsgPortion,
+		n.Config.StakerCPUPortion,
 		n.Log,
 		n.LogFactory,
 		n.vmManager,
