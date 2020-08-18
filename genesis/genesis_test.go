@@ -4,8 +4,10 @@
 package genesis
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/platformvm"
@@ -141,104 +143,110 @@ func TestGenesis(t *testing.T) {
 	}
 }
 
-// TODO: Uncomment when the genesis is finalized
+func TestVMGenesis(t *testing.T) {
+	tests := []struct {
+		networkID  uint32
+		vmID       ids.ID
+		expectedID string
+	}{
+		{
+			networkID:  constants.EverestID,
+			vmID:       avm.ID,
+			expectedID: "2azgNLYq32pB4dWKbTrcKXJtDZ4AswnqX3ty2zMvaiZse21Gnr",
+		},
+		{
+			networkID:  constants.DenaliID,
+			vmID:       avm.ID,
+			expectedID: "2X3Rb9M8aE7pPf1uc8SRirmWNBWCRfpq9KBwb38Zy27SpBoGuU",
+		},
+		{
+			networkID:  constants.CascadeID,
+			vmID:       avm.ID,
+			expectedID: "ra9hFBUy4ZegKwWfUCvSyQNRyY9hxHYWZXQvHdDctpCYRaGdc",
+		},
+		{
+			networkID:  constants.LocalID,
+			vmID:       avm.ID,
+			expectedID: "2VvmkRw4yrz8tPrVnCCbvEK1JxNyujpqhmU6SGonxMpkWBx9UD",
+		},
+		{
+			networkID:  constants.EverestID,
+			vmID:       EVMID,
+			expectedID: "2KsVS9rTFoi7sM1rwqTK3h85WLrLDeFvifAmHC9tTqMwVAT1Jd",
+		},
+		{
+			networkID:  constants.DenaliID,
+			vmID:       EVMID,
+			expectedID: "fHswrsVLLtNH9vnUzio2Lrw9FBEXG9EPp3fnH88DYpGWyV37f",
+		},
+		{
+			networkID:  constants.CascadeID,
+			vmID:       EVMID,
+			expectedID: "2gpRyuEGkRt1LMz2m4aSZ4gfxAzoZijxBALCZkSzzpxroAPTVJ",
+		},
+		{
+			networkID:  constants.LocalID,
+			vmID:       EVMID,
+			expectedID: "f5DjTrC9YJPagt9ogKgKPYpp7KMaCBKsv7AeqfonpTiw6rBec",
+		},
+	}
 
-// func TestVMGenesis(t *testing.T) {
-// 	tests := []struct {
-// 		networkID  uint32
-// 		vmID       ids.ID
-// 		expectedID string
-// 	}{
-// 		{
-// 			networkID:  EverestID,
-// 			vmID:       avm.ID,
-// 			expectedID: "Qr1HjshGTPR94z1cuHoKPykJhDoRDuoRDZiR8ayxn27CXLU7T",
-// 		},
-// 		{
-// 			networkID:  DenaliID,
-// 			vmID:       avm.ID,
-// 			expectedID: "gUadbMhXxsTmRFiDTouhiw3Kp1shRZ178tGxrfW1dGw7neGbX",
-// 		},
-// 		{
-// 			networkID:  CascadeID,
-// 			vmID:       avm.ID,
-// 			expectedID: "oHeDJzpCh8sJS4scRtS9oQLgeYwNQywFcsgoZFicA662CcoZ4",
-// 		},
-// 		{
-// 			networkID:  LocalID,
-// 			vmID:       avm.ID,
-// 			expectedID: "bSyUk9ZN4phchjkswxFvJC4cFPrdWQdSZADiLDGQW8ze5TtRN",
-// 		},
-// 		{
-// 			networkID:  EverestID,
-// 			vmID:       EVMID,
-// 			expectedID: "htVdB6qqhyM5iHA8FBrXrxBvtNm9tAmaupkWHv79JzS7LF5Su",
-// 		},
-// 		{
-// 			networkID:  DenaliID,
-// 			vmID:       EVMID,
-// 			expectedID: "2k2qmKmR8tFozCyALxcLGot5s7CZFaNZPmcsoHv9Z31iuWVuoC",
-// 		},
-// 		{
-// 			networkID:  CascadeID,
-// 			vmID:       EVMID,
-// 			expectedID: "2mecQcyhZmBSwJgWCZfXGhVCAsn8fNhieenGYZj1LvqWmyWAfN",
-// 		},
-// 		{
-// 			networkID:  LocalID,
-// 			vmID:       EVMID,
-// 			expectedID: "zbv2btTBZyodqpoPyq8rNNeF9gDQqGuiQiiQAP4vQiLbMf5c5",
-// 		},
-// 	}
+	for _, test := range tests {
+		name := fmt.Sprintf("%s-%s",
+			constants.NetworkIDToNetworkName[test.networkID],
+			test.vmID,
+		)
+		t.Run(name, func(t *testing.T) {
+			genesisTx, err := VMGenesis(test.networkID, test.vmID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result := genesisTx.ID().String(); test.expectedID != result {
+				t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
+					test.vmID,
+					test.networkID,
+					test.expectedID,
+					result)
+			}
+		})
+	}
+}
 
-// 	for _, test := range tests {
-// 		genesisTx, err := VMGenesis(test.networkID, test.vmID)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		if result := genesisTx.ID().String(); test.expectedID != result {
-// 			t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
-// 				test.vmID,
-// 				test.networkID,
-// 				test.expectedID,
-// 				result)
-// 		}
-// 	}
-// }
+func TestAVAXAssetID(t *testing.T) {
+	tests := []struct {
+		networkID  uint32
+		expectedID string
+	}{
+		{
+			networkID:  constants.EverestID,
+			expectedID: "47yAUKq1Bxzk7tGmfxZqiiHMYo4A2GNyXWGmohrgpbn8uCu7r",
+		},
+		{
+			networkID:  constants.DenaliID,
+			expectedID: "47yAUKq1Bxzk7tGmfxZqiiHMYo4A2GNyXWGmohrgpbn8uCu7r",
+		},
+		{
+			networkID:  constants.CascadeID,
+			expectedID: "47yAUKq1Bxzk7tGmfxZqiiHMYo4A2GNyXWGmohrgpbn8uCu7r",
+		},
+		{
+			networkID:  constants.LocalID,
+			expectedID: "2TrXx5kLGWa9RP3RiYWi7VkmNbppwPU4DCmTdqwuKzGFE7fsvP",
+		},
+	}
 
-// func TestAVAXAssetID(t *testing.T) {
-// 	tests := []struct {
-// 		networkID  uint32
-// 		expectedID string
-// 	}{
-// 		{
-// 			networkID:  EverestID,
-// 			expectedID: "2JttwD4vZYYUETj12MMcCnGzcf1WBfSi6fPrHeZVdCXj5y4iYM",
-// 		},
-// 		{
-// 			networkID:  DenaliID,
-// 			expectedID: "2JttwD4vZYYUETj12MMcCnGzcf1WBfSi6fPrHeZVdCXj5y4iYM",
-// 		},
-// 		{
-// 			networkID:  CascadeID,
-// 			expectedID: "2JttwD4vZYYUETj12MMcCnGzcf1WBfSi6fPrHeZVdCXj5y4iYM",
-// 		},
-// 		{
-// 			networkID:  LocalID,
-// 			expectedID: "Q4KMfeLXTBgBpr367pRUuBzLoJqs2QtkvVJ6r4zV12HVj5K7X",
-// 		},
-// 	}
-
-// 	for _, test := range tests {
-// 		_, avaxAssetID, err := Genesis(test.networkID)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		if result := avaxAssetID.String(); test.expectedID != result {
-// 			t.Fatalf("AVAX assetID with networkID %d was expected to be %s but was %s",
-// 				test.networkID,
-// 				test.expectedID,
-// 				result)
-// 		}
-// 	}
-// }
+	for _, test := range tests {
+		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+			_, avaxAssetID, err := Genesis(test.networkID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result := avaxAssetID.String(); test.expectedID != result {
+				t.Fatalf("AVAX assetID with networkID %d was expected to be %s but was %s",
+					test.networkID,
+					test.expectedID,
+					result)
+			}
+		})
+	}
+}
