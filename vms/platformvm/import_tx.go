@@ -100,10 +100,6 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		return permError{err}
 	}
 
-	// Verify (but don't spend) imported inputs
-	smDB := vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
-
 	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
 	for index, input := range tx.Ins {
 		utxoID := input.UTXOID.InputID()
@@ -113,6 +109,25 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		}
 		utxos[index] = utxo
 	}
+
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := vm.consumeInputs(db, tx.Ins); err != nil {
+		return tempError{err}
+	}
+	// Produce the UTXOS
+	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return tempError{err}
+	}
+
+	if !vm.bootstrapped {
+		return nil
+	}
+
+	// Verify (but don't spend) imported inputs
+	smDB := vm.Ctx.SharedMemory.GetDatabase(tx.SourceChain)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(tx.SourceChain)
 
 	state := avax.NewPrefixedState(smDB, vm.codec, vm.Ctx.ChainID, tx.SourceChain)
 	for index, input := range tx.ImportedInputs {
@@ -128,23 +143,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-	// Verify the flowcheck
-	if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
-		return err
-	}
-
-	txID := tx.ID()
-
-	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return tempError{err}
-	}
-	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return tempError{err}
-	}
-
-	return nil
+	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.avaxAssetID)
 }
 
 // Accept this transaction and spend imported inputs

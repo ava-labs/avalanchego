@@ -1255,8 +1255,6 @@ func TestAtomicImport(t *testing.T) {
 	}
 }
 
-/* TODO I don't know what this is supposed to test but it's broken.
-   Should we keep this?
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	vm := defaultVM()
@@ -1266,67 +1264,66 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	avmID := ids.Empty.Prefix(0)
-	utxoID := avax.UTXOID{
-		TxID:        ids.Empty.Prefix(1),
-		OutputIndex: 1,
-	}
-	assetID := ids.Empty.Prefix(2)
-	amount := uint64(50000)
-	key := keys[0]
-
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
-
-	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
-
-	tx, err := vm.newImportTx(
-		defaultNonce+1,
-		testNetworkID,
-		[]*avax.TransferableInput{&avax.TransferableInput{
-			UTXOID: utxoID,
-			Asset:  avax.Asset{ID: assetID},
+	tx := Tx{UnsignedTx: &UnsignedImportTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.Ctx.NetworkID,
+			BlockchainID: vm.Ctx.ChainID,
+		}},
+		SourceChain: vm.avm,
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(1),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: vm.avaxAssetID},
 			In: &secp256k1fx.TransferInput{
-				Amt:   amount,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				Amt: 50000,
 			},
 		}},
-		[][]*crypto.PrivateKeySECP256K1R{[]*crypto.PrivateKeySECP256K1R{key}},
-		key,
-	)
+	}}
+	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
+		t.Fatal(err)
+	}
+
+	preferredHeight, err := vm.preferredHeight()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vm.avax = assetID
-	vm.avm = avmID
-
-	blk, err := vm.newAtomicBlock(vm.Preferred(), tx)
+	blk, err := vm.newAtomicBlock(vm.Preferred(), preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if err := blk.Verify(); err == nil {
-		t.Fatalf("should have errored due to an invalid atomic utxo")
+		t.Fatalf("Block should have failed verification due to missing UTXOs")
 	}
 
-	previousAccount, err := vm.getAccount(vm.DB, key.PublicKey().Address())
+	if err := vm.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := vm.getStatus(vm.DB, tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	blk.Accept()
-
-	newAccount, err := vm.getAccount(vm.DB, key.PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if newAccount.Balance != previousAccount.Balance+amount {
-		t.Fatalf("failed to provide funds")
+	if status != Committed {
+		t.Fatalf("Wrong status returned. Expected %s; Got %s", Committed, status)
 	}
 }
-*/
 
 // test restarting the node
 func TestRestartPartiallyAccepted(t *testing.T) {

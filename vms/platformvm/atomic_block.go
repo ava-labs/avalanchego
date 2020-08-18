@@ -84,9 +84,9 @@ func (ab *AtomicBlock) Verify() error {
 	if err := tx.SemanticVerify(ab.vm, ab.onAcceptDB, &ab.Tx); err != nil {
 		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
 		return err
-	} else if txBytes, err := ab.vm.codec.Marshal(ab.Tx); err != nil {
-		return err
-	} else if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
+	}
+	txBytes := ab.Tx.Bytes()
+	if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
 		return err
 	} else if err := ab.vm.putStatus(ab.onAcceptDB, ab.Tx.ID(), Committed); err != nil {
 		return err

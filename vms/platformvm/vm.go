@@ -202,6 +202,9 @@ type VM struct {
 	// These txs may be re-issued and put into accepted blocks, so check the database
 	// to see if it was later committed/aborted before reporting that it's dropped
 	droppedTxCache cache.LRU
+
+	// Bootstrapped remembers if this chain has finished bootstrapping or not
+	bootstrapped bool
 }
 
 // Initialize this blockchain.
@@ -449,10 +452,10 @@ func (vm *VM) createChain(tx *Tx) {
 }
 
 // Bootstrapping marks this VM as bootstrapping
-func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
+func (vm *VM) Bootstrapping() error { vm.bootstrapped = false; return vm.fx.Bootstrapping() }
 
 // Bootstrapped marks this VM as bootstrapped
-func (vm *VM) Bootstrapped() error { return vm.fx.Bootstrapped() }
+func (vm *VM) Bootstrapped() error { vm.bootstrapped = true; return vm.fx.Bootstrapped() }
 
 // Shutdown this blockchain
 func (vm *VM) Shutdown() error {
