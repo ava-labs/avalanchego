@@ -180,7 +180,7 @@ func init() {
 	networkName := fs.String("network-id", defaultNetworkName, "Network ID this node will connect to")
 
 	// AVAX fees:
-	fs.Uint64Var(&Config.AvaxTxFee, "avax-tx-fee", units.MilliAvax, "AVAX transaction fee, in nAVAX")
+	fs.Uint64Var(&Config.TxFee, "tx-fee", units.MilliAvax, "Transaction fee, in nAVAX")
 
 	// Minimum stake, in nAVAX, required to validate the Default Subnet
 	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the Default Subnet")

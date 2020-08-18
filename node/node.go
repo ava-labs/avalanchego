@@ -452,18 +452,18 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			StakingEnabled: n.Config.EnableStaking,
 			AVAX:           avaxAssetID,
 			AVM:            createAVMTx.ID(),
-			Fee:            n.Config.AvaxTxFee,
+			Fee:            n.Config.TxFee,
 			MinStake:       n.Config.MinStake,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			AVAX: avaxAssetID,
-			Fee:  n.Config.AvaxTxFee,
+			Fee:  n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: path.Join(n.Config.PluginDir, "evm"),
 		}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
-			TxFee: n.Config.AvaxTxFee,
+			TxFee: n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),

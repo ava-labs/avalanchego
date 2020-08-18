@@ -21,7 +21,7 @@ type Config struct {
 	NetworkID uint32
 
 	// Transaction fee configuration
-	AvaxTxFee uint64
+	TxFee uint64
 
 	// Minimum stake, in nAVAX, required to validate the Default Subnet
 	MinStake uint64
