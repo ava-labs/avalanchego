@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
@@ -107,44 +108,33 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	keyIntf1, err := vm.factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	key1 := keyIntf1.(*crypto.PrivateKeySECP256K1R)
-
-	keyIntf2, err := vm.factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	key2 := keyIntf2.(*crypto.PrivateKeySECP256K1R)
+	vdrRewardAddress := ids.GenerateTestShortID()
+	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
-	vdrDestination := key1.PublicKey().Address()
+	vdrNodeID := ids.GenerateTestShortID()
 	vdrTx, err := vm.newAddDefaultSubnetValidatorTx(
 		MinimumStakeAmount, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
-		vdrDestination, // node ID
-		vdrDestination, // reward address
+		vdrNodeID,        // node ID
+		vdrRewardAddress, // reward address
 		NumberOfShares/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	unsignedVdrTx := vdrTx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
 
 	delStartTime := vdrStartTime + 1
 	delEndTime := vdrEndTime - 1
-	delDestination := key2.PublicKey().Address()
 	delTx, err := vm.newAddDefaultSubnetDelegatorTx(
 		MinimumStakeAmount, // stakeAmt
 		delStartTime,
 		delEndTime,
-		vdrDestination,                          // node ID
-		delDestination,                          // reward address
+		vdrNodeID,                               // node ID
+		delRewardAddress,                        // reward address
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
 	if err != nil {
@@ -175,9 +165,9 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	vdrDestSet := ids.ShortSet{}
-	vdrDestSet.Add(vdrDestination)
+	vdrDestSet.Add(vdrRewardAddress)
 	delDestSet := ids.ShortSet{}
-	delDestSet.Add(keys[0].PublicKey().Address())
+	delDestSet.Add(delRewardAddress)
 
 	expectedReward := reward(
 		time.Unix(int64(delEndTime), 0).Sub(time.Unix(int64(delStartTime), 0)), // duration
@@ -187,31 +177,46 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
-	if oldVdrBalance, err := vm.getBalance(vm.DB, vdrDestSet); err != nil {
-		t.Fatal(err)
-	} else if commitVdrBalance, err := vm.getBalance(onCommitDB, vdrDestSet); err != nil {
-		t.Fatal(err)
-	} else if vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance); err != nil || vdrReward == 0 && InflationRate > 1.0 {
+	oldVdrBalance, err := vm.getBalance(vm.DB, vdrDestSet)
+	assert.NoError(t, err)
+	commitVdrBalance, err := vm.getBalance(onCommitDB, vdrDestSet)
+	assert.NoError(t, err)
+	vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance)
+	assert.NoError(t, err)
+	if vdrReward == 0 && InflationRate > 1.0 {
 		t.Fatal("expected delegatee balance to increase because of reward")
-	} else if oldDelBalance, err := vm.getBalance(vm.DB, delDestSet); err != nil {
-		t.Fatal(err)
-	} else if commitDelBalance, err := vm.getBalance(onCommitDB, delDestSet); err != nil {
-		t.Fatal(err)
-	} else if delBalanceChange, err := math.Sub64(commitDelBalance, oldDelBalance); err != nil || delBalanceChange == 0 {
-		t.Fatal("expected delgator balance to increase upon commit")
-	} else if delReward, err := math.Sub64(delBalanceChange, unsignedVdrTx.Validator.Weight()); err != nil || delReward == 0 && InflationRate > 1.0 {
-		t.Fatal("expected delegator reward to be non-zero")
-	} else if delReward < vdrReward {
+	}
+
+	oldDelBalance, err := vm.getBalance(vm.DB, delDestSet)
+	assert.NoError(t, err)
+	commitDelBalance, err := vm.getBalance(onCommitDB, delDestSet)
+	assert.NoError(t, err)
+	delReward, err := math.Sub64(commitDelBalance, oldDelBalance)
+	assert.NoError(t, err)
+	if delReward == 0 && InflationRate > 1.0 {
+		t.Fatal("expected delegator balance to increase because of reward")
+	}
+
+	if delReward < vdrReward {
 		t.Fatal("the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
-	} else if delReward+vdrReward != expectedReward {
+	}
+	if delReward+vdrReward != expectedReward {
 		t.Fatalf("expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
-	} else if abortVdrBalance, err := vm.getBalance(onAbortDB, vdrDestSet); err != nil {
-		t.Fatal(err)
-	} else if vdrReward, err = math.Sub64(abortVdrBalance, oldVdrBalance); err != nil || vdrReward != 0 && InflationRate > 1.0 {
-		t.Fatal("expected delgatee balance to stay the same upon abort")
-	} else if abortDelBalance, err := vm.getBalance(onAbortDB, delDestSet); err != nil {
-		t.Fatal(err)
-	} else if delReward, err = math.Sub64(abortDelBalance, oldDelBalance); err != nil || delReward != unsignedDelTx.Validator.Weight() {
-		t.Fatal("expected delgator balance to increase by stake amount upon abort")
+	}
+
+	abortVdrBalance, err := vm.getBalance(onAbortDB, vdrDestSet)
+	assert.NoError(t, err)
+	vdrReward, err = math.Sub64(abortVdrBalance, oldVdrBalance)
+	assert.NoError(t, err)
+	if vdrReward != 0 {
+		t.Fatal("expected delegatee balance to stay the same")
+	}
+
+	abortDelBalance, err := vm.getBalance(onAbortDB, delDestSet)
+	assert.NoError(t, err)
+	delReward, err = math.Sub64(abortDelBalance, oldDelBalance)
+	assert.NoError(t, err)
+	if delReward != 0 {
+		t.Fatal("expected delegatee balance to stay the same")
 	}
 }
