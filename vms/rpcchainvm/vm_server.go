@@ -7,8 +7,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
-
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
@@ -23,6 +21,7 @@ import (
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"

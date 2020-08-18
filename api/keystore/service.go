@@ -339,6 +339,8 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
+	ks.log.Info("Keystore: GetDatabase called with %s from %s", username, bID)
+
 	usr, err := ks.getUser(username)
 	if err != nil {
 		return nil, err
