@@ -21,6 +21,9 @@ var (
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 	errWrongLocktime                = errors.New("wrong locktime reported")
 	errUnknownOwners                = errors.New("unknown owners")
+	errCantSign                     = errors.New("can't sign")
+	errInputOverflow                = errors.New("inputs overflowed uint64")
+	errOutputOverflow               = errors.New("outputs overflowed uint64")
 )
 
 // stake the provided amount while deducting the provided fee.
@@ -279,24 +282,17 @@ func (vm *VM) stake(
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
 
-var (
-	errUnknownOwner   = errors.New("unknown owner type")
-	errCantSign       = errors.New("can't sign")
-	errInputOverflow  = errors.New("inputs overflowed uint64")
-	errOutputOverflow = errors.New("outputs overflowed uint64")
-)
-
-// authorize ...
+// authorize an operation on behalf of the named subnet with the provided keys.
 func (vm *VM) authorize(
 	db database.Database,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
-	verify.Verifiable,
-	[]*crypto.PrivateKeySECP256K1R,
+	verify.Verifiable, // Input that names owners
+	[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
 	error,
 ) {
-	// Get information about the subnet we're adding a chain to
+	// Get information about the subnet we're authorizing the operation for
 	subnet, err := vm.getSubnet(db, subnetID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("subnet %s doesn't exist", subnetID)
@@ -305,7 +301,7 @@ func (vm *VM) authorize(
 	// Make sure the owners of the subnet match the provided keys
 	owner, ok := subnet.UnsignedTx.(*UnsignedCreateSubnetTx).Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, nil, errUnknownOwner
+		return nil, nil, errUnknownOwners
 	}
 
 	// Add the keys to a keychain
@@ -314,8 +310,10 @@ func (vm *VM) authorize(
 		kc.Add(key)
 	}
 
-	// Attempt to prove ownership of the subnet
+	// Make sure that the operation is valid after a minimum time
 	now := uint64(vm.clock.Time().Unix())
+
+	// Attempt to prove ownership of the subnet
 	indices, signers, matches := kc.Match(owner, now)
 	if !matches {
 		return nil, nil, errCantSign
@@ -330,18 +328,18 @@ func (vm *VM) authorize(
 // * sum(inputs{locked}) >= sum(outputs{locked})
 func syntacticVerifySpend(
 	ins []*avax.TransferableInput,
-	unlockedOuts []*avax.TransferableOutput,
-	lockedOuts []*avax.TransferableOutput,
-	locked uint64,
-	burnedUnlocked uint64,
-	avaxAssetID ids.ID,
+	returnedOuts []*avax.TransferableOutput,
+	stakedOuts []*avax.TransferableOutput,
+	stakedAmount uint64,
+	feeAmount uint64,
+	feeAssetID ids.ID,
 ) error {
 	// AVAX consumed in this tx
 	consumedLocked := uint64(0)
 	consumedUnlocked := uint64(0)
 	for _, in := range ins {
-		if assetID := in.AssetID(); !assetID.Equals(avaxAssetID) { // all inputs must be AVAX
-			return fmt.Errorf("input has unexpected asset ID %s expected %s", assetID, avaxAssetID)
+		if assetID := in.AssetID(); !assetID.Equals(feeAssetID) {
+			return fmt.Errorf("input has unexpected asset ID %s expected %s", assetID, feeAssetID)
 		}
 
 		in := in.Input()
@@ -362,10 +360,10 @@ func syntacticVerifySpend(
 	}
 
 	// AVAX produced in this tx
-	producedUnlocked := burnedUnlocked
-	for _, out := range unlockedOuts {
-		if assetID := out.AssetID(); !assetID.Equals(avaxAssetID) { // all outputs must be AVAX
-			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, avaxAssetID)
+	producedUnlocked := feeAmount
+	for _, out := range returnedOuts {
+		if assetID := out.AssetID(); !assetID.Equals(feeAssetID) {
+			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, feeAssetID)
 		}
 
 		out := out.Output()
@@ -381,9 +379,9 @@ func syntacticVerifySpend(
 
 	// AVAX produced in this tx
 	producedLocked := uint64(0)
-	for _, out := range lockedOuts {
-		if assetID := out.AssetID(); !assetID.Equals(avaxAssetID) { // all outputs must be AVAX
-			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, avaxAssetID)
+	for _, out := range stakedOuts {
+		if assetID := out.AssetID(); !assetID.Equals(feeAssetID) {
+			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, feeAssetID)
 		}
 
 		out := out.Output()
@@ -394,49 +392,13 @@ func syntacticVerifySpend(
 		}
 		producedLocked = newProduced
 	}
-	if producedLocked < locked {
+	if producedLocked < stakedAmount {
 		return fmt.Errorf("tx locked outputs (%d) < required locked (%d)",
-			producedLocked, locked)
+			producedLocked, stakedAmount)
 	}
 	if producedUnlocked > consumedUnlocked {
 		return fmt.Errorf("tx unlocked outputs (%d) + burn amount (%d) > inputs (%d)",
-			producedUnlocked-burnedUnlocked, burnedUnlocked, consumedUnlocked)
-	}
-	return nil
-}
-
-// Removes the UTXOs consumed by [ins] from the UTXO set
-func (vm *VM) consumeInputs(
-	db database.Database,
-	ins []*avax.TransferableInput,
-) error {
-	for _, input := range ins {
-		utxoID := input.UTXOID.InputID()
-		if err := vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{err}
-		}
-	}
-	return nil
-}
-
-// Adds the UTXOs created by [outs] to the UTXO set.
-// [txID] is the ID of the tx that created [outs].
-func (vm *VM) produceOutputs(
-	db database.Database,
-	txID ids.ID,
-	outs []*avax.TransferableOutput,
-) error {
-	for index, out := range outs {
-		if err := vm.putUTXO(db, &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(index),
-			},
-			Asset: avax.Asset{ID: vm.avaxAssetID},
-			Out:   out.Output(),
-		}); err != nil {
-			return err
-		}
+			producedUnlocked-feeAmount, feeAmount, consumedUnlocked)
 	}
 	return nil
 }
@@ -614,5 +576,41 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 	}
 
+	return nil
+}
+
+// Removes the UTXOs consumed by [ins] from the UTXO set
+func (vm *VM) consumeInputs(
+	db database.Database,
+	ins []*avax.TransferableInput,
+) error {
+	for _, input := range ins {
+		utxoID := input.UTXOID.InputID()
+		if err := vm.removeUTXO(db, utxoID); err != nil {
+			return tempError{err}
+		}
+	}
+	return nil
+}
+
+// Adds the UTXOs created by [outs] to the UTXO set.
+// [txID] is the ID of the tx that created [outs].
+func (vm *VM) produceOutputs(
+	db database.Database,
+	txID ids.ID,
+	outs []*avax.TransferableOutput,
+) error {
+	for index, out := range outs {
+		if err := vm.putUTXO(db, &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(index),
+			},
+			Asset: avax.Asset{ID: vm.avaxAssetID},
+			Out:   out.Output(),
+		}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
