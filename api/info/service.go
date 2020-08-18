@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/version"
 
@@ -29,10 +30,11 @@ type Info struct {
 	log          logging.Logger
 	networking   network.Network
 	chainManager chains.Manager
+	txFee        uint64
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID, networkID uint32, chainManager chains.Manager, peers network.Network) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID, networkID uint32, chainManager chains.Manager, peers network.Network, txFee uint64) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -44,6 +46,7 @@ func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID,
 		log:          log,
 		chainManager: chainManager,
 		networking:   peers,
+		txFee:        txFee,
 	}, "info"); err != nil {
 		return nil, err
 	}
@@ -159,5 +162,15 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 		return fmt.Errorf("there is no chain with alias/ID '%s'", args.Chain)
 	}
 	reply.IsBootstrapped = service.chainManager.IsBootstrapped(chainID)
+	return nil
+}
+
+// GetTxFee returns the transaction fee in nAVAX.
+// Note that the transaction fee is a command line argument and this node's view
+// of the transaction fee may be different than another node's.
+func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *struct {
+	Fee json.Uint64 `json:"txFee"`
+}) error {
+	reply.Fee = json.Uint64(service.txFee)
 	return nil
 }

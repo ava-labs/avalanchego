@@ -547,7 +547,7 @@ func (n *Node) initInfoAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net)
+	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net, n.Config.AvaxTxFee)
 	if err != nil {
 		return err
 	}
