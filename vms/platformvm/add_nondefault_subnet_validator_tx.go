@@ -101,7 +101,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	// Ensure the proposed validator starts after the current timestamp
 	if currentTimestamp, err := vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current timestamp: %v", err)}
-	} else if validatorStartTime := tx.Validator.StartTime(); !currentTimestamp.Before(validatorStartTime) {
+	} else if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) is at or after current chain timestamp (%s)",
 			currentTimestamp,
 			validatorStartTime)}
@@ -116,11 +116,11 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	}
 	if dsValidator, err := currentDSValidators.getDefaultSubnetStaker(tx.Validator.NodeID); err == nil {
 		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.Validator.StartTime(), unsignedValidator.Validator.EndTime()) {
+		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
-					tx.Validator.StartTime(), tx.Validator.EndTime(),
-					unsignedValidator.Validator.StartTime(), unsignedValidator.Validator.EndTime())}
+					tx.StartTime(), tx.EndTime(),
+					unsignedValidator.StartTime(), unsignedValidator.EndTime())}
 		}
 	} else {
 		// They aren't currently validating the default subnet. See if they will
@@ -135,11 +135,11 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 				permError{fmt.Errorf("validator would not be validating default subnet while validating non-default subnet")}
 		}
 		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.Validator.StartTime(), unsignedValidator.Validator.EndTime()) {
+		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
-					tx.Validator.StartTime(), tx.Validator.EndTime(),
-					unsignedValidator.Validator.StartTime(), unsignedValidator.Validator.EndTime())}
+					tx.StartTime(), tx.EndTime(),
+					unsignedValidator.StartTime(), unsignedValidator.EndTime())}
 		}
 	}
 
@@ -224,7 +224,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
 func (tx *UnsignedAddNonDefaultSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
-	return tx.Validator.StartTime().After(vm.clock.Time())
+	return tx.StartTime().After(vm.clock.Time())
 }
 
 // Create a new transaction
@@ -236,7 +236,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

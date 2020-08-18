@@ -169,7 +169,7 @@ func (vm *VM) newExportTx(
 	if err != nil {
 		return nil, errOverflowExport
 	}
-	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, toBurn)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, toBurn)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

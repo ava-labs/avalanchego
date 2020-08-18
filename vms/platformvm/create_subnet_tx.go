@@ -112,7 +112,7 @@ func (vm *VM) newCreateSubnetTx(
 	ownerAddrs []ids.ShortID, // control addresses for the new subnet
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.spend(vm.DB, keys, 0, vm.txFee)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

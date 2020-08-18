@@ -133,7 +133,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	// Ensure the proposed validator starts after the current time
 	if currentTime, err := vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if startTime := tx.Validator.StartTime(); !currentTime.Before(startTime) {
+	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
 			currentTime,
 			startTime)}
@@ -208,7 +208,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
 func (tx *UnsignedAddDefaultSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
-	return tx.Validator.StartTime().After(vm.clock.Time())
+	return tx.StartTime().After(vm.clock.Time())
 }
 
 // NewAddDefaultSubnetValidatorTx returns a new NewAddDefaultSubnetValidatorTx
@@ -221,7 +221,7 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.spend(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

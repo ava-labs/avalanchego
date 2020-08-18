@@ -86,7 +86,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) Verify(
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, c):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
@@ -132,7 +132,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 	// Ensure the proposed validator starts after the current timestamp
 	if currentTimestamp, err := vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if validatorStartTime := tx.Validator.StartTime(); !currentTimestamp.Before(validatorStartTime) {
+	} else if validatorStartTime := tx.StartTime(); !currentTimestamp.Before(validatorStartTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,
 			validatorStartTime)}
@@ -152,7 +152,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 
 	if validator, err := currentValidators.getDefaultSubnetStaker(tx.Validator.NodeID); err == nil {
 		unsignedValidator := validator.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.Validator.StartTime(), unsignedValidator.Validator.EndTime()) {
+		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
 	} else {
@@ -163,7 +163,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
 		unsignedValidator := validator.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.Validator.StartTime(), unsignedValidator.Validator.EndTime()) {
+		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
 	}
@@ -214,7 +214,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
 func (tx *UnsignedAddDefaultSubnetDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
-	return tx.Validator.StartTime().After(vm.clock.Time())
+	return tx.StartTime().After(vm.clock.Time())
 }
 
 // Creates a new transaction
@@ -226,7 +226,7 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	rewardAddress ids.ShortID, // Address to returned staked tokens (and maybe reward) to
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.spend(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

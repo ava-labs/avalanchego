@@ -543,8 +543,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.Validator.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.Validator.EndTime().Unix()),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
 			case *UnsignedAddDefaultSubnetDelegatorTx:
@@ -552,8 +552,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.Validator.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.Validator.EndTime().Unix()),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
 			default: // Shouldn't happen
@@ -567,8 +567,8 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			weight := json.Uint64(vdr.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime: json.Uint64(utx.Validator.StartTime().Unix()),
-				EndTime:   json.Uint64(utx.Validator.EndTime().Unix()),
+				StartTime: json.Uint64(utx.StartTime().Unix()),
+				EndTime:   json.Uint64(utx.EndTime().Unix()),
 				Weight:    &weight,
 			}
 		}
@@ -610,8 +610,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.Validator.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.Validator.EndTime().Unix()),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
 			case *UnsignedAddDefaultSubnetDelegatorTx:
@@ -619,8 +619,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				weight := json.Uint64(vdr.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.Validator.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.Validator.EndTime().Unix()),
+					StartTime:   json.Uint64(tx.StartTime().Unix()),
+					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
 			default: // Shouldn't happen
@@ -632,8 +632,8 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			weight := json.Uint64(vdr.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime: json.Uint64(utx.Validator.StartTime().Unix()),
-				EndTime:   json.Uint64(utx.Validator.EndTime().Unix()),
+				StartTime: json.Uint64(utx.StartTime().Unix()),
+				EndTime:   json.Uint64(utx.EndTime().Unix()),
 				Weight:    &weight,
 			}
 		}
