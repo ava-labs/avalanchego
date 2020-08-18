@@ -847,6 +847,8 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 			current.Add(nextTx)
 			pending.Remove()
 			started.Add(tx.Validator.Vdr().ID())
+		default:
+			pending.Remove()
 		}
 	}
 	return current, pending, started, stopped, nil
