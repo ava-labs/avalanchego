@@ -196,7 +196,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 		// Reward the delegator here
 		if delegatorReward > 0 {
-			outIntf, err := vm.fx.CreateOutput(reward, uVdrTx.RewardsOwner)
+			outIntf, err := vm.fx.CreateOutput(delegatorReward, uVdrTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
@@ -220,7 +220,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 		// Reward the delegatee here
 		if delegateeReward > 0 {
-			outIntf, err := vm.fx.CreateOutput(reward, unsignedParentTx.RewardsOwner)
+			outIntf, err := vm.fx.CreateOutput(delegateeReward, unsignedParentTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}

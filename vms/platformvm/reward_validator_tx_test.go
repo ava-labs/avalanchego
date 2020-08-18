@@ -192,7 +192,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	} else if commitVdrBalance, err := vm.getBalance(onCommitDB, vdrDestSet); err != nil {
 		t.Fatal(err)
 	} else if vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance); err != nil || vdrReward == 0 && InflationRate > 1.0 {
-		t.Fatal("expected delgatee balance to increase because of reward")
+		t.Fatal("expected delegatee balance to increase because of reward")
 	} else if oldDelBalance, err := vm.getBalance(vm.DB, delDestSet); err != nil {
 		t.Fatal(err)
 	} else if commitDelBalance, err := vm.getBalance(onCommitDB, delDestSet); err != nil {

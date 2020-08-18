@@ -1348,11 +1348,12 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 			}
 			amountsSpent[asset] = newAmount
 		}
-
-		// Because we ensured that we had enough inputs for the fee, we can
-		// safely just remove it without concern for underflow.
-		amountsSpent[avaxKey] -= service.vm.txFee
 	}
+
+	// Because we ensured that we had enough inputs for the fee, we can
+	// safely just remove it without concern for underflow.
+	amountsSpent[avaxKey] -= service.vm.txFee
+
 	keys = append(keys, importKeys...)
 
 	outs := []*avax.TransferableOutput{}
