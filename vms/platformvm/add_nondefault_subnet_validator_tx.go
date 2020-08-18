@@ -69,10 +69,6 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) Verify(
 		return err
 	}
 
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, feeAmount, feeAssetID); err != nil {
-		return err
-	}
-
 	// cache that this is valid
 	tx.syntacticallyVerified = true
 	return nil
@@ -185,7 +181,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 

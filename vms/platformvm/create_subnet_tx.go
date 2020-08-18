@@ -49,9 +49,6 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 	if err := tx.Owner.Verify(); err != nil {
 		return err
 	}
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, feeAmount, feeAssetID); err != nil {
-		return err
-	}
 
 	tx.syntacticallyVerified = true
 	return nil
@@ -82,7 +79,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, err
 	}
 

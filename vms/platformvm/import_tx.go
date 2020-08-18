@@ -86,13 +86,6 @@ func (tx *UnsignedImportTx) Verify(
 		return errInputsNotSortedUnique
 	}
 
-	allIns := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
-	copy(allIns, tx.Ins)
-	copy(allIns[len(tx.Ins):], tx.ImportedInputs)
-	if err := syntacticVerifySpend(allIns, tx.Outs, nil, 0, feeAmount, feeAssetID); err != nil {
-		return err
-	}
-
 	tx.syntacticallyVerified = true
 	return nil
 }
@@ -136,7 +129,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds); err != nil {
+	if err := vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
 		return err
 	}
 

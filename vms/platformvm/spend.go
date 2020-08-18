@@ -322,87 +322,6 @@ func (vm *VM) authorize(
 	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
 }
 
-// Verify that:
-// * inputs and outputs are all AVAX
-// * sum(inputs{unlocked}) >= sum(outputs{unlocked}) + burnAmount{unlocked}
-// * sum(inputs{locked}) >= sum(outputs{locked})
-func syntacticVerifySpend(
-	ins []*avax.TransferableInput,
-	returnedOuts []*avax.TransferableOutput,
-	stakedOuts []*avax.TransferableOutput,
-	stakedAmount uint64,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
-	// AVAX consumed in this tx
-	consumedLocked := uint64(0)
-	consumedUnlocked := uint64(0)
-	for _, in := range ins {
-		if assetID := in.AssetID(); !assetID.Equals(feeAssetID) {
-			return fmt.Errorf("input has unexpected asset ID %s expected %s", assetID, feeAssetID)
-		}
-
-		in := in.Input()
-		consumed := in.Amount()
-		if _, ok := in.(*StakeableLockIn); ok {
-			newConsumed, err := safemath.Add64(consumedLocked, consumed)
-			if err != nil {
-				return errInputOverflow
-			}
-			consumedLocked = newConsumed
-		} else {
-			newConsumed, err := safemath.Add64(consumedUnlocked, consumed)
-			if err != nil {
-				return errInputOverflow
-			}
-			consumedUnlocked = newConsumed
-		}
-	}
-
-	// AVAX produced in this tx
-	producedUnlocked := feeAmount
-	for _, out := range returnedOuts {
-		if assetID := out.AssetID(); !assetID.Equals(feeAssetID) {
-			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, feeAssetID)
-		}
-
-		out := out.Output()
-		produced := out.Amount()
-		if _, ok := out.(*StakeableLockOut); !ok {
-			newProduced, err := safemath.Add64(producedUnlocked, produced)
-			if err != nil {
-				return errOutputOverflow
-			}
-			producedUnlocked = newProduced
-		}
-	}
-
-	// AVAX produced in this tx
-	producedLocked := uint64(0)
-	for _, out := range stakedOuts {
-		if assetID := out.AssetID(); !assetID.Equals(feeAssetID) {
-			return fmt.Errorf("output has unexpected asset ID %s expected %s", assetID, feeAssetID)
-		}
-
-		out := out.Output()
-		produced := out.Amount()
-		newProduced, err := safemath.Add64(producedLocked, produced)
-		if err != nil {
-			return errOutputOverflow
-		}
-		producedLocked = newProduced
-	}
-	if producedLocked < stakedAmount {
-		return fmt.Errorf("tx locked outputs (%d) < required locked (%d)",
-			producedLocked, stakedAmount)
-	}
-	if producedUnlocked > consumedUnlocked {
-		return fmt.Errorf("tx unlocked outputs (%d) + burn amount (%d) > inputs (%d)",
-			producedUnlocked-feeAmount, feeAmount, consumedUnlocked)
-	}
-	return nil
-}
-
 // Verify that [tx] is semantically valid.
 // [db] should not be committed if an error is returned
 // [ins] and [outs] are the inputs and outputs of [tx].
@@ -414,6 +333,8 @@ func (vm *VM) semanticVerifySpend(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
+	feeAmount uint64,
+	feeAssetID ids.ID,
 ) TxError {
 	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
@@ -425,7 +346,7 @@ func (vm *VM) semanticVerifySpend(
 		utxos[index] = utxo
 	}
 
-	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, outs, creds)
+	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, outs, creds, feeAmount, feeAssetID)
 }
 
 // Verify that [tx] is semantically valid.
@@ -440,6 +361,8 @@ func (vm *VM) semanticVerifySpendUTXOs(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
+	feeAmount uint64,
+	feeAssetID ids.ID,
 ) TxError {
 	if len(ins) != len(creds) {
 		return permError{fmt.Errorf("there are %d inputs but %d credentials. Should be same number",
@@ -455,12 +378,27 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 	}
 
+	// Time this transaction is being verified
 	now := uint64(vm.clock.Time().Unix())
-	// locktime -> owners -> amount
-	produced := make(map[uint64]map[[32]byte]uint64)
-	consumed := make(map[uint64]map[[32]byte]uint64)
+
+	// Track the amount of unlocked transfers
+	unlockedProduced := feeAmount
+	unlockedConsumed := uint64(0)
+
+	// Track the amount of locked transfers and their owners
+	// locktime -> ownerID -> amount
+	lockedProduced := make(map[uint64]map[[32]byte]uint64)
+	lockedConsumed := make(map[uint64]map[[32]byte]uint64)
+
 	for index, input := range ins {
 		utxo := utxos[index] // The UTXO consumed by [input]
+
+		if assetID := utxo.AssetID(); !assetID.Equals(feeAssetID) {
+			return permError{errAssetIDMismatch}
+		}
+		if assetID := input.AssetID(); !assetID.Equals(feeAssetID) {
+			return permError{errAssetIDMismatch}
+		}
 
 		out := utxo.Out
 		locktime := uint64(0)
@@ -471,8 +409,9 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 
 		in := input.In
-		// The UTXO says it's locked until [locktime], but this input, which consumes it,
-		// is not locked even though [locktime] hasn't passed. This is invalid.
+		// The UTXO says it's locked until [locktime], but this input, which
+		// consumes it, is not locked even though [locktime] hasn't passed. This
+		// is invalid.
 		if inner, ok := in.(*StakeableLockIn); now < locktime && !ok {
 			return permError{errLockedFundsNotMarkedAsLocked}
 		} else if ok {
@@ -488,6 +427,17 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{err}
 		}
 
+		amount := in.Amount()
+
+		if locktime == 0 {
+			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+			if err != nil {
+				return permError{err}
+			}
+			unlockedConsumed = newUnlockedConsumed
+			continue
+		}
+
 		owned, ok := out.(Owned)
 		if !ok {
 			return permError{errUnknownOwners}
@@ -498,24 +448,40 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return tempError{err}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
-		owners, ok := consumed[locktime]
+		owners, ok := lockedConsumed[locktime]
 		if !ok {
 			owners = make(map[[32]byte]uint64)
-			consumed[locktime] = owners
+			lockedConsumed[locktime] = owners
 		}
-		newAmount, err := safemath.Add64(owners[ownerID], in.Amount())
+		newAmount, err := safemath.Add64(owners[ownerID], amount)
 		if err != nil {
 			return permError{err}
 		}
 		owners[ownerID] = newAmount
 	}
+
 	for _, out := range outs {
+		if assetID := out.AssetID(); !assetID.Equals(feeAssetID) {
+			return permError{errAssetIDMismatch}
+		}
+
 		output := out.Output()
 		locktime := uint64(0)
 		// Set [locktime] to this output's locktime, if applicable
 		if inner, ok := output.(*StakeableLockOut); ok {
 			output = inner.TransferableOut
 			locktime = inner.Locktime
+		}
+
+		amount := output.Amount()
+
+		if locktime == 0 {
+			newUnlockedProduced, err := safemath.Add64(unlockedProduced, amount)
+			if err != nil {
+				return permError{err}
+			}
+			unlockedProduced = newUnlockedProduced
+			continue
 		}
 
 		owned, ok := output.(Owned)
@@ -528,52 +494,37 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return tempError{err}
 		}
 		ownerID := hashing.ComputeHash256Array(ownerBytes)
-		owners, ok := produced[locktime]
+		owners, ok := lockedProduced[locktime]
 		if !ok {
 			owners = make(map[[32]byte]uint64)
-			produced[locktime] = owners
+			lockedProduced[locktime] = owners
 		}
-		newAmount, err := safemath.Add64(owners[ownerID], output.Amount())
+		newAmount, err := safemath.Add64(owners[ownerID], amount)
 		if err != nil {
 			return permError{err}
 		}
 		owners[ownerID] = newAmount
 	}
 
-	// [unlockedProduced] is the amount of unlocked tokens produced by [outs]
-	unlockedProduced := uint64(0)
-	for _, amount := range produced[0] {
-		newAmount, err := safemath.Add64(unlockedProduced, amount)
-		if err != nil {
-			return permError{err}
-		}
-		unlockedProduced = newAmount
-	}
-	delete(produced, 0)
-
-	// [unlockedConsumed] is the amount of unlocked tokens consumed by [ins]
-	unlockedConsumed := uint64(0)
-	for _, amount := range consumed[0] {
-		newAmount, err := safemath.Add64(unlockedConsumed, amount)
-		if err != nil {
-			return permError{err}
-		}
-		unlockedConsumed = newAmount
-	}
-	delete(consumed, 0)
-
-	if unlockedProduced > unlockedConsumed { // More unlocked tokens produced than consumed. Invalid.
-		return permError{errInvalidAmount}
-	}
-
 	// Make sure that for each locktime, tokens produced <= tokens consumed
-	for locktime, producedAmounts := range produced {
-		consumedAmounts := consumed[locktime]
-		for ownerID, amount := range producedAmounts {
-			if amount > consumedAmounts[ownerID] {
-				return permError{errInvalidAmount}
+	for locktime, producedAmounts := range lockedProduced {
+		consumedAmounts := lockedConsumed[locktime]
+		for ownerID, producedAmount := range producedAmounts {
+			consumedAmount := consumedAmounts[ownerID]
+
+			if producedAmount > consumedAmount {
+				increase := producedAmount - consumedAmount
+				if increase > unlockedConsumed {
+					return permError{errInvalidAmount}
+				}
+				unlockedConsumed -= increase
 			}
 		}
+	}
+
+	// More unlocked tokens produced than consumed. Invalid.
+	if unlockedProduced > unlockedConsumed {
+		return permError{errInvalidAmount}
 	}
 
 	return nil

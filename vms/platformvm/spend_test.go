@@ -1,283 +1,357 @@
 package platformvm
 
 import (
-	"errors"
-	"math"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-type MockCredential struct {
-	// If true, Verify() returns an error
-	FailVerify bool
-}
+func TestSemanticVerifySpendUTXOs(t *testing.T) {
+	vm := defaultVM()
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
 
-func (mc MockCredential) Verify() error {
-	if mc.FailVerify {
-		return errors.New("erroring on purpose")
-	}
-	return nil
-}
+	now := time.Now()
+	vm.clock.Set(now)
 
-// MockTransferable implements Transferable
-// For use in testing
-type MockTransferable struct {
-	// If true, Verify() returns an error
-	FailVerify bool
-	// Amount() returns AmountVal
-	AmountVal uint64 `serialize:"true"`
-}
+	unsignedTx := avax.Metadata{}
+	unsignedTx.Initialize([]byte{0}, []byte{1})
 
-func (mt MockTransferable) Verify() error {
-	if mt.FailVerify {
-		return errors.New("erroring on purpose")
-	}
-	return nil
-}
-
-func (mt MockTransferable) VerifyState() error { return mt.Verify() }
-
-func (mt MockTransferable) Amount() uint64 {
-	return mt.AmountVal
-}
-
-type MockSpendTx struct {
-	IDF    func() ids.ID
-	InsF   func() []*avax.TransferableInput
-	OutsF  func() []*avax.TransferableOutput
-	CredsF func() []verify.Verifiable
-}
-
-func (tx MockSpendTx) ID() ids.ID {
-	if tx.IDF != nil {
-		return tx.IDF()
-	}
-	return ids.ID{}
-}
-
-func (tx MockSpendTx) Ins() []*avax.TransferableInput {
-	if tx.InsF != nil {
-		return tx.InsF()
-	}
-	return nil
-}
-
-func (tx MockSpendTx) Outs() []*avax.TransferableOutput {
-	if tx.OutsF != nil {
-		return tx.OutsF()
-	}
-	return nil
-}
-
-func (tx MockSpendTx) Creds() []verify.Verifiable {
-	if tx.CredsF != nil {
-		return tx.CredsF()
-	}
-	return nil
-}
-
-func TestSyntacticVerifySpend(t *testing.T) {
-	avaxAssetID := ids.NewID([32]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
-	otherAssetID := ids.NewID([32]byte{1, 2, 3})
-	txID1 := ids.NewID([32]byte{1})
-	utxoID1 := avax.UTXOID{
-		TxID:        txID1,
-		OutputIndex: 0,
-		Symbol:      false,
-	}
-	utxoID2 := avax.UTXOID{
-		TxID:        txID1,
-		OutputIndex: 1,
-		Symbol:      false,
-	}
-
-	type spendTest struct {
-		description     string
-		ins             []*avax.TransferableInput
-		unlockedOuts    []*avax.TransferableOutput
-		lockedOuts      []*avax.TransferableOutput
-		lockedAmt       uint64
-		unlockedBurnAmt uint64
-		shouldErr       bool
-	}
-	tests := []spendTest{
+	tests := []struct {
+		description string
+		utxos       []*avax.UTXO
+		ins         []*avax.TransferableInput
+		outs        []*avax.TransferableOutput
+		creds       []verify.Verifiable
+		fee         uint64
+		assetID     ids.ID
+		shouldErr   bool
+	}{
 		{
-			"no inputs, no unlocked outputs, no locked outputs, no locked, no burn",
-			[]*avax.TransferableInput{},
-			[]*avax.TransferableOutput{},
-			[]*avax.TransferableOutput{},
-			0,
-			0,
-			false,
+			description: "no inputs, no outputs, no fee",
+			utxos:       []*avax.UTXO{},
+			ins:         []*avax.TransferableInput{},
+			outs:        []*avax.TransferableOutput{},
+			creds:       []verify.Verifiable{},
+			fee:         0,
+			assetID:     vm.avaxAssetID,
+			shouldErr:   false,
 		},
 		{
-			"no inputs, no unlocked outputs, no locked outputs, no locked, non-zero burn",
-			[]*avax.TransferableInput{},
-			[]*avax.TransferableOutput{},
-			[]*avax.TransferableOutput{},
-			0,
-			1,
-			true,
+			description: "no inputs, no outputs, positive fee",
+			utxos:       []*avax.UTXO{},
+			ins:         []*avax.TransferableInput{},
+			outs:        []*avax.TransferableOutput{},
+			creds:       []verify.Verifiable{},
+			fee:         1,
+			assetID:     vm.avaxAssetID,
+			shouldErr:   true,
 		},
 		{
-			"one input, no unlocked outputs, no locked outputs, no locked, sufficient burn",
-			[]*avax.TransferableInput{{
-				UTXOID: utxoID1,
-				Asset:  avax.Asset{ID: avaxAssetID},
-				In:     MockTransferable{AmountVal: 1},
+			description: "no inputs, no outputs, positive fee",
+			utxos:       []*avax.UTXO{},
+			ins:         []*avax.TransferableInput{},
+			outs:        []*avax.TransferableOutput{},
+			creds:       []verify.Verifiable{},
+			fee:         1,
+			assetID:     vm.avaxAssetID,
+			shouldErr:   true,
+		},
+		{
+			description: "one input, no outputs, positive fee",
+			utxos: []*avax.UTXO{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
+				},
 			}},
-			[]*avax.TransferableOutput{},
-			[]*avax.TransferableOutput{},
-			0,
-			1,
-			false,
+			ins: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: 1,
+				},
+			}},
+			outs: []*avax.TransferableOutput{},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: false,
 		},
 		{
-			"one input, no unlocked outputs, no locked outputs, no locked, insufficient burn",
-			[]*avax.TransferableInput{{
-				UTXOID: utxoID1,
-				Asset:  avax.Asset{ID: avaxAssetID},
-				In:     MockTransferable{AmountVal: 1},
+			description: "wrong number of credentials",
+			utxos: []*avax.UTXO{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
+				},
 			}},
-			[]*avax.TransferableOutput{},
-			[]*avax.TransferableOutput{},
-			0,
-			2,
-			true,
+			ins: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: 1,
+				},
+			}},
+			outs:      []*avax.TransferableOutput{},
+			creds:     []verify.Verifiable{},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: true,
 		},
 		{
-			"one input, one unlocked output, no locked outputs, no locked, sufficient burn",
-			[]*avax.TransferableInput{{
-				UTXOID: utxoID1,
-				Asset:  avax.Asset{ID: avaxAssetID},
-				In:     MockTransferable{AmountVal: 2},
+			description: "wrong number of UTXOs",
+			utxos:       []*avax.UTXO{},
+			ins: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: 1,
+				},
 			}},
-			[]*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: avaxAssetID},
-				Out:   MockTransferable{AmountVal: 1},
-			}},
-			[]*avax.TransferableOutput{},
-			0,
-			1,
-			false,
+			outs: []*avax.TransferableOutput{},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: true,
 		},
 		{
-			"multiple inputs, multiple unlocked outputs, no locked outputs, no locked, insufficient burn",
-			[]*avax.TransferableInput{
+			description: "invalid credential",
+			utxos: []*avax.UTXO{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
+				},
+			}},
+			ins: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: 1,
+				},
+			}},
+			outs: []*avax.TransferableOutput{},
+			creds: []verify.Verifiable{
+				(*secp256k1fx.Credential)(nil),
+			},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: true,
+		},
+		{
+			description: "one input, no outputs, positive fee",
+			utxos: []*avax.UTXO{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
+				},
+			}},
+			ins: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: 1,
+				},
+			}},
+			outs: []*avax.TransferableOutput{},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: false,
+		},
+		{
+			description: "locked one input, no outputs, no fee",
+			utxos: []*avax.UTXO{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Out: &StakeableLockOut{
+					Locktime: uint64(now.Unix()) + 1,
+					TransferableOut: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			}},
+			ins: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				In: &StakeableLockIn{
+					Locktime: uint64(now.Unix()) + 1,
+					TransferableIn: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				},
+			}},
+			outs: []*avax.TransferableOutput{},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       0,
+			assetID:   vm.avaxAssetID,
+			shouldErr: false,
+		},
+		{
+			description: "locked one input, no outputs, positive fee",
+			utxos: []*avax.UTXO{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Out: &StakeableLockOut{
+					Locktime: uint64(now.Unix()) + 1,
+					TransferableOut: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			}},
+			ins: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: vm.avaxAssetID},
+				In: &StakeableLockIn{
+					Locktime: uint64(now.Unix()) + 1,
+					TransferableIn: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				},
+			}},
+			outs: []*avax.TransferableOutput{},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: true,
+		},
+		{
+			description: "one locked one unlock input, one locked output, positive fee",
+			utxos: []*avax.UTXO{
 				{
-					UTXOID: utxoID1,
-					Asset:  avax.Asset{ID: avaxAssetID},
-					In:     MockTransferable{AmountVal: 1},
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					Out: &StakeableLockOut{
+						Locktime: uint64(now.Unix()) + 1,
+						TransferableOut: &secp256k1fx.TransferOutput{
+							Amt: 1,
+						},
+					},
 				},
 				{
-					UTXOID: utxoID2,
-					Asset:  avax.Asset{ID: avaxAssetID},
-					In:     MockTransferable{AmountVal: 1},
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
 				},
 			},
-			[]*avax.TransferableOutput{
+			ins: []*avax.TransferableInput{
 				{
-					Asset: avax.Asset{ID: avaxAssetID},
-					Out:   MockTransferable{AmountVal: 1},
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					In: &StakeableLockIn{
+						Locktime: uint64(now.Unix()) + 1,
+						TransferableIn: &secp256k1fx.TransferInput{
+							Amt: 1,
+						},
+					},
 				},
 				{
-					Asset: avax.Asset{ID: avaxAssetID},
-					Out:   MockTransferable{AmountVal: 1},
-				},
-			},
-			[]*avax.TransferableOutput{},
-			0,
-			1,
-			true,
-		},
-		{
-			"multiple inputs, multiple unlocked outputs, no locked outputs, no locked, sufficient burn",
-			[]*avax.TransferableInput{
-				{
-					UTXOID: utxoID1,
-					Asset:  avax.Asset{ID: avaxAssetID},
-					In:     MockTransferable{AmountVal: 2},
-				},
-				{
-					UTXOID: utxoID2,
-					Asset:  avax.Asset{ID: avaxAssetID},
-					In:     MockTransferable{AmountVal: 1},
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
 				},
 			},
-			[]*avax.TransferableOutput{
+			outs: []*avax.TransferableOutput{
 				{
-					Asset: avax.Asset{ID: avaxAssetID},
-					Out:   MockTransferable{AmountVal: 1},
-				},
-				{
-					Asset: avax.Asset{ID: avaxAssetID},
-					Out:   MockTransferable{AmountVal: 1},
-				},
-			},
-			[]*avax.TransferableOutput{},
-			0,
-			1,
-			false,
-		},
-		{
-			"wrong asset ID for input",
-			[]*avax.TransferableInput{{
-				UTXOID: utxoID1,
-				Asset:  avax.Asset{ID: otherAssetID},
-				In:     MockTransferable{AmountVal: 1},
-			}},
-			[]*avax.TransferableOutput{},
-			[]*avax.TransferableOutput{},
-			0,
-			1,
-			true,
-		},
-		{
-			"wrong asset ID for output",
-			[]*avax.TransferableInput{{
-				UTXOID: utxoID1,
-				Asset:  avax.Asset{ID: avaxAssetID},
-				In:     MockTransferable{AmountVal: 1},
-			}},
-			[]*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: otherAssetID},
-				Out:   MockTransferable{AmountVal: 1},
-			}},
-			[]*avax.TransferableOutput{},
-			0,
-			1,
-			true,
-		},
-		{
-			"input amount overflow",
-			[]*avax.TransferableInput{
-				{
-					UTXOID: utxoID1,
-					Asset:  avax.Asset{ID: avaxAssetID},
-					In:     MockTransferable{AmountVal: math.MaxUint64},
-				},
-				{
-					UTXOID: utxoID2,
-					Asset:  avax.Asset{ID: avaxAssetID},
-					In:     MockTransferable{AmountVal: 1},
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					Out: &StakeableLockOut{
+						Locktime: uint64(now.Unix()) + 1,
+						TransferableOut: &secp256k1fx.TransferOutput{
+							Amt: 1,
+						},
+					},
 				},
 			},
-			[]*avax.TransferableOutput{},
-			[]*avax.TransferableOutput{},
-			0,
-			0,
-			true,
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+				&secp256k1fx.Credential{},
+			},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: false,
+		},
+		{
+			description: "one locked one unlock input, one locked output, positive fee, partially locked",
+			utxos: []*avax.UTXO{
+				{
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					Out: &StakeableLockOut{
+						Locktime: uint64(now.Unix()) + 1,
+						TransferableOut: &secp256k1fx.TransferOutput{
+							Amt: 1,
+						},
+					},
+				},
+				{
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 2,
+					},
+				},
+			},
+			ins: []*avax.TransferableInput{
+				{
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					In: &StakeableLockIn{
+						Locktime: uint64(now.Unix()) + 1,
+						TransferableIn: &secp256k1fx.TransferInput{
+							Amt: 1,
+						},
+					},
+				},
+				{
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 2,
+					},
+				},
+			},
+			outs: []*avax.TransferableOutput{
+				{
+					Asset: avax.Asset{ID: vm.avaxAssetID},
+					Out: &StakeableLockOut{
+						Locktime: uint64(now.Unix()) + 1,
+						TransferableOut: &secp256k1fx.TransferOutput{
+							Amt: 2,
+						},
+					},
+				},
+			},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+				&secp256k1fx.Credential{},
+			},
+			fee:       1,
+			assetID:   vm.avaxAssetID,
+			shouldErr: false,
 		},
 	}
 
-	for _, tt := range tests {
-		if err := syntacticVerifySpend(tt.ins, tt.unlockedOuts, tt.lockedOuts, tt.lockedAmt, tt.unlockedBurnAmt, avaxAssetID); err == nil && tt.shouldErr {
-			t.Fatalf("expected test '%s' error but got none", tt.description)
-		} else if err != nil && !tt.shouldErr {
-			t.Fatalf("unexpected error on test '%s': %s", tt.description, err)
-		}
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			err := vm.semanticVerifySpendUTXOs(
+				&unsignedTx,
+				test.utxos,
+				test.ins,
+				test.outs,
+				test.creds,
+				test.fee,
+				test.assetID,
+			)
+
+			if err == nil && test.shouldErr {
+				t.Fatalf("expected error but got none")
+			} else if err != nil && !test.shouldErr {
+				t.Fatalf("unexpected error: %s", err)
+			}
+		})
 	}
 }

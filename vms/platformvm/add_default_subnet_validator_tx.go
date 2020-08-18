@@ -103,11 +103,6 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) Verify(
 		return errTooManyShares
 	}
 
-	// verify the flow check
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, tx.Stake, tx.Validator.Wght, feeAmount, feeAssetID); err != nil {
-		return err
-	}
-
 	// cache that this is valid
 	tx.syntacticallyVerified = true
 	return nil
@@ -168,7 +163,7 @@ func (tx *UnsignedAddDefaultSubnetValidatorTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 

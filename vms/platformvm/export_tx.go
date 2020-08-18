@@ -81,13 +81,6 @@ func (tx *UnsignedExportTx) Verify(
 		return errOutputsNotSorted
 	}
 
-	allOuts := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(allOuts, tx.Outs)
-	copy(allOuts[len(tx.Outs):], tx.ExportedOutputs)
-	if err := syntacticVerifySpend(tx.Ins, allOuts, nil, 0, feeAmount, feeAssetID); err != nil {
-		return err
-	}
-
 	tx.syntacticallyVerified = true
 	return nil
 }
@@ -107,7 +100,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
 		return err
 	}
 

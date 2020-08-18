@@ -90,9 +90,6 @@ func (tx *UnsignedCreateChainTx) Verify(
 	if err := tx.SubnetAuth.Verify(); err != nil {
 		return err
 	}
-	if err := syntacticVerifySpend(tx.Ins, tx.Outs, nil, 0, feeAmount, feeAssetID); err != nil {
-		return err
-	}
 
 	tx.syntacticallyVerified = true
 	return nil
@@ -121,7 +118,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.avaxAssetID); err != nil {
 		return nil, err
 	}
 
