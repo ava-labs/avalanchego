@@ -589,7 +589,7 @@ type GetPendingValidatorsReply struct {
 	Validators []FormattedAPIValidator `json:"validators"`
 }
 
-// GetPendingValidators returns the list of current validators
+// GetPendingValidators returns the list of pending validators
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
 	if args.SubnetID.IsZero() {
@@ -700,8 +700,8 @@ type AddDefaultSubnetValidatorArgs struct {
 	api.UserPass
 }
 
-// AddDefaultSubnetValidator returns an unsigned transaction to add a validator to the default subnet
-// The returned unsigned transaction should be signed using Sign()
+// AddDefaultSubnetValidator creates and signs and issues a transaction to add a
+// validator to the default subnet
 func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
 	switch {
@@ -765,9 +765,8 @@ type AddDefaultSubnetDelegatorArgs struct {
 	RewardAddress string `json:"rewardAddress"`
 }
 
-// AddDefaultSubnetDelegator returns an unsigned transaction to add a delegator
-// to the default subnet
-// The returned unsigned transaction should be signed using Sign()
+// AddDefaultSubnetDelegator creates and signs and issues a transaction to add a
+// delegator to the default subnet
 func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
 	switch {
@@ -829,8 +828,8 @@ type AddNonDefaultSubnetValidatorArgs struct {
 	SubnetID string `json:"subnetID"`
 }
 
-// AddNonDefaultSubnetValidator adds a validator to a subnet other than the default subnet
-// Returns the unsigned transaction, which must be signed using Sign
+// AddNonDefaultSubnetValidator creates and signs and issues a transaction to
+// add a validator to a subnet other than the default subnet
 func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *api.JsonTxID) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddNonDefaultSubnetValidator called")
 	switch {
@@ -886,8 +885,8 @@ type CreateSubnetArgs struct {
 	api.UserPass
 }
 
-// CreateSubnet returns an unsigned transaction to create a new subnet.
-// The unsigned transaction must be signed with the key of [args.Payer]
+// CreateSubnet creates and signs and issues a transaction to create a new
+// subnet
 func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
@@ -988,8 +987,8 @@ type ImportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-// ImportAVAX returns an unsigned transaction to import AVAX from the X-Chain.
-// The AVAX must have already been exported from the X-Chain.
+// ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
+// must have already been exported from the X-Chain.
 func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
 
@@ -1045,8 +1044,7 @@ type CreateBlockchainArgs struct {
 	GenesisData formatting.CB58 `json:"genesisData"`
 }
 
-// CreateBlockchain returns an unsigned transaction to create a new blockchain
-// Must be signed with the Subnet's control keys and with a key that pays the transaction fee before issuance
+// CreateBlockchain issues a transaction to create a new blockchain
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JsonTxID) error {
 	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 	switch {
@@ -1342,25 +1340,9 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		*response = Unknown
 		return nil
 	}
-	switch block := preferred.(type) {
-	case *Abort:
+	if block, ok := preferred.(decision); ok {
 		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
 			*response = Processing // Found the status in the preferred block's db. Report tx is processing.
-			return nil
-		}
-	case *Commit:
-		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
-			*response = Processing
-			return nil
-		}
-	case *AtomicBlock:
-		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
-			*response = Processing
-			return nil
-		}
-	case *StandardBlock:
-		if _, err := service.vm.getStatus(block.onAccept(), args.TxID); err == nil {
-			*response = Processing
 			return nil
 		}
 	}
