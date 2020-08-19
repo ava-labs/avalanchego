@@ -18,16 +18,16 @@ func TestWriteAll(t *testing.T) {
 	prefixedDBChain := prefixdb.New([]byte{0}, baseDB)
 	prefixedDBSharedMemory := prefixdb.New([]byte{1}, baseDB)
 
-	sm := SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixedDBSharedMemory)
+	m := Memory{}
+	m.Initialize(logging.NoLog{}, prefixedDBSharedMemory)
 
-	sharedID := sm.sharedID(blockchainID0, blockchainID1)
+	sharedID := m.sharedID(blockchainID0, blockchainID1)
 
-	sharedDB := sm.GetDatabase(sharedID)
+	sharedDB := m.GetDatabase(sharedID)
 
 	writeDB0 := versiondb.New(prefixedDBChain)
 	writeDB1 := versiondb.New(sharedDB)
-	defer sm.ReleaseDatabase(sharedID)
+	defer m.ReleaseDatabase(sharedID)
 
 	if err := writeDB0.Put([]byte{1}, []byte{2}); err != nil {
 		t.Fatal(err)

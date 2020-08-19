@@ -11,12 +11,12 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-func TestBlockchainSharedMemory(t *testing.T) {
-	sm := SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+func TestBlockchainMemory(t *testing.T) {
+	m := Memory{}
+	m.Initialize(logging.NoLog{}, memdb.New())
 
-	bsm0 := sm.NewBlockchainSharedMemory(blockchainID0)
-	bsm1 := sm.NewBlockchainSharedMemory(blockchainID1)
+	bsm0 := m.NewBlockchainMemory(blockchainID0)
+	bsm1 := m.NewBlockchainMemory(blockchainID1)
 
 	sharedDB0 := bsm0.GetDatabase(blockchainID1)
 	if err := sharedDB0.Put([]byte{1}, []byte{2}); err != nil {

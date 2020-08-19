@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avax
+package atomic
 
 import (
 	"bytes"
@@ -14,12 +14,6 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/codec"
 )
-
-// Addressable is the interface a feature extension must provide to be able to
-// be tracked as a part of the utxo set for a set of addresses
-type Addressable interface {
-	Addresses() [][]byte
-}
 
 const (
 	smallerUTXOID uint64 = iota

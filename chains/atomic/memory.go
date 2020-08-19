@@ -20,8 +20,8 @@ type rcLock struct {
 	count int
 }
 
-// SharedMemory is the interface for shared memory inside a subnet
-type SharedMemory struct {
+// Memory is the interface for shared memory inside a subnet
+type Memory struct {
 	lock  sync.Mutex
 	log   logging.Logger
 	codec codec.Codec
@@ -30,67 +30,67 @@ type SharedMemory struct {
 }
 
 // Initialize the SharedMemory
-func (sm *SharedMemory) Initialize(log logging.Logger, db database.Database) {
-	sm.log = log
-	sm.codec = codec.NewDefault()
-	sm.locks = make(map[[32]byte]*rcLock)
-	sm.db = db
+func (m *Memory) Initialize(log logging.Logger, db database.Database) {
+	m.log = log
+	m.codec = codec.NewDefault()
+	m.locks = make(map[[32]byte]*rcLock)
+	m.db = db
 }
 
-// NewBlockchainSharedMemory returns a new BlockchainSharedMemory
-func (sm *SharedMemory) NewBlockchainSharedMemory(id ids.ID) *BlockchainSharedMemory {
-	return &BlockchainSharedMemory{
-		blockchainID: id,
-		sm:           sm,
+// NewBlockchainMemory returns a new BlockchainMemory
+func (m *Memory) NewBlockchainMemory(id ids.ID) SharedMemory {
+	return &sharedMemory{
+		m:           m,
+		thisChainID: id,
 	}
 }
 
 // GetDatabase returns and locks the provided DB
-func (sm *SharedMemory) GetDatabase(id ids.ID) database.Database {
-	lock := sm.makeLock(id)
+func (m *Memory) GetDatabase(id ids.ID) database.Database {
+	lock := m.makeLock(id)
 	lock.Lock()
 
-	return prefixdb.New(id.Bytes(), sm.db)
+	return prefixdb.New(id.Bytes(), m.db)
 }
 
 // ReleaseDatabase unlocks the provided DB
-func (sm *SharedMemory) ReleaseDatabase(id ids.ID) {
-	lock := sm.releaseLock(id)
+func (m *Memory) ReleaseDatabase(id ids.ID) {
+	lock := m.releaseLock(id)
 	lock.Unlock()
 }
 
-func (sm *SharedMemory) makeLock(id ids.ID) *sync.Mutex {
-	sm.lock.Lock()
-	defer sm.lock.Unlock()
+func (m *Memory) makeLock(id ids.ID) *sync.Mutex {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	key := id.Key()
-	rc, exists := sm.locks[key]
+	rc, exists := m.locks[key]
 	if !exists {
 		rc = &rcLock{}
-		sm.locks[key] = rc
+		m.locks[key] = rc
 	}
 	rc.count++
 	return &rc.lock
 }
 
-func (sm *SharedMemory) releaseLock(id ids.ID) *sync.Mutex {
-	sm.lock.Lock()
-	defer sm.lock.Unlock()
+func (m *Memory) releaseLock(id ids.ID) *sync.Mutex {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	key := id.Key()
-	rc, exists := sm.locks[key]
+	rc, exists := m.locks[key]
 	if !exists {
 		panic("Attemping to free an unknown lock")
 	}
 	rc.count--
 	if rc.count == 0 {
-		delete(sm.locks, key)
+		delete(m.locks, key)
 	}
 	return &rc.lock
 }
 
 // sharedID calculates the ID of the shared memory space
-func (sm *SharedMemory) sharedID(id1, id2 ids.ID) ids.ID {
+func (m *Memory) sharedID(id1, id2 ids.ID) ids.ID {
 	idKey1 := id1.Key()
 	idKey2 := id2.Key()
 
@@ -98,8 +98,8 @@ func (sm *SharedMemory) sharedID(id1, id2 ids.ID) ids.ID {
 		idKey1, idKey2 = idKey2, idKey1
 	}
 
-	combinedBytes, err := sm.codec.Marshal([2][32]byte{idKey1, idKey2})
-	sm.log.AssertNoError(err)
+	combinedBytes, err := m.codec.Marshal([2][32]byte{idKey1, idKey2})
+	m.log.AssertNoError(err)
 
 	return ids.NewID(hashing.ComputeHash256Array(combinedBytes))
 }
