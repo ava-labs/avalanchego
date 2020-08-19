@@ -80,12 +80,12 @@ func (b *Block) Verify() error {
 		p = p.Parent().(*Block)
 	}
 	for i := len(path) - 1; i >= 0; i-- {
-		inputs_copy := new(ids.Set)
+		inputsCopy := new(ids.Set)
 		p := path[i]
 		atx := vm.getAtomicTx(p.ethBlock)
 		inputs.Union(atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs())
-		inputs_copy.Union(*inputs)
-		vm.blockAtomicInputCache.Put(p.ID(), inputs_copy)
+		inputsCopy.Union(*inputs)
+		vm.blockAtomicInputCache.Put(p.ID(), inputsCopy)
 	}
 	tx := b.vm.getAtomicTx(b.ethBlock)
 	atx := tx.UnsignedTx.(*UnsignedImportTx)
