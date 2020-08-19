@@ -114,7 +114,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -162,7 +162,7 @@ func (tx *UnsignedAddDefaultSubnetDelegatorTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -246,5 +246,5 @@ func (vm *VM) newAddDefaultSubnetDelegatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake)
 }

@@ -64,7 +64,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	TxError,
 ) {
 	// Make sure this transaction is well formed.
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -79,7 +79,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
@@ -134,5 +134,5 @@ func (vm *VM) newCreateSubnetTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
 }

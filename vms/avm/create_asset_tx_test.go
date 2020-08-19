@@ -84,7 +84,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 	}
 	tx.Initialize(unsignedBytes, unsignedBytes)
 
-	ctx := NewContext()
+	ctx := NewContext(t)
 	if err := tx.SyntacticVerify(ctx, c, asset, 0, 1); err != nil {
 		t.Fatalf("Valid CreateAssetTx failed syntactic verification due to: %s", err)
 	}
@@ -303,7 +303,7 @@ func TestCreateAssetTxGetters(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerify(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -326,7 +326,7 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := (*CreateAssetTx)(nil)
@@ -337,7 +337,7 @@ func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -360,7 +360,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -385,7 +385,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -408,7 +408,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -431,7 +431,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -451,7 +451,7 @@ func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -474,7 +474,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -497,7 +497,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -520,7 +520,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -543,7 +543,7 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -566,7 +566,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{
@@ -589,7 +589,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 }
 
 func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &CreateAssetTx{

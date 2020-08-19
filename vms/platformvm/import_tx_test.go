@@ -30,8 +30,6 @@ func (msm MockSharedMemory) ReleaseDatabase(ID ids.ID) {}
 
 func TestNewImportTx(t *testing.T) {
 	vm := defaultVM()
-	avmID := ids.GenerateTestID()
-	vm.avm = avmID
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

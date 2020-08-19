@@ -132,6 +132,8 @@ type manager struct {
 	server                             *api.Server        // Handles HTTP API calls
 	keystore                           *keystore.Keystore
 	sharedMemory                       *atomic.SharedMemory
+	avaxAssetID                        ids.ID
+	xChainID                           ids.ID
 	criticalChains                     ids.Set // Chains that can't exit gracefully
 
 	unblocked     bool
@@ -167,6 +169,8 @@ func New(
 	server *api.Server,
 	keystore *keystore.Keystore,
 	sharedMemory *atomic.SharedMemory,
+	avaxAssetID ids.ID,
+	xChainID ids.ID,
 	criticalChains ids.Set,
 ) (Manager, error) {
 	timeoutManager := timeout.Manager{}
@@ -201,6 +205,8 @@ func New(
 		server:           server,
 		keystore:         keystore,
 		sharedMemory:     sharedMemory,
+		avaxAssetID:      avaxAssetID,
+		xChainID:         xChainID,
 		criticalChains:   criticalChains,
 		chains:           make(map[[32]byte]*router.Handler),
 	}
@@ -273,13 +279,16 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	ctx := &snow.Context{
-		NetworkID:           m.networkID,
-		SubnetID:            chainParams.SubnetID,
-		ChainID:             chainParams.ID,
+		NetworkID:   m.networkID,
+		SubnetID:    chainParams.SubnetID,
+		ChainID:     chainParams.ID,
+		NodeID:      m.nodeID,
+		XChainID:    m.xChainID,
+		AVAXAssetID: m.avaxAssetID,
+
 		Log:                 chainLog,
 		DecisionDispatcher:  m.decisionEvents,
 		ConsensusDispatcher: m.consensusEvents,
-		NodeID:              m.nodeID,
 		Keystore:            m.keystore.NewBlockchainKeyStore(chainParams.ID),
 		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chainParams.ID),
 		BCLookup:            m,

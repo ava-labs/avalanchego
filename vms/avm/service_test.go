@@ -243,7 +243,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
-			Asset: avax.Asset{ID: vm.avax},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -263,7 +263,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
-			Asset: avax.Asset{ID: vm.avax},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -922,7 +922,6 @@ func TestImportAVAX(t *testing.T) {
 	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
 
 	// Must set AVAX assetID to be the correct asset since only AVAX can be imported
-	vm.avax = assetID
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{TxID: ids.Empty},
 		Asset:  avax.Asset{ID: assetID},

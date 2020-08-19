@@ -84,7 +84,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); !assetID.Equals(vm.avaxAssetID) {
+		if assetID := utxo.AssetID(); !assetID.Equals(vm.Ctx.AVAXAssetID) {
 			continue // We only care about staking AVAX, so ignore other assets
 		}
 
@@ -131,7 +131,7 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.avaxAssetID},
+			Asset:  avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			In: &StakeableLockIn{
 				Locktime:       out.Locktime,
 				TransferableIn: in,
@@ -140,7 +140,7 @@ func (vm *VM) stake(
 
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: vm.avaxAssetID},
+			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			Out: &StakeableLockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
@@ -154,7 +154,7 @@ func (vm *VM) stake(
 			// This input provided more value than was needed to be locked.
 			// Some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out: &StakeableLockOut{
 					Locktime: out.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
@@ -180,7 +180,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); !assetID.Equals(vm.avaxAssetID) {
+		if assetID := utxo.AssetID(); !assetID.Equals(vm.Ctx.AVAXAssetID) {
 			continue // We only care about burning AVAX, so ignore other assets
 		}
 
@@ -230,7 +230,7 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.avaxAssetID},
+			Asset:  avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			In:     in,
 		})
 
@@ -238,7 +238,7 @@ func (vm *VM) stake(
 			// Some of this input was put for staking
 			changeAddr := kc.Keys[0].PublicKey().Address()
 			stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountToStake,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -254,7 +254,7 @@ func (vm *VM) stake(
 			// This input had extra value, so some of it must be returned
 			changeAddr := kc.Keys[0].PublicKey().Address()
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: remainingValue,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -557,7 +557,7 @@ func (vm *VM) produceOutputs(
 				TxID:        txID,
 				OutputIndex: uint32(index),
 			},
-			Asset: avax.Asset{ID: vm.avaxAssetID},
+			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			Out:   out.Output(),
 		}); err != nil {
 			return err

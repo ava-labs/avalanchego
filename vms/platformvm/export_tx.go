@@ -91,7 +91,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	db database.Database,
 	stx *Tx,
 ) TxError {
-	if err := tx.Verify(vm.avm, vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := tx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return permError{err}
 	}
 
@@ -100,7 +100,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return err
 	}
 
@@ -154,7 +154,7 @@ func (vm *VM) newExportTx(
 	to ids.ShortID, // Address of chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*Tx, error) {
-	if !vm.avm.Equals(chainID) {
+	if !vm.Ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
 	}
 
@@ -177,7 +177,7 @@ func (vm *VM) newExportTx(
 		}},
 		DestinationChain: chainID,
 		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
-			Asset: avax.Asset{ID: vm.avaxAssetID},
+			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amount,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -192,5 +192,5 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.avm, vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
+	return tx, utx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
 }

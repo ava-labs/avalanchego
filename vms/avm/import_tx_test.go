@@ -20,7 +20,7 @@ import (
 )
 
 func TestImportTxSyntacticVerify(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ImportTx{
@@ -66,7 +66,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 }
 
 func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ImportTx{
@@ -223,7 +223,7 @@ func TestIssueImportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := NewContext()
+	ctx := NewContext(t)
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -232,9 +232,7 @@ func TestIssueImportTx(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
-	vm := &VM{
-		avax: avaxID,
-	}
+	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -360,14 +358,12 @@ func TestForceAcceptImportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := NewContext()
+	ctx := NewContext(t)
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	platformID := ids.Empty.Prefix(0)
 
-	vm := &VM{
-		avax: ids.Empty,
-	}
+	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

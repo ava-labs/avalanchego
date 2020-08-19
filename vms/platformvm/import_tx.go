@@ -96,7 +96,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	db database.Database,
 	stx *Tx,
 ) TxError {
-	if err := tx.Verify(vm.avm, vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := tx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return permError{err}
 	}
 
@@ -143,7 +143,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	copy(ins, tx.Ins)
 	copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
-	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.avaxAssetID)
+	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID)
 }
 
 // Accept this transaction and spend imported inputs
@@ -179,7 +179,7 @@ func (vm *VM) newImportTx(
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
-	if !vm.avm.Equals(chainID) {
+	if !vm.Ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
 	}
 
@@ -199,7 +199,7 @@ func (vm *VM) newImportTx(
 	importedAmount := uint64(0)
 	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
-		if !utxo.AssetID().Equals(vm.avaxAssetID) {
+		if !utxo.AssetID().Equals(vm.Ctx.AVAXAssetID) {
 			continue
 		}
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
@@ -238,7 +238,7 @@ func (vm *VM) newImportTx(
 		signers = append(baseSigners, signers...)
 	} else if importedAmount > vm.txFee {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: vm.avaxAssetID},
+			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: importedAmount - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -265,5 +265,5 @@ func (vm *VM) newImportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.avm, vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
+	return tx, utx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
 }

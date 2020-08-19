@@ -500,7 +500,7 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
 			args.SubnetID)
 	}
 
-	response.AssetID = service.vm.avaxAssetID
+	response.AssetID = service.vm.Ctx.AVAXAssetID
 	return nil
 }
 

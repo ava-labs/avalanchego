@@ -185,7 +185,7 @@ func TestBaseTxGetters(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerify(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -228,7 +228,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -272,7 +272,7 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyNil(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := (*BaseTx)(nil)
@@ -282,7 +282,7 @@ func TestBaseTxSyntacticVerifyNil(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -325,7 +325,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -368,7 +368,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -402,7 +402,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -459,7 +459,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -485,7 +485,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -548,7 +548,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -603,7 +603,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -646,7 +646,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 }
 
 func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
@@ -834,7 +834,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
@@ -1250,15 +1250,13 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
-	ctx := NewContext()
+	ctx := NewContext(t)
 
 	issuer := make(chan common.Message, 1)
 
 	ctx.Lock.Lock()
 
-	vm := &VM{
-		avax: ids.Empty,
-	}
+	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),
@@ -1394,15 +1392,13 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
-	ctx := NewContext()
+	ctx := NewContext(t)
 
 	issuer := make(chan common.Message, 1)
 
 	ctx.Lock.Lock()
 
-	vm := &VM{
-		avax: ids.Empty,
-	}
+	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		memdb.New(),

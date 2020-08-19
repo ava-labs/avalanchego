@@ -22,7 +22,7 @@ import (
 )
 
 func TestExportTxSyntacticVerify(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -68,7 +68,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyNil(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := (*ExportTx)(nil)
@@ -79,7 +79,7 @@ func TestExportTxSyntacticVerifyNil(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -125,7 +125,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -176,7 +176,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -223,7 +223,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -279,7 +279,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -347,7 +347,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -393,7 +393,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -451,7 +451,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -517,7 +517,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -583,7 +583,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 }
 
 func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
-	ctx := NewContext()
+	ctx := NewContext(t)
 	c := setupCodec()
 
 	tx := &ExportTx{
@@ -963,7 +963,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 
 func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
-	ctx := NewContext()
+	ctx := NewContext(t)
 
 	baseDB := memdb.New()
 
@@ -984,9 +984,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	avaxID := genesisTx.ID()
 
 	issuer := make(chan common.Message, 1)
-	vm := &VM{
-		avax: avaxID,
-	}
+	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -1144,7 +1142,7 @@ func TestIssueExportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := NewContext()
+	ctx := NewContext(t)
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -1152,9 +1150,7 @@ func TestIssueExportTx(t *testing.T) {
 	avaxID := genesisTx.ID()
 
 	ctx.Lock.Lock()
-	vm := &VM{
-		avax: avaxID,
-	}
+	vm := &VM{}
 	if err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -1274,7 +1270,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	sm := &atomic.SharedMemory{}
 	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := NewContext()
+	ctx := NewContext(t)
 	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -1283,9 +1279,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
-	vm := &VM{
-		avax: avaxID,
-	}
+	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),

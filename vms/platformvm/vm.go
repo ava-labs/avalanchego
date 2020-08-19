@@ -163,12 +163,6 @@ type VM struct {
 	// The node's chain manager
 	chainManager chains.Manager
 
-	// AVAX asset ID
-	avaxAssetID ids.ID
-
-	// AVM is the ID of the avm virtual machine
-	avm ids.ID
-
 	fx    Fx
 	codec codec.Codec
 

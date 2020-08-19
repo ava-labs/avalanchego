@@ -404,6 +404,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return err
 	}
 
+	xChainID := createAVMTx.ID()
+
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
@@ -426,6 +428,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		&n.APIServer,
 		&n.keystoreServer,
 		&n.sharedMemory,
+		avaxAssetID,
+		xChainID,
 		criticalChains,
 	)
 	if err != nil {
@@ -450,14 +454,11 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ChainManager:   n.chainManager,
 			Validators:     vdrs,
 			StakingEnabled: n.Config.EnableStaking,
-			AVAX:           avaxAssetID,
-			AVM:            createAVMTx.ID(),
 			Fee:            n.Config.TxFee,
 			MinStake:       n.Config.MinStake,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			AVAX: avaxAssetID,
-			Fee:  n.Config.TxFee,
+			Fee: n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: path.Join(n.Config.PluginDir, "evm"),

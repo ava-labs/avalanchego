@@ -28,7 +28,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : tx is nil
 	var unsignedTx *UnsignedAddDefaultSubnetDelegatorTx
-	if err := unsignedTx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err == nil {
+	if err := unsignedTx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -47,7 +47,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -66,7 +66,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Validator.NodeID = ids.ShortID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because NodeID is nil")
 	}
 
@@ -85,7 +85,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Validator.Wght = vm.minStake - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because of not enough weight")
 	}
 
@@ -104,7 +104,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Validator.End-- // 1 shorter than minimum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err == nil {
+	if err = tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
@@ -122,7 +122,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Validator.End++ // 1 longer than maximum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
@@ -136,7 +136,7 @@ func TestAddDefaultSubnetDelegatorTxSyntacticVerify(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID, vm.minStake); err != nil {
+	} else if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
 		t.Fatal(err)
 	}
 }

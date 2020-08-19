@@ -108,7 +108,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -118,7 +118,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
@@ -206,5 +206,5 @@ func (vm *VM) newCreateChainTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.avaxAssetID)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
 }

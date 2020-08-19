@@ -296,7 +296,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, tx.vm.avax, tx.vm.txFee, len(tx.vm.fxs))
+	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, tx.vm.ctx.AVAXAssetID, tx.vm.txFee, len(tx.vm.fxs))
 	return tx.validity
 }
 

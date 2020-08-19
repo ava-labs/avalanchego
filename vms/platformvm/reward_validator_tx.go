@@ -120,7 +120,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        txID,
 					OutputIndex: uint32(len(uVdrTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
 
@@ -147,7 +147,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        txID,
 					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake)),
 				},
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
 				return nil, nil, nil, nil, tempError{err}
@@ -168,7 +168,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        txID,
 					OutputIndex: uint32(len(uVdrTx.Outs) + i),
 				},
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
 
@@ -209,7 +209,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        txID,
 					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake)),
 				},
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
 				return nil, nil, nil, nil, tempError{err}
@@ -233,7 +233,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 					TxID:        txID,
 					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake) + offset),
 				},
-				Asset: avax.Asset{ID: vm.avaxAssetID},
+				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
 				return nil, nil, nil, nil, tempError{err}

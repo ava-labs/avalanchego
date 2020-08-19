@@ -65,10 +65,15 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func NewContext() *snow.Context {
+func NewContext(t *testing.T) *snow.Context {
+	genesisBytes := BuildGenesisTest(t)
+	tx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = networkID
 	ctx.ChainID = chainID
+	ctx.AVAXAssetID = tx.ID()
+	ctx.XChainID = ids.Empty.Prefix(0)
 	aliaser := ctx.BCLookup.(*ids.Aliaser)
 	aliaser.Alias(chainID, "X")
 	aliaser.Alias(chainID, chainID.String())
@@ -190,7 +195,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 
 func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	genesisBytes := BuildGenesisTest(t)
-	ctx := NewContext()
+	ctx := NewContext(t)
 
 	baseDB := memdb.New()
 
@@ -208,14 +213,8 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
-
-	avaxID := genesisTx.ID()
-
 	issuer := make(chan common.Message, 1)
-	vm := &VM{
-		avax: avaxID,
-	}
+	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -445,7 +444,7 @@ func TestTxSerialization(t *testing.T) {
 
 func TestInvalidGenesis(t *testing.T) {
 	vm := &VM{}
-	ctx := NewContext()
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -466,7 +465,7 @@ func TestInvalidGenesis(t *testing.T) {
 
 func TestInvalidFx(t *testing.T) {
 	vm := &VM{}
-	ctx := NewContext()
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -490,7 +489,7 @@ func TestInvalidFx(t *testing.T) {
 
 func TestFxInitializationFailure(t *testing.T) {
 	vm := &VM{}
-	ctx := NewContext()
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -665,10 +664,8 @@ func TestIssueDependentTx(t *testing.T) {
 
 // Test issuing a transaction that creates an NFT family
 func TestIssueNFT(t *testing.T) {
-	vm := &VM{
-		avax: ids.Empty,
-	}
-	ctx := NewContext()
+	vm := &VM{}
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -810,10 +807,8 @@ func TestIssueNFT(t *testing.T) {
 
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
-	vm := &VM{
-		avax: ids.Empty,
-	}
-	ctx := NewContext()
+	vm := &VM{}
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

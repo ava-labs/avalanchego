@@ -110,6 +110,8 @@ func init() {
 func defaultContext() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID
+	ctx.XChainID = avmID
+	ctx.AVAXAssetID = avaxAssetID
 	aliaser := &ids.Aliaser{}
 	aliaser.Initialize()
 	aliaser.Alias(constants.PlatformChainID, "P")
@@ -204,8 +206,6 @@ func defaultVM() *VM {
 	vm := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
-		avaxAssetID:  avaxAssetID,
-		avm:          avmID,
 		txFee:        defaultTxFee,
 		minStake:     minStake,
 	}
@@ -1202,7 +1202,7 @@ func TestAtomicImport(t *testing.T) {
 	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
 
 	if _, err := vm.newImportTx(
-		vm.avm,
+		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err == nil {
@@ -1210,7 +1210,7 @@ func TestAtomicImport(t *testing.T) {
 	}
 
 	// Provide the avm UTXO
-	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.avm)
+	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.Ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: avaxAssetID},
@@ -1222,14 +1222,14 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	state := avax.NewPrefixedState(smDB, Codec, vm.avm, vm.Ctx.ChainID)
+	state := avax.NewPrefixedState(smDB, Codec, vm.Ctx.XChainID, vm.Ctx.ChainID)
 	if err := state.FundUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
+	vm.Ctx.SharedMemory.ReleaseDatabase(vm.Ctx.XChainID)
 
 	tx, err := vm.newImportTx(
-		vm.avm,
+		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 	)
@@ -1251,9 +1251,9 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", status)
 	}
 
-	smDB = vm.Ctx.SharedMemory.GetDatabase(vm.avm)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.avm)
-	state = avax.NewPrefixedState(smDB, vm.codec, vm.Ctx.ChainID, vm.avm)
+	smDB = vm.Ctx.SharedMemory.GetDatabase(vm.Ctx.XChainID)
+	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.Ctx.XChainID)
+	state = avax.NewPrefixedState(smDB, vm.codec, vm.Ctx.ChainID, vm.Ctx.XChainID)
 	if _, err := state.UTXO(utxoID.InputID()); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
@@ -1273,13 +1273,13 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,
 		}},
-		SourceChain: vm.avm,
+		SourceChain: vm.Ctx.XChainID,
 		ImportedInputs: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty.Prefix(1),
 				OutputIndex: 1,
 			},
-			Asset: avax.Asset{ID: vm.avaxAssetID},
+			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 			In: &secp256k1fx.TransferInput{
 				Amt: 50000,
 			},

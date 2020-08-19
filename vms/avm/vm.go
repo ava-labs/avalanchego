@@ -60,8 +60,6 @@ type VM struct {
 	metrics
 	ids.Aliaser
 
-	avax ids.ID
-
 	// Contains information of where this VM is executing
 	ctx *snow.Context
 
