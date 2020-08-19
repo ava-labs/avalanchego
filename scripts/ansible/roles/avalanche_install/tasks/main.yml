@@ -1,9 +1,6 @@
-- name: Create shared directories #noqa 208
+- name: Create shared directories
   become: true
   file:
-    # Don't specify owner, mode etc for directories not specific to Avalanche.
-    # OS defaults, or local defaults are better than any guess we could make.
-    # TODO remove the above comment
     path: "{{ item.path }}"
     state: directory
     mode: preserve
