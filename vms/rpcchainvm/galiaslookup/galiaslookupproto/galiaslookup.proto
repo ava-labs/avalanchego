@@ -1,0 +1,23 @@
+syntax = "proto3";
+package galiaslookupproto;
+
+message LookupRequest {
+    string alias = 1;
+}
+
+message LookupResponse {
+    bytes id = 1;
+}
+
+message PrimaryAliasRequest {
+    bytes id = 1;
+}
+
+message PrimaryAliasResponse {
+    string alias = 1;
+}
+
+service AliasLookup {
+    rpc Lookup(LookupRequest) returns (LookupResponse);
+    rpc PrimaryAlias(PrimaryAliasRequest) returns (PrimaryAliasResponse);
+}

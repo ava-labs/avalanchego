@@ -2,10 +2,18 @@ syntax = "proto3";
 package vmproto;
 
 message InitializeRequest {
-    bytes genesisBytes = 1;
-    uint32 dbServer = 2;
-    uint32 engineServer = 3;
-    uint32 keystoreServer = 4;
+    uint32 networkID = 1;
+    bytes subnetID = 2;
+    bytes chainID = 3;
+    bytes nodeID = 4;
+    bytes genesisBytes = 5;
+    
+    uint32 dbServer = 6;
+    uint32 engineServer = 7;
+    uint32 keystoreServer = 8;
+    uint32 sharedMemoryServer = 9;
+    uint32 bcLookupServer = 10;
+    uint32 snLookupServer = 11;
 }
 
 message InitializeResponse {

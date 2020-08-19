@@ -49,10 +49,11 @@ type SubnetLookup interface {
 // [ChainID] is the ID of the chain this context exists within.
 // [NodeID] is the ID of this node
 type Context struct {
-	NetworkID           uint32
-	SubnetID            ids.ID
-	ChainID             ids.ID
-	NodeID              ids.ShortID
+	NetworkID uint32
+	SubnetID  ids.ID
+	ChainID   ids.ID
+	NodeID    ids.ShortID
+
 	Log                 logging.Logger
 	DecisionDispatcher  *triggers.EventDispatcher
 	ConsensusDispatcher *triggers.EventDispatcher

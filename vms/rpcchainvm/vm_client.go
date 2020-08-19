@@ -8,8 +8,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
-
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
@@ -23,9 +21,14 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/vms/components/missing"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
@@ -44,6 +47,8 @@ type VMClient struct {
 	db        *rpcdb.DatabaseServer
 	messenger *messenger.Server
 	keystore  *gkeystore.Server
+	bcLookup  *galiaslookup.Server
+	snLookup  *gsubnetlookup.Server
 
 	lock    sync.Mutex
 	closed  bool
@@ -87,6 +92,8 @@ func (vm *VMClient) Initialize(
 	vm.db = rpcdb.NewServer(db)
 	vm.messenger = messenger.NewServer(toEngine)
 	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
+	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
+	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 
 	// start the db server
 	dbBrokerID := vm.broker.NextId()
@@ -100,11 +107,26 @@ func (vm *VMClient) Initialize(
 	keystoreBrokerID := vm.broker.NextId()
 	go vm.broker.AcceptAndServe(keystoreBrokerID, vm.startKeystoreServer)
 
+	// start the blockchain alias server
+	bcLookupBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(bcLookupBrokerID, vm.startBCLookupServer)
+
+	// start the subnet alias server
+	snLookupBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(snLookupBrokerID, vm.startSNLookupServer)
+
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		GenesisBytes:   genesisBytes,
+		NetworkID:    ctx.NetworkID,
+		SubnetID:     ctx.SubnetID.Bytes(),
+		ChainID:      ctx.ChainID.Bytes(),
+		NodeID:       ctx.NodeID.Bytes(),
+		GenesisBytes: genesisBytes,
+
 		DbServer:       dbBrokerID,
 		EngineServer:   messengerBrokerID,
 		KeystoreServer: keystoreBrokerID,
+		BcLookupServer: bcLookupBrokerID,
+		SnLookupServer: snLookupBrokerID,
 	})
 	if err != nil {
 		return err
@@ -164,6 +186,38 @@ func (vm *VMClient) startKeystoreServer(opts []grpc.ServerOption) *grpc.Server {
 	}
 
 	gkeystoreproto.RegisterKeystoreServer(server, vm.keystore)
+	return server
+}
+
+func (vm *VMClient) startBCLookupServer(opts []grpc.ServerOption) *grpc.Server {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+
+	server := grpc.NewServer(opts...)
+
+	if vm.closed {
+		server.Stop()
+	} else {
+		vm.servers = append(vm.servers, server)
+	}
+
+	galiaslookupproto.RegisterAliasLookupServer(server, vm.bcLookup)
+	return server
+}
+
+func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+
+	server := grpc.NewServer(opts...)
+
+	if vm.closed {
+		server.Stop()
+	} else {
+		vm.servers = append(vm.servers, server)
+	}
+
+	gsubnetlookupproto.RegisterSubnetLookupServer(server, vm.snLookup)
 	return server
 }
 

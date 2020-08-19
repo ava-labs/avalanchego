@@ -91,7 +91,7 @@ type Keystore struct {
 	//    UserDB        BlockchainDB
 	//                 /      |     \
 	//               Usr     Usr    Usr
-	//            /   |   \
+	//             /  |  \
 	//          BID  BID  BID
 }
 
