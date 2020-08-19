@@ -4,6 +4,6 @@ set -ev
 
 go get -d -t -v github.com/ava-labs/gecko/...
 
-cd $GOPATH/src/github.com/ava-labs/gecko
+cd $GECKO_HOME
 ./scripts/build_test.sh
 ./scripts/build.sh
