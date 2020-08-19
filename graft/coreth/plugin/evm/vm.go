@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	//"github.com/ava-labs/gecko/utils/constants"
 	//"github.com/ava-labs/gecko/utils/formatting"
 	avajson "github.com/ava-labs/gecko/utils/json"
@@ -98,6 +99,13 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		Codec.RegisterType(&UnsignedImportTx{}),
+		Codec.RegisterType(&secp256k1fx.TransferInput{}),
+		Codec.RegisterType(&secp256k1fx.Input{}),
+		Codec.RegisterType(&secp256k1fx.Credential{}),
+		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
+		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
+		Codec.RegisterType(&secp256k1fx.MintOperation{}),
+		Codec.RegisterType(&secp256k1fx.MintOutput{}),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -657,6 +665,11 @@ func (vm *VM) GetAtomicUTXOs(
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	// TODO: finish this function via gRPC
-	utxos := []*avax.UTXO{}
+	utxos := []*avax.UTXO{{
+		Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 100,
+		},
+	}}
 	return utxos, ids.ShortEmpty, ids.Empty, nil
 }
