@@ -17,6 +17,7 @@ import (
 	//"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ava-labs/go-ethereum/log"
 	//"github.com/ava-labs/go-ethereum/crypto"
 )
 
@@ -191,6 +192,7 @@ func (vm *VM) newImportTx(
 	}
 	tx := &Tx{UnsignedTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
+		log.Info("hey here1", "err", err, "utx", utx)
 		return nil, err
 	}
 	return tx, utx.Verify(vm.avm, vm.ctx, vm.txFee, vm.avaxAssetID)

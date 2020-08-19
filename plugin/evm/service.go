@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
 	"github.com/ava-labs/go-ethereum/crypto"
+	"github.com/ava-labs/go-ethereum/log"
 )
 
 const (
@@ -253,5 +254,6 @@ func (service *AvaAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respons
 	}
 
 	response.TxID = tx.ID()
+	log.Info("hey here2")
 	return service.vm.issueTx(tx)
 }
