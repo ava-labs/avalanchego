@@ -179,6 +179,11 @@ func (k *PrivateKeySECP256K1R) SignHash(hash []byte) ([]byte, error) {
 	return rawSigToSig(sig)
 }
 
+// ToECDSA returns the ecdsa representation of this private key
+func (k *PrivateKeySECP256K1R) ToECDSA() *stdecdsa.PrivateKey {
+	return k.sk.ToECDSA()
+}
+
 // Bytes implements the PrivateKey interface
 func (k *PrivateKeySECP256K1R) Bytes() []byte {
 	if k.bytes == nil {
