@@ -134,6 +134,7 @@ type VM struct {
 
 	genlock               sync.Mutex
 	txSubmitChan          <-chan struct{}
+	atomicTxSubmitChan    chan struct{}
 	codec                 codec.Codec
 	clock                 timer.Clock
 	avaxAssetID           ids.ID
@@ -211,6 +212,7 @@ func (vm *VM) Initialize(
 		case atx := <-vm.pendingAtomicTxs:
 			raw, _ := vm.codec.Marshal(atx)
 			block.SetExtraData(raw)
+			// TODO: make sure the atomic Tx is valid
 		}
 		return nil
 	})
@@ -312,6 +314,9 @@ func (vm *VM) Initialize(
 			select {
 			case <-vm.txSubmitChan:
 				vm.ctx.Log.Verbo("New tx detected, trying to generate a block")
+				vm.tryBlockGen()
+			case <-vm.atomicTxSubmitChan:
+				vm.ctx.Log.Verbo("New atomic Tx detected, trying to generate a block")
 				vm.tryBlockGen()
 			case <-time.After(5 * time.Second):
 				vm.tryBlockGen()
@@ -628,6 +633,7 @@ func (vm *VM) FormatAddress(addr common.Address) (string, error) {
 func (vm *VM) issueTx(tx *Tx) error {
 	select {
 	case vm.pendingAtomicTxs <- tx:
+		vm.atomicTxSubmitChan <- struct{}{}
 	default:
 		return errTooManyAtomicTx
 	}
