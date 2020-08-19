@@ -39,7 +39,7 @@ type UnsignedAddDefaultSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator DurationValidator `serialize:"true" json:"validator"`
+	Validator Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
@@ -229,13 +229,11 @@ func (vm *VM) newAddDefaultSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: DurationValidator{
-			Validator: Validator{
-				NodeID: nodeID,
-				Wght:   stakeAmt,
-			},
-			Start: startTime,
-			End:   endTime,
+		Validator: Validator{
+			NodeID: nodeID,
+			Start:  startTime,
+			End:    endTime,
+			Wght:   stakeAmt,
 		},
 		Stake: lockedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{

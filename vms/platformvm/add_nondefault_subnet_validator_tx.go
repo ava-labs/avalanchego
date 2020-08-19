@@ -252,13 +252,11 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 			Outs:         outs,
 		}},
 		Validator: SubnetValidator{
-			DurationValidator: DurationValidator{
-				Validator: Validator{
-					NodeID: nodeID,
-					Wght:   weight,
-				},
-				Start: startTime,
-				End:   endTime,
+			Validator: Validator{
+				NodeID: nodeID,
+				Start:  startTime,
+				End:    endTime,
+				Wght:   weight,
 			},
 			Subnet: subnetID,
 		},
