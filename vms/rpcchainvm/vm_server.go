@@ -68,6 +68,14 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	if err != nil {
 		return nil, err
 	}
+	xChainID, err := ids.ToID(req.XChainID)
+	if err != nil {
+		return nil, err
+	}
+	avaxAssetID, err := ids.ToID(req.AvaxAssetID)
+	if err != nil {
+		return nil, err
+	}
 
 	dbConn, err := vm.broker.Dial(req.DbServer)
 	if err != nil {
@@ -123,6 +131,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		SubnetID:            subnetID,
 		ChainID:             chainID,
 		NodeID:              nodeID,
+		XChainID:            xChainID,
+		AVAXAssetID:         avaxAssetID,
 		Log:                 logging.NoLog{},
 		DecisionDispatcher:  nil,
 		ConsensusDispatcher: nil,

@@ -116,12 +116,13 @@ func (vm *VMClient) Initialize(
 	go vm.broker.AcceptAndServe(snLookupBrokerID, vm.startSNLookupServer)
 
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		NetworkID:    ctx.NetworkID,
-		SubnetID:     ctx.SubnetID.Bytes(),
-		ChainID:      ctx.ChainID.Bytes(),
-		NodeID:       ctx.NodeID.Bytes(),
-		GenesisBytes: genesisBytes,
-
+		NetworkID:      ctx.NetworkID,
+		SubnetID:       ctx.SubnetID.Bytes(),
+		ChainID:        ctx.ChainID.Bytes(),
+		NodeID:         ctx.NodeID.Bytes(),
+		XChainID:       ctx.XChainID.Bytes(),
+		AvaxAssetID:    ctx.AVAXAssetID.Bytes(),
+		GenesisBytes:   genesisBytes,
 		DbServer:       dbBrokerID,
 		EngineServer:   messengerBrokerID,
 		KeystoreServer: keystoreBrokerID,
