@@ -2,8 +2,8 @@
 
 set -ev
 
-go get -d -t -v github.com/ava-labs/gecko/...
-
-cd $GECKO_HOME
-./scripts/build_test.sh
+# Note: On OSX, GOPATH is set before GECKO_HOME environment variable
+# which leads to $GOPATH within GECKO_HOME to be empty.
+cd "$GOPATH/$GECKO_HOME"
 ./scripts/build.sh
+./scripts/build_test.sh
