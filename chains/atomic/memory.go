@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
+	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -37,8 +38,8 @@ func (m *Memory) Initialize(log logging.Logger, db database.Database) {
 	m.db = db
 }
 
-// NewBlockchainMemory returns a new BlockchainMemory
-func (m *Memory) NewBlockchainMemory(id ids.ID) SharedMemory {
+// NewSharedMemory returns a new SharedMemory
+func (m *Memory) NewSharedMemory(id ids.ID) SharedMemory {
 	return &sharedMemory{
 		m:           m,
 		thisChainID: id,
@@ -46,24 +47,25 @@ func (m *Memory) NewBlockchainMemory(id ids.ID) SharedMemory {
 }
 
 // GetDatabase returns and locks the provided DB
-func (m *Memory) GetDatabase(id ids.ID) database.Database {
-	lock := m.makeLock(id)
+func (m *Memory) GetDatabase(sharedID ids.ID) (*versiondb.Database, database.Database) {
+	lock := m.makeLock(sharedID)
 	lock.Lock()
 
-	return prefixdb.New(id.Bytes(), m.db)
+	vdb := versiondb.New(m.db)
+	return vdb, prefixdb.New(sharedID.Bytes(), vdb)
 }
 
 // ReleaseDatabase unlocks the provided DB
-func (m *Memory) ReleaseDatabase(id ids.ID) {
-	lock := m.releaseLock(id)
+func (m *Memory) ReleaseDatabase(sharedID ids.ID) {
+	lock := m.releaseLock(sharedID)
 	lock.Unlock()
 }
 
-func (m *Memory) makeLock(id ids.ID) *sync.Mutex {
+func (m *Memory) makeLock(sharedID ids.ID) *sync.Mutex {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	key := id.Key()
+	key := sharedID.Key()
 	rc, exists := m.locks[key]
 	if !exists {
 		rc = &rcLock{}
@@ -73,11 +75,11 @@ func (m *Memory) makeLock(id ids.ID) *sync.Mutex {
 	return &rc.lock
 }
 
-func (m *Memory) releaseLock(id ids.ID) *sync.Mutex {
+func (m *Memory) releaseLock(sharedID ids.ID) *sync.Mutex {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	key := id.Key()
+	key := sharedID.Key()
 	rc, exists := m.locks[key]
 	if !exists {
 		panic("Attemping to free an unknown lock")
