@@ -8,8 +8,11 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v3"
+	stdecdsa "crypto/ecdsa"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v3/ecdsa"
+
+	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
@@ -123,6 +126,11 @@ func (k *PublicKeySECP256K1R) VerifyHash(hash, sig []byte) bool {
 		return false
 	}
 	return k.Address().Equals(pk.Address())
+}
+
+// ToECDSA returns the ecdsa representation of this public key
+func (k *PublicKeySECP256K1R) ToECDSA() *stdecdsa.PublicKey {
+	return k.pk.ToECDSA()
 }
 
 // Address implements the PublicKey interface
