@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
@@ -33,10 +34,12 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/codec"
+	//"github.com/ava-labs/gecko/utils/constants"
+	//"github.com/ava-labs/gecko/utils/formatting"
 	avajson "github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 
 	commonEng "github.com/ava-labs/gecko/snow/engine/common"
 )
@@ -69,13 +72,14 @@ const (
 )
 
 var (
-	errEmptyBlock     = errors.New("empty block")
-	errCreateBlock    = errors.New("couldn't create block")
-	errUnknownBlock   = errors.New("unknown block")
-	errBlockFrequency = errors.New("too frequent block issuance")
-	errUnsupportedFXs = errors.New("unsupported feature extensions")
-	errInvalidBlock   = errors.New("invalid block")
-	errInvalidAddr    = errors.New("invalid hex address")
+	errEmptyBlock      = errors.New("empty block")
+	errCreateBlock     = errors.New("couldn't create block")
+	errUnknownBlock    = errors.New("unknown block")
+	errBlockFrequency  = errors.New("too frequent block issuance")
+	errUnsupportedFXs  = errors.New("unsupported feature extensions")
+	errInvalidBlock    = errors.New("invalid block")
+	errInvalidAddr     = errors.New("invalid hex address")
+	errTooManyAtomicTx = errors.New("too many pending atomix txs")
 )
 
 func maxDuration(x, y time.Duration) time.Duration {
@@ -128,13 +132,25 @@ type VM struct {
 	bdGenWaitFlag   bool
 	bdGenFlag       bool
 
-	genlock      sync.Mutex
-	txSubmitChan <-chan struct{}
-	codec        codec.Codec
-	clock        timer.Clock
-	avaxAssetID  ids.ID
-	txFee        uint64
-	//atomicTxPool []
+	genlock               sync.Mutex
+	txSubmitChan          <-chan struct{}
+	codec                 codec.Codec
+	clock                 timer.Clock
+	avaxAssetID           ids.ID
+	avm                   ids.ID
+	txFee                 uint64
+	pendingAtomicTxs      chan *Tx
+	blockAtomicInputCache cache.LRU
+}
+
+func (vm *VM) getAtomicTx(block *types.Block) *Tx {
+	var atx *Tx
+	if extdata := block.ExtraData(); extdata != nil {
+		if err := vm.codec.Unmarshal(block.ExtraData(), atx); err != nil {
+			panic(err)
+		}
+	}
+	return atx
 }
 
 /*
@@ -191,6 +207,11 @@ func (vm *VM) Initialize(
 			vm.newBlockChan <- nil
 			return errEmptyBlock
 		}
+		select {
+		case atx := <-vm.pendingAtomicTxs:
+			raw, _ := vm.codec.Marshal(atx)
+			block.SetExtraData(raw)
+		}
 		return nil
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
@@ -211,8 +232,14 @@ func (vm *VM) Initialize(
 	chain.SetOnQueryAcceptedBlock(func() *types.Block {
 		return vm.getLastAccepted().ethBlock
 	})
+	chain.SetOnExtraStateChange(func(block *types.Block, statedb *state.StateDB) error {
+		atx := vm.getAtomicTx(block).UnsignedTx.(*UnsignedImportTx)
+		vm.ctx.Log.Info(atx.ID().String())
+		return nil
+	})
 	vm.blockCache = cache.LRU{Size: 2048}
 	vm.blockStatusCache = cache.LRU{Size: 1024}
+	vm.blockAtomicInputCache = cache.LRU{Size: 4096}
 	vm.newBlockChan = make(chan *Block)
 	vm.networkChan = toEngine
 	vm.blockDelayTimer = timer.NewTimer(func() {
@@ -236,6 +263,8 @@ func (vm *VM) Initialize(
 	vm.bdGenWaitFlag = true
 	vm.newTxPoolHeadChan = make(chan core.NewTxPoolHeadEvent, 1)
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
+	// TODO: read size from options
+	vm.pendingAtomicTxs = make(chan *Tx, 1024)
 	chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
 	// TODO: shutdown this go routine
 	go ctx.Log.RecoverAndPanic(func() {
@@ -419,7 +448,7 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
-		"/ava": newHandler("", &AvaAPI{vm}),
+		"/ava": newHandler("ava", &AvaAPI{vm}),
 		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}
 }
@@ -584,7 +613,8 @@ func (vm *VM) getLastAccepted() *Block {
 	return vm.lastAccepted
 }
 
-func (vm *VM) ParseAddress(addrStr string) (common.Address, error) {
+// ParseLocalAddress takes in an address for this chain and produces the ID
+func (vm *VM) ParseLocalAddress(addrStr string) (common.Address, error) {
 	if !common.IsHexAddress(addrStr) {
 		return common.Address{}, errInvalidAddr
 	}
@@ -595,14 +625,25 @@ func (vm *VM) FormatAddress(addr common.Address) (string, error) {
 	return addr.Hex(), nil
 }
 
-func (vm *VM) issueTx(tx *AtomicTx) error {
+func (vm *VM) issueTx(tx *Tx) error {
+	select {
+	case vm.pendingAtomicTxs <- tx:
+	default:
+		return errTooManyAtomicTx
+	}
 	return nil
 }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
-func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
+func (vm *VM) GetAtomicUTXOs(
+	chainID ids.ID,
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	// TODO: finish this function via gRPC
-	utxos := []*ava.UTXO{}
-	return utxos, nil
+	utxos := []*avax.UTXO{}
+	return utxos, ids.ShortEmpty, ids.Empty, nil
 }

@@ -61,6 +61,27 @@ func (b *Block) Parent() snowman.Block {
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
+	p := b
+	path := []*Block{}
+	for {
+		if p.Status() == choices.Accepted {
+			break
+		}
+		path = append(path, p)
+		p = p.Parent().(*Block)
+	}
+	inputs := new(ids.Set)
+	for i := len(path) - 1; i >= 0; i-- {
+		p := path[i]
+		atx := p.vm.getAtomicTx(p.ethBlock)
+		inputs.Union(atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs())
+	}
+	tx := b.vm.getAtomicTx(b.ethBlock)
+	atx := tx.UnsignedTx.(*UnsignedImportTx)
+	if atx.SemanticVerify(b.vm, tx) != nil {
+		return errInvalidBlock
+	}
+
 	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }
