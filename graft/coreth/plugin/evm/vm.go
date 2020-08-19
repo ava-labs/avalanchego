@@ -173,6 +173,8 @@ func (vm *VM) Initialize(
 	}
 
 	vm.ctx = ctx
+	vm.avaxAssetID = ctx.AVAXAssetID
+	vm.avm = ctx.XChainID
 	vm.chaindb = Database{db}
 	g := new(core.Genesis)
 	err := json.Unmarshal(b, g)
@@ -237,6 +239,11 @@ func (vm *VM) Initialize(
 	chain.SetOnExtraStateChange(func(block *types.Block, statedb *state.StateDB) error {
 		atx := vm.getAtomicTx(block).UnsignedTx.(*UnsignedImportTx)
 		vm.ctx.Log.Info(atx.ID().String())
+		for _, to := range atx.Outs {
+			amount := new(big.Int)
+			amount.SetUint64(to.Amount)
+			statedb.AddBalance(to.Address, amount)
+		}
 		return nil
 	})
 	vm.blockCache = cache.LRU{Size: 2048}
