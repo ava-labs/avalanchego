@@ -2,10 +2,10 @@ package evm
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/go-ethereum/common"
 )
 
@@ -37,16 +37,9 @@ func (out *EVMOutput) Verify() error {
 // struct's serialized fields without doing the same on avm.BaseTx.
 // TODO: Factor out this and avm.BaseTX
 type BaseTx struct {
-	vm *VM
+	avax.Metadata
 	// true iff this transaction has already passed syntactic verification
 	syntacticallyVerified bool
-	// ID of this tx
-	id ids.ID
-	// Byte representation of this unsigned tx
-	unsignedBytes []byte
-	// Byte representation of the signed transaction (ie with credentials)
-	bytes []byte
-
 	// ID of the network on which this tx was issued
 	NetworkID uint32 `serialize:"true" json:"networkID"`
 	// ID of this blockchain. In practice is always the empty ID.
@@ -55,38 +48,22 @@ type BaseTx struct {
 	// Outputs
 	Outs []EVMOutput `serialize:"true" json:"outputs"`
 	// Inputs consumed by this tx
-	Ins []*ava.TransferableInput `serialize:"true" json:"inputs"`
+	Ins []*avax.TransferableInput `serialize:"true" json:"inputs"`
 	// Memo field contains arbitrary bytes, up to maxMemoSize
 	Memo []byte `serialize:"true" json:"memo"`
 }
 
-// UnsignedBytes returns the byte representation of this unsigned tx
-func (tx *BaseTx) UnsignedBytes() []byte { return tx.unsignedBytes }
-
-// Bytes returns the byte representation of this tx
-func (tx *BaseTx) Bytes() []byte { return tx.bytes }
-
-// ID returns this transaction's ID
-func (tx *BaseTx) ID() ids.ID { return tx.id }
-
 // Verify returns nil iff this tx is well formed
-func (tx *BaseTx) Verify() error {
+func (tx *BaseTx) Verify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.id.IsZero():
-		return errInvalidID
-	case tx.vm == nil:
-		return errVMNil
-	case tx.NetworkID != tx.vm.ctx.NetworkID:
+	case tx.NetworkID != ctx.NetworkID:
 		return errWrongNetworkID
-	case !tx.vm.ctx.ChainID.Equals(tx.BlockchainID):
+	case !ctx.ChainID.Equals(tx.BlockchainID):
 		return errWrongBlockchainID
-	case len(tx.Memo) > maxMemoSize:
-		return fmt.Errorf("memo length, %d, exceeds maximum memo length, %d",
-			len(tx.Memo), maxMemoSize)
 	}
 	for _, out := range tx.Outs {
 		if err := out.Verify(); err != nil {
@@ -99,9 +76,8 @@ func (tx *BaseTx) Verify() error {
 		}
 	}
 	switch {
-	//case !ava.IsSortedTransferableOutputs(tx.Outs, Codec):
-	//	return errOutputsNotSorted
-	case !ava.IsSortedAndUniqueTransferableInputs(tx.Ins):
+	// TODO: check whether output addreses are sorted?
+	case !avax.IsSortedAndUniqueTransferableInputs(tx.Ins):
 		return errInputsNotSortedUnique
 	default:
 		return nil

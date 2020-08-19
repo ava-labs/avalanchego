@@ -5,12 +5,13 @@ package evm
 
 import (
 	"errors"
+	"fmt"
 
-	"crypto/ecdsa"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/crypto"
+	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 )
 
 // Key in the database whose corresponding value is the list of
@@ -66,12 +67,13 @@ func (u *user) controlsAddress(address common.Address) (bool, error) {
 }
 
 // putAddress persists that this user controls address controlled by [privKey]
-func (u *user) putAddress(privKey *ecdsa.PrivateKey) error {
+func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 	if privKey == nil {
 		return errKeyNil
 	}
 
-	address := crypto.PubkeyToAddress(privKey.PublicKey) // address the privKey controls
+	address := ethcrypto.PubkeyToAddress(
+		(*privKey.PublicKey().(*crypto.PublicKeySECP256K1R).ToECDSA())) // address the privKey controls
 	controlsAddress, err := u.controlsAddress(address)
 	if err != nil {
 		return err
@@ -80,7 +82,7 @@ func (u *user) putAddress(privKey *ecdsa.PrivateKey) error {
 		return nil
 	}
 
-	if err := u.db.Put(address.Bytes(), crypto.FromECDSA(privKey)); err != nil { // Address --> private key
+	if err := u.db.Put(address.Bytes(), privKey.Bytes()); err != nil { // Address --> private key
 		return err
 	}
 
@@ -106,31 +108,35 @@ func (u *user) putAddress(privKey *ecdsa.PrivateKey) error {
 }
 
 // Key returns the private key that controls the given address
-func (u *user) getKey(address common.Address) (*ecdsa.PrivateKey, error) {
+func (u *user) getKey(address common.Address) (*crypto.PrivateKeySECP256K1R, error) {
 	if u.db == nil {
 		return nil, errDBNil
 		//} else if address.IsZero() {
 		//	return nil, errEmptyAddress
 	}
 
+	factory := crypto.FactorySECP256K1R{}
 	bytes, err := u.db.Get(address.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	sk, err := crypto.ToECDSA(bytes)
+	sk, err := factory.ToPrivateKey(bytes)
 	if err != nil {
 		return nil, err
 	}
-	return sk, nil
+	if sk, ok := sk.(*crypto.PrivateKeySECP256K1R); ok {
+		return sk, nil
+	}
+	return nil, fmt.Errorf("expected private key to be type *crypto.PrivateKeySECP256K1R but is type %T", sk)
 }
 
 // Return all private keys controlled by this user
-func (u *user) getKeys() ([]*ecdsa.PrivateKey, error) {
+func (u *user) getKeys() ([]*crypto.PrivateKeySECP256K1R, error) {
 	addrs, err := u.getAddresses()
 	if err != nil {
 		return nil, err
 	}
-	keys := make([]*ecdsa.PrivateKey, len(addrs))
+	keys := make([]*crypto.PrivateKeySECP256K1R, len(addrs))
 	for i, addr := range addrs {
 		key, err := u.getKey(addr)
 		if err != nil {
