@@ -34,11 +34,14 @@ var (
 
 // Codec handles marshaling and unmarshaling of structs
 type codec struct {
-	version      uint16
-	maxSize      int
-	maxSliceLen  int
+	version     uint16
+	maxSize     int
+	maxSliceLen int
+
+	nextTypeID   uint32
 	typeIDToType map[uint32]reflect.Type
 	typeToTypeID map[reflect.Type]uint32
+
 	// Key: a struct type
 	// Value: Slice where each element is index in the struct type
 	// of a field that is serialized/deserialized
@@ -50,6 +53,7 @@ type codec struct {
 
 // Codec marshals and unmarshals
 type Codec interface {
+	Skip(int)
 	RegisterType(interface{}) error
 	Marshal(interface{}) ([]byte, error)
 	Unmarshal([]byte, interface{}) error
@@ -70,6 +74,9 @@ func New(maxSize, maxSliceLen int) Codec {
 // NewDefault returns a new codec with reasonable default values
 func NewDefault() Codec { return New(defaultMaxSize, defaultMaxSliceLength) }
 
+// Skip some number of type IDs
+func (c *codec) Skip(num int) { c.nextTypeID += uint32(num) }
+
 // RegisterType is used to register types that may be unmarshaled into an interface
 // [val] is a value of the type being registered
 func (c *codec) RegisterType(val interface{}) error {
@@ -77,8 +84,9 @@ func (c *codec) RegisterType(val interface{}) error {
 	if _, exists := c.typeToTypeID[valType]; exists {
 		return fmt.Errorf("type %v has already been registered", valType)
 	}
-	c.typeIDToType[uint32(len(c.typeIDToType))] = reflect.TypeOf(val)
-	c.typeToTypeID[valType] = uint32(len(c.typeIDToType) - 1)
+	c.typeIDToType[c.nextTypeID] = reflect.TypeOf(val)
+	c.typeToTypeID[valType] = c.nextTypeID
+	c.nextTypeID++
 	return nil
 }
 
