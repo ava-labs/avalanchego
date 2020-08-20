@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	geckojson "github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
@@ -63,6 +64,8 @@ const (
 	minBlockTime = 250 * time.Millisecond
 	maxBlockTime = 1000 * time.Millisecond
 	batchSize    = 250
+
+	maxUTXOsToFetch = 1024
 )
 
 const (
@@ -117,13 +120,16 @@ func init() {
 	errs.Add(
 		Codec.RegisterType(&UnsignedImportTx{}),
 		Codec.RegisterType(&UnsignedExportTx{}),
+	)
+	Codec.Skip(3)
+	errs.Add(
 		Codec.RegisterType(&secp256k1fx.TransferInput{}),
-		Codec.RegisterType(&secp256k1fx.Input{}),
-		Codec.RegisterType(&secp256k1fx.Credential{}),
-		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
-		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
-		Codec.RegisterType(&secp256k1fx.MintOperation{}),
 		Codec.RegisterType(&secp256k1fx.MintOutput{}),
+		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
+		Codec.RegisterType(&secp256k1fx.MintOperation{}),
+		Codec.RegisterType(&secp256k1fx.Credential{}),
+		Codec.RegisterType(&secp256k1fx.Input{}),
+		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -166,6 +172,8 @@ type VM struct {
 	txFee                 uint64
 	pendingAtomicTxs      chan *Tx
 	blockAtomicInputCache cache.LRU
+
+	fx secp256k1fx.Fx
 }
 
 func (vm *VM) getAtomicTx(block *types.Block) *Tx {
@@ -178,6 +186,15 @@ func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 	atx.Sign(vm.codec, nil)
 	return atx
 }
+
+// Codec implements the secp256k1fx interface
+func (vm *VM) Codec() codec.Codec { return codec.NewDefault() }
+
+// Clock implements the secp256k1fx interface
+func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+
+// Logger implements the secp256k1fx interface
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 /*
  ******************************************************************************
@@ -356,16 +373,16 @@ func (vm *VM) Initialize(
 	})
 	vm.codec = Codec
 
-	return nil
+	return vm.fx.Initialize(vm)
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
 // bootstrapping
-func (vm *VM) Bootstrapping() error { return nil }
+func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 
 // Bootstrapped notifies this VM that the consensus engine has finished
 // bootstrapping
-func (vm *VM) Bootstrapped() error { return nil }
+func (vm *VM) Bootstrapped() error { return vm.fx.Bootstrapped() }
 
 // Shutdown implements the snowman.ChainVM interface
 func (vm *VM) Shutdown() error {
@@ -708,15 +725,44 @@ func (vm *VM) GetAtomicUTXOs(
 	startUTXOID ids.ID,
 	limit int,
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	// TODO: finish this function via gRPC
-	utxos := []*avax.UTXO{{
-		UTXOID: avax.UTXOID{TxID: ids.Empty},
-		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 100,
-		},
-	}}
-	return utxos, ids.ShortEmpty, ids.Empty, nil
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
+	}
+
+	addrsList := make([][]byte, addrs.Len())
+	for i, addr := range addrs.List() {
+		addrsList[i] = addr.Bytes()
+	}
+
+	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
+		chainID,
+		addrsList,
+		startAddr.Bytes(),
+		startUTXOID.Bytes(),
+		limit,
+	)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
+	}
+
+	lastAddrID, err := ids.ToShortID(lastAddr)
+	if err != nil {
+		lastAddrID = ids.ShortEmpty
+	}
+	lastUTXOID, err := ids.ToID(lastUTXO)
+	if err != nil {
+		lastAddrID = ids.ShortEmpty
+	}
+
+	utxos := make([]*avax.UTXO, len(allUTXOBytes))
+	for i, utxoBytes := range allUTXOBytes {
+		utxo := &avax.UTXO{}
+		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
+		}
+		utxos[i] = utxo
+	}
+	return utxos, lastAddrID, lastUTXOID, nil
 }
 
 func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
