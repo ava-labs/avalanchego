@@ -62,7 +62,7 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
-	case constants.DenaliID:
+	case constants.EverestID:
 		return []string{
 			"18.188.121.35:21001",
 			"3.133.83.66:21001",
@@ -84,14 +84,6 @@ func GetIPs(networkID uint32) []string {
 			"18.188.95.241:21001",
 			"3.12.197.248:21001",
 			"3.17.39.236:21001",
-		}
-	case constants.CascadeID:
-		return []string{
-			"3.227.207.132:21001",
-			"34.207.133.167:21001",
-			"54.162.71.9:21001",
-			"54.197.215.186:21001",
-			"18.234.153.22:21001",
 		}
 	default:
 		return nil
@@ -123,14 +115,6 @@ func GetIDs(networkID uint32) []string {
 			"NodeID-84KbQHSDnojroCVY7vQ7u9Tx7pUonPaS",
 			"NodeID-JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
 			"NodeID-4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
-		}
-	case constants.CascadeID:
-		return []string{
-			"NodeID-NX4zVkuiRJZYe6Nzzav7GXN3TakUet3Co",
-			"NodeID-CMsa8cMw4eib1Hb8GG4xiUKAq5eE1BwUX",
-			"NodeID-DsMP6jLhi1MkDVc3qx9xx9AAZWx8e87Jd",
-			"NodeID-N86eodVZja3GEyZJTo3DFUPGpxEEvjGHs",
-			"NodeID-EkKeGSLUbHrrtuayBtbwgWDRUiAziC3ao",
 		}
 	default:
 		return nil

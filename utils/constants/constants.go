@@ -28,7 +28,7 @@ var (
 	CascadeID  uint32 = 2
 	DenaliID   uint32 = 3
 	EverestID  uint32 = 4
-	TestnetID  uint32 = 4
+	TestnetID  uint32 = EverestID
 	LocalID    uint32 = 12345
 	UnitTestID uint32 = 10
 
