@@ -4,11 +4,8 @@ set -ev
 
 bash <(curl -s https://codecov.io/bash)
 
-docker tag $DOCKERHUB_REPO:$COMMIT $DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER
-
-if [ "${TRAVIS_EVENT_TYPE}" == "push" ] && [ "${TRAVIS_BRANCH}" == "platform" ]; then
-    docker tag $DOCKERHUB_REPO:$COMMIT $DOCKERHUB_REPO:$TRAVIS_BRANCH
-fi
+TRAVIS_TAG="$DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER"
+docker tag $DOCKERHUB_REPO:$COMMIT "$TRAVIS_TAG"
 
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-docker push $DOCKERHUB_REPO
+docker push "$TRAVIS_TAG"
