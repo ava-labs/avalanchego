@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -13,24 +12,11 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	crypto "github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/go-ethereum/common"
-)
-
-var (
-	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
-	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
-	errNoInputs                   = errors.New("tx has no inputs")
-	errNoImportInputs             = errors.New("tx has no imported inputs")
-	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
-	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errUnknownAsset               = errors.New("unknown asset ID")
-	errNoFunds                    = errors.New("no spendable funds were found")
-	errWrongChainID               = errors.New("tx has wrong chain ID")
-	errInsufficientFunds          = errors.New("insufficient funds")
 )
 
 // UnsignedImportTx is an unsigned ImportTx
@@ -109,16 +95,16 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
 ) TxError {
-	if err := tx.Verify(vm.avm, vm.ctx, vm.txFee, vm.avaxAssetID); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID); err != nil {
 		return permError{err}
 	}
 
 	// do flow-checking
 	fc := avax.NewFlowChecker()
-	fc.Produce(vm.avaxAssetID, vm.txFee)
+	fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
 
 	for _, out := range tx.Outs {
-		fc.Produce(vm.avaxAssetID, out.Amount)
+		fc.Produce(vm.ctx.AVAXAssetID, out.Amount)
 	}
 
 	for _, in := range tx.ImportedInputs {
@@ -168,7 +154,7 @@ func (vm *VM) newImportTx(
 	importedAmount := uint64(0)
 	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
-		if !utxo.AssetID().Equals(vm.avaxAssetID) {
+		if !utxo.AssetID().Equals(vm.ctx.AVAXAssetID) {
 			continue
 		}
 		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
@@ -219,7 +205,7 @@ func (vm *VM) newImportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.avm, vm.ctx, vm.txFee, vm.avaxAssetID)
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
 }
 
 func (tx *UnsignedImportTx) EVMStateTransfer(state *state.StateDB) {

@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
@@ -15,12 +14,6 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/gecko/utils/math"
-)
-
-var (
-	errNoExportOutputs  = errors.New("no export outputs")
-	errOutputsNotSorted = errors.New("outputs not sorted")
-	errOverflowExport   = errors.New("overflow when computing export amount + txFee")
 )
 
 // UnsignedExportTx is an unsigned ExportTx
