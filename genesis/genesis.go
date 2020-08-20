@@ -63,7 +63,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, addr := range config.FundedAddresses {
 			avax.InitialState["fixedCap"] = append(avax.InitialState["fixedCap"], avm.Holder{
-				Amount:  json.Uint64(45 * units.MegaAvax),
+				Amount:  json.Uint64(5 * units.MegaAvax),
 				Address: addr,
 			})
 		}
@@ -85,20 +85,6 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
-	// Specify the initial state of the Platform Chain
-	platformvmArgs := platformvm.BuildGenesisArgs{
-		NetworkID:   json.Uint32(config.NetworkID),
-		AvaxAssetID: avaxAssetID,
-	}
-	for _, addr := range config.FundedAddresses {
-		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
-			platformvm.APIUTXO{
-				Address: addr,
-				Amount:  json.Uint64(20 * units.KiloAvax),
-			},
-		)
-	}
-
 	genesisTime := time.Date(
 		/*year=*/ 2019,
 		/*month=*/ time.November,
@@ -109,6 +95,23 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		/*nano-second=*/ 0,
 		/*location=*/ time.UTC,
 	)
+
+	// Specify the initial state of the Platform Chain
+	platformvmArgs := platformvm.BuildGenesisArgs{
+		NetworkID:   json.Uint32(config.NetworkID),
+		AvaxAssetID: avaxAssetID,
+		Time:        json.Uint64(genesisTime.Unix()),
+		Message:     config.Message,
+	}
+	for _, addr := range config.FundedAddresses {
+		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
+			platformvm.APIUTXO{
+				Address: addr,
+				Amount:  json.Uint64(5 * units.MegaAvax),
+			},
+		)
+	}
+
 	stakingDuration := 365 * 24 * time.Hour // ~ 1 year
 	endStakingTime := genesisTime.Add(stakingDuration)
 
@@ -149,9 +152,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 	}
 
-	platformvmArgs.Time = json.Uint64(genesisTime.Unix())
 	platformvmReply := platformvm.BuildGenesisReply{}
-
 	platformvmSS := platformvm.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)

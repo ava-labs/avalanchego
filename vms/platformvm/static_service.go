@@ -128,6 +128,7 @@ type BuildGenesisArgs struct {
 	Validators  []FormattedAPIDefaultSubnetValidator `json:"defaultSubnetValidators"`
 	Chains      []APIChain                           `json:"chains"`
 	Time        json.Uint64                          `json:"time"`
+	Message     string                               `json:"message"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -138,14 +139,15 @@ type BuildGenesisReply struct {
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
 	UTXOs      []*avax.UTXO `serialize:"true"`
-	Validators *EventHeap   `serialize:"true"`
+	Validators []*Tx        `serialize:"true"`
 	Chains     []*Tx        `serialize:"true"`
 	Timestamp  uint64       `serialize:"true"`
+	Message    string       `serialize:"true"`
 }
 
 // Initialize ...
 func (g *Genesis) Initialize() error {
-	for _, tx := range g.Validators.Txs {
+	for _, tx := range g.Validators {
 		if err := tx.Sign(Codec, nil); err != nil {
 			return err
 		}
@@ -276,9 +278,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	// genesis holds the genesis state
 	genesis := Genesis{
 		UTXOs:      utxos,
-		Validators: validators,
+		Validators: validators.Txs,
 		Chains:     chains,
 		Timestamp:  uint64(args.Time),
+		Message:    args.Message,
 	}
 
 	// Marshal genesis to bytes

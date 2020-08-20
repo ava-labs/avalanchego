@@ -23,6 +23,7 @@ type Config struct {
 	MintAddresses, FundedAddresses, StakerIDs                   []string
 	ParsedMintAddresses, ParsedFundedAddresses, ParsedStakerIDs []ids.ShortID
 	EVMBytes                                                    []byte
+	Message                                                     string
 }
 
 func (c *Config) init() error {
@@ -71,10 +72,8 @@ func (c *Config) init() error {
 // Hard coded genesis constants
 var (
 	EverestConfig = Config{
-		NetworkID: constants.EverestID,
-		MintAddresses: []string{
-			"everest1tzw0pxhlerlpu7ajws86cv6tzmm5lsaz3nxndr",
-		},
+		NetworkID:     constants.EverestID,
+		MintAddresses: []string{},
 		FundedAddresses: []string{
 			"everest1vxn8qxc4wjaumd5zefh40vjx2npjeysmuk9wj9",
 			"everest1hcak2mtd758w0jdty76svreu84kj59fxerpqe4",
@@ -186,6 +185,7 @@ var (
 			0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x22,
 			0x7d,
 		},
+		Message: "Now I am become Death, the destroyer of worlds.",
 	}
 	DenaliConfig = Config{
 		NetworkID: constants.DenaliID,
@@ -527,6 +527,7 @@ var (
 			0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x22,
 			0x7d,
 		},
+		Message: "Hello World!",
 	}
 	CustomConfig = Config{
 		NetworkID:     math.MaxUint32,
