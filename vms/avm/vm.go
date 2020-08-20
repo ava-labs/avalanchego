@@ -376,7 +376,7 @@ func (vm *VM) GetAtomicUTXOs(
 	}
 	lastUTXOID, err := ids.ToID(lastUTXO)
 	if err != nil {
-		lastAddrID = ids.ShortEmpty
+		lastUTXOID = ids.Empty
 	}
 
 	utxos := make([]*avax.UTXO, len(allUTXOBytes))
