@@ -74,14 +74,27 @@ const (
 )
 
 var (
-	errEmptyBlock      = errors.New("empty block")
-	errCreateBlock     = errors.New("couldn't create block")
-	errUnknownBlock    = errors.New("unknown block")
-	errBlockFrequency  = errors.New("too frequent block issuance")
-	errUnsupportedFXs  = errors.New("unsupported feature extensions")
-	errInvalidBlock    = errors.New("invalid block")
-	errInvalidAddr     = errors.New("invalid hex address")
-	errTooManyAtomicTx = errors.New("too many pending atomix txs")
+	errEmptyBlock                 = errors.New("empty block")
+	errCreateBlock                = errors.New("couldn't create block")
+	errUnknownBlock               = errors.New("unknown block")
+	errBlockFrequency             = errors.New("too frequent block issuance")
+	errUnsupportedFXs             = errors.New("unsupported feature extensions")
+	errInvalidBlock               = errors.New("invalid block")
+	errInvalidAddr                = errors.New("invalid hex address")
+	errTooManyAtomicTx            = errors.New("too many pending atomix txs")
+	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
+	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
+	errNoInputs                   = errors.New("tx has no inputs")
+	errNoImportInputs             = errors.New("tx has no imported inputs")
+	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
+	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
+	errUnknownAsset               = errors.New("unknown asset ID")
+	errNoFunds                    = errors.New("no spendable funds were found")
+	errWrongChainID               = errors.New("tx has wrong chain ID")
+	errInsufficientFunds          = errors.New("insufficient funds")
+	errNoExportOutputs            = errors.New("no export outputs")
+	errOutputsNotSorted           = errors.New("outputs not sorted")
+	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 )
 
 func maxDuration(x, y time.Duration) time.Duration {
@@ -146,8 +159,6 @@ type VM struct {
 	atomicTxSubmitChan    chan struct{}
 	codec                 codec.Codec
 	clock                 timer.Clock
-	avaxAssetID           ids.ID
-	avm                   ids.ID
 	txFee                 uint64
 	pendingAtomicTxs      chan *Tx
 	blockAtomicInputCache cache.LRU
@@ -182,8 +193,6 @@ func (vm *VM) Initialize(
 	}
 
 	vm.ctx = ctx
-	vm.avaxAssetID = ctx.AVAXAssetID
-	vm.avm = ctx.XChainID
 	vm.chaindb = Database{db}
 	g := new(core.Genesis)
 	err := json.Unmarshal(b, g)
