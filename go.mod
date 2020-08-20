@@ -4,7 +4,6 @@ go 1.14
 
 require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
-	github.com/ava-labs/coreth v0.2.12
 	github.com/ava-labs/go-ethereum v1.9.3
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
