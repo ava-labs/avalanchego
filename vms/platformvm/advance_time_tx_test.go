@@ -13,7 +13,7 @@ import (
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -29,7 +29,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
@@ -73,7 +73,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm.Ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator end time
-	vm = defaultVM()
+	vm, _ = defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -93,7 +93,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 
 // Ensure semantic verification updates the current and pending validator sets correctly
 func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -166,7 +166,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -192,7 +192,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

@@ -17,7 +17,7 @@ import (
 )
 
 func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
-	vm := defaultVM()
+	vm , _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -248,7 +248,7 @@ func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 // Test AddDefaultSubnetValidatorTx.SemanticVerify
 func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
-	vm := defaultVM()
+	vm , _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

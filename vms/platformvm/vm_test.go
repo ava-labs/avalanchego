@@ -202,7 +202,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	return &buildGenesisArgs, buildGenesisResponse.Bytes.Bytes
 }
 
-func defaultVM() *VM {
+func defaultVM() (*VM, database.Database) {
 	vm := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
@@ -210,18 +210,27 @@ func defaultVM() *VM {
 		minStake:     minStake,
 	}
 
+	baseDB := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, baseDB)
+	atomicDB := prefixdb.New([]byte{1}, baseDB)
+
 	defaultSubnet := validators.NewSet() // TODO do we need this?
 	vm.validators = validators.NewManager()
 	vm.validators.PutValidatorSet(constants.DefaultSubnetID, defaultSubnet)
 
 	vm.clock.Set(defaultGenesisTime)
-	db := prefixdb.New([]byte{0}, memdb.New())
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
+
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, atomicDB)
+
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis()
-	if err := vm.Initialize(ctx, db, genesisBytes, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, chainDB, genesisBytes, msgChan, nil); err != nil {
 		panic(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -248,16 +257,12 @@ func defaultVM() *VM {
 		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
 
-	vm.Ctx.SharedMemory = MockSharedMemory{
-		GetDatabaseF: func(ids.ID) database.Database { return memdb.New() },
-	}
-
-	return vm
+	return vm, baseDB
 }
 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -348,7 +353,7 @@ func TestGenesis(t *testing.T) {
 
 // accept proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -427,7 +432,7 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 // verify invalid proposal to add validator to default subnet
 func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -473,7 +478,7 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 
 // Reject proposal to add validator to default subnet
 func TestAddDefaultSubnetValidatorReject(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -551,7 +556,7 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 
 // Accept proposal to add validator to non-default subnet
 func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -630,7 +635,7 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 
 // Reject proposal to add validator to non-default subnet
 func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -711,7 +716,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 
 // Test case where default subnet validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -807,7 +812,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 // Test case where default subnet validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -895,7 +900,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -908,7 +913,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -961,7 +966,7 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's start time (moving the validator from pending to current)
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -1183,7 +1188,7 @@ func TestCreateSubnet(t *testing.T) {
 
 // test asset import
 func TestAtomicImport(t *testing.T) {
-	vm := defaultVM()
+	vm, baseDB := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -1197,9 +1202,10 @@ func TestAtomicImport(t *testing.T) {
 	amount := uint64(50000)
 	recipientKey := keys[1]
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, vm.DB.GetDatabase()))
-	vm.Ctx.SharedMemory = sm.NewBlockchainSharedMemory(vm.Ctx.ChainID)
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{5}, baseDB))
+	vm.Ctx.SharedMemory = m.NewSharedMemory(vm.Ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(vm.Ctx.XChainID)
 
 	if _, err := vm.newImportTx(
 		vm.Ctx.XChainID,
@@ -1210,7 +1216,7 @@ func TestAtomicImport(t *testing.T) {
 	}
 
 	// Provide the avm UTXO
-	smDB := vm.Ctx.SharedMemory.GetDatabase(vm.Ctx.XChainID)
+
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: avaxAssetID},
@@ -1222,11 +1228,20 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	state := avax.NewPrefixedState(smDB, Codec, vm.Ctx.XChainID, vm.Ctx.ChainID)
-	if err := state.FundUTXO(utxo); err != nil {
+	utxoBytes, err := vm.codec.Marshal(utxo)
+	if err != nil {
 		t.Fatal(err)
 	}
-	vm.Ctx.SharedMemory.ReleaseDatabase(vm.Ctx.XChainID)
+
+	if err := peerSharedMemory.Put(vm.Ctx.ChainID, []*atomic.Element{{
+		Key:   utxo.InputID().Bytes(),
+		Value: utxoBytes,
+		Traits: [][]byte{
+			recipientKey.PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
 
 	tx, err := vm.newImportTx(
 		vm.Ctx.XChainID,
@@ -1251,17 +1266,14 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatalf("status should be Committed but is %s", status)
 	}
 
-	smDB = vm.Ctx.SharedMemory.GetDatabase(vm.Ctx.XChainID)
-	defer vm.Ctx.SharedMemory.ReleaseDatabase(vm.Ctx.XChainID)
-	state = avax.NewPrefixedState(smDB, vm.codec, vm.Ctx.ChainID, vm.Ctx.XChainID)
-	if _, err := state.UTXO(utxoID.InputID()); err == nil {
+	if _, err := vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
 
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -1787,14 +1799,14 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestParseAddress(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	if _, err := vm.ParseLocalAddress(testAddress); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestParseAddressInvalid(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	tests := []struct {
 		in   string
 		want string
@@ -1824,7 +1836,7 @@ func TestParseAddressInvalid(t *testing.T) {
 }
 
 func TestFormatAddress(t *testing.T) {
-	vm := defaultVM()
+	vm, _ := defaultVM()
 	tests := []struct {
 		label string
 		in    ids.ShortID

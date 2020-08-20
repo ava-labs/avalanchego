@@ -63,7 +63,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 6, 0)
+	Version       = version.NewDefaultVersion("avalanche", 0, 6, 1)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -84,7 +84,7 @@ type Node struct {
 	keystoreServer keystore.Keystore
 
 	// Manages shared memory
-	sharedMemory atomic.SharedMemory
+	sharedMemory atomic.Memory
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager

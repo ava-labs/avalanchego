@@ -4,32 +4,18 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/nodb"
+	"github.com/ava-labs/gecko/chains/atomic"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-// implements snow.SharedMemory
-type MockSharedMemory struct {
-	GetDatabaseF func(ids.ID) database.Database
-}
-
-func (msm MockSharedMemory) GetDatabase(ID ids.ID) database.Database {
-	if msm.GetDatabaseF != nil {
-		return msm.GetDatabaseF(ID)
-	}
-	return &nodb.Database{}
-}
-
-func (msm MockSharedMemory) ReleaseDatabase(ID ids.ID) {}
-
 func TestNewImportTx(t *testing.T) {
-	vm := defaultVM()
+	vm, baseDB := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -38,7 +24,7 @@ func TestNewImportTx(t *testing.T) {
 
 	type test struct {
 		description   string
-		sharedMemory  MockSharedMemory
+		sharedMemory  atomic.SharedMemory
 		feeKeys       []*crypto.PrivateKeySECP256K1R
 		recipientKeys []*crypto.PrivateKeySECP256K1R
 		shouldErr     bool
@@ -51,33 +37,49 @@ func TestNewImportTx(t *testing.T) {
 	}
 	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
+	cnt := new(byte)
+
 	// Returns a shared memory where GetDatabase returns a database
 	// where [recipientKey] has a balance of [amt]
-	fundedSharedMemory := func(amt uint64) MockSharedMemory {
-		return MockSharedMemory{
-			GetDatabaseF: func(ids.ID) database.Database {
-				db := memdb.New()
-				state := avax.NewPrefixedState(db, Codec, avmID, vm.Ctx.ChainID)
-				if err := state.FundUTXO(&avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        ids.GenerateTestID(),
-						OutputIndex: rand.Uint32(),
-					},
-					Asset: avax.Asset{ID: avaxAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: amt,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
-							Threshold: 1,
-						},
-					},
-				}); err != nil {
-					panic(err)
-				}
-				return db
+	fundedSharedMemory := func(amt uint64) atomic.SharedMemory {
+		*cnt++
+		m := &atomic.Memory{}
+		m.Initialize(logging.NoLog{}, prefixdb.New([]byte{*cnt}, baseDB))
+
+		sm := m.NewSharedMemory(vm.Ctx.ChainID)
+		peerSharedMemory := m.NewSharedMemory(avmID)
+
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.GenerateTestID(),
+				OutputIndex: rand.Uint32(),
+			},
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+					Threshold: 1,
+				},
 			},
 		}
+		utxoBytes, err := Codec.Marshal(utxo)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := peerSharedMemory.Put(vm.Ctx.ChainID, []*atomic.Element{{
+			Key:   utxo.InputID().Bytes(),
+			Value: utxoBytes,
+			Traits: [][]byte{
+				recipientKey.PublicKey().Address().Bytes(),
+			},
+		}}); err != nil {
+			panic(err)
+		}
+
+		return sm
 	}
 
 	tests := []test{

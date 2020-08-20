@@ -10,7 +10,7 @@ import (
 )
 
 func TestBaseTxMarshalJSON(t *testing.T) {
-	vm := defaultVM()
+	vm , _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
