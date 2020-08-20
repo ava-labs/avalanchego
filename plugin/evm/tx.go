@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
@@ -15,7 +16,27 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/go-ethereum/common"
 )
+
+// Max size of memo field
+// Don't change without also changing avm.maxMemoSize
+const maxMemoSize = 256
+
+var (
+	errWrongBlockchainID = errors.New("wrong blockchain ID provided")
+	errWrongNetworkID    = errors.New("tx was issued with a different network ID")
+	errNilTx             = errors.New("tx is nil")
+)
+
+type EVMOutput struct {
+	Address common.Address `serialize:"true" json:"address"`
+	Amount  uint64         `serialize:"true" json:"amount"`
+}
+
+func (out *EVMOutput) Verify() error {
+	return nil
+}
 
 // UnsignedTx is an unsigned transaction
 type UnsignedTx interface {
