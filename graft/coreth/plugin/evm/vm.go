@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/coreth/node"
 
 	"github.com/ava-labs/go-ethereum/common"
+	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/rlp"
 	"github.com/ava-labs/go-ethereum/rpc"
 	avarpc "github.com/gorilla/rpc/v2"
@@ -34,6 +35,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/crypto"
 	avajson "github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -48,6 +50,7 @@ var (
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
+	x2cRate = big.NewInt(1000000000)
 )
 
 const (
@@ -160,6 +163,15 @@ func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 	return atx
 }
 
+func importTxStateTransfer(tx *UnsignedImportTx, state *state.StateDB) {
+	for _, to := range tx.Outs {
+		amount := new(big.Int).SetUint64(to.Amount)
+		state.AddBalance(to.Address, new(big.Int).Mul(amount, x2cRate))
+		nonce := state.GetNonce(to.Address)
+		state.SetNonce(to.Address, nonce+1)
+	}
+}
+
 /*
  ******************************************************************************
  ********************************* Snowman API ********************************
@@ -213,11 +225,7 @@ func (vm *VM) Initialize(
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
-			for _, to := range atx.UnsignedTx.(*UnsignedImportTx).Outs {
-				amount := new(big.Int)
-				amount.SetUint64(to.Amount)
-				state.AddBalance(to.Address, amount)
-			}
+			importTxStateTransfer(atx.UnsignedTx.(*UnsignedImportTx), state)
 			raw, _ := vm.codec.Marshal(atx)
 			return raw, nil
 		default:
@@ -250,13 +258,9 @@ func (vm *VM) Initialize(
 	chain.SetOnQueryAcceptedBlock(func() *types.Block {
 		return vm.getLastAccepted().ethBlock
 	})
-	chain.SetOnExtraStateChange(func(block *types.Block, statedb *state.StateDB) error {
+	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
 		atx := vm.getAtomicTx(block).UnsignedTx.(*UnsignedImportTx)
-		for _, to := range atx.Outs {
-			amount := new(big.Int)
-			amount.SetUint64(to.Amount)
-			statedb.AddBalance(to.Address, amount)
-		}
+		importTxStateTransfer(atx, state)
 		return nil
 	})
 	vm.blockCache = cache.LRU{Size: 2048}
@@ -682,4 +686,39 @@ func (vm *VM) GetAtomicUTXOs(
 		},
 	}}
 	return utxos, ids.ShortEmpty, ids.Empty, nil
+}
+
+func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
+	return ethcrypto.PubkeyToAddress(
+		(*privKey.PublicKey().(*crypto.PublicKeySECP256K1R).ToECDSA()))
+}
+
+func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+	// NOTE: should we use HEAD block or lastAccepted?
+	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
+	if err != nil {
+		return nil, nil, err
+	}
+	inputs := []EVMInput{}
+	signers := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, key := range keys {
+		if amount == 0 {
+			break
+		}
+		addr := GetEthAddress(key)
+		balance := new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		if amount < balance {
+			balance = amount
+		}
+		inputs = append(inputs, EVMInput{
+			Address: addr,
+			Amount:  balance,
+		})
+		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
+		amount -= balance
+	}
+	if amount > 0 {
+		return nil, nil, errInsufficientFunds
+	}
+	return inputs, signers, nil
 }

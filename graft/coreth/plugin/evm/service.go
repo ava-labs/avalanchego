@@ -201,8 +201,7 @@ func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ap
 	}
 
 	// TODO: return eth address here
-	reply.Address, err = service.vm.FormatAddress(
-		ethcrypto.PubkeyToAddress(*(sk.PublicKey().(*crypto.PublicKeySECP256K1R).ToECDSA())))
+	reply.Address, err = service.vm.FormatAddress(GetEthAddress(sk))
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}

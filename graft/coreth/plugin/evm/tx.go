@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
@@ -38,38 +37,18 @@ func (out *EVMOutput) Verify() error {
 	return nil
 }
 
+type EVMInput EVMOutput
+
+func (in *EVMInput) Verify() error {
+	return nil
+}
+
 // UnsignedTx is an unsigned transaction
 type UnsignedTx interface {
 	Initialize(unsignedBytes, signedBytes []byte)
 	ID() ids.ID
 	UnsignedBytes() []byte
 	Bytes() []byte
-}
-
-// UnsignedDecisionTx is an unsigned operation that can be immediately decided
-type UnsignedDecisionTx interface {
-	UnsignedTx
-
-	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, db database.Database, stx *Tx) (
-		onAcceptFunc func() error,
-		err TxError,
-	)
-}
-
-// UnsignedProposalTx is an unsigned operation that can be proposed
-type UnsignedProposalTx interface {
-	UnsignedTx
-
-	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, db database.Database, stx *Tx) (
-		onCommitDB *versiondb.Database,
-		onAbortDB *versiondb.Database,
-		onCommitFunc func() error,
-		onAbortFunc func() error,
-		err TxError,
-	)
-	InitiallyPrefersCommit(vm *VM) bool
 }
 
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
@@ -79,7 +58,7 @@ type UnsignedAtomicTx interface {
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, db database.Database, stx *Tx) TxError
+	SemanticVerify(vm *VM, stx *Tx) TxError
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
@@ -93,6 +72,8 @@ type Tx struct {
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 }
+
+// (*secp256k1fx.Credential)
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {

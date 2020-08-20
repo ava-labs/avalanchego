@@ -27,6 +27,7 @@ var (
 	errUnknownAsset               = errors.New("unknown asset ID")
 	errNoFunds                    = errors.New("no spendable funds were found")
 	errWrongChainID               = errors.New("tx has wrong chain ID")
+	errInsufficientFunds          = errors.New("insufficient funds")
 )
 
 // UnsignedImportTx is an unsigned ImportTx
@@ -36,19 +37,16 @@ type UnsignedImportTx struct {
 	syntacticallyVerified bool
 	// ID of the network on which this tx was issued
 	NetworkID uint32 `serialize:"true" json:"networkID"`
-	// ID of this blockchain. In practice is always the empty ID.
-	// This is only here to match avm.BaseTx's format
+	// ID of this blockchain.
 	BlockchainID ids.ID `serialize:"true" json:"blockchainID"`
+	// Which chain to consume the funds from
+	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
+	// Inputs that consume UTXOs produced on the chain
+	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 	// Outputs
 	Outs []EVMOutput `serialize:"true" json:"outputs"`
 	// Memo field contains arbitrary bytes, up to maxMemoSize
 	Memo []byte `serialize:"true" json:"memo"`
-
-	// Which chain to consume the funds from
-	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
-
-	// Inputs that consume UTXOs produced on the chain
-	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
@@ -147,7 +145,7 @@ func (vm *VM) newImportTx(
 	to common.Address, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
-	if !vm.avm.Equals(chainID) {
+	if !vm.ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
 	}
 
