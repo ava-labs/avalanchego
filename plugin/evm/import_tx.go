@@ -34,8 +34,8 @@ type UnsignedImportTx struct {
 	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 	// Outputs
 	Outs []EVMOutput `serialize:"true" json:"outputs"`
-	// Memo field contains arbitrary bytes, up to maxMemoSize
-	Memo []byte `serialize:"true" json:"memo"`
+	// EVM nonce
+	nonce uint64
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
@@ -193,6 +193,10 @@ func (vm *VM) newImportTx(
 		})
 	}
 
+	nonce, err := vm.GetAcceptedNonce(to)
+	if err != nil {
+		return nil, err
+	}
 	// Create the transaction
 	utx := &UnsignedImportTx{
 		NetworkID:      vm.ctx.NetworkID,
@@ -200,6 +204,7 @@ func (vm *VM) newImportTx(
 		Outs:           outs,
 		ImportedInputs: importedInputs,
 		SourceChain:    chainID,
+		nonce:          nonce,
 	}
 	tx := &Tx{UnsignedTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
@@ -208,11 +213,15 @@ func (vm *VM) newImportTx(
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
 }
 
-func (tx *UnsignedImportTx) EVMStateTransfer(state *state.StateDB) {
+func (tx *UnsignedImportTx) EVMStateTransfer(state *state.StateDB) error {
 	for _, to := range tx.Outs {
-		amount := new(big.Int).SetUint64(to.Amount)
-		state.AddBalance(to.Address, new(big.Int).Mul(amount, x2cRate))
-		nonce := state.GetNonce(to.Address)
-		state.SetNonce(to.Address, nonce+1)
+		state.AddBalance(to.Address,
+			new(big.Int).Mul(
+				new(big.Int).SetUint64(to.Amount), x2cRate))
+		if state.GetNonce(to.Address) != tx.nonce {
+			return errInvalidNonce
+		}
+		state.SetNonce(to.Address, tx.nonce+1)
 	}
+	return nil
 }

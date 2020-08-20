@@ -5,15 +5,17 @@ package evm
 
 import (
 	"fmt"
+	"math/big"
+
+	"github.com/ava-labs/coreth/core/state"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/crypto"
+	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 // UnsignedExportTx is an unsigned ExportTx
@@ -31,6 +33,8 @@ type UnsignedExportTx struct {
 	Ins []EVMInput `serialize:"true" json:"inputs"`
 	// Outputs that are exported to the chain
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
+	// EVM nonce
+	nonce uint64
 }
 
 // InputUTXOs returns an empty set
@@ -143,4 +147,20 @@ func (vm *VM) newExportTx(
 		return nil, err
 	}
 	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID)
+}
+
+func (tx *UnsignedExportTx) EVMStateTransfer(state *state.StateDB) error {
+	for _, from := range tx.Ins {
+		amount := new(big.Int).Mul(
+			new(big.Int).SetUint64(from.Amount), x2cRate)
+		if state.GetBalance(from.Address).Cmp(amount) < 0 {
+			return errInsufficientFunds
+		}
+		state.SubBalance(from.Address, amount)
+		if state.GetNonce(from.Address) != tx.nonce {
+			return errInvalidNonce
+		}
+		state.SetNonce(from.Address, tx.nonce+1)
+	}
+	return nil
 }
