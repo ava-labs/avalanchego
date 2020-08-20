@@ -74,6 +74,13 @@ func (b *Block) Parent() snowman.Block {
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
+	// Ensure the minimum gas price is paid for every transaction
+	for _, tx := range b.ethBlock.Transactions() {
+		if tx.GasPrice().Cmp(minGasPrice) < 0 {
+			return errInvalidBlock
+		}
+	}
+
 	vm := b.vm
 	tx := vm.getAtomicTx(b.ethBlock)
 	if tx != nil {
