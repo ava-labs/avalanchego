@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
@@ -94,12 +96,21 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		_ = msgConn.Close()
 		return nil, err
 	}
+	sharedMemoryConn, err := vm.broker.Dial(req.SharedMemoryServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
+		_ = keystoreConn.Close()
+		return nil, err
+	}
 	bcLookupConn, err := vm.broker.Dial(req.BcLookupServer)
 	if err != nil {
 		// Ignore closing error to return the original error
 		_ = dbConn.Close()
 		_ = msgConn.Close()
 		_ = keystoreConn.Close()
+		_ = sharedMemoryConn.Close()
 		return nil, err
 	}
 	snLookupConn, err := vm.broker.Dial(req.SnLookupServer)
@@ -108,6 +119,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		_ = dbConn.Close()
 		_ = msgConn.Close()
 		_ = keystoreConn.Close()
+		_ = sharedMemoryConn.Close()
 		_ = bcLookupConn.Close()
 		return nil, err
 	}
@@ -115,6 +127,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	dbClient := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
 	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
 	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(keystoreConn), vm.broker)
+	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(sharedMemoryConn))
 	bcLookupClient := galiaslookup.NewClient(galiaslookupproto.NewAliasLookupClient(bcLookupConn))
 	snLookupClient := gsubnetlookup.NewClient(gsubnetlookupproto.NewSubnetLookupClient(snLookupConn))
 
@@ -137,7 +150,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		DecisionDispatcher:  nil,
 		ConsensusDispatcher: nil,
 		Keystore:            keystoreClient,
-		SharedMemory:        nil, // TODO: Need to populate this field correctly
+		SharedMemory:        sharedMemoryClient,
 		BCLookup:            bcLookupClient,
 		SNLookup:            snLookupClient,
 	}
@@ -147,6 +160,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		_ = dbConn.Close()
 		_ = msgConn.Close()
 		_ = keystoreConn.Close()
+		_ = sharedMemoryConn.Close()
 		_ = bcLookupConn.Close()
 		_ = snLookupConn.Close()
 		close(toEngine)
