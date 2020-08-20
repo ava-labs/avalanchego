@@ -1057,7 +1057,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 	foundNewValidator := false
 	for _, tx := range pendingValidators.Txs {
-		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1122,7 +1122,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 	foundNewValidator = false
 	for _, tx := range currentValidators.Txs {
-		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.Vdr().ID().Equals(nodeID) {
+		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
