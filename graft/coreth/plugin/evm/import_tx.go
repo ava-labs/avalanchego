@@ -94,7 +94,22 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	if err := tx.Verify(vm.avm, vm.ctx, vm.txFee, vm.avaxAssetID); err != nil {
 		return permError{err}
 	}
-	// TODO: verify using avax.VerifyTx(vm.txFee, vm.avaxAssetID, tx.Ins, outs)
+
+	// do flow-checking
+	fc := avax.NewFlowChecker()
+	fc.Produce(vm.avaxAssetID, vm.txFee)
+
+	for _, out := range tx.Outs {
+		fc.Produce(vm.avaxAssetID, out.Amount)
+	}
+
+	for _, in := range tx.ImportedInputs {
+		fc.Consume(in.AssetID(), in.Input().Amount())
+	}
+	if err := fc.Verify(); err != nil {
+		return permError{err}
+	}
+
 	// TODO: verify UTXO inputs via gRPC (with creds)
 	return nil
 }
