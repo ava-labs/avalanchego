@@ -1,10 +1,9 @@
 - name: Create shared directories
   become: true
   file:
-    # Don't specify owner, mode etc for directories not specific to Avalanche.
-    # OS defaults, or local defaults are better than any guess we could make.
     path: "{{ item.path }}"
     state: directory
+    mode: preserve
   loop:
     - path: "{{ sharedstatedir }}"
     - path: "{{ logdir }}"
