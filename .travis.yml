@@ -13,8 +13,8 @@ services:
 env:
   global:
   - CODECOV_TOKEN="8c18c993-fc6e-4706-998b-01ddc7987804"
-  - GECKO_HOME=/go/src/github.com/ava-labs/gecko/
-  - E2E_TEST_HOME=/go/src/github.com/kurtosis-tech/ava-e2e-tests/
+  - GECKO_HOME=$GOPATH/src/github.com/$TRAVIS_REPO_SLUG/
+  - E2E_TEST_HOME=$GOPATH/src/github.com/ava-labs/avalanche-testing/
   - COMMIT=${TRAVIS_COMMIT::8}
   - DOCKERHUB_REPO=avaplatform/gecko
   - secure: "L/A9+re0NEKP6EV6H9RcTGiDhX3WMvsiWrkRKDYKqnviqbjY30RK6EM4vvjrM4Lrw2QwsO3YKgnku3+zioE/TxEZFkpkbjNUXru0nYBrWAg1TKVsDXnYaIZkHUejfryST3E8N7F4Hx6zCtGEO0sEdUeKuT+MNUIuHezHooTgGzDjMogm70EWMFjQHc7VucTJu7dWU1RBPjovWQ0q9qflrtCpbrvXFIiihQQ1PQha1Q2C4wLakKuLbhhSafue90Mnyss0blaPHy/tyewcASJu4vsGTKRBn0DzttlkNTwuD6+nKrbmJY0ohunnkVFzYjrZAw1gyN+DCDb/lPbz4ZDItKPwrIUPEtL5xuUOrxUZPUh+0io3Q2d6rjaqkdGjd1KQXzbnW1mn0BxX3d3b2UpIqhBn9umYYjHBKnMuoRiTK33b7U9+LF3K84+tEvVDCPeHs/mw6Inp5jGRSravnM6yPQ6feGzogs4+3EMzZXxnkngKFKCsnd67Oe9xfV9amOU2aQAx4jaAwlPjEpBEkUa8YKx3lPznvmUk1QsNCUbLjdSl5JBaXojLJoiuPbj29hp4S5AXXgn+3Hvwk3ndcFCxi6/l1W9mjYSOtFqg3EAUdF4EgnA/ykQg9ZokkoKY0+qgOzG2bKOAYuCDWeGr7P1apToh00ccsQXL81nVPiq7uDw="

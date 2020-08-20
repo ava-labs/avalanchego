@@ -6,4 +6,4 @@
       # provides the appropriate version.
       - golang-go
   tags:
-    - golang-base
+    - golang_base

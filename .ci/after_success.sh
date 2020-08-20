@@ -10,5 +10,5 @@ if [ "${TRAVIS_EVENT_TYPE}" == "push" ] && [ "${TRAVIS_BRANCH}" == "platform" ];
     docker tag $DOCKERHUB_REPO:$COMMIT $DOCKERHUB_REPO:$TRAVIS_BRANCH
 fi
 
-echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
 docker push $DOCKERHUB_REPO
