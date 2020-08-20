@@ -539,19 +539,17 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		for i, tx := range validators.Txs {
 			switch tx := tx.UnsignedTx.(type) {
 			case *UnsignedAddDefaultSubnetValidatorTx:
-				vdr := tx.Validator.Vdr()
-				weight := json.Uint64(vdr.Weight())
+				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
-					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 					StartTime:   json.Uint64(tx.StartTime().Unix()),
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
 			case *UnsignedAddDefaultSubnetDelegatorTx:
-				vdr := tx.Validator.Vdr()
-				weight := json.Uint64(vdr.Weight())
+				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
-					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 					StartTime:   json.Uint64(tx.StartTime().Unix()),
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
@@ -563,10 +561,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	} else {
 		for i, tx := range validators.Txs {
 			utx := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
-			vdr := utx.Validator.Vdr()
-			weight := json.Uint64(vdr.Weight())
+			weight := json.Uint64(utx.Validator.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
-				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
+				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(utx.StartTime().Unix()),
 				EndTime:   json.Uint64(utx.EndTime().Unix()),
 				Weight:    &weight,
@@ -606,19 +603,17 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		if args.SubnetID.Equals(constants.DefaultSubnetID) {
 			switch tx := tx.UnsignedTx.(type) {
 			case *UnsignedAddDefaultSubnetValidatorTx:
-				vdr := tx.Validator.Vdr()
-				weight := json.Uint64(vdr.Weight())
+				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
-					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 					StartTime:   json.Uint64(tx.StartTime().Unix()),
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
 			case *UnsignedAddDefaultSubnetDelegatorTx:
-				vdr := tx.Validator.Vdr()
-				weight := json.Uint64(vdr.Weight())
+				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
-					ID:          vdr.ID().PrefixedString(constants.NodeIDPrefix),
+					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 					StartTime:   json.Uint64(tx.StartTime().Unix()),
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
@@ -628,10 +623,9 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			}
 		} else {
 			utx := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
-			vdr := utx.Validator.Vdr()
-			weight := json.Uint64(vdr.Weight())
+			weight := json.Uint64(utx.Validator.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
-				ID:        vdr.ID().PrefixedString(constants.NodeIDPrefix),
+				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(utx.StartTime().Unix()),
 				EndTime:   json.Uint64(utx.EndTime().Unix()),
 				Weight:    &weight,
@@ -748,7 +742,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys, // Private keys
+		privKeys,                             // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)

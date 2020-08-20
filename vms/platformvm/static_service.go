@@ -222,13 +222,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
 			}},
-			Validator: DurationValidator{
-				Validator: Validator{
-					NodeID: nodeID,
-					Wght:   weight,
-				},
-				Start: uint64(args.Time),
-				End:   uint64(validator.EndTime),
+			Validator: Validator{
+				NodeID: nodeID,
+				Start:  uint64(args.Time),
+				End:    uint64(validator.EndTime),
+				Wght:   weight,
 			},
 			Stake: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: args.AvaxAssetID},

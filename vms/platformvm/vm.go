@@ -826,7 +826,7 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 				break
 			}
 			current.Remove()
-			stopped.Add(next.Validator.Vdr().ID())
+			stopped.Add(next.Validator.ID())
 		}
 	}
 	pending, err = vm.getPendingValidators(db, subnetID)
@@ -842,21 +842,21 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 			}
 			current.Add(nextTx)
 			pending.Remove()
-			started.Add(tx.Validator.Vdr().ID())
+			started.Add(tx.Validator.ID())
 		case *UnsignedAddNonDefaultSubnetValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				break
 			}
 			current.Add(nextTx)
 			pending.Remove()
-			started.Add(tx.Validator.Vdr().ID())
+			started.Add(tx.Validator.ID())
 		case *UnsignedAddDefaultSubnetDelegatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				break
 			}
 			current.Add(nextTx)
 			pending.Remove()
-			started.Add(tx.Validator.Vdr().ID())
+			started.Add(tx.Validator.ID())
 		default:
 			pending.Remove()
 		}
@@ -870,11 +870,11 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 		var vdr validators.Validator
 		switch tx := event.UnsignedTx.(type) {
 		case *UnsignedAddDefaultSubnetValidatorTx:
-			vdr = tx.Validator.Vdr()
+			vdr = &tx.Validator
 		case *UnsignedAddDefaultSubnetDelegatorTx:
-			vdr = tx.Validator.Vdr()
+			vdr = &tx.Validator
 		case *UnsignedAddNonDefaultSubnetValidatorTx:
-			vdr = tx.Validator.Vdr()
+			vdr = &tx.Validator
 		default:
 			continue
 		}
