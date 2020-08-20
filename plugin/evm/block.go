@@ -27,9 +27,18 @@ func (b *Block) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
 func (b *Block) Accept() error {
-	b.vm.ctx.Log.Verbo("Block %s is accepted", b.ID())
-	b.vm.updateStatus(b.ID(), choices.Accepted)
-	return nil
+	vm := b.vm
+
+	vm.ctx.Log.Verbo("Block %s is accepted", b.ID())
+	vm.updateStatus(b.ID(), choices.Accepted)
+
+	tx := vm.getAtomicTx(b.ethBlock)
+	utx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
+	if !ok {
+		return errors.New("unknown atomic tx type")
+	}
+
+	return utx.Accept(vm.ctx, nil)
 }
 
 // Reject implements the snowman.Block interface
