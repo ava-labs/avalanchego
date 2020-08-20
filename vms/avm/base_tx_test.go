@@ -876,9 +876,9 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}
 
 	cr := codecRegistry{
+		Codec:         vm.codec,
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
-		codec:         vm.codec,
 	}
 
 	cr.RegisterType(&avax.TestTransferable{})
@@ -1289,9 +1289,9 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	}
 
 	cr := codecRegistry{
+		Codec:         vm.codec,
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
-		codec:         vm.codec,
 	}
 
 	cr.RegisterType(&avax.TestVerifiable{})
@@ -1431,9 +1431,9 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	}
 
 	cr := codecRegistry{
+		Codec:         vm.codec,
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
-		codec:         vm.codec,
 	}
 
 	cr.RegisterType(&avax.TestVerifiable{})

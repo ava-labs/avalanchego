@@ -65,6 +65,7 @@ func New(maxSize, maxSliceLen int) Codec {
 		maxSize:                maxSize,
 		maxSliceLen:            maxSliceLen,
 		version:                version,
+		nextTypeID:             0,
 		typeIDToType:           map[uint32]reflect.Type{},
 		typeToTypeID:           map[reflect.Type]uint32{},
 		serializedFieldIndices: map[reflect.Type][]int{},

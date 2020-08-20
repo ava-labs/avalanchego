@@ -93,19 +93,15 @@ type VM struct {
 }
 
 type codecRegistry struct {
+	codec.Codec
 	index         int
 	typeToFxIndex map[reflect.Type]int
-	codec         codec.Codec
 }
 
 func (cr *codecRegistry) RegisterType(val interface{}) error {
 	valType := reflect.TypeOf(val)
 	cr.typeToFxIndex[valType] = cr.index
-	return cr.codec.RegisterType(val)
-}
-func (cr *codecRegistry) Marshal(val interface{}) ([]byte, error) { return cr.codec.Marshal(val) }
-func (cr *codecRegistry) Unmarshal(b []byte, val interface{}) error {
-	return cr.codec.Unmarshal(b, val)
+	return cr.Codec.RegisterType(val)
 }
 
 /*
@@ -164,9 +160,9 @@ func (vm *VM) Initialize(
 			Fx: fx,
 		}
 		vm.codec = &codecRegistry{
+			Codec:         c,
 			index:         i,
 			typeToFxIndex: vm.typeToFxIndex,
-			codec:         c,
 		}
 		if err := fx.Initialize(vm); err != nil {
 			return err
