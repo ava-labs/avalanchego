@@ -116,6 +116,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		Codec.RegisterType(&UnsignedImportTx{}),
+		Codec.RegisterType(&UnsignedExportTx{}),
 		Codec.RegisterType(&secp256k1fx.TransferInput{}),
 		Codec.RegisterType(&secp256k1fx.Input{}),
 		Codec.RegisterType(&secp256k1fx.Credential{}),
