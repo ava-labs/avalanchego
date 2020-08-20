@@ -112,7 +112,49 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		return permError{err}
 	}
 
-	// TODO: verify UTXO inputs via gRPC (with creds)
+	if !vm.ctx.IsBootstrapped() {
+		// Allow for force committing during bootstrapping
+		return nil
+	}
+
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+	}
+	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
+	if err != nil {
+		return tempError{err}
+	}
+
+	utxos := make([]*avax.UTXO, len(tx.ImportedInputs))
+	for i, utxoBytes := range allUTXOBytes {
+		utxo := &avax.UTXO{}
+		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return tempError{err}
+		}
+		utxos[i] = utxo
+	}
+
+	for i, in := range tx.ImportedInputs {
+		utxoBytes := allUTXOBytes[i]
+
+		utxo := &avax.UTXO{}
+		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return tempError{err}
+		}
+
+		cred := stx.Creds[i]
+
+		utxoAssetID := utxo.AssetID()
+		inAssetID := in.AssetID()
+		if !utxoAssetID.Equals(inAssetID) {
+			return permError{errAssetIDMismatch}
+		}
+
+		if err := vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
+			return tempError{err}
+		}
+	}
 	return nil
 }
 
@@ -121,9 +163,13 @@ func (tx *UnsignedImportTx) SemanticVerify(
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
-	// TODO: finish this function via gRPC
-	return nil
+func (tx *UnsignedImportTx) Accept(ctx *snow.Context, _ database.Batch) error {
+	// TODO: Is any batch passed in here?
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoIDs[i] = in.InputID().Bytes()
+	}
+	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs)
 }
 
 // Create a new transaction
