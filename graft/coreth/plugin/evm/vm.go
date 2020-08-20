@@ -25,7 +25,7 @@ import (
 	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/rlp"
 	"github.com/ava-labs/go-ethereum/rpc"
-	avarpc "github.com/gorilla/rpc/v2"
+	geckorpc "github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/cache"
@@ -35,8 +35,10 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
-	avajson "github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/gecko/utils/formatting"
+	geckojson "github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
@@ -454,9 +456,9 @@ func (vm *VM) LastAccepted() ids.ID {
 //     By default the LockOption is WriteLock
 //     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
 func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) *commonEng.HTTPHandler {
-	server := avarpc.NewServer()
-	server.RegisterCodec(avajson.NewCodec(), "application/json")
-	server.RegisterCodec(avajson.NewCodec(), "application/json;charset=UTF-8")
+	server := geckorpc.NewServer()
+	server.RegisterCodec(geckojson.NewCodec(), "application/json")
+	server.RegisterCodec(geckojson.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterService(service, name)
 
 	var lock commonEng.LockOption = commonEng.WriteLock
@@ -643,16 +645,41 @@ func (vm *VM) getLastAccepted() *Block {
 	return vm.lastAccepted
 }
 
-// ParseLocalAddress takes in an address for this chain and produces the ID
-func (vm *VM) ParseLocalAddress(addrStr string) (common.Address, error) {
+func (vm *VM) ParseEthAddress(addrStr string) (common.Address, error) {
 	if !common.IsHexAddress(addrStr) {
 		return common.Address{}, errInvalidAddr
 	}
 	return common.HexToAddress(addrStr), nil
 }
 
-func (vm *VM) FormatAddress(addr common.Address) (string, error) {
+func (vm *VM) FormatEthAddress(addr common.Address) (string, error) {
 	return addr.Hex(), nil
+}
+
+// ParseAddress takes in an address and produces the ID of the chain it's for
+// the ID of the address
+func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
+	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+
+	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+
+	expectedHRP := constants.GetHRP(vm.ctx.NetworkID)
+	if hrp != expectedHRP {
+		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
+			expectedHRP, hrp)
+	}
+
+	addr, err := ids.ToShortID(addrBytes)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+	return chainID, addr, nil
 }
 
 func (vm *VM) issueTx(tx *Tx) error {

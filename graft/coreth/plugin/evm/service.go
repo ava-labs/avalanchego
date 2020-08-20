@@ -6,6 +6,7 @@ package evm
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
@@ -149,7 +151,7 @@ func (service *AvaAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *Ex
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 	user := user{db: db}
-	if address, err := service.vm.ParseLocalAddress(args.Address); err != nil {
+	if address, err := service.vm.ParseEthAddress(args.Address); err != nil {
 		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
 	} else if sk, err := user.getKey(address); err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
@@ -201,7 +203,7 @@ func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ap
 	}
 
 	// TODO: return eth address here
-	reply.Address, err = service.vm.FormatAddress(GetEthAddress(sk))
+	reply.Address, err = service.vm.FormatEthAddress(GetEthAddress(sk))
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -236,7 +238,7 @@ func (service *AvaAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respons
 	}
 	user := user{db: db}
 
-	to, err := service.vm.ParseLocalAddress(args.To)
+	to, err := service.vm.ParseEthAddress(args.To)
 	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
 	}
@@ -249,6 +251,58 @@ func (service *AvaAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respons
 	tx, err := service.vm.newImportTx(chainID, to, privKeys)
 	if err != nil {
 		return err
+	}
+
+	response.TxID = tx.ID()
+	return service.vm.issueTx(tx)
+}
+
+// ExportAVAXArgs are the arguments to ExportAVAX
+type ExportAVAXArgs struct {
+	api.UserPass
+
+	// Amount of AVAX to send
+	Amount json.Uint64 `json:"amount"`
+
+	// ID of the address that will receive the AVAX. This address includes the
+	// chainID, which is used to determine what the destination chain is.
+	To string `json:"to"`
+}
+
+// ExportAVAX exports AVAX from the P-Chain to the X-Chain
+// It must be imported on the X-Chain to complete the transfer
+func (service *AvaAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.ctx.Log.Info("Platform: ExportAVAX called")
+
+	if args.Amount == 0 {
+		return errors.New("argument 'amount' must be > 0")
+	}
+
+	chainID, to, err := service.vm.ParseAddress(args.To)
+	if err != nil {
+		return err
+	}
+
+	// Get this user's data
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+	}
+	user := user{db: db}
+	privKeys, err := user.getKeys()
+	if err != nil {
+		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
+	}
+
+	// Create the transaction
+	tx, err := service.vm.newExportTx(
+		uint64(args.Amount), // Amount
+		chainID,             // ID of the chain to send the funds to
+		to,                  // Address
+		privKeys,            // Private keys
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
 	response.TxID = tx.ID()
