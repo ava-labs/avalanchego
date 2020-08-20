@@ -91,8 +91,36 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		return permError{err}
 	}
 
-	// TODO: credential check
-	// TODO: flow check
+	f := crypto.FactorySECP256K1R{}
+	for i, cred := range stx.Creds {
+		if err := cred.Verify(); err != nil {
+			return permError{err}
+		}
+		pubKey, err := f.RecoverPublicKey(tx.UnsignedBytes(), cred.(*secp256k1fx.Credential).Sigs[0][:])
+		if err != nil {
+			return permError{err}
+		}
+		if tx.Ins[i].Address != PublicKeyToEthAddress(pubKey) {
+			return permError{errPublicKeySignatureMismatch}
+		}
+	}
+
+	// do flow-checking
+	fc := avax.NewFlowChecker()
+	fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
+
+	for _, out := range tx.ExportedOutputs {
+		fc.Produce(out.AssetID(), out.Output().Amount())
+	}
+
+	for _, in := range tx.Ins {
+		fc.Consume(vm.ctx.AVAXAssetID, in.Amount)
+	}
+
+	if err := fc.Verify(); err != nil {
+		return permError{err}
+	}
+
 	// TODO: verify UTXO outputs via gRPC
 	return nil
 }
