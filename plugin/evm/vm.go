@@ -41,6 +41,7 @@ import (
 	geckojson "github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -79,6 +80,12 @@ const (
 )
 
 var (
+	// minGasPrice is the number of nAVAX required per gas unit for a transaction
+	// to be valid
+	minGasPrice = big.NewInt(47)
+
+	txFee = units.MilliAvax
+
 	errEmptyBlock                 = errors.New("empty block")
 	errCreateBlock                = errors.New("couldn't create block")
 	errUnknownBlock               = errors.New("unknown block")
@@ -222,12 +229,19 @@ func (vm *VM) Initialize(
 	}
 
 	vm.chainID = g.Config.ChainID
+	vm.txFee = txFee
 
 	config := eth.DefaultConfig
 	config.ManualCanonical = true
 	config.Genesis = g
 	config.Miner.ManualMining = true
 	config.Miner.DisableUncle = true
+
+	// Set minimum price for mining and default gas price oracle value to the min
+	// gas price to prevent so transactions and blocks all use the correct fees
+	config.Miner.GasPrice = minGasPrice
+	config.GPO.Default = minGasPrice
+
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
 	}
