@@ -152,42 +152,42 @@ func TestVMGenesis(t *testing.T) {
 		{
 			networkID:  constants.EverestID,
 			vmID:       avm.ID,
-			expectedID: "2azgNLYq32pB4dWKbTrcKXJtDZ4AswnqX3ty2zMvaiZse21Gnr",
+			expectedID: "jnUjZSRt16TcRnZzmh5aMhavwVHz3zBrSN8GfFMTQkzUnoBxC",
 		},
 		{
 			networkID:  constants.DenaliID,
 			vmID:       avm.ID,
-			expectedID: "2X3Rb9M8aE7pPf1uc8SRirmWNBWCRfpq9KBwb38Zy27SpBoGuU",
+			expectedID: "2ku4ACFiovQnp2bDQ9MUib3q4mChtHZioAn3LqNfQA3ovA1dHP",
 		},
 		{
 			networkID:  constants.CascadeID,
 			vmID:       avm.ID,
-			expectedID: "ra9hFBUy4ZegKwWfUCvSyQNRyY9hxHYWZXQvHdDctpCYRaGdc",
+			expectedID: "oMrNBf9aQ7kPDEPxfww7rsUntfJ3w7qNTowdRzMPejAJNC2p5",
 		},
 		{
 			networkID:  constants.LocalID,
 			vmID:       avm.ID,
-			expectedID: "2VvmkRw4yrz8tPrVnCCbvEK1JxNyujpqhmU6SGonxMpkWBx9UD",
+			expectedID: "v4hFSZTNNVdyomeMoXa77dAz4CdxU3cziSb45TB7mfXUmy7C7",
 		},
 		{
 			networkID:  constants.EverestID,
 			vmID:       EVMID,
-			expectedID: "2KsVS9rTFoi7sM1rwqTK3h85WLrLDeFvifAmHC9tTqMwVAT1Jd",
+			expectedID: "SEQ7TUzTD7wBFzqBWaamhEFBZgdeCsR1ekWvz2zFaQFqbxSKh",
 		},
 		{
 			networkID:  constants.DenaliID,
 			vmID:       EVMID,
-			expectedID: "fHswrsVLLtNH9vnUzio2Lrw9FBEXG9EPp3fnH88DYpGWyV37f",
+			expectedID: "hDDhhNaY5hBVvYiCqM9wesBucQhbhDhKy4pHPzXBTX85p8SzU",
 		},
 		{
 			networkID:  constants.CascadeID,
 			vmID:       EVMID,
-			expectedID: "2gpRyuEGkRt1LMz2m4aSZ4gfxAzoZijxBALCZkSzzpxroAPTVJ",
+			expectedID: "k7WaBJzHrwNnnHjdA8Dyw3MwNYjVnPbLm7qac12TjCCM8Lgo7",
 		},
 		{
 			networkID:  constants.LocalID,
 			vmID:       EVMID,
-			expectedID: "f5DjTrC9YJPagt9ogKgKPYpp7KMaCBKsv7AeqfonpTiw6rBec",
+			expectedID: "2m6aMgMBJWsmT4Hv448n6sNAwGMFfugBvdU6PdY5oxZge4qb1W",
 		},
 	}
 
@@ -219,19 +219,19 @@ func TestAVAXAssetID(t *testing.T) {
 	}{
 		{
 			networkID:  constants.EverestID,
-			expectedID: "47yAUKq1Bxzk7tGmfxZqiiHMYo4A2GNyXWGmohrgpbn8uCu7r",
+			expectedID: "nznftJBicce1PfWQeNEVBmDyweZZ6zcM3p78z9Hy9Hhdhfaxm",
 		},
 		{
 			networkID:  constants.DenaliID,
-			expectedID: "47yAUKq1Bxzk7tGmfxZqiiHMYo4A2GNyXWGmohrgpbn8uCu7r",
+			expectedID: "bi7tCZzj11ExAL1wsSKeSdFmJcS2S3rEL5GtPfrTWk6SS4yG6",
 		},
 		{
 			networkID:  constants.CascadeID,
-			expectedID: "47yAUKq1Bxzk7tGmfxZqiiHMYo4A2GNyXWGmohrgpbn8uCu7r",
+			expectedID: "bi7tCZzj11ExAL1wsSKeSdFmJcS2S3rEL5GtPfrTWk6SS4yG6",
 		},
 		{
 			networkID:  constants.LocalID,
-			expectedID: "2TrXx5kLGWa9RP3RiYWi7VkmNbppwPU4DCmTdqwuKzGFE7fsvP",
+			expectedID: "SSUAMrVdqYuvybAMGNitTYSAnE4T5fVdVDB82ped1qQ9f8DDM",
 		},
 	}
 

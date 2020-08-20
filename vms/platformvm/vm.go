@@ -4,11 +4,11 @@
 package platformvm
 
 import (
+	"container/heap"
 	"errors"
 	"fmt"
-	"time"
-
 	"math"
+	"time"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/chains"
@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -245,8 +246,14 @@ func (vm *VM) Initialize(
 			}
 		}
 
+		validators := &EventHeap{
+			SortByStartTime: false,
+			Txs:             genesis.Validators,
+		}
+		heap.Init(validators)
+
 		// Persist default subnet validator set at genesis
-		if err := vm.putCurrentValidators(vm.DB, genesis.Validators, constants.DefaultSubnetID); err != nil {
+		if err := vm.putCurrentValidators(vm.DB, validators, constants.DefaultSubnetID); err != nil {
 			return err
 		}
 
@@ -290,7 +297,8 @@ func (vm *VM) Initialize(
 		// Create the genesis block and save it as being accepted (We don't just
 		// do genesisBlock.Accept() because then it'd look for genesisBlock's
 		// non-existent parent)
-		genesisBlock, err := vm.newCommitBlock(ids.Empty, 0)
+		genesisID := ids.NewID(hashing.ComputeHash256Array(genesisBytes))
+		genesisBlock, err := vm.newCommitBlock(genesisID, 0)
 		if err != nil {
 			return err
 		}

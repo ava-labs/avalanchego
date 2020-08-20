@@ -6,11 +6,9 @@ package platformvm
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/utils/constants"
-
-	"github.com/ava-labs/gecko/utils/formatting"
-
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 )
 
@@ -202,15 +200,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 	validators := genesis.Validators
-	if validators.Len() == 0 {
+	if len(validators) != 3 {
 		t.Fatal("Validators should contain 3 validators")
-	}
-	currentValidator := validators.Remove().UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
-	for validators.Len() > 0 {
-		nextValidator := validators.Remove().UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
-		if currentValidator.EndTime().Unix() > nextValidator.EndTime().Unix() {
-			t.Fatalf("Validators returned by genesis should be a min heap sorted by end time")
-		}
-		currentValidator = nextValidator
 	}
 }
