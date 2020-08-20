@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/go-ethereum/common"
-	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 )
 
 // Key in the database whose corresponding value is the list of
@@ -72,8 +71,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		return errKeyNil
 	}
 
-	address := ethcrypto.PubkeyToAddress(
-		(*privKey.PublicKey().(*crypto.PublicKeySECP256K1R).ToECDSA())) // address the privKey controls
+	address := GetEthAddress(privKey) // address the privKey controls
 	controlsAddress, err := u.controlsAddress(address)
 	if err != nil {
 		return err
