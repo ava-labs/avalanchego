@@ -16,12 +16,11 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/utils/constants"
-	avacrypto "github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/crypto"
-	"github.com/ava-labs/go-ethereum/log"
+	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 )
 
 const (
@@ -64,7 +63,7 @@ type Web3API struct{}
 func (s *Web3API) ClientVersion() string { return version }
 
 // Sha3 returns the bytes returned by hashing [input] with Keccak256
-func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return crypto.Keccak256(input) }
+func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return ethcrypto.Keccak256(input) }
 
 // GetAcceptedFrontReply defines the reply that will be sent from the
 // GetAcceptedFront API call
@@ -101,7 +100,7 @@ func (api *DebugAPI) SpendGenesis(ctx context.Context, nonce uint64) error {
 	gasLimit := 21000
 	gasPrice := big.NewInt(1000000000)
 
-	genPrivateKey, err := crypto.HexToECDSA(GenesisTestKey[2:])
+	genPrivateKey, err := ethcrypto.HexToECDSA(GenesisTestKey[2:])
 	if err != nil {
 		return err
 	}
@@ -180,7 +179,7 @@ func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ap
 
 	user := user{db: db}
 
-	factory := avacrypto.FactorySECP256K1R{}
+	factory := crypto.FactorySECP256K1R{}
 
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
@@ -195,7 +194,7 @@ func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ap
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
-	sk := skIntf.(*avacrypto.PrivateKeySECP256K1R)
+	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
 	if err := user.putAddress(sk); err != nil {
 		return fmt.Errorf("problem saving key %w", err)
@@ -203,7 +202,7 @@ func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *ap
 
 	// TODO: return eth address here
 	reply.Address, err = service.vm.FormatAddress(
-		crypto.PubkeyToAddress(*(sk.PublicKey().(*avacrypto.PublicKeySECP256K1R).ToECDSA())))
+		ethcrypto.PubkeyToAddress(*(sk.PublicKey().(*crypto.PublicKeySECP256K1R).ToECDSA())))
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -254,6 +253,5 @@ func (service *AvaAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respons
 	}
 
 	response.TxID = tx.ID()
-	log.Info("hey here2")
 	return service.vm.issueTx(tx)
 }
