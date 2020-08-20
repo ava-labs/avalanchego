@@ -163,15 +163,6 @@ func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 	return atx
 }
 
-func importTxStateTransfer(tx *UnsignedImportTx, state *state.StateDB) {
-	for _, to := range tx.Outs {
-		amount := new(big.Int).SetUint64(to.Amount)
-		state.AddBalance(to.Address, new(big.Int).Mul(amount, x2cRate))
-		nonce := state.GetNonce(to.Address)
-		state.SetNonce(to.Address, nonce+1)
-	}
-}
-
 /*
  ******************************************************************************
  ********************************* Snowman API ********************************
@@ -225,7 +216,7 @@ func (vm *VM) Initialize(
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
-			importTxStateTransfer(atx.UnsignedTx.(*UnsignedImportTx), state)
+			atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
 			raw, _ := vm.codec.Marshal(atx)
 			return raw, nil
 		default:
@@ -259,8 +250,7 @@ func (vm *VM) Initialize(
 		return vm.getLastAccepted().ethBlock
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		atx := vm.getAtomicTx(block).UnsignedTx.(*UnsignedImportTx)
-		importTxStateTransfer(atx, state)
+		vm.getAtomicTx(block).UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
 		return nil
 	})
 	vm.blockCache = cache.LRU{Size: 2048}

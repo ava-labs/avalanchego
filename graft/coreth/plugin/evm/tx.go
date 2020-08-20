@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/coreth/core/state"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -62,6 +64,8 @@ type UnsignedAtomicTx interface {
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
+
+	EVMStateTransfer(state *state.StateDB)
 }
 
 // Tx is a signed transaction
