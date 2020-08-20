@@ -8,11 +8,8 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
-	"time"
-
-	"github.com/ava-labs/gecko/utils/hashing"
-
 	"math"
+	"time"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/chains"
@@ -27,6 +24,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
