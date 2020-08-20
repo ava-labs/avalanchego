@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/go-ethereum/log"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -149,6 +150,7 @@ func (vm *VM) newExportTx(
 
 func (tx *UnsignedExportTx) EVMStateTransfer(state *state.StateDB) error {
 	for _, from := range tx.Ins {
+		log.Info("consume", "in", from.Address, "amount", from.Amount, "nonce", from.Nonce, "nonce0", state.GetNonce(from.Address))
 		amount := new(big.Int).Mul(
 			new(big.Int).SetUint64(from.Amount), x2cRate)
 		if state.GetBalance(from.Address).Cmp(amount) < 0 {
