@@ -229,7 +229,10 @@ func (vm *VM) Initialize(
 	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
-			atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
+			if err := atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state); err != nil {
+				vm.newBlockChan <- nil
+				return nil, err
+			}
 			raw, _ := vm.codec.Marshal(atx)
 			return raw, nil
 		default:
@@ -263,8 +266,7 @@ func (vm *VM) Initialize(
 		return vm.getLastAccepted().ethBlock
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		vm.getAtomicTx(block).UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
-		return nil
+		return vm.getAtomicTx(block).UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
 	})
 	vm.blockCache = cache.LRU{Size: 2048}
 	vm.blockStatusCache = cache.LRU{Size: 1024}
@@ -735,6 +737,9 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount 
 		}
 		addr := GetEthAddress(key)
 		balance := new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		if balance == 0 {
+			continue
+		}
 		if amount < balance {
 			balance = amount
 		}
