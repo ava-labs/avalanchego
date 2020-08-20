@@ -576,7 +576,7 @@ func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainReader, header *t
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, receipts), nil
+	return types.NewBlock(header, txs, uncles, receipts, nil), nil
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

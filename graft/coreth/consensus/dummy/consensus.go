@@ -19,7 +19,7 @@ import (
 )
 
 type OnFinalizeCallbackType = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
-type OnFinalizeAndAssembleCallbackType = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt)
+type OnFinalizeAndAssembleCallbackType = func(state *state.StateDB, txs []*types.Transaction) ([]byte, error)
 type OnAPIsCallbackType = func(consensus.ChainReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
 
@@ -261,14 +261,19 @@ func (self *DummyEngine) Finalize(
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+	var extdata []byte
 	if self.cb.OnFinalizeAndAssemble != nil {
-		self.cb.OnFinalizeAndAssemble(chain, header, state, txs, uncles, receipts)
+		ret, err := self.cb.OnFinalizeAndAssemble(state, txs)
+		extdata = ret
+		if err != nil {
+			return nil, err
+		}
 	}
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, receipts), nil
+	return types.NewBlock(header, txs, uncles, receipts, extdata), nil
 }
 
 func (self *DummyEngine) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) (err error) {

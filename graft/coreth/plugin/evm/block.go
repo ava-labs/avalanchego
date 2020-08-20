@@ -69,7 +69,7 @@ func (b *Block) Verify() error {
 	path := []*Block{}
 	inputs := new(ids.Set)
 	for {
-		if p.Status() == choices.Accepted {
+		if p.Status() == choices.Accepted || p.(*Block).ethBlock.Hash() == vm.genesisHash {
 			break
 		}
 		if ret, hit := vm.blockAtomicInputCache.Get(p.ID()); hit {

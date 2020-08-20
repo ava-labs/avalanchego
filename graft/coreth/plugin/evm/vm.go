@@ -34,13 +34,11 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	//"github.com/ava-labs/gecko/utils/constants"
-	//"github.com/ava-labs/gecko/utils/formatting"
 	avajson "github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/gecko/snow/engine/common"
 )
@@ -153,9 +151,9 @@ type VM struct {
 }
 
 func (vm *VM) getAtomicTx(block *types.Block) *Tx {
-	var atx *Tx
+	atx := new(Tx)
 	if extdata := block.ExtraData(); extdata != nil {
-		if err := vm.codec.Unmarshal(block.ExtraData(), atx); err != nil {
+		if err := vm.codec.Unmarshal(extdata, atx); err != nil {
 			panic(err)
 		}
 	}
@@ -212,19 +210,24 @@ func (vm *VM) Initialize(
 		}
 		header.Extra = append(header.Extra, hid...)
 	})
-	chain.SetOnSeal(func(block *types.Block) error {
-		if len(block.Transactions()) == 0 {
-			// this could happen due to the async logic of geth tx pool
-			vm.newBlockChan <- nil
-			return errEmptyBlock
-		}
+	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
 		select {
 		case atx := <-vm.pendingAtomicTxs:
+			for _, to := range atx.UnsignedTx.(*UnsignedImportTx).Outs {
+				amount := new(big.Int)
+				amount.SetUint64(to.Amount)
+				state.AddBalance(to.Address, amount)
+			}
 			raw, _ := vm.codec.Marshal(atx)
-			block.SetExtraData(raw)
-			// TODO: make sure the atomic Tx is valid
+			return raw, nil
+		default:
+			if len(txs) == 0 {
+				// this could happen due to the async logic of geth tx pool
+				vm.newBlockChan <- nil
+				return nil, errEmptyBlock
+			}
 		}
-		return nil
+		return nil, nil
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
 		vm.ctx.Log.Verbo("EVM sealed a block")
@@ -233,6 +236,9 @@ func (vm *VM) Initialize(
 			id:       ids.NewID(block.Hash()),
 			ethBlock: block,
 			vm:       vm,
+		}
+		if blk.Verify() != nil {
+			return errInvalidBlock
 		}
 		vm.newBlockChan <- blk
 		vm.updateStatus(ids.NewID(block.Hash()), choices.Processing)
@@ -246,7 +252,6 @@ func (vm *VM) Initialize(
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, statedb *state.StateDB) error {
 		atx := vm.getAtomicTx(block).UnsignedTx.(*UnsignedImportTx)
-		vm.ctx.Log.Info(atx.ID().String())
 		for _, to := range atx.Outs {
 			amount := new(big.Int)
 			amount.SetUint64(to.Amount)
@@ -282,6 +287,7 @@ func (vm *VM) Initialize(
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
 	// TODO: read size from options
 	vm.pendingAtomicTxs = make(chan *Tx, 1024)
+	vm.atomicTxSubmitChan = make(chan struct{}, 1)
 	chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
 	// TODO: shutdown this go routine
 	go ctx.Log.RecoverAndPanic(func() {
@@ -523,7 +529,7 @@ func (vm *VM) tryBlockGen() error {
 	if err != nil {
 		return err
 	}
-	if size == 0 {
+	if size == 0 && len(vm.pendingAtomicTxs) == 0 {
 		return nil
 	}
 
@@ -648,7 +654,10 @@ func (vm *VM) FormatAddress(addr common.Address) (string, error) {
 func (vm *VM) issueTx(tx *Tx) error {
 	select {
 	case vm.pendingAtomicTxs <- tx:
-		vm.atomicTxSubmitChan <- struct{}{}
+		select {
+		case vm.atomicTxSubmitChan <- struct{}{}:
+		default:
+		}
 	default:
 		return errTooManyAtomicTx
 	}
@@ -666,7 +675,8 @@ func (vm *VM) GetAtomicUTXOs(
 ) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
 	// TODO: finish this function via gRPC
 	utxos := []*avax.UTXO{{
-		Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+		UTXOID: avax.UTXOID{TxID: ids.Empty},
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 100,
 		},

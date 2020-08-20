@@ -4,21 +4,17 @@
 package evm
 
 import (
-	//"crypto/ecdsa"
 	"errors"
 	"fmt"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	avacrypto "github.com/ava-labs/gecko/utils/crypto"
+	crypto "github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/components/avax"
-	//"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/log"
-	//"github.com/ava-labs/go-ethereum/crypto"
 )
 
 var (
@@ -68,7 +64,6 @@ func (tx *UnsignedImportTx) Verify(
 	case tx.SourceChain.IsZero():
 		return errWrongChainID
 	case !tx.SourceChain.Equals(avmID):
-		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
@@ -118,7 +113,7 @@ func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
 func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
 	to common.Address, // Address of recipient
-	keys []*avacrypto.PrivateKeySECP256K1R, // Keys to import the funds
+	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
 	if !vm.avm.Equals(chainID) {
 		return nil, errWrongChainID
@@ -135,7 +130,7 @@ func (vm *VM) newImportTx(
 	}
 
 	importedInputs := []*avax.TransferableInput{}
-	signers := [][]*avacrypto.PrivateKeySECP256K1R{}
+	signers := [][]*crypto.PrivateKeySECP256K1R{}
 
 	importedAmount := uint64(0)
 	now := vm.clock.Unix()
@@ -172,6 +167,7 @@ func (vm *VM) newImportTx(
 	outs := []EVMOutput{}
 	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
 		// TODO: spend EVM balance to compensate vm.txFee-importedAmount
+		return nil, errNoFunds
 	} else if importedAmount > vm.txFee {
 		outs = append(outs, EVMOutput{
 			Address: to,
@@ -192,7 +188,6 @@ func (vm *VM) newImportTx(
 	}
 	tx := &Tx{UnsignedTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
-		log.Info("hey here1", "err", err, "utx", utx)
 		return nil, err
 	}
 	return tx, utx.Verify(vm.avm, vm.ctx, vm.txFee, vm.avaxAssetID)
