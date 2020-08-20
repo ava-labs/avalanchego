@@ -177,11 +177,10 @@ type VM struct {
 }
 
 func (vm *VM) getAtomicTx(block *types.Block) *Tx {
+	extdata := block.ExtraData()
 	atx := new(Tx)
-	if extdata := block.ExtraData(); extdata != nil {
-		if err := vm.codec.Unmarshal(extdata, atx); err != nil {
-			panic(err)
-		}
+	if err := vm.codec.Unmarshal(extdata, atx); err != nil {
+		return nil
 	}
 	atx.Sign(vm.codec, nil)
 	return atx
@@ -284,7 +283,11 @@ func (vm *VM) Initialize(
 		return vm.getLastAccepted().ethBlock
 	})
 	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		return vm.getAtomicTx(block).UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
+		tx := vm.getAtomicTx(block)
+		if tx == nil {
+			return nil
+		}
+		return tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
 	})
 	vm.blockCache = cache.LRU{Size: 2048}
 	vm.blockStatusCache = cache.LRU{Size: 1024}

@@ -33,9 +33,12 @@ func (b *Block) Accept() error {
 	vm.updateStatus(b.ID(), choices.Accepted)
 
 	tx := vm.getAtomicTx(b.ethBlock)
+	if tx == nil {
+		return nil
+	}
 	utx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
 	if !ok {
-		return errors.New("unknown atomic tx type")
+		return errors.New("unknown tx type")
 	}
 
 	return utx.Accept(vm.ctx, nil)
@@ -73,47 +76,50 @@ func (b *Block) Parent() snowman.Block {
 func (b *Block) Verify() error {
 	vm := b.vm
 	tx := vm.getAtomicTx(b.ethBlock)
-	switch atx := tx.UnsignedTx.(type) {
-	case *UnsignedImportTx:
-		if b.ethBlock.Hash() == vm.genesisHash {
-			return nil
-		}
-		p := b.Parent()
-		path := []*Block{}
-		inputs := new(ids.Set)
-		for {
-			if p.Status() == choices.Accepted || p.(*Block).ethBlock.Hash() == vm.genesisHash {
-				break
+	if tx != nil {
+		switch atx := tx.UnsignedTx.(type) {
+		case *UnsignedImportTx:
+			if b.ethBlock.Hash() == vm.genesisHash {
+				return nil
 			}
-			if ret, hit := vm.blockAtomicInputCache.Get(p.ID()); hit {
-				inputs = ret.(*ids.Set)
-				break
+			p := b.Parent()
+			path := []*Block{}
+			inputs := new(ids.Set)
+			for {
+				if p.Status() == choices.Accepted || p.(*Block).ethBlock.Hash() == vm.genesisHash {
+					break
+				}
+				if ret, hit := vm.blockAtomicInputCache.Get(p.ID()); hit {
+					inputs = ret.(*ids.Set)
+					break
+				}
+				path = append(path, p.(*Block))
+				p = p.Parent().(*Block)
 			}
-			path = append(path, p.(*Block))
-			p = p.Parent().(*Block)
-		}
-		for i := len(path) - 1; i >= 0; i-- {
-			inputsCopy := new(ids.Set)
-			p := path[i]
-			atx := vm.getAtomicTx(p.ethBlock)
-			inputs.Union(atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs())
-			inputsCopy.Union(*inputs)
-			vm.blockAtomicInputCache.Put(p.ID(), inputsCopy)
-		}
-		for _, in := range atx.InputUTXOs().List() {
-			if inputs.Contains(in) {
-				return errInvalidBlock
+			for i := len(path) - 1; i >= 0; i-- {
+				inputsCopy := new(ids.Set)
+				p := path[i]
+				atx := vm.getAtomicTx(p.ethBlock)
+				if atx != nil {
+					inputs.Union(atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs())
+					inputsCopy.Union(*inputs)
+				}
+				vm.blockAtomicInputCache.Put(p.ID(), inputsCopy)
 			}
+			for _, in := range atx.InputUTXOs().List() {
+				if inputs.Contains(in) {
+					return errInvalidBlock
+				}
+			}
+		case *UnsignedExportTx:
+		default:
+			return errors.New("unknown atomic tx type")
 		}
-	case *UnsignedExportTx:
-	default:
-		return errors.New("unknown atomic tx type")
-	}
 
-	if tx.UnsignedTx.(UnsignedAtomicTx).SemanticVerify(vm, tx) != nil {
-		return errInvalidBlock
+		if tx.UnsignedTx.(UnsignedAtomicTx).SemanticVerify(vm, tx) != nil {
+			return errInvalidBlock
+		}
 	}
-
 	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }

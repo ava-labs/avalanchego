@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/go-ethereum/log"
 
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -126,9 +127,37 @@ func (tx *UnsignedExportTx) SemanticVerify(
 }
 
 // Accept this transaction.
-func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
-	// TODO: finish this function via gRPC
-	return nil
+func (tx *UnsignedExportTx) Accept(ctx *snow.Context, _ database.Batch) error {
+	txID := tx.ID()
+
+	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
+	for i, out := range tx.ExportedOutputs {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(i),
+			},
+			Asset: avax.Asset{ID: out.AssetID()},
+			Out:   out.Out,
+		}
+
+		utxoBytes, err := Codec.Marshal(utxo)
+		if err != nil {
+			return err
+		}
+
+		elem := &atomic.Element{
+			Key:   utxo.InputID().Bytes(),
+			Value: utxoBytes,
+		}
+		if out, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = out.Addresses()
+		}
+
+		elems[i] = elem
+	}
+
+	return ctx.SharedMemory.Put(tx.DestinationChain, elems)
 }
 
 // Create a new transaction
