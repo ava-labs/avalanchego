@@ -21,8 +21,6 @@ var (
 	errNoExportOutputs  = errors.New("no export outputs")
 	errOutputsNotSorted = errors.New("outputs not sorted")
 	errOverflowExport   = errors.New("overflow when computing export amount + txFee")
-
-	_ UnsignedAtomicTx = &UnsignedExportTx{}
 )
 
 // UnsignedExportTx is an unsigned ExportTx

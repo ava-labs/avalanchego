@@ -6,6 +6,9 @@ package evm
 import (
 	"errors"
 	"fmt"
+	"math/big"
+
+	"github.com/ava-labs/coreth/core/state"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -134,7 +137,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept(batch database.Batch) error {
+func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	// TODO: finish this function via gRPC
 	return nil
 }
@@ -217,4 +220,13 @@ func (vm *VM) newImportTx(
 		return nil, err
 	}
 	return tx, utx.Verify(vm.avm, vm.ctx, vm.txFee, vm.avaxAssetID)
+}
+
+func (tx *UnsignedImportTx) EVMStateTransfer(state *state.StateDB) {
+	for _, to := range tx.Outs {
+		amount := new(big.Int).SetUint64(to.Amount)
+		state.AddBalance(to.Address, new(big.Int).Mul(amount, x2cRate))
+		nonce := state.GetNonce(to.Address)
+		state.SetNonce(to.Address, nonce+1)
+	}
 }
