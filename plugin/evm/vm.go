@@ -175,6 +175,7 @@ func (vm *VM) getAtomicTx(block *types.Block) *Tx {
 			panic(err)
 		}
 	}
+	atx.Sign(vm.codec, nil)
 	return atx
 }
 
@@ -719,8 +720,12 @@ func (vm *VM) GetAtomicUTXOs(
 }
 
 func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
+	return PublicKeyToEthAddress(privKey.PublicKey())
+}
+
+func PublicKeyToEthAddress(pubKey crypto.PublicKey) common.Address {
 	return ethcrypto.PubkeyToAddress(
-		(*privKey.PublicKey().(*crypto.PublicKeySECP256K1R).ToECDSA()))
+		(*pubKey.(*crypto.PublicKeySECP256K1R).ToECDSA()))
 }
 
 func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
