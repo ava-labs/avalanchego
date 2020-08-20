@@ -93,7 +93,7 @@ func GetIPs(networkID uint32) []string {
 // GetIDs returns the default IDs for each network
 func GetIDs(networkID uint32) []string {
 	switch networkID {
-	case constants.DenaliID:
+	case constants.EverestID:
 		return []string{
 			"NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk",
 			"NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
