@@ -33,8 +33,6 @@ type UnsignedExportTx struct {
 	Ins []EVMInput `serialize:"true" json:"inputs"`
 	// Outputs that are exported to the chain
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
-	// EVM nonce
-	nonce uint64
 }
 
 // InputUTXOs returns an empty set
@@ -157,10 +155,10 @@ func (tx *UnsignedExportTx) EVMStateTransfer(state *state.StateDB) error {
 			return errInsufficientFunds
 		}
 		state.SubBalance(from.Address, amount)
-		if state.GetNonce(from.Address) != tx.nonce {
+		if state.GetNonce(from.Address) != from.Nonce {
 			return errInvalidNonce
 		}
-		state.SetNonce(from.Address, tx.nonce+1)
+		state.SetNonce(from.Address, from.Nonce+1)
 	}
 	return nil
 }

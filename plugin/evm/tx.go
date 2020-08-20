@@ -33,6 +33,7 @@ var (
 type EVMOutput struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
+	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
 func (out *EVMOutput) Verify() error {

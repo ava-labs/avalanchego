@@ -737,9 +737,14 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount 
 		if amount < balance {
 			balance = amount
 		}
+		nonce, err := vm.GetAcceptedNonce(addr)
+		if err != nil {
+			return nil, nil, err
+		}
 		inputs = append(inputs, EVMInput{
 			Address: addr,
 			Amount:  balance,
+			Nonce:   nonce,
 		})
 		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
 		amount -= balance

@@ -34,8 +34,6 @@ type UnsignedImportTx struct {
 	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 	// Outputs
 	Outs []EVMOutput `serialize:"true" json:"outputs"`
-	// EVM nonce
-	nonce uint64
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
@@ -182,6 +180,11 @@ func (vm *VM) newImportTx(
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
+	nonce, err := vm.GetAcceptedNonce(to)
+	if err != nil {
+		return nil, err
+	}
+
 	outs := []EVMOutput{}
 	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
 		// TODO: spend EVM balance to compensate vm.txFee-importedAmount
@@ -190,13 +193,10 @@ func (vm *VM) newImportTx(
 		outs = append(outs, EVMOutput{
 			Address: to,
 			Amount:  importedAmount - vm.txFee,
+			Nonce:   nonce,
 		})
 	}
 
-	nonce, err := vm.GetAcceptedNonce(to)
-	if err != nil {
-		return nil, err
-	}
 	// Create the transaction
 	utx := &UnsignedImportTx{
 		NetworkID:      vm.ctx.NetworkID,
@@ -204,7 +204,6 @@ func (vm *VM) newImportTx(
 		Outs:           outs,
 		ImportedInputs: importedInputs,
 		SourceChain:    chainID,
-		nonce:          nonce,
 	}
 	tx := &Tx{UnsignedTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
@@ -218,10 +217,10 @@ func (tx *UnsignedImportTx) EVMStateTransfer(state *state.StateDB) error {
 		state.AddBalance(to.Address,
 			new(big.Int).Mul(
 				new(big.Int).SetUint64(to.Amount), x2cRate))
-		if state.GetNonce(to.Address) != tx.nonce {
+		if state.GetNonce(to.Address) != to.Nonce {
 			return errInvalidNonce
 		}
-		state.SetNonce(to.Address, tx.nonce+1)
+		state.SetNonce(to.Address, to.Nonce+1)
 	}
 	return nil
 }
