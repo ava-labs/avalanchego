@@ -113,7 +113,7 @@ func (vm *VMClient) Initialize(
 
 	// start the shared memory server
 	sharedMemoryBrokerID := vm.broker.NextId()
-	go vm.broker.AcceptAndServe(keystoreBrokerID, vm.startSharedMemoryServer)
+	go vm.broker.AcceptAndServe(sharedMemoryBrokerID, vm.startSharedMemoryServer)
 
 	// start the blockchain alias server
 	bcLookupBrokerID := vm.broker.NextId()
