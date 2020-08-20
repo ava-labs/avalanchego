@@ -95,6 +95,7 @@ var (
 	errNoExportOutputs            = errors.New("no export outputs")
 	errOutputsNotSorted           = errors.New("outputs not sorted")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
+	errInvalidNonce               = errors.New("invalid nonce")
 )
 
 func maxDuration(x, y time.Duration) time.Duration {
@@ -720,4 +721,12 @@ func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount 
 		return nil, nil, errInsufficientFunds
 	}
 	return inputs, signers, nil
+}
+
+func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
+	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
+	if err != nil {
+		return 0, err
+	}
+	return state.GetNonce(address), nil
 }

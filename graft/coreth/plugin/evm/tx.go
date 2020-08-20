@@ -65,7 +65,7 @@ type UnsignedAtomicTx interface {
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
 
-	EVMStateTransfer(state *state.StateDB)
+	EVMStateTransfer(state *state.StateDB) error
 }
 
 // Tx is a signed transaction
