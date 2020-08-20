@@ -730,7 +730,7 @@ func TestExportTxSerialization(t *testing.T) {
 }
 
 func TestExportTxSemanticVerify(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -788,7 +788,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 }
 
 func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -846,7 +846,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 }
 
 func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -904,7 +904,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 }
 
 func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -967,9 +967,9 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(ctx.ChainID)
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	ctx.Lock.Lock()
 
@@ -1075,7 +1075,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 }
 
 func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -1139,11 +1139,11 @@ func TestIssueExportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := NewContext(t)
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1236,27 +1236,21 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
-
-	// check from the peer chain side
-	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
-
-	utxo := avax.UTXOID{
-		TxID:        tx.ID(),
-		OutputIndex: 0,
-	}
-	utxoID := utxo.InputID()
-	if _, err := state.UTXO(utxoID); err != nil {
-		t.Fatal(err)
-	}
-
-	utxoIDs, err := state.Funds(key.PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
+	peerSharedMemory := m.NewSharedMemory(platformChainID)
+	utxoBytes, _, _, err := peerSharedMemory.Indexed(
+		vm.ctx.ChainID,
+		[][]byte{
+			key.PublicKey().Address().Bytes(),
+		},
+		nil,
+		nil,
+		math.MaxInt32,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(utxoIDs) != 1 {
-		t.Fatalf("wrong number of utxoIDs %d", len(utxoIDs))
+	if len(utxoBytes) != 1 {
+		t.Fatalf("wrong number of utxos %d", len(utxoBytes))
 	}
 }
 
@@ -1267,11 +1261,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := NewContext(t)
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -1366,29 +1360,20 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
-
-	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
-
 	utxo := avax.UTXOID{
 		TxID:        tx.ID(),
 		OutputIndex: 0,
 	}
 	utxoID := utxo.InputID()
-	if err := state.SpendUTXO(utxoID); err != nil {
+
+	peerSharedMemory := m.NewSharedMemory(platformID)
+	if err := peerSharedMemory.Remove(vm.ctx.ChainID, [][]byte{utxoID.Bytes()}); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
-
 	parsedTx.Accept()
 
-	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
-
-	state = avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
-
-	if _, err := state.UTXO(utxoID); err == nil {
+	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID.Bytes()}); err == nil {
 		t.Fatalf("should have failed to read the utxo")
 	}
 }

@@ -220,11 +220,12 @@ func TestIssueImportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := NewContext(t)
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+	ctx.SharedMemory = m.NewSharedMemory(chainID)
+	peerSharedMemory := m.NewSharedMemory(platformChainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
@@ -294,8 +295,6 @@ func TestIssueImportTx(t *testing.T) {
 
 	// Provide the platform UTXO:
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
-
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: avaxID},
@@ -307,13 +306,20 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		},
 	}
-
-	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
-	if err := state.FundUTXO(utxo); err != nil {
+	utxoBytes, err := vm.codec.Marshal(utxo)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
+	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   utxo.InputID().Bytes(),
+		Value: utxoBytes,
+		Traits: [][]byte{
+			key.PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
@@ -339,11 +345,7 @@ func TestIssueImportTx(t *testing.T) {
 	parsedTx := txs[0]
 	parsedTx.Accept()
 
-	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
-
-	state = avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
-	if _, err := state.UTXO(utxoID.InputID()); err == nil {
+	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -355,11 +357,11 @@ func TestForceAcceptImportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
 	ctx := NewContext(t)
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
 	platformID := ids.Empty.Prefix(0)
 
@@ -438,12 +440,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	parsedTx.Accept()
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
-
-	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, platformChainID)
-	utxoSource := utxoID.InputID()
-	if _, err := state.UTXO(utxoSource); err == nil {
+	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }

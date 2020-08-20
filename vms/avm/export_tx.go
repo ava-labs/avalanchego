@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
@@ -95,12 +94,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 	txID := t.ID()
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(t.DestinationChain)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(t.DestinationChain)
-
-	vsmDB := versiondb.New(smDB)
-
-	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.DestinationChain)
+	elems := make([]*atomic.Element, len(t.ExportedOuts))
 	for i, out := range t.ExportedOuts {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
@@ -110,15 +104,22 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			Asset: avax.Asset{ID: out.AssetID()},
 			Out:   out.Out,
 		}
-		if err := state.FundUTXO(utxo); err != nil {
+
+		utxoBytes, err := vm.codec.Marshal(utxo)
+		if err != nil {
 			return err
 		}
+
+		elem := &atomic.Element{
+			Key:   utxo.InputID().Bytes(),
+			Value: utxoBytes,
+		}
+		if out, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = out.Addresses()
+		}
+
+		elems[i] = elem
 	}
 
-	sharedBatch, err := vsmDB.CommitBatch()
-	if err != nil {
-		return err
-	}
-
-	return atomic.WriteAll(batch, sharedBatch)
+	return vm.ctx.SharedMemory.Put(t.DestinationChain, elems, batch)
 }

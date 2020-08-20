@@ -131,7 +131,7 @@ type manager struct {
 	networkID                          uint32             // ID of the network this node is connected to
 	server                             *api.Server        // Handles HTTP API calls
 	keystore                           *keystore.Keystore
-	sharedMemory                       *atomic.SharedMemory
+	atomicMemory                       *atomic.Memory
 	avaxAssetID                        ids.ID
 	xChainID                           ids.ID
 	criticalChains                     ids.Set // Chains that can't exit gracefully
@@ -168,7 +168,7 @@ func New(
 	networkID uint32,
 	server *api.Server,
 	keystore *keystore.Keystore,
-	sharedMemory *atomic.SharedMemory,
+	atomicMemory *atomic.Memory,
 	avaxAssetID ids.ID,
 	xChainID ids.ID,
 	criticalChains ids.Set,
@@ -204,7 +204,7 @@ func New(
 		networkID:        networkID,
 		server:           server,
 		keystore:         keystore,
-		sharedMemory:     sharedMemory,
+		atomicMemory:     atomicMemory,
 		avaxAssetID:      avaxAssetID,
 		xChainID:         xChainID,
 		criticalChains:   criticalChains,
@@ -290,7 +290,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		DecisionDispatcher:  m.decisionEvents,
 		ConsensusDispatcher: m.consensusEvents,
 		Keystore:            m.keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:        m.sharedMemory.NewBlockchainSharedMemory(chainParams.ID),
+		SharedMemory:        m.atomicMemory.NewSharedMemory(chainParams.ID),
 		BCLookup:            m,
 		SNLookup:            m,
 		Namespace:           fmt.Sprintf("gecko_%s_vm", primaryAlias),

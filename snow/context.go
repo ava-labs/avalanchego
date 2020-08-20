@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"sync"
-	"sync/atomic"
+
+	stdatomic "sync/atomic"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/triggers"
@@ -25,12 +27,6 @@ type Callable interface {
 // Keystore ...
 type Keystore interface {
 	GetDatabase(username, password string) (database.Database, error)
-}
-
-// SharedMemory ...
-type SharedMemory interface {
-	GetDatabase(id ids.ID) database.Database
-	ReleaseDatabase(id ids.ID)
 }
 
 // AliasLookup ...
@@ -62,7 +58,7 @@ type Context struct {
 	ConsensusDispatcher *triggers.EventDispatcher
 	Lock                sync.RWMutex
 	Keystore            Keystore
-	SharedMemory        SharedMemory
+	SharedMemory        atomic.SharedMemory
 	BCLookup            AliasLookup
 	SNLookup            SubnetLookup
 
@@ -74,12 +70,12 @@ type Context struct {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (ctx *Context) IsBootstrapped() bool {
-	return atomic.LoadUint32(&ctx.bootstrapped) > 0
+	return stdatomic.LoadUint32(&ctx.bootstrapped) > 0
 }
 
 // Bootstrapped marks this chain as done bootstrapping
 func (ctx *Context) Bootstrapped() {
-	atomic.StoreUint32(&ctx.bootstrapped, 1)
+	stdatomic.StoreUint32(&ctx.bootstrapped, 1)
 }
 
 // DefaultContextTest ...

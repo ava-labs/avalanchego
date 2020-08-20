@@ -10,7 +10,9 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/hashing"
 )
 
 var (
@@ -48,7 +50,7 @@ type Element struct {
 // SharedMemory ...
 type SharedMemory interface {
 	// Adds to the peer chain's side
-	Put(peerChainID ids.ID, elems []*Element) error
+	Put(peerChainID ids.ID, elems []*Element, batches ...database.Batch) error
 
 	// Fetches from this chain's side
 	Get(peerChainID ids.ID, keys [][]byte) (values [][]byte, err error)
@@ -64,7 +66,7 @@ type SharedMemory interface {
 		lastKey []byte,
 		err error,
 	)
-	Remove(peerChainID ids.ID, keys [][]byte) error
+	Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error
 }
 
 // sharedMemory provides the API for a blockchain to interact with shared memory
@@ -74,7 +76,7 @@ type sharedMemory struct {
 	thisChainID ids.ID
 }
 
-func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element) error {
+func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...database.Batch) error {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 	vdb, db := sm.m.GetDatabase(sharedID)
 	defer sm.m.ReleaseDatabase(sharedID)
@@ -95,7 +97,12 @@ func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element) error {
 			return err
 		}
 	}
-	return vdb.Commit()
+
+	myBatch, err := vdb.CommitBatch()
+	if err != nil {
+		return err
+	}
+	return WriteAll(myBatch, batches...)
 }
 
 func (sm *sharedMemory) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
@@ -145,7 +152,7 @@ func (sm *sharedMemory) Indexed(
 		s.indexDB = prefixdb.New(largerIndexPrefix, db)
 	}
 
-	keys, err := s.getKeys(traits)
+	keys, lastTrait, lastKey, err := s.getKeys(traits, startTrait, startKey, limit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -158,10 +165,10 @@ func (sm *sharedMemory) Indexed(
 		}
 		values[i] = elem.Value
 	}
-	return values, nil, nil, nil
+	return values, lastTrait, lastKey, nil
 }
 
-func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte) error {
+func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 	vdb, db := sm.m.GetDatabase(sharedID)
 	defer sm.m.ReleaseDatabase(sharedID)
@@ -182,7 +189,12 @@ func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte) error {
 			return err
 		}
 	}
-	return vdb.Commit()
+
+	myBatch, err := vdb.CommitBatch()
+	if err != nil {
+		return err
+	}
+	return WriteAll(myBatch, batches...)
 }
 
 type state struct {
@@ -284,15 +296,44 @@ func (s *state) loadValue(key []byte) (*dbElement, error) {
 	return value, s.c.Unmarshal(valueBytes, value)
 }
 
-func (s *state) getKeys(traits [][]byte) ([][]byte, error) {
+func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int) ([][]byte, []byte, []byte, error) {
+	tracked := ids.Set{}
 	keys := [][]byte(nil)
+	lastTrait := startTrait
+	lastKey := startKey
+	utils.Sort2DBytes(traits)
 	for _, trait := range traits {
+		switch bytes.Compare(trait, startTrait) {
+		case -1:
+			continue
+		case 1:
+			startKey = nil
+		}
+
+		lastTrait = trait
+		lastKey = startKey
+
 		traitDB := prefixdb.New(trait, s.indexDB)
-		iter := traitDB.NewIterator()
+		iter := traitDB.NewIteratorWithStart(startKey)
 		for iter.Next() {
-			keys = append(keys, iter.Key())
+			if limit == 0 {
+				iter.Release()
+				return keys, lastTrait, lastKey, nil
+			}
+
+			key := iter.Key()
+			lastKey = key
+
+			id := ids.NewID(hashing.ComputeHash256Array(key))
+			if tracked.Contains(id) {
+				continue
+			}
+
+			tracked.Add(id)
+			keys = append(keys, key)
+			limit--
 		}
 		iter.Release()
 	}
-	return keys, nil
+	return keys, lastTrait, lastKey, nil
 }

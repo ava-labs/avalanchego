@@ -193,15 +193,15 @@ func BuildGenesisTest(t *testing.T) []byte {
 	return reply.Bytes.Bytes
 }
 
-func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
+func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	genesisBytes := BuildGenesisTest(t)
 	ctx := NewContext(t)
 
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(ctx.ChainID)
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
@@ -244,7 +244,7 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 		t.Fatal(err)
 	}
 
-	return genesisBytes, issuer, vm
+	return genesisBytes, issuer, vm, m
 }
 
 func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
@@ -521,7 +521,7 @@ type testTxBytes struct{ unsignedBytes []byte }
 func (tx *testTxBytes) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func TestIssueTx(t *testing.T) {
-	genesisBytes, issuer, vm := GenesisVM(t)
+	genesisBytes, issuer, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -551,7 +551,7 @@ func TestIssueTx(t *testing.T) {
 }
 
 func TestGenesisGetUTXOs(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -575,7 +575,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // Test issuing a transaction that consumes a currently pending UTXO. The
 // transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
-	genesisBytes, issuer, vm := GenesisVM(t)
+	genesisBytes, issuer, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -968,7 +968,7 @@ func TestIssueProperty(t *testing.T) {
 }
 
 func TestVMFormat(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm , _ := GenesisVM(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -994,7 +994,7 @@ func TestVMFormat(t *testing.T) {
 }
 
 func TestTxCached(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -1022,7 +1022,7 @@ func TestTxCached(t *testing.T) {
 }
 
 func TestTxNotCached(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()

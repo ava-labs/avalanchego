@@ -6,9 +6,7 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
@@ -109,22 +107,25 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		return err
 	}
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(t.SourceChain)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(t.SourceChain)
-
-	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
+	utxoIDs := make([][]byte, len(t.ImportedIns))
+	for i, in := range t.ImportedIns {
+		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+	}
+	allUTXOBytes, err := vm.ctx.SharedMemory.Get(t.SourceChain, utxoIDs)
+	if err != nil {
+		return err
+	}
 
 	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.ImportedIns {
-		cred := creds[i+offset]
-
-		utxoID := in.UTXOID.InputID()
-		utxo, err := state.UTXO(utxoID)
-		if err != nil {
+		utxo := avax.UTXO{}
+		if err := vm.codec.Unmarshal(allUTXOBytes[i], &utxo); err != nil {
 			return err
 		}
 
-		if err := vm.verifyTransferOfUTXO(tx, in, cred, utxo); err != nil {
+		cred := creds[i+offset]
+
+		if err := vm.verifyTransferOfUTXO(tx, in, cred, &utxo); err != nil {
 			return err
 		}
 	}
@@ -133,23 +134,9 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
 func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
-	smDB := vm.ctx.SharedMemory.GetDatabase(t.SourceChain)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(t.SourceChain)
-
-	vsmDB := versiondb.New(smDB)
-
-	state := avax.NewPrefixedState(vsmDB, vm.codec, vm.ctx.ChainID, t.SourceChain)
-	for _, in := range t.ImportedIns {
-		utxoID := in.UTXOID.InputID()
-		if err := state.SpendUTXO(utxoID); err != nil {
-			return err
-		}
+	utxoIDs := make([][]byte, len(t.ImportedIns))
+	for i, in := range t.ImportedIns {
+		utxoIDs[i] = in.UTXOID.InputID().Bytes()
 	}
-
-	sharedBatch, err := vsmDB.CommitBatch()
-	if err != nil {
-		return err
-	}
-
-	return atomic.WriteAll(batch, sharedBatch)
+	return vm.ctx.SharedMemory.Remove(t.SourceChain, utxoIDs, batch)
 }

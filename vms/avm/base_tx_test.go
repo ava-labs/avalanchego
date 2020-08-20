@@ -688,7 +688,7 @@ func TestBaseTxSyntacticVerifyUninitialized(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerify(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -733,7 +733,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -785,7 +785,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -916,7 +916,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -968,7 +968,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -1015,7 +1015,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -1062,7 +1062,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
-	genesisBytes, issuer, vm := GenesisVM(t)
+	genesisBytes, issuer, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -1155,7 +1155,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
-	genesisBytes, issuer, vm := GenesisVM(t)
+	genesisBytes, issuer, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
@@ -1534,7 +1534,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyMalformedOutput(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -1584,7 +1584,7 @@ func TestBaseTxSemanticVerifyMalformedOutput(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
-	genesisBytes, _, vm := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()

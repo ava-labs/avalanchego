@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/keystore"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/constants"
@@ -23,17 +24,17 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-func setup(t *testing.T) ([]byte, *VM, *Service) {
-	genesisBytes, _, vm := GenesisVM(t)
+func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
+	genesisBytes, _, vm, m := GenesisVM(t)
 	keystore := keystore.CreateTestKeystore()
 	keystore.AddUser(username, password)
 	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
 	s := &Service{vm: vm}
-	return genesisBytes, vm, s
+	return genesisBytes, vm, s, m
 }
 
-func setupWithKeys(t *testing.T) ([]byte, *VM, *Service) {
-	genesisBytes, vm, s := setup(t)
+func setupWithKeys(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
+	genesisBytes, vm, s, m := setup(t)
 
 	// Import the initially funded private keys
 	user := userState{vm: vm}
@@ -52,11 +53,11 @@ func setupWithKeys(t *testing.T) ([]byte, *VM, *Service) {
 	if err := user.SetAddresses(db, addrs); err != nil {
 		t.Fatalf("Failed to set user addresses: %s", err)
 	}
-	return genesisBytes, vm, s
+	return genesisBytes, vm, s, m
 }
 
 func TestServiceIssueTx(t *testing.T) {
-	genesisBytes, vm, s := setup(t)
+	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -81,7 +82,7 @@ func TestServiceIssueTx(t *testing.T) {
 }
 
 func TestServiceGetTxStatus(t *testing.T) {
-	genesisBytes, vm, s := setup(t)
+	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -124,7 +125,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 }
 
 func TestServiceGetBalance(t *testing.T) {
-	genesisBytes, vm, s := setup(t)
+	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -151,7 +152,7 @@ func TestServiceGetBalance(t *testing.T) {
 }
 
 func TestServiceGetAllBalances(t *testing.T) {
-	genesisBytes, vm, s := setup(t)
+	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -184,7 +185,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 }
 
 func TestServiceGetTx(t *testing.T) {
-	genesisBytes, vm, s := setup(t)
+	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -203,7 +204,7 @@ func TestServiceGetTx(t *testing.T) {
 }
 
 func TestServiceGetNilTx(t *testing.T) {
-	_, vm, s := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -215,7 +216,7 @@ func TestServiceGetNilTx(t *testing.T) {
 }
 
 func TestServiceGetUnknownTx(t *testing.T) {
-	_, vm, s := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -227,7 +228,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	_, vm, s := setup(t)
+	_, vm, s, m := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -256,10 +257,11 @@ func TestServiceGetUTXOs(t *testing.T) {
 		}
 	}
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
-	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
-	for i := 0; i < numUTXOs; i++ {
-		if err := state.FundUTXO(&avax.UTXO{
+	sm := m.NewSharedMemory(platformChainID)
+
+	elems := make([]*atomic.Element, numUTXOs)
+	for i := range elems {
+		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
@@ -271,11 +273,24 @@ func TestServiceGetUTXOs(t *testing.T) {
 					Addrs:     []ids.ShortID{rawAddr},
 				},
 			},
-		}); err != nil {
+		}
+
+		utxoBytes, err := vm.codec.Marshal(utxo)
+		if err != nil {
 			t.Fatal(err)
 		}
+		elems[i] = &atomic.Element{
+			Key:   utxo.InputID().Bytes(),
+			Value: utxoBytes,
+			Traits: [][]byte{
+				rawAddr.Bytes(),
+			},
+		}
 	}
-	vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
+
+	if err := sm.Put(vm.ctx.ChainID, elems); err != nil {
+		t.Fatal(err)
+	}
 
 	hrp := constants.GetHRP(vm.ctx.NetworkID)
 	xAddr, err := vm.FormatLocalAddress(rawAddr)
@@ -444,7 +459,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 }
 
 func TestGetAssetDescription(t *testing.T) {
-	genesisBytes, vm, s := setup(t)
+	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -471,7 +486,7 @@ func TestGetAssetDescription(t *testing.T) {
 }
 
 func TestGetBalance(t *testing.T) {
-	genesisBytes, vm, s := setup(t)
+	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -500,7 +515,7 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestCreateFixedCapAsset(t *testing.T) {
-	_, vm, s := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -534,7 +549,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 }
 
 func TestCreateVariableCapAsset(t *testing.T) {
-	_, vm, s := setupWithKeys(t)
+	_, vm, s, _ := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -624,7 +639,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 }
 
 func TestNFTWorkflow(t *testing.T) {
-	_, vm, s := setupWithKeys(t)
+	_, vm, s, _ := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -714,7 +729,7 @@ func TestNFTWorkflow(t *testing.T) {
 }
 
 func TestImportExportKey(t *testing.T) {
-	_, vm, s := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -770,7 +785,7 @@ func TestImportExportKey(t *testing.T) {
 }
 
 func TestImportAVMKeyNoDuplicates(t *testing.T) {
-	_, vm, s := setup(t)
+	_, vm, s, _ := setup(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -833,7 +848,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 }
 
 func TestSend(t *testing.T) {
-	genesisBytes, vm, s := setupWithKeys(t)
+	genesisBytes, vm, s, _ := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -873,7 +888,7 @@ func TestSend(t *testing.T) {
 }
 
 func TestCreateAndListAddresses(t *testing.T) {
-	_, vm, s := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
@@ -910,16 +925,14 @@ func TestCreateAndListAddresses(t *testing.T) {
 }
 
 func TestImportAVAX(t *testing.T) {
-	genesisBytes, vm, s := setupWithKeys(t)
+	genesisBytes, vm, s, m := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
 	}()
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
-
 	addr0 := keys[0].PublicKey().Address()
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformChainID)
 
 	// Must set AVAX assetID to be the correct asset since only AVAX can be imported
 	utxo := &avax.UTXO{
@@ -933,12 +946,21 @@ func TestImportAVAX(t *testing.T) {
 			},
 		},
 	}
-
-	state := avax.NewPrefixedState(smDB, vm.codec, platformChainID, vm.ctx.ChainID)
-	if err := state.FundUTXO(utxo); err != nil {
+	utxoBytes, err := vm.codec.Marshal(utxo)
+	if err != nil {
 		t.Fatal(err)
 	}
-	vm.ctx.SharedMemory.ReleaseDatabase(platformChainID)
+
+	peerSharedMemory := m.NewSharedMemory(platformChainID)
+	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   utxo.InputID().Bytes(),
+		Value: utxoBytes,
+		Traits: [][]byte{
+			addr0.Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
 
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {

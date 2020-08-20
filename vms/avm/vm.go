@@ -358,42 +358,40 @@ func (vm *VM) GetAtomicUTXOs(
 		limit = maxUTXOsToFetch
 	}
 
-	seen := ids.Set{} // IDs of UTXOs already in the list
-	utxos := make([]*avax.UTXO, 0, limit)
-	lastAddr := ids.ShortEmpty
-	lastIndex := ids.Empty
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
-	smDB := vm.ctx.SharedMemory.GetDatabase(chainID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(chainID)
-	state := avax.NewPrefixedState(smDB, vm.codec, vm.ctx.ChainID, chainID)
-	for _, addr := range addrs.List() {
-		if bytes.Compare(addr.Bytes(), startAddr.Bytes()) < 0 { // Skip addresses before start
-			continue
-		}
-		utxoIDs, err := state.Funds(addr.Bytes(), startUTXOID, limit)
-		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
-		}
-		for _, utxoID := range utxoIDs {
-			if seen.Contains(utxoID) { // Already have this UTXO in the list
-				continue
-			}
-			utxo, err := state.UTXO(utxoID)
-			if err != nil {
-				return nil, ids.ShortEmpty, ids.Empty, err
-			}
-			utxos = append(utxos, utxo)
-			seen.Add(utxoID)
-			lastAddr = addr
-			lastIndex = utxoID
-			limit--
-			if limit <= 0 { // We fetched enough UTXOs; stop.
-				break
-			}
-		}
+	addrsList := make([][]byte, addrs.Len())
+	for i, addr := range addrs.List() {
+		addrsList[i] = addr.Bytes()
 	}
-	return utxos, lastAddr, lastIndex, nil
+
+	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
+		chainID,
+		addrsList,
+		startAddr.Bytes(),
+		startUTXOID.Bytes(),
+		limit,
+	)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
+	}
+
+	lastAddrID, err := ids.ToShortID(lastAddr)
+	if err != nil {
+		lastAddrID = ids.ShortEmpty
+	}
+	lastUTXOID, err := ids.ToID(lastUTXO)
+	if err != nil {
+		lastAddrID = ids.ShortEmpty
+	}
+
+	utxos := make([]*avax.UTXO, len(allUTXOBytes))
+	for i, utxoBytes := range allUTXOBytes {
+		utxo := &avax.UTXO{}
+		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
+		}
+		utxos[i] = utxo
+	}
+	return utxos, lastAddrID, lastUTXOID, nil
 }
 
 // GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.

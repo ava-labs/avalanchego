@@ -17,7 +17,7 @@ import (
 
 // Test function IDs when argument start is empty
 func TestStateIDsNoStart(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -149,7 +149,7 @@ func TestStateIDsNoStart(t *testing.T) {
 }
 
 func TestStateIDsWithStart(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -195,7 +195,7 @@ func TestStateIDsWithStart(t *testing.T) {
 }
 
 func TestStateStatuses(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -242,7 +242,7 @@ func TestStateStatuses(t *testing.T) {
 }
 
 func TestStateUTXOs(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -318,7 +318,7 @@ func TestStateUTXOs(t *testing.T) {
 }
 
 func TestStateTXs(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm , _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
