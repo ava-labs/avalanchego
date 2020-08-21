@@ -24,9 +24,10 @@ type Log struct {
 	wg                               sync.WaitGroup
 	flushLock, writeLock, configLock sync.Mutex
 	needsFlush                       *sync.Cond
-	w                                *bufio.Writer
 
 	closed bool
+
+	writer RotatingWriter
 }
 
 // New ...
@@ -34,7 +35,10 @@ func New(config Config) (*Log, error) {
 	if err := os.MkdirAll(config.Directory, os.ModePerm); err != nil {
 		return nil, err
 	}
-	l := &Log{config: config}
+	l := &Log{
+		config: config,
+		writer: &fileWriter{},
+	}
 	l.needsFlush = sync.NewCond(&l.flushLock)
 
 	l.wg.Add(1)
@@ -50,13 +54,9 @@ func (l *Log) run() {
 	l.writeLock.Lock()
 	defer l.writeLock.Unlock()
 
-	fileIndex := 0
-	filename := path.Join(l.config.Directory, fmt.Sprintf("%d.log", fileIndex))
-	f, err := os.Create(filename)
-	if err != nil {
+	if err := l.writer.Initialize(l.config); err != nil {
 		panic(err)
 	}
-	l.w = bufio.NewWriter(f)
 
 	closed := false
 	nextRotation := time.Now().Add(l.config.RotationInterval)
@@ -75,38 +75,39 @@ func (l *Log) run() {
 		l.writeLock.Lock()
 
 		for _, msg := range prevMessages {
-			n, _ := l.w.WriteString(msg)
+			n, _ := l.writer.WriteString(msg)
 			currentSize += n
 		}
 
 		if !l.config.DisableFlushOnWrite {
-			l.w.Flush()
+			// attempt to flush after the write
+			_ = l.writer.Flush()
 		}
 
 		if now := time.Now(); nextRotation.Before(now) || currentSize > l.config.FileSize {
 			nextRotation = now.Add(l.config.RotationInterval)
 			currentSize = 0
-			l.w.Flush()
-			f.Close()
+			// attempt to flush before closing
+			_ = l.writer.Flush()
+			// attempt to close the file
+			_ = l.writer.Close()
 
-			fileIndex = (fileIndex + 1) % l.config.RotationSize
-			filename := path.Join(l.config.Directory, fmt.Sprintf("%d.log", fileIndex))
-			f, err = os.Create(filename)
-			if err != nil {
+			if err := l.writer.Rotate(); err != nil {
 				panic(err)
 			}
-			l.w = bufio.NewWriter(f)
 		}
 	}
-	l.w.Flush()
-	f.Close()
+	// attempt to flush when exiting
+	_ = l.writer.Flush()
+	// attempt to close the file when exiting
+	_ = l.writer.Close()
 }
 
 func (l *Log) Write(p []byte) (int, error) {
 	l.writeLock.Lock()
 	defer l.writeLock.Unlock()
 
-	return l.w.Write(p)
+	return l.writer.Write(p)
 }
 
 // Stop ...
@@ -148,6 +149,8 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 	if shouldDisplay {
 		if l.config.DisableContextualDisplaying {
 			fmt.Println(fmt.Sprintf(format, args...))
+		} else if l.config.DisplayHighlight == Plain {
+			fmt.Print(output)
 		} else {
 			fmt.Print(level.Color().Wrap(output))
 		}
@@ -253,6 +256,17 @@ func (l *Log) StopOnPanic() {
 // RecoverAndPanic ...
 func (l *Log) RecoverAndPanic(f func()) { defer l.StopOnPanic(); f() }
 
+func (l *Log) stopAndExit(exit func()) {
+	if r := recover(); r != nil {
+		l.Fatal("Panicing due to:\n%s\nFrom:\n%s", r, Stacktrace{})
+		l.Stop()
+		exit()
+	}
+}
+
+// RecoverAndExit ...
+func (l *Log) RecoverAndExit(f, exit func()) { defer l.stopAndExit(exit); f() }
+
 // SetLogLevel ...
 func (l *Log) SetLogLevel(lvl Level) {
 	l.configLock.Lock()
@@ -299,4 +313,60 @@ func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
 	defer l.configLock.Unlock()
 
 	l.config.DisableContextualDisplaying = !enabled
+}
+
+type fileWriter struct {
+	writer *bufio.Writer
+	file   *os.File
+
+	config    Config
+	fileIndex int
+}
+
+func (fw *fileWriter) Flush() error {
+	return fw.writer.Flush()
+}
+
+func (fw *fileWriter) Write(b []byte) (int, error) {
+	return fw.writer.Write(b)
+}
+
+func (fw *fileWriter) WriteString(s string) (int, error) {
+	return fw.writer.WriteString(s)
+}
+
+func (fw *fileWriter) Close() error {
+	return fw.file.Close()
+}
+
+func (fw *fileWriter) Rotate() error {
+	fw.fileIndex = (fw.fileIndex + 1) % fw.config.RotationSize
+	writer, file, err := fw.create(fw.fileIndex)
+	if err != nil {
+		return err
+	}
+	fw.file = file
+	fw.writer = writer
+	return nil
+}
+
+func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
+	filename := path.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
+	file, err := os.Create(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	writer := bufio.NewWriter(file)
+	return writer, file, nil
+}
+
+func (fw *fileWriter) Initialize(config Config) error {
+	fw.config = config
+	writer, file, err := fw.create(fw.fileIndex)
+	if err != nil {
+		return err
+	}
+	fw.writer = writer
+	fw.file = file
+	return nil
 }

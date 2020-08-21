@@ -6,6 +6,6 @@
   gather_facts: false
   hosts: all
   roles:
-    - name: ava-stop
-    - name: ava-build
-    - name: ava-start
+    - name: avalanche_stop
+    - name: avalanche_build
+    - name: avalanche_start

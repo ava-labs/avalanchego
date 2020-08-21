@@ -16,24 +16,20 @@ func TestValidatorBoundedBy(t *testing.T) {
 	// case 1: a starts, a finishes, b starts, b finishes
 	aStartTime := uint64(0)
 	aEndTIme := uint64(1)
-	a := &DurationValidator{
-		Validator: Validator{
-			NodeID: defaultKey.PublicKey().Address(),
-			Wght:   defaultWeight,
-		},
-		Start: aStartTime,
-		End:   aEndTIme,
+	a := &Validator{
+		NodeID: keys[0].PublicKey().Address(),
+		Start:  aStartTime,
+		End:    aEndTIme,
+		Wght:   defaultWeight,
 	}
 
 	bStartTime := uint64(2)
 	bEndTime := uint64(3)
-	b := &DurationValidator{
-		Validator: Validator{
-			NodeID: defaultKey.PublicKey().Address(),
-			Wght:   defaultWeight,
-		},
-		Start: bStartTime,
-		End:   bEndTime,
+	b := &Validator{
+		NodeID: keys[0].PublicKey().Address(),
+		Start:  bStartTime,
+		End:    bEndTime,
+		Wght:   defaultWeight,
 	}
 
 	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {

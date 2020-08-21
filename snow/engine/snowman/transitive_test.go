@@ -15,14 +15,18 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/snow/validators"
 )
 
 var (
+	errUnknownBlock = errors.New("unknown block")
 	errUnknownBytes = errors.New("unknown bytes")
+
+	Genesis = ids.GenerateTestID()
 )
 
-func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTest, *VMTest, *Transitive, snowman.Block) {
+func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	config := DefaultConfig()
 
 	vdr := validators.GenerateRandomValidator(1)
@@ -38,17 +42,17 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &block.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
 
-	gBlk := &Blk{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     Genesis,
+		StatusV: choices.Accepted,
+	}}
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
@@ -65,6 +69,7 @@ func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTe
 	}
 
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -87,18 +92,22 @@ func TestEngineShutdown(t *testing.T) {
 func TestEngineAdd(t *testing.T) {
 	vdr, _, sender, vm, te, _ := setup(t)
 
-	if !te.Context().ChainID.Equals(ids.Empty) {
+	if !te.Ctx.ChainID.Equals(ids.Empty) {
 		t.Fatalf("Wrong chain ID")
 	}
 
-	blk := &Blk{
-		parent: &Blk{
-			id:     GenerateID(),
-			status: choices.Unknown,
+	parent := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Unknown,
+	}}
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+		ParentV: parent,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	asked := new(bool)
@@ -136,7 +145,7 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatalf("Should have been blocking on request")
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errParseBlock }
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errUnknownBytes }
 
 	te.Put(vdr.ID(), *reqID, blk.Parent().ID(), nil)
 
@@ -150,11 +159,14 @@ func TestEngineAdd(t *testing.T) {
 func TestEngineQuery(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setup(t)
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	blocked := new(bool)
@@ -166,7 +178,7 @@ func TestEngineQuery(t *testing.T) {
 		if !blkID.Equals(blk.ID()) {
 			t.Fatalf("Wrong block requested")
 		}
-		return &Blk{id: blkID, status: choices.Unknown}, errUnknownBlock
+		return nil, errUnknownBlock
 	}
 
 	asked := new(bool)
@@ -244,12 +256,14 @@ func TestEngineQuery(t *testing.T) {
 		t.Fatalf("Didn't provide preferences")
 	}
 
-	blk1 := &Blk{
-		parent: blk,
-		id:     GenerateID(),
-		height: 1,
-		status: choices.Processing,
-		bytes:  []byte{5, 4, 3, 2, 1, 9},
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk,
+		HeightV: 2,
+		BytesV:  []byte{5, 4, 3, 2, 1, 9},
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -257,7 +271,7 @@ func TestEngineQuery(t *testing.T) {
 		case blkID.Equals(blk.ID()):
 			return blk, nil
 		case blkID.Equals(blk1.ID()):
-			return &Blk{id: blkID, status: choices.Unknown}, errUnknownBlock
+			return nil, errUnknownBlock
 		}
 		t.Fatalf("Wrong block requested")
 		panic("Should have failed")
@@ -363,17 +377,17 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &block.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
 
-	gBlk := &Blk{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
@@ -389,16 +403,20 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
-	blk0 := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	queried := new(bool)
@@ -419,13 +437,16 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	te.insert(blk0)
+	te.issue(blk0)
 
-	blk1 := &Blk{
-		parent: blk0,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk0,
+		HeightV: 2,
+		BytesV:  []byte{2},
 	}
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
@@ -435,7 +456,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		case id.Equals(blk0.ID()):
 			return blk0, nil
 		case id.Equals(blk1.ID()):
-			return &Blk{id: blk0.ID(), status: choices.Unknown}, errUnknownBlock
+			return nil, errUnknownBlock
 		}
 		t.Fatalf("Unknown block")
 		panic("Should have errored")
@@ -513,24 +534,29 @@ func TestEngineBlockedIssue(t *testing.T) {
 
 	sender.Default(false)
 
-	blk0 := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Unknown,
-		bytes:  []byte{1},
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk0,
+		HeightV: 2,
+		BytesV:  []byte{2},
 	}
 
-	blk1 := &Blk{
-		parent: blk0,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
-	}
+	te.issue(blk1)
 
-	te.insert(blk1)
-
-	blk0.status = choices.Processing
-	te.insert(blk0)
+	blk0.StatusV = choices.Processing
+	te.issue(blk0)
 
 	if !blk1.ID().Equals(te.Consensus.Preference()) {
 		t.Fatalf("Should have issued blk1")
@@ -542,14 +568,17 @@ func TestEngineAbandonResponse(t *testing.T) {
 
 	sender.Default(false)
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Unknown,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 	te.QueryFailed(vdr.ID(), 1)
 
 	if len(te.blocked) != 0 {
@@ -596,11 +625,14 @@ func TestEnginePushQuery(t *testing.T) {
 
 	sender.Default(true)
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -670,11 +702,14 @@ func TestEngineBuildBlock(t *testing.T) {
 
 	sender.Default(true)
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	queried := new(bool)
@@ -752,17 +787,17 @@ func TestVoteCanceling(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &block.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
 
-	gBlk := &Blk{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
@@ -779,15 +814,19 @@ func TestVoteCanceling(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	queried := new(bool)
@@ -808,7 +847,7 @@ func TestVoteCanceling(t *testing.T) {
 		}
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 
 	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
@@ -841,12 +880,12 @@ func TestEngineNoQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	gBlk := &Blk{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	vm := &VMTest{}
+	vm := &block.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 
@@ -854,15 +893,19 @@ func TestEngineNoQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
@@ -875,12 +918,12 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	gBlk := &Blk{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	vm := &VMTest{}
+	vm := &block.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 
@@ -888,6 +931,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	te.repoll()
 }
@@ -897,12 +941,12 @@ func TestEngineAbandonQuery(t *testing.T) {
 
 	sender.Default(true)
 
-	blkID := GenerateID()
+	blkID := ids.GenerateTestID()
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch {
 		case id.Equals(blkID):
-			return &Blk{status: choices.Unknown}, errUnknownBlock
+			return nil, errUnknownBlock
 		default:
 			t.Fatalf("Loaded unknown block")
 			panic("Should have failed")
@@ -932,22 +976,25 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	sender.Default(true)
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	sender.CantPushQuery = false
 
-	te.insert(blk)
+	te.issue(blk)
 
-	fakeBlkID := GenerateID()
+	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch {
 		case id.Equals(fakeBlkID):
-			return &Blk{status: choices.Unknown}, errUnknownBlock
+			return nil, errUnknownBlock
 		default:
 			t.Fatalf("Loaded unknown block")
 			panic("Should have failed")
@@ -979,26 +1026,35 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	sender.Default(true)
 
-	missingBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Unknown,
-		bytes:  []byte{1},
+	missingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
-	parentBlk := &Blk{
-		parent: missingBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	parentBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: missingBlk,
+		HeightV: 2,
+		BytesV:  []byte{2},
 	}
-	blockingBlk := &Blk{
-		parent: parentBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blockingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: parentBlk,
+		HeightV: 3,
+		BytesV:  []byte{3},
 	}
 
-	te.insert(parentBlk)
+	te.issue(parentBlk)
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
@@ -1028,8 +1084,8 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	missingBlk.status = choices.Processing
-	te.insert(missingBlk)
+	missingBlk.StatusV = choices.Processing
+	te.issue(missingBlk)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1041,27 +1097,35 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	sender.Default(true)
 
-	issuedBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	issuedBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	missingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{2},
+	}
+	blockingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: missingBlk,
+		HeightV: 2,
+		BytesV:  []byte{3},
 	}
 
-	missingBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Unknown,
-		bytes:  []byte{1},
-	}
-	blockingBlk := &Blk{
-		parent: missingBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
-	}
-
-	te.insert(blockingBlk)
+	te.issue(blockingBlk)
 
 	queryRequestID := new(uint32)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
@@ -1076,7 +1140,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	te.insert(issuedBlk)
+	te.issue(issuedBlk)
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
@@ -1098,8 +1162,8 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.PushQueryF = nil
 	sender.CantPushQuery = false
 
-	missingBlk.status = choices.Processing
-	te.insert(missingBlk)
+	missingBlk.StatusV = choices.Processing
+	te.issue(missingBlk)
 }
 
 func TestEngineRetryFetch(t *testing.T) {
@@ -1107,12 +1171,14 @@ func TestEngineRetryFetch(t *testing.T) {
 
 	sender.Default(true)
 
-	missingBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		height: 1,
-		status: choices.Unknown,
-		bytes:  []byte{1},
+	missingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	vm.CantGetBlock = false
@@ -1151,21 +1217,24 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	sender.Default(true)
 
-	validBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		height: 1,
-		status: choices.Processing,
-		bytes:  []byte{1},
+	validBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
-
-	invalidBlk := &Blk{
-		parent:   validBlk,
-		id:       GenerateID(),
-		height:   2,
-		status:   choices.Processing,
-		validity: errors.New("invalid due to an undeclared dependency"),
-		bytes:    []byte{2},
+	invalidBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: validBlk,
+		HeightV: 2,
+		VerifyV: errors.New(""),
+		BytesV:  []byte{2},
 	}
 
 	validBlkID := validBlk.ID()
@@ -1176,11 +1245,11 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		*reqID = requestID
 	}
 
-	te.insert(validBlk)
+	te.issue(validBlk)
 
 	sender.PushQueryF = nil
 
-	te.insert(invalidBlk)
+	te.issue(invalidBlk)
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
@@ -1244,20 +1313,23 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	sender.Default(true)
 
-	missingBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		height: 1,
-		status: choices.Unknown,
-		bytes:  []byte{1},
+	missingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
-
-	pendingBlk := &Blk{
-		parent: missingBlk,
-		id:     GenerateID(),
-		height: 2,
-		status: choices.Processing,
-		bytes:  []byte{2},
+	pendingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: missingBlk,
+		HeightV: 2,
+		BytesV:  []byte{2},
 	}
 
 	parsed := new(bool)
@@ -1320,7 +1392,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	missingBlk.status = choices.Processing
+	missingBlk.StatusV = choices.Processing
 
 	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
 
@@ -1335,23 +1407,26 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	sender.Default(true)
 
-	missingBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		height: 1,
-		status: choices.Unknown,
-		bytes:  []byte{1},
+	missingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	pendingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: missingBlk,
+		HeightV: 2,
+		BytesV:  []byte{2},
 	}
 
-	pendingBlk := &Blk{
-		parent: missingBlk,
-		id:     GenerateID(),
-		height: 2,
-		status: choices.Processing,
-		bytes:  []byte{2},
-	}
-
-	randomBlkID := GenerateID()
+	randomBlkID := ids.GenerateTestID()
 
 	parsed := new(bool)
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -1442,17 +1517,17 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &block.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
 
-	gBlk := &Blk{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
@@ -1469,6 +1544,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	vm.GetBlockF = nil
 	vm.LastAcceptedF = nil
@@ -1476,12 +1552,14 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	sender.Default(true)
 
-	pendingBlk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		height: 2,
-		status: choices.Processing,
-		bytes:  []byte{1},
+	pendingBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	parsed := new(bool)
@@ -1549,17 +1627,17 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &VMTest{}
+	vm := &block.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 	vm.CantSetPreference = false
 
-	gBlk := &Blk{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
 	sender.CantGetAcceptedFrontier = false
@@ -1576,15 +1654,19 @@ func TestEngineDoubleChit(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	vm.LastAcceptedF = nil
 	sender.CantGetAcceptedFrontier = true
 
-	blk := &Blk{
-		parent: gBlk,
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
 	queried := new(bool)
@@ -1605,7 +1687,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		}
 	}
 
-	te.insert(blk)
+	te.issue(blk)
 
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch {

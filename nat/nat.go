@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	mapTimeout       = 30 * time.Second
+	mapTimeout       = 30 * time.Minute
 	mapUpdateTimeout = mapTimeout / 2
 	maxRetries       = 20
 )
@@ -84,9 +84,9 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 
 	for i := 0; i <= maxRetries; i++ {
 		extPort := intPort + uint16(i)
-		if intaddr, intPort, desc, err := dev.r.GetPortMappingEntry(extPort, protocol); err == nil {
+		if addr, port, desc, err := dev.r.GetPortMappingEntry(extPort, protocol); err == nil {
 			dev.log.Debug("Port %d is taken by %s:%d: %s, retry with the next port",
-				extPort, intaddr, intPort, desc)
+				extPort, addr, port, desc)
 		} else if err := dev.r.MapPort(protocol, intPort, extPort, desc, mapTimeout); err != nil {
 			dev.log.Debug("Map port failed. Protocol %s Internal %d External %d. %s",
 				protocol, intPort, extPort, err)
@@ -102,7 +102,9 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 				updateTimer.Stop()
 
 				dev.log.Debug("Unmap protocol %s external port %d", protocol, extPort)
-				dev.r.UnmapPort(protocol, intPort, extPort)
+				if err := dev.r.UnmapPort(protocol, intPort, extPort); err != nil {
+					dev.log.Debug("Error unmapping port %d to %d: %s", intPort, extPort, err)
+				}
 
 				dev.wg.Done()
 			}(extPort)

@@ -20,8 +20,8 @@ type MintOperation struct {
 }
 
 // Outs ...
-func (op *MintOperation) Outs() []verify.Verifiable {
-	outs := []verify.Verifiable{}
+func (op *MintOperation) Outs() []verify.State {
+	outs := []verify.State{}
 	for _, out := range op.Outputs {
 		outs = append(outs, &TransferOutput{
 			GroupID:      op.GroupID,

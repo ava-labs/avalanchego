@@ -71,7 +71,7 @@ func (ipDesc IPDesc) IsPrivate() bool {
 			return true
 		}
 	}
-	return true
+	return false
 }
 
 // IsZero returns if the IP or port is zeroed out

@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"testing"
 
 	"github.com/gorilla/rpc/v2"
 
 	zxcvbn "github.com/nbutton23/zxcvbn-go"
 
+	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/encdb"
@@ -57,7 +57,7 @@ const (
 var (
 	errEmptyUsername     = errors.New("username can't be the empty string")
 	errUserPassMaxLength = fmt.Errorf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen)
-	errWeakPassword      = errors.New("Failed to create user as the given password is too weak. A stronger password is one of 8 or more characters containing attributes of upper and lowercase letters, numbers, and/or special characters")
+	errWeakPassword      = errors.New("Failed to create user as the given password is too weak")
 )
 
 // KeyValuePair ...
@@ -91,7 +91,7 @@ type Keystore struct {
 	//    UserDB        BlockchainDB
 	//                 /      |     \
 	//               Usr     Usr    Usr
-	//            /   |   \
+	//             /  |  \
 	//          BID  BID  BID
 }
 
@@ -105,13 +105,15 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
-func (ks *Keystore) CreateHandler() *common.HTTPHandler {
+func (ks *Keystore) CreateHandler() (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(ks, "keystore")
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}
+	if err := newServer.RegisterService(ks, "keystore"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}, nil
 }
 
 // Get the user whose name is [username]
@@ -131,19 +133,8 @@ func (ks *Keystore) getUser(username string) (*User, error) {
 	return usr, ks.codec.Unmarshal(usrBytes, usr)
 }
 
-// CreateUserArgs are arguments for passing into CreateUser requests
-type CreateUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// CreateUserReply is the response from calling CreateUser
-type CreateUserReply struct {
-	Success bool `json:"success"`
-}
-
 // CreateUser creates an empty user with the provided username and password
-func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *CreateUserReply) error {
+func (ks *Keystore) CreateUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -156,16 +147,13 @@ func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *Cre
 	return nil
 }
 
-// ListUsersArgs are the arguments to ListUsers
-type ListUsersArgs struct{}
-
 // ListUsersReply is the reply from ListUsers
 type ListUsersReply struct {
 	Users []string `json:"users"`
 }
 
 // ListUsers lists all the registered usernames
-func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListUsersReply) error {
+func (ks *Keystore) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersReply) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -181,19 +169,13 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListU
 	return it.Error()
 }
 
-// ExportUserArgs are the arguments to ExportUser
-type ExportUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
 // ExportUserReply is the reply from ExportUser
 type ExportUserReply struct {
 	User formatting.CB58 `json:"user"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
-func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *ExportUserReply) error {
+func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *ExportUserReply) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -235,18 +217,13 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
-	Username string          `json:"username"`
-	Password string          `json:"password"`
-	User     formatting.CB58 `json:"user"`
+	api.UserPass
+	User formatting.CB58 `json:"user"`
 }
 
-// ImportUserReply is the response for ImportUser
-type ImportUserReply struct {
-	Success bool `json:"success"`
-}
-
-// ImportUser imports a serialized encoding of a user's information complete with encrypted database values, integrity checks the password, and adds it to the database
-func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *ImportUserReply) error {
+// ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
+// integrity checks the password, and adds it to the database
+func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -281,7 +258,9 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	userDataDB := prefixdb.New([]byte(args.Username), ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
-		dataBatch.Put(kvp.Key, kvp.Value)
+		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
+			return fmt.Errorf("error on database put: %w", err)
+		}
 	}
 
 	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
@@ -294,19 +273,8 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	return nil
 }
 
-// DeleteUserArgs are arguments for passing into DeleteUser requests
-type DeleteUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// DeleteUserReply is the response from calling DeleteUser
-type DeleteUserReply struct {
-	Success bool `json:"success"`
-}
-
 // DeleteUser deletes user with the provided username and password.
-func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *DeleteUserReply) error {
+func (ks *Keystore) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
@@ -371,6 +339,8 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
+	ks.log.Info("Keystore: GetDatabase called with %s from %s", username, bID)
+
 	usr, err := ks.getUser(username)
 	if err != nil {
 		return nil, err
@@ -432,7 +402,7 @@ func (ks *Keystore) AddUser(username, password string) error {
 }
 
 // CreateTestKeystore returns a new keystore that can be utilized for testing
-func CreateTestKeystore(t *testing.T) *Keystore {
+func CreateTestKeystore() *Keystore {
 	ks := &Keystore{}
 	ks.Initialize(logging.NoLog{}, memdb.New())
 	return ks

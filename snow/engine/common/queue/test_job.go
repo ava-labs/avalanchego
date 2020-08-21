@@ -20,7 +20,7 @@ type TestJob struct {
 	CantBytes bool
 
 	IDF                  func() ids.ID
-	MissingDependenciesF func() ids.Set
+	MissingDependenciesF func() (ids.Set, error)
 	ExecuteF             func() error
 	BytesF               func() []byte
 }
@@ -45,14 +45,14 @@ func (j *TestJob) ID() ids.ID {
 }
 
 // MissingDependencies ...
-func (j *TestJob) MissingDependencies() ids.Set {
+func (j *TestJob) MissingDependencies() (ids.Set, error) {
 	if j.MissingDependenciesF != nil {
 		return j.MissingDependenciesF()
 	}
 	if j.CantMissingDependencies && j.T != nil {
 		j.T.Fatalf("Unexpectedly called MissingDependencies")
 	}
-	return ids.Set{}
+	return ids.Set{}, nil
 }
 
 // Execute ...

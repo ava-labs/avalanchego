@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"
 )
 
@@ -20,10 +21,10 @@ var (
 )
 
 func TestServiceListNoUsers(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	reply := ListUsersReply{}
-	if err := ks.ListUsers(nil, &ListUsersArgs{}, &reply); err != nil {
+	if err := ks.ListUsers(nil, nil, &reply); err != nil {
 		t.Fatal(err)
 	}
 	if len(reply.Users) != 0 {
@@ -32,11 +33,11 @@ func TestServiceListNoUsers(t *testing.T) {
 }
 
 func TestServiceCreateUser(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
-		reply := CreateUserReply{}
-		if err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		if err := ks.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
 		}, &reply); err != nil {
@@ -49,7 +50,7 @@ func TestServiceCreateUser(t *testing.T) {
 
 	{
 		reply := ListUsersReply{}
-		if err := ks.ListUsers(nil, &ListUsersArgs{}, &reply); err != nil {
+		if err := ks.ListUsers(nil, nil, &reply); err != nil {
 			t.Fatal(err)
 		}
 		if len(reply.Users) != 1 {
@@ -68,14 +69,14 @@ func genStr(n int) string {
 	return fmt.Sprintf("%x", b)[:n]
 }
 
-// TestServiceCreateUserArgsChecks generates excessively long usernames or
+// TestServiceCreateUserArgsCheck generates excessively long usernames or
 // passwords to assure the santity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
-		reply := CreateUserReply{}
-		err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		err := ks.CreateUser(nil, &api.UserPass{
 			Username: genStr(maxUserPassLen + 1),
 			Password: strongPassword,
 		}, &reply)
@@ -86,8 +87,8 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 	}
 
 	{
-		reply := CreateUserReply{}
-		err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		err := ks.CreateUser(nil, &api.UserPass{
 			Username: "shortuser",
 			Password: genStr(maxUserPassLen + 1),
 		}, &reply)
@@ -99,7 +100,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 
 	{
 		reply := ListUsersReply{}
-		if err := ks.ListUsers(nil, &ListUsersArgs{}, &reply); err != nil {
+		if err := ks.ListUsers(nil, nil, &reply); err != nil {
 			t.Fatal(err)
 		}
 
@@ -112,11 +113,11 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
-		reply := CreateUserReply{}
-		err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		err := ks.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: "weak",
 		}, &reply)
@@ -132,11 +133,11 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
-		reply := CreateUserReply{}
-		if err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		if err := ks.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
 		}, &reply); err != nil {
@@ -148,8 +149,8 @@ func TestServiceCreateDuplicate(t *testing.T) {
 	}
 
 	{
-		reply := CreateUserReply{}
-		if err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		if err := ks.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
 		}, &reply); err == nil {
@@ -159,10 +160,10 @@ func TestServiceCreateDuplicate(t *testing.T) {
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
-	reply := CreateUserReply{}
-	if err := ks.CreateUser(nil, &CreateUserArgs{
+	reply := api.SuccessResponse{}
+	if err := ks.CreateUser(nil, &api.UserPass{
 		Password: strongPassword,
 	}, &reply); err == nil {
 		t.Fatalf("Shouldn't have allowed empty username")
@@ -170,11 +171,11 @@ func TestServiceCreateUserNoName(t *testing.T) {
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
-		reply := CreateUserReply{}
-		if err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		if err := ks.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
 		}, &reply); err != nil {
@@ -209,11 +210,11 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 }
 
 func TestServiceExportImport(t *testing.T) {
-	ks := CreateTestKeystore(t)
+	ks := CreateTestKeystore()
 
 	{
-		reply := CreateUserReply{}
-		if err := ks.CreateUser(nil, &CreateUserArgs{
+		reply := api.SuccessResponse{}
+		if err := ks.CreateUser(nil, &api.UserPass{
 			Username: "bob",
 			Password: strongPassword,
 		}, &reply); err != nil {
@@ -235,43 +236,49 @@ func TestServiceExportImport(t *testing.T) {
 	}
 
 	exportReply := ExportUserReply{}
-	if err := ks.ExportUser(nil, &ExportUserArgs{
+	if err := ks.ExportUser(nil, &api.UserPass{
 		Username: "bob",
 		Password: strongPassword,
 	}, &exportReply); err != nil {
 		t.Fatal(err)
 	}
 
-	newKS := CreateTestKeystore(t)
+	newKS := CreateTestKeystore()
 
 	{
-		reply := ImportUserReply{}
+		reply := api.SuccessResponse{}
 		if err := newKS.ImportUser(nil, &ImportUserArgs{
-			Username: "bob",
-			Password: "",
-			User:     exportReply.User,
+			UserPass: api.UserPass{
+				Username: "bob",
+				Password: "",
+			},
+			User: exportReply.User,
 		}, &reply); err == nil {
 			t.Fatal("Should have errored due to incorrect password")
 		}
 	}
 
 	{
-		reply := ImportUserReply{}
+		reply := api.SuccessResponse{}
 		if err := newKS.ImportUser(nil, &ImportUserArgs{
-			Username: "",
-			Password: "strongPassword",
-			User:     exportReply.User,
+			UserPass: api.UserPass{
+				Username: "",
+				Password: "strongPassword",
+			},
+			User: exportReply.User,
 		}, &reply); err == nil {
 			t.Fatal("Should have errored due to empty username")
 		}
 	}
 
 	{
-		reply := ImportUserReply{}
+		reply := api.SuccessResponse{}
 		if err := newKS.ImportUser(nil, &ImportUserArgs{
-			Username: "bob",
-			Password: strongPassword,
-			User:     exportReply.User,
+			UserPass: api.UserPass{
+				Username: "bob",
+				Password: strongPassword,
+			},
+			User: exportReply.User,
 		}, &reply); err != nil {
 			t.Fatal(err)
 		}
@@ -299,34 +306,34 @@ func TestServiceDeleteUser(t *testing.T) {
 	tests := []struct {
 		desc      string
 		setup     func(ks *Keystore) error
-		request   *DeleteUserArgs
-		want      *DeleteUserReply
+		request   *api.UserPass
+		want      *api.SuccessResponse
 		wantError bool
 	}{{
 		desc:      "empty user name case",
-		request:   &DeleteUserArgs{},
+		request:   &api.UserPass{},
 		wantError: true,
 	}, {
 		desc:      "user not exists case",
-		request:   &DeleteUserArgs{Username: "dummy"},
+		request:   &api.UserPass{Username: "dummy"},
 		wantError: true,
 	}, {
 		desc:      "user exists and invalid password case",
-		request:   &DeleteUserArgs{Username: testUser, Password: "password"},
+		request:   &api.UserPass{Username: testUser, Password: "password"},
 		wantError: true,
 	}, {
 		desc: "user exists and valid password case",
 		setup: func(ks *Keystore) error {
-			return ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &CreateUserReply{})
+			return ks.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.SuccessResponse{})
 		},
-		request: &DeleteUserArgs{Username: testUser, Password: password},
-		want:    &DeleteUserReply{Success: true},
+		request: &api.UserPass{Username: testUser, Password: password},
+		want:    &api.SuccessResponse{Success: true},
 	}, {
 		desc: "delete a user, imported from import api case",
 		setup: func(ks *Keystore) error {
 
-			reply := CreateUserReply{}
-			if err := ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &reply); err != nil {
+			reply := api.SuccessResponse{}
+			if err := ks.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &reply); err != nil {
 				return err
 			}
 
@@ -341,20 +348,20 @@ func TestServiceDeleteUser(t *testing.T) {
 
 			return nil
 		},
-		request: &DeleteUserArgs{Username: testUser, Password: password},
-		want:    &DeleteUserReply{Success: true},
+		request: &api.UserPass{Username: testUser, Password: password},
+		want:    &api.SuccessResponse{Success: true},
 	}}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ks := CreateTestKeystore(t)
+			ks := CreateTestKeystore()
 
 			if tt.setup != nil {
 				if err := tt.setup(ks); err != nil {
 					t.Fatalf("failed to create user setup in keystore: %v", err)
 				}
 			}
-			got := &DeleteUserReply{}
+			got := &api.SuccessResponse{}
 			err := ks.DeleteUser(nil, tt.request, got)
 			if (err != nil) != tt.wantError {
 				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
@@ -370,7 +377,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 
 				// deleted user details should be available to create user again.
-				if err = ks.CreateUser(nil, &CreateUserArgs{Username: testUser, Password: password}, &CreateUserReply{}); err != nil {
+				if err = ks.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.SuccessResponse{}); err != nil {
 					t.Fatalf("failed to create user: %v", err)
 				}
 			}

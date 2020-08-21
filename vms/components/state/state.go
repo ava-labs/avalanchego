@@ -41,7 +41,7 @@ type State interface {
 	// [value] will be converted to bytes by calling Bytes() on it.
 	// [typeID] must have already been registered using RegisterType.
 	// If [value] is nil, the value associated with [key] and [typeID] is deleted (if it exists).
-	Put(db database.Database, typeID uint64, key ids.ID, value Marshaller) error
+	Put(db database.Database, typeID uint64, key ids.ID, value interface{}) error
 
 	// From [db], get the value of type [typeID] whose key is [key]
 	// Returns database.ErrNotFound if the entry doesn't exist
@@ -73,7 +73,9 @@ type State interface {
 	// they will be unmarshaled from bytes using [unmarshal].
 	// Returns an error if there is already a type with ID [typeID]
 	RegisterType(typeID uint64,
-		unmarshal func([]byte) (interface{}, error)) error
+		marshal func(interface{}) ([]byte, error),
+		unmarshal func([]byte) (interface{}, error),
+	) error
 }
 
 type state struct {
@@ -83,35 +85,48 @@ type state struct {
 	unmarshallers map[uint64]func([]byte) (interface{}, error)
 
 	// Keys:   Type ID
+	// Values: Function that marshals values
+	//         that were Put with that type ID
+	marshallers map[uint64]func(interface{}) ([]byte, error)
+
+	// Keys:   Type ID
 	// Values: Cache that stores uniqueIDs for values that were put with that type ID
 	//         (Saves us from having to re-compute uniqueIDs)
 	uniqueIDCaches map[uint64]*cache.LRU
 }
 
 // Implements State.RegisterType
-func (s *state) RegisterType(typeID uint64, unmarshal func([]byte) (interface{}, error)) error {
+func (s *state) RegisterType(
+	typeID uint64,
+	marshal func(interface{}) ([]byte, error),
+	unmarshal func([]byte) (interface{}, error),
+) error {
+
 	if _, exists := s.unmarshallers[typeID]; exists {
 		return fmt.Errorf("there is already a type with ID %d", typeID)
 	}
+	s.marshallers[typeID] = marshal
 	s.unmarshallers[typeID] = unmarshal
 	return nil
 }
 
 // Implements State.Put
-func (s *state) Put(db database.Database, typeID uint64, key ids.ID, value Marshaller) error {
-	if _, exists := s.unmarshallers[typeID]; !exists {
+func (s *state) Put(db database.Database, typeID uint64, key ids.ID, value interface{}) error {
+	marshaller, exists := s.marshallers[typeID]
+	if !exists {
 		return fmt.Errorf("typeID %d has not been registered", typeID)
 	}
-
 	// Get the unique ID of thie key/typeID pair
 	uID := s.uniqueID(key, typeID)
-
 	if value == nil {
 		return db.Delete(uID.Bytes())
 	}
-
 	// Put the byte repr. of the value in the database
-	return db.Put(uID.Bytes(), value.Bytes())
+	valueBytes, err := marshaller(value)
+	if err != nil {
+		return err
+	}
+	return db.Put(uID.Bytes(), valueBytes)
 }
 
 func (s *state) Has(db database.Database, typeID uint64, key ids.ID) (bool, error) {
@@ -180,7 +195,7 @@ func (s *state) GetID(db database.Database, key ids.ID) (ids.ID, error) {
 
 // PutTime associates [key] with [time] in [db]
 func (s *state) PutTime(db database.Database, key ids.ID, time time.Time) error {
-	return s.Put(db, TimeTypeID, key, &timeMarshaller{time})
+	return s.Put(db, TimeTypeID, key, time)
 }
 
 // GetTime gets the time associated with [key] in [db]
@@ -213,28 +228,21 @@ func (s *state) uniqueID(ID ids.ID, typeID uint64) ids.ID {
 }
 
 // NewState returns a new State
-func NewState() State {
+func NewState() (State, error) {
 	state := &state{
+		marshallers:    make(map[uint64]func(interface{}) ([]byte, error)),
 		unmarshallers:  make(map[uint64]func([]byte) (interface{}, error)),
 		uniqueIDCaches: make(map[uint64]*cache.LRU),
 	}
 
 	// Register ID, Status and time.Time so they can be put/get without client code
 	// having to register them
-	state.RegisterType(IDTypeID, unmarshalID)
-	state.RegisterType(StatusTypeID, unmarshalStatus)
-	state.RegisterType(TimeTypeID, unmarshalTime)
 
-	return state
-}
-
-// So we can marshal time
-type timeMarshaller struct {
-	t time.Time
-}
-
-func (tm *timeMarshaller) Bytes() []byte {
-	p := wrappers.Packer{MaxSize: 8}
-	p.PackLong(uint64(tm.t.Unix()))
-	return p.Bytes
+	errs := wrappers.Errs{}
+	errs.Add(
+		state.RegisterType(IDTypeID, marshalID, unmarshalID),
+		state.RegisterType(StatusTypeID, marshalStatus, unmarshalStatus),
+		state.RegisterType(TimeTypeID, marshalTime, unmarshalTime),
+	)
+	return state, errs.Err
 }

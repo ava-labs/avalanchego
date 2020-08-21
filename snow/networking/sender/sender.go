@@ -4,6 +4,8 @@
 package sender
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/networking/router"
@@ -31,17 +33,23 @@ func (s *Sender) Context() *snow.Context { return s.ctx }
 
 // GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
+	currentDeadline := time.Time{}
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+		deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
 		})
+		if deadline.After(currentDeadline) {
+			currentDeadline = deadline
+		}
 	}
+
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
-		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID)
+		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline)
 	}
-	s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID)
+
+	s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, currentDeadline)
 }
 
 // AcceptedFrontier ...
@@ -55,17 +63,23 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 
 // GetAccepted ...
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs ids.Set) {
+	currentDeadline := time.Time{}
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+		deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.GetAcceptedFailed(vID, s.ctx.ChainID, requestID)
 		})
+		if deadline.After(currentDeadline) {
+			currentDeadline = deadline
+		}
 	}
+
 	if validatorIDs.Contains(s.ctx.NodeID) {
 		validatorIDs.Remove(s.ctx.NodeID)
-		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, containerIDs)
+		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline, containerIDs)
 	}
-	s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, containerIDs)
+
+	s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, currentDeadline, containerIDs)
 }
 
 // Accepted ...
@@ -75,6 +89,29 @@ func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerID
 	} else {
 		s.sender.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
+}
+
+// GetAncestors sends a GetAncestors message
+func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+	s.ctx.Log.Verbo("Sending GetAncestors to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
+	// Sending a GetAncestors to myself will always fail
+	if validatorID.Equals(s.ctx.NodeID) {
+		go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
+		return
+	}
+
+	deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+		s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
+	})
+	s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, deadline, containerID)
+}
+
+// MultiPut sends a MultiPut message to the consensus engine running on the specified chain
+// on the specified validator.
+// The MultiPut message gives the recipient the contents of several containers.
+func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
+	s.ctx.Log.Verbo("Sending MultiPut to validator %s. RequestID: %d. NumContainers: %d", validatorID, requestID, len(containers))
+	s.sender.MultiPut(validatorID, s.ctx.ChainID, requestID, containers)
 }
 
 // Get sends a Get message to the consensus engine running on the specified
@@ -92,25 +129,10 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 
 	// Add a timeout -- if we don't get a response before the timeout expires,
 	// send this consensus engine a GetFailed message
-	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+	deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 		s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 	})
-	s.sender.Get(validatorID, s.ctx.ChainID, requestID, containerID)
-}
-
-// GetAncestors sends a GetAncestors message
-func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
-	s.ctx.Log.Verbo("Sending GetAncestors to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
-	// Sending a GetAncestors to myself will always fail
-	if validatorID.Equals(s.ctx.NodeID) {
-		go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
-		return
-	}
-
-	s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
-		s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
-	})
-	s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, containerID)
+	s.sender.Get(validatorID, s.ctx.ChainID, requestID, deadline, containerID)
 }
 
 // Put sends a Put message to the consensus engine running on the specified chain
@@ -122,25 +144,22 @@ func (s *Sender) Put(validatorID ids.ShortID, requestID uint32, containerID ids.
 	s.sender.Put(validatorID, s.ctx.ChainID, requestID, containerID, container)
 }
 
-// MultiPut sends a MultiPut message to the consensus engine running on the specified chain
-// on the specified validator.
-// The MultiPut message gives the recipient the contents of several containers.
-func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
-	s.ctx.Log.Verbo("Sending MultiPut to validator %s. RequestID: %d. NumContainers: %d", validatorID, requestID, len(containers))
-	s.sender.MultiPut(validatorID, s.ctx.ChainID, requestID, containers)
-}
-
 // PushQuery sends a PushQuery message to the consensus engines running on the specified chains
 // on the specified validators.
 // The PushQuery message signifies that this consensus engine would like each validator to send
 // their preferred frontier given the existence of the specified container.
 func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
+
+	currentDeadline := time.Time{}
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+		deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
 		})
+		if deadline.After(currentDeadline) {
+			currentDeadline = deadline
+		}
 	}
 
 	// If one of the validators in [validatorIDs] is myself, send this message directly
@@ -150,10 +169,10 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		// We use a goroutine to avoid a deadlock in the case where the consensus engine queries itself.
 		// The flow of execution in that case is handler --> engine --> sender --> chain router --> handler
 		// If this were not a goroutine, then we would deadlock here when [handler].msgs is full
-		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, containerID, container)
+		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline, containerID, container)
 	}
 
-	s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, containerID, container)
+	s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, currentDeadline, containerID, container)
 }
 
 // PullQuery sends a PullQuery message to the consensus engines running on the specified chains
@@ -163,11 +182,15 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
 
+	currentDeadline := time.Time{}
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
+		deadline := s.timeouts.Register(validatorID, s.ctx.ChainID, requestID, func() {
 			s.router.QueryFailed(vID, s.ctx.ChainID, requestID)
 		})
+		if deadline.After(currentDeadline) {
+			currentDeadline = deadline
+		}
 	}
 
 	// If one of the validators in [validatorIDs] is myself, send this message directly
@@ -177,10 +200,10 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		// We use a goroutine to avoid a deadlock in the case where the consensus engine queries itself.
 		// The flow of execution in that case is handler --> engine --> sender --> chain router --> handler
 		// If this were not a goroutine, then we would deadlock when [handler].msgs is full
-		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, containerID)
+		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, currentDeadline, containerID)
 	}
 
-	s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, containerID)
+	s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, currentDeadline, containerID)
 }
 
 // Chits sends chits

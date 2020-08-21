@@ -15,14 +15,12 @@ var (
 
 // Factory ...
 type Factory struct {
-	AVA      ids.ID
-	Platform ids.ID
+	Fee uint64
 }
 
 // New ...
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
-		ava:      f.AVA,
-		platform: f.Platform,
+		txFee: f.Fee,
 	}, nil
 }

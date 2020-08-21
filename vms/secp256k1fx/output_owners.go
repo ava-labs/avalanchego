@@ -18,6 +18,7 @@ var (
 
 // OutputOwners ...
 type OutputOwners struct {
+	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
 }
@@ -31,12 +32,19 @@ func (out *OutputOwners) Addresses() [][]byte {
 	return addrs
 }
 
+// AddressesSet returns addresses as a set
+func (out *OutputOwners) AddressesSet() ids.ShortSet {
+	set := ids.ShortSet{}
+	set.Add(out.Addrs...)
+	return set
+}
+
 // Equals returns true if the provided owners create the same condition
 func (out *OutputOwners) Equals(other *OutputOwners) bool {
 	if out == other {
 		return true
 	}
-	if out == nil || other == nil || out.Threshold != other.Threshold || len(out.Addrs) != len(other.Addrs) {
+	if out == nil || other == nil || out.Locktime != other.Locktime || out.Threshold != other.Threshold || len(out.Addrs) != len(other.Addrs) {
 		return false
 	}
 	for i, addr := range out.Addrs {
@@ -63,6 +71,9 @@ func (out *OutputOwners) Verify() error {
 		return nil
 	}
 }
+
+// VerifyState ...
+func (out *OutputOwners) VerifyState() error { return out.Verify() }
 
 // Sort ...
 func (out *OutputOwners) Sort() { ids.SortShortIDs(out.Addrs) }

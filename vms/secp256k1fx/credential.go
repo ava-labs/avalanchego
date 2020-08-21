@@ -4,9 +4,12 @@
 package secp256k1fx
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 )
 
 var (
@@ -16,6 +19,19 @@ var (
 // Credential ...
 type Credential struct {
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
+}
+
+// MarshalJSON marshals [cr] to JSON
+func (cr *Credential) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString("{\"signatures\":[")
+	for i, sig := range cr.Sigs {
+		buffer.WriteString(fmt.Sprintf("\"%s\"", formatting.CB58{Bytes: sig[:]}))
+		if i != len(cr.Sigs)-1 {
+			buffer.WriteString(",")
+		}
+	}
+	buffer.WriteString("]}")
+	return buffer.Bytes(), nil
 }
 
 // Verify ...

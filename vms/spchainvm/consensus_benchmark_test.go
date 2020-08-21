@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
@@ -57,7 +58,7 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize(2 * time.Second)
+		timeoutManager.Initialize("", prometheus.NewRegistry())
 		go timeoutManager.Dispatch()
 
 		chainRouter := &router.ChainRouter{}
@@ -81,9 +82,9 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		// The engine handles consensus
 		engine := smeng.Transitive{}
 		engine.Initialize(smeng.Config{
-			BootstrapConfig: smeng.BootstrapConfig{
+			Config: bootstrap.Config{
 				Config: common.Config{
-					Context:    ctx,
+					Ctx:        ctx,
 					Validators: vdrs,
 					Beacons:    beacons,
 					Alpha:      uint64(beacons.Len()/2 + 1),
@@ -107,8 +108,11 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		handler := &router.Handler{}
 		handler.Initialize(
 			&engine,
+			vdrs,
 			msgChan,
 			1000,
+			router.DefaultStakerPortion,
+			router.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)
@@ -191,7 +195,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize(2 * time.Second)
+		timeoutManager.Initialize("", prometheus.NewRegistry())
 		go timeoutManager.Dispatch()
 
 		chainRouter := &router.ChainRouter{}
@@ -220,9 +224,9 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		// The engine handles consensus
 		engine := smeng.Transitive{}
 		engine.Initialize(smeng.Config{
-			BootstrapConfig: smeng.BootstrapConfig{
+			Config: bootstrap.Config{
 				Config: common.Config{
-					Context:    ctx,
+					Ctx:        ctx,
 					Validators: vdrs,
 					Beacons:    beacons,
 					Alpha:      uint64(beacons.Len()/2 + 1),
@@ -246,8 +250,11 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		handler := &router.Handler{}
 		handler.Initialize(
 			&engine,
+			vdrs,
 			msgChan,
 			1000,
+			router.DefaultStakerPortion,
+			router.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)

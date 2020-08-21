@@ -4,6 +4,8 @@
 package platformvm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
@@ -42,20 +44,26 @@ func (a *Abort) Verify() error {
 
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
 // block, has ID [parentID].
-func (vm *VM) newAbortBlock(parentID ids.ID) *Abort {
-	abort := &Abort{DoubleDecisionBlock: DoubleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-		Block: core.NewBlock(parentID),
-		vm:    vm,
-	}}}}
+func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*Abort, error) {
+	abort := &Abort{
+		DoubleDecisionBlock: DoubleDecisionBlock{
+			CommonDecisionBlock: CommonDecisionBlock{
+				CommonBlock: CommonBlock{
+					Block: core.NewBlock(parentID, height),
+					vm:    vm,
+				},
+			},
+		},
+	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(abort)
 	bytes, err := Codec.Marshal(&blk)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
 
 	abort.Block.Initialize(bytes, vm.SnowmanVM)
-	return abort
+	return abort, nil
 }

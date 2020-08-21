@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// reward returns the amount of $AVA to reward the staker with
+// reward returns the amount of tokens to reward the staker with
 func reward(duration time.Duration, amount uint64, inflationRate float64) uint64 {
 	// TODO: Can't use floats here. Need to figure out how to do some integer
 	// approximations
@@ -18,7 +18,7 @@ func reward(duration time.Duration, amount uint64, inflationRate float64) uint64
 	// Total value of this transaction
 	value := float64(amount) * math.Pow(inflationRate, years)
 
-	// Amount of the reward in $AVA
+	// Amount of the reward
 	reward := value - float64(amount)
 
 	return uint64(reward)
