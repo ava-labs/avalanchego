@@ -54,6 +54,7 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 	drawn := make(defaultMap, count)
 	results := make([]uint64, count)
 	for i := 0; i < count; i++ {
+		// math/rand is OK to use here.
 		draw := uint64(rand.Int63n(int64(s.length-uint64(i)))) + uint64(i)
 
 		ret := drawn.get(draw, draw)

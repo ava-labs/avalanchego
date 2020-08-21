@@ -225,19 +225,21 @@ func NewNetwork(
 	pingFrequency time.Duration,
 ) Network {
 	netw := &network{
-		log:                                log,
-		id:                                 id,
-		ip:                                 ip,
-		networkID:                          networkID,
-		version:                            version,
-		parser:                             parser,
-		listener:                           listener,
-		dialer:                             dialer,
-		serverUpgrader:                     serverUpgrader,
-		clientUpgrader:                     clientUpgrader,
-		vdrs:                               vdrs,
-		beacons:                            beacons,
-		router:                             router,
+		log:            log,
+		id:             id,
+		ip:             ip,
+		networkID:      networkID,
+		version:        version,
+		parser:         parser,
+		listener:       listener,
+		dialer:         dialer,
+		serverUpgrader: serverUpgrader,
+		clientUpgrader: clientUpgrader,
+		vdrs:           vdrs,
+		beacons:        beacons,
+		router:         router,
+		// math/rand is OK to use here. This field just makes sure we don't connect
+		// to ourselves when TLS is disabled.
 		nodeID:                             rand.Uint32(),
 		initialReconnectDelay:              initialReconnectDelay,
 		maxReconnectDelay:                  maxReconnectDelay,
@@ -888,6 +890,7 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
+			// math/rand is OK to use here
 			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
 		}
 

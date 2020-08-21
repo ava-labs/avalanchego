@@ -50,6 +50,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 
 	samples := make([]uint64, s.benchmarkIterations)
 	for i := range samples {
+		// math/rand is OK to use here
 		samples[i] = uint64(rand.Int63n(int64(totalWeight)))
 	}
 
