@@ -838,21 +838,21 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 		switch tx := nextTx.UnsignedTx.(type) {
 		case *UnsignedAddDefaultSubnetValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
-				break
+				return current, pending, started, stopped, nil
 			}
 			current.Add(nextTx)
 			pending.Remove()
 			started.Add(tx.Validator.ID())
 		case *UnsignedAddNonDefaultSubnetValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
-				break
+				return current, pending, started, stopped, nil
 			}
 			current.Add(nextTx)
 			pending.Remove()
 			started.Add(tx.Validator.ID())
 		case *UnsignedAddDefaultSubnetDelegatorTx:
 			if timestamp.Before(tx.StartTime()) {
-				break
+				return current, pending, started, stopped, nil
 			}
 			current.Add(nextTx)
 			pending.Remove()
