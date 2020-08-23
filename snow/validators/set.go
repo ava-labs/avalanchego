@@ -71,6 +71,14 @@ func NewSet() Set {
 	}
 }
 
+// NewBestSet returns a new, empty set of validators.
+func NewBestSet(expectedSampleSize int) Set {
+	return &set{
+		vdrMap:  make(map[[20]byte]int),
+		sampler: sampler.NewBestWeightedWithoutReplacement(expectedSampleSize),
+	}
+}
+
 // set of validators. Validator function results are cached. Therefore, to
 // update a validators weight, one should ensure to call add with the updated
 // validator.

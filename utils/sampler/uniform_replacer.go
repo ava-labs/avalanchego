@@ -35,9 +35,6 @@ type uniformReplacer struct {
 	length uint64
 }
 
-// NewUniform returns a new sampler
-func NewUniform() Uniform { return &uniformReplacer{} }
-
 func (s *uniformReplacer) Initialize(length uint64) error {
 	if length > math.MaxInt64 {
 		return errOutOfRange
