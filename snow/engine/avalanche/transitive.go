@@ -95,10 +95,9 @@ func (t *Transitive) finishBootstrapping() error {
 			t.Ctx.Log.Error("vertex %s failed to be loaded from the frontier with %s", vtxID, err)
 		}
 	}
-	t.Consensus.Initialize(t.Ctx, t.Params, frontier)
 
 	t.Ctx.Log.Info("bootstrapping finished with %d vertices in the accepted frontier", len(frontier))
-	return nil
+	return t.Consensus.Initialize(t.Ctx, t.Params, frontier)
 }
 
 // Gossip implements the Engine interface

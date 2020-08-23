@@ -4,6 +4,8 @@
 package snowstorm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
@@ -44,15 +46,14 @@ type common struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (c *common) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	ctx.Log.AssertDeferredNoError(params.Valid)
-
+func (c *common) Initialize(ctx *snow.Context, params snowball.Parameters) error {
 	c.ctx = ctx
 	c.params = params
 
 	if err := c.metrics.Initialize(params.Namespace, params.Metrics); err != nil {
-		ctx.Log.Error("failed to initialize metrics: %s", err)
+		return fmt.Errorf("failed to initialize metrics: %s", err)
 	}
+	return params.Valid()
 }
 
 // Parameters implements the Snowstorm interface

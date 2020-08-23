@@ -53,11 +53,11 @@ type inputUtxo struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (ig *Input) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	ig.common.Initialize(ctx, params)
-
+func (ig *Input) Initialize(ctx *snow.Context, params snowball.Parameters) error {
 	ig.txs = make(map[[32]byte]inputTx)
 	ig.utxos = make(map[[32]byte]inputUtxo)
+
+	return ig.common.Initialize(ctx, params)
 }
 
 // IsVirtuous implements the ConflictGraph interface

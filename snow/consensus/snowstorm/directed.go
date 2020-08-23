@@ -46,11 +46,11 @@ type directedTx struct {
 }
 
 // Initialize implements the Consensus interface
-func (dg *Directed) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	dg.common.Initialize(ctx, params)
-
+func (dg *Directed) Initialize(ctx *snow.Context, params snowball.Parameters) error {
 	dg.utxos = make(map[[32]byte]ids.Set)
 	dg.txs = make(map[[32]byte]*directedTx)
+
+	return dg.common.Initialize(ctx, params)
 }
 
 // IsVirtuous implements the Consensus interface
