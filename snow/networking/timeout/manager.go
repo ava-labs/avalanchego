@@ -24,7 +24,8 @@ func (m *Manager) Initialize(
 	return m.tm.Initialize(
 		time.Second,
 		500*time.Millisecond,
-		2,
+		10*time.Second,
+		1.1,
 		time.Millisecond,
 		namespace,
 		registerer,
