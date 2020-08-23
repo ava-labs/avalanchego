@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	errNoValidSamplers = errors.New("no valid samplers found")
+	errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -48,9 +48,12 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 		return errWeightsTooLarge
 	}
 
-	samples := make([]uint64, s.benchmarkIterations)
-	for i := range samples {
-		samples[i] = uint64(rand.Int63n(int64(totalWeight)))
+	samples := []uint64(nil)
+	if totalWeight > 0 {
+		samples = make([]uint64, s.benchmarkIterations)
+		for i := range samples {
+			samples[i] = uint64(rand.Int63n(int64(totalWeight)))
+		}
 	}
 
 	s.Weighted = nil
@@ -75,7 +78,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 	}
 
 	if s.Weighted == nil {
-		return errNoValidSamplers
+		return errNoValidWeightedSamplers
 	}
 	return nil
 }
