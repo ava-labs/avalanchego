@@ -1,8 +1,0 @@
-- name: Install AVA dependencies
-  become: true
-  yum:
-    name:
-      # Staking key management
-      - openssl
-      - python-cryptography  # Python 2.x bindings
-    state: present

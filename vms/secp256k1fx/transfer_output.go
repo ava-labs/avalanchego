@@ -13,8 +13,7 @@ var (
 
 // TransferOutput ...
 type TransferOutput struct {
-	Amt      uint64 `serialize:"true" json:"amount"`
-	Locktime uint64 `serialize:"true" json:"locktime"`
+	Amt uint64 `serialize:"true" json:"amount"`
 
 	OutputOwners `serialize:"true"`
 }
@@ -28,8 +27,14 @@ func (out *TransferOutput) Verify() error {
 	case out == nil:
 		return errNilOutput
 	case out.Amt == 0:
-		return errNoValueInput
+		return errNoValueOutput
 	default:
 		return out.OutputOwners.Verify()
 	}
 }
+
+// VerifyState ...
+func (out *TransferOutput) VerifyState() error { return out.Verify() }
+
+// Owners ...
+func (out *TransferOutput) Owners() interface{} { return &out.OutputOwners }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/units"
@@ -19,9 +20,6 @@ import (
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/ava-labs/gecko/vms/spchainvm"
-	"github.com/ava-labs/gecko/vms/spdagvm"
-	"github.com/ava-labs/gecko/vms/timestampvm"
 )
 
 // ID of the EVM VM
@@ -30,44 +28,48 @@ var (
 )
 
 // Genesis returns the genesis data of the Platform Chain.
-// Since an AVA network has exactly one Platform Chain, and the Platform Chain
-// defines the genesis state of the network (who is staking, which chains exist,
-// etc.), defining the genesis state of the Platform Chain is the same as
+//
+// Since an Avalanche network has exactly one Platform Chain, and the Platform
+// Chain defines the genesis state of the network (who is staking, which chains
+// exist, etc.), defining the genesis state of the Platform Chain is the same as
 // defining the genesis state of the network.
+//
 // The ID of the new network is [networkID].
 
-// FromConfig ...
-func FromConfig(networkID uint32, config *Config) ([]byte, error) {
+// FromConfig returns:
+// 1) The byte representation of the genesis state of the platform chain
+//    (ie the genesis state of the network)
+// 2) The asset ID of AVAX
+func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err := config.init(); err != nil {
-		return nil, err
+		return nil, ids.ID{}, err
 	}
 
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
-		ava := avm.AssetDefinition{
-			Name:         "AVA",
-			Symbol:       "AVA",
+		avax := avm.AssetDefinition{
+			Name:         "AVAX",
+			Symbol:       "AVAX",
 			Denomination: 9,
 			InitialState: map[string][]interface{}{},
 		}
 
 		if len(config.MintAddresses) > 0 {
-			ava.InitialState["variableCap"] = []interface{}{avm.Owners{
+			avax.InitialState["variableCap"] = []interface{}{avm.Owners{
 				Threshold: 1,
 				Minters:   config.MintAddresses,
 			}}
 		}
 		for _, addr := range config.FundedAddresses {
-			ava.InitialState["fixedCap"] = append(ava.InitialState["fixedCap"], avm.Holder{
-				Amount:  json.Uint64(45 * units.MegaAva),
+			avax.InitialState["fixedCap"] = append(avax.InitialState["fixedCap"], avm.Holder{
+				Amount:  json.Uint64(5 * units.MegaAvax),
 				Address: addr,
 			})
 		}
 
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
-			// The AVM starts out with one asset, $AVA
-			"AVA": ava,
+			"AVAX": avax, // The AVM starts out with one asset: AVAX
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}
@@ -75,55 +77,12 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 	avmSS := avm.StaticService{}
 	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
 	if err != nil {
-		return nil, err
+		return nil, ids.ID{}, err
 	}
 
-	// Specify the genesis state of the simple payments DAG
-	spdagvmArgs := spdagvm.BuildGenesisArgs{}
-	for _, addr := range config.ParsedFundedAddresses {
-		spdagvmArgs.Outputs = append(spdagvmArgs.Outputs,
-			spdagvm.APIOutput{
-				Amount:    json.Uint64(20 * units.KiloAva),
-				Threshold: 1,
-				Addresses: []ids.ShortID{addr},
-			},
-		)
-	}
-
-	spdagvmReply := spdagvm.BuildGenesisReply{}
-	spdagvmSS := spdagvm.StaticService{}
-	if err := spdagvmSS.BuildGenesis(nil, &spdagvmArgs, &spdagvmReply); err != nil {
-		return nil, fmt.Errorf("problem creating simple payments DAG: %w", err)
-	}
-
-	// Specify the genesis state of the simple payments chain
-	spchainvmArgs := spchainvm.BuildGenesisArgs{}
-	for _, addr := range config.ParsedFundedAddresses {
-		spchainvmArgs.Accounts = append(spchainvmArgs.Accounts,
-			spchainvm.APIAccount{
-				Address: addr,
-				Balance: json.Uint64(20 * units.KiloAva),
-			},
-		)
-	}
-	spchainvmReply := spchainvm.BuildGenesisReply{}
-
-	spchainvmSS := spchainvm.StaticService{}
-	if err := spchainvmSS.BuildGenesis(nil, &spchainvmArgs, &spchainvmReply); err != nil {
-		return nil, fmt.Errorf("problem creating simple payments chain: %w", err)
-	}
-
-	// Specify the initial state of the Platform Chain
-	platformvmArgs := platformvm.BuildGenesisArgs{
-		NetworkID: json.Uint32(networkID),
-	}
-	for _, addr := range config.ParsedFundedAddresses {
-		platformvmArgs.Accounts = append(platformvmArgs.Accounts,
-			platformvm.APIAccount{
-				Address: addr,
-				Balance: json.Uint64(20 * units.KiloAva),
-			},
-		)
+	avaxAssetID, err := AVAXAssetID(avmReply.Bytes.Bytes)
+	if err != nil {
+		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
 	genesisTime := time.Date(
@@ -136,20 +95,38 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 		/*nano-second=*/ 0,
 		/*location=*/ time.UTC,
 	)
+
+	// Specify the initial state of the Platform Chain
+	platformvmArgs := platformvm.BuildGenesisArgs{
+		NetworkID:   json.Uint32(config.NetworkID),
+		AvaxAssetID: avaxAssetID,
+		Time:        json.Uint64(genesisTime.Unix()),
+		Message:     config.Message,
+	}
+	for _, addr := range config.FundedAddresses {
+		platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
+			platformvm.APIUTXO{
+				Address: addr,
+				Amount:  json.Uint64(5 * units.MegaAvax),
+			},
+		)
+	}
+
 	stakingDuration := 365 * 24 * time.Hour // ~ 1 year
 	endStakingTime := genesisTime.Add(stakingDuration)
 
 	for i, validatorID := range config.ParsedStakerIDs {
-		weight := json.Uint64(20 * units.KiloAva)
+		weight := json.Uint64(20 * units.KiloAvax)
+		destAddr := config.FundedAddresses[i%len(config.FundedAddresses)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.APIDefaultSubnetValidator{
-				APIValidator: platformvm.APIValidator{
+			platformvm.FormattedAPIDefaultSubnetValidator{
+				FormattedAPIValidator: platformvm.FormattedAPIValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					Weight:    &weight,
-					ID:        validatorID,
+					ID:        validatorID.PrefixedString(constants.NodeIDPrefix),
 				},
-				Destination: config.ParsedFundedAddresses[i%len(config.ParsedFundedAddresses)],
+				RewardAddress: destAddr,
 			},
 		)
 	}
@@ -158,7 +135,7 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 	platformvmArgs.Chains = []platformvm.APIChain{
 		{
 			GenesisData: avmReply.Bytes,
-			SubnetID:    platformvm.DefaultSubnetID,
+			SubnetID:    constants.DefaultSubnetID,
 			VMID:        avm.ID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
@@ -169,70 +146,53 @@ func FromConfig(networkID uint32, config *Config) ([]byte, error) {
 		},
 		{
 			GenesisData: formatting.CB58{Bytes: config.EVMBytes},
-			SubnetID:    platformvm.DefaultSubnetID,
+			SubnetID:    constants.DefaultSubnetID,
 			VMID:        EVMID,
 			Name:        "C-Chain",
 		},
-		{
-			GenesisData: spdagvmReply.Bytes,
-			SubnetID:    platformvm.DefaultSubnetID,
-			VMID:        spdagvm.ID,
-			Name:        "Simple DAG Payments",
-		},
-		{
-			GenesisData: spchainvmReply.Bytes,
-			SubnetID:    platformvm.DefaultSubnetID,
-			VMID:        spchainvm.ID,
-			Name:        "Simple Chain Payments",
-		},
-		{
-			GenesisData: formatting.CB58{Bytes: []byte{}}, // There is no genesis data
-			SubnetID:    platformvm.DefaultSubnetID,
-			VMID:        timestampvm.ID,
-			Name:        "Simple Timestamp Server",
-		},
 	}
 
-	platformvmArgs.Time = json.Uint64(genesisTime.Unix())
 	platformvmReply := platformvm.BuildGenesisReply{}
-
 	platformvmSS := platformvm.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
-		return nil, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
+		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	return platformvmReply.Bytes.Bytes, nil
+	return platformvmReply.Bytes.Bytes, avaxAssetID, nil
 }
 
-// Genesis ...
-func Genesis(networkID uint32) ([]byte, error) { return FromConfig(networkID, GetConfig(networkID)) }
+// Genesis returns:
+// 1) The byte representation of the genesis state of the platform chain
+//    (ie the genesis state of the network)
+// 2) The asset ID of AVAX
+func Genesis(networkID uint32) ([]byte, ids.ID, error) {
+	return FromConfig(GetConfig(networkID))
+}
 
 // VMGenesis ...
-func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.CreateChainTx, error) {
-	genesisBytes, err := Genesis(networkID)
+func VMGenesis(networkID uint32, vmID ids.ID) (*platformvm.Tx, error) {
+	genesisBytes, _, err := Genesis(networkID)
 	if err != nil {
 		return nil, err
 	}
 	genesis := platformvm.Genesis{}
-	platformvm.Codec.Unmarshal(genesisBytes, &genesis)
+	if err := platformvm.Codec.Unmarshal(genesisBytes, &genesis); err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
+	}
 	if err := genesis.Initialize(); err != nil {
 		return nil, err
 	}
 	for _, chain := range genesis.Chains {
-		if chain.VMID.Equals(vmID) {
+		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
+		if uChain.VMID.Equals(vmID) {
 			return chain, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find subnet with VM ID %s", vmID)
+	return nil, fmt.Errorf("couldn't find blockchain with VM ID %s", vmID)
 }
 
-// AVAAssetID ...
-func AVAAssetID(networkID uint32) (ids.ID, error) {
-	createAVM, err := VMGenesis(networkID, avm.ID)
-	if err != nil {
-		return ids.ID{}, err
-	}
-
+// AVAXAssetID ...
+func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	c := codec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -252,7 +212,7 @@ func AVAAssetID(networkID uint32) (ids.ID, error) {
 	}
 
 	genesis := avm.Genesis{}
-	if err := c.Unmarshal(createAVM.GenesisData, &genesis); err != nil {
+	if err := c.Unmarshal(avmGenesisBytes, &genesis); err != nil {
 		return ids.ID{}, err
 	}
 
@@ -262,11 +222,15 @@ func AVAAssetID(networkID uint32) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := avm.Tx{UnsignedTx: &genesisTx.CreateAssetTx}
-	txBytes, err := c.Marshal(&tx)
+	unsignedBytes, err := c.Marshal(tx.UnsignedTx)
 	if err != nil {
 		return ids.ID{}, err
 	}
-	tx.Initialize(txBytes)
+	signedBytes, err := c.Marshal(&tx)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	tx.Initialize(unsignedBytes, signedBytes)
 
 	return tx.ID(), nil
 }

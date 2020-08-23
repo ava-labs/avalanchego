@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
@@ -36,7 +37,7 @@ func TestSenderContext(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize(time.Millisecond)
+	tm.Initialize("", prometheus.NewRegistry())
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -63,8 +64,11 @@ func TestTimeout(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -87,7 +91,7 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize(50 * time.Millisecond)
+	tm.Initialize("", prometheus.NewRegistry())
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -116,8 +120,11 @@ func TestReliableMessages(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -149,7 +156,7 @@ func TestReliableMessages(t *testing.T) {
 
 func TestReliableMessagesToMyself(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize(50 * time.Millisecond)
+	tm.Initialize("", prometheus.NewRegistry())
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -179,8 +186,11 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler := router.Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
+		router.DefaultStakerPortion,
+		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

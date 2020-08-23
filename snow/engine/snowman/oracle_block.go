@@ -17,5 +17,5 @@ type OracleBlock interface {
 
 	// Options returns the possible children of this block in the order this
 	// validator prefers the blocks.
-	Options() [2]snowman.Block
+	Options() ([2]snowman.Block, error)
 }

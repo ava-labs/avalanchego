@@ -6,14 +6,14 @@ package timeout
 import (
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
-	manager.Initialize(time.Millisecond)
+	manager.Initialize("", prometheus.NewRegistry())
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}
@@ -26,7 +26,7 @@ func TestManagerFire(t *testing.T) {
 
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
-	manager.Initialize(50 * time.Millisecond)
+	manager.Initialize("", prometheus.NewRegistry())
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}

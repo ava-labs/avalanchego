@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/gecko/utils/json"
 )
 
-// StaticService defines the static API exposed by the AVA VM
+// StaticService defines the static API exposed by the spdag VM
 type StaticService struct{}
 
 // APIOutput ...

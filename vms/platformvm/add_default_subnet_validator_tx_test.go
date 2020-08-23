@@ -4,320 +4,351 @@
 package platformvm
 
 import (
+	"math"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 func TestAddDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
-	vm := defaultVM()
+	vm , _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	// Case 1: tx is nil
-	var tx *addDefaultSubnetValidatorTx
-	if err := tx.SyntacticVerify(); err == nil {
+	key, err := vm.factory.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeID := key.PublicKey().Address()
+
+	// Case: tx is nil
+	var unsignedTx *UnsignedAddDefaultSubnetValidatorTx
+	if err := unsignedTx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
-	// Case 2: ID is nil
-	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
-		NumberOfShares,
-		testNetworkID,
-		defaultKey,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.id = ids.ID{}
-	if err := tx.SyntacticVerify(); err == nil {
-		t.Fatal("should have errored because ID is nil")
-	}
-
 	// Case 3: Wrong Network ID
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+	tx, err := vm.newAddDefaultSubnetValidatorTx(
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID+1,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).NetworkID++
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
-	// Case 4: Node ID is nil
+	// Case: Node ID is nil
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.NodeID = ids.ShortID{}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Validator.NodeID = ids.ShortID{ID: nil}
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because node ID is nil")
 	}
 
-	// Case 5: Destination ID is nil
+	// Case: Stake owner has no addresses
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Destination = ids.ShortID{}
-	if err := tx.SyntacticVerify(); err == nil {
-		t.Fatal("should have errored because destination ID is nil")
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Stake = []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: vm.minStake,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     nil,
+			},
+		},
+	}}
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+		t.Fatal("should have errored because stake owner has no addresses")
 	}
 
-	// Case 6: Stake amount too small
+	// Case: Rewards owner has no addresses
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		MinimumStakeAmount-1,
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).RewardsOwner = &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     nil,
+	}
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+		t.Fatal("should have errored because rewards owner has no addresses")
+	}
+
+	// Case: Stake amount too small
+	tx, err = vm.newAddDefaultSubnetValidatorTx(
+		vm.minStake,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		nodeID,
+		nodeID,
+		NumberOfShares,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Validator.Wght-- // 1 less than minimum amount
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because stake amount too small")
 	}
 
-	// Case 7: Too many shares
+	// Case: Too many shares
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
-		NumberOfShares+1,
-		testNetworkID,
-		defaultKey,
+		nodeID,
+		nodeID,
+		NumberOfShares,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Shares++ // 1 more than max amount
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
 
-	// Case 8.1: Validation length is too short
+	// Case: Validation length is too short
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix())-1,
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Validator.End-- // 1 less than min duration
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
-	// Case 8.2: Validation length is negative
+	// Case: Validation length is negative
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Unix())-1,
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Validator.End = tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Validator.Start - 1
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
-	// Case 9: Validation length is too long
+	// Case: Validation length is too long
 	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix())+1,
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix()),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.SyntacticVerify(); err == nil {
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Validator.End++ // 1 more than maximum duration
+	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+	tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
-	// Case 10: Valid
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
+	// Case: Valid
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
+		vm.minStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
+		nodeID,
+		nodeID,
 		NumberOfShares,
-		testNetworkID,
-		defaultKey,
-	)
-	if err != nil {
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	); err != nil {
 		t.Fatal(err)
-	}
-	if err := tx.SyntacticVerify(); err != nil {
+	} else if err := tx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
 		t.Fatal(err)
 	}
 }
 
 // Test AddDefaultSubnetValidatorTx.SemanticVerify
 func TestAddDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
-	vm := defaultVM()
+	vm , _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
 		vm.Ctx.Lock.Unlock()
 	}()
+	vDB := versiondb.New(vm.DB)
 
-	// Case 1: Validator's start time too early
-	tx, err := vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
-		uint64(defaultValidateStartTime.Unix())-1,
-		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
-		NumberOfShares,
-		testNetworkID,
-		defaultKey,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
-		t.Fatal("should've errored because start time too early")
-	}
-
-	// Case 2: Validator doesn't have enough $AVA to cover stake amount
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultBalance-txFee+1,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(),
-		defaultKey.PublicKey().Address(),
-		NumberOfShares,
-		testNetworkID,
-		defaultKey,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
-		t.Fatal("should've errored because validator doesn't have enough $AVA to cover stake")
-	}
-
-	// Case 3: Validator already validating default subnet
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,
-		defaultStakeAmount,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		defaultKey.PublicKey().Address(), // node ID
-		defaultKey.PublicKey().Address(), // destination
-		NumberOfShares,
-		testNetworkID,
-		defaultKey,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
-		t.Fatal("should've errored because validator already validating")
-	}
-
-	// Case 4: Validator in pending validator set of default subnet
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
+	nodeID := key.PublicKey().Address()
+
+	// Case: Validator's start time too early
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
+		vm.minStake,
+		uint64(defaultValidateStartTime.Unix())-1,
+		uint64(defaultValidateEndTime.Unix()),
+		nodeID,
+		nodeID,
+		NumberOfShares,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	); err != nil {
+		t.Fatal(err)
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+		t.Fatal("should've errored because start time too early")
+	}
+	vDB.Abort()
+
+	// Case: Validator already validating default subnet
+	if tx, err := vm.newAddDefaultSubnetValidatorTx(
+		vm.minStake,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		nodeID, // node ID
+		nodeID, // reward address
+		NumberOfShares,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	); err != nil {
+		t.Fatal(err)
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+		t.Fatal("should've errored because validator already validating")
+	}
+	vDB.Abort()
+
+	// Case: Validator in pending validator set of default subnet
+	key2, err := vm.factory.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
-	tx, err = vm.newAddDefaultSubnetValidatorTx(
-		defaultNonce+1,                                       // nonce
-		defaultStakeAmount,                                   // stake amount
+	tx, err := vm.newAddDefaultSubnetValidatorTx(
+		vm.minStake,                                          // stake amount
 		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
-		key.PublicKey().Address(),                            // node ID
-		defaultKey.PublicKey().Address(),                     // destination
-		NumberOfShares,                                       // shares
-		testNetworkID,                                        // network
-		defaultKey,                                           // key
+		nodeID, // node ID
+		key2.PublicKey().Address(),              // reward address
+		NumberOfShares,                          // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// Put validator in pending validator set
-	err = vm.putPendingValidators(vm.DB,
+	} else if err := vm.putPendingValidators(vDB, // Put validator in pending validator set
 		&EventHeap{
 			SortByStartTime: true,
-			Txs:             []TimedTx{tx},
+			Txs:             []*Tx{tx},
 		},
-		DefaultSubnetID,
-	)
+		constants.DefaultSubnetID,
+	); err != nil {
+		t.Fatal(err)
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+		t.Fatal("should have failed because validator in pending validator set")
+	}
+	vDB.Abort()
+
+	// Case: Validator doesn't have enough tokens to cover stake amount
+	if _, err := vm.newAddDefaultSubnetValidatorTx( // create the tx
+		vm.minStake,
+		uint64(defaultValidateStartTime.Unix()),
+		uint64(defaultValidateEndTime.Unix()),
+		nodeID,
+		nodeID,
+		NumberOfShares,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	); err != nil {
+		t.Fatal(err)
+	}
+	// Remove all UTXOs owned by keys[0]
+	utxoIDs, err := vm.getReferencingUTXOs(vDB, keys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if _, _, _, _, err := tx.SemanticVerify(vm.DB); err == nil {
-		t.Fatal("should have failed because validator in pending validator set")
+	for _, utxoID := range utxoIDs.List() {
+		if err := vm.removeUTXO(vDB, utxoID); err != nil {
+			t.Fatal(err)
+		}
 	}
+	// Now keys[0] has no funds
+	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+		t.Fatal("should have failed because tx fee paying key has no funds")
+	}
+	vDB.Abort()
 }

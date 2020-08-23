@@ -4,13 +4,13 @@
 package snowman
 
 import (
-	"math"
+	"math/rand"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 )
 
 type Network struct {
@@ -20,30 +20,37 @@ type Network struct {
 }
 
 func (n *Network) shuffleColors() {
-	s := random.Uniform{N: len(n.colors)}
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(n.colors)))
+	indices, _ := s.Sample(len(n.colors))
 	colors := []*TestBlock(nil)
-	for s.CanSample() {
-		colors = append(colors, n.colors[s.Sample()])
+	for _, index := range indices {
+		colors = append(colors, n.colors[int(index)])
 	}
 	n.colors = colors
-	SortVts(n.colors)
+	SortTestBlocks(n.colors)
 }
 
 func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 	n.params = params
 	n.colors = append(n.colors, &TestBlock{
-		parent: Genesis,
-		id:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
-		status: choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis,
+		HeightV: 0,
 	})
 
 	for i := 1; i < numColors; i++ {
-		dependency := n.colors[random.Rand(0, len(n.colors))]
+		dependency := n.colors[rand.Intn(len(n.colors))]
 		n.colors = append(n.colors, &TestBlock{
-			parent: dependency,
-			id:     ids.Empty.Prefix(uint64(random.Rand(0, math.MaxInt64))),
-			height: dependency.height + 1,
-			status: choices.Processing,
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
+				StatusV: choices.Processing,
+			},
+			ParentV: dependency,
+			HeightV: dependency.HeightV + 1,
 		})
 	}
 }
@@ -54,15 +61,19 @@ func (n *Network) AddNode(sm Consensus) {
 	n.shuffleColors()
 	deps := map[[32]byte]Block{}
 	for _, blk := range n.colors {
-		myDep, found := deps[blk.parent.ID().Key()]
+		myDep, found := deps[blk.ParentV.ID().Key()]
 		if !found {
-			myDep = blk.parent
+			myDep = blk.Parent()
 		}
 		myVtx := &TestBlock{
-			parent: myDep,
-			id:     blk.id,
-			height: blk.height,
-			status: blk.status,
+			TestDecidable: choices.TestDecidable{
+				IDV:     blk.ID(),
+				StatusV: blk.Status(),
+			},
+			ParentV: myDep,
+			HeightV: blk.Height(),
+			VerifyV: blk.Verify(),
+			BytesV:  blk.Bytes(),
 		}
 		sm.Add(myVtx)
 		deps[myVtx.ID().Key()] = myDep
@@ -75,18 +86,16 @@ func (n *Network) Finalized() bool { return len(n.running) == 0 }
 
 func (n *Network) Round() {
 	if len(n.running) > 0 {
-		runningInd := random.Rand(0, len(n.running))
+		runningInd := rand.Intn(len(n.running))
 		running := n.running[runningInd]
 
-		sampler := random.Uniform{N: len(n.nodes)}
+		s := sampler.NewUniform()
+		_ = s.Initialize(uint64(len(n.nodes)))
+		indices, _ := s.Sample(n.params.K)
 		sampledColors := ids.Bag{}
-		for i := 0; i < n.params.K; i++ {
-			peer := n.nodes[sampler.Sample()]
-			if peer != running {
-				sampledColors.Add(peer.Preference())
-			} else {
-				i-- // So that we still sample k people
-			}
+		for _, index := range indices {
+			peer := n.nodes[int(index)]
+			sampledColors.Add(peer.Preference())
 		}
 
 		running.RecordPoll(sampledColors)

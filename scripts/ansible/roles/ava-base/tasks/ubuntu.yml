@@ -1,8 +1,0 @@
-- name: Install AVA dependencies
-  become: true
-  apt:
-    name:
-      # Staking key management
-      - openssl
-      - python3-cryptography
-    state: present

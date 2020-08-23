@@ -11,7 +11,7 @@ import (
 // DefaultConfigTest returns a test configuration
 func DefaultConfigTest() Config {
 	return Config{
-		Context:       snow.DefaultContextTest(),
+		Ctx:           snow.DefaultContextTest(),
 		Validators:    validators.NewSet(),
 		Beacons:       validators.NewSet(),
 		Sender:        &SenderTest{},

@@ -5,6 +5,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
@@ -68,9 +69,19 @@ func (s *snowmanState) PutLastAccepted(db database.Database, lastAccepted ids.ID
 
 // NewSnowmanState returns a new SnowmanState
 func NewSnowmanState(unmarshalBlockFunc func([]byte) (snowman.Block, error)) (SnowmanState, error) {
-	rawState := state.NewState()
+	rawState, err := state.NewState()
+	if err != nil {
+		return nil, fmt.Errorf("error creating new state: %w", err)
+	}
 	snowmanState := &snowmanState{State: rawState}
-	return snowmanState, rawState.RegisterType(state.BlockTypeID,
+	return snowmanState, rawState.RegisterType(
+		state.BlockTypeID,
+		func(b interface{}) ([]byte, error) {
+			if block, ok := b.(snowman.Block); ok {
+				return block.Bytes(), nil
+			}
+			return nil, errors.New("expected snowman.Block but got unexpected type")
+		},
 		func(bytes []byte) (interface{}, error) {
 			return unmarshalBlockFunc(bytes)
 		},

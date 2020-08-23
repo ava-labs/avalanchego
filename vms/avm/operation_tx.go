@@ -9,15 +9,14 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
 	errOperationsNotSortedUnique = errors.New("operations not sorted and unique")
 	errNoOperations              = errors.New("an operationTx must have at least one operation")
-
-	errDoubleSpend = errors.New("inputs attempt to double spend an input")
+	errDoubleSpend               = errors.New("inputs attempt to double spend an input")
 )
 
 // OperationTx is a transaction with no credentials.
@@ -31,7 +30,7 @@ type OperationTx struct {
 func (t *OperationTx) Operations() []*Operation { return t.Ops }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *OperationTx) InputUTXOs() []*ava.UTXOID {
+func (t *OperationTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
 	for _, op := range t.Ops {
 		utxos = append(utxos, op.UTXOIDs...)
@@ -63,19 +62,19 @@ func (t *OperationTx) AssetIDs() ids.Set {
 func (t *OperationTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ops) }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *OperationTx) UTXOs() []*ava.UTXO {
+func (t *OperationTx) UTXOs() []*avax.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, op := range t.Ops {
 		asset := op.AssetID()
 		for _, out := range op.Op.Outs() {
-			utxos = append(utxos, &ava.UTXO{
-				UTXOID: ava.UTXOID{
+			utxos = append(utxos, &avax.UTXO{
+				UTXOID: avax.UTXOID{
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: ava.Asset{ID: asset},
+				Asset: avax.Asset{ID: asset},
 				Out:   out,
 			})
 		}
@@ -85,7 +84,13 @@ func (t *OperationTx) UTXOs() []*ava.UTXO {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *OperationTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
@@ -93,7 +98,7 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 		return errNoOperations
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
 		return err
 	}
 
@@ -121,40 +126,15 @@ func (t *OperationTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs i
 }
 
 // SemanticVerify that this transaction is well-formed.
-func (t *OperationTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
-	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
+func (t *OperationTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
 		return err
 	}
 
 	offset := t.BaseTx.NumCredentials()
 	for i, op := range t.Ops {
-		opAssetID := op.AssetID()
-
-		utxos := []interface{}{}
-		for _, utxoID := range op.UTXOIDs {
-			utxo, err := vm.getUTXO(utxoID)
-			if err != nil {
-				return err
-			}
-
-			utxoAssetID := utxo.AssetID()
-			if !utxoAssetID.Equals(opAssetID) {
-				return errAssetIDMismatch
-			}
-			utxos = append(utxos, utxo.Out)
-		}
-
-		fxIndex, err := vm.getFx(op.Op)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
-		if !vm.verifyFxUsage(fxIndex, opAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyOperation(uTx, op.Op, creds[offset+i], utxos); err != nil {
+		cred := creds[offset+i]
+		if err := vm.verifyOperation(tx, op, cred); err != nil {
 			return err
 		}
 	}

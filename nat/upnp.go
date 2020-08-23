@@ -5,6 +5,7 @@ package nat
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"time"
 
@@ -116,10 +117,13 @@ func (r *upnpRouter) MapPort(protocol string, intPort, extPort uint16,
 	if err != nil {
 		return nil
 	}
-	lifetime := uint32(duration / time.Second)
+	lifetime := duration.Seconds()
+	if lifetime < 0 || lifetime > math.MaxUint32 {
+		return fmt.Errorf("invalid lifetime duration range")
+	}
 
 	return r.client.AddPortMapping("", extPort, protocol, intPort,
-		ip.String(), true, desc, lifetime)
+		ip.String(), true, desc, uint32(lifetime))
 }
 
 func (r *upnpRouter) UnmapPort(protocol string, _, extPort uint16) error {
