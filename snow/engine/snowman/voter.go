@@ -49,7 +49,7 @@ func (v *voter) Update() {
 	results = v.bubbleVotes(results)
 
 	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
-	if err := v.t.Consensus.RecordPoll(results); err != nil {
+	if _, _, err := v.t.Consensus.RecordPoll(results); err != nil { // TODO use accepted/rejected vertices here
 		v.t.errs.Add(err)
 		return
 	}
