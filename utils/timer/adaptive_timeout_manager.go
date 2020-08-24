@@ -52,6 +52,7 @@ type AdaptiveTimeoutManager struct {
 	currentDurationMetric prometheus.Gauge
 
 	minimumDuration time.Duration
+	maximumDuration time.Duration
 	increaseRatio   float64
 	decreaseValue   time.Duration
 
@@ -66,6 +67,7 @@ type AdaptiveTimeoutManager struct {
 func (tm *AdaptiveTimeoutManager) Initialize(
 	initialDuration time.Duration,
 	minimumDuration time.Duration,
+	maximumDuration time.Duration,
 	increaseRatio float64,
 	decreaseValue time.Duration,
 	namespace string,
@@ -77,6 +79,7 @@ func (tm *AdaptiveTimeoutManager) Initialize(
 		Help:      "Duration of current network timeouts in nanoseconds",
 	})
 	tm.minimumDuration = minimumDuration
+	tm.maximumDuration = maximumDuration
 	tm.increaseRatio = increaseRatio
 	tm.decreaseValue = decreaseValue
 	tm.currentDuration = initialDuration
@@ -164,6 +167,11 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 			// If the current timeout duration is less than or equal to the
 			// timeout that was triggered, double the duration.
 			tm.currentDuration = time.Duration(float64(tm.currentDuration) * tm.increaseRatio)
+
+			if tm.currentDuration > tm.maximumDuration {
+				// Make sure that we never get stuck in a bad situation
+				tm.currentDuration = tm.maximumDuration
+			}
 		}
 	} else {
 		// This request is being removed because it finished successfully.

@@ -18,6 +18,7 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 	tm.Initialize(
 		time.Millisecond,         // initialDuration
 		time.Millisecond,         // minimumDuration
+		time.Hour,                // maximumDuration
 		2,                        // increaseRatio
 		time.Microsecond,         // decreaseValue
 		"gecko",                  // namespace
