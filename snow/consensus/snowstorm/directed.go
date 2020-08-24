@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/utils/formatting"
 )
@@ -89,9 +90,7 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 	}
 
 	// The tx isn't processing, so we need to check to see if it conflicts with
-	// any of the other txs that are currently processing. This means that we
-	// need to iterate over all the inputs of this tx to see if currently issued
-	// txs also name one of those inputs.
+	// any of the other txs that are currently processing.
 	for _, input := range tx.InputIDs().List() {
 		if _, exists := dg.utxos[input.Key()]; exists {
 			// A currently processing tx names the same input as the provided
@@ -100,116 +99,162 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 		}
 	}
 
-	// This tx is virtuous as far as this consensus instance knows
+	// This tx is virtuous as far as this consensus instance knows.
 	return true
 }
 
 // Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
-	txID := tx.ID()
 	conflicts := ids.Set{}
-
-	if node, exists := dg.txs[txID.Key()]; exists {
+	if node, exists := dg.txs[tx.ID().Key()]; exists {
+		// If the tx is currently processing, the conflicting txs is just the
+		// union of the inbound conflicts and the outbound conflicts.
 		conflicts.Union(node.ins)
 		conflicts.Union(node.outs)
 	} else {
+		// If the tx isn't currently processing, the conflicting txs is the
+		// union of all the txs that spend an input that this tx spends.
 		for _, input := range tx.InputIDs().List() {
 			if spends, exists := dg.utxos[input.Key()]; exists {
 				conflicts.Union(spends)
 			}
 		}
-		conflicts.Remove(txID)
 	}
-
 	return conflicts
 }
 
 // Add implements the Consensus interface
 func (dg *Directed) Add(tx Tx) error {
 	if dg.Issued(tx) {
-		return nil // Already inserted
+		// If the tx was previously inserted, nothing should be done here.
+		return nil
 	}
 
 	txID := tx.ID()
 	bytes := tx.Bytes()
 
+	// Notify the IPC socket that this tx has been issued.
 	dg.ctx.DecisionDispatcher.Issue(dg.ctx.ChainID, txID, bytes)
+
+	// Notify the metrics that this transaction was just issued.
+	dg.metrics.Issued(txID)
+
 	inputs := tx.InputIDs()
-	// If there are no inputs, Tx is vacuously accepted
+
+	// If this tx doesn't have any inputs, it's impossible for there to be any
+	// conflicting transactions. Therefore, this transaction is treated as
+	// vacuously accepted.
 	if inputs.Len() == 0 {
+		// Accept is called before notifying the IPC so that acceptances that
+		// cause fatal errors aren't sent to an IPC peer.
 		if err := tx.Accept(); err != nil {
 			return err
 		}
+
+		// Notify the IPC socket that this tx has been accepted.
 		dg.ctx.DecisionDispatcher.Accept(dg.ctx.ChainID, txID, bytes)
-		dg.metrics.Issued(txID)
+
+		// Notify the metrics that this transaction was just accepted.
 		dg.metrics.Accepted(txID)
 		return nil
 	}
 
 	txNode := &directedTx{tx: tx}
 
-	// For each UTXO input to Tx:
-	// * Get all transactions that consume that UTXO
-	// * Add edges from Tx to those transactions in the conflict graph
-	// * Mark those transactions as rogue
+	// For each UTXO consumed by the tx:
+	// * Add edges between this tx and txs that consume this UTXO
+	// * Mark this tx as attempting to consume this UTXO
 	for _, inputID := range inputs.List() {
 		inputKey := inputID.Key()
-		spends := dg.utxos[inputKey] // Transactions spending this UTXO
 
-		// Add edges to conflict graph
-		txNode.outs.Union(spends)
+		// Get the set of txs that are currently processing that also consume
+		// this UTXO
+		spenders := dg.utxos[inputKey]
 
-		// Mark transactions conflicting with Tx as rogue
-		for _, conflictID := range spends.List() {
+		// Add all the txs that spend this UTXO to this tx's conflicts that are
+		// preferred over this tx. We know all these tx's are preferred over
+		// this tx, because this tx currently has a bias of 0 and the tie-break
+		// goes to the tx whose bias was updated first.
+		txNode.outs.Union(spenders)
+
+		// Update txs conflicting with tx to account for its issuance
+		for _, conflictID := range spenders.List() {
 			conflictKey := conflictID.Key()
+
+			// Get the node that contains this conflicting tx
 			conflict := dg.txs[conflictKey]
 
+			// This conflicting tx can't be virtuous anymore. So we remove this
+			// conflicting tx from any of the virtuous sets if it was previously
+			// in them.
 			dg.virtuous.Remove(conflictID)
 			dg.virtuousVoting.Remove(conflictID)
 
+			// This tx should be set to rogue if it wasn't rogue before.
 			conflict.rogue = true
+
+			// This conflicting tx is preferred over the tx being inserted, as
+			// described above. So we add the conflict to the inbound set.
 			conflict.ins.Add(txID)
-
-			dg.txs[conflictKey] = conflict
 		}
-		// Add Tx to list of transactions consuming UTXO whose ID is id
-		spends.Add(txID)
-		dg.utxos[inputKey] = spends
-	}
-	txNode.rogue = txNode.outs.Len() != 0 // Mark this transaction as rogue if it has conflicts
 
-	// Add the node representing Tx to the node set
-	dg.txs[txID.Key()] = txNode
+		// Add this tx to list of txs consuming the current UTXO
+		spenders.Add(txID)
+
+		// Because this isn't a pointer, we should re-map the set.
+		dg.utxos[inputKey] = spenders
+	}
+
+	// Mark this transaction as rogue if had any conflicts registered above
+	txNode.rogue = txNode.outs.Len() != 0
+
 	if !txNode.rogue {
-		// I'm not rogue
+		// If this tx is currently virtuous, add it to the virtuous sets
 		dg.virtuous.Add(txID)
 		dg.virtuousVoting.Add(txID)
 
-		// If I'm not rogue, I must be preferred
+		// If a tx is virtuous, it must be preferred.
 		dg.preferences.Add(txID)
 	}
-	dg.metrics.Issued(txID)
 
-	// Tx can be accepted only if the transactions it depends on are also accepted
-	// If any transactions that Tx depends on are rejected, reject Tx
+	// Add this tx to the set of currently processing txs
+	dg.txs[txID.Key()] = txNode
+
+	// This tx can be accepted only if all the txs it depends on are also
+	// accepted. If any txs that this tx depends on are rejected, reject it.
 	toReject := &directedRejector{
 		dg:     dg,
 		txNode: txNode,
 	}
+
+	// Register all of this txs dependencies as possibilities to reject this tx.
 	for _, dependency := range tx.Dependencies() {
-		if !dependency.Status().Decided() {
+		if dependency.Status() != choices.Accepted {
+			// If the dependency isn't accepted, then it must be processing. So,
+			// this tx should be rejected if any of these processing txs are
+			// rejected. Note that the dependencies can't be rejected, because
+			// it is assumped that this tx is currently considered valid.
 			toReject.deps.Add(dependency.ID())
 		}
 	}
+
+	// Register these dependencies
 	dg.pendingReject.Register(toReject)
-	return dg.errs.Err
+
+	// Registering the rejector can't result in an error, so we can safely
+	// return nil here.
+	return nil
 }
 
 // Issued implements the Consensus interface
 func (dg *Directed) Issued(tx Tx) bool {
+	// If the tx is either Accepted or Rejected, then it must have been issued
+	// previously.
 	if tx.Status().Decided() {
 		return true
 	}
+
+	// If the tx is currently processing, then it must have been issued.
 	_, ok := dg.txs[tx.ID().Key()]
 	return ok
 }
