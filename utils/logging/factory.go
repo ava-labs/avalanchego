@@ -3,9 +3,7 @@
 
 package logging
 
-import (
-	"path"
-)
+import "path/filepath"
 
 // Factory ...
 type Factory interface {
@@ -42,7 +40,7 @@ func (f *factory) Make() (Logger, error) {
 func (f *factory) MakeChain(chainID string, subdir string) (Logger, error) {
 	config := f.config
 	config.MsgPrefix = chainID + " Chain"
-	config.Directory = path.Join(config.Directory, "chain", chainID, subdir)
+	config.Directory = filepath.Join(config.Directory, "chain", chainID, subdir)
 
 	log, err := New(config)
 	if err == nil {
@@ -54,7 +52,7 @@ func (f *factory) MakeChain(chainID string, subdir string) (Logger, error) {
 // MakeSubdir ...
 func (f *factory) MakeSubdir(subdir string) (Logger, error) {
 	config := f.config
-	config.Directory = path.Join(config.Directory, subdir)
+	config.Directory = filepath.Join(config.Directory, subdir)
 
 	log, err := New(config)
 	if err == nil {

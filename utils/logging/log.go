@@ -7,7 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -351,7 +351,7 @@ func (fw *fileWriter) Rotate() error {
 }
 
 func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
-	filename := path.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
+	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
 	file, err := os.Create(filename)
 	if err != nil {
 		return nil, nil, err
