@@ -39,15 +39,17 @@ func (s *uniformResample) Sample(count int) ([]uint64, error) {
 
 	drawn := make(map[uint64]struct{}, count)
 	results := make([]uint64, count)
-	for i := 0; i < count; i++ {
+	for i := 0; i < count; {
+		// We don't use a cryptographically secure source of randomness here, as
+		// there's no need to ensure a truly random sampling.
 		draw := uint64(rand.Int63n(int64(s.length)))
 		if _, ok := drawn[draw]; ok {
-			i--
 			continue
 		}
 		drawn[draw] = struct{}{}
 
 		results[i] = draw
+		i++
 	}
 
 	return results, nil

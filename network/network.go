@@ -47,6 +47,8 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 )
 
+func init() { rand.Seed(time.Now().UnixNano()) }
+
 // Network defines the functionality of the networking library.
 type Network interface {
 	// All consensus messages can be sent through this interface. Thread safety
