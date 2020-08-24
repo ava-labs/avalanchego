@@ -15,3 +15,17 @@ type Weighted interface {
 	Initialize(weights []uint64) error
 	Sample(sampleValue uint64) (int, error)
 }
+
+// NewWeighted returns a new sampler
+func NewWeighted() Weighted {
+	return &weightedBest{
+		samplers: []Weighted{
+			&weightedArray{},
+			&weightedHeap{},
+			&weightedUniform{
+				maxWeight: 1 << 10,
+			},
+		},
+		benchmarkIterations: 100,
+	}
+}
