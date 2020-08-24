@@ -240,8 +240,9 @@ func NewNetwork(
 		vdrs:           vdrs,
 		beacons:        beacons,
 		router:         router,
-		// math/rand is OK to use here. This field just makes sure we don't connect
-		// to ourselves when TLS is disabled.
+		// This field just makes sure we don't connect to ourselves when TLS is
+		// disabled. So, cryptographically secure random number generation isn't
+		// used here.
 		nodeID:                             rand.Uint32(),
 		initialReconnectDelay:              initialReconnectDelay,
 		maxReconnectDelay:                  maxReconnectDelay,
@@ -887,12 +888,12 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = n.initialReconnectDelay
 		}
 
-		// Ignore weak randomness warnings in calculating timeouts because true
-		// randomness is unnecessary here
+		// Randomization is only performed here to distribute reconnection
+		// attempts to a node that previously shut down. This doesn't require
+		// cryptographically secure random number generation.
 		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
-			// math/rand is OK to use here
 			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
 		}
 
