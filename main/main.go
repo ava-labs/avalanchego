@@ -5,7 +5,7 @@ package main
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/node"
@@ -22,7 +22,7 @@ func main() {
 	}
 
 	config := Config.LoggingConfig
-	config.Directory = path.Join(config.Directory, "node")
+	config.Directory = filepath.Join(config.Directory, "node")
 	factory := logging.NewFactory(config)
 	defer factory.Close()
 

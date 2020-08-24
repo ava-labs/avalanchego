@@ -12,7 +12,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -461,7 +461,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee: n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
-			Path: path.Join(n.Config.PluginDir, "evm"),
+			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
 			TxFee: n.Config.TxFee,
