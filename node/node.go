@@ -12,7 +12,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -63,7 +63,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 6, 2)
+	Version       = version.NewDefaultVersion("avalanche", 0, 6, 3)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -463,7 +463,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee: n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
-			Path: path.Join(n.Config.PluginDir, "evm"),
+			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
 		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
 			TxFee: n.Config.TxFee,
