@@ -36,43 +36,80 @@ type Directed struct {
 }
 
 type directedTx struct {
-	bias, confidence, lastVote int
-	rogue                      bool
+	// bias is the number of times this transaction was the successful result of
+	// a network poll
+	bias int
 
-	pendingAccept, accepted bool
-	ins, outs               ids.Set
+	// confidence is the number of consecutive times this transaction was the
+	// successful result of a network poll as of [lastVote]
+	confidence int
 
+	// lastVote is the last poll number that this transaction was included in a
+	// successful network poll
+	lastVote int
+
+	// rogue identifies if there is a known conflict with this transaction
+	rogue bool
+
+	// pendingAccept identifies if this transaction has been marked as accepted
+	// once its transitive dependencies have also been accepted
+	pendingAccept bool
+
+	// accepted identifies if this transaction has been accepted. This should
+	// only be set if [pendingAccept] is also set
+	accepted bool
+
+	// ins is the set of txIDs that this tx conflicts with that are less
+	// preferred than this tx
+	ins ids.Set
+
+	// outs is the set of txIDs that this tx conflicts with that are more
+	// preferred than this tx
+	outs ids.Set
+
+	// tx is the actual transaction this node represents
 	tx Tx
 }
 
 // Initialize implements the Consensus interface
 func (dg *Directed) Initialize(ctx *snow.Context, params snowball.Parameters) error {
-	dg.utxos = make(map[[32]byte]ids.Set)
 	dg.txs = make(map[[32]byte]*directedTx)
+	dg.utxos = make(map[[32]byte]ids.Set)
 
 	return dg.common.Initialize(ctx, params)
 }
 
 // IsVirtuous implements the Consensus interface
 func (dg *Directed) IsVirtuous(tx Tx) bool {
-	id := tx.ID()
-	if node, exists := dg.txs[id.Key()]; exists {
+	txID := tx.ID()
+	// If the tx is currently processing, we should just return if was registed
+	// as rogue or not.
+	if node, exists := dg.txs[txID.Key()]; exists {
 		return !node.rogue
 	}
+
+	// The tx isn't processing, so we need to check to see if it conflicts with
+	// any of the other txs that are currently processing. This means that we
+	// need to iterate over all the inputs of this tx to see if currently issued
+	// txs also name one of those inputs.
 	for _, input := range tx.InputIDs().List() {
 		if _, exists := dg.utxos[input.Key()]; exists {
+			// A currently processing tx names the same input as the provided
+			// tx, so the provided tx would be rogue.
 			return false
 		}
 	}
+
+	// This tx is virtuous as far as this consensus instance knows
 	return true
 }
 
 // Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
-	id := tx.ID()
+	txID := tx.ID()
 	conflicts := ids.Set{}
 
-	if node, exists := dg.txs[id.Key()]; exists {
+	if node, exists := dg.txs[txID.Key()]; exists {
 		conflicts.Union(node.ins)
 		conflicts.Union(node.outs)
 	} else {
@@ -81,7 +118,7 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 				conflicts.Union(spends)
 			}
 		}
-		conflicts.Remove(id)
+		conflicts.Remove(txID)
 	}
 
 	return conflicts
