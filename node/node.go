@@ -63,7 +63,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 6, 3)
+	Version       = version.NewDefaultVersion("avalanche", 0, 6, 4)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -443,7 +443,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
 		defaultSubnetValidators := validators.NewSet()
-		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
+		if err := defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
+			return fmt.Errorf("couldn't add validator to Default Subnet: %w", err)
+		}
 		vdrs = validators.NewManager()
 		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
 	}

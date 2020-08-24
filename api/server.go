@@ -156,7 +156,8 @@ func rejectMiddleware(handler http.Handler, ctx *snow.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if !ctx.IsBootstrapped() {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("API call rejected because chain is not done bootstrapping"))
+			// Doesn't matter if there's an error while writing. They'll get the StatusServiceUnavailable code.
+			_, _ = w.Write([]byte("API call rejected because chain is not done bootstrapping"))
 		} else {
 			handler.ServeHTTP(w, r)
 		}
