@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
-	vm , _ := defaultVM()
+func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -26,13 +26,13 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	nodeID := keys[0].PublicKey().Address()
 
 	// Case: tx is nil
-	var unsignedTx *UnsignedAddNonDefaultSubnetValidatorTx
+	var unsignedTx *UnsignedAddSubnetValidatorTx
 	if err := unsignedTx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
 	// Case: Wrong network ID
-	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -43,15 +43,15 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).NetworkID++
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
 	// Case: Missing Node ID
-	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -62,15 +62,15 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.NodeID = ids.ShortID{ID: nil}
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.NodeID = ids.ShortID{ID: nil}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because NodeID is empty")
 	}
 
 	// Case: Missing Subnet ID
-	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -81,15 +81,15 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.Subnet = ids.ID{ID: nil}
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Subnet = ids.ID{ID: nil}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because Subnet ID is nil")
 	}
 
 	// Case: No weight
-	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		1,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -100,15 +100,15 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.Wght = 0
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Wght = 0
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because of no weight")
 	}
 
 	// Case: Subnet auth indices not unique
-	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix())-1,
@@ -119,16 +119,16 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
-		tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
+		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because sig indices weren't unique")
 	}
 
 	// Case: Validation length is too short
-	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
@@ -139,15 +139,15 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.End-- // 1 less than min duration
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End-- // 1 less than min duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
 	// Case: Validation length is too long
-	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix()),
@@ -158,15 +158,15 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.End++ // 1 more than max duration
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End++ // 1 more than max duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
 	// Case: Valid
-	if tx, err = vm.newAddNonDefaultSubnetValidatorTx(
+	if tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -175,13 +175,13 @@ func TestAddNonDefaultSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	} else if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
-	vm , _ := defaultVM()
+func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -190,10 +190,10 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	nodeID := keys[0].PublicKey().Address()
 
-	// Case: Proposed validator currently validating default subnet
-	// but stops validating non-default subnet after stops validating default subnet
+	// Case: Proposed validator currently validating primary network
+	// but stops validating subnet after stops validating primary network
 	// (note that keys[0] is a genesis validator)
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix())+1,
@@ -203,14 +203,14 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
-		t.Fatal("should have failed because validator stops validating default subnet earlier than non-default subnet")
+		t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
 	}
 
-	// Case: Proposed validator currently validating default subnet
-	// and proposed non-default subnet validation period is subset of
-	// default subnet validation period
+	// Case: Proposed validator currently validating primary network
+	// and proposed subnet validation period is subset of
+	// primary network validation period
 	// (note that keys[0] is a genesis validator)
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()+1),
 		uint64(defaultValidateEndTime.Unix()),
@@ -223,18 +223,18 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add a validator to pending validator set of default subnet
+	// Add a validator to pending validator set of primary network
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	pendingDSValidatorID := key.PublicKey().Address()
 
-	// starts validating default subnet 10 seconds after genesis
+	// starts validating primary network 10 seconds after genesis
 	DSStartTime := defaultGenesisTime.Add(10 * time.Second)
 	DSEndTime := DSStartTime.Add(5 * MinimumStakingDuration)
 
-	addDSTx, err := vm.newAddDefaultSubnetValidatorTx(
+	addDSTx, err := vm.newAddPrimaryValidatorTx(
 		vm.minStake,                             // stake amount
 		uint64(DSStartTime.Unix()),              // start time
 		uint64(DSEndTime.Unix()),                // end time
@@ -248,9 +248,9 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	// Case: Proposed validator isn't in pending or current validator sets
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
-		uint64(DSStartTime.Unix()), // start validating non-default subnet before default subnet
+		uint64(DSStartTime.Unix()), // start validating subnet before primary network
 		uint64(DSEndTime.Unix()),
 		pendingDSValidatorID,
 		testSubnet1.ID(),
@@ -258,7 +258,7 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
-		t.Fatal("should have failed because validator not in the current or pending validator sets of the default subnet")
+		t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
 	}
 
 	if err := vm.putPendingValidators(
@@ -267,17 +267,17 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []*Tx{addDSTx},
 		},
-		constants.DefaultSubnetID,
+		constants.PrimaryNetworkID,
 	); err != nil {
 		t.Fatal(err)
 	}
-	// Node with ID key.PublicKey().Address() now a pending validator for default subnet
+	// Node with ID key.PublicKey().Address() now a pending validator for primary network
 
-	// Case: Proposed validator is pending validator of default subnet
-	// but starts validating non-default subnet before default subnet
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	// Case: Proposed validator is pending validator of primary network
+	// but starts validating subnet before primary network
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
-		uint64(DSStartTime.Unix())-1, // start validating non-default subnet before default subnet
+		uint64(DSStartTime.Unix())-1, // start validating subnet before primary network
 		uint64(DSEndTime.Unix()),
 		pendingDSValidatorID,
 		testSubnet1.ID(),
@@ -285,32 +285,32 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
-		t.Fatal("should have failed because validator starts validating non-default " +
-			"subnet before starting to validate default subnet")
+		t.Fatal("should have failed because validator starts validating primary " +
+			"network before starting to validate primary network")
 	}
 
-	// Case: Proposed validator is pending validator of default subnet
-	// but stops validating non-default subnet after default subnet
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	// Case: Proposed validator is pending validator of primary network
+	// but stops validating subnet after primary network
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(DSStartTime.Unix()),
-		uint64(DSEndTime.Unix())+1, // stop validating non-default subnet after stopping validating default subnet
+		uint64(DSEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
 		pendingDSValidatorID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
-		t.Fatal("should have failed because validator stops validating non-default " +
-			"subnet after stops validating default subnet")
+		t.Fatal("should have failed because validator stops validating primary " +
+			"network after stops validating primary network")
 	}
 
-	// Case: Proposed validator is pending validator of default subnet
-	// and period validating non-default subnet is subset of time validating default subnet
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	// Case: Proposed validator is pending validator of primary network
+	// and period validating subnet is subset of time validating primary network
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
-		uint64(DSStartTime.Unix()), // same start time as for default subnet
-		uint64(DSEndTime.Unix()),   // same end time as for default subnet
+		uint64(DSStartTime.Unix()), // same start time as for primary network
+		uint64(DSEndTime.Unix()),   // same end time as for primary network
 		pendingDSValidatorID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -327,9 +327,9 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                           // weight
-		uint64(newTimestamp.Unix()),                             // start time
+	if tx, err := vm.newAddSubnetValidatorTx(
+		defaultWeight,               // weight
+		uint64(newTimestamp.Unix()), // start time
 		uint64(newTimestamp.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -345,14 +345,14 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Case: Proposed validator already validating the non-default subnet
-	// First, add validator as validator of non-default subnet
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	// Case: Proposed validator already validating the subnet
+	// First, add validator as validator of subnet
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		nodeID,           // node ID
-		testSubnet1.ID(), // subnet ID
+		nodeID,                                  // node ID
+		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
@@ -367,12 +367,12 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 	// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		nodeID,           // node ID
-		testSubnet1.ID(), // subnet ID
+		nodeID,                                  // node ID
+		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
@@ -388,9 +388,9 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	// Case: Too many signatures
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                   // weight
-		uint64(defaultGenesisTime.Unix()),                               // start time
+	if tx, err := vm.newAddSubnetValidatorTx(
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -402,9 +402,9 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	// Case: Too few signatures
-	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                 // weight
-		uint64(defaultGenesisTime.Unix()),                             // start time
+	tx, err := vm.newAddSubnetValidatorTx(
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -414,18 +414,18 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove a signature
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
-		tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
+		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
 		// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should have failed verification because not enough control sigs")
 	}
 
 	// Case: Control Signature from invalid key (keys[3] is not a control key)
-	tx, err = vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                 // weight
-		uint64(defaultGenesisTime.Unix()),                             // start time
+	tx, err = vm.newAddSubnetValidatorTx(
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -446,9 +446,9 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Proposed validator in pending validator set for subnet
 	// First, add validator to pending validator set of subnet
-	if tx, err := vm.newAddNonDefaultSubnetValidatorTx(
-		defaultWeight,                                                   // weight
-		uint64(defaultGenesisTime.Unix())+1,                             // start time
+	if tx, err := vm.newAddSubnetValidatorTx(
+		defaultWeight,                       // weight
+		uint64(defaultGenesisTime.Unix())+1, // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -469,8 +469,8 @@ func TestAddNonDefaultSubnetValidatorTxSemanticVerify(t *testing.T) {
 }
 
 // Test that marshalling/unmarshalling works
-func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
-	vm , _ := defaultVM()
+func TestAddSubnetValidatorMarshal(t *testing.T) {
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -480,7 +480,7 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 	var unmarshaledTx Tx
 
 	// valid tx
-	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
@@ -496,11 +496,11 @@ func TestAddNonDefaultSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal(err)
 	} else if err := unmarshaledTx.Sign(vm.codec, nil); err != nil {
 		t.Fatal(err)
-	} else if err := unmarshaledTx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	} else if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
 		t.Fatal(err)
 	}
-	if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Memo == nil { // reflect.DeepEqual considers []byte{} and nil to be different so change nil to []byte{}
-		tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Memo = []byte{}
+	if tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Memo == nil { // reflect.DeepEqual considers []byte{} and nil to be different so change nil to []byte{}
+		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Memo = []byte{}
 	}
 	if !reflect.DeepEqual(*tx, unmarshaledTx) {
 		t.Fatal("should be equal")

@@ -69,7 +69,7 @@ var (
 	// amount all genesis validators stake in defaultVM
 	defaultStakeAmount uint64 = 100 * minStake
 
-	// non-default Subnet that exists at genesis in defaultVM
+	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	testSubnet1            *UnsignedCreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
@@ -165,7 +165,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]FormattedAPIDefaultSubnetValidator, len(keys))
+	genesisValidators := make([]FormattedAPIPrimaryValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
 		id := key.PublicKey().Address()
@@ -173,7 +173,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = FormattedAPIDefaultSubnetValidator{
+		genesisValidators[i] = FormattedAPIPrimaryValidator{
 			FormattedAPIValidator: FormattedAPIValidator{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
@@ -214,9 +214,9 @@ func defaultVM() (*VM, database.Database) {
 	chainDB := prefixdb.New([]byte{0}, baseDB)
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
-	defaultSubnet := validators.NewSet() // TODO do we need this?
+	primaryNetwork := validators.NewSet() // TODO do we need this?
 	vm.validators = validators.NewManager()
-	vm.validators.PutValidatorSet(constants.DefaultSubnetID, defaultSubnet)
+	vm.validators.PutValidatorSet(constants.PrimaryNetworkID, primaryNetwork)
 
 	vm.clock.Set(defaultGenesisTime)
 	msgChan := make(chan common.Message, 1)
@@ -237,7 +237,7 @@ func defaultVM() (*VM, database.Database) {
 		panic(err)
 	}
 
-	// Create a non-default subnet and store it in testSubnet1
+	// Create a subnet and store it in testSubnet1
 	if tx, err := vm.newCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
@@ -314,8 +314,8 @@ func TestGenesis(t *testing.T) {
 		}
 	}
 
-	// Ensure current validator set of default subnet is correct
-	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
+	// Ensure current validator set of primary network is correct
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(currentValidators.Txs) != len(genesisState.Validators) {
@@ -332,7 +332,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure pending validator set is correct (empty)
-	if pendingValidators, err := vm.getPendingValidators(vm.DB, constants.DefaultSubnetID); err != nil {
+	if pendingValidators, err := vm.getPendingValidators(vm.DB, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 	} else if pendingValidators.Len() != 0 {
 		t.Fatal("vm's pending validator set should be empty")
@@ -351,8 +351,8 @@ func TestGenesis(t *testing.T) {
 	}
 }
 
-// accept proposal to add validator to default subnet
-func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
+// accept proposal to add validator to primary network
+func TestAddPrimaryValidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -369,7 +369,7 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create valid tx
-	tx, err := vm.newAddDefaultSubnetValidatorTx(
+	tx, err := vm.newAddPrimaryValidatorTx(
 		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -419,7 +419,7 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	}
 
 	// Verify that new validator now in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, constants.DefaultSubnetID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,8 +430,8 @@ func TestAddDefaultSubnetValidatorCommit(t *testing.T) {
 	}
 }
 
-// verify invalid proposal to add validator to default subnet
-func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
+// verify invalid proposal to add validator to primary network
+func TestInvalidAddPrimaryValidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -445,7 +445,7 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create invalid tx
-	if tx, err := vm.newAddDefaultSubnetValidatorTx(
+	if tx, err := vm.newAddPrimaryValidatorTx(
 		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -476,8 +476,8 @@ func TestInvalidAddDefaultSubnetValidatorCommit(t *testing.T) {
 	}
 }
 
-// Reject proposal to add validator to default subnet
-func TestAddDefaultSubnetValidatorReject(t *testing.T) {
+// Reject proposal to add validator to primary network
+func TestAddPrimaryValidatorReject(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -491,7 +491,7 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create valid tx
-	tx, err := vm.newAddDefaultSubnetValidatorTx(
+	tx, err := vm.newAddPrimaryValidatorTx(
 		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -543,7 +543,7 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	}
 
 	// Verify that new validator NOT in pending validator set
-	pendingValidators, err := vm.getPendingValidators(vm.DB, constants.DefaultSubnetID)
+	pendingValidators, err := vm.getPendingValidators(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -554,8 +554,8 @@ func TestAddDefaultSubnetValidatorReject(t *testing.T) {
 	}
 }
 
-// Accept proposal to add validator to non-default subnet
-func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
+// Accept proposal to add validator to subnet
+func TestAddSubnetValidatorAccept(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -568,8 +568,8 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
-	// validates default subnet ([defaultValidateStartTime, defaultValidateEndTime])
-	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
+	tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -633,8 +633,8 @@ func TestAddNonDefaultSubnetValidatorAccept(t *testing.T) {
 	}
 }
 
-// Reject proposal to add validator to non-default subnet
-func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
+// Reject proposal to add validator to subnet
+func TestAddSubnetValidatorReject(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -649,8 +649,8 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
-	// validates default subnet ([defaultValidateStartTime, defaultValidateEndTime])
-	tx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
+	tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -714,7 +714,7 @@ func TestAddNonDefaultSubnetValidatorReject(t *testing.T) {
 	}
 }
 
-// Test case where default subnet validator rewarded
+// Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
@@ -802,7 +802,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if status != Committed {
 		t.Fatalf("status should be Committed but is %s", status)
-	} else if currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID); err != nil {
+	} else if currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID); err != nil {
 		// Verify that genesis validator was rewarded and removed from current validator set
 		t.Fatal(err)
 	} else if currentValidators.Len() != len(keys)-1 {
@@ -810,7 +810,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	}
 }
 
-// Test case where default subnet validator not rewarded
+// Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
@@ -889,7 +889,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	}
 
 	// Verify that genesis validator was removed from current validator set
-	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1005,7 +1005,7 @@ func TestCreateSubnet(t *testing.T) {
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
 	endTime := startTime.Add(MinimumStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
-	if addValidatorTx, err := vm.newAddNonDefaultSubnetValidatorTx(
+	if addValidatorTx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -1062,7 +1062,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 	foundNewValidator := false
 	for _, tx := range pendingValidators.Txs {
-		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.ID().Equals(nodeID) {
+		if tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1127,7 +1127,7 @@ func TestCreateSubnet(t *testing.T) {
 	}
 	foundNewValidator = false
 	for _, tx := range currentValidators.Txs {
-		if tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx).Validator.ID().Equals(nodeID) {
+		if tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.ID().Equals(nodeID) {
 			foundNewValidator = true
 			break
 		}
@@ -1350,9 +1350,9 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
 	}
-	firstDefaultSubnet := validators.NewSet()
+	firstPrimaryNetwork := validators.NewSet()
 	firstVM.validators = validators.NewManager()
-	firstVM.validators.PutValidatorSet(constants.DefaultSubnetID, firstDefaultSubnet)
+	firstVM.validators.PutValidatorSet(constants.PrimaryNetworkID, firstPrimaryNetwork)
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
 	firstCtx.Lock.Lock()
@@ -1423,9 +1423,9 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		chainManager: chains.MockManager{},
 	}
 
-	secondDefaultSubnet := validators.NewSet()
+	secondPrimaryNetwork := validators.NewSet()
 	secondVM.validators = validators.NewManager()
-	secondVM.validators.PutValidatorSet(constants.DefaultSubnetID, secondDefaultSubnet)
+	secondVM.validators.PutValidatorSet(constants.PrimaryNetworkID, secondPrimaryNetwork)
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
@@ -1456,9 +1456,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 		chainManager: chains.MockManager{},
 	}
 
-	firstDefaultSubnet := validators.NewSet()
+	firstPrimaryNetwork := validators.NewSet()
 	firstVM.validators = validators.NewManager()
-	firstVM.validators.PutValidatorSet(constants.DefaultSubnetID, firstDefaultSubnet)
+	firstVM.validators.PutValidatorSet(constants.PrimaryNetworkID, firstPrimaryNetwork)
 
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
@@ -1544,9 +1544,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 		chainManager: chains.MockManager{},
 	}
 
-	secondDefaultSubnet := validators.NewSet()
+	secondPrimaryNetwork := validators.NewSet()
 	secondVM.validators = validators.NewManager()
-	secondVM.validators.PutValidatorSet(constants.DefaultSubnetID, secondDefaultSubnet)
+	secondVM.validators.PutValidatorSet(constants.PrimaryNetworkID, secondPrimaryNetwork)
 
 	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
@@ -1582,9 +1582,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainManager: chains.MockManager{},
 	}
 
-	defaultSubnet := validators.NewSet()
+	primaryNetwork := validators.NewSet()
 	vm.validators = validators.NewManager()
-	vm.validators.PutValidatorSet(constants.DefaultSubnetID, defaultSubnet)
+	vm.validators.PutValidatorSet(constants.PrimaryNetworkID, primaryNetwork)
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
@@ -1735,9 +1735,9 @@ func TestUnverifiedParent(t *testing.T) {
 		chainManager: chains.MockManager{},
 	}
 
-	defaultSubnet := validators.NewSet()
+	primaryNetwork := validators.NewSet()
 	vm.validators = validators.NewManager()
-	vm.validators.PutValidatorSet(constants.DefaultSubnetID, defaultSubnet)
+	vm.validators.PutValidatorSet(constants.PrimaryNetworkID, primaryNetwork)
 
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()

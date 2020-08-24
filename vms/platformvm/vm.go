@@ -100,7 +100,7 @@ var (
 	errEmptyAddressPrefix       = errors.New("empty address prefix")
 	errEmptyAddressSuffix       = errors.New("empty address suffix")
 	errInvalidID                = errors.New("invalid ID")
-	errDSCantValidate           = errors.New("new blockchain can't be validated by default Subnet")
+	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
 )
 
 // Codec does serialization and deserialization
@@ -128,9 +128,9 @@ func init() {
 		Codec.RegisterType(&secp256k1fx.Input{}),
 		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
 
-		Codec.RegisterType(&UnsignedAddDefaultSubnetValidatorTx{}),
-		Codec.RegisterType(&UnsignedAddNonDefaultSubnetValidatorTx{}),
-		Codec.RegisterType(&UnsignedAddDefaultSubnetDelegatorTx{}),
+		Codec.RegisterType(&UnsignedAddPrimaryValidatorTx{}),
+		Codec.RegisterType(&UnsignedAddSubnetValidatorTx{}),
+		Codec.RegisterType(&UnsignedAddPrimaryDelegatorTx{}),
 
 		Codec.RegisterType(&UnsignedCreateChainTx{}),
 		Codec.RegisterType(&UnsignedCreateSubnetTx{}),
@@ -252,8 +252,8 @@ func (vm *VM) Initialize(
 		}
 		heap.Init(validators)
 
-		// Persist default subnet validator set at genesis
-		if err := vm.putCurrentValidators(vm.DB, validators, constants.DefaultSubnetID); err != nil {
+		// Persist primary network validator set at genesis
+		if err := vm.putCurrentValidators(vm.DB, validators, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
@@ -290,7 +290,7 @@ func (vm *VM) Initialize(
 		}
 
 		// There are no pending stakers at genesis
-		if err := vm.putPendingValidators(vm.DB, &EventHeap{SortByStartTime: true}, constants.DefaultSubnetID); err != nil {
+		if err := vm.putPendingValidators(vm.DB, &EventHeap{SortByStartTime: true}, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
@@ -406,7 +406,7 @@ func (vm *VM) initSubnets() error {
 		return err
 	}
 
-	if err := vm.updateValidators(constants.DefaultSubnetID); err != nil {
+	if err := vm.updateValidators(constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
@@ -434,7 +434,7 @@ func (vm *VM) createChain(tx *Tx) {
 		return
 	}
 	if vm.stakingEnabled && // Staking is enabled, so nodes might not validate all chains
-		!constants.DefaultSubnetID.Equals(unsignedTx.SubnetID) && // All nodes must validate the default subnet
+		!constants.PrimaryNetworkID.Equals(unsignedTx.SubnetID) && // All nodes must validate the primary network
 		!validators.Contains(vm.Ctx.NodeID) { // This node doesn't validate this blockchain
 		return
 	}
@@ -547,9 +547,9 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, errEndOfTime
 	}
 
-	// If the chain time would be the time for the next default subnet validator to leave,
+	// If the chain time would be the time for the next primary network validator to leave,
 	// then we create a block that removes the validator and proposes they receive a validator reward
-	currentValidators, err := vm.getCurrentValidators(db, constants.DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get validator set: %w", err)
 	}
@@ -728,7 +728,7 @@ func (vm *VM) resetTimer() {
 		return
 	}
 
-	nextDSValidatorEndTime := vm.nextSubnetValidatorChangeTime(db, constants.DefaultSubnetID, false)
+	nextDSValidatorEndTime := vm.nextSubnetValidatorChangeTime(db, constants.PrimaryNetworkID, false)
 	if timestamp.Equal(nextDSValidatorEndTime) {
 		vm.SnowmanVM.NotifyBlockReady() // Should issue a ProposeRewardValidator
 		return
@@ -772,7 +772,7 @@ func (vm *VM) resetTimer() {
 // Otherwise, returns the time at which the next validator (of any subnet) stops validating
 // If no such validator is found, returns maxTime
 func (vm *VM) nextValidatorChangeTime(db database.Database, start bool) time.Time {
-	earliest := vm.nextSubnetValidatorChangeTime(db, constants.DefaultSubnetID, start)
+	earliest := vm.nextSubnetValidatorChangeTime(db, constants.PrimaryNetworkID, start)
 	subnets, err := vm.getSubnets(db)
 	if err != nil {
 		return earliest
@@ -810,7 +810,7 @@ func (vm *VM) nextSubnetValidatorChangeTime(db database.Database, subnetID ids.I
 // 2) The pending validator set of subnet with ID [subnetID] when timestamp is advanced to [timestamp]
 // 3) The IDs of the validators that start validating [subnetID] between now and [timestamp]
 // 4) The IDs of the validators that stop validating [subnetID] between now and [timestamp]
-// Note that this method will not remove validators from the current validator set of the default subnet.
+// Note that this method will not remove validators from the current validator set of the primary network.
 // That happens in reward blocks.
 func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, subnetID ids.ID) (current,
 	pending *EventHeap, started, stopped ids.ShortSet, err error) {
@@ -819,9 +819,9 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	if !subnetID.Equals(constants.DefaultSubnetID) { // validators of default subnet removed in rewardValidatorTxs, not here
+	if !subnetID.Equals(constants.PrimaryNetworkID) { // validators of primary network removed in rewardValidatorTxs, not here
 		for current.Len() > 0 {
-			next := current.Peek().UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx) // current validator with earliest end time
+			next := current.Peek().UnsignedTx.(*UnsignedAddSubnetValidatorTx) // current validator with earliest end time
 			if timestamp.Before(next.EndTime()) {
 				break
 			}
@@ -836,21 +836,21 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 	for pending.Len() > 0 {
 		nextTx := pending.Peek() // pending staker with earliest start time
 		switch tx := nextTx.UnsignedTx.(type) {
-		case *UnsignedAddDefaultSubnetValidatorTx:
+		case *UnsignedAddPrimaryValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				return current, pending, started, stopped, nil
 			}
 			current.Add(nextTx)
 			pending.Remove()
 			started.Add(tx.Validator.ID())
-		case *UnsignedAddNonDefaultSubnetValidatorTx:
+		case *UnsignedAddSubnetValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				return current, pending, started, stopped, nil
 			}
 			current.Add(nextTx)
 			pending.Remove()
 			started.Add(tx.Validator.ID())
-		case *UnsignedAddDefaultSubnetDelegatorTx:
+		case *UnsignedAddPrimaryDelegatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				return current, pending, started, stopped, nil
 			}
@@ -869,11 +869,11 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 	for _, event := range validatorEvents.Txs {
 		var vdr validators.Validator
 		switch tx := event.UnsignedTx.(type) {
-		case *UnsignedAddDefaultSubnetValidatorTx:
+		case *UnsignedAddPrimaryValidatorTx:
 			vdr = &tx.Validator
-		case *UnsignedAddDefaultSubnetDelegatorTx:
+		case *UnsignedAddPrimaryDelegatorTx:
 			vdr = &tx.Validator
-		case *UnsignedAddNonDefaultSubnetValidatorTx:
+		case *UnsignedAddSubnetValidatorTx:
 			vdr = &tx.Validator
 		default:
 			continue

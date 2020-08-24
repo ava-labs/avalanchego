@@ -398,12 +398,12 @@ type GetSubnetsArgs struct {
 // GetSubnetsResponse is the response from calling GetSubnets
 type GetSubnetsResponse struct {
 	// Each element is a subnet that exists
-	// Null if there are no subnets other than the default subnet
+	// Null if there are no subnets other than the primary network
 	Subnets []APISubnet `json:"subnets"`
 }
 
 // GetSubnets returns the subnets whose ID are in [args.IDs]
-// The response will include the default subnet
+// The response will include the primary network
 func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *GetSubnetsResponse) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetSubnets called")
 	subnets, err := service.vm.getSubnets(service.vm.DB) // all subnets
@@ -432,9 +432,9 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 				Threshold:   json.Uint32(owner.Threshold),
 			}
 		}
-		// Include Default Subnet
+		// Include primary network
 		response.Subnets[len(subnets)] = APISubnet{
-			ID:          constants.DefaultSubnetID,
+			ID:          constants.PrimaryNetworkID,
 			ControlKeys: []string{},
 			Threshold:   json.Uint32(0),
 		}
@@ -464,10 +464,10 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			)
 		}
 	}
-	if idsSet.Contains(constants.DefaultSubnetID) {
+	if idsSet.Contains(constants.PrimaryNetworkID) {
 		response.Subnets = append(response.Subnets,
 			APISubnet{
-				ID:          constants.DefaultSubnetID,
+				ID:          constants.PrimaryNetworkID,
 				ControlKeys: []string{},
 				Threshold:   json.Uint32(0),
 			},
@@ -492,10 +492,10 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: GetStakingAssetID called")
 
 	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.DefaultSubnetID
+		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	if !args.SubnetID.Equals(constants.DefaultSubnetID) {
+	if !args.SubnetID.Equals(constants.PrimaryNetworkID) {
 		return fmt.Errorf("Subnet %s doesn't have a valid staking token",
 			args.SubnetID)
 	}
@@ -513,7 +513,7 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
 // GetCurrentValidatorsArgs are the arguments for calling GetCurrentValidators
 type GetCurrentValidatorsArgs struct {
 	// Subnet we're listing the validators of
-	// If omitted, defaults to default subnet
+	// If omitted, defaults to primary network
 	SubnetID ids.ID `json:"subnetID"`
 }
 
@@ -526,7 +526,7 @@ type GetCurrentValidatorsReply struct {
 func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetCurrentValidators called")
 	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.DefaultSubnetID
+		args.SubnetID = constants.PrimaryNetworkID
 	}
 
 	validators, err := service.vm.getCurrentValidators(service.vm.DB, args.SubnetID)
@@ -535,10 +535,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
-	if args.SubnetID.Equals(constants.DefaultSubnetID) {
+	if args.SubnetID.Equals(constants.PrimaryNetworkID) {
 		for i, tx := range validators.Txs {
 			switch tx := tx.UnsignedTx.(type) {
-			case *UnsignedAddDefaultSubnetValidatorTx:
+			case *UnsignedAddPrimaryValidatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -546,7 +546,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
-			case *UnsignedAddDefaultSubnetDelegatorTx:
+			case *UnsignedAddPrimaryDelegatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -560,7 +560,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		}
 	} else {
 		for i, tx := range validators.Txs {
-			utx := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
+			utx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
 			weight := json.Uint64(utx.Validator.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -577,7 +577,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
 type GetPendingValidatorsArgs struct {
 	// Subnet we're getting the pending validators of
-	// If omitted, defaults to default subnet
+	// If omitted, defaults to primary network
 	SubnetID ids.ID `json:"subnetID"`
 }
 
@@ -590,7 +590,7 @@ type GetPendingValidatorsReply struct {
 func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
 	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.DefaultSubnetID
+		args.SubnetID = constants.PrimaryNetworkID
 	}
 
 	validators, err := service.vm.getPendingValidators(service.vm.DB, args.SubnetID)
@@ -600,9 +600,9 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
 	for i, tx := range validators.Txs {
-		if args.SubnetID.Equals(constants.DefaultSubnetID) {
+		if args.SubnetID.Equals(constants.PrimaryNetworkID) {
 			switch tx := tx.UnsignedTx.(type) {
-			case *UnsignedAddDefaultSubnetValidatorTx:
+			case *UnsignedAddPrimaryValidatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -610,7 +610,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
-			case *UnsignedAddDefaultSubnetDelegatorTx:
+			case *UnsignedAddPrimaryDelegatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -622,7 +622,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
 			}
 		} else {
-			utx := tx.UnsignedTx.(*UnsignedAddNonDefaultSubnetValidatorTx)
+			utx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
 			weight := json.Uint64(utx.Validator.Weight())
 			reply.Validators[i] = FormattedAPIValidator{
 				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -642,7 +642,7 @@ type SampleValidatorsArgs struct {
 	Size json.Uint16 `json:"size"`
 
 	// ID of subnet to sample validators from
-	// If omitted, defaults to the default subnet
+	// If omitted, defaults to the primary network
 	SubnetID ids.ID `json:"subnetID"`
 }
 
@@ -655,7 +655,7 @@ type SampleValidatorsReply struct {
 func (service *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, reply *SampleValidatorsReply) error {
 	service.vm.Ctx.Log.Info("Platform: SampleValidators called with Size = %d", args.Size)
 	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.DefaultSubnetID
+		args.SubnetID = constants.PrimaryNetworkID
 	}
 
 	validators, ok := service.vm.validators.GetValidatorSet(args.SubnetID)
@@ -687,17 +687,17 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
  ******************************************************
  */
 
-// AddDefaultSubnetValidatorArgs are the arguments to AddDefaultSubnetValidator
-type AddDefaultSubnetValidatorArgs struct {
-	FormattedAPIDefaultSubnetValidator
+// AddPrimaryValidatorArgs are the arguments to AddPrimaryValidator
+type AddPrimaryValidatorArgs struct {
+	FormattedAPIPrimaryValidator
 
 	api.UserPass
 }
 
-// AddDefaultSubnetValidator creates and signs and issues a transaction to add a
-// validator to the default subnet
-func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefaultSubnetValidatorArgs, reply *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetValidator called")
+// AddPrimaryValidator creates and signs and issues a transaction to add a
+// validator to the primary network
+func (service *Service) AddPrimaryValidator(_ *http.Request, args *AddPrimaryValidatorArgs, reply *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: AddPrimaryValidator called")
 	switch {
 	case args.RewardAddress == "":
 		return errNoRewardAddress
@@ -735,7 +735,7 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddDefaultSubnetValidatorTx(
+	tx, err := service.vm.newAddPrimaryValidatorTx(
 		uint64(args.weight()),                // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
@@ -752,17 +752,17 @@ func (service *Service) AddDefaultSubnetValidator(_ *http.Request, args *AddDefa
 	return service.vm.issueTx(tx)
 }
 
-// AddDefaultSubnetDelegatorArgs are the arguments to AddDefaultSubnetDelegator
-type AddDefaultSubnetDelegatorArgs struct {
+// AddPrimaryDelegatorArgs are the arguments to AddPrimaryDelegator
+type AddPrimaryDelegatorArgs struct {
 	FormattedAPIValidator
 	api.UserPass
 	RewardAddress string `json:"rewardAddress"`
 }
 
-// AddDefaultSubnetDelegator creates and signs and issues a transaction to add a
-// delegator to the default subnet
-func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefaultSubnetDelegatorArgs, reply *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: AddDefaultSubnetDelegator called")
+// AddPrimaryDelegator creates and signs and issues a transaction to add a
+// delegator to the primary network
+func (service *Service) AddPrimaryDelegator(_ *http.Request, args *AddPrimaryDelegatorArgs, reply *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: AddPrimaryDelegator called")
 	switch {
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
@@ -798,7 +798,7 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddDefaultSubnetDelegatorTx(
+	tx, err := service.vm.newAddPrimaryDelegatorTx(
 		uint64(args.weight()),  // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
@@ -814,18 +814,18 @@ func (service *Service) AddDefaultSubnetDelegator(_ *http.Request, args *AddDefa
 	return service.vm.issueTx(tx)
 }
 
-// AddNonDefaultSubnetValidatorArgs are the arguments to AddNonDefaultSubnetValidator
-type AddNonDefaultSubnetValidatorArgs struct {
+// AddSubnetValidatorArgs are the arguments to AddSubnetValidator
+type AddSubnetValidatorArgs struct {
 	FormattedAPIValidator
 	api.UserPass
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
 }
 
-// AddNonDefaultSubnetValidator creates and signs and issues a transaction to
-// add a validator to a subnet other than the default subnet
-func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddNonDefaultSubnetValidatorArgs, response *api.JsonTxID) error {
-	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddNonDefaultSubnetValidator called")
+// AddSubnetValidator creates and signs and issues a transaction to
+// add a validator to a subnet other than the primary network
+func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JsonTxID) error {
+	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddSubnetValidator called")
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
@@ -840,8 +840,8 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	if err != nil {
 		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
 	}
-	if subnetID.Equals(constants.DefaultSubnetID) {
-		return errors.New("non-default subnet validator attempts to validate default subnet")
+	if subnetID.Equals(constants.PrimaryNetworkID) {
+		return errors.New("subnet validator attempts to validate primary network")
 	}
 
 	// Get the keys controlled by the user
@@ -856,7 +856,7 @@ func (service *Service) AddNonDefaultSubnetValidator(_ *http.Request, args *AddN
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddNonDefaultSubnetValidatorTx(
+	tx, err := service.vm.newAddSubnetValidatorTx(
 		uint64(args.weight()),  // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
@@ -1069,7 +1069,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		fxIDs = append(fxIDs, secp256k1fx.ID)
 	}
 
-	if args.SubnetID.Equals(constants.DefaultSubnetID) {
+	if args.SubnetID.Equals(constants.PrimaryNetworkID) {
 		return errDSCantValidate
 	}
 
@@ -1205,8 +1205,8 @@ type ValidatesResponse struct {
 func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response *ValidatesResponse) error {
 	service.vm.Ctx.Log.Info("Platform: Validates called")
 	// Verify that the Subnet exists
-	// Ignore lookup error if it's the DefaultSubnetID
-	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.DefaultSubnetID) {
+	// Ignore lookup error if it's the PrimaryNetworkID
+	if _, err := service.vm.getSubnet(service.vm.DB, args.SubnetID); err != nil && !args.SubnetID.Equals(constants.PrimaryNetworkID) {
 		return fmt.Errorf("problem retrieving subnet '%s': %w", args.SubnetID, err)
 	}
 	// Get the chains that exist
