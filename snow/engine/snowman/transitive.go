@@ -51,6 +51,12 @@ type Transitive struct {
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
+
+	// Key: ID of a processing block
+	// Value: The block
+	// Invariant 1: All processing blocks are in this map
+	// Invariant 2: Every block in this map is processing
+	processing map[[32]byte]snowman.Block
 }
 
 // Initialize implements the Engine interface
@@ -118,7 +124,7 @@ func (t *Transitive) finishBootstrapping() error {
 // Gossip implements the Engine interface
 func (t *Transitive) Gossip() error {
 	blkID := t.VM.LastAccepted()
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
 		return nil
@@ -136,7 +142,7 @@ func (t *Transitive) Shutdown() error {
 
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, the validator is not following the protocol, or the
@@ -153,7 +159,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	startTime := time.Now()
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil { // Don't have the block. Drop this request.
 		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)", blkID, vdr, requestID, blkID)
 		return nil
@@ -420,7 +426,7 @@ func (t *Transitive) repoll() {
 // If we do not have [blkID], request it.
 // Returns true if the block was issued, now or previously, to consensus.
 func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		t.sendRequest(vdr, blkID)
 		return false, nil
@@ -593,7 +599,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	}
 
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
-	if err := t.Consensus.Add(blk); err != nil {
+	if _, err := t.Consensus.Add(blk); err != nil { // TODO unpin blk from memory if it's rejected
 		return err
 	}
 
@@ -613,7 +619,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 				t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 				dropped = append(dropped, blk)
 			} else {
-				if err := t.Consensus.Add(blk); err != nil {
+				if _, err := t.Consensus.Add(blk); err != nil { // TODO unpin blk from memory if it's rejected
 					return err
 				}
 				added = append(added, blk)
@@ -652,4 +658,14 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
 	return t.Ctx.IsBootstrapped()
+}
+
+// GetBlock gets a block by its ID
+func (t *Transitive) GetBlock(id ids.ID) (snowman.Block, error) {
+	// Check the processing set
+	if block, ok := t.processing[id.Key()]; ok {
+		return block, nil
+	}
+	// Not processing. Check the database.
+	return t.VM.GetBlock(id)
 }

@@ -19,8 +19,10 @@ type Consensus interface {
 	Parameters() snowball.Parameters
 
 	// Adds a new decision. Assumes the dependency has already been added.
-	// Returns if a critical error has occurred.
-	Add(Block) error
+	// Returns:
+	//   1) true if the block was rejected.
+	//   2) Whether a critical error has occured
+	Add(Block) (bool, error)
 
 	// Issued returns true if the block has been issued into consensus
 	Issued(Block) bool

@@ -107,8 +107,10 @@ func AddToTailTest(t *testing.T, factory Factory) {
 	}
 
 	// Adding to the previous preference will update the preference
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	} else if pref := sm.Preference(); !pref.Equals(block.IDV) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", block.IDV, pref)
 	}
@@ -145,16 +147,20 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 	}
 
 	// Adding to the previous preference will update the preference
-	if err := sm.Add(firstBlock); err != nil {
+	if rejected, err := sm.Add(firstBlock); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	} else if pref := sm.Preference(); !pref.Equals(firstBlock.IDV) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.IDV, pref)
 	}
 
 	// Adding to something other than the previous preference won't update the
 	// preference
-	if err := sm.Add(secondBlock); err != nil {
+	if rejected, err := sm.Add(secondBlock); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	} else if pref := sm.Preference(); !pref.Equals(firstBlock.IDV) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.IDV, pref)
 	}
@@ -191,8 +197,10 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 
 	// Adding a block with an unknown parent means the parent must have already
 	// been rejected. Therefore the block should be immediately rejected
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if !rejected {
+		t.Fatal("should have been rejected")
 	} else if pref := sm.Preference(); !pref.Equals(GenesisID) {
 		t.Fatalf("Wrong preference. Expected %s, got %s", GenesisID, pref)
 	} else if status := block.Status(); status != choices.Rejected {
@@ -295,10 +303,12 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
 	} else if !sm.Issued(block) {
 		t.Fatalf("Should have marked a pending block as having been issued")
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 }
 
@@ -324,8 +334,10 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}
@@ -378,10 +390,14 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(firstBlock); err != nil {
+	if rejected, err := sm.Add(firstBlock); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(secondBlock); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(secondBlock); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}
@@ -471,12 +487,18 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		ParentV: block1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if rejected, err := sm.Add(block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block2); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	// Current graph structure:
@@ -553,14 +575,22 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		ParentV: block1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if rejected, err := sm.Add(block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block2); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block3); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block3); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	// Current graph structure:
@@ -643,8 +673,10 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	}
 	unknownBlockID := ids.Empty.Prefix(2)
 
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	validVotes := ids.Bag{}
@@ -716,16 +748,26 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		ParentV: block3,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if rejected, err := sm.Add(block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block2); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block3); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block3); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block4); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block4); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	// Current graph structure:
@@ -842,24 +884,32 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		ParentV: block2,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if rejected, err := sm.Add(block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block1); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes0 := ids.Bag{}
 	votes0.Add(block0.ID())
 	if err := sm.RecordPoll(votes0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if rejected, err := sm.Add(block2); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	// dep2 is already rejected.
 
-	if err := sm.Add(block3); err != nil {
+	if rejected, err := sm.Add(block3); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	} else if status := block0.Status(); status == choices.Accepted {
 		t.Fatalf("Shouldn't be accepted yet")
 	}
@@ -910,8 +960,10 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}
@@ -956,8 +1008,10 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}
@@ -1002,8 +1056,10 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}
@@ -1044,8 +1100,10 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		ParentV: rejectedBlock,
 	}
 
-	if err := sm.Add(block); err == nil {
+	if rejected, err := sm.Add(block); err == nil {
 		t.Fatalf("Should have errored on rejecting the rejectable block")
+	} else if !rejected {
+		t.Fatal("should have been rejected")
 	}
 }
 
@@ -1073,8 +1131,10 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if rejected, err := sm.Add(block); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}
@@ -1115,10 +1175,14 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if rejected, err := sm.Add(block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block1); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}
@@ -1166,12 +1230,18 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		ParentV: block1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if rejected, err := sm.Add(block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if rejected {
+		t.Fatal("should not have been rejected")
+	} else if rejected, err := sm.Add(block2); err != nil {
 		t.Fatal(err)
+	} else if rejected {
+		t.Fatal("should not have been rejected")
 	}
 
 	votes := ids.Bag{}

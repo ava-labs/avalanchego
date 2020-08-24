@@ -79,7 +79,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
 // Add implements the Snowman interface
-func (ts *Topological) Add(blk Block) error {
+func (ts *Topological) Add(blk Block) (bool, error) {
 	parent := blk.Parent()
 	parentID := parent.ID()
 	parentKey := parentID.Key()
@@ -98,14 +98,14 @@ func (ts *Topological) Add(blk Block) error {
 		// been pruned. Therefore, the dependent should be transitively
 		// rejected.
 		if err := blk.Reject(); err != nil {
-			return err
+			return true, err
 		}
 
 		// Notify anyone listening that this block was rejected.
 		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
 		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
 		ts.metrics.Rejected(blkID)
-		return nil
+		return true, nil
 	}
 
 	// add the block as a child of its parent, and add the block to the tree
@@ -119,7 +119,7 @@ func (ts *Topological) Add(blk Block) error {
 	if ts.tail.Equals(parentID) {
 		ts.tail = blkID
 	}
-	return nil
+	return false, nil
 }
 
 // Issued implements the Snowman interface
