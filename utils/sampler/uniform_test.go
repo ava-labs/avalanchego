@@ -22,6 +22,14 @@ var (
 			name:    "replacer",
 			sampler: &uniformReplacer{},
 		},
+		{
+			name:    "resampler",
+			sampler: &uniformResample{},
+		},
+		{
+			name:    "best",
+			sampler: NewBestUniform(30),
+		},
 	}
 	uniformTests = []struct {
 		name string

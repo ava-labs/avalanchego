@@ -8,3 +8,6 @@ type Uniform interface {
 	Initialize(sampleRange uint64) error
 	Sample(length int) ([]uint64, error)
 }
+
+// NewUniform returns a new sampler
+func NewUniform() Uniform { return &uniformReplacer{} }

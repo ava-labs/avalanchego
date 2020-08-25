@@ -10,18 +10,17 @@ import (
 
 // BenchmarkAllUniform
 func BenchmarkAllUniform(b *testing.B) {
-	sizes := []int{
-		1,
-		5,
-		25,
-		50,
-		75,
-		100,
+	sizes := []uint64{
+		30,
+		35,
+		500,
+		10000,
+		100000,
 	}
 	for _, s := range uniformSamplers {
 		for _, size := range sizes {
 			b.Run(fmt.Sprintf("sampler %s with %d elements uniformly", s.name, size), func(b *testing.B) {
-				UniformBenchmark(b, s.sampler, 1000000, size)
+				UniformBenchmark(b, s.sampler, size, 30)
 			})
 		}
 	}

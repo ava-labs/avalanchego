@@ -35,9 +35,6 @@ type uniformReplacer struct {
 	length uint64
 }
 
-// NewUniform returns a new sampler
-func NewUniform() Uniform { return &uniformReplacer{} }
-
 func (s *uniformReplacer) Initialize(length uint64) error {
 	if length > math.MaxInt64 {
 		return errOutOfRange
@@ -54,6 +51,8 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 	drawn := make(defaultMap, count)
 	results := make([]uint64, count)
 	for i := 0; i < count; i++ {
+		// We don't use a cryptographically secure source of randomness here, as
+		// there's no need to ensure a truly random sampling.
 		draw := uint64(rand.Int63n(int64(s.length-uint64(i)))) + uint64(i)
 
 		ret := drawn.get(draw, draw)
