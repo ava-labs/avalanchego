@@ -886,17 +886,30 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 
 // SendArgs are arguments for passing into Send requests
 type SendArgs struct {
+	// Username and password of user sending the funds
 	api.UserPass
-	Amount  json.Uint64 `json:"amount"`
-	AssetID string      `json:"assetID"`
-	To      string      `json:"to"`
+
+	// The amount of funds to send
+	Amount json.Uint64 `json:"amount"`
+
+	// ID of the asset being sent
+	AssetID string `json:"assetID"`
+
+	// Address of the recipient
+	To string `json:"to"`
+
+	// Memo field
+	Memo string `json:"memo"`
 }
 
 // Send returns the ID of the newly created transaction
 func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: Send called with username: %s", args.Username)
 
-	if args.Amount == 0 {
+	memoBytes := []byte(args.Memo)
+	if l := len(memoBytes); l > avax.MaxMemoSize {
+		return fmt.Errorf("Max memo length is %d but provided memo field is length %d", avax.MaxMemoSize, l)
+	} else if args.Amount == 0 {
 		return errInvalidAmount
 	}
 
@@ -983,6 +996,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		BlockchainID: service.vm.ctx.ChainID,
 		Outs:         outs,
 		Ins:          ins,
+		Memo:         memoBytes,
 	}}}
 	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
