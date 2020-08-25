@@ -166,7 +166,7 @@ func init() {
 	// AVAX fees:
 	fs.Uint64Var(&Config.TxFee, "tx-fee", units.MilliAvax, "Transaction fee, in nAVAX")
 
-	// Minimum stake, in nAVAX, required to validate the primary netwok
+	// Minimum stake, in nAVAX, required to validate the primary network
 	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the primary network")
 
 	// Assertions:
