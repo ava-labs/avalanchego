@@ -6,6 +6,7 @@
     update: yes
 
 - name: Build project
+  # noqa 301
   command: ./scripts/build.sh
   args:
     chdir: "{{ repo_folder }}"
