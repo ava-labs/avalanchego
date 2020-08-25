@@ -6,15 +6,23 @@ package evm
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
+	"strings"
 
 	"github.com/ava-labs/coreth"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/gecko/api"
+	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/crypto"
+	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 )
 
 const (
@@ -36,6 +44,8 @@ type SnowmanAPI struct{ vm *VM }
 // NetAPI offers network related API methods
 type NetAPI struct{ vm *VM }
 
+type AvaAPI struct{ vm *VM }
+
 // NewNetAPI creates a new net API instance.
 func NewNetAPI(vm *VM) *NetAPI { return &NetAPI{vm} }
 
@@ -55,7 +65,7 @@ type Web3API struct{}
 func (s *Web3API) ClientVersion() string { return version }
 
 // Sha3 returns the bytes returned by hashing [input] with Keccak256
-func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return crypto.Keccak256(input) }
+func (s *Web3API) Sha3(input hexutil.Bytes) hexutil.Bytes { return ethcrypto.Keccak256(input) }
 
 // GetAcceptedFrontReply defines the reply that will be sent from the
 // GetAcceptedFront API call
@@ -92,7 +102,7 @@ func (api *DebugAPI) SpendGenesis(ctx context.Context, nonce uint64) error {
 	gasLimit := 21000
 	gasPrice := big.NewInt(1000000000)
 
-	genPrivateKey, err := crypto.HexToECDSA(GenesisTestKey[2:])
+	genPrivateKey, err := ethcrypto.HexToECDSA(GenesisTestKey[2:])
 	if err != nil {
 		return err
 	}
@@ -119,4 +129,182 @@ func (api *DebugAPI) IssueBlock(ctx context.Context) error {
 	api.vm.ctx.Log.Info("Issuing a new block")
 
 	return api.vm.tryBlockGen()
+}
+
+// ExportKeyArgs are arguments for ExportKey
+type ExportKeyArgs struct {
+	api.UserPass
+	Address string `json:"address"`
+}
+
+// ExportKeyReply is the response for ExportKey
+type ExportKeyReply struct {
+	// The decrypted PrivateKey for the Address provided in the arguments
+	PrivateKey string `json:"privateKey"`
+}
+
+// ExportKey returns a private key from the provided user
+func (service *AvaAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
+	service.vm.ctx.Log.Info("Platform: ExportKey called")
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+	}
+	user := user{db: db}
+	if address, err := service.vm.ParseEthAddress(args.Address); err != nil {
+		return fmt.Errorf("couldn't parse %s to address: %s", args.Address, err)
+	} else if sk, err := user.getKey(address); err != nil {
+		return fmt.Errorf("problem retrieving private key: %w", err)
+	} else {
+		reply.PrivateKey = constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String()
+		return nil
+	}
+}
+
+// ImportKeyArgs are arguments for ImportKey
+type ImportKeyArgs struct {
+	api.UserPass
+	PrivateKey string `json:"privateKey"`
+}
+
+// ImportKey adds a private key to the provided user
+func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
+	service.vm.ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
+	if service.vm.ctx.Keystore == nil {
+		return fmt.Errorf("oh no")
+	}
+	fmt.Sprintf("good")
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving data: %w", err)
+	}
+
+	user := user{db: db}
+
+	factory := crypto.FactorySECP256K1R{}
+
+	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
+		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	}
+	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
+	formattedPrivateKey := formatting.CB58{}
+	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+
+	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+
+	if err := user.putAddress(sk); err != nil {
+		return fmt.Errorf("problem saving key %w", err)
+	}
+
+	// TODO: return eth address here
+	reply.Address, err = service.vm.FormatEthAddress(GetEthAddress(sk))
+	if err != nil {
+		return fmt.Errorf("problem formatting address: %w", err)
+	}
+	return nil
+}
+
+// ImportAVAXArgs are the arguments to ImportAVAX
+type ImportAVAXArgs struct {
+	api.UserPass
+
+	// Chain the funds are coming from
+	SourceChain string `json:"sourceChain"`
+
+	// The address that will receive the imported funds
+	To string `json:"to"`
+}
+
+// ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
+// must have already been exported from the X-Chain.
+func (service *AvaAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.ctx.Log.Info("Platform: ImportAVAX called")
+
+	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
+	if err != nil {
+		return fmt.Errorf("problem parsing chainID %q: %w", args.SourceChain, err)
+	}
+
+	// Get the user's info
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("couldn't get user '%s': %w", args.Username, err)
+	}
+	user := user{db: db}
+
+	to, err := service.vm.ParseEthAddress(args.To)
+	if err != nil { // Parse address
+		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
+	}
+
+	privKeys, err := user.getKeys()
+	if err != nil { // Get keys
+		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
+	}
+
+	tx, err := service.vm.newImportTx(chainID, to, privKeys)
+	if err != nil {
+		return err
+	}
+
+	response.TxID = tx.ID()
+	return service.vm.issueTx(tx)
+}
+
+// ExportAVAXArgs are the arguments to ExportAVAX
+type ExportAVAXArgs struct {
+	api.UserPass
+
+	// Amount of AVAX to send
+	Amount json.Uint64 `json:"amount"`
+
+	// ID of the address that will receive the AVAX. This address includes the
+	// chainID, which is used to determine what the destination chain is.
+	To string `json:"to"`
+}
+
+// ExportAVAX exports AVAX from the P-Chain to the X-Chain
+// It must be imported on the X-Chain to complete the transfer
+func (service *AvaAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+	service.vm.ctx.Log.Info("Platform: ExportAVAX called")
+
+	if args.Amount == 0 {
+		return errors.New("argument 'amount' must be > 0")
+	}
+
+	chainID, to, err := service.vm.ParseAddress(args.To)
+	if err != nil {
+		return err
+	}
+
+	// Get this user's data
+	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
+	if err != nil {
+		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
+	}
+	user := user{db: db}
+	privKeys, err := user.getKeys()
+	if err != nil {
+		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
+	}
+
+	// Create the transaction
+	tx, err := service.vm.newExportTx(
+		uint64(args.Amount), // Amount
+		chainID,             // ID of the chain to send the funds to
+		to,                  // Address
+		privKeys,            // Private keys
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create tx: %w", err)
+	}
+
+	response.TxID = tx.ID()
+	return service.vm.issueTx(tx)
 }

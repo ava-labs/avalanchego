@@ -16,13 +16,17 @@ import (
 
 	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
+	"github.com/ava-labs/coreth/params"
 
-	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/go-ethereum/common"
+	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/rlp"
+	"github.com/ava-labs/go-ethereum/rpc"
+	geckorpc "github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/api/admin"
 	"github.com/ava-labs/gecko/cache"
@@ -31,7 +35,17 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
+	geckojson "github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/gecko/utils/units"
+	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/gecko/snow/engine/common"
 )
@@ -41,6 +55,7 @@ var (
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
+	x2cRate = big.NewInt(1000000000)
 )
 
 const (
@@ -48,9 +63,11 @@ const (
 )
 
 const (
-	minBlockTime = 250 * time.Millisecond
-	maxBlockTime = 1000 * time.Millisecond
-	batchSize    = 250
+	minBlockTime    = 250 * time.Millisecond
+	maxBlockTime    = 1000 * time.Millisecond
+	batchSize       = 250
+	maxUTXOsToFetch = 1024
+	blockCacheSize  = 1 << 17 // 131072
 )
 
 const (
@@ -59,13 +76,39 @@ const (
 	bdTimerStateLong
 )
 
+const (
+	addressSep = "-"
+)
+
 var (
-	errEmptyBlock     = errors.New("empty block")
-	errCreateBlock    = errors.New("couldn't create block")
-	errUnknownBlock   = errors.New("unknown block")
-	errBlockFrequency = errors.New("too frequent block issuance")
-	errUnsupportedFXs = errors.New("unsupported feature extensions")
-	errInvalidBlock   = errors.New("invalid block")
+	// minGasPrice is the number of nAVAX required per gas unit for a transaction
+	// to be valid, measured in wei
+	minGasPrice = big.NewInt(47 * params.GWei)
+
+	txFee = units.MilliAvax
+
+	errEmptyBlock                 = errors.New("empty block")
+	errCreateBlock                = errors.New("couldn't create block")
+	errUnknownBlock               = errors.New("unknown block")
+	errBlockFrequency             = errors.New("too frequent block issuance")
+	errUnsupportedFXs             = errors.New("unsupported feature extensions")
+	errInvalidBlock               = errors.New("invalid block")
+	errInvalidAddr                = errors.New("invalid hex address")
+	errTooManyAtomicTx            = errors.New("too many pending atomic txs")
+	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
+	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
+	errNoInputs                   = errors.New("tx has no inputs")
+	errNoImportInputs             = errors.New("tx has no imported inputs")
+	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
+	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
+	errUnknownAsset               = errors.New("unknown asset ID")
+	errNoFunds                    = errors.New("no spendable funds were found")
+	errWrongChainID               = errors.New("tx has wrong chain ID")
+	errInsufficientFunds          = errors.New("insufficient funds")
+	errNoExportOutputs            = errors.New("no export outputs")
+	errOutputsNotSorted           = errors.New("outputs not sorted")
+	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
+	errInvalidNonce               = errors.New("invalid nonce")
 )
 
 func maxDuration(x, y time.Duration) time.Duration {
@@ -73,6 +116,32 @@ func maxDuration(x, y time.Duration) time.Duration {
 		return x
 	}
 	return y
+}
+
+// Codec does serialization and deserialization
+var Codec codec.Codec
+
+func init() {
+	Codec = codec.NewDefault()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		Codec.RegisterType(&UnsignedImportTx{}),
+		Codec.RegisterType(&UnsignedExportTx{}),
+	)
+	Codec.Skip(3)
+	errs.Add(
+		Codec.RegisterType(&secp256k1fx.TransferInput{}),
+		Codec.RegisterType(&secp256k1fx.MintOutput{}),
+		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
+		Codec.RegisterType(&secp256k1fx.MintOperation{}),
+		Codec.RegisterType(&secp256k1fx.Credential{}),
+		Codec.RegisterType(&secp256k1fx.Input{}),
+		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 }
 
 // VM implements the snowman.ChainVM interface
@@ -103,9 +172,36 @@ type VM struct {
 	bdGenWaitFlag   bool
 	bdGenFlag       bool
 
-	genlock      sync.Mutex
-	txSubmitChan <-chan struct{}
+	genlock               sync.Mutex
+	txSubmitChan          <-chan struct{}
+	atomicTxSubmitChan    chan struct{}
+	codec                 codec.Codec
+	clock                 timer.Clock
+	txFee                 uint64
+	pendingAtomicTxs      chan *Tx
+	blockAtomicInputCache cache.LRU
+
+	fx secp256k1fx.Fx
 }
+
+func (vm *VM) getAtomicTx(block *types.Block) *Tx {
+	extdata := block.ExtraData()
+	atx := new(Tx)
+	if err := vm.codec.Unmarshal(extdata, atx); err != nil {
+		return nil
+	}
+	atx.Sign(vm.codec, nil)
+	return atx
+}
+
+// Codec implements the secp256k1fx interface
+func (vm *VM) Codec() codec.Codec { return codec.NewDefault() }
+
+// Clock implements the secp256k1fx interface
+func (vm *VM) Clock() *timer.Clock { return &vm.clock }
+
+// Logger implements the secp256k1fx interface
+func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 /*
  ******************************************************************************
@@ -134,12 +230,20 @@ func (vm *VM) Initialize(
 	}
 
 	vm.chainID = g.Config.ChainID
+	vm.txFee = txFee
 
 	config := eth.DefaultConfig
 	config.ManualCanonical = true
 	config.Genesis = g
 	config.Miner.ManualMining = true
 	config.Miner.DisableUncle = true
+
+	// Set minimum price for mining and default gas price oracle value to the min
+	// gas price to prevent so transactions and blocks all use the correct fees
+	config.Miner.GasPrice = minGasPrice
+	config.GPO.Default = minGasPrice
+	config.TxPool.PriceLimit = minGasPrice.Uint64()
+
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
 	}
@@ -155,13 +259,23 @@ func (vm *VM) Initialize(
 		}
 		header.Extra = append(header.Extra, hid...)
 	})
-	chain.SetOnSeal(func(block *types.Block) error {
-		if len(block.Transactions()) == 0 {
-			// this could happen due to the async logic of geth tx pool
-			vm.newBlockChan <- nil
-			return errEmptyBlock
+	chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
+		select {
+		case atx := <-vm.pendingAtomicTxs:
+			if err := atx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state); err != nil {
+				vm.newBlockChan <- nil
+				return nil, err
+			}
+			raw, _ := vm.codec.Marshal(atx)
+			return raw, nil
+		default:
+			if len(txs) == 0 {
+				// this could happen due to the async logic of geth tx pool
+				vm.newBlockChan <- nil
+				return nil, errEmptyBlock
+			}
 		}
-		return nil
+		return nil, nil
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
 		vm.ctx.Log.Verbo("EVM sealed a block")
@@ -170,6 +284,9 @@ func (vm *VM) Initialize(
 			id:       ids.NewID(block.Hash()),
 			ethBlock: block,
 			vm:       vm,
+		}
+		if blk.Verify() != nil {
+			return errInvalidBlock
 		}
 		vm.newBlockChan <- blk
 		vm.updateStatus(ids.NewID(block.Hash()), choices.Processing)
@@ -181,8 +298,16 @@ func (vm *VM) Initialize(
 	chain.SetOnQueryAcceptedBlock(func() *types.Block {
 		return vm.getLastAccepted().ethBlock
 	})
-	vm.blockCache = cache.LRU{Size: 2048}
-	vm.blockStatusCache = cache.LRU{Size: 1024}
+	chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
+		tx := vm.getAtomicTx(block)
+		if tx == nil {
+			return nil
+		}
+		return tx.UnsignedTx.(UnsignedAtomicTx).EVMStateTransfer(state)
+	})
+	vm.blockCache = cache.LRU{Size: blockCacheSize}
+	vm.blockStatusCache = cache.LRU{Size: blockCacheSize}
+	vm.blockAtomicInputCache = cache.LRU{Size: blockCacheSize}
 	vm.newBlockChan = make(chan *Block)
 	vm.networkChan = toEngine
 	vm.blockDelayTimer = timer.NewTimer(func() {
@@ -206,6 +331,9 @@ func (vm *VM) Initialize(
 	vm.bdGenWaitFlag = true
 	vm.newTxPoolHeadChan = make(chan core.NewTxPoolHeadEvent, 1)
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
+	// TODO: read size from options
+	vm.pendingAtomicTxs = make(chan *Tx, 1024)
+	vm.atomicTxSubmitChan = make(chan struct{}, 1)
 	chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
 	// TODO: shutdown this go routine
 	go ctx.Log.RecoverAndPanic(func() {
@@ -254,22 +382,26 @@ func (vm *VM) Initialize(
 			case <-vm.txSubmitChan:
 				vm.ctx.Log.Verbo("New tx detected, trying to generate a block")
 				vm.tryBlockGen()
+			case <-vm.atomicTxSubmitChan:
+				vm.ctx.Log.Verbo("New atomic Tx detected, trying to generate a block")
+				vm.tryBlockGen()
 			case <-time.After(5 * time.Second):
 				vm.tryBlockGen()
 			}
 		}
 	})
+	vm.codec = Codec
 
-	return nil
+	return vm.fx.Initialize(vm)
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
 // bootstrapping
-func (vm *VM) Bootstrapping() error { return nil }
+func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 
 // Bootstrapped notifies this VM that the consensus engine has finished
 // bootstrapping
-func (vm *VM) Bootstrapped() error { return nil }
+func (vm *VM) Bootstrapped() error { return vm.fx.Bootstrapped() }
 
 // Shutdown implements the snowman.ChainVM interface
 func (vm *VM) Shutdown() error {
@@ -356,6 +488,26 @@ func (vm *VM) LastAccepted() ids.ID {
 	return vm.lastAccepted.ID()
 }
 
+// NewHandler returns a new Handler for a service where:
+//   * The handler's functionality is defined by [service]
+//     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)
+//   * The name of the service is [name]
+//   * The LockOption is the first element of [lockOption]
+//     By default the LockOption is WriteLock
+//     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
+func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) *commonEng.HTTPHandler {
+	server := geckorpc.NewServer()
+	server.RegisterCodec(geckojson.NewCodec(), "application/json")
+	server.RegisterCodec(geckojson.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterService(service, name)
+
+	var lock commonEng.LockOption = commonEng.WriteLock
+	if len(lockOption) != 0 {
+		lock = lockOption[0]
+	}
+	return &commonEng.HTTPHandler{LockOptions: lock, Handler: server}
+}
+
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 	handler := vm.chain.NewRPCHandler()
@@ -368,6 +520,7 @@ func (vm *VM) CreateHandlers() map[string]*commonEng.HTTPHandler {
 
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc": &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler},
+		"/ava": newHandler("ava", &AvaAPI{vm}),
 		"/ws":  &commonEng.HTTPHandler{LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
 	}
 }
@@ -402,10 +555,6 @@ func (vm *VM) updateStatus(blockID ids.ID, status choices.Status) {
 	vm.blockStatusCache.Put(blockID, status)
 }
 
-func (vm *VM) getCachedBlock(blockID ids.ID) *types.Block {
-	return vm.chain.GetBlockByHash(blockID.Key())
-}
-
 func (vm *VM) tryBlockGen() error {
 	vm.bdlock.Lock()
 	defer vm.bdlock.Unlock()
@@ -422,7 +571,7 @@ func (vm *VM) tryBlockGen() error {
 	if err != nil {
 		return err
 	}
-	if size == 0 {
+	if size == 0 && len(vm.pendingAtomicTxs) == 0 {
 		return nil
 	}
 
@@ -454,10 +603,11 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 	if statusIntf, ok := vm.blockStatusCache.Get(blockID); ok {
 		status = statusIntf.(choices.Status)
 	} else {
-		blk := vm.chain.GetBlockByHash(blockID.Key())
-		if blk == nil {
+		wrappedBlk := vm.getBlock(blockID)
+		if wrappedBlk == nil {
 			return choices.Unknown
 		}
+		blk := wrappedBlk.ethBlock
 		acceptedBlk := vm.lastAccepted.ethBlock
 
 		// TODO: There must be a better way of doing this.
@@ -468,7 +618,12 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 			highBlock, lowBlock = lowBlock, highBlock
 		}
 		for highBlock.Number().Cmp(lowBlock.Number()) > 0 {
-			highBlock = vm.chain.GetBlockByHash(highBlock.ParentHash())
+			parentBlock := vm.getBlock(ids.NewID(highBlock.ParentHash()))
+			if parentBlock == nil {
+				vm.blockStatusCache.Put(blockID, choices.Processing)
+				return choices.Processing
+			}
+			highBlock = parentBlock.ethBlock
 		}
 
 		if highBlock.Hash() == lowBlock.Hash() { // on the same branch
@@ -488,7 +643,7 @@ func (vm *VM) getBlock(id ids.ID) *Block {
 	if blockIntf, ok := vm.blockCache.Get(id); ok {
 		return blockIntf.(*Block)
 	}
-	ethBlock := vm.getCachedBlock(id)
+	ethBlock := vm.chain.GetBlockByHash(id.Key())
 	if ethBlock == nil {
 		return nil
 	}
@@ -530,4 +685,158 @@ func (vm *VM) getLastAccepted() *Block {
 	defer vm.metalock.Unlock()
 
 	return vm.lastAccepted
+}
+
+func (vm *VM) ParseEthAddress(addrStr string) (common.Address, error) {
+	if !common.IsHexAddress(addrStr) {
+		return common.Address{}, errInvalidAddr
+	}
+	return common.HexToAddress(addrStr), nil
+}
+
+func (vm *VM) FormatEthAddress(addr common.Address) (string, error) {
+	return addr.Hex(), nil
+}
+
+// ParseAddress takes in an address and produces the ID of the chain it's for
+// the ID of the address
+func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
+	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+
+	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+
+	expectedHRP := constants.GetHRP(vm.ctx.NetworkID)
+	if hrp != expectedHRP {
+		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
+			expectedHRP, hrp)
+	}
+
+	addr, err := ids.ToShortID(addrBytes)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+	return chainID, addr, nil
+}
+
+func (vm *VM) issueTx(tx *Tx) error {
+	select {
+	case vm.pendingAtomicTxs <- tx:
+		select {
+		case vm.atomicTxSubmitChan <- struct{}{}:
+		default:
+		}
+	default:
+		return errTooManyAtomicTx
+	}
+	return nil
+}
+
+// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
+// referenced in.
+func (vm *VM) GetAtomicUTXOs(
+	chainID ids.ID,
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
+	}
+
+	addrsList := make([][]byte, addrs.Len())
+	for i, addr := range addrs.List() {
+		addrsList[i] = addr.Bytes()
+	}
+
+	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
+		chainID,
+		addrsList,
+		startAddr.Bytes(),
+		startUTXOID.Bytes(),
+		limit,
+	)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
+	}
+
+	lastAddrID, err := ids.ToShortID(lastAddr)
+	if err != nil {
+		lastAddrID = ids.ShortEmpty
+	}
+	lastUTXOID, err := ids.ToID(lastUTXO)
+	if err != nil {
+		lastUTXOID = ids.Empty
+	}
+
+	utxos := make([]*avax.UTXO, len(allUTXOBytes))
+	for i, utxoBytes := range allUTXOBytes {
+		utxo := &avax.UTXO{}
+		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
+		}
+		utxos[i] = utxo
+	}
+	return utxos, lastAddrID, lastUTXOID, nil
+}
+
+func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
+	return PublicKeyToEthAddress(privKey.PublicKey())
+}
+
+func PublicKeyToEthAddress(pubKey crypto.PublicKey) common.Address {
+	return ethcrypto.PubkeyToAddress(
+		(*pubKey.(*crypto.PublicKeySECP256K1R).ToECDSA()))
+}
+
+func (vm *VM) GetSpendableCanonical(keys []*crypto.PrivateKeySECP256K1R, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+	// NOTE: should we use HEAD block or lastAccepted?
+	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
+	if err != nil {
+		return nil, nil, err
+	}
+	inputs := []EVMInput{}
+	signers := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, key := range keys {
+		if amount == 0 {
+			break
+		}
+		addr := GetEthAddress(key)
+		balance := new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		if balance == 0 {
+			continue
+		}
+		if amount < balance {
+			balance = amount
+		}
+		nonce, err := vm.GetAcceptedNonce(addr)
+		if err != nil {
+			return nil, nil, err
+		}
+		inputs = append(inputs, EVMInput{
+			Address: addr,
+			Amount:  balance,
+			Nonce:   nonce,
+		})
+		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
+		amount -= balance
+	}
+	if amount > 0 {
+		return nil, nil, errInsufficientFunds
+	}
+	return inputs, signers, nil
+}
+
+func (vm *VM) GetAcceptedNonce(address common.Address) (uint64, error) {
+	state, err := vm.chain.BlockState(vm.lastAccepted.ethBlock)
+	if err != nil {
+		return 0, err
+	}
+	return state.GetNonce(address), nil
 }

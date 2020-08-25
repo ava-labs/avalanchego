@@ -751,6 +751,7 @@ func (w *worker) updateSnapshot() {
 		w.current.txs,
 		uncles,
 		w.current.receipts,
+		nil,
 	)
 
 	w.snapshotState = w.current.state.Copy()
