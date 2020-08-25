@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/vms/components/missing"
 )
 
 // Block implements the snowman.Block interface
@@ -26,9 +28,21 @@ func (b *Block) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
 func (b *Block) Accept() error {
-	b.vm.ctx.Log.Verbo("Block %s is accepted", b.ID())
-	b.vm.updateStatus(b.ID(), choices.Accepted)
-	return nil
+	vm := b.vm
+
+	vm.ctx.Log.Verbo("Block %s is accepted", b.ID())
+	vm.updateStatus(b.ID(), choices.Accepted)
+
+	tx := vm.getAtomicTx(b.ethBlock)
+	if tx == nil {
+		return nil
+	}
+	utx, ok := tx.UnsignedTx.(UnsignedAtomicTx)
+	if !ok {
+		return errors.New("unknown tx type")
+	}
+
+	return utx.Accept(vm.ctx, nil)
 }
 
 // Reject implements the snowman.Block interface
@@ -50,17 +64,72 @@ func (b *Block) Status() choices.Status {
 // Parent implements the snowman.Block interface
 func (b *Block) Parent() snowman.Block {
 	parentID := ids.NewID(b.ethBlock.ParentHash())
-	block := &Block{
-		id:       parentID,
-		ethBlock: b.vm.getCachedBlock(parentID),
-		vm:       b.vm,
+	if block := b.vm.getBlock(parentID); block != nil {
+		b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", parentID, block.Status())
+		return block
 	}
-	b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", block.ID(), block.Status())
-	return block
+	b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", parentID, choices.Unknown)
+	return &missing.Block{BlkID: parentID}
 }
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
+	// Only enforce a minimum fee when bootstrapping has finished
+	if b.vm.ctx.IsBootstrapped() {
+		// Ensure the minimum gas price is paid for every transaction
+		for _, tx := range b.ethBlock.Transactions() {
+			if tx.GasPrice().Cmp(minGasPrice) < 0 {
+				return errInvalidBlock
+			}
+		}
+	}
+
+	vm := b.vm
+	tx := vm.getAtomicTx(b.ethBlock)
+	if tx != nil {
+		switch atx := tx.UnsignedTx.(type) {
+		case *UnsignedImportTx:
+			if b.ethBlock.Hash() == vm.genesisHash {
+				return nil
+			}
+			p := b.Parent()
+			path := []*Block{}
+			inputs := new(ids.Set)
+			for {
+				if p.Status() == choices.Accepted || p.(*Block).ethBlock.Hash() == vm.genesisHash {
+					break
+				}
+				if ret, hit := vm.blockAtomicInputCache.Get(p.ID()); hit {
+					inputs = ret.(*ids.Set)
+					break
+				}
+				path = append(path, p.(*Block))
+				p = p.Parent().(*Block)
+			}
+			for i := len(path) - 1; i >= 0; i-- {
+				inputsCopy := new(ids.Set)
+				p := path[i]
+				atx := vm.getAtomicTx(p.ethBlock)
+				if atx != nil {
+					inputs.Union(atx.UnsignedTx.(UnsignedAtomicTx).InputUTXOs())
+					inputsCopy.Union(*inputs)
+				}
+				vm.blockAtomicInputCache.Put(p.ID(), inputsCopy)
+			}
+			for _, in := range atx.InputUTXOs().List() {
+				if inputs.Contains(in) {
+					return errInvalidBlock
+				}
+			}
+		case *UnsignedExportTx:
+		default:
+			return errors.New("unknown atomic tx type")
+		}
+
+		if tx.UnsignedTx.(UnsignedAtomicTx).SemanticVerify(vm, tx) != nil {
+			return errInvalidBlock
+		}
+	}
 	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
 	return err
 }

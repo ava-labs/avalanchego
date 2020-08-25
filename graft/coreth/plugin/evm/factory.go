@@ -13,7 +13,13 @@ var (
 )
 
 // Factory ...
-type Factory struct{}
+type Factory struct {
+	Fee uint64
+}
 
 // New ...
-func (f *Factory) New() interface{} { return &VM{} }
+func (f *Factory) New() interface{} {
+	return &VM{
+		txFee: f.Fee,
+	}
+}

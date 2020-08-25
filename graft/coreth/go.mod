@@ -3,7 +3,7 @@ module github.com/ava-labs/coreth
 go 1.14
 
 require (
-	github.com/ava-labs/gecko v0.5.7
+	github.com/ava-labs/gecko v0.6.1-rc.1
 	github.com/ava-labs/go-ethereum v1.9.3
 	github.com/cespare/cp v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
@@ -11,7 +11,9 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
+	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3
 	github.com/golang/snappy v0.0.1
+	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-plugin v1.3.0
 	github.com/hashicorp/golang-lru v0.5.4
