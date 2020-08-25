@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/node"
+	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/go-ethereum/common"
 	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
@@ -81,8 +82,8 @@ const (
 
 var (
 	// minGasPrice is the number of nAVAX required per gas unit for a transaction
-	// to be valid
-	minGasPrice = big.NewInt(47)
+	// to be valid, measured in wei
+	minGasPrice = big.NewInt(47*params.GWei)
 
 	txFee = units.MilliAvax
 
