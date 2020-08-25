@@ -234,7 +234,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	DSStartTime := defaultGenesisTime.Add(10 * time.Second)
 	DSEndTime := DSStartTime.Add(5 * MinimumStakingDuration)
 
-	addDSTx, err := vm.newAddPrimaryValidatorTx(
+	addDSTx, err := vm.newAddValidatorTx(
 		vm.minStake,                             // stake amount
 		uint64(DSStartTime.Unix()),              // start time
 		uint64(DSEndTime.Unix()),                // end time

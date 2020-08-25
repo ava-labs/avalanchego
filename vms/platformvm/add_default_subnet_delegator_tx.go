@@ -26,12 +26,12 @@ var (
 	errInvalidState  = errors.New("generated output isn't valid state")
 	errInvalidAmount = errors.New("invalid amount")
 
-	_ UnsignedProposalTx = &UnsignedAddPrimaryDelegatorTx{}
-	_ TimedTx            = &UnsignedAddPrimaryDelegatorTx{}
+	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
+	_ TimedTx            = &UnsignedAddDelegatorTx{}
 )
 
-// UnsignedAddPrimaryDelegatorTx is an unsigned addPrimaryDelegatorTx
-type UnsignedAddPrimaryDelegatorTx struct {
+// UnsignedAddDelegatorTx is an unsigned addDelegatorTx
+type UnsignedAddDelegatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
@@ -43,17 +43,17 @@ type UnsignedAddPrimaryDelegatorTx struct {
 }
 
 // StartTime of this validator
-func (tx *UnsignedAddPrimaryDelegatorTx) StartTime() time.Time {
+func (tx *UnsignedAddDelegatorTx) StartTime() time.Time {
 	return tx.Validator.StartTime()
 }
 
 // EndTime of this validator
-func (tx *UnsignedAddPrimaryDelegatorTx) EndTime() time.Time {
+func (tx *UnsignedAddDelegatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddPrimaryDelegatorTx) Verify(
+func (tx *UnsignedAddDelegatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
 	feeAmount uint64,
@@ -102,7 +102,7 @@ func (tx *UnsignedAddPrimaryDelegatorTx) Verify(
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *UnsignedAddPrimaryDelegatorTx) SemanticVerify(
+func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vm *VM,
 	db database.Database,
 	stx *Tx,
@@ -140,7 +140,7 @@ func (tx *UnsignedAddPrimaryDelegatorTx) SemanticVerify(
 	}
 
 	if validator, err := currentValidators.getPrimaryStaker(tx.Validator.NodeID); err == nil {
-		unsignedValidator := validator.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+		unsignedValidator := validator.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
@@ -151,7 +151,7 @@ func (tx *UnsignedAddPrimaryDelegatorTx) SemanticVerify(
 		if err != nil {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
-		unsignedValidator := validator.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+		unsignedValidator := validator.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
@@ -202,12 +202,12 @@ func (tx *UnsignedAddPrimaryDelegatorTx) SemanticVerify(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *UnsignedAddPrimaryDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx *UnsignedAddDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
 // Creates a new transaction
-func (vm *VM) newAddPrimaryDelegatorTx(
+func (vm *VM) newAddDelegatorTx(
 	stakeAmt, // Amount the delegator stakes
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
@@ -220,7 +220,7 @@ func (vm *VM) newAddPrimaryDelegatorTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 	// Create the tx
-	utx := &UnsignedAddPrimaryDelegatorTx{
+	utx := &UnsignedAddDelegatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,

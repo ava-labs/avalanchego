@@ -48,8 +48,8 @@ func (h *EventHeap) Less(i, j int) bool {
 	case iTime.Unix() < jTime.Unix():
 		return true
 	case iTime == jTime:
-		_, iOk := iTx.(*UnsignedAddPrimaryValidatorTx)
-		_, jOk := jTx.(*UnsignedAddPrimaryValidatorTx)
+		_, iOk := iTx.(*UnsignedAddValidatorTx)
+		_, jOk := jTx.(*UnsignedAddValidatorTx)
 
 		if iOk != jOk {
 			return iOk == h.SortByStartTime
@@ -98,7 +98,7 @@ func (h *EventHeap) Bytes() ([]byte, error) {
 // getPrimaryStaker ...
 func (h *EventHeap) getPrimaryStaker(id ids.ShortID) (*Tx, error) {
 	for _, txIntf := range h.Txs {
-		tx, ok := txIntf.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+		tx, ok := txIntf.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !ok {
 			continue
 		}

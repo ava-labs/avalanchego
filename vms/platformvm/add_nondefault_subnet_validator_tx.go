@@ -111,7 +111,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current validators of primary network: %v", err)}
 	}
 	if dsValidator, err := currentDSValidators.getPrimaryStaker(tx.Validator.NodeID); err == nil {
-		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating primary network [%v, %v]",
@@ -130,7 +130,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("validator would not be validating primary network while validating subnet")}
 		}
-		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
 				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating primary network [%v, %v]",

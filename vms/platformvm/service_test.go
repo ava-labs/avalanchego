@@ -72,9 +72,9 @@ func defaultAddress(t *testing.T, service *Service) {
 	}
 }
 
-func TestAddPrimaryValidator(t *testing.T) {
+func TestAddValidator(t *testing.T) {
 	expectedJSONString := `{"startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000","username":"","password":""}`
-	args := AddPrimaryValidatorArgs{}
+	args := AddValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
 		t.Fatal(err)
@@ -235,7 +235,7 @@ func TestGetTx(t *testing.T) {
 		test{
 			"proposal block",
 			func() (*Tx, error) {
-				return service.vm.newAddPrimaryValidatorTx( // Test GetTx works for proposal blocks
+				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.minStake,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
 					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),

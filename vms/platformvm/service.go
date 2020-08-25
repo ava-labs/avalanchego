@@ -538,7 +538,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	if args.SubnetID.Equals(constants.PrimaryNetworkID) {
 		for i, tx := range validators.Txs {
 			switch tx := tx.UnsignedTx.(type) {
-			case *UnsignedAddPrimaryValidatorTx:
+			case *UnsignedAddValidatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -546,7 +546,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
-			case *UnsignedAddPrimaryDelegatorTx:
+			case *UnsignedAddDelegatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -602,7 +602,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	for i, tx := range validators.Txs {
 		if args.SubnetID.Equals(constants.PrimaryNetworkID) {
 			switch tx := tx.UnsignedTx.(type) {
-			case *UnsignedAddPrimaryValidatorTx:
+			case *UnsignedAddValidatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -610,7 +610,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 					EndTime:     json.Uint64(tx.EndTime().Unix()),
 					StakeAmount: &weight,
 				}
-			case *UnsignedAddPrimaryDelegatorTx:
+			case *UnsignedAddDelegatorTx:
 				weight := json.Uint64(tx.Validator.Weight())
 				reply.Validators[i] = FormattedAPIValidator{
 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -687,17 +687,17 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
  ******************************************************
  */
 
-// AddPrimaryValidatorArgs are the arguments to AddPrimaryValidator
-type AddPrimaryValidatorArgs struct {
+// AddValidatorArgs are the arguments to AddValidator
+type AddValidatorArgs struct {
 	FormattedAPIPrimaryValidator
 
 	api.UserPass
 }
 
-// AddPrimaryValidator creates and signs and issues a transaction to add a
+// AddValidator creates and signs and issues a transaction to add a
 // validator to the primary network
-func (service *Service) AddPrimaryValidator(_ *http.Request, args *AddPrimaryValidatorArgs, reply *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: AddPrimaryValidator called")
+func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: AddValidator called")
 	switch {
 	case args.RewardAddress == "":
 		return errNoRewardAddress
@@ -735,7 +735,7 @@ func (service *Service) AddPrimaryValidator(_ *http.Request, args *AddPrimaryVal
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddPrimaryValidatorTx(
+	tx, err := service.vm.newAddValidatorTx(
 		uint64(args.weight()),                // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
@@ -752,17 +752,17 @@ func (service *Service) AddPrimaryValidator(_ *http.Request, args *AddPrimaryVal
 	return service.vm.issueTx(tx)
 }
 
-// AddPrimaryDelegatorArgs are the arguments to AddPrimaryDelegator
-type AddPrimaryDelegatorArgs struct {
+// AddDelegatorArgs are the arguments to AddDelegator
+type AddDelegatorArgs struct {
 	FormattedAPIValidator
 	api.UserPass
 	RewardAddress string `json:"rewardAddress"`
 }
 
-// AddPrimaryDelegator creates and signs and issues a transaction to add a
+// AddDelegator creates and signs and issues a transaction to add a
 // delegator to the primary network
-func (service *Service) AddPrimaryDelegator(_ *http.Request, args *AddPrimaryDelegatorArgs, reply *api.JsonTxID) error {
-	service.vm.Ctx.Log.Info("Platform: AddPrimaryDelegator called")
+func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JsonTxID) error {
+	service.vm.Ctx.Log.Info("Platform: AddDelegator called")
 	switch {
 	case int64(args.StartTime) < time.Now().Unix():
 		return fmt.Errorf("start time must be in the future")
@@ -798,7 +798,7 @@ func (service *Service) AddPrimaryDelegator(_ *http.Request, args *AddPrimaryDel
 	}
 
 	// Create the transaction
-	tx, err := service.vm.newAddPrimaryDelegatorTx(
+	tx, err := service.vm.newAddDelegatorTx(
 		uint64(args.weight()),  // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time

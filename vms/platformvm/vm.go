@@ -128,9 +128,9 @@ func init() {
 		Codec.RegisterType(&secp256k1fx.Input{}),
 		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
 
-		Codec.RegisterType(&UnsignedAddPrimaryValidatorTx{}),
+		Codec.RegisterType(&UnsignedAddValidatorTx{}),
 		Codec.RegisterType(&UnsignedAddSubnetValidatorTx{}),
-		Codec.RegisterType(&UnsignedAddPrimaryDelegatorTx{}),
+		Codec.RegisterType(&UnsignedAddDelegatorTx{}),
 
 		Codec.RegisterType(&UnsignedCreateChainTx{}),
 		Codec.RegisterType(&UnsignedCreateSubnetTx{}),
@@ -836,7 +836,7 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 	for pending.Len() > 0 {
 		nextTx := pending.Peek() // pending staker with earliest start time
 		switch tx := nextTx.UnsignedTx.(type) {
-		case *UnsignedAddPrimaryValidatorTx:
+		case *UnsignedAddValidatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				return current, pending, started, stopped, nil
 			}
@@ -850,7 +850,7 @@ func (vm *VM) calculateValidators(db database.Database, timestamp time.Time, sub
 			current.Add(nextTx)
 			pending.Remove()
 			started.Add(tx.Validator.ID())
-		case *UnsignedAddPrimaryDelegatorTx:
+		case *UnsignedAddDelegatorTx:
 			if timestamp.Before(tx.StartTime()) {
 				return current, pending, started, stopped, nil
 			}
@@ -869,9 +869,9 @@ func (vm *VM) getValidators(validatorEvents *EventHeap) []validators.Validator {
 	for _, event := range validatorEvents.Txs {
 		var vdr validators.Validator
 		switch tx := event.UnsignedTx.(type) {
-		case *UnsignedAddPrimaryValidatorTx:
+		case *UnsignedAddValidatorTx:
 			vdr = &tx.Validator
-		case *UnsignedAddPrimaryDelegatorTx:
+		case *UnsignedAddDelegatorTx:
 			vdr = &tx.Validator
 		case *UnsignedAddSubnetValidatorTx:
 			vdr = &tx.Validator

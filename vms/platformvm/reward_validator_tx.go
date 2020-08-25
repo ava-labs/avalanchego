@@ -112,7 +112,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	}
 
 	switch uVdrTx := vdrTx.UnsignedTx.(type) {
-	case *UnsignedAddPrimaryValidatorTx:
+	case *UnsignedAddValidatorTx:
 		// Refund the stake here
 		for i, out := range uVdrTx.Stake {
 			utxo := &avax.UTXO{
@@ -153,13 +153,13 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				return nil, nil, nil, nil, tempError{err}
 			}
 		}
-	case *UnsignedAddPrimaryDelegatorTx:
+	case *UnsignedAddDelegatorTx:
 		// We're removing a delegator
 		parentTx, err := primaryNetworkVdrHeap.getPrimaryStaker(uVdrTx.Validator.NodeID)
 		if err != nil {
 			return nil, nil, nil, nil, permError{err}
 		}
-		unsignedParentTx := parentTx.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+		unsignedParentTx := parentTx.UnsignedTx.(*UnsignedAddValidatorTx)
 
 		// Refund the stake here
 		for i, out := range uVdrTx.Stake {

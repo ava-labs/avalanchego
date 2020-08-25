@@ -352,7 +352,7 @@ func TestGenesis(t *testing.T) {
 }
 
 // accept proposal to add validator to primary network
-func TestAddPrimaryValidatorCommit(t *testing.T) {
+func TestAddidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -369,7 +369,7 @@ func TestAddPrimaryValidatorCommit(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create valid tx
-	tx, err := vm.newAddPrimaryValidatorTx(
+	tx, err := vm.newAddValidatorTx(
 		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -431,7 +431,7 @@ func TestAddPrimaryValidatorCommit(t *testing.T) {
 }
 
 // verify invalid proposal to add validator to primary network
-func TestInvalidAddPrimaryValidatorCommit(t *testing.T) {
+func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -445,7 +445,7 @@ func TestInvalidAddPrimaryValidatorCommit(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create invalid tx
-	if tx, err := vm.newAddPrimaryValidatorTx(
+	if tx, err := vm.newAddValidatorTx(
 		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -477,7 +477,7 @@ func TestInvalidAddPrimaryValidatorCommit(t *testing.T) {
 }
 
 // Reject proposal to add validator to primary network
-func TestAddPrimaryValidatorReject(t *testing.T) {
+func TestAddValidatorReject(t *testing.T) {
 	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
@@ -491,7 +491,7 @@ func TestAddPrimaryValidatorReject(t *testing.T) {
 	ID := key.PublicKey().Address()
 
 	// create valid tx
-	tx, err := vm.newAddPrimaryValidatorTx(
+	tx, err := vm.newAddValidatorTx(
 		vm.minStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),

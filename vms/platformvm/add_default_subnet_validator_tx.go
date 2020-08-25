@@ -30,12 +30,12 @@ var (
 	errStakeTooLong   = errors.New("staking period is too long")
 	errTooManyShares  = fmt.Errorf("a staker can only require at most %d shares from delegators", NumberOfShares)
 
-	_ UnsignedProposalTx = &UnsignedAddPrimaryValidatorTx{}
-	_ TimedTx            = &UnsignedAddPrimaryValidatorTx{}
+	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
+	_ TimedTx            = &UnsignedAddValidatorTx{}
 )
 
-// UnsignedAddPrimaryValidatorTx is an unsigned addPrimaryValidatorTx
-type UnsignedAddPrimaryValidatorTx struct {
+// UnsignedAddValidatorTx is an unsigned addValidatorTx
+type UnsignedAddValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
@@ -50,17 +50,17 @@ type UnsignedAddPrimaryValidatorTx struct {
 }
 
 // StartTime of this validator
-func (tx *UnsignedAddPrimaryValidatorTx) StartTime() time.Time {
+func (tx *UnsignedAddValidatorTx) StartTime() time.Time {
 	return tx.Validator.StartTime()
 }
 
 // EndTime of this validator
-func (tx *UnsignedAddPrimaryValidatorTx) EndTime() time.Time {
+func (tx *UnsignedAddValidatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddPrimaryValidatorTx) Verify(
+func (tx *UnsignedAddValidatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
 	feeAmount uint64,
@@ -110,7 +110,7 @@ func (tx *UnsignedAddPrimaryValidatorTx) Verify(
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *UnsignedAddPrimaryValidatorTx) SemanticVerify(
+func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
 	db database.Database,
 	stx *Tx,
@@ -203,12 +203,12 @@ func (tx *UnsignedAddPrimaryValidatorTx) SemanticVerify(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *UnsignedAddPrimaryValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx *UnsignedAddValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
-// NewAddPrimaryValidatorTx returns a new NewAddPrimaryValidatorTx
-func (vm *VM) newAddPrimaryValidatorTx(
+// NewAddValidatorTx returns a new NewAddValidatorTx
+func (vm *VM) newAddValidatorTx(
 	stakeAmt, // Amount the delegator stakes
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
@@ -222,7 +222,7 @@ func (vm *VM) newAddPrimaryValidatorTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 	// Create the tx
-	utx := &UnsignedAddPrimaryValidatorTx{
+	utx := &UnsignedAddValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,

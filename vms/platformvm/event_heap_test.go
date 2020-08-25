@@ -20,7 +20,7 @@ func TestTxHeapStart(t *testing.T) {
 
 	txHeap := EventHeap{SortByStartTime: true}
 
-	validator0, err := vm.newAddPrimaryValidatorTx(
+	validator0, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
@@ -32,9 +32,9 @@ func TestTxHeapStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr0Tx := validator0.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+	vdr0Tx := validator0.UnsignedTx.(*UnsignedAddValidatorTx)
 
-	validator1, err := vm.newAddPrimaryValidatorTx(
+	validator1, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+2), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+2), // endTime
@@ -46,9 +46,9 @@ func TestTxHeapStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr1Tx := validator1.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+	vdr1Tx := validator1.UnsignedTx.(*UnsignedAddValidatorTx)
 
-	validator2, err := vm.newAddPrimaryValidatorTx(
+	validator2, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+3), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+3), // endTime
@@ -60,7 +60,7 @@ func TestTxHeapStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr2Tx := validator2.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+	vdr2Tx := validator2.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	txHeap.Add(validator2)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.StartTime()) {
@@ -90,7 +90,7 @@ func TestTxHeapStop(t *testing.T) {
 
 	txHeap := EventHeap{}
 
-	validator0, err := vm.newAddPrimaryValidatorTx(
+	validator0, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
@@ -102,9 +102,9 @@ func TestTxHeapStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr0Tx := validator0.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+	vdr0Tx := validator0.UnsignedTx.(*UnsignedAddValidatorTx)
 
-	validator1, err := vm.newAddPrimaryValidatorTx(
+	validator1, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+2), // endTime
@@ -116,9 +116,9 @@ func TestTxHeapStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr1Tx := validator1.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+	vdr1Tx := validator1.UnsignedTx.(*UnsignedAddValidatorTx)
 
-	validator2, err := vm.newAddPrimaryValidatorTx(
+	validator2, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+3), // endTime
@@ -130,7 +130,7 @@ func TestTxHeapStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr2Tx := validator2.UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+	vdr2Tx := validator2.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	txHeap.Add(validator2)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.EndTime()) {
@@ -160,7 +160,7 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 
 	txHeap := EventHeap{SortByStartTime: true}
 
-	validator, err := vm.newAddPrimaryValidatorTx(
+	validator, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
@@ -173,7 +173,7 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	delegator, err := vm.newAddPrimaryDelegatorTx(
+	delegator, err := vm.newAddDelegatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
@@ -203,7 +203,7 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 
 	txHeap := EventHeap{}
 
-	validator, err := vm.newAddPrimaryValidatorTx(
+	validator, err := vm.newAddValidatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime
@@ -216,7 +216,7 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	delegator, err := vm.newAddPrimaryDelegatorTx(
+	delegator, err := vm.newAddDelegatorTx(
 		vm.minStake,                         // stake amount
 		uint64(defaultGenesisTime.Unix()+1), // startTime
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()+1), // endTime

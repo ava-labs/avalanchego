@@ -28,7 +28,7 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	// ID of validator that should leave DS validator set next
-	nextToRemove := currentValidators.Peek().UnsignedTx.(*UnsignedAddPrimaryValidatorTx)
+	nextToRemove := currentValidators.Peek().UnsignedTx.(*UnsignedAddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(nextToRemove.ID()); err != nil {
@@ -114,7 +114,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestShortID()
-	vdrTx, err := vm.newAddPrimaryValidatorTx(
+	vdrTx, err := vm.newAddValidatorTx(
 		vm.minStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -129,7 +129,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 	delStartTime := vdrStartTime + 1
 	delEndTime := vdrEndTime - 1
-	delTx, err := vm.newAddPrimaryDelegatorTx(
+	delTx, err := vm.newAddDelegatorTx(
 		vm.minStake, // stakeAmt
 		delStartTime,
 		delEndTime,
@@ -140,7 +140,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unsignedDelTx := delTx.UnsignedTx.(*UnsignedAddPrimaryDelegatorTx)
+	unsignedDelTx := delTx.UnsignedTx.(*UnsignedAddDelegatorTx)
 
 	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
