@@ -12,8 +12,9 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/utils/formatting"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 // DirectedFactory implements Factory by returning a directed struct
@@ -37,20 +38,7 @@ type Directed struct {
 }
 
 type directedTx struct {
-	// bias is the number of times this transaction was the successful result of
-	// a network poll
-	bias int
-
-	// confidence is the number of consecutive times this transaction was the
-	// successful result of a network poll as of [lastVote]
-	confidence int
-
-	// lastVote is the last poll number that this transaction was included in a
-	// successful network poll
-	lastVote int
-
-	// rogue identifies if there is a known conflict with this transaction
-	rogue bool
+	snowball
 
 	// pendingAccept identifies if this transaction has been marked as accepted
 	// once its transitive dependencies have also been accepted
@@ -73,7 +61,10 @@ type directedTx struct {
 }
 
 // Initialize implements the Consensus interface
-func (dg *Directed) Initialize(ctx *snow.Context, params snowball.Parameters) error {
+func (dg *Directed) Initialize(
+	ctx *snow.Context,
+	params sbcon.Parameters,
+) error {
 	dg.txs = make(map[[32]byte]*directedTx)
 	dg.utxos = make(map[[32]byte]ids.Set)
 
@@ -171,10 +162,10 @@ func (dg *Directed) Add(tx Tx) error {
 		// this UTXO
 		spenders := dg.utxos[inputKey]
 
-		// Add all the txs that spend this UTXO to this tx's conflicts that are
-		// preferred over this tx. We know all these tx's are preferred over
-		// this tx, because this tx currently has a bias of 0 and the tie-break
-		// goes to the tx whose bias was updated first.
+		// Add all the txs that spend this UTXO to this txs conflicts that are
+		// preferred over this tx. We know all these txs are preferred over
+		// this tx, because this tx currently has a bias of 0 and the tie goes
+		// to the tx whose bias was updated first.
 		txNode.outs.Union(spenders)
 
 		// Update txs conflicting with tx to account for its issuance
@@ -261,41 +252,52 @@ func (dg *Directed) Issued(tx Tx) bool {
 
 // RecordPoll implements the Consensus interface
 func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
+	// Increase the vote ID. This is updated here and is used to reset the
+	// confidence values of transactions lazily.
 	dg.currentVote++
+
+	// Changed tracks if the Avalanche instance needs to recompute its
+	// frontiers. Frontiers only need to be recalculated if preferences change
+	// or if a tx was accepted.
 	changed := false
 
+	// We only want to iterate over txs that received alpha votes
 	votes.SetThreshold(dg.params.Alpha)
-	threshold := votes.Threshold() // Each element is ID of transaction preferred by >= Alpha poll respondents
-	for _, toInc := range threshold.List() {
-		incKey := toInc.Key()
-		txNode, exist := dg.txs[incKey]
+	// Get the set of IDs that meet this alpha threshold
+	metThreshold := votes.Threshold()
+	for _, txID := range metThreshold.List() {
+		txKey := txID.Key()
+
+		// Get the node this tx represents
+		txNode, exist := dg.txs[txKey]
 		if !exist {
-			// Votes for decided consumers are ignored
+			// This tx may have already been accepted because of tx
+			// dependencies. If this is the case, we can just drop the vote.
 			continue
 		}
 
-		if txNode.lastVote+1 != dg.currentVote {
-			txNode.confidence = 0
-		}
-		txNode.lastVote = dg.currentVote
+		txNode.RecordSuccessfulPoll(dg.currentVote)
 
-		dg.ctx.Log.Verbo("Increasing (bias, confidence) of %s from (%d, %d) to (%d, %d)",
-			toInc, txNode.bias, txNode.confidence, txNode.bias+1, txNode.confidence+1)
+		dg.ctx.Log.Verbo("Updated TxID=%s to have consensus state=%s",
+			txID, &txNode.snowball)
 
-		txNode.bias++
-		txNode.confidence++
-
+		// If the tx should be accepted, then we should defer its acceptance
+		// until its dependencies are decided. However, if this tx was
+		// already marked to be accepted, we shouldn't register it again.
 		if !txNode.pendingAccept &&
-			((!txNode.rogue && txNode.confidence >= dg.params.BetaVirtuous) ||
-				txNode.confidence >= dg.params.BetaRogue) {
+			txNode.Finalized(dg.params.BetaVirtuous, dg.params.BetaRogue) {
 			dg.deferAcceptance(txNode)
 			if dg.errs.Errored() {
 				return changed, dg.errs.Err
 			}
 		}
+
 		if !txNode.accepted {
+			// If this tx wasn't accepted, then this instance is only changed if
+			// preferences changed.
 			changed = dg.redirectEdges(txNode) || changed
 		} else {
+			// By accepting a tx, the state of this instance has changed.
 			changed = true
 		}
 	}
@@ -307,31 +309,24 @@ func (dg *Directed) String() string {
 	for _, tx := range dg.txs {
 		nodes = append(nodes, tx)
 	}
+	// Sort the nodes so that the string representation is canonical
 	sortTxNodes(nodes)
 
 	sb := strings.Builder{}
-
 	sb.WriteString("DG(")
 
 	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s Confidence: %s Bias: %%d",
-		formatting.IntFormat(len(dg.txs)-1),
-		formatting.IntFormat(dg.params.BetaRogue-1))
-
+		"\n    Choice[%s] = ID: %%50s %%s",
+		formatting.IntFormat(len(dg.txs)-1))
 	for i, txNode := range nodes {
-		confidence := txNode.confidence
-		if txNode.lastVote != dg.currentVote {
-			confidence = 0
-		}
 		sb.WriteString(fmt.Sprintf(format,
-			i, txNode.tx.ID(), confidence, txNode.bias))
+			i, txNode.tx.ID(), txNode.snowball.CurrentString(dg.currentVote)))
 	}
 
 	if len(nodes) > 0 {
 		sb.WriteString("\n")
 	}
 	sb.WriteString(")")
-
 	return sb.String()
 }
 
@@ -390,7 +385,7 @@ func (dg *Directed) redirectEdges(tx *directedTx) bool {
 func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 	nodeID := txNode.tx.ID()
 	conflict := dg.txs[conflictID.Key()]
-	if txNode.bias <= conflict.bias {
+	if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {
 		return false
 	}
 

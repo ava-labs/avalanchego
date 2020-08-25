@@ -11,8 +11,9 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/utils/formatting"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 // InputFactory implements Factory by returning an input struct
@@ -53,7 +54,7 @@ type inputUtxo struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (ig *Input) Initialize(ctx *snow.Context, params snowball.Parameters) error {
+func (ig *Input) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 	ig.txs = make(map[[32]byte]inputTx)
 	ig.utxos = make(map[[32]byte]inputUtxo)
 

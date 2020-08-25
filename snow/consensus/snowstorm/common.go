@@ -8,9 +8,10 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/wrappers"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 type common struct {
@@ -21,7 +22,7 @@ type common struct {
 	ctx *snow.Context
 
 	// params describes how this instance was parameterized
-	params snowball.Parameters
+	params sbcon.Parameters
 
 	// each element of preferences is the ID of a transaction that is preferred
 	preferences ids.Set
@@ -46,7 +47,7 @@ type common struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (c *common) Initialize(ctx *snow.Context, params snowball.Parameters) error {
+func (c *common) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 	c.ctx = ctx
 	c.params = params
 
@@ -57,7 +58,7 @@ func (c *common) Initialize(ctx *snow.Context, params snowball.Parameters) error
 }
 
 // Parameters implements the Snowstorm interface
-func (c *common) Parameters() snowball.Parameters { return c.params }
+func (c *common) Parameters() sbcon.Parameters { return c.params }
 
 // Virtuous implements the ConflictGraph interface
 func (c *common) Virtuous() ids.Set { return c.virtuous }
