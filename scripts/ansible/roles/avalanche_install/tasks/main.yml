@@ -3,7 +3,12 @@
   file:
     path: "{{ item.path }}"
     state: directory
-    mode: preserve
+    # This task intentionally leaves the owner, group, & mode unspecified.
+    # The intention is to preserve permissions chosen by the Operating System
+    # vendor, in the case that e.g. /var/local has been created by them.
+    # You might think `mode: preserve` does this, but that is not supported
+    # with `state: directory`. ansible-lint erroneously flags this as E208.
+    # See: https://github.com/ansible/ansible/issues/71377
   loop:
     - path: "{{ sharedstatedir }}"
     - path: "{{ logdir }}"
