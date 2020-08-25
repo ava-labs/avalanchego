@@ -163,6 +163,7 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // Returns:
 //   1) IDs of accepted vertices, or the empty set if there are none
 //   2) IDs of rejected vertices, or the empty set if there are none
+// If an error is returned, both of the above returned sets are nil
 func (ts *Topological) RecordPoll(voteBag ids.Bag) (ids.Set, ids.Set, error) {
 	var voteStack []votes
 	if voteBag.Len() >= ts.params.Alpha {
@@ -315,6 +316,7 @@ func (ts *Topological) pushVotes(
 //   1) The tail
 //   2) IDs of accepted blocks, or the empty set if there are none
 //   3) IDs of rejected blocks, or the empty set if there are none
+// If an error is returned, (2) and (3) are both nil
 func (ts *Topological) vote(voteStack []votes) (ids.ID, ids.Set, ids.Set, error) {
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.

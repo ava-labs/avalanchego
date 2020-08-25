@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/consensus/snowman"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -49,9 +50,21 @@ func (v *voter) Update() {
 	results = v.bubbleVotes(results)
 
 	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
-	if _, _, err := v.t.Consensus.RecordPoll(results); err != nil { // TODO use accepted/rejected vertices here
+	accepted, rejected, err := v.t.Consensus.RecordPoll(results)
+	if err != nil {
 		v.t.errs.Add(err)
 		return
+	}
+	// Unpin accepted and rejected blocks from memory
+	for _, acceptedID := range accepted.List() {
+		v.t.decidedCache.Put(acceptedID, nil)
+		v.t.droppedCache.Evict(acceptedID) // Remove from dropped cache, if it was in there
+		delete(v.t.processing, acceptedID.Key())
+	}
+	for _, rejectedID := range rejected.List() {
+		v.t.decidedCache.Put(rejectedID, nil)
+		v.t.droppedCache.Evict(rejectedID) // Remove from dropped cache, if it was in there
+		delete(v.t.processing, rejectedID.Key())
 	}
 
 	v.t.VM.SetPreference(v.t.Consensus.Preference())
@@ -69,9 +82,14 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.VM.GetBlock(vote)
-		if err != nil {
-			continue
+		blk, ok := v.t.processing[vote.Key()] // Check if the block is non-dropped and processing
+		if !ok {
+			blkIntf, ok := v.t.droppedCache.Get(vote) // See if the block was dropped
+			if ok {                                   // The block was dropped before but we still have it.
+				blk = blkIntf.(snowman.Block)
+			} else { // Couldn't find the block that this vote is for. Skip it.
+				continue
+			}
 		}
 
 		for blk.Status().Fetched() && !v.t.Consensus.Issued(blk) {

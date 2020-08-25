@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -25,6 +26,12 @@ const (
 	// TODO define this constant in one place rather than here and in snowman
 	// Max containers size in a MultiPut message
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
+
+	// Max size of cache of accepted/rejected block IDs
+	decidedCacheSize = 5000
+
+	// Max size of cache of dropped blocks
+	droppedCacheSize = 1000
 )
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -54,9 +61,20 @@ type Transitive struct {
 
 	// Key: ID of a processing block
 	// Value: The block
-	// Invariant 1: All processing blocks are in this map
-	// Invariant 2: Every block in this map is processing
+	// Invariant: Every block in this map is processing
+	// If a block is dropped, it will be removed from this map.
+	// However, it may be re-added later.
 	processing map[[32]byte]snowman.Block
+
+	// Cache of decided block IDs.
+	// Key: Block ID
+	// Value: nil
+	decidedCache cache.LRU
+
+	// Cache of dropped blocks
+	// We keep this so that if we drop a block and receive a query for it,
+	// we don't need to fetch the block again
+	droppedCache cache.LRU
 }
 
 // Initialize implements the Engine interface
@@ -72,6 +90,9 @@ func (t *Transitive) Initialize(config Config) error {
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
+	t.processing = map[[32]byte]snowman.Block{}
+	t.decidedCache = cache.LRU{Size: decidedCacheSize}
+	t.droppedCache = cache.LRU{Size: droppedCacheSize}
 
 	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return err
@@ -211,6 +232,10 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 		// abandon the request.
 		return t.GetFailed(vdr, requestID)
 	}
+	if blk.Status() == choices.Processing { // Pin this block in memory until it's decided or dropped
+		t.processing[blk.ID().Key()] = blk
+		t.droppedCache.Evict(blkID)
+	}
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, vdr will
@@ -289,6 +314,12 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
 		return nil
+	} else if !blk.ID().Equals(blkID) {
+		t.Ctx.Log.Debug("query said block's ID is %s but parsed ID %s. Dropping query", blkID, blk.ID())
+		return nil
+	} else if blk.Status() == choices.Processing { // Pin this block in memory until it's decided or dropped
+		t.processing[blkID.Key()] = blk
+		t.droppedCache.Evict(blkID)
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -301,7 +332,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 	}
 
 	// register the chit request
-	return t.PullQuery(vdr, requestID, blk.ID())
+	return t.PullQuery(vdr, requestID, blkID)
 }
 
 // Chits implements the Engine interface
@@ -379,11 +410,16 @@ func (t *Transitive) Notify(msg common.Message) error {
 			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
 			return nil
 		}
+		blkID := blk.ID()
 
 		// a newly created block is expected to be processing. If this check
 		// fails, there is potentially an error in the VM this engine is running
 		if status := blk.Status(); status != choices.Processing {
-			t.Ctx.Log.Warn("attempting to issue a block with status: %s, expected Processing", status)
+			t.Ctx.Log.Warn("attempted to issue a block with status: %s, expected Processing", status)
+			return nil // TODO should we return an error here?
+		} else if t.pending.Contains(blkID) || t.Consensus.Issued(blk) {
+			t.Ctx.Log.Warn("attemped to issue already issued block %s", blkID)
+			return nil // TODO should we return an error here?
 		}
 
 		// The newly created block should be built on top of the preferred block.
@@ -393,6 +429,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
 
+		t.processing[blkID.Key()] = blk
+		t.droppedCache.Evict(blkID)
 		added, err := t.issueWithAncestors(blk)
 		if err != nil {
 			return err
@@ -426,12 +464,28 @@ func (t *Transitive) repoll() {
 // If we do not have [blkID], request it.
 // Returns true if the block was issued, now or previously, to consensus.
 func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
+	// See if block [blkID] was recently accepted/rejected.
+	_, wasDecided := t.decidedCache.Get(blkID)
+	if wasDecided {
+		// Block [blkID] was decided, so it must have been previously added to consensus.
+		return true, nil
+	}
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
+		// We don't have block [blkID]. Request it from [vdr].
 		t.sendRequest(vdr, blkID)
 		return false, nil
 	}
+	// We have block [blkID]
+	if status := blk.Status(); status == choices.Accepted || status == choices.Rejected {
+		// block [blkID] has already been decided.
+		t.decidedCache.Put(blkID, nil)
+		return true, nil
+	}
+	// We have block [blkID] but it's not yet decided.
+	// Queue it to be added to consensus.
 	return t.issueFrom(vdr, blk)
+
 }
 
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
@@ -500,7 +554,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
 
-	// Will add [blk] to consensus once its ancestors have been
+	// Will add [blk] to consensus once its ancestors have been added
 	i := &issuer{
 		t:   t,
 		blk: blk,
@@ -591,7 +645,8 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// Make sure this block is valid
 	if err := blk.Verify(); err != nil {
 		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
-
+		delete(t.processing, blkID.Key()) // Unpin from memory
+		t.droppedCache.Put(blkID, blk)
 		// if verify fails, then all descendants are also invalid
 		t.blocked.Abandon(blkID)
 		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
@@ -599,8 +654,12 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	}
 
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
-	if _, err := t.Consensus.Add(blk); err != nil { // TODO unpin blk from memory if it's rejected
+	if rejected, err := t.Consensus.Add(blk); err != nil {
 		return err
+	} else if rejected {
+		t.decidedCache.Put(blkID, nil)
+		t.droppedCache.Evict(blkID)       // Remove from dropped cache, if it was in there
+		delete(t.processing, blkID.Key()) // This block was rejected. Unpin from memory.
 	}
 
 	// Add all the oracle blocks if they exist. We call verify on all the blocks
@@ -616,11 +675,15 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		}
 		for _, blk := range options {
 			if err := blk.Verify(); err != nil {
-				t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+				t.Ctx.Log.Debug("block %s failed verification due to %s, dropping block", blk.ID(), err)
 				dropped = append(dropped, blk)
 			} else {
-				if _, err := t.Consensus.Add(blk); err != nil { // TODO unpin blk from memory if it's rejected
+				if rejected, err := t.Consensus.Add(blk); err != nil {
 					return err
+				} else if rejected {
+					t.decidedCache.Put(blk.ID(), nil)
+					t.droppedCache.Evict(blkID)          // Remove from dropped cache, if it was in there
+					delete(t.processing, blk.ID().Key()) // This block was rejected. Unpin from memory.
 				}
 				added = append(added, blk)
 			}
@@ -665,6 +728,10 @@ func (t *Transitive) GetBlock(id ids.ID) (snowman.Block, error) {
 	// Check the processing set
 	if block, ok := t.processing[id.Key()]; ok {
 		return block, nil
+	}
+	// Check the cache of recently dropped blocks
+	if block, ok := t.droppedCache.Get(id); ok {
+		return block.(snowman.Block), nil
 	}
 	// Not processing. Check the database.
 	return t.VM.GetBlock(id)

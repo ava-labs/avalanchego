@@ -30,6 +30,9 @@ func (i *issuer) Abandon(ids.ID) {
 		blkID := i.blk.ID()
 		i.t.pending.Remove(blkID)
 		i.t.blocked.Abandon(blkID)
+		// We're dropping this block; unpin it from memory
+		delete(i.t.processing, blkID.Key())
+		i.t.droppedCache.Put(blkID, i.blk)
 
 		// Tracks performance statistics
 		i.t.numRequests.Set(float64(i.t.blkReqs.Len()))
