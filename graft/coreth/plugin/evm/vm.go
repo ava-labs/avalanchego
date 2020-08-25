@@ -241,6 +241,7 @@ func (vm *VM) Initialize(
 	// gas price to prevent so transactions and blocks all use the correct fees
 	config.Miner.GasPrice = minGasPrice
 	config.GPO.Default = minGasPrice
+	config.TxPool.PriceLimit = minGasPrice.Uint64()
 
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
