@@ -330,7 +330,11 @@ func (dg *Directed) String() string {
 	return sb.String()
 }
 
+// deferAcceptance attempts to mark this tx as accepted now or in the future
+// once dependencies are accepted
 func (dg *Directed) deferAcceptance(txNode *directedTx) {
+	// Mark that this tx is pending acceptance so this function won't be called
+	// again
 	txNode.pendingAccept = true
 
 	toAccept := &directedAccepter{
@@ -338,36 +342,56 @@ func (dg *Directed) deferAcceptance(txNode *directedTx) {
 		txNode: txNode,
 	}
 	for _, dependency := range txNode.tx.Dependencies() {
-		if !dependency.Status().Decided() {
+		if dependency.Status() != choices.Accepted {
+			// If the dependency isn't accepted, then it must be processing. So,
+			// this tx should be accepted after all of these processing txs are
+			// accepted.
 			toAccept.deps.Add(dependency.ID())
 		}
 	}
 
+	// This tx is no longer being voted on, so we remove it from the voting set.
+	// This ensures that virtuous txs built on top of rogue txs don't force the
+	// node to treat the rogue tx as virtuous.
 	dg.virtuousVoting.Remove(txNode.tx.ID())
 	dg.pendingAccept.Register(toAccept)
 }
 
+// reject all the named txIDs and remove them from the graph
 func (dg *Directed) reject(ids ...ids.ID) error {
-	for _, conflict := range ids {
-		conflictKey := conflict.Key()
-		conf := dg.txs[conflictKey]
+	for _, conflictID := range ids {
+		conflictKey := conflictID.Key()
+		conflict := dg.txs[conflictKey]
+
+		// We are rejecting the tx, so we should remove it from the graph
 		delete(dg.txs, conflictKey)
 
-		dg.preferences.Remove(conflict)
+		// While it's statistically unlikely that something being rejected is
+		// preferred, it is handled for completion.
+		dg.preferences.Remove(conflictID)
 
 		// remove the edge between this node and all its neighbors
-		dg.removeConflict(conflict, conf.ins.List()...)
-		dg.removeConflict(conflict, conf.outs.List()...)
+		dg.removeConflict(conflictID, conflict.ins.List()...)
+		dg.removeConflict(conflictID, conflict.outs.List()...)
 
-		// Mark it as rejected
-		if err := conf.tx.Reject(); err != nil {
+		// Reject is called before notifying the IPC so that rejections that
+		// cause fatal errors aren't sent to an IPC peer.
+		if err := conflict.tx.Reject(); err != nil {
 			return err
 		}
-		dg.ctx.DecisionDispatcher.Reject(dg.ctx.ChainID, conf.tx.ID(), conf.tx.Bytes())
-		dg.metrics.Rejected(conflict)
 
-		dg.pendingAccept.Abandon(conflict)
-		dg.pendingReject.Fulfill(conflict)
+		// Notify the IPC that the tx was rejected
+		dg.ctx.DecisionDispatcher.Reject(dg.ctx.ChainID, conflict.tx.ID(), conflict.tx.Bytes())
+
+		// Update the metrics to account for this transaction's rejection
+		dg.metrics.Rejected(conflictID)
+
+		// If there is a tx that was accepted pending on this tx, the ancestor
+		// tx can't be accepted.
+		dg.pendingAccept.Abandon(conflictID)
+		// If there is a tx that was issued pending on this tx, the ancestor tx
+		// must be rejected.
+		dg.pendingReject.Fulfill(conflictID)
 	}
 	return nil
 }
@@ -388,10 +412,6 @@ func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 	if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {
 		return false
 	}
-
-	// TODO: why is this confidence reset here? It should already be reset
-	// implicitly by the lack of a timestamp increase.
-	conflict.confidence = 0
 
 	// Change the edge direction
 	conflict.ins.Remove(nodeID)
