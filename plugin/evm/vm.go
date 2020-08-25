@@ -83,7 +83,7 @@ const (
 var (
 	// minGasPrice is the number of nAVAX required per gas unit for a transaction
 	// to be valid, measured in wei
-	minGasPrice = big.NewInt(47*params.GWei)
+	minGasPrice = big.NewInt(47 * params.GWei)
 
 	txFee = units.MilliAvax
 
@@ -94,7 +94,7 @@ var (
 	errUnsupportedFXs             = errors.New("unsupported feature extensions")
 	errInvalidBlock               = errors.New("invalid block")
 	errInvalidAddr                = errors.New("invalid hex address")
-	errTooManyAtomicTx            = errors.New("too many pending atomix txs")
+	errTooManyAtomicTx            = errors.New("too many pending atomic txs")
 	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
 	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
 	errNoInputs                   = errors.New("tx has no inputs")
