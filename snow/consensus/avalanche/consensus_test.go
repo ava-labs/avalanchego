@@ -19,8 +19,7 @@ import (
 )
 
 var (
-	Genesis = ids.GenerateTestID()
-	Tests   = []func(*testing.T, Factory){
+	Tests = []func(*testing.T, Factory){
 		MetricsTest,
 		ParamsTest,
 		AddTest,

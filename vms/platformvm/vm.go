@@ -78,29 +78,19 @@ var (
 	// taken from https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go/32620397#32620397
 	maxTime = time.Unix(1<<63-62135596801, 0) // 0 is used because we drop the nano-seconds
 
-	timestampKey         = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
-	currentValidatorsKey = ids.NewID([32]byte{'c', 'u', 'r', 'r', 'e', 'n', 't'})
-	pendingValidatorsKey = ids.NewID([32]byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'})
-	chainsKey            = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
-	subnetsKey           = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
+	timestampKey = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
+	chainsKey    = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
+	subnetsKey   = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
 )
 
 var (
 	errEndOfTime                = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
-	errTimeTooAdvanced          = errors.New("this is proposing a time too far in the future")
 	errNoPendingBlocks          = errors.New("no pending blocks")
-	errUnsupportedFXs           = errors.New("unsupported feature extensions")
 	errRegisteringType          = errors.New("error registering type with database")
-	errMissingBlock             = errors.New("missing block")
 	errInvalidLastAcceptedBlock = errors.New("last accepted block must be a decision block")
-	errInvalidAddress           = errors.New("invalid address")
-	errInvalidAddressSeperator  = errors.New("invalid address seperator")
-	errInvalidAddressPrefix     = errors.New("invalid address prefix")
-	errInvalidAddressSuffix     = errors.New("invalid address suffix")
-	errEmptyAddressPrefix       = errors.New("empty address prefix")
-	errEmptyAddressSuffix       = errors.New("empty address suffix")
 	errInvalidID                = errors.New("invalid ID")
 	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
+	errUnknownTxType            = errors.New("unknown transaction type")
 )
 
 // Codec does serialization and deserialization
@@ -377,7 +367,7 @@ func (vm *VM) issueTx(tx *Tx) error {
 	case UnsignedAtomicTx:
 		vm.unissuedAtomicTxs = append(vm.unissuedAtomicTxs, tx)
 	default:
-		return errors.New("Could not parse given tx. Provided tx needs to be a ProposalTx, DecisionTx, or AtomicTx")
+		return errUnknownTxType
 	}
 	vm.resetTimer()
 	return nil

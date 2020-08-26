@@ -50,17 +50,6 @@ type APIValidator struct {
 	ID          ids.ShortID  `json:"id"`
 }
 
-func (v *APIValidator) weight() uint64 {
-	switch {
-	case v.Weight != nil:
-		return uint64(*v.Weight)
-	case v.StakeAmount != nil:
-		return uint64(*v.StakeAmount)
-	default:
-		return 0
-	}
-}
-
 // APIPrimaryValidator is a validator of the primary network
 type APIPrimaryValidator struct {
 	APIValidator

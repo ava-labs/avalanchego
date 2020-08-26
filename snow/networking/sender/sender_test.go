@@ -150,7 +150,7 @@ func TestReliableMessages(t *testing.T) {
 	}()
 
 	for _, await := range awaiting {
-		_, _ = <-await
+		<-await
 	}
 }
 
@@ -216,6 +216,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}()
 
 	for _, await := range awaiting {
-		_, _ = <-await
+		<-await
 	}
 }

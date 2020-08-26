@@ -148,7 +148,7 @@ func TestSlice(t *testing.T) {
 
 // Test marshalling/unmarshalling largest possible slice
 func TestMaxSizeSlice(t *testing.T) {
-	mySlice := make([]string, math.MaxUint16, math.MaxUint16)
+	mySlice := make([]string, math.MaxUint16)
 	mySlice[0] = "first!"
 	mySlice[math.MaxUint16-1] = "last!"
 	codec := NewDefault()

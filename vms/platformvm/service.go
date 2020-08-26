@@ -30,11 +30,8 @@ const (
 var (
 	errMissingDecisionBlock  = errors.New("should have a decision block within the past two blocks")
 	errNoFunds               = errors.New("no spendable funds were found")
-	errNoUsername            = errors.New("argument 'username' not provided")
-	errNoPassword            = errors.New("argument 'password' not provided")
 	errNoSubnetID            = errors.New("argument 'subnetID' not provided")
 	errNoRewardAddress       = errors.New("argument 'rewardAddress' not provided")
-	errUnexpectedTxType      = errors.New("expected tx to be a DecisionTx, ProposalTx or AtomicTx but is not")
 	errInvalidDelegationRate = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
 	errNoAddresses           = errors.New("no addresses provided")
 )
@@ -742,7 +739,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys,                             // Private keys
+		privKeys, // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -833,7 +830,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 	nodeID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
 	if err != nil {
-		return fmt.Errorf("Error parsing nodeID: '%s': %w", args.ID, err)
+		return fmt.Errorf("error parsing nodeID: '%s': %w", args.ID, err)
 	}
 
 	subnetID, err := ids.FromString(args.SubnetID)

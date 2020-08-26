@@ -470,7 +470,7 @@ func (h *Handler) shutdownDispatch() {
 		go h.toClose()
 	}
 	h.closing = true
-	h.shutdown.Observe(float64(time.Now().Sub(startTime)))
+	h.shutdown.Observe(float64(time.Since(startTime)))
 	close(h.closed)
 }
 

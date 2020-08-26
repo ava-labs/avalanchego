@@ -37,8 +37,7 @@ type Wallet struct {
 	balance map[[32]byte]uint64
 	txFee   uint64
 
-	txsSent int32
-	txs     []*avm.Tx
+	txs []*avm.Tx
 }
 
 // NewWallet returns a new Wallet

@@ -18,13 +18,10 @@ import (
 )
 
 var (
-	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
-	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
-	errNoInputs                   = errors.New("tx has no inputs")
-	errNoImportInputs             = errors.New("tx has no imported inputs")
-	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
-	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errUnknownAsset               = errors.New("unknown asset ID")
+	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
+	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
+	errNoImportInputs           = errors.New("tx has no imported inputs")
+	errInputsNotSortedUnique    = errors.New("inputs not sorted and unique")
 
 	_ UnsignedAtomicTx = &UnsignedImportTx{}
 )

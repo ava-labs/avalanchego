@@ -19,7 +19,6 @@ import (
 
 var (
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
-	errOverflowReward      = errors.New("overflow while calculating validator reward")
 	errWrongTxType         = errors.New("wrong transaction type")
 
 	_ UnsignedProposalTx = &UnsignedRewardValidatorTx{}

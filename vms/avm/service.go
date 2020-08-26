@@ -372,8 +372,8 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 		return fmt.Errorf("couldn't get address's UTXOs: %s", err)
 	}
 
-	assetIDs := ids.Set{}                    // IDs of assets the address has a non-zero balance of
-	balances := make(map[[32]byte]uint64, 0) // key: ID (as bytes). value: balance of that asset
+	assetIDs := ids.Set{}                 // IDs of assets the address has a non-zero balance of
+	balances := make(map[[32]byte]uint64) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
 		transferable, ok := utxo.Out.(avax.TransferableOut)
 		if !ok {
@@ -908,7 +908,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 
 	memoBytes := []byte(args.Memo)
 	if l := len(memoBytes); l > avax.MaxMemoSize {
-		return fmt.Errorf("Max memo length is %d but provided memo field is length %d", avax.MaxMemoSize, l)
+		return fmt.Errorf("max memo length is %d but provided memo field is length %d", avax.MaxMemoSize, l)
 	} else if args.Amount == 0 {
 		return errInvalidAmount
 	}

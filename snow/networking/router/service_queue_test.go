@@ -86,7 +86,7 @@ func TestMultiLevelQueueSendsMessages(t *testing.T) {
 
 	// Ensure that the 6th message was never added to the queue
 	select {
-	case _ = <-semaChan:
+	case <-semaChan:
 		t.Fatal("Semaphore channel should have been empty after reading all messages from the queue")
 	default:
 	}

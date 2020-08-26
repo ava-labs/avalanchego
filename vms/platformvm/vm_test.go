@@ -63,9 +63,6 @@ var (
 
 	minStake = 5 * units.MilliAvax
 
-	// balance of addresses that exist at genesis in defaultVM
-	defaultBalance = 100 * minStake
-
 	// amount all genesis validators stake in defaultVM
 	defaultStakeAmount uint64 = 100 * minStake
 
@@ -78,9 +75,8 @@ var (
 )
 
 var (
-	errShouldNotifyEngine = errors.New("should have notified engine of block ready")
-	errShouldPrefCommit   = errors.New("should prefer to commit proposal")
-	errShouldPrefAbort    = errors.New("should prefer to abort proposal")
+	errShouldPrefCommit = errors.New("should prefer to commit proposal")
+	errShouldPrefAbort  = errors.New("should prefer to abort proposal")
 )
 
 const (
@@ -120,31 +116,6 @@ func defaultContext() *snow.Context {
 	aliaser.Alias(avmID, avmID.String())
 	ctx.BCLookup = aliaser
 	return ctx
-}
-
-// The UTXOs that exist at genesis in the default VM
-func defaultGenesisUTXOs() []*avax.UTXO {
-	utxos := []*avax.UTXO(nil)
-	for i, key := range keys {
-		utxos = append(utxos,
-			&avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        ids.Empty,
-					OutputIndex: uint32(i),
-				},
-				Asset: avax.Asset{ID: avaxAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: defaultBalance,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
-			},
-		)
-	}
-	return utxos
 }
 
 // Returns:

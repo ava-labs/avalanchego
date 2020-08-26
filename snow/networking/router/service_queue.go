@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	errNoMessages = errors.New("No messages remaining on queue")
+	errNoMessages = errors.New("no messages remaining on queue")
 )
 
 type messageQueue interface {
