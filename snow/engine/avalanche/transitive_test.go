@@ -24,8 +24,6 @@ var (
 	errUnknownVertex = errors.New("unknown vertex")
 	errFailedParsing = errors.New("failed parsing")
 	errMissing       = errors.New("missing")
-
-	Genesis = ids.GenerateTestID()
 )
 
 func TestEngineShutdown(t *testing.T) {

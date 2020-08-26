@@ -90,7 +90,7 @@ func (b *Bag) Len() int { return b.size }
 
 // List returns a list of all ids that have been added.
 func (b *Bag) List() []ID {
-	idList := make([]ID, len(b.counts), len(b.counts))
+	idList := make([]ID, len(b.counts))
 	i := 0
 	for id := range b.counts {
 		idList[i] = NewID(id)

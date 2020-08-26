@@ -20,9 +20,7 @@ import (
 )
 
 var (
-	errSigsNotUniqueOrNotSorted = errors.New("control signatures not unique or not sorted")
-	errWrongNumberOfSignatures  = errors.New("wrong number of signatures")
-	errDSValidatorSubset        = errors.New("all subnets must be a subset of the primary network")
+	errDSValidatorSubset = errors.New("all subnets must be a subset of the primary network")
 
 	_ UnsignedProposalTx = &UnsignedAddSubnetValidatorTx{}
 	_ TimedTx            = &UnsignedAddSubnetValidatorTx{}

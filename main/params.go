@@ -298,7 +298,7 @@ func init() {
 	}
 
 	if ip == nil {
-		errs.Add(fmt.Errorf("Invalid IP Address %s", *consensusIP))
+		errs.Add(fmt.Errorf("invalid IP Address %s", *consensusIP))
 		return
 	}
 
@@ -362,7 +362,7 @@ func init() {
 			}
 		}
 		if len(Config.BootstrapPeers) != i {
-			errs.Add(fmt.Errorf("More bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i))
+			errs.Add(fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i))
 			return
 		}
 	} else {

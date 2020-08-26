@@ -96,23 +96,23 @@ func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 		t.Fatal(err)
 	}
 
-	for _, genesisTx := range genesis.Txs {
-		if len(genesisTx.Outs) != 0 {
-			t.Fatal("genesis tx can't have non-new assets")
-		}
-
-		tx := Tx{
-			UnsignedTx: &genesisTx.CreateAssetTx,
-		}
-		if err := tx.SignSECP256K1Fx(c, nil); err != nil {
-			t.Fatal(err)
-		}
-
-		return &tx
+	if len(genesis.Txs) == 0 {
+		t.Fatal("genesis tx didn't have any txs")
 	}
 
-	t.Fatal("genesis tx didn't have any txs")
-	return nil
+	genesisTx := genesis.Txs[0]
+	if len(genesisTx.Outs) != 0 {
+		t.Fatal("genesis tx can't have non-new assets")
+	}
+
+	tx := Tx{
+		UnsignedTx: &genesisTx.CreateAssetTx,
+	}
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	return &tx
 }
 
 func BuildGenesisTest(t *testing.T) []byte {
@@ -515,10 +515,6 @@ func TestFxInitializationFailure(t *testing.T) {
 		t.Fatalf("Should have errored due to an invalid fx initialization")
 	}
 }
-
-type testTxBytes struct{ unsignedBytes []byte }
-
-func (tx *testTxBytes) UnsignedBytes() []byte { return tx.unsignedBytes }
 
 func TestIssueTx(t *testing.T) {
 	genesisBytes, issuer, vm, _ := GenesisVM(t)

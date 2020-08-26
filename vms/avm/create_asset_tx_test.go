@@ -21,7 +21,7 @@ var (
 	illegalNameCharacter = "h8*32"
 	invalidASCIIStr      = "ÉÎ"
 	invalidWhitespaceStr = " HAT"
-	denominationTooLarge = maxDenomination + 1
+	denominationTooLarge = byte(maxDenomination + 1)
 )
 
 func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Context) {
@@ -461,7 +461,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
-		Denomination: 33,
+		Denomination: denominationTooLarge,
 		States: []*InitialState{{
 			FxID: 0,
 		}},
@@ -506,6 +506,29 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY!",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize(nil, nil)
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Name with an invalid character should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
+	ctx := NewContext(t)
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		Name:         illegalNameCharacter,
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{

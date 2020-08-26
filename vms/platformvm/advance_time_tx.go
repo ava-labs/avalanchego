@@ -103,7 +103,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	// Key: Subnet ID
 	// Value: IDs of validators that will have started validating this Subnet when
 	// timestamp is advanced to tx.Timestamp()
-	startedValidating := make(map[[32]byte]ids.ShortSet, 0)
+	startedValidating := make(map[[32]byte]ids.ShortSet)
 	subnets, err := vm.getSubnets(db)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
