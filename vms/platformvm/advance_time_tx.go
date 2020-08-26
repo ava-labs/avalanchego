@@ -88,12 +88,12 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	current, pending, _, _, err := vm.calculateValidators(db, tx.Timestamp(), constants.DefaultSubnetID)
+	current, pending, _, _, err := vm.calculateValidators(db, tx.Timestamp(), constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if err := vm.putCurrentValidators(onCommitDB, current, constants.DefaultSubnetID); err != nil {
+	} else if err := vm.putCurrentValidators(onCommitDB, current, constants.PrimaryNetworkID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if err := vm.putPendingValidators(onCommitDB, pending, constants.DefaultSubnetID); err != nil {
+	} else if err := vm.putPendingValidators(onCommitDB, pending, constants.PrimaryNetworkID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
@@ -134,7 +134,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 				return err
 			}
 		}
-		if err := vm.updateValidators(constants.DefaultSubnetID); err != nil {
+		if err := vm.updateValidators(constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 

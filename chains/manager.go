@@ -344,7 +344,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	if m.stakingEnabled {
 		validators, ok = m.validators.GetValidatorSet(chainParams.SubnetID)
 	} else { // Staking is disabled. Every peer validates every subnet.
-		validators, ok = m.validators.GetValidatorSet(constants.DefaultSubnetID)
+		validators, ok = m.validators.GetValidatorSet(constants.PrimaryNetworkID)
 	}
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)

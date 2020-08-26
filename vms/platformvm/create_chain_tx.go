@@ -66,7 +66,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 		return nil
 	case tx.SubnetID.IsZero():
 		return errNoSubnetID
-	case tx.SubnetID.Equals(constants.DefaultSubnetID):
+	case tx.SubnetID.Equals(constants.PrimaryNetworkID):
 		return errDSCantValidate
 	case len(tx.ChainName) > maxNameLen:
 		return errNameTooLong
