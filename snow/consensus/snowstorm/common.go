@@ -81,3 +81,26 @@ func (c *common) Finalized() bool {
 		numPreferences)
 	return numPreferences == 0
 }
+
+// rejector implements Blockable
+type rejector struct {
+	g        Consensus
+	deps     ids.Set
+	errs     *wrappers.Errs
+	rejected bool // true if the tx has been rejected
+	txID     ids.ID
+}
+
+func (r *rejector) Dependencies() ids.Set { return r.deps }
+
+func (r *rejector) Fulfill(ids.ID) {
+	if r.rejected || r.errs.Errored() {
+		return
+	}
+	r.rejected = true
+	r.errs.Add(r.g.reject(r.txID))
+}
+
+func (*rejector) Abandon(ids.ID) {}
+
+func (*rejector) Update() {}

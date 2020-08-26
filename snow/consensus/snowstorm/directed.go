@@ -44,10 +44,6 @@ type directedTx struct {
 	// once its transitive dependencies have also been accepted
 	pendingAccept bool
 
-	// accepted identifies if this transaction has been accepted. This should
-	// only be set if [pendingAccept] is also set
-	accepted bool
-
 	// ins is the set of txIDs that this tx conflicts with that are less
 	// preferred than this tx
 	ins ids.Set
@@ -213,9 +209,10 @@ func (dg *Directed) Add(tx Tx) error {
 
 	// This tx can be accepted only if all the txs it depends on are also
 	// accepted. If any txs that this tx depends on are rejected, reject it.
-	toReject := &directedRejector{
-		dg:     dg,
-		txNode: txNode,
+	toReject := &rejector{
+		g:    dg,
+		errs: &dg.errs,
+		txID: txID,
 	}
 
 	// Register all of this txs dependencies as possibilities to reject this tx.
@@ -292,7 +289,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			}
 		}
 
-		if !txNode.accepted {
+		if txNode.tx.Status() != choices.Accepted {
 			// If this tx wasn't accepted, then this instance is only changed if
 			// preferences changed.
 			changed = dg.redirectEdges(txNode) || changed
@@ -358,10 +355,33 @@ func (dg *Directed) deferAcceptance(txNode *directedTx) {
 }
 
 // reject all the named txIDs and remove them from the graph
-func (dg *Directed) reject(ids ...ids.ID) error {
-	for _, conflictID := range ids {
+func (dg *Directed) reject(conflictIDs ...ids.ID) error {
+	for _, conflictID := range conflictIDs {
 		conflictKey := conflictID.Key()
 		conflict := dg.txs[conflictKey]
+
+		// This tx is not longer an option for consuming the UTXOs from its
+		// inputs, so we should remove their reference to this tx.
+		for _, inputID := range conflict.tx.InputIDs().List() {
+			inputKey := inputID.Key()
+			txIDs, exists := dg.utxos[inputKey]
+			if !exists {
+				// This UTXO may no longer exist because it was removed due to
+				// the acceptance of a tx. If that is the case, there is nothing
+				// left to remove from memory.
+				continue
+			}
+			txIDs.Remove(conflictID)
+			if txIDs.Len() == 0 {
+				// If this tx was the last tx consuming this UTXO, we should
+				// prune the UTXO from memory entirely.
+				delete(dg.utxos, inputKey)
+			} else {
+				// If this UTXO still has txs consuming it, then we should make
+				// sure this update is written back to the UTXOs map.
+				dg.utxos[inputKey] = txIDs
+			}
+		}
 
 		// We are rejecting the tx, so we should remove it from the graph
 		delete(dg.txs, conflictKey)
@@ -396,6 +416,8 @@ func (dg *Directed) reject(ids ...ids.ID) error {
 	return nil
 }
 
+// redirectEdges attempts to turn outbound edges into inbound edges if the
+// preferences have changed
 func (dg *Directed) redirectEdges(tx *directedTx) bool {
 	changed := false
 	for _, conflictID := range tx.outs.List() {
@@ -404,43 +426,51 @@ func (dg *Directed) redirectEdges(tx *directedTx) bool {
 	return changed
 }
 
-// Set the confidence of all conflicts to 0
-// Change the direction of edges if needed
+// Change the direction of this edge if needed. Returns true if the direction
+// was switched.
 func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
-	nodeID := txNode.tx.ID()
 	conflict := dg.txs[conflictID.Key()]
 	if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {
 		return false
 	}
 
-	// Change the edge direction
+	// Because this tx has a higher preference than the conflicting tx, we must
+	// ensure that the edge is directed towards this tx.
+	nodeID := txNode.tx.ID()
+
+	// Change the edge direction according to the conflict tx
 	conflict.ins.Remove(nodeID)
 	conflict.outs.Add(nodeID)
-	dg.preferences.Remove(conflictID) // This consumer now has an out edge
+	dg.preferences.Remove(conflictID) // This conflict has an outbound edge
 
+	// Change the edge direction according to this tx
 	txNode.ins.Add(conflictID)
 	txNode.outs.Remove(conflictID)
 	if txNode.outs.Len() == 0 {
-		// If I don't have out edges, I'm preferred
+		// If this tx doesn't have any outbound edges, it's preferred
 		dg.preferences.Add(nodeID)
 	}
 	return true
 }
 
-func (dg *Directed) removeConflict(id ids.ID, ids ...ids.ID) {
-	for _, neighborID := range ids {
+func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ...ids.ID) {
+	for _, neighborID := range neighborIDs {
 		neighborKey := neighborID.Key()
-		// If the neighbor doesn't exist, they may have already been rejected
-		if neighbor, exists := dg.txs[neighborKey]; exists {
-			neighbor.ins.Remove(id)
-			neighbor.outs.Remove(id)
+		neighbor, exists := dg.txs[neighborKey]
+		if !exists {
+			// If the neighbor doesn't exist, they may have already been
+			// rejected, so this mapping can be skipped.
+			continue
+		}
 
-			if neighbor.outs.Len() == 0 {
-				// Make sure to mark the neighbor as preferred if needed
-				dg.preferences.Add(neighborID)
-			}
+		// Remove any edge to this tx.
+		neighbor.ins.Remove(txID)
+		neighbor.outs.Remove(txID)
 
-			dg.txs[neighborKey] = neighbor
+		if neighbor.outs.Len() == 0 {
+			// If this tx should now be preferred, make sure its status is
+			// updated.
+			dg.preferences.Add(neighborID)
 		}
 	}
 }
@@ -462,66 +492,60 @@ func (a *directedAccepter) Fulfill(id ids.ID) {
 func (a *directedAccepter) Abandon(id ids.ID) { a.rejected = true }
 
 func (a *directedAccepter) Update() {
-	// If I was rejected or I am still waiting on dependencies to finish do
-	// nothing.
+	// If I was rejected or I am still waiting on dependencies to finish or an
+	// error has occurred, I shouldn't do anything.
 	if a.rejected || a.deps.Len() != 0 || a.dg.errs.Errored() {
 		return
 	}
 
-	id := a.txNode.tx.ID()
-	delete(a.dg.txs, id.Key())
+	txID := a.txNode.tx.ID()
+	// We are accepting the tx, so we should remove the node from the graph.
+	delete(a.dg.txs, txID.Key())
 
+	// This tx is consuming all the UTXOs from its inputs, so we can prune them
+	// all from memory
 	for _, inputID := range a.txNode.tx.InputIDs().List() {
 		delete(a.dg.utxos, inputID.Key())
 	}
-	a.dg.virtuous.Remove(id)
-	a.dg.preferences.Remove(id)
 
-	// Reject the conflicts
+	// This tx is now accepted, so it shouldn't be part of the virtuous set or
+	// the preferred set. Its status as Accepted implies these descriptions.
+	a.dg.virtuous.Remove(txID)
+	a.dg.preferences.Remove(txID)
+
+	// Reject all the txs that conflicted with this tx.
 	if err := a.dg.reject(a.txNode.ins.List()...); err != nil {
 		a.dg.errs.Add(err)
 		return
 	}
-	// Should normally be empty
+	// While it is typically true that a tx this is being accepted is preferred,
+	// it is possible for this to not be the case. So this is handled for
+	// completeness.
 	if err := a.dg.reject(a.txNode.outs.List()...); err != nil {
 		a.dg.errs.Add(err)
 		return
 	}
 
-	// Mark it as accepted
+	// Accept is called before notifying the IPC so that acceptances that cause
+	// fatal errors aren't sent to an IPC peer.
 	if err := a.txNode.tx.Accept(); err != nil {
 		a.dg.errs.Add(err)
 		return
 	}
-	a.txNode.accepted = true
-	a.dg.ctx.DecisionDispatcher.Accept(a.dg.ctx.ChainID, id, a.txNode.tx.Bytes())
-	a.dg.metrics.Accepted(id)
 
-	a.dg.pendingAccept.Fulfill(id)
-	a.dg.pendingReject.Abandon(id)
+	// Notify the IPC socket that this tx has been accepted.
+	a.dg.ctx.DecisionDispatcher.Accept(a.dg.ctx.ChainID, txID, a.txNode.tx.Bytes())
+
+	// Update the metrics to account for this transaction's acceptance
+	a.dg.metrics.Accepted(txID)
+
+	// If there is a tx that was accepted pending on this tx, the ancestor
+	// should be notified that it doesn't need to block on this tx anymore.
+	a.dg.pendingAccept.Fulfill(txID)
+	// If there is a tx that was issued pending on this tx, the ancestor tx
+	// doesn't need to be rejected because of this tx.
+	a.dg.pendingReject.Abandon(txID)
 }
-
-// directedRejector implements Blockable
-type directedRejector struct {
-	dg       *Directed
-	deps     ids.Set
-	rejected bool // true if the transaction has been rejected
-	txNode   *directedTx
-}
-
-func (r *directedRejector) Dependencies() ids.Set { return r.deps }
-
-func (r *directedRejector) Fulfill(id ids.ID) {
-	if r.rejected || r.dg.errs.Errored() {
-		return
-	}
-	r.rejected = true
-	r.dg.errs.Add(r.dg.reject(r.txNode.tx.ID()))
-}
-
-func (*directedRejector) Abandon(id ids.ID) {}
-
-func (*directedRejector) Update() {}
 
 type sortTxNodeData []*directedTx
 

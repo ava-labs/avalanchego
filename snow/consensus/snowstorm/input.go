@@ -129,9 +129,10 @@ func (ig *Input) Add(tx Tx) error {
 	}
 	ig.metrics.Issued(txID)
 
-	toReject := &inputRejector{
-		ig: ig,
-		tn: cn,
+	toReject := &rejector{
+		g:    ig,
+		errs: &ig.errs,
+		txID: txID,
 	}
 
 	for _, dependency := range tx.Dependencies() {
@@ -474,28 +475,6 @@ func (a *inputAccepter) Update() {
 	a.ig.pendingAccept.Fulfill(id)
 	a.ig.pendingReject.Abandon(id)
 }
-
-// inputRejector implements Blockable
-type inputRejector struct {
-	ig       *Input
-	deps     ids.Set
-	rejected bool // true if the transaction represented by fn has been rejected
-	tn       inputTx
-}
-
-func (r *inputRejector) Dependencies() ids.Set { return r.deps }
-
-func (r *inputRejector) Fulfill(id ids.ID) {
-	if r.rejected || r.ig.errs.Errored() {
-		return
-	}
-	r.rejected = true
-	r.ig.errs.Add(r.ig.reject(r.tn.tx.ID()))
-}
-
-func (*inputRejector) Abandon(id ids.ID) {}
-
-func (*inputRejector) Update() {}
 
 type tempNode struct {
 	id               ids.ID
