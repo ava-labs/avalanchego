@@ -11,8 +11,9 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/utils/formatting"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 // InputFactory implements Factory by returning an input struct
@@ -53,11 +54,11 @@ type inputUtxo struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (ig *Input) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	ig.common.Initialize(ctx, params)
-
+func (ig *Input) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 	ig.txs = make(map[[32]byte]inputTx)
 	ig.utxos = make(map[[32]byte]inputUtxo)
+
+	return ig.common.Initialize(ctx, params)
 }
 
 // IsVirtuous implements the ConflictGraph interface
@@ -128,9 +129,10 @@ func (ig *Input) Add(tx Tx) error {
 	}
 	ig.metrics.Issued(txID)
 
-	toReject := &inputRejector{
-		ig: ig,
-		tn: cn,
+	toReject := &rejector{
+		g:    ig,
+		errs: &ig.errs,
+		txID: txID,
 	}
 
 	for _, dependency := range tx.Dependencies() {
@@ -379,13 +381,13 @@ func (ig *Input) String() string {
 				confidence = 0
 				break
 			}
-
-			if input.confidence < confidence {
-				confidence = input.confidence
-			}
 			if !id.Equals(input.color) {
 				confidence = 0
 				break
+			}
+
+			if input.confidence < confidence {
+				confidence = input.confidence
 			}
 		}
 
@@ -402,12 +404,11 @@ func (ig *Input) String() string {
 	sb.WriteString("IG(")
 
 	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s Confidence: %s Bias: %%d",
-		formatting.IntFormat(len(nodes)-1),
-		formatting.IntFormat(ig.params.BetaRogue-1))
+		"\n    Choice[%s] = ID: %%50s %%s",
+		formatting.IntFormat(len(nodes)-1))
 
 	for i, cn := range nodes {
-		sb.WriteString(fmt.Sprintf(format, i, cn.id, cn.confidence, cn.bias))
+		sb.WriteString(fmt.Sprintf(format, i, cn.id, &cn))
 	}
 
 	if len(nodes) > 0 {
@@ -474,31 +475,16 @@ func (a *inputAccepter) Update() {
 	a.ig.pendingReject.Abandon(id)
 }
 
-// inputRejector implements Blockable
-type inputRejector struct {
-	ig       *Input
-	deps     ids.Set
-	rejected bool // true if the transaction represented by fn has been rejected
-	tn       inputTx
-}
-
-func (r *inputRejector) Dependencies() ids.Set { return r.deps }
-
-func (r *inputRejector) Fulfill(id ids.ID) {
-	if r.rejected || r.ig.errs.Errored() {
-		return
-	}
-	r.rejected = true
-	r.ig.errs.Add(r.ig.reject(r.tn.tx.ID()))
-}
-
-func (*inputRejector) Abandon(id ids.ID) {}
-
-func (*inputRejector) Update() {}
-
 type tempNode struct {
 	id               ids.ID
 	bias, confidence int
+}
+
+func (tn *tempNode) String() string {
+	return fmt.Sprintf(
+		"SB(NumSuccessfulPolls = %d, Confidence = %d)",
+		tn.bias,
+		tn.confidence)
 }
 
 type sortTempNodeData []tempNode

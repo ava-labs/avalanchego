@@ -140,9 +140,9 @@ func (n *Node) initNetworking() error {
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
-			// We do not use TLS's CA functionality, we just require an
-			// authenticated channel. Therefore, we can safely skip verification
-			// here.
+			// We do not use TLS's CA functionality to authenticate a hostname.
+			// We only require an authenticated channel based on the peer's
+			// public key. Therefore, we can safely skip CA verification.
 			//
 			// TODO: Security audit required
 			InsecureSkipVerify: true,

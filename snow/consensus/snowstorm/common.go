@@ -4,11 +4,14 @@
 package snowstorm
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/events"
 	"github.com/ava-labs/gecko/utils/wrappers"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 type common struct {
@@ -19,7 +22,7 @@ type common struct {
 	ctx *snow.Context
 
 	// params describes how this instance was parameterized
-	params snowball.Parameters
+	params sbcon.Parameters
 
 	// each element of preferences is the ID of a transaction that is preferred
 	preferences ids.Set
@@ -44,19 +47,18 @@ type common struct {
 }
 
 // Initialize implements the ConflictGraph interface
-func (c *common) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	ctx.Log.AssertDeferredNoError(params.Valid)
-
+func (c *common) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 	c.ctx = ctx
 	c.params = params
 
 	if err := c.metrics.Initialize(params.Namespace, params.Metrics); err != nil {
-		ctx.Log.Error("failed to initialize metrics: %s", err)
+		return fmt.Errorf("failed to initialize metrics: %s", err)
 	}
+	return params.Valid()
 }
 
 // Parameters implements the Snowstorm interface
-func (c *common) Parameters() snowball.Parameters { return c.params }
+func (c *common) Parameters() sbcon.Parameters { return c.params }
 
 // Virtuous implements the ConflictGraph interface
 func (c *common) Virtuous() ids.Set { return c.virtuous }
@@ -79,3 +81,26 @@ func (c *common) Finalized() bool {
 		numPreferences)
 	return numPreferences == 0
 }
+
+// rejector implements Blockable
+type rejector struct {
+	g        Consensus
+	deps     ids.Set
+	errs     *wrappers.Errs
+	rejected bool // true if the tx has been rejected
+	txID     ids.ID
+}
+
+func (r *rejector) Dependencies() ids.Set { return r.deps }
+
+func (r *rejector) Fulfill(ids.ID) {
+	if r.rejected || r.errs.Errored() {
+		return
+	}
+	r.rejected = true
+	r.errs.Add(r.g.reject(r.txID))
+}
+
+func (*rejector) Abandon(ids.ID) {}
+
+func (*rejector) Update() {}
