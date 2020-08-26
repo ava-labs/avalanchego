@@ -3077,7 +3077,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatalf("should have issued one push query")
 	}
 	if *numPullQueries != 2 {
-		t.Fatalf("should have issued two pull query")
+		t.Fatalf("should have issued two pull queries")
 	}
 }
 

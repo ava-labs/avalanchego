@@ -70,8 +70,8 @@ func (dg *Directed) Initialize(
 // IsVirtuous implements the Consensus interface
 func (dg *Directed) IsVirtuous(tx Tx) bool {
 	txID := tx.ID()
-	// If the tx is currently processing, we should just return if was registed
-	// as rogue or not.
+	// If the tx is currently processing, we should just return if was
+	// registered as rogue or not.
 	if node, exists := dg.txs[txID.Key()]; exists {
 		return !node.rogue
 	}
@@ -94,12 +94,12 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
 	conflicts := ids.Set{}
 	if node, exists := dg.txs[tx.ID().Key()]; exists {
-		// If the tx is currently processing, the conflicting txs is just the
+		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
 		conflicts.Union(node.ins)
 		conflicts.Union(node.outs)
 	} else {
-		// If the tx isn't currently processing, the conflicting txs is the
+		// If the tx isn't currently processing, the conflicting txs are the
 		// union of all the txs that spend an input that this tx spends.
 		for _, input := range tx.InputIDs().List() {
 			if spends, exists := dg.utxos[input.Key()]; exists {
@@ -113,7 +113,7 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 // Add implements the Consensus interface
 func (dg *Directed) Add(tx Tx) error {
 	if dg.Issued(tx) {
-		// If the tx was previously inserted, nothing should be done here.
+		// If the tx was previously inserted, it shouldn't be re-inserted.
 		return nil
 	}
 
@@ -158,10 +158,10 @@ func (dg *Directed) Add(tx Tx) error {
 		// this UTXO
 		spenders := dg.utxos[inputKey]
 
-		// Add all the txs that spend this UTXO to this txs conflicts that are
-		// preferred over this tx. We know all these txs are preferred over
-		// this tx, because this tx currently has a bias of 0 and the tie goes
-		// to the tx whose bias was updated first.
+		// Add all the txs that spend this UTXO to this txs conflicts. These
+		// conflicting txs must be preferred over this tx. We know this because
+		// this tx currently has a bias of 0 and the tie goes to the tx whose
+		// bias was updated first.
 		txNode.outs.Union(spenders)
 
 		// Update txs conflicting with tx to account for its issuance
@@ -171,9 +171,8 @@ func (dg *Directed) Add(tx Tx) error {
 			// Get the node that contains this conflicting tx
 			conflict := dg.txs[conflictKey]
 
-			// This conflicting tx can't be virtuous anymore. So we remove this
-			// conflicting tx from any of the virtuous sets if it was previously
-			// in them.
+			// This conflicting tx can't be virtuous anymore. So, we attempt to
+			// remove it from all of the virtuous sets.
 			dg.virtuous.Remove(conflictID)
 			dg.virtuousVoting.Remove(conflictID)
 
@@ -207,8 +206,8 @@ func (dg *Directed) Add(tx Tx) error {
 	// Add this tx to the set of currently processing txs
 	dg.txs[txID.Key()] = txNode
 
-	// This tx can be accepted only if all the txs it depends on are also
-	// accepted. If any txs that this tx depends on are rejected, reject it.
+	// If a tx that this tx depends on is rejected, this tx should also be
+	// rejected.
 	toReject := &rejector{
 		g:    dg,
 		errs: &dg.errs,
@@ -220,8 +219,9 @@ func (dg *Directed) Add(tx Tx) error {
 		if dependency.Status() != choices.Accepted {
 			// If the dependency isn't accepted, then it must be processing. So,
 			// this tx should be rejected if any of these processing txs are
-			// rejected. Note that the dependencies can't be rejected, because
-			// it is assumped that this tx is currently considered valid.
+			// rejected. Note that the dependencies can't already be rejected,
+			// because it is assumped that this tx is currently considered
+			// valid.
 			toReject.deps.Add(dependency.ID())
 		}
 	}
@@ -249,11 +249,11 @@ func (dg *Directed) Issued(tx Tx) bool {
 
 // RecordPoll implements the Consensus interface
 func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
-	// Increase the vote ID. This is updated here and is used to reset the
+	// Increase the vote ID. This is only updated here and is used to reset the
 	// confidence values of transactions lazily.
 	dg.currentVote++
 
-	// Changed tracks if the Avalanche instance needs to recompute its
+	// This flag tracks if the Avalanche instance needs to recompute its
 	// frontiers. Frontiers only need to be recalculated if preferences change
 	// or if a tx was accepted.
 	changed := false
@@ -279,8 +279,8 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			txID, &txNode.snowball)
 
 		// If the tx should be accepted, then we should defer its acceptance
-		// until its dependencies are decided. However, if this tx was
-		// already marked to be accepted, we shouldn't register it again.
+		// until its dependencies are decided. If this tx was already marked to
+		// be accepted, we shouldn't register it again.
 		if !txNode.pendingAccept &&
 			txNode.Finalized(dg.params.BetaVirtuous, dg.params.BetaRogue) {
 			dg.deferAcceptance(txNode)
@@ -327,8 +327,9 @@ func (dg *Directed) String() string {
 	return sb.String()
 }
 
-// deferAcceptance attempts to mark this tx as accepted now or in the future
-// once dependencies are accepted
+// deferAcceptance attempts to mark this tx once all its dependencies are
+// accepted. If all the dependencies are already accepted, this function will
+// immediately accept the tx.
 func (dg *Directed) deferAcceptance(txNode *directedTx) {
 	// Mark that this tx is pending acceptance so this function won't be called
 	// again
@@ -340,9 +341,8 @@ func (dg *Directed) deferAcceptance(txNode *directedTx) {
 	}
 	for _, dependency := range txNode.tx.Dependencies() {
 		if dependency.Status() != choices.Accepted {
-			// If the dependency isn't accepted, then it must be processing. So,
-			// this tx should be accepted after all of these processing txs are
-			// accepted.
+			// If the dependency isn't accepted, then it must be processing.
+			// This tx should be accepted after this tx is accepted.
 			toAccept.deps.Add(dependency.ID())
 		}
 	}
@@ -360,7 +360,7 @@ func (dg *Directed) reject(conflictIDs ...ids.ID) error {
 		conflictKey := conflictID.Key()
 		conflict := dg.txs[conflictKey]
 
-		// This tx is not longer an option for consuming the UTXOs from its
+		// This tx is no longer an option for consuming the UTXOs from its
 		// inputs, so we should remove their reference to this tx.
 		for _, inputID := range conflict.tx.InputIDs().List() {
 			inputKey := inputID.Key()
