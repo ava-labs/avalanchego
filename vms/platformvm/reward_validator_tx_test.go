@@ -16,19 +16,19 @@ import (
 )
 
 func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// ID of validator that should leave DS validator set next
-	nextToRemove := currentValidators.Peek().UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
+	nextToRemove := currentValidators.Peek().UnsignedTx.(*UnsignedAddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(nextToRemove.ID()); err != nil {
@@ -60,11 +60,11 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 
 	// Should be one less validator than before
 	oldNumValidators := len(currentValidators.Txs)
-	if currentValidators, err := vm.getCurrentValidators(onCommitDB, constants.DefaultSubnetID); err != nil {
+	if currentValidators, err := vm.getCurrentValidators(onCommitDB, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 	} else if numValidators := currentValidators.Len(); numValidators != oldNumValidators-1 {
 		t.Fatalf("Should be %d validators but are %d", oldNumValidators-1, numValidators)
-	} else if currentValidators, err = vm.getCurrentValidators(onAbortDB, constants.DefaultSubnetID); err != nil {
+	} else if currentValidators, err = vm.getCurrentValidators(onAbortDB, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 	} else if numValidators := currentValidators.Len(); numValidators != oldNumValidators-1 {
 		t.Fatalf("Should be %d validators but there are %d", oldNumValidators-1, numValidators)
@@ -101,7 +101,7 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 }
 
 func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -114,7 +114,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestShortID()
-	vdrTx, err := vm.newAddDefaultSubnetValidatorTx(
+	vdrTx, err := vm.newAddValidatorTx(
 		vm.minStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -129,7 +129,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 
 	delStartTime := vdrStartTime + 1
 	delEndTime := vdrEndTime - 1
-	delTx, err := vm.newAddDefaultSubnetDelegatorTx(
+	delTx, err := vm.newAddDelegatorTx(
 		vm.minStake, // stakeAmt
 		delStartTime,
 		delEndTime,
@@ -140,15 +140,15 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unsignedDelTx := delTx.UnsignedTx.(*UnsignedAddDefaultSubnetDelegatorTx)
+	unsignedDelTx := delTx.UnsignedTx.(*UnsignedAddDelegatorTx)
 
-	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.DefaultSubnetID)
+	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	currentValidators.Add(vdrTx)
 	currentValidators.Add(delTx)
-	if err := vm.putCurrentValidators(vm.DB, currentValidators, constants.DefaultSubnetID); err != nil {
+	if err := vm.putCurrentValidators(vm.DB, currentValidators, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 		// Advance timestamp to when delegator should leave validator set
 	} else if err := vm.putTimestamp(vm.DB, time.Unix(int64(delEndTime), 0)); err != nil {

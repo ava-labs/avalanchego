@@ -63,7 +63,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 6, 4)
+	Version       = version.NewDefaultVersion("avalanche", 0, 6, 5)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -155,10 +155,10 @@ func (n *Node) initNetworking() error {
 		clientUpgrader = network.NewIPUpgrader()
 	}
 
-	// Initialize validator manager and default subnet's validator set
-	defaultSubnetValidators := validators.NewSet()
+	// Initialize validator manager and primary network's validator set
+	primaryNetworkValidators := validators.NewSet()
 	n.vdrs = validators.NewManager()
-	n.vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
+	n.vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -172,14 +172,14 @@ func (n *Node) initNetworking() error {
 		dialer,
 		serverUpgrader,
 		clientUpgrader,
-		defaultSubnetValidators,
+		primaryNetworkValidators,
 		n.beacons,
 		n.Config.ConsensusRouter,
 	)
 
 	if !n.Config.EnableStaking {
 		n.Net.RegisterHandler(&insecureValidatorManager{
-			vdrs:   defaultSubnetValidators,
+			vdrs:   primaryNetworkValidators,
 			weight: n.Config.DisabledStakingWeight,
 		})
 	}
@@ -356,7 +356,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	// Create the Platform Chain
 	n.chainManager.ForceCreateChain(chains.ChainParameters{
 		ID:            constants.PlatformChainID,
-		SubnetID:      constants.DefaultSubnetID,
+		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMAlias:       platformvm.ID.String(),
 		CustomBeacons: n.beacons,
@@ -442,12 +442,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Instead of updating node's validator manager, platform chain makes changes
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
-		defaultSubnetValidators := validators.NewSet()
-		if err := defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
-			return fmt.Errorf("couldn't add validator to Default Subnet: %w", err)
+		primaryNetworkValidators := validators.NewSet()
+		if err := primaryNetworkValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
+			return fmt.Errorf("couldn't add validator to primary network: %w", err)
 		}
 		vdrs = validators.NewManager()
-		vdrs.PutValidatorSet(constants.DefaultSubnetID, defaultSubnetValidators)
+		vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
 	}
 
 	errs := wrappers.Errs{}

@@ -25,7 +25,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		Amount:  0,
 	}
 	weight := json.Uint64(987654321)
-	validator := FormattedAPIDefaultSubnetValidator{
+	validator := FormattedAPIPrimaryValidator{
 		FormattedAPIValidator: FormattedAPIValidator{
 			EndTime: 15,
 			Weight:  &weight,
@@ -38,7 +38,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIDefaultSubnetValidator{
+		Validators: []FormattedAPIPrimaryValidator{
 			validator,
 		},
 		Time: 5,
@@ -64,7 +64,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		Amount:  123456789,
 	}
 	weight := json.Uint64(0)
-	validator := FormattedAPIDefaultSubnetValidator{
+	validator := FormattedAPIPrimaryValidator{
 		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 0,
 			EndTime:   15,
@@ -78,7 +78,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIDefaultSubnetValidator{
+		Validators: []FormattedAPIPrimaryValidator{
 			validator,
 		},
 		Time: 5,
@@ -105,7 +105,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 
 	weight := json.Uint64(987654321)
-	validator := FormattedAPIDefaultSubnetValidator{
+	validator := FormattedAPIPrimaryValidator{
 		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 0,
 			EndTime:   5,
@@ -119,7 +119,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIDefaultSubnetValidator{
+		Validators: []FormattedAPIPrimaryValidator{
 			validator,
 		},
 		Time: 5,
@@ -146,7 +146,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	weight := json.Uint64(987654321)
-	validator1 := FormattedAPIDefaultSubnetValidator{
+	validator1 := FormattedAPIPrimaryValidator{
 		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 0,
 			EndTime:   20,
@@ -156,7 +156,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		RewardAddress: addr,
 	}
 
-	validator2 := FormattedAPIDefaultSubnetValidator{
+	validator2 := FormattedAPIPrimaryValidator{
 		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 3,
 			EndTime:   15,
@@ -166,7 +166,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		RewardAddress: addr,
 	}
 
-	validator3 := FormattedAPIDefaultSubnetValidator{
+	validator3 := FormattedAPIPrimaryValidator{
 		FormattedAPIValidator: FormattedAPIValidator{
 			StartTime: 1,
 			EndTime:   10,
@@ -181,7 +181,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIDefaultSubnetValidator{
+		Validators: []FormattedAPIPrimaryValidator{
 			validator1,
 			validator2,
 			validator3,
