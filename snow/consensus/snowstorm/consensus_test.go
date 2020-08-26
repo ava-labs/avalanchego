@@ -982,13 +982,11 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 
 	redVotes := ids.Bag{}
 	redVotes.Add(Red.ID())
-	changed, err := graph.RecordPoll(redVotes)
+	_, err = graph.RecordPoll(redVotes)
 	assert.NoError(t, err)
-	assert.False(t, changed, "shouldn't have accepted red yet")
 
-	changed, err = graph.RecordPoll(redVotes)
+	_, err = graph.RecordPoll(redVotes)
 	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted red")
 
 	assert.Equal(t, choices.Accepted, Red.Status())
 	assert.Equal(t, choices.Rejected, Green.Status())
@@ -998,9 +996,8 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 
 	blueVotes := ids.Bag{}
 	blueVotes.Add(Blue.ID())
-	changed, err = graph.RecordPoll(blueVotes)
+	_, err = graph.RecordPoll(blueVotes)
 	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted blue")
 
 	assert.Equal(t, choices.Accepted, Blue.Status())
 }

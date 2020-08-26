@@ -381,13 +381,13 @@ func (ig *Input) String() string {
 				confidence = 0
 				break
 			}
-
-			if input.confidence < confidence {
-				confidence = input.confidence
-			}
 			if !id.Equals(input.color) {
 				confidence = 0
 				break
+			}
+
+			if input.confidence < confidence {
+				confidence = input.confidence
 			}
 		}
 
@@ -404,12 +404,11 @@ func (ig *Input) String() string {
 	sb.WriteString("IG(")
 
 	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s Confidence: %s Bias: %%d",
-		formatting.IntFormat(len(nodes)-1),
-		formatting.IntFormat(ig.params.BetaRogue-1))
+		"\n    Choice[%s] = ID: %%50s %%s",
+		formatting.IntFormat(len(nodes)-1))
 
 	for i, cn := range nodes {
-		sb.WriteString(fmt.Sprintf(format, i, cn.id, cn.confidence, cn.bias))
+		sb.WriteString(fmt.Sprintf(format, i, cn.id, &cn))
 	}
 
 	if len(nodes) > 0 {
@@ -479,6 +478,13 @@ func (a *inputAccepter) Update() {
 type tempNode struct {
 	id               ids.ID
 	bias, confidence int
+}
+
+func (tn *tempNode) String() string {
+	return fmt.Sprintf(
+		"SB(NumSuccessfulPolls = %d, Confidence = %d)",
+		tn.bias,
+		tn.confidence)
 }
 
 type sortTempNodeData []tempNode
