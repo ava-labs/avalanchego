@@ -307,7 +307,7 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	}
 	// Verify must be called in the case the that tx was flushed from the unique
 	// cache.
-	return tx, tx.Verify()
+	return tx, tx.verifyWithoutCacheWrites()
 }
 
 /*
@@ -328,7 +328,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
-	if err := tx.Verify(); err != nil {
+	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
@@ -609,7 +609,7 @@ func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 		txID: inputTx,
 	}
 
-	if err := parent.Verify(); err != nil {
+	if err := parent.verifyWithoutCacheWrites(); err != nil {
 		return nil, errMissingUTXO
 	} else if status := parent.Status(); status.Decided() {
 		return nil, errMissingUTXO
