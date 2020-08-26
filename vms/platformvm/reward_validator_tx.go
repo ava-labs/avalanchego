@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	errShouldBeDSValidator = errors.New("expected validator to be in the default subnet")
+	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
 	errOverflowReward      = errors.New("overflow while calculating validator reward")
 	errWrongTxType         = errors.New("wrong transaction type")
 
@@ -68,14 +68,14 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
-	defaultSubnetVdrHeap, err := vm.getCurrentValidators(db, constants.DefaultSubnetID)
+	primaryNetworkVdrHeap, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if defaultSubnetVdrHeap.Len() == 0 { // there is no validator to remove
+	} else if primaryNetworkVdrHeap.Len() == 0 { // there is no validator to remove
 		return nil, nil, nil, nil, permError{errEmptyValidatingSet}
 	}
 
-	vdrTx := defaultSubnetVdrHeap.Remove()
+	vdrTx := primaryNetworkVdrHeap.Remove()
 	txID := vdrTx.ID()
 	if !txID.Equals(tx.TxID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
@@ -101,18 +101,18 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	// If this tx's proposal is committed, remove the validator from the validator set
 	onCommitDB := versiondb.New(db)
-	if err := vm.putCurrentValidators(onCommitDB, defaultSubnetVdrHeap, constants.DefaultSubnetID); err != nil {
+	if err := vm.putCurrentValidators(onCommitDB, primaryNetworkVdrHeap, constants.PrimaryNetworkID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// If this tx's proposal is aborted, remove the validator from the validator set
 	onAbortDB := versiondb.New(db)
-	if err := vm.putCurrentValidators(onAbortDB, defaultSubnetVdrHeap, constants.DefaultSubnetID); err != nil {
+	if err := vm.putCurrentValidators(onAbortDB, primaryNetworkVdrHeap, constants.PrimaryNetworkID); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	switch uVdrTx := vdrTx.UnsignedTx.(type) {
-	case *UnsignedAddDefaultSubnetValidatorTx:
+	case *UnsignedAddValidatorTx:
 		// Refund the stake here
 		for i, out := range uVdrTx.Stake {
 			utxo := &avax.UTXO{
@@ -153,13 +153,13 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				return nil, nil, nil, nil, tempError{err}
 			}
 		}
-	case *UnsignedAddDefaultSubnetDelegatorTx:
+	case *UnsignedAddDelegatorTx:
 		// We're removing a delegator
-		parentTx, err := defaultSubnetVdrHeap.getDefaultSubnetStaker(uVdrTx.Validator.NodeID)
+		parentTx, err := primaryNetworkVdrHeap.getPrimaryStaker(uVdrTx.Validator.NodeID)
 		if err != nil {
 			return nil, nil, nil, nil, permError{err}
 		}
-		unsignedParentTx := parentTx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		unsignedParentTx := parentTx.UnsignedTx.(*UnsignedAddValidatorTx)
 
 		// Refund the stake here
 		for i, out := range uVdrTx.Stake {
@@ -247,7 +247,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
 	// (flush to vm.DB) before this is called
 	updateValidators := func() error {
-		return vm.updateValidators(constants.DefaultSubnetID)
+		return vm.updateValidators(constants.PrimaryNetworkID)
 	}
 
 	return onCommitDB, onAbortDB, updateValidators, updateValidators, nil

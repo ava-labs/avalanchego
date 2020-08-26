@@ -22,14 +22,14 @@ import (
 var (
 	errSigsNotUniqueOrNotSorted = errors.New("control signatures not unique or not sorted")
 	errWrongNumberOfSignatures  = errors.New("wrong number of signatures")
-	errDSValidatorSubset        = errors.New("all subnets must be a subset of the default subnet")
+	errDSValidatorSubset        = errors.New("all subnets must be a subset of the primary network")
 
-	_ UnsignedProposalTx = &UnsignedAddNonDefaultSubnetValidatorTx{}
-	_ TimedTx            = &UnsignedAddNonDefaultSubnetValidatorTx{}
+	_ UnsignedProposalTx = &UnsignedAddSubnetValidatorTx{}
+	_ TimedTx            = &UnsignedAddSubnetValidatorTx{}
 )
 
-// UnsignedAddNonDefaultSubnetValidatorTx is an unsigned addNonDefaultSubnetValidatorTx
-type UnsignedAddNonDefaultSubnetValidatorTx struct {
+// UnsignedAddSubnetValidatorTx is an unsigned addSubnetValidatorTx
+type UnsignedAddSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// The validator
@@ -39,17 +39,17 @@ type UnsignedAddNonDefaultSubnetValidatorTx struct {
 }
 
 // StartTime of this validator
-func (tx *UnsignedAddNonDefaultSubnetValidatorTx) StartTime() time.Time {
+func (tx *UnsignedAddSubnetValidatorTx) StartTime() time.Time {
 	return tx.Validator.StartTime()
 }
 
 // EndTime of this validator
-func (tx *UnsignedAddNonDefaultSubnetValidatorTx) EndTime() time.Time {
+func (tx *UnsignedAddSubnetValidatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddNonDefaultSubnetValidatorTx) Verify(
+func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
 	feeAmount uint64,
@@ -75,7 +75,7 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) Verify(
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
+func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	vm *VM,
 	db database.Database,
 	stx *Tx,
@@ -104,36 +104,36 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 	}
 
 	// Ensure that the period this validator validates the specified subnet is a
-	// subnet of the time they validate the default subnet. First, see if
-	// they're currently validating the default subnet.
-	currentDSValidators, err := vm.getCurrentValidators(db, constants.DefaultSubnetID)
+	// subnet of the time they validate the primary network. First, see if
+	// they're currently validating the primary network.
+	currentDSValidators, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current validators of default subnet: %v", err)}
+		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get current validators of primary network: %v", err)}
 	}
-	if dsValidator, err := currentDSValidators.getDefaultSubnetStaker(tx.Validator.NodeID); err == nil {
-		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
+	if dsValidator, err := currentDSValidators.getPrimaryStaker(tx.Validator.NodeID); err == nil {
+		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
-				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
+				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating primary network [%v, %v]",
 					tx.StartTime(), tx.EndTime(),
 					unsignedValidator.StartTime(), unsignedValidator.EndTime())}
 		}
 	} else {
-		// They aren't currently validating the default subnet. See if they will
-		// validate the default subnet in the future.
-		pendingDSValidators, err := vm.getPendingValidators(db, constants.DefaultSubnetID)
+		// They aren't currently validating the primary network. See if they will
+		// validate the primary network in the future.
+		pendingDSValidators, err := vm.getPendingValidators(db, constants.PrimaryNetworkID)
 		if err != nil {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of default subnet: %v", err)}
+			return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of primary network: %v", err)}
 		}
-		dsValidator, err := pendingDSValidators.getDefaultSubnetStaker(tx.Validator.NodeID)
+		dsValidator, err := pendingDSValidators.getPrimaryStaker(tx.Validator.NodeID)
 		if err != nil {
 			return nil, nil, nil, nil,
-				permError{fmt.Errorf("validator would not be validating default subnet while validating non-default subnet")}
+				permError{fmt.Errorf("validator would not be validating primary network while validating subnet")}
 		}
-		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		unsignedValidator := dsValidator.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
 			return nil, nil, nil, nil,
-				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating default subnet [%v, %v]",
+				permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating primary network [%v, %v]",
 					tx.StartTime(), tx.EndTime(),
 					unsignedValidator.StartTime(), unsignedValidator.EndTime())}
 		}
@@ -219,12 +219,12 @@ func (tx *UnsignedAddNonDefaultSubnetValidatorTx) SemanticVerify(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *UnsignedAddNonDefaultSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx *UnsignedAddSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
 // Create a new transaction
-func (vm *VM) newAddNonDefaultSubnetValidatorTx(
+func (vm *VM) newAddSubnetValidatorTx(
 	weight, // Sampling weight of the new validator
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they top delegating
@@ -244,7 +244,7 @@ func (vm *VM) newAddNonDefaultSubnetValidatorTx(
 	signers = append(signers, subnetSigners)
 
 	// Create the tx
-	utx := &UnsignedAddNonDefaultSubnetValidatorTx{
+	utx := &UnsignedAddSubnetValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.Ctx.NetworkID,
 			BlockchainID: vm.Ctx.ChainID,

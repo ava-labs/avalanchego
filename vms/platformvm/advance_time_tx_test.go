@@ -38,7 +38,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(MinimumStakingDuration)
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
-	addPendingValidatorTx, err := vm.newAddDefaultSubnetValidatorTx(
+	addPendingValidatorTx, err := vm.newAddValidatorTx(
 		vm.minStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
@@ -57,7 +57,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []*Tx{addPendingValidatorTx},
 		},
-		constants.DefaultSubnetID,
+		constants.PrimaryNetworkID,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(MinimumStakingDuration)
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
-	addPendingValidatorTx, err := vm.newAddDefaultSubnetValidatorTx(
+	addPendingValidatorTx, err := vm.newAddValidatorTx(
 		vm.minStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
@@ -125,7 +125,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 			SortByStartTime: true,
 			Txs:             []*Tx{addPendingValidatorTx},
 		},
-		constants.DefaultSubnetID,
+		constants.PrimaryNetworkID,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -139,25 +139,25 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, constants.DefaultSubnetID); err != nil {
+	if onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 	} else if onCommitCurrentEvents.Len() != len(keys)+1 { // Each key in [keys] is a validator to start with...then we added a validator
 		t.Fatalf("Should have added the validator to the validator set")
 	}
 
-	if onCommitPendingEvents, err := vm.getPendingValidators(onCommit, constants.DefaultSubnetID); err != nil {
+	if onCommitPendingEvents, err := vm.getPendingValidators(onCommit, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 	} else if onCommitPendingEvents.Len() != 0 {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
-	if onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, constants.DefaultSubnetID); err != nil {
+	if onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 	} else if onAbortCurrentEvents.Len() != len(keys) {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
 	}
 
-	if onAbortPendingEvents, err := vm.getPendingValidators(onAbort, constants.DefaultSubnetID); err != nil {
+	if onAbortPendingEvents, err := vm.getPendingValidators(onAbort, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
 	} else if onAbortPendingEvents.Len() != 1 {
 		t.Fatalf("Shouldn't have removed the validator from the pending validator set")

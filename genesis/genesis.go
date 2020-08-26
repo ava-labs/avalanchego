@@ -119,7 +119,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		weight := json.Uint64(20 * units.KiloAvax)
 		destAddr := config.FundedAddresses[i%len(config.FundedAddresses)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.FormattedAPIDefaultSubnetValidator{
+			platformvm.FormattedAPIPrimaryValidator{
 				FormattedAPIValidator: platformvm.FormattedAPIValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
@@ -135,7 +135,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	platformvmArgs.Chains = []platformvm.APIChain{
 		{
 			GenesisData: avmReply.Bytes,
-			SubnetID:    constants.DefaultSubnetID,
+			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        avm.ID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
@@ -146,7 +146,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 		{
 			GenesisData: formatting.CB58{Bytes: config.EVMBytes},
-			SubnetID:    constants.DefaultSubnetID,
+			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        EVMID,
 			Name:        "C-Chain",
 		},
