@@ -4,16 +4,11 @@
 package snowstorm
 
 import (
-	"bytes"
-	"fmt"
 	"math"
-	"sort"
-	"strings"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/formatting"
 
 	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
@@ -125,40 +120,11 @@ func (ig *Input) Conflicts(tx Tx) ids.Set {
 
 // Add implements the ConflictGraph interface
 func (ig *Input) Add(tx Tx) error {
-	if ig.Issued(tx) {
-		// If the tx was previously inserted, it shouldn't be re-inserted.
-		return nil
+	if shouldVote, err := ig.shouldVote(ig, tx); !shouldVote || err != nil {
+		return err
 	}
 
 	txID := tx.ID()
-	bytes := tx.Bytes()
-
-	// Notify the IPC socket that this tx has been issued.
-	ig.ctx.DecisionDispatcher.Issue(ig.ctx.ChainID, txID, bytes)
-
-	// Notify the metrics that this transaction was just issued.
-	ig.metrics.Issued(txID)
-
-	inputs := tx.InputIDs()
-
-	// If this tx doesn't have any inputs, it's impossible for there to be any
-	// conflicting transactions. Therefore, this transaction is treated as
-	// vacuously accepted.
-	if inputs.Len() == 0 {
-		// Accept is called before notifying the IPC so that acceptances that
-		// cause fatal errors aren't sent to an IPC peer.
-		if err := tx.Accept(); err != nil {
-			return err
-		}
-
-		// Notify the IPC socket that this tx has been accepted.
-		ig.ctx.DecisionDispatcher.Accept(ig.ctx.ChainID, txID, bytes)
-
-		// Notify the metrics that this transaction was just accepted.
-		ig.metrics.Accepted(txID)
-		return nil
-	}
-
 	txNode := &inputTx{tx: tx}
 
 	// This tx should be added to the virtuous sets and preferred sets if this
@@ -168,7 +134,7 @@ func (ig *Input) Add(tx Tx) error {
 	// For each UTXO consumed by the tx:
 	// * Mark this tx as attempting to consume this UTXO
 	// * Mark the UTXO as being rogue if applicable
-	for _, inputID := range inputs.List() {
+	for _, inputID := range tx.InputIDs().List() {
 		inputKey := inputID.Key()
 		utxo, exists := ig.utxos[inputKey]
 		if exists {
@@ -212,29 +178,7 @@ func (ig *Input) Add(tx Tx) error {
 
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
-	toReject := &rejector{
-		g:    ig,
-		errs: &ig.errs,
-		txID: txID,
-	}
-
-	// Register all of this txs dependencies as possibilities to reject this tx.
-	for _, dependency := range tx.Dependencies() {
-		if dependency.Status() != choices.Accepted {
-			// If the dependency isn't accepted, then it must be processing. So,
-			// this tx should be rejected if any of these processing txs are
-			// rejected. Note that the dependencies can't already be rejected,
-			// because it is assumped that this tx is currently considered
-			// valid.
-			toReject.deps.Add(dependency.ID())
-		}
-	}
-
-	// Register these dependencies
-	ig.pendingReject.Register(toReject)
-
-	// Registering the rejector can't result in an error, so we can safely
-	// return nil here.
+	ig.registerRejector(ig, tx)
 	return nil
 }
 
@@ -353,7 +297,11 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 		if !txNode.pendingAccept &&
 			((!rogue && confidence >= ig.params.BetaVirtuous) ||
 				confidence >= ig.params.BetaRogue) {
-			ig.deferAcceptance(txNode)
+			// Mark that this tx is pending acceptance so acceptance is only
+			// registered once.
+			txNode.pendingAccept = true
+
+			ig.registerAcceptor(ig, txNode.tx)
 			if ig.errs.Errored() {
 				return changed, ig.errs.Err
 			}
@@ -368,14 +316,14 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 }
 
 func (ig *Input) String() string {
-	nodes := make([]tempNode, 0, len(ig.txs))
+	nodes := make([]*snowballNode, 0, len(ig.txs))
 	for _, tx := range ig.txs {
-		id := tx.tx.ID()
+		txID := tx.tx.ID()
 
 		confidence := ig.params.BetaRogue
 		for _, inputID := range tx.tx.InputIDs().List() {
 			input := ig.utxos[inputID.Key()]
-			if input.lastVote != ig.currentVote || !id.Equals(input.color) {
+			if input.lastVote != ig.currentVote || !txID.Equals(input.color) {
 				confidence = 0
 				break
 			}
@@ -384,58 +332,41 @@ func (ig *Input) String() string {
 			}
 		}
 
-		nodes = append(nodes, tempNode{
-			id:                 id,
+		nodes = append(nodes, &snowballNode{
+			txID:               txID,
 			numSuccessfulPolls: tx.numSuccessfulPolls,
 			confidence:         confidence,
 		})
 	}
-	// Sort the nodes so that the string representation is canonical
-	sortTempNodes(nodes)
-
-	sb := strings.Builder{}
-	sb.WriteString("IG(")
-
-	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s %%s",
-		formatting.IntFormat(len(nodes)-1))
-	for i, cn := range nodes {
-		sb.WriteString(fmt.Sprintf(format, i, cn.id, &cn))
-	}
-
-	if len(nodes) > 0 {
-		sb.WriteString("\n")
-	}
-	sb.WriteString(")")
-	return sb.String()
+	return ConsensusString("IG", nodes)
 }
 
-// deferAcceptance attempts to accept this tx once all its dependencies are
-// accepted. If all the dependencies are already accepted, this function will
-// immediately accept the tx.
-func (ig *Input) deferAcceptance(txNode *inputTx) {
-	// Mark that this tx is pending acceptance so this function won't be called
-	// again
-	txNode.pendingAccept = true
+// accept the named txID and remove it from the graph
+func (ig *Input) accept(txID ids.ID) error {
+	txKey := txID.Key()
+	txNode := ig.txs[txKey]
+	// We are accepting the tx, so we should remove the node from the graph.
+	delete(ig.txs, txID.Key())
 
-	toAccept := &inputAccepter{
-		ig:     ig,
-		txNode: txNode,
+	// Get the conflicts of this tx so that we can reject them
+	conflicts := ig.Conflicts(txNode.tx)
+
+	// This tx is consuming all the UTXOs from its inputs, so we can prune them
+	// all from memory
+	for _, inputID := range txNode.tx.InputIDs().List() {
+		delete(ig.utxos, inputID.Key())
 	}
 
-	for _, dependency := range txNode.tx.Dependencies() {
-		if dependency.Status() != choices.Accepted {
-			// If the dependency isn't accepted, then it must be processing.
-			// This tx should be accepted after this tx is accepted.
-			toAccept.deps.Add(dependency.ID())
-		}
-	}
+	// This tx is now accepted, so it shouldn't be part of the virtuous set or
+	// the preferred set. Its status as Accepted implies these descriptions.
+	ig.virtuous.Remove(txID)
+	ig.preferences.Remove(txID)
 
-	// This tx is no longer being voted on, so we remove it from the voting set.
-	// This ensures that virtuous txs built on top of rogue txs don't force the
-	// node to treat the rogue tx as virtuous.
-	ig.virtuousVoting.Remove(txNode.tx.ID())
-	ig.pendingAccept.Register(toAccept)
+	// Reject all the txs that conflicted with this tx.
+	if err := ig.reject(conflicts.List()...); err != nil {
+		return err
+	}
+	return ig.acceptTx(txNode.tx)
 }
 
 // reject all the named txIDs and remove them from their conflict sets
@@ -454,24 +385,9 @@ func (ig *Input) reject(conflictIDs ...ids.ID) error {
 		// Remove this tx from all the conflict sets it's currently in
 		ig.removeConflict(conflictID, conflict.tx.InputIDs().List()...)
 
-		// Reject is called before notifying the IPC so that rejections that
-		// cause fatal errors aren't sent to an IPC peer.
-		if err := conflict.tx.Reject(); err != nil {
+		if err := ig.rejectTx(conflict.tx); err != nil {
 			return err
 		}
-
-		// Notify the IPC that the tx was rejected
-		ig.ctx.DecisionDispatcher.Reject(ig.ctx.ChainID, conflict.tx.ID(), conflict.tx.Bytes())
-
-		// Update the metrics to account for this transaction's rejection
-		ig.metrics.Rejected(conflictID)
-
-		// If there is a tx that was accepted pending on this tx, the ancestor
-		// tx can't be accepted.
-		ig.pendingAccept.Abandon(conflictID)
-		// If there is a tx that was issued pending on this tx, the ancestor tx
-		// must be rejected.
-		ig.pendingReject.Fulfill(conflictID)
 	}
 	return nil
 }
@@ -548,93 +464,3 @@ func (ig *Input) removeConflict(txID ids.ID, inputIDs ...ids.ID) {
 		}
 	}
 }
-
-type inputAccepter struct {
-	ig       *Input
-	deps     ids.Set
-	rejected bool
-	txNode   *inputTx
-}
-
-func (a *inputAccepter) Dependencies() ids.Set { return a.deps }
-
-func (a *inputAccepter) Fulfill(id ids.ID) {
-	a.deps.Remove(id)
-	a.Update()
-}
-
-func (a *inputAccepter) Abandon(id ids.ID) { a.rejected = true }
-
-func (a *inputAccepter) Update() {
-	// If I was rejected or I am still waiting on dependencies to finish or an
-	// error has occurred, I shouldn't do anything.
-	if a.rejected || a.deps.Len() != 0 || a.ig.errs.Errored() {
-		return
-	}
-
-	txID := a.txNode.tx.ID()
-	// We are accepting the tx, so we should remove the node from the graph.
-	delete(a.ig.txs, txID.Key())
-
-	// Get the conflicts of this tx so that we can reject them
-	conflicts := a.ig.Conflicts(a.txNode.tx)
-
-	// This tx is consuming all the UTXOs from its inputs, so we can prune them
-	// all from memory
-	for _, inputID := range a.txNode.tx.InputIDs().List() {
-		delete(a.ig.utxos, inputID.Key())
-	}
-
-	// This tx is now accepted, so it shouldn't be part of the virtuous set or
-	// the preferred set. Its status as Accepted implies these descriptions.
-	a.ig.virtuous.Remove(txID)
-	a.ig.preferences.Remove(txID)
-
-	// Reject all the txs that conflicted with this tx.
-	if err := a.ig.reject(conflicts.List()...); err != nil {
-		a.ig.errs.Add(err)
-		return
-	}
-
-	// Accept is called before notifying the IPC so that acceptances that cause
-	// fatal errors aren't sent to an IPC peer.
-	if err := a.txNode.tx.Accept(); err != nil {
-		a.ig.errs.Add(err)
-		return
-	}
-
-	// Notify the IPC socket that this tx has been accepted.
-	a.ig.ctx.DecisionDispatcher.Accept(a.ig.ctx.ChainID, txID, a.txNode.tx.Bytes())
-
-	// Update the metrics to account for this transaction's acceptance
-	a.ig.metrics.Accepted(txID)
-
-	// If there is a tx that was accepted pending on this tx, the ancestor
-	// should be notified that it doesn't need to block on this tx anymore.
-	a.ig.pendingAccept.Fulfill(txID)
-	// If there is a tx that was issued pending on this tx, the ancestor tx
-	// doesn't need to be rejected because of this tx.
-	a.ig.pendingReject.Abandon(txID)
-}
-
-type tempNode struct {
-	id                             ids.ID
-	numSuccessfulPolls, confidence int
-}
-
-func (tn *tempNode) String() string {
-	return fmt.Sprintf(
-		"SB(NumSuccessfulPolls = %d, Confidence = %d)",
-		tn.numSuccessfulPolls,
-		tn.confidence)
-}
-
-type sortTempNodeData []tempNode
-
-func (tnd sortTempNodeData) Less(i, j int) bool {
-	return bytes.Compare(tnd[i].id.Bytes(), tnd[j].id.Bytes()) == -1
-}
-func (tnd sortTempNodeData) Len() int      { return len(tnd) }
-func (tnd sortTempNodeData) Swap(i, j int) { tnd[j], tnd[i] = tnd[i], tnd[j] }
-
-func sortTempNodes(nodes []tempNode) { sort.Sort(sortTempNodeData(nodes)) }

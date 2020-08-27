@@ -60,6 +60,9 @@ type Consensus interface {
 	// that this instance is no longer finalized.
 	Finalized() bool
 
+	// Accept the provided tx remove it from the graph
+	accept(txID ids.ID) error
+
 	// Reject all the provided txs and remove them from the graph
 	reject(txIDs ...ids.ID) error
 }
