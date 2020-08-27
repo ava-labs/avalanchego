@@ -36,7 +36,10 @@ type metrics struct {
 }
 
 // Initialize implements the Engine interface
-func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer) error {
+func (m *metrics) Initialize(
+	namespace string,
+	registerer prometheus.Registerer,
+) error {
 	m.processing = make(map[[32]byte]time.Time)
 
 	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
