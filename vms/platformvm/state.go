@@ -13,7 +13,9 @@ import (
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
 
 	safemath "github.com/ava-labs/gecko/utils/math"
@@ -25,6 +27,14 @@ import (
 const (
 	currentValidatorsPrefix uint64 = iota
 	pendingValidatorsPrefix
+
+	delegator = "delegator"
+	start     = "start"
+	stop      = "stop"
+)
+
+var (
+	errNoValidators = errors.New("there are no validators")
 )
 
 // persist a tx
@@ -76,6 +86,189 @@ func (vm *VM) putCurrentValidators(db database.Database, validators *EventHeap, 
 		return fmt.Errorf("couldn't put current validator set: %w", err)
 	}
 	return nil
+}
+
+func (vm *VM) addValidator(db database.Database, subnetID ids.ID, validator TimedTx) error {
+	validatorBytes := validator.Bytes()
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(validator.StartTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
+	}
+	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
+	prefixStartDB := prefixdb.NewNested(prefixStart, db)
+	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	prefixStopDB := prefixdb.NewNested(prefixStop, db)
+	startKey := append(p.Bytes, validatorBytes...)
+
+	p = wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(validator.EndTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
+	}
+	stopKey := append(p.Bytes, validatorBytes...)
+
+	if err := prefixStartDB.Put(startKey, validatorBytes); err != nil {
+		return err
+	}
+	return prefixStopDB.Put(stopKey, validatorBytes)
+}
+
+func (vm *VM) removeValidator(db database.Database, subnetID ids.ID, validator TimedTx) error {
+	validatorBytes := validator.Bytes()
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(validator.StartTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
+	}
+	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
+	prefixStartDB := prefixdb.NewNested(prefixStart, db)
+	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	prefixStopDB := prefixdb.NewNested(prefixStop, db)
+	startKey := append(p.Bytes, validatorBytes...)
+
+	p = wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(validator.EndTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
+	}
+	stopKey := append(p.Bytes, validatorBytes...)
+
+	if err := prefixStartDB.Put(startKey, validatorBytes); err != nil {
+		return err
+	}
+	return prefixStopDB.Put(stopKey, validatorBytes)
+}
+
+func (vm *VM) addDelegator(db database.Database, delegator TimedTx) error {
+	delegatorBytes := delegator.Bytes()
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(delegator.StartTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
+	}
+	prefixStart := []byte(fmt.Sprintf("%s%s", delegator, start))
+	prefixStartDB := prefixdb.NewNested(prefixStart, db)
+	prefixStop := []byte(fmt.Sprintf("%s%s", delegator, stop))
+	prefixStopDB := prefixdb.NewNested(prefixStop, db)
+	startKey := append(p.Bytes, delegatorBytes...)
+
+	p = wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(delegator.EndTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
+	}
+	stopKey := append(p.Bytes, delegatorBytes...)
+
+	if err := prefixStartDB.Put(startKey, delegatorBytes); err != nil {
+		return err
+	}
+	return prefixStopDB.Put(stopKey, delegatorBytes)
+}
+
+func (vm *VM) removeDelegator(db database.Database, delegator TimedTx) error {
+	delegatorBytes := delegator.Bytes()
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(delegator.StartTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
+	}
+	prefixStart := []byte(fmt.Sprintf("%s%s", delegator, start))
+	prefixStartDB := prefixdb.NewNested(prefixStart, db)
+	prefixStop := []byte(fmt.Sprintf("%s%s", delegator, stop))
+	prefixStopDB := prefixdb.NewNested(prefixStop, db)
+	startKey := append(p.Bytes, delegatorBytes...)
+
+	p = wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(delegator.EndTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
+	}
+	stopKey := append(p.Bytes, delegatorBytes...)
+
+	if err := prefixStartDB.Put(startKey, delegatorBytes); err != nil {
+		return err
+	}
+	return prefixStopDB.Put(stopKey, delegatorBytes)
+}
+
+// Returns the pending validator that will start validating next
+func (vm *VM) nextValidatorToStart(db database.Database, subnetID ids.ID) (TimedTx, error) {
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, start)), db).NewIterator()
+	if iter.Next() {
+		txBytes := iter.Value()
+		var tx *Tx
+		if err := Codec.Unmarshal(txBytes, tx); err != nil {
+			return nil, err
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return nil, fmt.Errorf("couldn't sign tx: %w", err)
+		}
+		asTimedTx, ok := tx.UnsignedTx.(TimedTx)
+		if !ok {
+			return nil, fmt.Errorf("expected validator to be type TimedTx but is %T", tx)
+		}
+		return asTimedTx, nil
+	}
+	return nil, errNoValidators
+}
+
+// Returns the current validator that will top validating next
+func (vm *VM) nextValidatorToStop(db database.Database, subnetID ids.ID) (TimedTx, error) {
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stop)), db).NewIterator()
+	if iter.Next() {
+		txBytes := iter.Value()
+		var tx *Tx
+		if err := Codec.Unmarshal(txBytes, tx); err != nil {
+			return nil, err
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return nil, fmt.Errorf("couldn't sign tx: %w", err)
+		}
+		asTimedTx, ok := tx.UnsignedTx.(TimedTx)
+		if !ok {
+			return nil, fmt.Errorf("expected validator to be type TimedTx but is %T", tx)
+		}
+		return asTimedTx, nil
+	}
+	return nil, errNoValidators
+}
+
+// Returns true if [nodeID] is a validator
+func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool) {
+	iter := prefixdb.NewNested([]byte(start), db).NewIterator()
+	for iter.Next() {
+		txBytes := iter.Value()
+		var tx *Tx
+		if err := Codec.Unmarshal(txBytes, tx); err != nil {
+			vm.Ctx.Log.Warn("couldn't unmarshal Tx: %w", err)
+			return nil, false
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			vm.Ctx.Log.Warn("couldn't sign *Tx: %w", err)
+			return nil, false
+		}
+		switch vdr := tx.UnsignedTx.(type) {
+		case *UnsignedAddValidatorTx:
+			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+				return vdr, true
+			}
+			return nil, false
+		case *UnsignedAddSubnetValidatorTx:
+			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+				return vdr, true
+			}
+			return nil, false
+		default:
+			vm.Ctx.Log.Warn("expected tx to be *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx)
+			return nil, false
+		}
+	}
+	return nil, false
 }
 
 // get the validators that are slated to validate the specified subnet in the future

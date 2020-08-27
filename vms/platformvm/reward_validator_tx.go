@@ -100,15 +100,23 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	// If this tx's proposal is committed, remove the validator from the validator set
 	onCommitDB := versiondb.New(db)
-	if err := vm.putCurrentValidators(onCommitDB, primaryNetworkVdrHeap, constants.PrimaryNetworkID); err != nil {
+	if err := vm.removeValidator(onCommitDB, constants.PrimaryNetworkID, unsignedVdrTx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
+	// TODO remove
+	// if err := vm.putCurrentValidators(onCommitDB, primaryNetworkVdrHeap, constants.PrimaryNetworkID); err != nil {
+	// 	return nil, nil, nil, nil, tempError{err}
+	// }
 
 	// If this tx's proposal is aborted, remove the validator from the validator set
 	onAbortDB := versiondb.New(db)
-	if err := vm.putCurrentValidators(onAbortDB, primaryNetworkVdrHeap, constants.PrimaryNetworkID); err != nil {
+	if err := vm.removeValidator(onCommitDB, constants.PrimaryNetworkID, unsignedVdrTx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
+	// TODO remove
+	// if err := vm.putCurrentValidators(onAbortDB, primaryNetworkVdrHeap, constants.PrimaryNetworkID); err != nil {
+	// 	return nil, nil, nil, nil, tempError{err}
+	// }
 
 	switch uVdrTx := vdrTx.UnsignedTx.(type) {
 	case *UnsignedAddValidatorTx:

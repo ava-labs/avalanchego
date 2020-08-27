@@ -134,28 +134,10 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 			startTime)}
 	}
 
-	// Ensure the proposed validator is not already a validator of the specified subnet
-	currentValidators, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-	for _, currentVdr := range vm.getValidators(currentValidators) {
-		if currentVdr.ID().Equals(tx.Validator.NodeID) {
-			return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a primary network validator",
-				tx.Validator.NodeID)}
-		}
-	}
-
-	// Ensure the proposed validator is not already slated to validate for the specified subnet
-	pendingValidators, err := vm.getPendingValidators(db, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-	for _, pendingVdr := range vm.getValidators(pendingValidators) {
-		if pendingVdr.ID().Equals(tx.Validator.NodeID) {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("validator %s is already a pending primary network validator",
-				tx.Validator.NodeID)}
-		}
+	vdr, isValidator := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if isValidator && tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a primary network validator from %s to %s",
+			tx.Validator.NodeID, vdr.StartTime(), vdr.EndTime())}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -181,9 +163,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	}
 
 	// Add validator to set of pending validators
-	pendingValidators.Add(stx)
-	// If this proposal is committed, update the pending validator set to include the validator
-	if err := vm.putPendingValidators(onCommitDB, pendingValidators, constants.PrimaryNetworkID); err != nil {
+	if err := vm.addValidator(onCommitDB, constants.PrimaryNetworkID, tx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

@@ -17,6 +17,7 @@ type TimedTx interface {
 	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
+	Bytes() []byte
 }
 
 // EventHeap is a collection of timedTxs where elements are ordered by either

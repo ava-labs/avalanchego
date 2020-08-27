@@ -539,17 +539,14 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 
 	// If the chain time would be the time for the next primary network validator to leave,
 	// then we create a block that removes the validator and proposes they receive a validator reward
-	currentValidators, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get validator set: %w", err)
-	}
 	nextValidatorEndtime := maxTime
-	if currentValidators.Len() > 0 {
-		nextValidatorEndtime = currentValidators.Peek().UnsignedTx.(TimedTx).EndTime()
+	nextToLeave, err := vm.nextValidatorToStop(db, constants.PrimaryNetworkID) // TODO check for delegators too
+	if err != nil {
+		return nil, err
 	}
+	nextValidatorEndtime = nextToLeave.EndTime()
 	if currentChainTimestamp.Equal(nextValidatorEndtime) {
-		stakerTx := currentValidators.Peek()
-		rewardValidatorTx, err := vm.newRewardValidatorTx(stakerTx.ID())
+		rewardValidatorTx, err := vm.newRewardValidatorTx(nextToLeave.ID())
 		if err != nil {
 			return nil, err
 		}
@@ -777,22 +774,21 @@ func (vm *VM) nextValidatorChangeTime(db database.Database, start bool) time.Tim
 }
 
 func (vm *VM) nextSubnetValidatorChangeTime(db database.Database, subnetID ids.ID, start bool) time.Time {
-	var validators *EventHeap
-	var err error
-	if start {
-		validators, err = vm.getPendingValidators(db, subnetID)
-	} else {
-		validators, err = vm.getCurrentValidators(db, subnetID)
+	nextToStart, err1 := vm.nextValidatorToStart(db, subnetID)
+	nextToStop, err2 := vm.nextValidatorToStop(db, subnetID)
+	if err1 != nil {
+		if err2 != nil {
+			return maxTime
+		}
+		return nextToStop.EndTime()
 	}
-	if err != nil {
-		vm.Ctx.Log.Error("couldn't get validators of subnet with ID %s: %v", subnetID, err)
-		return maxTime
+	if err2 != nil {
+		return nextToStart.StartTime()
 	}
-	if validators.Len() == 0 {
-		vm.Ctx.Log.Verbo("subnet, %s, has no validators", subnetID)
-		return maxTime
+	if nextToStart.StartTime().Before(nextToStop.EndTime()) {
+		return nextToStart.StartTime()
 	}
-	return validators.Timestamp()
+	return nextToStop.EndTime()
 }
 
 // Returns:

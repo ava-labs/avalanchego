@@ -127,34 +127,11 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 			validatorStartTime)}
 	}
 
-	// Ensure that the period this delegator is running is a subset of the time
-	// the validator is running. First, see if the validator is currently
-	// running.
-	currentValidators, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of primary network: %w", err)}
-	}
-	pendingValidators, err := vm.getPendingValidators(db, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of primary network: %w", err)}
-	}
-
-	if validator, err := currentValidators.getPrimaryStaker(tx.Validator.NodeID); err == nil {
-		unsignedValidator := validator.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
-			return nil, nil, nil, nil, permError{errDSValidatorSubset}
-		}
-	} else {
-		// They aren't currently validating, so check to see if they will
-		// validate in the future.
-		validator, err := pendingValidators.getPrimaryStaker(tx.Validator.NodeID)
-		if err != nil {
-			return nil, nil, nil, nil, permError{errDSValidatorSubset}
-		}
-		unsignedValidator := validator.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
-			return nil, nil, nil, nil, permError{errDSValidatorSubset}
-		}
+	// Ensure that the period this delegator delegates is a subset of the time
+	// the validator validates.
+	vdr, isValidator := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+		return nil, nil, nil, nil, permError{errDSValidatorSubset}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -179,12 +156,8 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	// Add the delegator to the pending validators heap
-	pendingValidators.Add(stx)
 	// If this proposal is committed, update the pending validator set to include the delegator
-	if err := vm.putPendingValidators(onCommitDB, pendingValidators, constants.PrimaryNetworkID); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
+	vm.addValidator(onCommitDB, constants.PrimaryNetworkID, tx)
 
 	// Set up the DB if this tx is aborted
 	onAbortDB := versiondb.New(db)
