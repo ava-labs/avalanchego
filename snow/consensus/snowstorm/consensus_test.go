@@ -224,8 +224,10 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if _, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !graph.Finalized() {
@@ -269,8 +271,10 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if _, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Blue.ID()) {
@@ -316,8 +320,10 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if _, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Alpha.ID()) {
@@ -360,8 +366,10 @@ func IndependentTest(t *testing.T, factory Factory) {
 	ra.SetThreshold(2)
 	ra.AddCount(Red.ID(), 2)
 	ra.AddCount(Alpha.ID(), 2)
-	if _, err := graph.RecordPoll(ra); err != nil {
+	if updated, err := graph.RecordPoll(ra); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Red.ID()) {
@@ -370,8 +378,10 @@ func IndependentTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if _, err := graph.RecordPoll(ra); err != nil {
+	} else if updated, err := graph.RecordPoll(ra); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !graph.Finalized() {
@@ -539,8 +549,10 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	g := ids.Bag{}
 	g.Add(Green.ID())
-	if _, err := graph.RecordPoll(g); err != nil {
+	if updated, err := graph.RecordPoll(g); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -557,8 +569,10 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	rp := ids.Bag{}
 	rp.Add(Red.ID(), purple.ID())
-	if _, err := graph.RecordPoll(rp); err != nil {
+	if updated, err := graph.RecordPoll(rp); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -575,8 +589,10 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	r := ids.Bag{}
 	r.Add(Red.ID())
-	if _, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if Red.Status() != choices.Accepted {
@@ -654,8 +670,10 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 
 	g := ids.Bag{}
 	g.Add(Green.ID())
-	if _, err := graph.RecordPoll(g); err != nil {
+	if updated, err := graph.RecordPoll(g); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -672,8 +690,10 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 
 	p := ids.Bag{}
 	p.Add(purple.ID())
-	if _, err := graph.RecordPoll(p); err != nil {
+	if updated, err := graph.RecordPoll(p); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -690,8 +710,10 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 
 	rp := ids.Bag{}
 	rp.Add(Red.ID(), purple.ID())
-	if _, err := graph.RecordPoll(rp); err != nil {
+	if updated, err := graph.RecordPoll(rp); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -708,8 +730,10 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 
 	r := ids.Bag{}
 	r.Add(Red.ID())
-	if _, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if Red.Status() != choices.Accepted {
@@ -771,8 +795,10 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 
 	gp := ids.Bag{}
 	gp.Add(Green.ID(), purple.ID())
-	if _, err := graph.RecordPoll(gp); err != nil {
+	if updated, err := graph.RecordPoll(gp); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -787,8 +813,10 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", Blue.ID(), choices.Processing)
 	} else if purple.Status() != choices.Processing {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
-	} else if _, err := graph.RecordPoll(gp); err != nil {
+	} else if updated, err := graph.RecordPoll(gp); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if Red.Status() != choices.Rejected {
@@ -935,8 +963,10 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 	votes := ids.Bag{}
 	votes.Add(rogue1.ID())
 	votes.Add(virtuous.ID())
-	if _, err := graph.RecordPoll(votes); err != nil {
+	if updated, err := graph.RecordPoll(votes); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if status := rogue1.Status(); status != choices.Processing {
 		t.Fatalf("Rogue Tx is %s expected %s", status, choices.Processing)
 	} else if status := rogue2.Status(); status != choices.Processing {
@@ -1117,11 +1147,13 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 
 	redVotes := ids.Bag{}
 	redVotes.Add(Red.ID())
-	_, err = graph.RecordPoll(redVotes)
+	changed, err := graph.RecordPoll(redVotes)
 	assert.NoError(t, err)
+	assert.False(t, changed, "shouldn't have accepted the red tx")
 
-	_, err = graph.RecordPoll(redVotes)
+	changed, err = graph.RecordPoll(redVotes)
 	assert.NoError(t, err)
+	assert.True(t, changed, "should have accepted the red tx")
 
 	assert.Equal(t, choices.Accepted, Red.Status())
 	assert.Equal(t, choices.Rejected, Green.Status())
@@ -1131,8 +1163,9 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 
 	blueVotes := ids.Bag{}
 	blueVotes.Add(Blue.ID())
-	_, err = graph.RecordPoll(blueVotes)
+	changed, err = graph.RecordPoll(blueVotes)
 	assert.NoError(t, err)
+	assert.True(t, changed, "should have accepted the blue tx")
 
 	assert.Equal(t, choices.Accepted, Blue.Status())
 }
@@ -1172,8 +1205,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	rb.SetThreshold(2)
 	rb.AddCount(Red.ID(), 2)
 	rb.AddCount(Blue.ID(), 2)
-	if _, err := graph.RecordPoll(rb); err != nil {
+	if changed, err := graph.RecordPoll(rb); err != nil {
 		t.Fatal(err)
+	} else if !changed {
+		t.Fatalf("Should have caused the frontiers to recalculate")
 	} else if err := graph.Add(Blue); err != nil {
 		t.Fatal(err)
 	}
@@ -1204,8 +1239,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	ga.SetThreshold(2)
 	ga.AddCount(Green.ID(), 2)
 	ga.AddCount(Alpha.ID(), 2)
-	if _, err := graph.RecordPoll(ga); err != nil {
+	if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
+	} else if changed {
+		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
 	}
 
 	{
@@ -1231,8 +1268,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	}
 
 	empty := ids.Bag{}
-	if _, err := graph.RecordPoll(empty); err != nil {
+	if changed, err := graph.RecordPoll(empty); err != nil {
 		t.Fatal(err)
+	} else if changed {
+		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
 	}
 
 	{
@@ -1255,8 +1294,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Wrong preference. Expected %s", Blue.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if _, err := graph.RecordPoll(ga); err != nil {
+	} else if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
+	} else if !changed {
+		t.Fatalf("Should have caused the frontiers to recalculate")
 	}
 
 	{
@@ -1279,8 +1320,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if _, err := graph.RecordPoll(ga); err != nil {
+	} else if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
+	} else if !changed {
+		t.Fatalf("Should have caused the frontiers to recalculate")
 	}
 
 	{
@@ -1302,8 +1345,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("%s should have been rejected", Red.ID())
 	} else if Blue.Status() != choices.Rejected {
 		t.Fatalf("%s should have been rejected", Blue.ID())
-	} else if _, err := graph.RecordPoll(rb); err != nil {
+	} else if changed, err := graph.RecordPoll(rb); err != nil {
 		t.Fatal(err)
+	} else if changed {
+		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
 	}
 
 	{
