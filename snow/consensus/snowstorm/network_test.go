@@ -32,7 +32,12 @@ func (n *Network) shuffleConsumers() {
 	n.consumers = consumers
 }
 
-func (n *Network) Initialize(params sbcon.Parameters, numColors, colorsPerConsumer, maxInputConflicts int) {
+func (n *Network) Initialize(
+	params sbcon.Parameters,
+	numColors,
+	colorsPerConsumer,
+	maxInputConflicts int,
+) {
 	n.params = params
 
 	idCount := uint64(0)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/gecko/ids"
@@ -30,6 +31,7 @@ var (
 		IsVirtuousTest,
 		QuiesceTest,
 		AcceptingDependencyTest,
+		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
 		VacuouslyAcceptedTest,
 		ConflictsTest,
@@ -538,6 +540,139 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	g := ids.Bag{}
 	g.Add(Green.ID())
 	if _, err := graph.RecordPoll(g); err != nil {
+		t.Fatal(err)
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Green.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Green.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	rp := ids.Bag{}
+	rp.Add(Red.ID(), purple.ID())
+	if _, err := graph.RecordPoll(rp); err != nil {
+		t.Fatal(err)
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Green.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Green.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	r := ids.Bag{}
+	r.Add(Red.ID())
+	if _, err := graph.RecordPoll(r); err != nil {
+		t.Fatal(err)
+	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if Red.Status() != choices.Accepted {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Accepted)
+	} else if Green.Status() != choices.Rejected {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Rejected)
+	} else if purple.Status() != choices.Accepted {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Accepted)
+	}
+}
+
+type singleAcceptTx struct {
+	Tx
+
+	t        *testing.T
+	accepted bool
+}
+
+func (tx *singleAcceptTx) Accept() error {
+	if tx.accepted {
+		tx.t.Fatalf("accept called multiple times")
+	}
+	tx.accepted = true
+	return tx.Tx.Accept()
+}
+
+func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
+	Setup()
+
+	graph := factory.New()
+
+	rawPurple := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Red},
+	}
+	rawPurple.InputIDsV.Add(ids.Empty.Prefix(8))
+
+	purple := &singleAcceptTx{
+		Tx: rawPurple,
+		t:  t,
+	}
+
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	graph.Initialize(snow.DefaultContextTest(), params)
+
+	if err := graph.Add(Red); err != nil {
+		t.Fatal(err)
+	} else if err := graph.Add(Green); err != nil {
+		t.Fatal(err)
+	} else if err := graph.Add(purple); err != nil {
+		t.Fatal(err)
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Red.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Red.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	g := ids.Bag{}
+	g.Add(Green.ID())
+	if _, err := graph.RecordPoll(g); err != nil {
+		t.Fatal(err)
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Green.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Green.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	p := ids.Bag{}
+	p.Add(purple.ID())
+	if _, err := graph.RecordPoll(p); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")

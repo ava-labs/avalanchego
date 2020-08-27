@@ -236,7 +236,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 // Marks a starting or stopping point when fetching UTXOs. Used for pagination.
 type Index struct {
 	Address string `json:"address"` // The address as a string
-	Utxo    string `json:"utxo"`    // The UTXO ID as a string
+	UTXO    string `json:"utxo"`    // The UTXO ID as a string
 }
 
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
@@ -245,7 +245,7 @@ type Index struct {
 // If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
 // [StartIndex] defines where to start fetching UTXOs (for pagination.)
 // UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
-// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.Utxo] will be returned.
+// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.UTXO] will be returned.
 // If [StartIndex] is omitted, gets all UTXOs.
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
@@ -303,7 +303,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
-	if args.StartIndex.Address != "" || args.StartIndex.Utxo != "" {
+	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
 		addrChainID, addr, err := service.vm.ParseAddress(args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address: %w", err)
@@ -312,7 +312,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
 				chainID, addrChainID)
 		}
-		utxo, err := ids.FromString(args.StartIndex.Utxo)
+		utxo, err := ids.FromString(args.StartIndex.UTXO)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index utxo: %w", err)
 		}
@@ -363,7 +363,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 	}
 
 	response.EndIndex.Address = endAddress
-	response.EndIndex.Utxo = endUTXOID.String()
+	response.EndIndex.UTXO = endUTXOID.String()
 	return nil
 }
 

@@ -3,10 +3,6 @@
 
 package snowstorm
 
-import (
-	"fmt"
-)
-
 type snowball struct {
 	// numSuccessfulPolls is the number of times this choice was the successful
 	// result of a network poll
@@ -22,6 +18,13 @@ type snowball struct {
 
 	// rogue identifies if there is a known conflict with this choice
 	rogue bool
+}
+
+func (sb *snowball) Confidence(currentVote int) int {
+	if sb.lastVote != currentVote {
+		return 0
+	}
+	return sb.confidence
 }
 
 func (sb *snowball) RecordSuccessfulPoll(currentVote int) {
@@ -45,23 +48,4 @@ func (sb *snowball) Finalized(betaVirtuous, betaRogue int) bool {
 	// be accepted with a snowflake counter of at least [betaVirtuous].
 	return (!sb.rogue && sb.confidence >= betaVirtuous) ||
 		sb.confidence >= betaRogue
-}
-
-func (sb *snowball) CurrentString(currentVote int) string {
-	confidence := sb.confidence
-	if sb.lastVote != currentVote {
-		confidence = 0
-	}
-	return fmt.Sprintf(
-		"SB(NumSuccessfulPolls = %d, Confidence = %d)",
-		sb.numSuccessfulPolls,
-		confidence)
-}
-
-func (sb *snowball) String() string {
-	return fmt.Sprintf(
-		"SB(NumSuccessfulPolls = %d, Confidence = %d, As of %d)",
-		sb.numSuccessfulPolls,
-		sb.confidence,
-		sb.lastVote)
 }

@@ -4,15 +4,9 @@
 package snowstorm
 
 import (
-	"bytes"
-	"fmt"
-	"sort"
-	"strings"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/formatting"
 
 	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
@@ -78,8 +72,8 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 
 	// The tx isn't processing, so we need to check to see if it conflicts with
 	// any of the other txs that are currently processing.
-	for _, input := range tx.InputIDs().List() {
-		if _, exists := dg.utxos[input.Key()]; exists {
+	for _, utxoID := range tx.InputIDs().List() {
+		if _, exists := dg.utxos[utxoID.Key()]; exists {
 			// A currently processing tx names the same input as the provided
 			// tx, so the provided tx would be rogue.
 			return false
@@ -112,46 +106,17 @@ func (dg *Directed) Conflicts(tx Tx) ids.Set {
 
 // Add implements the Consensus interface
 func (dg *Directed) Add(tx Tx) error {
-	if dg.Issued(tx) {
-		// If the tx was previously inserted, it shouldn't be re-inserted.
-		return nil
+	if shouldVote, err := dg.shouldVote(dg, tx); !shouldVote || err != nil {
+		return err
 	}
 
 	txID := tx.ID()
-	bytes := tx.Bytes()
-
-	// Notify the IPC socket that this tx has been issued.
-	dg.ctx.DecisionDispatcher.Issue(dg.ctx.ChainID, txID, bytes)
-
-	// Notify the metrics that this transaction was just issued.
-	dg.metrics.Issued(txID)
-
-	inputs := tx.InputIDs()
-
-	// If this tx doesn't have any inputs, it's impossible for there to be any
-	// conflicting transactions. Therefore, this transaction is treated as
-	// vacuously accepted.
-	if inputs.Len() == 0 {
-		// Accept is called before notifying the IPC so that acceptances that
-		// cause fatal errors aren't sent to an IPC peer.
-		if err := tx.Accept(); err != nil {
-			return err
-		}
-
-		// Notify the IPC socket that this tx has been accepted.
-		dg.ctx.DecisionDispatcher.Accept(dg.ctx.ChainID, txID, bytes)
-
-		// Notify the metrics that this transaction was just accepted.
-		dg.metrics.Accepted(txID)
-		return nil
-	}
-
 	txNode := &directedTx{tx: tx}
 
 	// For each UTXO consumed by the tx:
 	// * Add edges between this tx and txs that consume this UTXO
 	// * Mark this tx as attempting to consume this UTXO
-	for _, inputID := range inputs.List() {
+	for _, inputID := range tx.InputIDs().List() {
 		inputKey := inputID.Key()
 
 		// Get the set of txs that are currently processing that also consume
@@ -208,29 +173,7 @@ func (dg *Directed) Add(tx Tx) error {
 
 	// If a tx that this tx depends on is rejected, this tx should also be
 	// rejected.
-	toReject := &rejector{
-		g:    dg,
-		errs: &dg.errs,
-		txID: txID,
-	}
-
-	// Register all of this txs dependencies as possibilities to reject this tx.
-	for _, dependency := range tx.Dependencies() {
-		if dependency.Status() != choices.Accepted {
-			// If the dependency isn't accepted, then it must be processing. So,
-			// this tx should be rejected if any of these processing txs are
-			// rejected. Note that the dependencies can't already be rejected,
-			// because it is assumped that this tx is currently considered
-			// valid.
-			toReject.deps.Add(dependency.ID())
-		}
-	}
-
-	// Register these dependencies
-	dg.pendingReject.Register(toReject)
-
-	// Registering the rejector can't result in an error, so we can safely
-	// return nil here.
+	dg.registerRejector(dg, tx)
 	return nil
 }
 
@@ -263,10 +206,8 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	// Get the set of IDs that meet this alpha threshold
 	metThreshold := votes.Threshold()
 	for _, txID := range metThreshold.List() {
-		txKey := txID.Key()
-
 		// Get the node this tx represents
-		txNode, exist := dg.txs[txKey]
+		txNode, exist := dg.txs[txID.Key()]
 		if !exist {
 			// This tx may have already been accepted because of tx
 			// dependencies. If this is the case, we can just drop the vote.
@@ -283,7 +224,11 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 		// be accepted, we shouldn't register it again.
 		if !txNode.pendingAccept &&
 			txNode.Finalized(dg.params.BetaVirtuous, dg.params.BetaRogue) {
-			dg.deferAcceptance(txNode)
+			// Mark that this tx is pending acceptance so acceptance is only
+			// registered once.
+			txNode.pendingAccept = true
+
+			dg.registerAcceptor(dg, txNode.tx)
 			if dg.errs.Errored() {
 				return changed, dg.errs.Err
 			}
@@ -302,56 +247,46 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 }
 
 func (dg *Directed) String() string {
-	nodes := make([]*directedTx, 0, len(dg.txs))
-	for _, tx := range dg.txs {
-		nodes = append(nodes, tx)
+	nodes := make([]*snowballNode, 0, len(dg.txs))
+	for _, txNode := range dg.txs {
+		nodes = append(nodes, &snowballNode{
+			txID:               txNode.tx.ID(),
+			numSuccessfulPolls: txNode.numSuccessfulPolls,
+			confidence:         txNode.Confidence(dg.currentVote),
+		})
 	}
-	// Sort the nodes so that the string representation is canonical
-	sortTxNodes(nodes)
-
-	sb := strings.Builder{}
-	sb.WriteString("DG(")
-
-	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s %%s",
-		formatting.IntFormat(len(dg.txs)-1))
-	for i, txNode := range nodes {
-		sb.WriteString(fmt.Sprintf(format,
-			i, txNode.tx.ID(), txNode.snowball.CurrentString(dg.currentVote)))
-	}
-
-	if len(nodes) > 0 {
-		sb.WriteString("\n")
-	}
-	sb.WriteString(")")
-	return sb.String()
+	return ConsensusString("DG", nodes)
 }
 
-// deferAcceptance attempts to mark this tx once all its dependencies are
-// accepted. If all the dependencies are already accepted, this function will
-// immediately accept the tx.
-func (dg *Directed) deferAcceptance(txNode *directedTx) {
-	// Mark that this tx is pending acceptance so this function won't be called
-	// again
-	txNode.pendingAccept = true
+// accept the named txID and remove it from the graph
+func (dg *Directed) accept(txID ids.ID) error {
+	txKey := txID.Key()
+	txNode := dg.txs[txKey]
+	// We are accepting the tx, so we should remove the node from the graph.
+	delete(dg.txs, txKey)
 
-	toAccept := &directedAccepter{
-		dg:     dg,
-		txNode: txNode,
-	}
-	for _, dependency := range txNode.tx.Dependencies() {
-		if dependency.Status() != choices.Accepted {
-			// If the dependency isn't accepted, then it must be processing.
-			// This tx should be accepted after this tx is accepted.
-			toAccept.deps.Add(dependency.ID())
-		}
+	// This tx is consuming all the UTXOs from its inputs, so we can prune them
+	// all from memory
+	for _, inputID := range txNode.tx.InputIDs().List() {
+		delete(dg.utxos, inputID.Key())
 	}
 
-	// This tx is no longer being voted on, so we remove it from the voting set.
-	// This ensures that virtuous txs built on top of rogue txs don't force the
-	// node to treat the rogue tx as virtuous.
-	dg.virtuousVoting.Remove(txNode.tx.ID())
-	dg.pendingAccept.Register(toAccept)
+	// This tx is now accepted, so it shouldn't be part of the virtuous set or
+	// the preferred set. Its status as Accepted implies these descriptions.
+	dg.virtuous.Remove(txID)
+	dg.preferences.Remove(txID)
+
+	// Reject all the txs that conflicted with this tx.
+	if err := dg.reject(txNode.ins.List()...); err != nil {
+		return err
+	}
+	// While it is typically true that a tx this is being accepted is preferred,
+	// it is possible for this to not be the case. So this is handled for
+	// completeness.
+	if err := dg.reject(txNode.outs.List()...); err != nil {
+		return err
+	}
+	return dg.acceptTx(txNode.tx)
 }
 
 // reject all the named txIDs and remove them from the graph
@@ -394,24 +329,9 @@ func (dg *Directed) reject(conflictIDs ...ids.ID) error {
 		dg.removeConflict(conflictID, conflict.ins.List()...)
 		dg.removeConflict(conflictID, conflict.outs.List()...)
 
-		// Reject is called before notifying the IPC so that rejections that
-		// cause fatal errors aren't sent to an IPC peer.
-		if err := conflict.tx.Reject(); err != nil {
+		if err := dg.rejectTx(conflict.tx); err != nil {
 			return err
 		}
-
-		// Notify the IPC that the tx was rejected
-		dg.ctx.DecisionDispatcher.Reject(dg.ctx.ChainID, conflict.tx.ID(), conflict.tx.Bytes())
-
-		// Update the metrics to account for this transaction's rejection
-		dg.metrics.Rejected(conflictID)
-
-		// If there is a tx that was accepted pending on this tx, the ancestor
-		// tx can't be accepted.
-		dg.pendingAccept.Abandon(conflictID)
-		// If there is a tx that was issued pending on this tx, the ancestor tx
-		// must be rejected.
-		dg.pendingReject.Fulfill(conflictID)
 	}
 	return nil
 }
@@ -474,87 +394,3 @@ func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ...ids.ID) {
 		}
 	}
 }
-
-type directedAccepter struct {
-	dg       *Directed
-	deps     ids.Set
-	rejected bool
-	txNode   *directedTx
-}
-
-func (a *directedAccepter) Dependencies() ids.Set { return a.deps }
-
-func (a *directedAccepter) Fulfill(id ids.ID) {
-	a.deps.Remove(id)
-	a.Update()
-}
-
-func (a *directedAccepter) Abandon(id ids.ID) { a.rejected = true }
-
-func (a *directedAccepter) Update() {
-	// If I was rejected or I am still waiting on dependencies to finish or an
-	// error has occurred, I shouldn't do anything.
-	if a.rejected || a.deps.Len() != 0 || a.dg.errs.Errored() {
-		return
-	}
-
-	txID := a.txNode.tx.ID()
-	// We are accepting the tx, so we should remove the node from the graph.
-	delete(a.dg.txs, txID.Key())
-
-	// This tx is consuming all the UTXOs from its inputs, so we can prune them
-	// all from memory
-	for _, inputID := range a.txNode.tx.InputIDs().List() {
-		delete(a.dg.utxos, inputID.Key())
-	}
-
-	// This tx is now accepted, so it shouldn't be part of the virtuous set or
-	// the preferred set. Its status as Accepted implies these descriptions.
-	a.dg.virtuous.Remove(txID)
-	a.dg.preferences.Remove(txID)
-
-	// Reject all the txs that conflicted with this tx.
-	if err := a.dg.reject(a.txNode.ins.List()...); err != nil {
-		a.dg.errs.Add(err)
-		return
-	}
-	// While it is typically true that a tx this is being accepted is preferred,
-	// it is possible for this to not be the case. So this is handled for
-	// completeness.
-	if err := a.dg.reject(a.txNode.outs.List()...); err != nil {
-		a.dg.errs.Add(err)
-		return
-	}
-
-	// Accept is called before notifying the IPC so that acceptances that cause
-	// fatal errors aren't sent to an IPC peer.
-	if err := a.txNode.tx.Accept(); err != nil {
-		a.dg.errs.Add(err)
-		return
-	}
-
-	// Notify the IPC socket that this tx has been accepted.
-	a.dg.ctx.DecisionDispatcher.Accept(a.dg.ctx.ChainID, txID, a.txNode.tx.Bytes())
-
-	// Update the metrics to account for this transaction's acceptance
-	a.dg.metrics.Accepted(txID)
-
-	// If there is a tx that was accepted pending on this tx, the ancestor
-	// should be notified that it doesn't need to block on this tx anymore.
-	a.dg.pendingAccept.Fulfill(txID)
-	// If there is a tx that was issued pending on this tx, the ancestor tx
-	// doesn't need to be rejected because of this tx.
-	a.dg.pendingReject.Abandon(txID)
-}
-
-type sortTxNodeData []*directedTx
-
-func (tnd sortTxNodeData) Less(i, j int) bool {
-	return bytes.Compare(
-		tnd[i].tx.ID().Bytes(),
-		tnd[j].tx.ID().Bytes()) == -1
-}
-func (tnd sortTxNodeData) Len() int      { return len(tnd) }
-func (tnd sortTxNodeData) Swap(i, j int) { tnd[j], tnd[i] = tnd[i], tnd[j] }
-
-func sortTxNodes(nodes []*directedTx) { sort.Sort(sortTxNodeData(nodes)) }
