@@ -78,8 +78,8 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 
 	// The tx isn't processing, so we need to check to see if it conflicts with
 	// any of the other txs that are currently processing.
-	for _, input := range tx.InputIDs().List() {
-		if _, exists := dg.utxos[input.Key()]; exists {
+	for _, utxoID := range tx.InputIDs().List() {
+		if _, exists := dg.utxos[utxoID.Key()]; exists {
 			// A currently processing tx names the same input as the provided
 			// tx, so the provided tx would be rogue.
 			return false
@@ -263,10 +263,8 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	// Get the set of IDs that meet this alpha threshold
 	metThreshold := votes.Threshold()
 	for _, txID := range metThreshold.List() {
-		txKey := txID.Key()
-
 		// Get the node this tx represents
-		txNode, exist := dg.txs[txKey]
+		txNode, exist := dg.txs[txID.Key()]
 		if !exist {
 			// This tx may have already been accepted because of tx
 			// dependencies. If this is the case, we can just drop the vote.
@@ -327,7 +325,7 @@ func (dg *Directed) String() string {
 	return sb.String()
 }
 
-// deferAcceptance attempts to mark this tx once all its dependencies are
+// deferAcceptance attempts to accept this tx once all its dependencies are
 // accepted. If all the dependencies are already accepted, this function will
 // immediately accept the tx.
 func (dg *Directed) deferAcceptance(txNode *directedTx) {
