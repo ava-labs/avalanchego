@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/vms/components/missing"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
@@ -364,6 +363,12 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	}, nil
 }
 
+// SaveBlock ...
+// TODO: Implement this
+func (vm *VMClient) SaveBlock(blk snowman.Block) error {
+	return errors.New("TODO")
+}
+
 // GetBlock ...
 func (vm *VMClient) GetBlock(id ids.ID) (snowman.Block, error) {
 	if blk, cached := vm.blks[id.Key()]; cached {
@@ -444,11 +449,8 @@ func (b *BlockClient) Reject() error {
 func (b *BlockClient) Status() choices.Status { return b.status }
 
 // Parent ...
-func (b *BlockClient) Parent() snowman.Block {
-	if parent, err := b.vm.GetBlock(b.parentID); err == nil {
-		return parent
-	}
-	return &missing.Block{BlkID: b.parentID}
+func (b *BlockClient) Parent() ids.ID {
+	return b.parentID
 }
 
 // Verify ...

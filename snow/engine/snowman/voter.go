@@ -6,6 +6,7 @@ package snowman
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/gecko/vms/components/missing"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -80,6 +81,7 @@ func (v *voter) Update() {
 
 func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
+	var err error
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
 		blk, ok := v.t.processing[vote.Key()] // Check if the block is non-dropped and processing
@@ -93,7 +95,11 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 		}
 
 		for blk.Status().Fetched() && !v.t.Consensus.Issued(blk) {
-			blk = blk.Parent()
+			blkID := blk.Parent()
+			blk, err = v.t.GetBlock(blkID)
+			if err != nil {
+				blk = &missing.Block{BlkID: blkID}
+			}
 		}
 
 		if !blk.Status().Decided() && v.t.Consensus.Issued(blk) {

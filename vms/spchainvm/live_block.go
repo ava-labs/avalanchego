@@ -10,8 +10,6 @@ import (
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/vms/components/missing"
 )
 
 var (
@@ -114,12 +112,8 @@ func (lb *LiveBlock) Status() choices.Status {
 }
 
 // Parent returns the parent of this block
-func (lb *LiveBlock) Parent() snowman.Block {
-	parent := lb.parentBlock()
-	if parent != nil {
-		return parent
-	}
-	return &missing.Block{BlkID: lb.block.ParentID()}
+func (lb *LiveBlock) Parent() ids.ID {
+	return lb.block.ParentID()
 }
 
 func (lb *LiveBlock) parentBlock() *LiveBlock {

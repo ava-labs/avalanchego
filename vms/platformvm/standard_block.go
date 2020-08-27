@@ -78,6 +78,8 @@ func (sb *StandardBlock) Verify() error {
 			return err
 		} else if err := sb.vm.putStatus(sb.onAcceptDB, tx.ID(), Committed); err != nil {
 			return err
+		} else if err := sb.vm.State.PutBlock(sb.onAcceptDB, sb); err != nil {
+			return err
 		} else if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}

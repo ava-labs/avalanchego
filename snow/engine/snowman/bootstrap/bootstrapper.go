@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
@@ -15,6 +16,12 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
 	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/vms/components/missing"
+)
+
+const (
+	// Size of block cache
+	blockCacheSize = 10000
 )
 
 // Config ...
@@ -42,6 +49,11 @@ type Bootstrapper struct {
 
 	Bootstrapped func()
 
+	// Cache of blocks.
+	// Key: Block ID
+	// Value: The block
+	blockCache cache.LRU
+
 	// true if all of the vertices in the original accepted frontier have been processed
 	processedStartingAcceptedFrontier bool
 }
@@ -57,6 +69,7 @@ func (b *Bootstrapper) Initialize(
 	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
 	b.OnFinished = onFinished
+	b.blockCache = cache.LRU{Size: blockCacheSize}
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -67,6 +80,7 @@ func (b *Bootstrapper) Initialize(
 		numAccepted: b.numAccepted,
 		numDropped:  b.numDropped,
 		vm:          b.VM,
+		bs:          b,
 	})
 
 	config.Bootstrapable = b
@@ -162,25 +176,30 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 			vdr, requestID)
 		return nil
 	}
-
-	wantedBlk, err := b.VM.ParseBlock(blks[0]) // the block we requested
-	if err != nil {
-		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
-		return b.fetch(wantedBlkID)
-	} else if actualID := wantedBlk.ID(); !actualID.Equals(wantedBlkID) {
-		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
-			wantedBlk, actualID)
-		return b.fetch(wantedBlkID)
-	}
-
-	for _, blkBytes := range blks {
-		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
+	var blk, tail snowman.Block
+	var err error
+	for i, blkBytes := range blks {
+		if blk, err = b.VM.ParseBlock(blkBytes); err != nil { // Parse the block from bytes
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
+			return b.fetch(wantedBlkID)
 		}
+		if i == 0 {
+			tail = blk
+		}
+		blkID := blk.ID()
+		if !blkID.Equals(wantedBlkID) {
+			b.Ctx.Log.Debug("expected the next block to be %s but is %s", wantedBlkID, blkID)
+			return b.fetch(wantedBlkID)
+		}
+		if err := b.VM.SaveBlock(blk); err != nil { // Save the block to database.
+			return fmt.Errorf("couldn't save block %s: %w", blkID, err)
+		}
+		wantedBlkID = blk.Parent()
+		b.blockCache.Put(blkID, blk) // Put block in cache
 	}
 
-	return b.process(wantedBlk)
+	return b.process(tail)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
@@ -200,16 +219,20 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
 	blkID := blk.ID()
 	for status == choices.Processing {
-		if err := b.Blocked.Push(&blockJob{
+		err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
-		}); err == nil {
-			b.numFetched.Inc()
-			b.NumFetched++                                      // Progress tracker
-			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
-			}
+			bs:          b,
+		})
+		if err != nil {
+			return fmt.Errorf("couldn't add block to queue: %w", err)
+		}
+
+		b.numFetched.Inc()
+		b.NumFetched++                                      // Progress tracker
+		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
 		}
 
 		if err := b.Blocked.Commit(); err != nil {
@@ -217,9 +240,12 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		}
 
 		// Process this block's parent
-		blk = blk.Parent()
+		blkID = blk.Parent()
+		blk, err = b.GetBlock(blkID)
+		if err != nil {
+			blk = &missing.Block{BlkID: blkID}
+		}
 		status = blk.Status()
-		blkID = blk.ID()
 	}
 
 	switch status := blk.Status(); status {
@@ -241,8 +267,7 @@ func (b *Bootstrapper) finish() error {
 	if b.IsBootstrapped() {
 		return nil
 	}
-	b.Ctx.Log.Info("bootstrapping finished fetching %d blocks. executing state transitions...",
-		b.NumFetched)
+	b.Ctx.Log.Info("bootstrapping finished fetching %d blocks", b.NumFetched)
 
 	if err := b.executeAll(b.Blocked); err != nil {
 		return err
@@ -284,4 +309,18 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) error {
 	}
 	b.Ctx.Log.Info("executed %d blocks", numExecuted)
 	return nil
+}
+
+// GetBlock gets the block with ID [id].
+// Return an error if the block can't be found.
+func (b *Bootstrapper) GetBlock(id ids.ID) (snowman.Block, error) {
+	if block, ok := b.blockCache.Get(id); ok {
+		return block.(snowman.Block), nil
+	}
+	block, err := b.VM.GetBlock(id)
+	if err != nil {
+		return nil, err
+	}
+	b.blockCache.Put(id, block)
+	return block, err
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/components/missing"
 )
 
 const (
@@ -191,9 +192,10 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < common.MaxContainersPerMultiPut && time.Since(startTime) < common.MaxTimeFetchingAncestors; numFetched++ {
-		blk = blk.Parent()
-		if blk.Status() == choices.Unknown {
-			break
+		blkID = blk.Parent()
+		blk, err := t.GetBlock(blkID)
+		if err != nil {
+			break // We don't have the next block
 		}
 		blkBytes := blk.Bytes()
 		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
@@ -424,7 +426,8 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
-		parentID := blk.Parent().ID()
+		parentID := blk.Parent()
+		t.Ctx.Log.Debug("Parent: %s", parentID) // TODO remove
 		if pref := t.Consensus.Preference(); !parentID.Equals(pref) {
 			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
@@ -496,16 +499,20 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// issue [blk] and its ancestors to consensus.
 	// If the block has been issued, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
+	var err error
 	for !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
 
-		blk = blk.Parent()
-		blkID = blk.ID()
-
-		// If we don't have this ancestor, request it from [vdr]
-		if !blk.Status().Fetched() {
+		blkID = blk.Parent()
+		if _, decided := t.decidedCache.Get(blkID); decided {
+			// We already decided this block. No need to fetch/try to add any more ancestors to consensus.
+			break
+		}
+		blk, err = t.GetBlock(blkID)
+		if err != nil || !blk.Status().Fetched() {
+			// If we don't have this ancestor, request it from [vdr]
 			t.sendRequest(vdr, blkID)
 			return false, nil
 		}
@@ -518,13 +525,18 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 // If a dependency is missing and the dependency hasn't been requested, the issuance will be abandoned.
 func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
+
 	// issue [blk] and its ancestors into consensus
+	var err error
 	for blk.Status().Fetched() && !t.Consensus.Issued(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
-		blk = blk.Parent()
-		blkID = blk.ID()
+		blkID = blk.Parent()
+		blk, err = t.GetBlock(blkID)
+		if err != nil { // Can't find the next ancestor
+			blk = &missing.Block{BlkID: blkID}
+		}
 	}
 
 	// The block was issued into consensus. This is the happy path.
@@ -561,8 +573,17 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	}
 
 	// block on the parent if needed
-	if parent := blk.Parent(); !t.Consensus.Issued(parent) {
-		parentID := parent.ID()
+	parentID := blk.Parent()
+	_, parentIssued := t.decidedCache.Get(parentID) // If parent is in decided cache, it was previously issued
+	if !parentIssued {
+		parent, err := t.GetBlock(parentID) // Try to get the parent (returns err if the parent is rejected)
+		if err != nil {
+			parent = &missing.Block{BlkID: parentID}
+		}
+		parentIssued = parentIssued || t.Consensus.Issued(parent) // If we have block locally, check if it's issued
+	}
+
+	if !parentIssued {
 		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
 	}
@@ -625,7 +646,6 @@ func (t *Transitive) pushSample(blk snowman.Block) {
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
 		vdrSet := ids.ShortSet{}
 		vdrSet.Add(vdrBag.List()...)
-
 		t.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
@@ -644,7 +664,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// Make sure this block is valid
 	if err := blk.Verify(); err != nil {
-		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+		t.Ctx.Log.Debug("block failed verification due to %s. Dropping block.", err)
 		delete(t.processing, blkID.Key()) // Unpin from memory
 		t.droppedCache.Put(blkID, blk)
 		// if verify fails, then all descendants are also invalid

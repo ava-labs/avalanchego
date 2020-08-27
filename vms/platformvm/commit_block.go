@@ -42,6 +42,15 @@ func (c *Commit) Verify() error {
 	return nil
 }
 
+// Accept implements the snowman.Block interface
+func (c *Commit) Accept() error {
+	// Write block to disk
+	if err := c.vm.State.PutBlock(c.VM.DB, c); err != nil {
+		return err
+	}
+	return c.DoubleDecisionBlock.Accept()
+}
+
 // newCommitBlock returns a new *Commit block where the block's parent, a
 // proposal block, has ID [parentID].
 func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*Commit, error) {

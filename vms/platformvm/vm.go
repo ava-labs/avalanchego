@@ -500,11 +500,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			vm.resetTimer()
 			return nil, err
 		}
-		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
-			vm.resetTimer()
-			return nil, err
-		}
-		return blk, vm.DB.Commit()
+		return blk, nil
 	}
 
 	// If there is a pending atomic tx, build a block with it
@@ -519,10 +515,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			vm.resetTimer()
 			return nil, err
 		}
-		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
-			return nil, err
-		}
-		return blk, vm.DB.Commit()
+		return blk, nil
 	}
 
 	// Get the preferred block (which we want to build off)
@@ -567,10 +560,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
-			return nil, err
-		}
-		return blk, vm.DB.Commit()
+		return blk, nil
 	}
 
 	// If local time is >= time of the next validator set change,
@@ -593,10 +583,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
-			return nil, err
-		}
-		return blk, vm.DB.Commit()
+		return blk, nil
 	}
 
 	// Propose adding a new validator but only if their start time is in the
@@ -606,14 +593,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		tx := vm.unissuedProposalTxs.Remove()
 		utx := tx.UnsignedTx.(TimedTx)
 		if !syncTime.After(utx.StartTime()) {
-			blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
-			if err != nil {
-				return nil, err
-			}
-			if err := vm.State.PutBlock(vm.DB, blk); err != nil {
-				return nil, err
-			}
-			return blk, vm.DB.Commit()
+			return vm.newProposalBlock(preferredID, preferredHeight+1, *tx)
 		}
 		vm.Ctx.Log.Debug("dropping tx to add validator because start time too late")
 	}
@@ -636,11 +616,12 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 		// If we have seen this block before, return it with the most up-to-date info
 		return block, nil
 	}
-	if err := vm.State.PutBlock(vm.DB, block); err != nil { // Persist the block
-		return nil, fmt.Errorf("failed to put block due to %w", err)
-	}
+	return block, nil
+}
 
-	return block, vm.DB.Commit()
+// SaveBlock saves [blk] to the database.
+func (vm *VM) SaveBlock(blk snowman.Block) error {
+	return vm.State.PutBlock(vm.DB, blk)
 }
 
 // GetBlock implements the snowman.ChainVM interface

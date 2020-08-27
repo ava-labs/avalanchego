@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
 )
 
 var (
@@ -34,7 +33,7 @@ func (*Block) Reject() error { return errMissingBlock }
 func (*Block) Status() choices.Status { return choices.Unknown }
 
 // Parent ...
-func (*Block) Parent() snowman.Block { return nil }
+func (*Block) Parent() ids.ID { return ids.ID{} }
 
 // Verify ...
 func (*Block) Verify() error { return errMissingBlock }

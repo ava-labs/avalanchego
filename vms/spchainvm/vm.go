@@ -185,6 +185,12 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return block, vm.state.SetBlock(vm.baseDB, rawBlock.ID(), rawBlock)
 }
 
+// SaveBlock implements the snowman.ChainVM interface
+func (vm *VM) SaveBlock(blk snowman.Block) error {
+	_, err := vm.ParseBlock(blk.Bytes())
+	return err
+}
+
 // GetBlock implements the snowman.ChainVM interface
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 	blk, err := vm.state.Block(vm.baseDB, id)

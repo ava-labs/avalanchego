@@ -1763,6 +1763,8 @@ func TestUnverifiedParent(t *testing.T) {
 	firstAdvanceTimeBlk, err := vm.newProposalBlock(vm.Preferred(), preferredHeight+1, *firstAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
+	} else if !vm.Preferred().Equals(firstAdvanceTimeBlk.Parent()) {
+		t.Fatalf("Wrong parent block ID returned")
 	}
 
 	vm.clock.Set(defaultGenesisTime.Add(2 * time.Second))
@@ -1784,10 +1786,7 @@ func TestUnverifiedParent(t *testing.T) {
 	secondAdvanceTimeBlk, err := vm.newProposalBlock(firstOption.ID(), firstOption.(Block).Height()+1, *secondAdvanceTimeTx)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	parentBlk := secondAdvanceTimeBlk.Parent()
-	if parentBlkID := parentBlk.ID(); !parentBlkID.Equals(firstOption.ID()) {
+	} else if !firstOption.ID().Equals(secondAdvanceTimeBlk.Parent()) {
 		t.Fatalf("Wrong parent block ID returned")
 	} else if err := firstOption.Verify(); err != nil {
 		t.Fatal(err)

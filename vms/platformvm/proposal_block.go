@@ -36,6 +36,10 @@ type ProposalBlock struct {
 
 // Accept implements the snowman.Block interface
 func (pb *ProposalBlock) Accept() error {
+	// Write block to disk
+	if err := pb.vm.State.PutBlock(pb.VM.DB, pb); err != nil {
+		return err
+	}
 	pb.SetStatus(choices.Accepted)
 	pb.VM.LastAcceptedID = pb.ID()
 	return nil
@@ -168,16 +172,6 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	}
 	abort, err := pb.vm.newAbortBlock(blockID, pb.Height()+1)
 	if err != nil {
-		return [2]snowman.Block{}, err
-	}
-
-	if err := pb.vm.State.PutBlock(pb.vm.DB, commit); err != nil {
-		return [2]snowman.Block{}, err
-	}
-	if err := pb.vm.State.PutBlock(pb.vm.DB, abort); err != nil {
-		return [2]snowman.Block{}, err
-	}
-	if err := pb.vm.DB.Commit(); err != nil {
 		return [2]snowman.Block{}, err
 	}
 

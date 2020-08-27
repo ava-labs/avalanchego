@@ -80,8 +80,7 @@ func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
 // Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) (bool, error) {
-	parent := blk.Parent()
-	parentID := parent.ID()
+	parentID := blk.Parent()
 	parentKey := parentID.Key()
 
 	blkID := blk.ID()
@@ -215,8 +214,7 @@ func (ts *Topological) calculateInDegree(
 		}
 
 		// The parent contains the snowball instance of its children
-		parent := votedBlock.blk.Parent()
-		parentID := parent.ID()
+		parentID := votedBlock.blk.Parent()
 		parentIDKey := parentID.Key()
 
 		// Add the votes for this block to the parent's set of responces
@@ -237,8 +235,7 @@ func (ts *Topological) calculateInDegree(
 		// iterate through all the block's ancestors and set up the inDegrees of
 		// the blocks
 		for n := ts.blocks[parentIDKey]; !n.Accepted(); n = ts.blocks[parentIDKey] {
-			parent := n.blk.Parent()
-			parentID := parent.ID()
+			parentID := n.blk.Parent()
 			parentIDKey = parentID.Key() // move the loop variable forward
 
 			// Increase the inDegree by one
@@ -293,8 +290,7 @@ func (ts *Topological) pushVotes(
 			continue
 		}
 
-		parent := block.blk.Parent()
-		parentID := parent.ID()
+		parentID := block.blk.Parent()
 		parentIDKey := parentID.Key()
 
 		// Remove an inbound edge from the parent kahn node and push the votes.
