@@ -697,6 +697,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initChainManager(avaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
+	if err := n.initIPCs(); err != nil { // Start the IPCs
+		return fmt.Errorf("couldn't initialize IPCs: %w", err)
+	}
 	if err := n.initAdminAPI(); err != nil { // Start the Admin API
 		return fmt.Errorf("couldn't initialize admin API: %w", err)
 	}
@@ -714,9 +717,6 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
-	}
-	if err := n.initIPCs(); err != nil { // Start the IPCs
-		return fmt.Errorf("couldn't initialize IPCs: %w", err)
 	}
 	return nil
 }
