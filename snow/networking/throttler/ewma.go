@@ -30,13 +30,19 @@ type ewmaThrottler struct {
 	vdrs           validators.Set
 
 	// Track CPU utilization
-	decayFactor               float64
-	stakerCPU, nonReservedCPU time.Duration
+	decayFactor    float64       // Factor used to discount the EWMA at every period
+	stakerCPU      time.Duration // Amount of CPU time reserved for stakers
+	nonReservedCPU time.Duration // Amount of CPU time that is not reserved for stakers
 
 	// Track pending messages
-	reservedStakerMessages                  uint32
-	pendingNonReservedMsgs, nonReservedMsgs uint32
-	maxNonStakerPendingMsgs                 uint32
+	reservedStakerMessages uint32 // Number of messages reserved for stakers
+	nonReservedMsgs        uint32 // Number of non-reserved messages left to a shared message pool
+	pendingNonReservedMsgs uint32 // Number of pending messages taken from the shared message pool
+
+	// Threshold of messages taken from the pool before the throttler begins to enforce hard caps on individual peers' pending messages
+	enforceIndividualCapThreshold uint32
+	// Cap on number of pending messages allowed to a non-staker (not enforced until above [enforceIndividualCapThreshold] is exceeded)
+	maxNonStakerPendingMsgs uint32
 
 	// Statistics adjusted at every interval
 	currentPeriod uint32
@@ -55,7 +61,8 @@ type ewmaThrottler struct {
 // which is not the limit since it tracks consumption using EWMA.
 func NewEWMAThrottler(
 	vdrs validators.Set,
-	maxMessages uint32,
+	maxMessages,
+	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	period time.Duration,
@@ -89,8 +96,10 @@ func NewEWMAThrottler(
 		stakerCPU:      stakerCPU,
 		nonReservedCPU: nonReservedCPU,
 
-		reservedStakerMessages: reservedStakerMessages,
-		nonReservedMsgs:        nonReservedMsgs,
+		reservedStakerMessages:        reservedStakerMessages,
+		nonReservedMsgs:               nonReservedMsgs,
+		enforceIndividualCapThreshold: nonReservedMsgs / 2, // If the pool is half empty, begin to enforce the max message caps
+		maxNonStakerPendingMsgs:       maxNonStakerPendingMsgs,
 	}
 
 	// Add validators to spenders, so that they will be calculated correctly in
@@ -161,7 +170,8 @@ func (et *ewmaThrottler) GetUtilization(
 	sp := et.getSpender(validatorID)
 	if !sp.staking {
 		exceedsMessageAllotment := et.pendingNonReservedMsgs > et.nonReservedMsgs || // the shared message pool has been taken
-			sp.pendingMessages > sp.maxMessages // exceeds its own individual message cap
+			(sp.pendingMessages > sp.maxMessages && // Spender has exceeded its individual cap
+				et.pendingNonReservedMsgs > et.enforceIndividualCapThreshold) // And the threshold before enforcing the cap has been reached
 
 		if exceedsMessageAllotment {
 			et.log.Verbo("Throttling non-staker %s: %s. Pending pool messages: %d/%d.",
@@ -176,9 +186,10 @@ func (et *ewmaThrottler) GetUtilization(
 	// Staker should only be throttled if it has exceeded its message allotment
 	// and there are either no messages left in the shared pool or it has
 	// exceeded its own maximum message allocation.
-	exceedsMessageAllotment := sp.pendingMessages > sp.msgAllotment && // exceeds its own individual message allotment
-		(et.pendingNonReservedMsgs > et.nonReservedMsgs || // no unreserved messages
-			sp.pendingMessages > sp.maxMessages) // exceeds its own individual message cap
+	exceedsMessageAllotment := sp.pendingMessages > sp.msgAllotment && // Throttle if the staker has exceeded its allotment
+		(et.pendingNonReservedMsgs > et.nonReservedMsgs || // And either the shared message pool is empty
+			(et.pendingNonReservedMsgs > et.enforceIndividualCapThreshold && // Or the threshold before enforcing the cap has been reached
+				sp.pendingMessages > sp.maxMessages)) // and this staker has exceeded its individual cap
 
 	if exceedsMessageAllotment {
 		et.log.Debug("Throttling staker %s: %s. Pending pool messages: %d/%d.",
@@ -198,8 +209,6 @@ func (et *ewmaThrottler) EndInterval() {
 
 	et.cumulativeEWMA = time.Duration(float64(et.cumulativeEWMA) / et.decayFactor)
 	stakingWeight := et.vdrs.Weight()
-	numPeers := et.vdrs.Len() + 1
-	et.maxNonStakerPendingMsgs = et.nonReservedMsgs / uint32(numPeers)
 
 	for key, spender := range et.spenders {
 		spender.cpuEWMA = time.Duration(float64(spender.cpuEWMA) / et.decayFactor)
@@ -209,7 +218,7 @@ func (et *ewmaThrottler) EndInterval() {
 			// Calculate staker allotment here
 			spender.staking = true
 			spender.msgAllotment = uint32(float64(et.reservedStakerMessages) * stakerPortion)
-			spender.maxMessages = uint32(float64(et.reservedStakerMessages)*stakerPortion) + et.maxNonStakerPendingMsgs
+			spender.maxMessages = spender.msgAllotment + et.maxNonStakerPendingMsgs
 			spender.expectedCPU = time.Duration(float64(et.stakerCPU)*stakerPortion) + defaultMinimumCPUAllotment
 			continue
 		}

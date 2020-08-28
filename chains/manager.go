@@ -115,6 +115,7 @@ type manager struct {
 
 	stakingEnabled                     bool // True iff the network has staking enabled
 	stakerMsgPortion, stakerCPUPortion float64
+	maxNonStakerPendingMsgs            uint32
 	log                                logging.Logger
 	logFactory                         logging.Factory
 	vmManager                          vms.Manager // Manage mappings from vm ID --> vm
@@ -152,6 +153,7 @@ type manager struct {
 // TODO: Make this function take less arguments
 func New(
 	stakingEnabled bool,
+	maxNonStakerPendingMsgs uint,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	log logging.Logger,
@@ -186,29 +188,30 @@ func New(
 	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
 
 	m := &manager{
-		stakingEnabled:   stakingEnabled,
-		stakerMsgPortion: stakerMsgPortion,
-		stakerCPUPortion: stakerCPUPortion,
-		log:              log,
-		logFactory:       logFactory,
-		vmManager:        vmManager,
-		decisionEvents:   decisionEvents,
-		consensusEvents:  consensusEvents,
-		db:               db,
-		chainRouter:      rtr,
-		net:              net,
-		timeoutManager:   &timeoutManager,
-		consensusParams:  consensusParams,
-		validators:       validators,
-		nodeID:           nodeID,
-		networkID:        networkID,
-		server:           server,
-		keystore:         keystore,
-		atomicMemory:     atomicMemory,
-		avaxAssetID:      avaxAssetID,
-		xChainID:         xChainID,
-		criticalChains:   criticalChains,
-		chains:           make(map[[32]byte]*router.Handler),
+		stakingEnabled:          stakingEnabled,
+		maxNonStakerPendingMsgs: uint32(maxNonStakerPendingMsgs),
+		stakerMsgPortion:        stakerMsgPortion,
+		stakerCPUPortion:        stakerCPUPortion,
+		log:                     log,
+		logFactory:              logFactory,
+		vmManager:               vmManager,
+		decisionEvents:          decisionEvents,
+		consensusEvents:         consensusEvents,
+		db:                      db,
+		chainRouter:             rtr,
+		net:                     net,
+		timeoutManager:          &timeoutManager,
+		consensusParams:         consensusParams,
+		validators:              validators,
+		nodeID:                  nodeID,
+		networkID:               networkID,
+		server:                  server,
+		keystore:                keystore,
+		atomicMemory:            atomicMemory,
+		avaxAssetID:             avaxAssetID,
+		xChainID:                xChainID,
+		criticalChains:          criticalChains,
+		chains:                  make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
 	return m, nil
@@ -510,6 +513,7 @@ func (m *manager) createAvalancheChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.maxNonStakerPendingMsgs,
 		m.stakerMsgPortion,
 		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
@@ -588,6 +592,7 @@ func (m *manager) createSnowmanChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.maxNonStakerPendingMsgs,
 		m.stakerMsgPortion,
 		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),

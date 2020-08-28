@@ -60,13 +60,14 @@ func newMultiLevelQueue(
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
 	bufferSize int,
+	maxNonStakerPendingMsgs uint32,
 	cpuInterval time.Duration,
 	msgPortion,
 	cpuPortion float64,
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
 	singleLevelSize := bufferSize / len(consumptionRanges)
-	throttler := throttler.NewEWMAThrottler(vdrs, uint32(bufferSize), msgPortion, cpuPortion, cpuInterval, log)
+	throttler := throttler.NewEWMAThrottler(vdrs, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, cpuPortion, cpuInterval, log)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)

@@ -1641,6 +1641,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		vdrs,
 		msgChan,
 		1000,
+		router.DefaultMaxNonStakerPendingMsgs,
 		router.DefaultStakerPortion,
 		router.DefaultStakerPortion,
 		"",

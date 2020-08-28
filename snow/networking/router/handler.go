@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	DefaultStakerPortion float64 = 0.2
+	DefaultStakerPortion           float64 = 0.2
+	DefaultMaxNonStakerPendingMsgs uint32  = 3
 )
 
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
@@ -117,6 +118,7 @@ func (h *Handler) Initialize(
 	validators validators.Set,
 	msgChan <-chan common.Message,
 	bufferSize int,
+	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	namespace string,
@@ -156,6 +158,7 @@ func (h *Handler) Initialize(
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
+		maxNonStakerPendingMsgs,
 		cpuInterval,
 		stakerMsgPortion,
 		stakerCPUPortion,
