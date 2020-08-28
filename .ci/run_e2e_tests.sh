@@ -6,6 +6,9 @@ GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
 DOCKER_REPO="avaplatform"
 
+echo "$DOCKER_USERNAME"
+echo "${#DOCKER_USERNAME}"
+
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
 
 TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:everest-dev"
