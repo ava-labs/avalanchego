@@ -507,6 +507,7 @@ func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAsset
  ******************************************************
  */
 
+/*
 // GetCurrentValidatorsArgs are the arguments for calling GetCurrentValidators
 type GetCurrentValidatorsArgs struct {
 	// Subnet we're listing the validators of
@@ -570,68 +571,69 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 
 	return nil
 }
+*/
 
-// GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
-type GetPendingValidatorsArgs struct {
-	// Subnet we're getting the pending validators of
-	// If omitted, defaults to primary network
-	SubnetID ids.ID `json:"subnetID"`
-}
+// // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
+// type GetPendingValidatorsArgs struct {
+// 	// Subnet we're getting the pending validators of
+// 	// If omitted, defaults to primary network
+// 	SubnetID ids.ID `json:"subnetID"`
+// }
 
-// GetPendingValidatorsReply are the results from calling GetPendingValidators
-type GetPendingValidatorsReply struct {
-	Validators []FormattedAPIValidator `json:"validators"`
-}
+// // GetPendingValidatorsReply are the results from calling GetPendingValidators
+// type GetPendingValidatorsReply struct {
+// 	Validators []FormattedAPIValidator `json:"validators"`
+// }
 
-// GetPendingValidators returns the list of pending validators
-func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
-	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
-	if args.SubnetID.IsZero() {
-		args.SubnetID = constants.PrimaryNetworkID
-	}
+// // GetPendingValidators returns the list of pending validators
+// func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
+// 	service.vm.Ctx.Log.Info("Platform: GetPendingValidators called")
+// 	if args.SubnetID.IsZero() {
+// 		args.SubnetID = constants.PrimaryNetworkID
+// 	}
 
-	validators, err := service.vm.getPendingValidators(service.vm.DB, args.SubnetID)
-	if err != nil {
-		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
-	}
+// 	validators, err := service.vm.getPendingValidators(service.vm.DB, args.SubnetID)
+// 	if err != nil {
+// 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
+// 	}
 
-	reply.Validators = make([]FormattedAPIValidator, validators.Len())
-	for i, tx := range validators.Txs {
-		if args.SubnetID.Equals(constants.PrimaryNetworkID) {
-			switch tx := tx.UnsignedTx.(type) {
-			case *UnsignedAddValidatorTx:
-				weight := json.Uint64(tx.Validator.Weight())
-				reply.Validators[i] = FormattedAPIValidator{
-					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.EndTime().Unix()),
-					StakeAmount: &weight,
-				}
-			case *UnsignedAddDelegatorTx:
-				weight := json.Uint64(tx.Validator.Weight())
-				reply.Validators[i] = FormattedAPIValidator{
-					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.EndTime().Unix()),
-					StakeAmount: &weight,
-				}
-			default: // Shouldn't happen
-				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
-			}
-		} else {
-			utx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
-			weight := json.Uint64(utx.Validator.Weight())
-			reply.Validators[i] = FormattedAPIValidator{
-				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime: json.Uint64(utx.StartTime().Unix()),
-				EndTime:   json.Uint64(utx.EndTime().Unix()),
-				Weight:    &weight,
-			}
-		}
-	}
+// 	reply.Validators = make([]FormattedAPIValidator, validators.Len())
+// 	for i, tx := range validators.Txs {
+// 		if args.SubnetID.Equals(constants.PrimaryNetworkID) {
+// 			switch tx := tx.UnsignedTx.(type) {
+// 			case *UnsignedAddValidatorTx:
+// 				weight := json.Uint64(tx.Validator.Weight())
+// 				reply.Validators[i] = FormattedAPIValidator{
+// 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+// 					StartTime:   json.Uint64(tx.StartTime().Unix()),
+// 					EndTime:     json.Uint64(tx.EndTime().Unix()),
+// 					StakeAmount: &weight,
+// 				}
+// 			case *UnsignedAddDelegatorTx:
+// 				weight := json.Uint64(tx.Validator.Weight())
+// 				reply.Validators[i] = FormattedAPIValidator{
+// 					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+// 					StartTime:   json.Uint64(tx.StartTime().Unix()),
+// 					EndTime:     json.Uint64(tx.EndTime().Unix()),
+// 					StakeAmount: &weight,
+// 				}
+// 			default: // Shouldn't happen
+// 				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
+// 			}
+// 		} else {
+// 			utx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
+// 			weight := json.Uint64(utx.Validator.Weight())
+// 			reply.Validators[i] = FormattedAPIValidator{
+// 				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+// 				StartTime: json.Uint64(utx.StartTime().Unix()),
+// 				EndTime:   json.Uint64(utx.EndTime().Unix()),
+// 				Weight:    &weight,
+// 			}
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // SampleValidatorsArgs are the arguments for calling SampleValidators
 type SampleValidatorsArgs struct {
@@ -655,7 +657,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	validators, ok := service.vm.validators.GetValidatorSet(args.SubnetID)
+	validators, ok := service.vm.vdrMgr.GetValidators(args.SubnetID)
 	if !ok {
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}
@@ -739,7 +741,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys, // Private keys
+		privKeys,                             // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)

@@ -163,7 +163,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	}
 
 	// Add validator to set of pending validators
-	if err := vm.addValidator(onCommitDB, constants.PrimaryNetworkID, tx); err != nil {
+	if err := vm.addStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

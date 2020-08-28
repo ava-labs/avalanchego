@@ -71,185 +71,143 @@ func (vm *VM) getStatus(db database.Database, ID ids.ID) (Status, error) {
 	return Unknown, fmt.Errorf("expected status to be type Status but is type %T", statusIntf)
 }
 
-// get the validators currently validating the specified subnet
-func (vm *VM) getCurrentValidators(db database.Database, subnetID ids.ID) (*EventHeap, error) {
-	return vm.getValidatorsFromDB(db, subnetID, currentValidatorsPrefix, false)
-}
-
-// put the validators currently validating the specified subnet
-func (vm *VM) putCurrentValidators(db database.Database, validators *EventHeap, subnetID ids.ID) error {
-	if validators.SortByStartTime {
-		return errors.New("current validators should be sorted by end time")
+// Add a staker to subnet [subnetID]
+// A staker may be a validator or a delegator
+func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+	var staker TimedTx
+	switch stakerTx.UnsignedTx.(type) {
+	case *UnsignedAddDelegatorTx, *UnsignedAddSubnetValidatorTx, *UnsignedAddValidatorTx:
+		staker = stakerTx.UnsignedTx.(TimedTx)
+	default:
+		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
-	err := vm.State.Put(db, validatorsTypeID, subnetID.Prefix(currentValidatorsPrefix), validators)
-	if err != nil {
-		return fmt.Errorf("couldn't put current validator set: %w", err)
-	}
-	return nil
-}
+	stakerID := staker.ID().Bytes() // Tx ID of this tx
 
-func (vm *VM) addValidator(db database.Database, subnetID ids.ID, validator TimedTx) error {
-	validatorBytes := validator.Bytes()
-
-	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(validator.StartTime().Unix()))
-	if p.Err != nil {
-		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
-	}
+	// Sorted by subnet ID then start time then tx ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
+	// Sorted by subnet ID then stop time then tx ID
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	startKey := append(p.Bytes, validatorBytes...)
-
-	p = wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(validator.EndTime().Unix()))
-	if p.Err != nil {
-		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
-	}
-	stopKey := append(p.Bytes, validatorBytes...)
-
-	if err := prefixStartDB.Put(startKey, validatorBytes); err != nil {
-		return err
-	}
-	return prefixStopDB.Put(stopKey, validatorBytes)
-}
-
-func (vm *VM) removeValidator(db database.Database, subnetID ids.ID, validator TimedTx) error {
-	validatorBytes := validator.Bytes()
+	defer func() {
+		prefixStartDB.Close()
+		prefixStopDB.Close()
+	}()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(validator.StartTime().Unix()))
+	p.PackLong(uint64(staker.StartTime().Unix()))
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
 	}
+	startKey := append(p.Bytes, stakerID...)
+
+	p = wrappers.Packer{MaxSize: wrappers.LongLen}
+	p.PackLong(uint64(staker.EndTime().Unix()))
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
+	}
+	stopKey := append(p.Bytes, stakerID...)
+
+	if err := prefixStartDB.Put(startKey, stakerTx.Bytes()); err != nil {
+		return err
+	}
+	return prefixStopDB.Put(stopKey, stakerTx.Bytes())
+}
+
+// Remove a staker from subnet [subnetID]
+// A staker may be a validator or a delegator
+func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+	var staker TimedTx
+	switch stakerTx.UnsignedTx.(type) {
+	case *UnsignedAddDelegatorTx, *UnsignedAddSubnetValidatorTx, *UnsignedAddValidatorTx:
+		staker = stakerTx.UnsignedTx.(TimedTx)
+	default:
+		return fmt.Errorf("staker is unexpected type %T", stakerTx)
+	}
+	stakerID := staker.ID().Bytes() // Tx ID of this tx
+
+	// Sorted by subnet ID then start time then ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
+	// Sorted by subnet ID then stop time
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	startKey := append(p.Bytes, validatorBytes...)
-
-	p = wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(validator.EndTime().Unix()))
-	if p.Err != nil {
-		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
-	}
-	stopKey := append(p.Bytes, validatorBytes...)
-
-	if err := prefixStartDB.Put(startKey, validatorBytes); err != nil {
-		return err
-	}
-	return prefixStopDB.Put(stopKey, validatorBytes)
-}
-
-func (vm *VM) addDelegator(db database.Database, delegator TimedTx) error {
-	delegatorBytes := delegator.Bytes()
+	defer func() {
+		prefixStartDB.Close()
+		prefixStopDB.Close()
+	}()
 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(delegator.StartTime().Unix()))
+	p.PackLong(uint64(staker.StartTime().Unix()))
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
 	}
-	prefixStart := []byte(fmt.Sprintf("%s%s", delegator, start))
-	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	prefixStop := []byte(fmt.Sprintf("%s%s", delegator, stop))
-	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	startKey := append(p.Bytes, delegatorBytes...)
+	startKey := append(p.Bytes, stakerID...)
 
 	p = wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(delegator.EndTime().Unix()))
+	p.PackLong(uint64(staker.EndTime().Unix()))
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
 	}
-	stopKey := append(p.Bytes, delegatorBytes...)
+	stopKey := append(p.Bytes, stakerID...)
 
-	if err := prefixStartDB.Put(startKey, delegatorBytes); err != nil {
+	if err := prefixStartDB.Put(startKey, nil); err != nil {
 		return err
 	}
-	return prefixStopDB.Put(stopKey, delegatorBytes)
+	return prefixStopDB.Put(stopKey, nil)
 }
 
-func (vm *VM) removeDelegator(db database.Database, delegator TimedTx) error {
-	delegatorBytes := delegator.Bytes()
-
-	p := wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(delegator.StartTime().Unix()))
-	if p.Err != nil {
-		return fmt.Errorf("couldn't serialize start time: %w", p.Err)
-	}
-	prefixStart := []byte(fmt.Sprintf("%s%s", delegator, start))
-	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	prefixStop := []byte(fmt.Sprintf("%s%s", delegator, stop))
-	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	startKey := append(p.Bytes, delegatorBytes...)
-
-	p = wrappers.Packer{MaxSize: wrappers.LongLen}
-	p.PackLong(uint64(delegator.EndTime().Unix()))
-	if p.Err != nil {
-		return fmt.Errorf("couldn't serialize stop time: %w", p.Err)
-	}
-	stopKey := append(p.Bytes, delegatorBytes...)
-
-	if err := prefixStartDB.Put(startKey, delegatorBytes); err != nil {
-		return err
-	}
-	return prefixStopDB.Put(stopKey, delegatorBytes)
-}
-
-// Returns the pending validator that will start validating next
-func (vm *VM) nextValidatorToStart(db database.Database, subnetID ids.ID) (TimedTx, error) {
+// Returns the pending staker that will start staking next
+func (vm *VM) nextStakerStart(db database.Database, subnetID ids.ID) (*Tx, error) {
 	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, start)), db).NewIterator()
+	// Key: [Staker start time] | [Tx ID]
+	// Value: Byte repr. of tx that added this validator
 	if iter.Next() {
-		txBytes := iter.Value()
-		var tx *Tx
-		if err := Codec.Unmarshal(txBytes, tx); err != nil {
+		var tx Tx
+		if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 			return nil, err
 		}
 		if err := tx.Sign(vm.codec, nil); err != nil {
 			return nil, fmt.Errorf("couldn't sign tx: %w", err)
 		}
-		asTimedTx, ok := tx.UnsignedTx.(TimedTx)
-		if !ok {
-			return nil, fmt.Errorf("expected validator to be type TimedTx but is %T", tx)
-		}
-		return asTimedTx, nil
+		return &tx, nil
 	}
 	return nil, errNoValidators
 }
 
-// Returns the current validator that will top validating next
-func (vm *VM) nextValidatorToStop(db database.Database, subnetID ids.ID) (TimedTx, error) {
+// Returns the current staker that will stop staking next
+func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error) {
 	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stop)), db).NewIterator()
+	// Key: [Staker stop time] | [Tx ID]
+	// Value: Byte repr. of tx that added this validator
 	if iter.Next() {
-		txBytes := iter.Value()
-		var tx *Tx
-		if err := Codec.Unmarshal(txBytes, tx); err != nil {
+		var tx Tx
+		if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 			return nil, err
 		}
 		if err := tx.Sign(vm.codec, nil); err != nil {
 			return nil, fmt.Errorf("couldn't sign tx: %w", err)
 		}
-		asTimedTx, ok := tx.UnsignedTx.(TimedTx)
-		if !ok {
-			return nil, fmt.Errorf("expected validator to be type TimedTx but is %T", tx)
-		}
-		return asTimedTx, nil
+		return &tx, nil
 	}
 	return nil, errNoValidators
 }
 
-// Returns true if [nodeID] is a validator
+// Returns true if [nodeID] is a validator (not a delegator) of subnet [subnetID]
 func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool) {
-	iter := prefixdb.NewNested([]byte(start), db).NewIterator()
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, start)), db).NewIterator()
 	for iter.Next() {
 		txBytes := iter.Value()
-		var tx *Tx
-		if err := Codec.Unmarshal(txBytes, tx); err != nil {
-			vm.Ctx.Log.Warn("couldn't unmarshal Tx: %w", err)
+		if txBytes == nil {
+			break
+		}
+		var tx Tx
+		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
+			vm.Ctx.Log.Warn("couldn't unmarshal Tx: %s", err)
 			return nil, false
 		}
 		if err := tx.Sign(vm.codec, nil); err != nil {
-			vm.Ctx.Log.Warn("couldn't sign *Tx: %w", err)
+			vm.Ctx.Log.Warn("couldn't sign *Tx: %s", err)
 			return nil, false
 		}
 		switch vdr := tx.UnsignedTx.(type) {
@@ -257,69 +215,13 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true
 			}
-			return nil, false
 		case *UnsignedAddSubnetValidatorTx:
 			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true
 			}
-			return nil, false
-		default:
-			vm.Ctx.Log.Warn("expected tx to be *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx)
-			return nil, false
 		}
 	}
 	return nil, false
-}
-
-// get the validators that are slated to validate the specified subnet in the future
-func (vm *VM) getPendingValidators(db database.Database, subnetID ids.ID) (*EventHeap, error) {
-	return vm.getValidatorsFromDB(db, subnetID, pendingValidatorsPrefix, true)
-}
-
-// put the validators that are slated to validate the specified subnet in the future
-func (vm *VM) putPendingValidators(db database.Database, validators *EventHeap, subnetID ids.ID) error {
-	if !validators.SortByStartTime {
-		return errors.New("pending validators should be sorted by start time")
-	}
-	err := vm.State.Put(db, validatorsTypeID, subnetID.Prefix(pendingValidatorsPrefix), validators)
-	if err != nil {
-		return fmt.Errorf("couldn't put pending validator set: %w", err)
-	}
-	return nil
-}
-
-// get the validators currently validating the specified subnet
-func (vm *VM) getValidatorsFromDB(
-	db database.Database,
-	subnetID ids.ID,
-	prefix uint64,
-	sortByStartTime bool,
-) (*EventHeap, error) {
-	// if current validators aren't specified in database, return empty validator set
-	key := subnetID.Prefix(prefix)
-	has, err := vm.State.Has(db, validatorsTypeID, key)
-	if err != nil {
-		return nil, err
-	}
-	if !has {
-		return &EventHeap{SortByStartTime: sortByStartTime}, nil
-	}
-	validatorsInterface, err := vm.State.Get(db, validatorsTypeID, key)
-	if err != nil {
-		return nil, err
-	}
-	validators, ok := validatorsInterface.(*EventHeap)
-	if !ok {
-		err := fmt.Errorf("expected to retrieve *EventHeap from database but got type %T", validatorsInterface)
-		vm.Ctx.Log.Error("error while fetching validators: %s", err)
-		return nil, err
-	}
-	for _, tx := range validators.Txs {
-		if err := tx.Sign(vm.codec, nil); err != nil {
-			return nil, err
-		}
-	}
-	return validators, nil
 }
 
 // getUTXO returns the UTXO with the specified ID

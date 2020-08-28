@@ -150,7 +150,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 	// Add the validator to the set of pending validators
-	if err := vm.addValidator(onCommitDB, tx.Validator.Subnet, tx); err != nil {
+	if err := vm.addStaker(onCommitDB, tx.Validator.Subnet, stx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

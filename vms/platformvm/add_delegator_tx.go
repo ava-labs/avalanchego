@@ -157,7 +157,9 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	}
 
 	// If this proposal is committed, update the pending validator set to include the delegator
-	vm.addValidator(onCommitDB, constants.PrimaryNetworkID, tx)
+	if err := vm.addStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
 
 	// Set up the DB if this tx is aborted
 	onAbortDB := versiondb.New(db)
