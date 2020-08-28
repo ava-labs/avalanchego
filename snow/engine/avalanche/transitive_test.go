@@ -24,8 +24,6 @@ var (
 	errUnknownVertex = errors.New("unknown vertex")
 	errFailedParsing = errors.New("failed parsing")
 	errMissing       = errors.New("missing")
-
-	Genesis = ids.GenerateTestID()
 )
 
 func TestEngineShutdown(t *testing.T) {
@@ -2984,6 +2982,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params.ConcurrentRepolls = 3
+	config.Params.BetaRogue = 3
 
 	vdr := validators.GenerateRandomValidator(1)
 
@@ -3034,8 +3033,12 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	te := &Transitive{}
-	te.Initialize(config)
-	te.finishBootstrapping()
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.finishBootstrapping(); err != nil {
+		t.Fatal(err)
+	}
 	te.Ctx.Bootstrapped()
 
 	parsed := new(bool)
@@ -3072,7 +3075,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatalf("should have issued one push query")
 	}
 	if *numPullQueries != 2 {
-		t.Fatalf("should have issued one pull query")
+		t.Fatalf("should have issued two pull queries")
 	}
 }
 

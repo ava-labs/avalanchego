@@ -23,7 +23,7 @@ func (d *TestDecidable) ID() ids.ID { return d.IDV }
 func (d *TestDecidable) Accept() error {
 	switch d.StatusV {
 	case Unknown, Rejected:
-		return fmt.Errorf("Invalid state transaition from %s to %s",
+		return fmt.Errorf("invalid state transaition from %s to %s",
 			d.StatusV, Accepted)
 	default:
 		d.StatusV = Accepted
@@ -35,7 +35,7 @@ func (d *TestDecidable) Accept() error {
 func (d *TestDecidable) Reject() error {
 	switch d.StatusV {
 	case Unknown, Accepted:
-		return fmt.Errorf("Invalid state transaition from %s to %s",
+		return fmt.Errorf("invalid state transaition from %s to %s",
 			d.StatusV, Rejected)
 	default:
 		d.StatusV = Rejected

@@ -295,17 +295,6 @@ func (s *set) Weight() uint64 {
 	return s.totalWeight
 }
 
-func (s *set) calculateWeight() (uint64, error) {
-	weight := uint64(0)
-	for _, vdr := range s.vdrSlice {
-		weight, err := safemath.Add64(weight, vdr.Weight())
-		if err != nil {
-			return weight, err
-		}
-	}
-	return weight, nil
-}
-
 func (s *set) String() string {
 	s.lock.Lock()
 	defer s.lock.Unlock()

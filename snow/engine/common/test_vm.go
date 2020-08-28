@@ -56,7 +56,7 @@ func (vm *TestVM) Bootstrapping() error {
 		if vm.T != nil {
 			vm.T.Fatalf("Unexpectedly called Bootstrapping")
 		}
-		return errors.New("Unexpectedly called Bootstrapping")
+		return errors.New("unexpectedly called Bootstrapping")
 	}
 	return nil
 }
@@ -69,7 +69,7 @@ func (vm *TestVM) Bootstrapped() error {
 		if vm.T != nil {
 			vm.T.Fatalf("Unexpectedly called Bootstrapped")
 		}
-		return errors.New("Unexpectedly called Bootstrapped")
+		return errors.New("unexpectedly called Bootstrapped")
 	}
 	return nil
 }
@@ -82,7 +82,7 @@ func (vm *TestVM) Shutdown() error {
 		if vm.T != nil {
 			vm.T.Fatalf("Unexpectedly called Shutdown")
 		}
-		return errors.New("Unexpectedly called Shutdown")
+		return errors.New("unexpectedly called Shutdown")
 	}
 	return nil
 }

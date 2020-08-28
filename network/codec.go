@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	errBadLength    = errors.New("stream has unexpected length")
 	errMissingField = errors.New("message missing field")
 	errBadOp        = errors.New("input field has invalid operation")
 )

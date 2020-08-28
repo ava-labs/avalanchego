@@ -37,7 +37,6 @@ var (
 
 var (
 	errNoTxs          = errors.New("no transactions")
-	errUnknownBlock   = errors.New("unknown block")
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 )
 

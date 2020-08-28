@@ -58,9 +58,9 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Calling engine function timed out")
-	case _, _ = <-called:
+	case <-called:
 	}
 }
 
@@ -95,9 +95,9 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Calling engine function timed out")
-	case _, _ = <-called:
+	case <-called:
 	}
 }
 
@@ -134,8 +134,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Handler shutdown timed out before calling toClose")
-	case _, _ = <-closed:
+	case <-closed:
 	}
 }

@@ -53,9 +53,9 @@ func TestShutdown(t *testing.T) {
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Handler shutdown was not called or timed out after 20ms during chainRouter shutdown")
-	case _, _ = <-shutdownCalled:
+	case <-shutdownCalled:
 	}
 
 	select {
@@ -118,8 +118,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	}()
 
 	select {
-	case _, _ = <-engineFinished:
+	case <-engineFinished:
 		t.Fatalf("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
-	case _, _ = <-shutdownFinished:
+	case <-shutdownFinished:
 	}
 }

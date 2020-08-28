@@ -21,8 +21,8 @@ const (
 
 // Variables to be exported
 var (
-	DefaultSubnetID = ids.Empty
-	PlatformChainID = ids.Empty
+	PrimaryNetworkID = ids.Empty
+	PlatformChainID  = ids.Empty
 
 	MainnetID  uint32 = 1
 	CascadeID  uint32 = 2

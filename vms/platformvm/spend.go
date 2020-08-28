@@ -16,14 +16,10 @@ import (
 )
 
 var (
-	errSpendOverflow                = errors.New("spent amount overflows uint64")
-	errNoKeys                       = errors.New("no keys provided")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 	errWrongLocktime                = errors.New("wrong locktime reported")
 	errUnknownOwners                = errors.New("unknown owners")
 	errCantSign                     = errors.New("can't sign")
-	errInputOverflow                = errors.New("inputs overflowed uint64")
-	errOutputOverflow               = errors.New("outputs overflowed uint64")
 )
 
 // stake the provided amount while deducting the provided fee.
