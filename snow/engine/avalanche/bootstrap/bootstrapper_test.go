@@ -48,9 +48,8 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 
 	sender.CantGetAcceptedFrontier = false
 
-	peer := validators.GenerateRandomValidator(1)
-	peerID := peer.ID()
-	peers.Add(peer)
+	peer := ids.GenerateTestShortID()
+	peers.AddWeight(peer, 1)
 
 	vtxBlocker, _ := queue.New(prefixdb.New([]byte("vtx"), db))
 	txBlocker, _ := queue.New(prefixdb.New([]byte("tx"), db))
@@ -68,7 +67,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		TxBlocked:  txBlocker,
 		Manager:    manager,
 		VM:         vm,
-	}, peerID, sender, manager, vm
+	}, peer, sender, manager, vm
 }
 
 // Three vertices in the accepted frontier. None have parents. No need to fetch anything
