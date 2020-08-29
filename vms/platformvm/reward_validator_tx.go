@@ -66,16 +66,15 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	case len(stx.Creds) != 0:
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
-	txID := tx.ID()
 
 	stakerTx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-	if !stakerTx.ID().Equals(tx.TxID) {
+	if stakerID := stakerTx.ID(); !stakerID.Equals(tx.TxID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
 			tx.TxID,
-			stakerTx)}
+			stakerID)}
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
@@ -112,7 +111,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        tx.ID(),
+					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
@@ -139,7 +138,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 			if err := vm.putUTXO(onCommitDB, &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
@@ -168,7 +167,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
@@ -209,7 +208,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 			if err := vm.putUTXO(onCommitDB, &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
@@ -233,7 +232,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 			if err := vm.putUTXO(onCommitDB, &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake) + offset),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
