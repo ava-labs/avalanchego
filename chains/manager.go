@@ -417,7 +417,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 				chain.Handler.Shutdown()
 			}
 		})
-		go m.net.RegisterHandler(awaiter)
+		go m.net.RegisterConnector(awaiter)
 	}
 
 	return chain, nil

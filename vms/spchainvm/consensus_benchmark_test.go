@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 
 	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
@@ -54,7 +55,7 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+		vdrs.Add(validators.NewValidator(ctx.NodeID, 1, time.Now(), timer.MaxTime))
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
@@ -191,7 +192,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+		vdrs.Add(validators.NewValidator(ctx.NodeID, 1, time.Now(), timer.MaxTime))
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}

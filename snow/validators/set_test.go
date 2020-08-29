@@ -6,6 +6,7 @@ package validators
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -13,10 +14,10 @@ import (
 )
 
 func TestSetSet(t *testing.T) {
-	vdr0 := NewValidator(ids.ShortEmpty, 1)
-	vdr1 := NewValidator(ids.NewShortID([20]byte{0xFF}), math.MaxInt64-1)
+	vdr0 := NewValidator(ids.ShortEmpty, 1, time.Now(), time.Now())
+	vdr1 := NewValidator(ids.NewShortID([20]byte{0xFF}), math.MaxInt64-1, time.Now(), time.Now())
 	// Should be discarded, because it has a weight of 0
-	vdr2 := NewValidator(ids.NewShortID([20]byte{0xAA}), 0)
+	vdr2 := NewValidator(ids.NewShortID([20]byte{0xAA}), 0, time.Now(), time.Now())
 
 	s := NewSet()
 	err := s.Set([]Validator{vdr0, vdr1, vdr2})
@@ -78,7 +79,7 @@ func TestSamplerSample(t *testing.T) {
 func TestSamplerDuplicate(t *testing.T) {
 	vdr0 := GenerateRandomValidator(1)
 	vdr1_0 := GenerateRandomValidator(math.MaxInt64 - 1)
-	vdr1_1 := NewValidator(vdr1_0.ID(), 0)
+	vdr1_1 := NewValidator(vdr1_0.ID(), 0, time.Now(), time.Now())
 
 	s := NewSet()
 	err := s.Add(vdr0)
@@ -119,13 +120,15 @@ func TestSamplerContains(t *testing.T) {
 }
 
 func TestSamplerString(t *testing.T) {
-	vdr0 := NewValidator(ids.ShortEmpty, 1)
+	vdr0 := NewValidator(ids.ShortEmpty, 1, time.Now(), time.Now())
 	vdr1 := NewValidator(
 		ids.NewShortID([20]byte{
 			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		}),
 		math.MaxInt64-1,
+		time.Now(),
+		time.Now(),
 	)
 
 	s := NewSet()
@@ -144,9 +147,9 @@ func TestSamplerString(t *testing.T) {
 
 func TestSetWeight(t *testing.T) {
 	weight0 := uint64(93)
-	vdr0 := NewValidator(ids.NewShortID([20]byte{1}), weight0)
+	vdr0 := NewValidator(ids.NewShortID([20]byte{1}), weight0, time.Now(), time.Now())
 	weight1 := uint64(123)
-	vdr1 := NewValidator(ids.NewShortID([20]byte{2}), weight1)
+	vdr1 := NewValidator(ids.NewShortID([20]byte{2}), weight1, time.Now(), time.Now())
 
 	s := NewSet()
 	err := s.Add(vdr0)

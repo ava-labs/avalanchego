@@ -75,9 +75,6 @@ const (
 )
 
 var (
-	// taken from https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go/32620397#32620397
-	maxTime = time.Unix(1<<63-62135596801, 0) // 0 is used because we drop the nano-seconds
-
 	timestampKey = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
 	chainsKey    = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
 	subnetsKey   = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
@@ -533,7 +530,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !currentChainTimestamp.Before(maxTime) {
+	if !currentChainTimestamp.Before(timer.MaxTime) {
 		return nil, errEndOfTime
 	}
 
@@ -543,7 +540,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get validator set: %w", err)
 	}
-	nextValidatorEndtime := maxTime
+	nextValidatorEndtime := timer.MaxTime
 	if currentValidators.Len() > 0 {
 		nextValidatorEndtime = currentValidators.Peek().UnsignedTx.(TimedTx).EndTime()
 	}
@@ -713,7 +710,7 @@ func (vm *VM) resetTimer() {
 		vm.Ctx.Log.Error("could not retrieve timestamp from database")
 		return
 	}
-	if timestamp.Equal(maxTime) {
+	if timestamp.Equal(timer.MaxTime) {
 		vm.Ctx.Log.Error("Program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred.")
 		return
 	}
@@ -786,11 +783,11 @@ func (vm *VM) nextSubnetValidatorChangeTime(db database.Database, subnetID ids.I
 	}
 	if err != nil {
 		vm.Ctx.Log.Error("couldn't get validators of subnet with ID %s: %v", subnetID, err)
-		return maxTime
+		return timer.MaxTime
 	}
 	if validators.Len() == 0 {
 		vm.Ctx.Log.Verbo("subnet, %s, has no validators", subnetID)
-		return maxTime
+		return timer.MaxTime
 	}
 	return validators.Timestamp()
 }

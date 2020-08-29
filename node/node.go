@@ -178,7 +178,7 @@ func (n *Node) initNetworking() error {
 	)
 
 	if !n.Config.EnableStaking {
-		n.Net.RegisterHandler(&insecureValidatorManager{
+		n.Net.RegisterConnector(&insecureValidatorManager{
 			vdrs:   primaryNetworkValidators,
 			weight: n.Config.DisabledStakingWeight,
 		})
@@ -198,7 +198,7 @@ type insecureValidatorManager struct {
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
-	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight))
+	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight, time.Now(), time.Now()))
 	return false
 }
 
@@ -313,7 +313,7 @@ func (n *Node) initNodeID() error {
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
-		if err := n.beacons.Add(validators.NewValidator(peer.ID, 1)); err != nil {
+		if err := n.beacons.Add(validators.NewValidator(peer.ID, 1, time.Now(), timer.MaxTime)); err != nil {
 			return err
 		}
 	}
@@ -382,7 +382,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	go connectToBootstrapsTimeout.Dispatch()
 	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
 
-	n.Net.RegisterHandler(awaiter)
+	n.Net.RegisterConnector(awaiter)
 	return nil
 }
 
@@ -442,12 +442,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Instead of updating node's validator manager, platform chain makes changes
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
-		primaryNetworkValidators := validators.NewSet()
-		if err := primaryNetworkValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
-			return fmt.Errorf("couldn't add validator to primary network: %w", err)
-		}
 		vdrs = validators.NewManager()
-		vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
 	}
 
 	errs := wrappers.Errs{}

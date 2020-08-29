@@ -1591,7 +1591,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	peerID := ids.NewShortID([20]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
 	vdrs := validators.NewSet()
-	vdrs.Add(validators.NewValidator(peerID, 1))
+	vdrs.Add(validators.NewValidator(peerID, 1, time.Now(), time.Now()))
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
