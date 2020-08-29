@@ -29,4 +29,10 @@ git checkout "tags/$E2E_TAG" -b "$E2E_TAG"
 
 go mod edit -replace github.com/ava-labs/gecko="$GECKO_HOME"
 bash "./scripts/rebuild_initializer_binary.sh"
-./build/avalanche-testing --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${TESTING_CONTROLLER_IMAGE}" --byzantine-image-name="${BYZANTINE_IMAGE}"
+
+# If Docker Credentials are not present (ex. PR from an untrusted fork) run only the non-byzantine tests
+if [[ ${#DOCKER_USERNAME} == 0 ]]; then
+    ./build/avalanche-testing --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${TESTING_CONTROLLER_IMAGE}"
+else 
+    ./build/avalanche-testing --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${TESTING_CONTROLLER_IMAGE}" --byzantine-image-name="${BYZANTINE_IMAGE}"
+fi
