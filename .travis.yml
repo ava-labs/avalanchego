@@ -18,7 +18,6 @@ env:
   - COMMIT=${TRAVIS_COMMIT::8}
   - DOCKERHUB_REPO=avaplatform/gecko
 before_install:
- - pip install --user awscli # need awscli to access byz-gecko images
  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .ci/before_install_linux.sh; fi
 
 install: 
