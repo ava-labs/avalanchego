@@ -10,6 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
 )
@@ -42,10 +43,10 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultMaxNonStakerPendingMsgs,
 		time.Second,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 	)
 
 	return queue, semaChan, vdrs
@@ -170,10 +171,10 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultMaxNonStakerPendingMsgs,
 		time.Second,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 	)
 
 	// Utilize CPU such that the next message from validator2 will be placed on a lower
@@ -265,10 +266,10 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultMaxNonStakerPendingMsgs,
 		time.Second,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 	)
 
 	queue.PushMessage(message{

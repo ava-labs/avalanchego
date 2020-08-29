@@ -31,8 +31,9 @@ type messageQueue interface {
 type multiLevelQueue struct {
 	lock sync.Mutex
 
-	validators validators.Set
-	throttler  throttler.Throttler
+	validators   validators.Set
+	cpuTracker   throttler.CPUTracker
+	msgThrottler throttler.CountingThrottler
 
 	// Tracks total CPU consumption
 	intervalConsumption, tierConsumption, cpuInterval time.Duration
@@ -67,7 +68,8 @@ func newMultiLevelQueue(
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
 	singleLevelSize := bufferSize / len(consumptionRanges)
-	throttler := throttler.NewEWMAThrottler(vdrs, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, cpuPortion, cpuInterval, log)
+	cpuTracker := throttler.NewEWMATracker(vdrs, cpuPortion, cpuInterval, log)
+	msgThrottler := throttler.NewMessageThrottler(vdrs, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, log)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)
@@ -85,7 +87,8 @@ func newMultiLevelQueue(
 
 	return &multiLevelQueue{
 		validators:    vdrs,
-		throttler:     throttler,
+		cpuTracker:    cpuTracker,
+		msgThrottler:  msgThrottler,
 		queues:        queues,
 		cpuRanges:     consumptionRanges,
 		cpuAllotments: consumptionAllotments,
@@ -117,7 +120,7 @@ func (ml *multiLevelQueue) PushMessage(msg message) bool {
 		return false
 	}
 	ml.pendingMessages++
-	ml.throttler.AddMessage(msg.validatorID)
+	ml.msgThrottler.Add(msg.validatorID)
 	select {
 	case ml.semaChan <- struct{}{}:
 	default:
@@ -135,7 +138,7 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 	msg, err := ml.popMessage()
 	if err == nil {
 		ml.pendingMessages--
-		ml.throttler.RemoveMessage(msg.validatorID)
+		ml.msgThrottler.Remove(msg.validatorID)
 		ml.metrics.pending.Dec()
 	}
 	return msg, err
@@ -146,7 +149,7 @@ func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.throttler.UtilizeCPU(vdr, duration)
+	ml.cpuTracker.UtilizeCPU(vdr, duration)
 	ml.intervalConsumption += duration
 	ml.tierConsumption += duration
 	if ml.tierConsumption > ml.cpuAllotments[ml.currentTier] {
@@ -161,7 +164,8 @@ func (ml *multiLevelQueue) EndInterval() {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.throttler.EndInterval()
+	ml.cpuTracker.EndInterval()
+	ml.msgThrottler.EndInterval()
 	ml.metrics.cpu.Observe(float64(ml.intervalConsumption.Milliseconds()))
 	ml.intervalConsumption = 0
 }
@@ -190,7 +194,7 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 			ml.queues[ml.currentTier].waitingTime.Observe(float64(time.Since(msg.received)))
 
 			// Check where messages from this validator currently belong
-			cpu, _ := ml.throttler.GetUtilization(msg.validatorID)
+			cpu := ml.cpuTracker.GetUtilization(msg.validatorID)
 			correctIndex := ml.getPriorityIndex(cpu)
 
 			// If the message is at least the priority of the current tier
@@ -228,12 +232,12 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 		ml.log.Warn("Dropping message due to invalid validatorID")
 		return false
 	}
-	cpu, throttle := ml.throttler.GetUtilization(validatorID)
+	throttle := ml.msgThrottler.Throttle(validatorID)
 	if throttle {
 		ml.metrics.throttled.Inc()
 		return false
 	}
-
+	cpu := ml.cpuTracker.GetUtilization(validatorID)
 	queueIndex := ml.getPriorityIndex(cpu)
 
 	return ml.waterfallMessage(msg, queueIndex)

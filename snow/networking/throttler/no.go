@@ -9,17 +9,27 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
-type noThrottler struct{}
+type noCountThrottler struct{}
 
-func (noThrottler) AddMessage(ids.ShortID) {}
+func (noCountThrottler) Add(ids.ShortID) {}
 
-func (noThrottler) RemoveMessage(ids.ShortID) {}
+func (noCountThrottler) Remove(ids.ShortID) {}
 
-func (noThrottler) UtilizeCPU(ids.ShortID, time.Duration) {}
+func (noCountThrottler) Throttle(ids.ShortID) bool { return false }
 
-func (noThrottler) GetUtilization(ids.ShortID) (float64, bool) { return 0, false }
+func (noCountThrottler) EndInterval() {}
 
-func (noThrottler) EndInterval() {}
+// NewNoCountThrottler returns a CountingThrottler that will never throttle
+func NewNoCountThrottler() CountingThrottler { return noCountThrottler{} }
 
-// NewNoThrottler returns a throttler that will never throttle
-func NewNoThrottler() Throttler { return noThrottler{} }
+type noCPUTracker struct{}
+
+func (noCPUTracker) UtilizeCPU(ids.ShortID, time.Duration) {}
+
+func (noCPUTracker) GetUtilization(ids.ShortID) float64 { return 0 }
+
+func (noCPUTracker) EndInterval() {}
+
+// NewNoCPUTracker returns a CPUTracker that does not track CPU usage and
+// always returns 0 for the utilization value
+func NewNoCPUTracker() CPUTracker { return noCPUTracker{} }

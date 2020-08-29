@@ -18,7 +18,9 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
+
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
 
@@ -111,9 +113,9 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 			vdrs,
 			msgChan,
 			1000,
-			router.DefaultMaxNonStakerPendingMsgs,
-			router.DefaultStakerPortion,
-			router.DefaultStakerPortion,
+			throttler.DefaultMaxNonStakerPendingMsgs,
+			throttler.DefaultStakerPortion,
+			throttler.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)
@@ -254,9 +256,9 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 			vdrs,
 			msgChan,
 			1000,
-			router.DefaultMaxNonStakerPendingMsgs,
-			router.DefaultStakerPortion,
-			router.DefaultStakerPortion,
+			throttler.DefaultMaxNonStakerPendingMsgs,
+			throttler.DefaultStakerPortion,
+			throttler.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)

@@ -12,52 +12,80 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
-const (
-	defaultMaxNonStakerPendingMsgs uint32 = 3
-)
-
-func TestEWMAThrottler(t *testing.T) {
+func TestEWMATrackerPrioritizes(t *testing.T) {
 	vdrs := validators.NewSet()
 	validator0 := validators.GenerateRandomValidator(1)
 	validator1 := validators.GenerateRandomValidator(1)
+	nonStaker := ids.NewShortID([20]byte{1})
 	vdrs.Add(validator0)
 	vdrs.Add(validator1)
 
-	maxMessages := uint32(16)
-	msgPortion := 0.25
 	cpuPortion := 0.25
 	period := time.Second
-	throttler := NewEWMAThrottler(vdrs, maxMessages, defaultMaxNonStakerPendingMsgs, msgPortion, cpuPortion, period, logging.NoLog{})
+	throttler := NewEWMATracker(vdrs, cpuPortion, period, logging.NoLog{})
 
 	throttler.UtilizeCPU(validator0.ID(), 25*time.Millisecond)
 	throttler.UtilizeCPU(validator1.ID(), 5*time.Second)
 
-	cpu0, throttle0 := throttler.GetUtilization(validator0.ID())
-	cpu1, throttle1 := throttler.GetUtilization(validator1.ID())
-
-	if throttle0 {
-		t.Fatalf("Should not throttle validator0 with no pending messages")
-	}
-	if throttle1 {
-		t.Fatalf("Should not throttle validator1 with no pending messages")
-	}
+	cpu0 := throttler.GetUtilization(validator0.ID())
+	cpu1 := throttler.GetUtilization(validator1.ID())
+	cpuNonStaker := throttler.GetUtilization(nonStaker)
 
 	if cpu1 <= cpu0 {
 		t.Fatalf("CPU utilization for validator1: %f should be greater than that of validator0: %f", cpu1, cpu0)
 	}
 
-	// Test that throttler prevents unknown validators from taking up half the message queue
-	for i := uint32(0); i < maxMessages; i++ {
-		throttler.AddMessage(ids.NewShortID([20]byte{byte(i)}))
-	}
-
-	_, throttle := throttler.GetUtilization(ids.NewShortID([20]byte{'s', 'y', 'b', 'i', 'l'}))
-	if !throttle {
-		t.Fatal("Throttler should have started throttling messages from unknown peers")
+	if cpuNonStaker < cpu1 {
+		t.Fatalf("CPU Utilization for non-staker: %f should be greater than or equal to the CPU Utilization for the highest spending staker: %f", cpuNonStaker, cpu1)
 	}
 }
 
-func TestThrottlerPrunesSpenders(t *testing.T) {
+func TestEWMATrackerPrunesSpenders(t *testing.T) {
+	vdrs := validators.NewSet()
+	staker0 := validators.GenerateRandomValidator(1)
+	staker1 := validators.GenerateRandomValidator(1)
+	nonStaker0 := ids.NewShortID([20]byte{1})
+	nonStaker1 := ids.NewShortID([20]byte{2})
+
+	vdrs.Add(staker0)
+	vdrs.Add(staker1)
+
+	cpuPortion := 0.25
+	period := time.Second
+	throttler := NewEWMATracker(vdrs, cpuPortion, period, logging.NoLog{})
+
+	throttler.UtilizeCPU(staker0.ID(), 1.0)
+	throttler.UtilizeCPU(nonStaker0, 1.0)
+
+	// 3 Cases:
+	// 		Stakers should not be pruned
+	// 		Non-stakers with non-zero cpuEWMA should not be pruned
+	// 		Non-stakers with cpuEWMA of 0 should be pruned
+
+	// After 64 intervals nonStaker0 should be removed because its cpuEWMA statistic should reach 0
+	// while nonStaker1 utilizes the CPU in every interval, so it should not be removed.
+	for i := 0; i < 64; i++ {
+		throttler.UtilizeCPU(nonStaker1, 1.0)
+		throttler.EndInterval()
+	}
+
+	// Ensure that the validators and the non-staker heard from every interval were not pruned
+	ewmat := throttler.(*ewmaCPUTracker)
+	if _, ok := ewmat.cpuSpenders[staker0.ID().Key()]; !ok {
+		t.Fatal("Staker was pruned from the set of spenders")
+	}
+	if _, ok := ewmat.cpuSpenders[staker1.ID().Key()]; !ok {
+		t.Fatal("Staker was pruned from the set of spenders")
+	}
+	if _, ok := ewmat.cpuSpenders[nonStaker0.Key()]; ok {
+		t.Fatal("Non-staker, not heard from in 64 periods, should have been pruned from the set of spenders")
+	}
+	if _, ok := ewmat.cpuSpenders[nonStaker1.Key()]; ok {
+		t.Fatal("Non-staker heard from in every period, was pruned from the set of spenders")
+	}
+}
+
+func TestMessageThrottlerPrunesSpenders(t *testing.T) {
 	vdrs := validators.NewSet()
 	staker0 := validators.GenerateRandomValidator(1)
 	staker1 := validators.GenerateRandomValidator(1)
@@ -69,44 +97,50 @@ func TestThrottlerPrunesSpenders(t *testing.T) {
 	vdrs.Add(staker1)
 
 	maxMessages := uint32(1024)
-	cpuPortion := 0.25
 	msgPortion := 0.25
-	period := time.Second
-	throttler := NewEWMAThrottler(vdrs, maxMessages, defaultMaxNonStakerPendingMsgs, msgPortion, cpuPortion, period, logging.NoLog{})
 
-	throttler.AddMessage(nonStaker2) // nonStaker2 should not be removed with a pending message
-	throttler.UtilizeCPU(nonStaker0, 1.0)
-	throttler.UtilizeCPU(nonStaker1, 1.0)
+	throttler := NewMessageThrottler(vdrs, maxMessages, DefaultMaxNonStakerPendingMsgs, msgPortion, logging.NoLog{})
+
+	// 4 Cases:
+	// 		Stakers should not be pruned
+	// 		Non-stakers with pending messages should not be pruned
+	// 		Non-stakers heard from recently should not be pruned
+	// 		Non-stakers not heard from in [defaultIntervalsUntilPruning] should be pruned
+
+	// Add pending messages for nonStaker1 and nonStaker2
+	throttler.Add(nonStaker2) // Will not be removed, so it should not be pruned
+	throttler.Add(nonStaker1)
+
+	throttler.EndInterval()
+	throttler.Remove(nonStaker1) // The pending message was removed, so nonStaker1 should be pruned
+	throttler.EndInterval()
 	intervalsUntilPruning := int(defaultIntervalsUntilPruning)
-	// Let two intervals pass with no activity to ensure that nonStaker1 can be pruned
-	throttler.EndInterval()
-	throttler.EndInterval()
-	throttler.UtilizeCPU(nonStaker0, 1.0)
 	// Let the required number of intervals elapse to allow nonStaker1 to be pruned
 	for i := 0; i < intervalsUntilPruning; i++ {
+		throttler.Add(nonStaker0) // nonStaker0 is heard from in every interval, so it should not be pruned
 		throttler.EndInterval()
+		throttler.Remove(nonStaker0)
 	}
 
-	// Ensure that the validators and the non-staker heard from in the past [intervalsUntilPruning] were not pruned
-	ewmat := throttler.(*ewmaThrottler)
-	if _, ok := ewmat.spenders[staker0.ID().Key()]; !ok {
+	msgThrottler := throttler.(*messageThrottler)
+	if _, ok := msgThrottler.msgSpenders[staker0.ID().Key()]; !ok {
 		t.Fatal("Staker was pruned from the set of spenders")
 	}
-	if _, ok := ewmat.spenders[staker1.ID().Key()]; !ok {
+	if _, ok := msgThrottler.msgSpenders[staker1.ID().Key()]; !ok {
 		t.Fatal("Staker was pruned from the set of spenders")
 	}
-	if _, ok := ewmat.spenders[nonStaker0.Key()]; !ok {
-		t.Fatal("Non-staker heard from recently was pruned from the set of spenders")
+	if _, ok := msgThrottler.msgSpenders[nonStaker0.Key()]; !ok {
+		t.Fatal("Non-staker heard from within [intervalsUntilPruning] was removed from the set of spenders")
 	}
-	if _, ok := ewmat.spenders[nonStaker1.Key()]; ok {
-		t.Fatal("Non-staker not heard from in a long time was not pruned from the set of spenders")
+	if _, ok := msgThrottler.msgSpenders[nonStaker1.Key()]; ok {
+		t.Fatal("Non-staker not heard from within [intervalsUntilPruning] was not removed from the set of spenders")
 	}
-	if _, ok := ewmat.spenders[nonStaker2.Key()]; !ok {
+	if _, ok := msgThrottler.msgSpenders[nonStaker2.Key()]; !ok {
 		t.Fatal("Non-staker with a pending message was pruned from the set of spenders")
 	}
 }
 
-func TestThrottleStaker(t *testing.T) {
+func TestMessageThrottling(t *testing.T) {
 	vdrs := validators.NewSet()
 	staker0 := validators.GenerateRandomValidator(1)
 	staker1 := validators.GenerateRandomValidator(1)
@@ -116,61 +150,68 @@ func TestThrottleStaker(t *testing.T) {
 	vdrs.Add(staker0)
 	vdrs.Add(staker1)
 
-	maxMessages := uint32(9)
+	maxMessages := uint32(8)
 	msgPortion := 0.25
-	cpuPortion := 0.25
-	period := time.Second
-	throttler := NewEWMAThrottler(vdrs, maxMessages, defaultMaxNonStakerPendingMsgs, msgPortion, cpuPortion, period, logging.NoLog{})
+	throttler := NewMessageThrottler(vdrs, maxMessages, DefaultMaxNonStakerPendingMsgs, msgPortion, logging.NoLog{})
 
 	// Message Allotment: 0.5 * 0.25 * 8 = 1
-	// Message Pool: 6 messages
-	// Max Messages: 1 + defaultMaxNonStakerPendingMsgs
+	// Message Pool: 8 * 0.75 = 6 messages
+	// Max Messages: 1 + DefaultMaxNonStakerPendingMsgs
 	// Validator should be throttled if it has exceeded its max messages
 	// or it has exceeded its message allotment and the shared message pool is empty.
 
 	// staker0 consumes its entire message allotment
 
 	// Ensure that it is allowed to consume its entire max messages before being throttled
-	for i := 0; i < int(defaultMaxNonStakerPendingMsgs)+1; i++ {
-		throttler.AddMessage(staker0.ID())
-		if _, throttle := throttler.GetUtilization(staker0.ID()); throttle {
+	for i := 0; i < int(DefaultMaxNonStakerPendingMsgs)+1; i++ {
+		throttler.Add(staker0.ID())
+		if throttler.Throttle(staker0.ID()) {
 			t.Fatal("Should not throttle message from staker until it has exceeded its own allotment")
 		}
 	}
 
-	throttler.AddMessage(staker0.ID())
-	if _, throttle := throttler.GetUtilization(staker0.ID()); !throttle {
-		t.Fatal("Should have throttled message after exceeding message")
+	// Ensure staker is throttled after exceeding its own max messages cap
+	throttler.Add(staker0.ID())
+	if !throttler.Throttle(staker0.ID()) {
+		t.Fatal("Should have throttled message after exceeding message cap")
 	}
 
-	// Remove messages to reduce staker0 to have its normal message allotment pending
-	for i := 0; i < int(defaultMaxNonStakerPendingMsgs); i++ {
-		throttler.RemoveMessage(staker0.ID())
+	// Remove messages to reduce staker0 to have its normal message allotment in pending
+	for i := 0; i < int(DefaultMaxNonStakerPendingMsgs)+1; i++ {
+		throttler.Remove(staker0.ID())
 	}
 
 	// Consume the entire message pool among two non-stakers
-	for i := 0; i < int(defaultMaxNonStakerPendingMsgs); i++ {
-		throttler.AddMessage(nonStaker0)
-		throttler.AddMessage(nonStaker1)
+	for i := 0; i < int(DefaultMaxNonStakerPendingMsgs); i++ {
+		throttler.Add(nonStaker0)
+		throttler.Add(nonStaker1)
 
 		// Neither should be throttled because they are only consuming until their own messsage cap
 		// and the shared pool has been emptied.
-		if _, throttle := throttler.GetUtilization(nonStaker0); throttle {
+		if throttler.Throttle(nonStaker0) {
 			t.Fatalf("Should not have throttled message from nonStaker0 after %d messages", i)
 		}
-		if _, throttle := throttler.GetUtilization(nonStaker1); throttle {
+		if throttler.Throttle(nonStaker1) {
 			t.Fatalf("Should not have throttled message from nonStaker1 after %d messages", i)
 		}
 	}
 
 	// An additional message from staker0 should now cause it to be throttled since the mesasage pool
 	// has been emptied.
-	if _, throttle := throttler.GetUtilization(staker0.ID()); throttle {
+	if throttler.Throttle(staker0.ID()) {
 		t.Fatal("Should not have throttled message from staker until it had exceeded its message allotment.")
 	}
-	throttler.AddMessage(staker0.ID())
-	if _, throttle := throttler.GetUtilization(staker0.ID()); !throttle {
+	throttler.Add(staker0.ID())
+	if !throttler.Throttle(staker0.ID()) {
 		t.Fatal("Should have throttled message from staker0 after it exceeded its message allotment because the message pool was empty.")
+	}
+
+	if !throttler.Throttle(nonStaker0) {
+		t.Fatal("Should have throttled message from nonStaker0 after the message pool was emptied")
+	}
+
+	if !throttler.Throttle(nonStaker1) {
+		t.Fatal("Should have throttled message from nonStaker1 after the message pool was emptied")
 	}
 }
 
@@ -181,11 +222,9 @@ func TestCalculatesEWMA(t *testing.T) {
 	vdrs.Add(validator0)
 	vdrs.Add(validator1)
 
-	maxMessages := uint32(16)
-	msgPortion := 0.25
 	stakerPortion := 0.25
 	period := time.Second
-	throttler := NewEWMAThrottler(vdrs, maxMessages, defaultMaxNonStakerPendingMsgs, msgPortion, stakerPortion, period, logging.NoLog{})
+	throttler := NewEWMATracker(vdrs, stakerPortion, period, logging.NoLog{})
 
 	// Spend X CPU time in consecutive intervals and ensure that the throttler correctly calculates EWMA
 	spends := []time.Duration{
@@ -206,7 +245,7 @@ func TestCalculatesEWMA(t *testing.T) {
 		throttler.EndInterval()
 	}
 
-	ewmat := throttler.(*ewmaThrottler)
+	ewmat := throttler.(*ewmaCPUTracker)
 	sp := ewmat.getSpender(validator0.ID())
 	if sp.cpuEWMA != ewma {
 		t.Fatalf("EWMA Throttler calculated EWMA incorrectly, expected: %s, but calculated: %s", ewma, sp.cpuEWMA)

@@ -9,6 +9,11 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+const (
+	DefaultMaxNonStakerPendingMsgs uint32  = 3
+	DefaultStakerPortion           float64 = 0.2
+)
+
 // Throttler provides an interface to register consumption
 // of resources and prioritize messages from nodes that have
 // used less CPU time.
@@ -18,4 +23,20 @@ type Throttler interface {
 	UtilizeCPU(ids.ShortID, time.Duration)
 	GetUtilization(ids.ShortID) (float64, bool) // Returns the CPU based priority and whether or not the peer has too many pending messages
 	EndInterval()                               // Notify throttler that the current period has ended
+}
+
+// CPUTracker tracks the consumption of CPU time
+type CPUTracker interface {
+	UtilizeCPU(ids.ShortID, time.Duration)
+	GetUtilization(ids.ShortID) float64
+	EndInterval()
+}
+
+// CountingThrottler tracks the usage of a discrete resource (ex. pending messages) by a peer
+// and determines whether or not a peer should be throttled.
+type CountingThrottler interface {
+	Add(ids.ShortID)
+	Remove(ids.ShortID)
+	Throttle(ids.ShortID) bool
+	EndInterval()
 }

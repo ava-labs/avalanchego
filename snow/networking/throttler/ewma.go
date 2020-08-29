@@ -15,17 +15,16 @@ import (
 )
 
 const (
-	defaultDecayFactor           float64 = 2
-	defaultIntervalsUntilPruning uint32  = 60
-	defaultMinimumCPUAllotment           = time.Nanosecond
+	defaultDecayFactor         float64 = 2
+	defaultMinimumCPUAllotment         = time.Nanosecond
 )
 
-type ewmaThrottler struct {
+type ewmaCPUTracker struct {
 	lock sync.Mutex
 	log  logging.Logger
 
 	// Track peers
-	spenders       map[[20]byte]*spender
+	cpuSpenders    map[[20]byte]*cpuSpender
 	cumulativeEWMA time.Duration
 	vdrs           validators.Set
 
@@ -33,41 +32,22 @@ type ewmaThrottler struct {
 	decayFactor    float64       // Factor used to discount the EWMA at every period
 	stakerCPU      time.Duration // Amount of CPU time reserved for stakers
 	nonReservedCPU time.Duration // Amount of CPU time that is not reserved for stakers
-
-	// Track pending messages
-	reservedStakerMessages uint32 // Number of messages reserved for stakers
-	nonReservedMsgs        uint32 // Number of non-reserved messages left to a shared message pool
-	pendingNonReservedMsgs uint32 // Number of pending messages taken from the shared message pool
-
-	// Threshold of messages taken from the pool before the throttler begins to enforce hard caps on individual peers' pending messages
-	enforceIndividualCapThreshold uint32
-	// Cap on number of pending messages allowed to a non-staker (not enforced until above [enforceIndividualCapThreshold] is exceeded)
-	maxNonStakerPendingMsgs uint32
-
-	// Statistics adjusted at every interval
-	currentPeriod uint32
 }
 
-// NewEWMAThrottler returns a Throttler that uses exponentially weighted moving
+// NewEWMATracker returns a CPUTracker that uses exponentially weighted moving
 // average to estimate CPU utilization.
 //
-// [maxMessages] is the maximum number of messages allotted to this chain
-// [stakerMsgPortion] is the portion of messages to reserve exclusively for stakers
-// [stakerCPUPortion] is the portion of CPU utilization to reserve for stakers
-// both staker portions should be in the range (0, 1]
+// [stakerCPUPortion] is the portion of CPU utilization to reserve for stakers (range (0, 1])
 // [period] is the interval of time to use for the calculation of EWMA
 //
-// Note: ewmaThrottler uses the period as the total amount of time per interval,
+// Note: ewmaCPUTracker uses the period as the total amount of time per interval,
 // which is not the limit since it tracks consumption using EWMA.
-func NewEWMAThrottler(
+func NewEWMATracker(
 	vdrs validators.Set,
-	maxMessages,
-	maxNonStakerPendingMsgs uint32,
-	stakerMsgPortion,
 	stakerCPUPortion float64,
 	period time.Duration,
 	log logging.Logger,
-) Throttler {
+) CPUTracker {
 	// Amount of CPU time reserved for processing messages from stakers
 	stakerCPU := time.Duration(float64(period) * stakerCPUPortion)
 	if stakerCPU < defaultMinimumCPUAllotment {
@@ -82,69 +62,30 @@ func NewEWMAThrottler(
 		nonReservedCPU = defaultMinimumCPUAllotment
 	}
 
-	// Number of messages reserved for Stakers vs. Non-Stakers
-	reservedStakerMessages := uint32(stakerMsgPortion * float64(maxMessages))
-	nonReservedMsgs := maxMessages - reservedStakerMessages
-
-	throttler := &ewmaThrottler{
-		spenders: make(map[[20]byte]*spender),
-		vdrs:     vdrs,
-		log:      log,
+	throttler := &ewmaCPUTracker{
+		cpuSpenders: make(map[[20]byte]*cpuSpender),
+		vdrs:        vdrs,
+		log:         log,
 
 		decayFactor: defaultDecayFactor,
 
 		stakerCPU:      stakerCPU,
 		nonReservedCPU: nonReservedCPU,
-
-		reservedStakerMessages:        reservedStakerMessages,
-		nonReservedMsgs:               nonReservedMsgs,
-		enforceIndividualCapThreshold: nonReservedMsgs / 2, // If the pool is half empty, begin to enforce the max message caps
-		maxNonStakerPendingMsgs:       maxNonStakerPendingMsgs,
 	}
 
-	// Add validators to spenders, so that they will be calculated correctly in
+	// Add validators to cpuSpenders, so that they will be calculated correctly in
 	// EndInterval
 	for _, vdr := range vdrs.List() {
-		throttler.spenders[vdr.ID().Key()] = &spender{}
+		throttler.cpuSpenders[vdr.ID().Key()] = &cpuSpender{}
 	}
 
 	// Call EndInterval to calculate initial period statistics and initial
-	// spender values for validators
+	// cpuSpender values for validators
 	throttler.EndInterval()
 	return throttler
 }
 
-func (et *ewmaThrottler) AddMessage(validatorID ids.ShortID) {
-	et.lock.Lock()
-	defer et.lock.Unlock()
-
-	sp := et.getSpender(validatorID)
-	sp.pendingMessages++
-
-	// If the spender has exceeded its message allotment, then the additional
-	// message is taken from the pool
-	if sp.pendingMessages > sp.msgAllotment {
-		sp.pendingPoolMessages++
-		et.pendingNonReservedMsgs++
-	}
-}
-
-func (et *ewmaThrottler) RemoveMessage(validatorID ids.ShortID) {
-	et.lock.Lock()
-	defer et.lock.Unlock()
-
-	sp := et.getSpender(validatorID)
-	sp.pendingMessages--
-
-	// If the spender has pending messages taken from the pool,
-	// they are the first messages to be removed.
-	if sp.pendingPoolMessages > 0 {
-		sp.pendingPoolMessages--
-		et.pendingNonReservedMsgs--
-	}
-}
-
-func (et *ewmaThrottler) UtilizeCPU(
+func (et *ewmaCPUTracker) UtilizeCPU(
 	validatorID ids.ShortID,
 	consumption time.Duration,
 ) {
@@ -153,140 +94,86 @@ func (et *ewmaThrottler) UtilizeCPU(
 
 	sp := et.getSpender(validatorID)
 	sp.cpuEWMA += consumption
-	sp.lastSpend = et.currentPeriod
 	et.cumulativeEWMA += consumption
 }
 
-// Returns CPU GetUtilization metric as percentage of expected utilization and
-// boolean specifying whether or not the validator has exceeded its message
-// allotment.
-func (et *ewmaThrottler) GetUtilization(
-	validatorID ids.ShortID,
-) (float64, bool) {
+// GetUtilization returns a percentage of expected CPU utilization of the peer
+// corresponding to [validatorID]
+func (et *ewmaCPUTracker) GetUtilization(validatorID ids.ShortID) float64 {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
 	sharedUtilization := float64(et.cumulativeEWMA) / float64(et.nonReservedCPU)
 	sp := et.getSpender(validatorID)
 	if !sp.staking {
-		exceedsMessageAllotment := et.pendingNonReservedMsgs > et.nonReservedMsgs || // the shared message pool has been taken
-			(sp.pendingMessages > sp.maxMessages && // Spender has exceeded its individual cap
-				et.pendingNonReservedMsgs > et.enforceIndividualCapThreshold) // And the threshold before enforcing the cap has been reached
-
-		if exceedsMessageAllotment {
-			et.log.Verbo("Throttling non-staker %s: %s. Pending pool messages: %d/%d.",
-				validatorID,
-				sp,
-				et.pendingNonReservedMsgs,
-				et.nonReservedMsgs)
-		}
-		return sharedUtilization, exceedsMessageAllotment
+		return sharedUtilization
 	}
-
-	// Staker should only be throttled if it has exceeded its message allotment
-	// and there are either no messages left in the shared pool or it has
-	// exceeded its own maximum message allocation.
-	exceedsMessageAllotment := sp.pendingMessages > sp.msgAllotment && // Throttle if the staker has exceeded its allotment
-		(et.pendingNonReservedMsgs > et.nonReservedMsgs || // And either the shared message pool is empty
-			(et.pendingNonReservedMsgs > et.enforceIndividualCapThreshold && // Or the threshold before enforcing the cap has been reached
-				sp.pendingMessages > sp.maxMessages)) // and this staker has exceeded its individual cap
-
-	if exceedsMessageAllotment {
-		et.log.Debug("Throttling staker %s: %s. Pending pool messages: %d/%d.",
-			validatorID,
-			sp,
-			et.pendingNonReservedMsgs,
-			et.nonReservedMsgs)
-	}
-	return math.Min(float64(sp.cpuEWMA)/float64(sp.expectedCPU), sharedUtilization), exceedsMessageAllotment
+	return math.Min(float64(sp.cpuEWMA)/float64(sp.expectedCPU), sharedUtilization)
 }
 
-func (et *ewmaThrottler) EndInterval() {
+// EndInterval registers the end of a given CPU interval by discounting
+// all cpuSpenders' cpuEWMA and removing outstanding spenders that have sufficiently
+// low cpuEWMA stats
+func (et *ewmaCPUTracker) EndInterval() {
 	et.lock.Lock()
 	defer et.lock.Unlock()
-
-	et.currentPeriod++
 
 	et.cumulativeEWMA = time.Duration(float64(et.cumulativeEWMA) / et.decayFactor)
 	stakingWeight := et.vdrs.Weight()
 
-	for key, spender := range et.spenders {
-		spender.cpuEWMA = time.Duration(float64(spender.cpuEWMA) / et.decayFactor)
+	removed := 0
+	for key, cpuSpender := range et.cpuSpenders {
+		cpuSpender.cpuEWMA = time.Duration(float64(cpuSpender.cpuEWMA) / et.decayFactor)
 		if vdr, exists := et.vdrs.Get(ids.NewShortID(key)); exists {
 			stakerPortion := float64(vdr.Weight()) / float64(stakingWeight)
 
 			// Calculate staker allotment here
-			spender.staking = true
-			spender.msgAllotment = uint32(float64(et.reservedStakerMessages) * stakerPortion)
-			spender.maxMessages = spender.msgAllotment + et.maxNonStakerPendingMsgs
-			spender.expectedCPU = time.Duration(float64(et.stakerCPU)*stakerPortion) + defaultMinimumCPUAllotment
+			cpuSpender.staking = true
+			cpuSpender.expectedCPU = time.Duration(float64(et.stakerCPU)*stakerPortion) + defaultMinimumCPUAllotment
 			continue
 		}
 
-		if spender.lastSpend+defaultIntervalsUntilPruning < et.currentPeriod && spender.pendingMessages == 0 {
-			et.log.Debug("Removing validator from throttler after not hearing from it for %d periods",
-				et.currentPeriod-spender.lastSpend)
-			delete(et.spenders, key)
+		if cpuSpender.cpuEWMA == 0 {
+			removed++
+			delete(et.cpuSpenders, key)
 		}
 
-		// If the validator is not a staker and was not deleted, set its spender
+		// If the validator is not a staker and was not deleted, set its cpuSpender
 		// attributes
-		spender.staking = false
-		spender.msgAllotment = 0
-		spender.maxMessages = et.maxNonStakerPendingMsgs
-		spender.expectedCPU = defaultMinimumCPUAllotment
+		cpuSpender.staking = false
+		cpuSpender.expectedCPU = defaultMinimumCPUAllotment
 	}
+	et.log.Debug("Removed %d validators from CPU Tracker.", removed)
 }
 
-// getSpender returns the [spender] corresponding to [validatorID]
-func (et *ewmaThrottler) getSpender(validatorID ids.ShortID) *spender {
+// getSpender returns the [cpuSpender] corresponding to [validatorID]
+func (et *ewmaCPUTracker) getSpender(validatorID ids.ShortID) *cpuSpender {
 	validatorKey := validatorID.Key()
-	if sp, exists := et.spenders[validatorKey]; exists {
+	if sp, exists := et.cpuSpenders[validatorKey]; exists {
 		return sp
 	}
 
-	// If this validator did not exist in spenders, create it and return
-	sp := &spender{
-		maxMessages: et.maxNonStakerPendingMsgs,
+	// If this validator did not exist in cpuSpenders, create it and return
+	sp := &cpuSpender{
 		expectedCPU: defaultMinimumCPUAllotment,
 	}
-	et.spenders[validatorKey] = sp
+	et.cpuSpenders[validatorKey] = sp
 	return sp
 }
 
-type spender struct {
-	// Last period that this spender utilized the CPU
-	lastSpend uint32
-
-	// Number of pending messages this spender has taken from the pool
-	pendingPoolMessages uint32
-
-	// Number of messages this spender currently has pending
-	pendingMessages uint32
-
-	// Number of messages allocated to this spender as a staker
-	msgAllotment uint32
-
-	// Max number of messages this spender can use even if the shared pool is
-	// non-empty
-	maxMessages uint32
-
-	// EWMA of this spender's CPU utilization
+type cpuSpender struct {
+	// EWMA of this cpuSpender's CPU utilization
 	cpuEWMA time.Duration
 
 	// The expected CPU utilization of this peer
 	expectedCPU time.Duration
 
-	// Flag to indicate if this spender is a staker
+	// Flag to indicate if this cpuSpender is a staker
 	staking bool
 }
 
-func (sp *spender) String() string {
-	return fmt.Sprintf("Spender(Messages: (%d+%d)/(%d+%d), CPU: %s/%s)",
-		sp.pendingPoolMessages,
-		sp.pendingMessages-sp.pendingPoolMessages,
-		sp.msgAllotment,
-		sp.maxMessages-sp.msgAllotment,
+func (sp *cpuSpender) String() string {
+	return fmt.Sprintf("CPUTracker(CPU: %s/%s)",
 		sp.cpuEWMA,
 		sp.expectedCPU,
 	)

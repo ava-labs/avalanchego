@@ -17,11 +17,6 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
-const (
-	DefaultStakerPortion           float64 = 0.2
-	DefaultMaxNonStakerPendingMsgs uint32  = 3
-)
-
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
 //              impact other node's queries.
 
