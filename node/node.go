@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -206,7 +205,7 @@ func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 	// Shouldn't error unless the set previously had an error, which should
 	// never happen as described above
-	_ = i.vdrs.RemoveWeight(vdrID, math.MaxUint64)
+	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
 	return false
 }
 
