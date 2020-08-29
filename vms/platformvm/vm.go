@@ -749,17 +749,15 @@ func (vm *VM) nextStakerChangeTime(db database.Database) (time.Time, error) {
 
 	earliest := maxTime
 	for _, subnetID := range subnetIDs.List() {
-		t, err := vm.nextStakerStart(db, subnetID)
-		if err == nil {
-			if staker, ok := t.UnsignedTx.(TimedTx); ok {
+		if tx, err := vm.nextStakerStart(db, subnetID); err == nil {
+			if staker, ok := tx.UnsignedTx.(TimedTx); ok {
 				if startTime := staker.StartTime(); startTime.Before(earliest) && startTime.After(timestamp) {
 					earliest = startTime
 				}
 			}
 		}
-		t, err = vm.nextStakerStop(db, subnetID)
-		if err == nil {
-			if staker, ok := t.UnsignedTx.(TimedTx); ok {
+		if tx, err := vm.nextStakerStop(db, subnetID); err == nil {
+			if staker, ok := tx.UnsignedTx.(TimedTx); ok {
 				if endTime := staker.EndTime(); endTime.Before(earliest) && endTime.After(timestamp) {
 					earliest = endTime
 				}
@@ -864,7 +862,7 @@ func (vm *VM) updateVdrMgr() error {
 	for _, subnetID := range subnetIDs.List() {
 		vdrs, initialized := vm.vdrMgr.GetValidators(subnetID)
 		if !initialized {
-			vdrs = validators.NewBestSet(5)
+			vdrs = validators.NewSet()
 		}
 
 		prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
