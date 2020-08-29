@@ -8,8 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"math"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/formatting"
 	safemath "github.com/ava-labs/gecko/utils/math"
@@ -157,40 +155,31 @@ func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
 		return nil // This validator would never be sampled anyway
 	}
 
-	vdrIDKey := vdrID.Key()
-
-	i, ok := s.vdrMap[vdrIDKey]
-	if ok { // Validator already exists
-		vdr := s.vdrSlice[i]
-		newWeight, err := safemath.Add64(s.vdrWeights[i], weight)
-		if err != nil {
-			newWeight = math.MaxUint64
-		}
-		s.vdrWeights[i] = newWeight
-		s.totalWeight, err = safemath.Add64(s.totalWeight, weight)
-		if err != nil {
-			newWeight = 0
-		}
-		vdr.addWeight(weight)
-		s.vdrSlice[i] = vdr
-		return s.sampler.Initialize(s.vdrWeights)
-	}
-
-	vdr := &validator{
-		id:     vdrID,
-		weight: weight,
-	}
-	i = len(s.vdrSlice)
-	s.vdrSlice = append(s.vdrSlice, vdr)
-	s.vdrWeights = append(s.vdrWeights, weight)
-	s.vdrMap[vdrIDKey] = i
 	newTotalWeight, err := safemath.Add64(s.totalWeight, weight)
 	if err != nil {
-		return err
+		return nil
 	}
 	s.totalWeight = newTotalWeight
-	return s.sampler.Initialize(s.vdrWeights)
 
+	vdrIDKey := vdrID.Key()
+
+	var vdr *validator
+	i, ok := s.vdrMap[vdrIDKey]
+	if !ok {
+		vdr = &validator{
+			id: vdrID,
+		}
+		i = len(s.vdrSlice)
+		s.vdrSlice = append(s.vdrSlice, vdr)
+		s.vdrWeights = append(s.vdrWeights, 0)
+		s.vdrMap[vdrIDKey] = i
+	} else {
+		vdr = s.vdrSlice[i]
+	}
+
+	s.vdrWeights[i] += weight
+	vdr.addWeight(weight)
+	return s.sampler.Initialize(s.vdrWeights)
 }
 
 // GetWeight implements the Set interface.
@@ -202,11 +191,10 @@ func (s *set) GetWeight(vdrID ids.ShortID) (uint64, bool) {
 }
 
 func (s *set) getWeight(vdrID ids.ShortID) (uint64, bool) {
-	index, ok := s.vdrMap[vdrID.Key()]
-	if !ok {
-		return 0, false
+	if index, ok := s.vdrMap[vdrID.Key()]; ok {
+		return s.vdrWeights[index], true
 	}
-	return s.vdrWeights[index], true
+	return 0, false
 }
 
 // RemoveWeight implements the Set interface.
@@ -222,25 +210,24 @@ func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
 		return nil
 	}
 
-	vdrIDKey := vdrID.Key()
-	i, ok := s.vdrMap[vdrIDKey]
+	i, ok := s.vdrMap[vdrID.Key()]
 	if !ok {
 		return nil
-
 	}
+
 	// Validator exists
 	vdr := s.vdrSlice[i]
-	newWeight, err := safemath.Sub64(s.vdrWeights[i], weight)
-	if err != nil {
-		newWeight = 0
-	}
-	s.vdrWeights[i] = newWeight
-	s.totalWeight, err = safemath.Sub64(s.totalWeight, weight)
-	if err != nil {
-		newWeight = 0
-	}
+
+	weight = safemath.Min64(s.vdrWeights[i], weight)
+	s.vdrWeights[i] -= weight
+	s.totalWeight -= weight
 	vdr.removeWeight(weight)
-	s.vdrSlice[i] = vdr
+
+	if vdr.Weight() == 0 {
+		if err := s.remove(vdrID); err != nil {
+			return err
+		}
+	}
 	return s.sampler.Initialize(s.vdrWeights)
 }
 

@@ -18,7 +18,7 @@ type Manager interface {
 	AddWeight(ids.ID, ids.ShortID, uint64) error
 
 	// RemoveWeight removes weight from a given validator on a given subnet
-	RemoveWeight(ids.ID, ids.ShortID, uint64)
+	RemoveWeight(ids.ID, ids.ShortID, uint64) error
 
 	// GetValidators returns the validator set for the given subnet
 	// Returns false if the subnet doesn't exist
@@ -55,26 +55,21 @@ func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) e
 
 	vdrs, ok := m.subnetToVdrs[subnetIDKey]
 	if !ok {
-		vdrs = NewBestSet(5)
-		if err := vdrs.AddWeight(vdrID, weight); err != nil {
-			return err
-		}
-	} else {
-		vdrs.AddWeight(vdrID, weight)
+		vdrs = NewSet()
+		m.subnetToVdrs[subnetIDKey] = vdrs
 	}
-	m.subnetToVdrs[subnetIDKey] = vdrs
-	return nil
+	return vdrs.AddWeight(vdrID, weight)
 }
 
 // RemoveValidatorSet implements the Manager interface.
-func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) {
+func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	vdrs, ok := m.subnetToVdrs[subnetID.Key()]
-	if ok {
-		vdrs.RemoveWeight(vdrID, weight)
+	if vdrs, ok := m.subnetToVdrs[subnetID.Key()]; ok {
+		return vdrs.RemoveWeight(vdrID, weight)
 	}
+	return nil
 }
 
 // GetValidatorSet implements the Manager interface.
