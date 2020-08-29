@@ -247,14 +247,6 @@ func (s *set) get(vdrID ids.ShortID) (Validator, bool) {
 	return s.vdrSlice[index], true
 }
 
-// Remove implements the Set interface.
-func (s *set) Remove(vdrID ids.ShortID) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.remove(vdrID)
-}
-
 func (s *set) remove(vdrID ids.ShortID) error {
 	// Get the element to remove
 	iKey := vdrID.Key()
