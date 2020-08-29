@@ -129,7 +129,10 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 
 	// Ensure that the period this delegator delegates is a subset of the time
 	// the validator validates.
-	vdr, isValidator := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
 	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 		return nil, nil, nil, nil, permError{errDSValidatorSubset}
 	}

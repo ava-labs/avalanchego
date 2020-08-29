@@ -337,7 +337,7 @@ func (vm *VM) semanticVerifySpend(
 		utxoID := input.UTXOID.InputID()
 		utxo, err := vm.getUTXO(db, utxoID)
 		if err != nil {
-			return tempError{err}
+			return tempError{fmt.Errorf("failed to read consumed UTXO %s due to: %w", utxoID, err)}
 		}
 		utxos[index] = utxo
 	}
@@ -536,6 +536,7 @@ func (vm *VM) consumeInputs(
 		if err := vm.removeUTXO(db, utxoID); err != nil {
 			return tempError{err}
 		}
+		vm.Ctx.Log.Error("Consuming UTXOID %s", utxoID)
 	}
 	return nil
 }

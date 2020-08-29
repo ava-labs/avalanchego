@@ -795,9 +795,12 @@ func (vm *VM) updateValidators(db database.Database) error {
 		for iter.Next() { // Iterates in order of increasing start time
 			txBytes := iter.Value()
 			if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
-				break // TODO what to do here?
-				//return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+				return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 			}
+			if err := tx.Sign(vm.codec, nil); err != nil {
+				return err
+			}
+
 			switch staker := tx.UnsignedTx.(type) {
 			case *UnsignedAddDelegatorTx:
 				if !subnetID.Equals(constants.PrimaryNetworkID) {

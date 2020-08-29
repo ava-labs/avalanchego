@@ -103,7 +103,10 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 
 	// Ensure that the period this validator validates the specified subnet is a
 	// subnet of the time they validate the primary network.
-	vdr, isValidator := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
 	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 		return nil, nil, nil, nil,
 			permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating primary network [%v, %v]",
@@ -112,7 +115,10 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	}
 
 	// Ensure the proposed validator is not already a validator of the specified subnet
-	vdr, isValidator = vm.isValidator(db, tx.Validator.Subnet, tx.Validator.NodeID)
+	vdr, isValidator, err = vm.isValidator(db, tx.Validator.Subnet, tx.Validator.NodeID)
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
 	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
 		return nil, nil, nil, nil,
 			permError{fmt.Errorf("already validating subnet between [%v, %v]",
@@ -123,9 +129,9 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	baseTxCreds := stx.Creds[:baseTxCredsLen]
 	subnetCred := stx.Creds[baseTxCredsLen]
 
-	subnet, err := vm.getSubnet(db, tx.Validator.Subnet)
+	subnet, timedErr := vm.getSubnet(db, tx.Validator.Subnet)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, timedErr
 	}
 	unsignedSubnet := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
 	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {

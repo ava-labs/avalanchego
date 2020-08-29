@@ -150,7 +150,10 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		}
 	case *UnsignedAddDelegatorTx:
 		// We're removing a delegator
-		vdrTx, ok := vm.isValidator(db, constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
+		vdrTx, ok, err := vm.isValidator(db, constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
 		if !ok {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf("couldn't find validator %s: %w", uStakerTx.Validator.NodeID, err)}
