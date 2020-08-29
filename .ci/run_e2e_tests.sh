@@ -6,18 +6,6 @@ GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 
 DOCKER_REPO="avaplatform"
 
-echo "$DOCKER_USERNAME"
-echo "${#DOCKER_USERNAME}"
-
-echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-
-TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:everest-dev"
-BYZANTINE_IMAGE="$DOCKER_REPO/gecko-byzantine:everest-dev"
-
-docker pull "$TESTING_CONTROLLER_IMAGE"
-docker pull "${BYZANTINE_IMAGE}"
-
-
 E2E_TESTING_REMOTE="https://github.com/ava-labs/avalanche-testing.git"
 E2E_TAG="v0.8.4-dev"
 
@@ -30,9 +18,18 @@ git checkout "tags/$E2E_TAG" -b "$E2E_TAG"
 go mod edit -replace github.com/ava-labs/gecko="$GECKO_HOME"
 bash "./scripts/rebuild_initializer_binary.sh"
 
-# If Docker Credentials are not present (ex. PR from an untrusted fork) run only the non-byzantine tests
+
+TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:everest-dev"
+BYZANTINE_IMAGE="$DOCKER_REPO/gecko-byzantine:everest-dev"
+
+docker pull "$TESTING_CONTROLLER_IMAGE"
+
+# If Docker Credentials are not available skip the Byzantine Tests
 if [[ ${#DOCKER_USERNAME} == 0 ]]; then
+    echo "Skipping Byzantine Tests because Docker Credentials were not present."
     ./build/avalanche-testing --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${TESTING_CONTROLLER_IMAGE}"
-else 
+else
+    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
+    docker pull "${BYZANTINE_IMAGE}"
     ./build/avalanche-testing --gecko-image-name="${GECKO_IMAGE}" --test-controller-image-name="${TESTING_CONTROLLER_IMAGE}" --byzantine-image-name="${BYZANTINE_IMAGE}"
 fi
