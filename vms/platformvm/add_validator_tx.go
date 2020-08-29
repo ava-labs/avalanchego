@@ -122,13 +122,11 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 ) {
 	// Verify the tx is well-formed
 	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
-		vm.Ctx.Log.Error("Verify: %s", err)
 		return nil, nil, nil, nil, permError{err}
 	}
 
 	// Ensure the proposed validator starts after the current time
 	if currentTime, err := vm.getTimestamp(db); err != nil {
-		vm.Ctx.Log.Error("Timestamp: %s", err)
 		return nil, nil, nil, nil, tempError{err}
 	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
@@ -138,7 +136,6 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 
 	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
-		vm.Ctx.Log.Error("isValidator: %s", err)
 		return nil, nil, nil, nil, tempError{err}
 	}
 	if isValidator && tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
@@ -152,7 +149,6 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 
 	// Verify the flowcheck
 	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
-		vm.Ctx.Log.Error("semanticVerify: %s", err)
 		return nil, nil, nil, nil, err
 	}
 
@@ -162,30 +158,25 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	onCommitDB := versiondb.New(db)
 	// Consume the UTXOS
 	if err := vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
-		vm.Ctx.Log.Error("consumeInputs: %s", err)
 		return nil, nil, nil, nil, tempError{err}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
-		vm.Ctx.Log.Error("produceOutputs: %s", err)
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// Add validator to set of pending validators
 	if err := vm.addStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
-		vm.Ctx.Log.Error("addStaker: %s", err)
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	onAbortDB := versiondb.New(db)
 	// Consume the UTXOS
 	if err := vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
-		vm.Ctx.Log.Error("consumeInputs: %s", err)
 		return nil, nil, nil, nil, tempError{err}
 	}
 	// Produce the UTXOS
 	if err := vm.produceOutputs(onAbortDB, txID, outs); err != nil {
-		vm.Ctx.Log.Error("produceOutputs: %s", err)
 		return nil, nil, nil, nil, tempError{err}
 	}
 
