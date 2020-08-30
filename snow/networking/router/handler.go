@@ -8,18 +8,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/constants"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
 const (
+	// DefaultStakerPortion defines the default percentage of resources to
+	// allocate to stakers.
 	DefaultStakerPortion float64 = 0.2
 )
 
