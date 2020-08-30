@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/gecko/staking"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/gecko/utils/fdlimit"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/sampler"
@@ -239,6 +240,10 @@ func init() {
 	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
+	// File Descriptors
+	var fdLimit uint64
+	fs.Uint64Var(&fdLimit, "fd-limit", fdlimit.DefaultFdLimit, "Attempts to raise the process file descriptor limit to at least this value.")
+
 	ferr := fs.Parse(os.Args[1:])
 
 	if *version { // If --version used, print version and exit
@@ -443,5 +448,11 @@ func init() {
 	// IPCs
 	if *ipcsChainIDs != "" {
 		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
+	}
+
+	// File Descriptors
+	if err := fdlimit.RaiseLimit(fdLimit); err != nil {
+		errs.Add(err)
+		return
 	}
 }
