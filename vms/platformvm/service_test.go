@@ -40,7 +40,7 @@ var (
 )
 
 func defaultService(t *testing.T) *Service {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 	ks := keystore.CreateTestKeystore()
@@ -72,9 +72,9 @@ func defaultAddress(t *testing.T, service *Service) {
 	}
 }
 
-func TestAddDefaultSubnetValidator(t *testing.T) {
+func TestAddValidator(t *testing.T) {
 	expectedJSONString := `{"startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000","username":"","password":""}`
-	args := AddDefaultSubnetValidatorArgs{}
+	args := AddValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
 		t.Fatal(err)
@@ -235,7 +235,7 @@ func TestGetTx(t *testing.T) {
 		test{
 			"proposal block",
 			func() (*Tx, error) {
-				return service.vm.newAddDefaultSubnetValidatorTx( // Test GetTx works for proposal blocks
+				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.minStake,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
 					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),

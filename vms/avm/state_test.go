@@ -17,7 +17,7 @@ import (
 
 // Test function IDs when argument start is empty
 func TestStateIDsNoStart(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -56,6 +56,9 @@ func TestStateIDsNoStart(t *testing.T) {
 	}
 
 	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(result) != len(expected) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
@@ -149,7 +152,7 @@ func TestStateIDsNoStart(t *testing.T) {
 }
 
 func TestStateIDsWithStart(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -195,7 +198,7 @@ func TestStateIDsWithStart(t *testing.T) {
 }
 
 func TestStateStatuses(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -242,7 +245,7 @@ func TestStateStatuses(t *testing.T) {
 }
 
 func TestStateUTXOs(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -318,7 +321,7 @@ func TestStateUTXOs(t *testing.T) {
 }
 
 func TestStateTXs(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()

@@ -38,101 +38,92 @@ func TestSetSet(t *testing.T) {
 }
 
 func TestSamplerSample(t *testing.T) {
-	vdr0 := GenerateRandomValidator(1)
-	vdr1 := GenerateRandomValidator(math.MaxInt64 - 1)
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
 
 	s := NewSet()
-	err := s.Add(vdr0)
+	err := s.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
 	sampled, err := s.Sample(1)
 	assert.NoError(t, err)
 	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr0.ID(), sampled[0].ID(), "should have sampled vdr0")
+	assert.Equal(t, vdr0, sampled[0].ID(), "should have sampled vdr0")
 
 	_, err = s.Sample(2)
 	assert.Error(t, err, "should have errored during sampling")
 
-	err = s.Add(vdr1)
+	err = s.AddWeight(vdr1, math.MaxInt64-1)
 	assert.NoError(t, err)
 
 	sampled, err = s.Sample(1)
 	assert.NoError(t, err)
 	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr1.ID(), sampled[0].ID(), "should have sampled vdr1")
+	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
 
 	sampled, err = s.Sample(2)
 	assert.NoError(t, err)
 	assert.Len(t, sampled, 2, "should have sampled two validators")
-	assert.Equal(t, vdr1.ID(), sampled[0].ID(), "should have sampled vdr1")
-	assert.Equal(t, vdr1.ID(), sampled[1].ID(), "should have sampled vdr1")
+	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
+	assert.Equal(t, vdr1, sampled[1].ID(), "should have sampled vdr1")
 
 	sampled, err = s.Sample(3)
 	assert.NoError(t, err)
 	assert.Len(t, sampled, 3, "should have sampled three validators")
-	assert.Equal(t, vdr1.ID(), sampled[0].ID(), "should have sampled vdr1")
-	assert.Equal(t, vdr1.ID(), sampled[1].ID(), "should have sampled vdr1")
-	assert.Equal(t, vdr1.ID(), sampled[2].ID(), "should have sampled vdr1")
+	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
+	assert.Equal(t, vdr1, sampled[1].ID(), "should have sampled vdr1")
+	assert.Equal(t, vdr1, sampled[2].ID(), "should have sampled vdr1")
 }
 
 func TestSamplerDuplicate(t *testing.T) {
-	vdr0 := GenerateRandomValidator(1)
-	vdr1_0 := GenerateRandomValidator(math.MaxInt64 - 1)
-	vdr1_1 := NewValidator(vdr1_0.ID(), 0)
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
 
 	s := NewSet()
-	err := s.Add(vdr0)
+	err := s.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
-	err = s.Add(vdr1_0)
+	err = s.AddWeight(vdr1, 1)
+	assert.NoError(t, err)
+
+	err = s.AddWeight(vdr1, math.MaxInt64-2)
 	assert.NoError(t, err)
 
 	sampled, err := s.Sample(1)
 	assert.NoError(t, err)
 	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr1_0.ID(), sampled[0].ID(), "should have sampled vdr1")
-
-	err = s.Add(vdr1_1)
-	assert.NoError(t, err)
-
-	sampled, err = s.Sample(1)
-	assert.NoError(t, err)
-	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr0.ID(), sampled[0].ID(), "should have sampled vdr0")
+	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
 }
 
 func TestSamplerContains(t *testing.T) {
-	vdr := GenerateRandomValidator(1)
+	vdr := ids.GenerateTestShortID()
 
 	s := NewSet()
-	err := s.Add(vdr)
+	err := s.AddWeight(vdr, 1)
 	assert.NoError(t, err)
 
-	contains := s.Contains(vdr.ID())
+	contains := s.Contains(vdr)
 	assert.True(t, contains, "should have contained validator")
 
-	err = s.Remove(vdr.ID())
+	err = s.RemoveWeight(vdr, 1)
 	assert.NoError(t, err)
 
-	contains = s.Contains(vdr.ID())
+	contains = s.Contains(vdr)
 	assert.False(t, contains, "shouldn't have contained validator")
 }
 
 func TestSamplerString(t *testing.T) {
-	vdr0 := NewValidator(ids.ShortEmpty, 1)
-	vdr1 := NewValidator(
-		ids.NewShortID([20]byte{
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-		}),
-		math.MaxInt64-1,
-	)
+	vdr0 := ids.ShortEmpty
+	vdr1 := ids.NewShortID([20]byte{
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	})
 
 	s := NewSet()
-	err := s.Add(vdr0)
+	err := s.AddWeight(vdr0, 1)
 	assert.NoError(t, err)
 
-	err = s.Add(vdr1)
+	err = s.AddWeight(vdr1, math.MaxInt64-1)
 	assert.NoError(t, err)
 
 	expected := "Validator Set: (Size = 2)\n" +
@@ -143,16 +134,16 @@ func TestSamplerString(t *testing.T) {
 }
 
 func TestSetWeight(t *testing.T) {
+	vdr0 := ids.NewShortID([20]byte{1})
 	weight0 := uint64(93)
-	vdr0 := NewValidator(ids.NewShortID([20]byte{1}), weight0)
+	vdr1 := ids.NewShortID([20]byte{2})
 	weight1 := uint64(123)
-	vdr1 := NewValidator(ids.NewShortID([20]byte{2}), weight1)
 
 	s := NewSet()
-	err := s.Add(vdr0)
+	err := s.AddWeight(vdr0, weight0)
 	assert.NoError(t, err)
 
-	err = s.Add(vdr1)
+	err = s.AddWeight(vdr1, weight1)
 	assert.NoError(t, err)
 
 	setWeight := s.Weight()

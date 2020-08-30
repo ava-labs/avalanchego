@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/networking/router"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -67,8 +68,9 @@ func TestTimeout(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -123,8 +125,9 @@ func TestReliableMessages(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -150,7 +153,7 @@ func TestReliableMessages(t *testing.T) {
 	}()
 
 	for _, await := range awaiting {
-		_, _ = <-await
+		<-await
 	}
 }
 
@@ -189,8 +192,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -216,6 +220,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}()
 
 	for _, await := range awaiting {
-		_, _ = <-await
+		<-await
 	}
 }

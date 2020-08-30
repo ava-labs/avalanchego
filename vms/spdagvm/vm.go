@@ -36,7 +36,6 @@ const (
 )
 
 var (
-	errNoKeys          = errors.New("no private keys were provided")
 	errUnknownUTXOType = errors.New("utxo has unknown output type")
 	errAsset           = errors.New("assetID must be blank")
 	errAmountOverflow  = errors.New("the amount of this transaction plus the transaction fee overflows")

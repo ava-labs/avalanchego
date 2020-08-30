@@ -89,7 +89,7 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 
 	ticker := time.NewTicker(sr.closeTimeout)
 	select {
-	case _, _ = <-chain.closed:
+	case <-chain.closed:
 	case <-ticker.C:
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
@@ -355,7 +355,7 @@ func (sr *ChainRouter) Shutdown() {
 	timedout := false
 	for _, chain := range prevChains {
 		select {
-		case _, _ = <-chain.closed:
+		case <-chain.closed:
 		case <-ticker.C:
 			timedout = true
 		}

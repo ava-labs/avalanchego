@@ -18,8 +18,6 @@ import (
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/version"
-
-	cjson "github.com/ava-labs/gecko/utils/json"
 )
 
 // Info is the API service for unprivileged info on a node
@@ -36,7 +34,7 @@ type Info struct {
 // NewService returns a new admin API service
 func NewService(log logging.Logger, version version.Version, nodeID ids.ShortID, networkID uint32, chainManager chains.Manager, peers network.Network, txFee uint64) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
-	codec := cjson.NewCodec()
+	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := newServer.RegisterService(&Info{
@@ -81,14 +79,14 @@ func (service *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDRep
 
 // GetNetworkIDReply are the results from calling GetNetworkID
 type GetNetworkIDReply struct {
-	NetworkID cjson.Uint32 `json:"networkID"`
+	NetworkID json.Uint32 `json:"networkID"`
 }
 
 // GetNetworkID returns the network ID this node is running on
 func (service *Info) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
 	service.log.Info("Info: GetNetworkID called")
 
-	reply.NetworkID = cjson.Uint32(service.networkID)
+	reply.NetworkID = json.Uint32(service.networkID)
 	return nil
 }
 

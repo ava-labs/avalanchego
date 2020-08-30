@@ -11,12 +11,6 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
-// ByzantineFactory implements Factory by returning a byzantine struct
-type ByzantineFactory struct{}
-
-// New implements Factory
-func (ByzantineFactory) New() Consensus { return &Byzantine{} }
-
 // Byzantine is a naive implementation of a multi-choice snowball instance
 type Byzantine struct {
 	// params contains all the configurations of a snowball instance

@@ -14,11 +14,8 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/timer"
-)
-
-const (
-	DefaultStakerPortion float64 = 0.2
 )
 
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
@@ -117,6 +114,7 @@ func (h *Handler) Initialize(
 	validators validators.Set,
 	msgChan <-chan common.Message,
 	bufferSize int,
+	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	namespace string,
@@ -156,6 +154,7 @@ func (h *Handler) Initialize(
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
+		maxNonStakerPendingMsgs,
 		cpuInterval,
 		stakerMsgPortion,
 		stakerCPUPortion,
@@ -235,7 +234,12 @@ func (h *Handler) dispatchMsg(msg message) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
+	if msg.requestID != constants.GossipMsgRequestID {
+		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
+	} else {
+		h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
+	}
+
 	var (
 		err error
 	)
@@ -470,7 +474,7 @@ func (h *Handler) shutdownDispatch() {
 		go h.toClose()
 	}
 	h.closing = true
-	h.shutdown.Observe(float64(time.Now().Sub(startTime)))
+	h.shutdown.Observe(float64(time.Since(startTime)))
 	close(h.closed)
 }
 

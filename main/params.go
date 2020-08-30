@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	dbVersion = "v0.6.1"
+	dbVersion = "v0.6.5"
 )
 
 // Results of parsing the CLI
@@ -166,8 +166,8 @@ func init() {
 	// AVAX fees:
 	fs.Uint64Var(&Config.TxFee, "tx-fee", units.MilliAvax, "Transaction fee, in nAVAX")
 
-	// Minimum stake, in nAVAX, required to validate the Default Subnet
-	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the Default Subnet")
+	// Minimum stake, in nAVAX, required to validate the primary network
+	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the primary network")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
@@ -202,6 +202,7 @@ func init() {
 	fs.Uint64Var(&Config.DisabledStakingWeight, "staking-disabled-weight", 1, "Weight to provide to each peer when staking is disabled")
 
 	// Throttling:
+	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", 3, "Maximum number of messages a non-staker is allowed to have pending.")
 	fs.Float64Var(&Config.StakerMsgPortion, "staker-msg-reserved", 0.2, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", 0.2, "Reserve a portion of the chain's CPU time for stakers.")
 
@@ -298,7 +299,7 @@ func init() {
 	}
 
 	if ip == nil {
-		errs.Add(fmt.Errorf("Invalid IP Address %s", *consensusIP))
+		errs.Add(fmt.Errorf("invalid IP Address %s", *consensusIP))
 		return
 	}
 
@@ -362,7 +363,7 @@ func init() {
 			}
 		}
 		if len(Config.BootstrapPeers) != i {
-			errs.Add(fmt.Errorf("More bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i))
+			errs.Add(fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i))
 			return
 		}
 	} else {

@@ -60,7 +60,7 @@ func (b *BootstrapableTest) ForceAccepted(containerIDs ids.Set) error {
 		if b.T != nil {
 			b.T.Fatalf("Unexpectedly called ForceAccepted")
 		}
-		return errors.New("Unexpectedly called ForceAccepted")
+		return errors.New("unexpectedly called ForceAccepted")
 	}
 	return nil
 }
