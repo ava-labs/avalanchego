@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/sender"
 	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
-
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
 
