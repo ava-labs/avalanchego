@@ -14,25 +14,27 @@ import (
 
 func TestEWMATrackerPrioritizes(t *testing.T) {
 	vdrs := validators.NewSet()
-	validator0 := validators.GenerateRandomValidator(1)
-	validator1 := validators.GenerateRandomValidator(1)
-	nonStaker := ids.NewShortID([20]byte{1})
-	vdrs.Add(validator0)
-	vdrs.Add(validator1)
+
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
+	nonStaker := ids.GenerateTestShortID()
+
+	vdrs.AddWeight(vdr0, 1)
+	vdrs.AddWeight(vdr1, 1)
 
 	cpuPortion := 0.25
 	period := time.Second
 	throttler := NewEWMATracker(vdrs, cpuPortion, period, logging.NoLog{})
 
-	throttler.UtilizeCPU(validator0.ID(), 25*time.Millisecond)
-	throttler.UtilizeCPU(validator1.ID(), 5*time.Second)
+	throttler.UtilizeCPU(vdr0, 25*time.Millisecond)
+	throttler.UtilizeCPU(vdr1, 5*time.Second)
 
-	cpu0 := throttler.GetUtilization(validator0.ID())
-	cpu1 := throttler.GetUtilization(validator1.ID())
+	cpu0 := throttler.GetUtilization(vdr0)
+	cpu1 := throttler.GetUtilization(vdr1)
 	cpuNonStaker := throttler.GetUtilization(nonStaker)
 
 	if cpu1 <= cpu0 {
-		t.Fatalf("CPU utilization for validator1: %f should be greater than that of validator0: %f", cpu1, cpu0)
+		t.Fatalf("CPU utilization for vdr1: %f should be greater than that of vdr0: %f", cpu1, cpu0)
 	}
 
 	if cpuNonStaker < cpu1 {
@@ -42,19 +44,20 @@ func TestEWMATrackerPrioritizes(t *testing.T) {
 
 func TestEWMATrackerPrunesSpenders(t *testing.T) {
 	vdrs := validators.NewSet()
-	staker0 := validators.GenerateRandomValidator(1)
-	staker1 := validators.GenerateRandomValidator(1)
-	nonStaker0 := ids.NewShortID([20]byte{1})
-	nonStaker1 := ids.NewShortID([20]byte{2})
 
-	vdrs.Add(staker0)
-	vdrs.Add(staker1)
+	staker0 := ids.GenerateTestShortID()
+	staker1 := ids.GenerateTestShortID()
+	nonStaker0 := ids.GenerateTestShortID()
+	nonStaker1 := ids.GenerateTestShortID()
+
+	vdrs.AddWeight(staker0, 1)
+	vdrs.AddWeight(staker1, 1)
 
 	cpuPortion := 0.25
 	period := time.Second
 	throttler := NewEWMATracker(vdrs, cpuPortion, period, logging.NoLog{})
 
-	throttler.UtilizeCPU(staker0.ID(), 1.0)
+	throttler.UtilizeCPU(staker0, 1.0)
 	throttler.UtilizeCPU(nonStaker0, 1.0)
 
 	// 3 Cases:
@@ -71,10 +74,10 @@ func TestEWMATrackerPrunesSpenders(t *testing.T) {
 
 	// Ensure that the validators and the non-staker heard from every interval were not pruned
 	ewmat := throttler.(*ewmaCPUTracker)
-	if _, ok := ewmat.cpuSpenders[staker0.ID().Key()]; !ok {
+	if _, ok := ewmat.cpuSpenders[staker0.Key()]; !ok {
 		t.Fatal("Staker was pruned from the set of spenders")
 	}
-	if _, ok := ewmat.cpuSpenders[staker1.ID().Key()]; !ok {
+	if _, ok := ewmat.cpuSpenders[staker1.Key()]; !ok {
 		t.Fatal("Staker was pruned from the set of spenders")
 	}
 	if _, ok := ewmat.cpuSpenders[nonStaker0.Key()]; ok {
@@ -87,14 +90,15 @@ func TestEWMATrackerPrunesSpenders(t *testing.T) {
 
 func TestMessageThrottlerPrunesSpenders(t *testing.T) {
 	vdrs := validators.NewSet()
-	staker0 := validators.GenerateRandomValidator(1)
-	staker1 := validators.GenerateRandomValidator(1)
-	nonStaker0 := ids.NewShortID([20]byte{1})
-	nonStaker1 := ids.NewShortID([20]byte{2})
-	nonStaker2 := ids.NewShortID([20]byte{3})
 
-	vdrs.Add(staker0)
-	vdrs.Add(staker1)
+	staker0 := ids.GenerateTestShortID()
+	staker1 := ids.GenerateTestShortID()
+	nonStaker0 := ids.GenerateTestShortID()
+	nonStaker1 := ids.GenerateTestShortID()
+	nonStaker2 := ids.GenerateTestShortID()
+
+	vdrs.AddWeight(staker0, 1)
+	vdrs.AddWeight(staker1, 1)
 
 	maxMessages := uint32(1024)
 	msgPortion := 0.25
@@ -123,10 +127,10 @@ func TestMessageThrottlerPrunesSpenders(t *testing.T) {
 	}
 
 	msgThrottler := throttler.(*messageThrottler)
-	if _, ok := msgThrottler.msgSpenders[staker0.ID().Key()]; !ok {
+	if _, ok := msgThrottler.msgSpenders[staker0.Key()]; !ok {
 		t.Fatal("Staker was pruned from the set of spenders")
 	}
-	if _, ok := msgThrottler.msgSpenders[staker1.ID().Key()]; !ok {
+	if _, ok := msgThrottler.msgSpenders[staker1.Key()]; !ok {
 		t.Fatal("Staker was pruned from the set of spenders")
 	}
 	if _, ok := msgThrottler.msgSpenders[nonStaker0.Key()]; !ok {
@@ -142,13 +146,14 @@ func TestMessageThrottlerPrunesSpenders(t *testing.T) {
 
 func TestMessageThrottling(t *testing.T) {
 	vdrs := validators.NewSet()
-	staker0 := validators.GenerateRandomValidator(1)
-	staker1 := validators.GenerateRandomValidator(1)
-	nonStaker0 := ids.NewShortID([20]byte{1})
-	nonStaker1 := ids.NewShortID([20]byte{2})
 
-	vdrs.Add(staker0)
-	vdrs.Add(staker1)
+	staker0 := ids.GenerateTestShortID()
+	staker1 := ids.GenerateTestShortID()
+	nonStaker0 := ids.GenerateTestShortID()
+	nonStaker1 := ids.GenerateTestShortID()
+
+	vdrs.AddWeight(staker0, 1)
+	vdrs.AddWeight(staker1, 1)
 
 	maxMessages := uint32(8)
 	msgPortion := 0.25
@@ -164,21 +169,21 @@ func TestMessageThrottling(t *testing.T) {
 
 	// Ensure that it is allowed to consume its entire max messages before being throttled
 	for i := 0; i < int(DefaultMaxNonStakerPendingMsgs)+1; i++ {
-		throttler.Add(staker0.ID())
-		if throttler.Throttle(staker0.ID()) {
+		throttler.Add(staker0)
+		if throttler.Throttle(staker0) {
 			t.Fatal("Should not throttle message from staker until it has exceeded its own allotment")
 		}
 	}
 
 	// Ensure staker is throttled after exceeding its own max messages cap
-	throttler.Add(staker0.ID())
-	if !throttler.Throttle(staker0.ID()) {
+	throttler.Add(staker0)
+	if !throttler.Throttle(staker0) {
 		t.Fatal("Should have throttled message after exceeding message cap")
 	}
 
 	// Remove messages to reduce staker0 to have its normal message allotment in pending
 	for i := 0; i < int(DefaultMaxNonStakerPendingMsgs)+1; i++ {
-		throttler.Remove(staker0.ID())
+		throttler.Remove(staker0)
 	}
 
 	// Consume the entire message pool among two non-stakers
@@ -198,11 +203,11 @@ func TestMessageThrottling(t *testing.T) {
 
 	// An additional message from staker0 should now cause it to be throttled since the mesasage pool
 	// has been emptied.
-	if throttler.Throttle(staker0.ID()) {
+	if throttler.Throttle(staker0) {
 		t.Fatal("Should not have throttled message from staker until it had exceeded its message allotment.")
 	}
-	throttler.Add(staker0.ID())
-	if !throttler.Throttle(staker0.ID()) {
+	throttler.Add(staker0)
+	if !throttler.Throttle(staker0) {
 		t.Fatal("Should have throttled message from staker0 after it exceeded its message allotment because the message pool was empty.")
 	}
 
@@ -217,10 +222,12 @@ func TestMessageThrottling(t *testing.T) {
 
 func TestCalculatesEWMA(t *testing.T) {
 	vdrs := validators.NewSet()
-	validator0 := validators.GenerateRandomValidator(1)
-	validator1 := validators.GenerateRandomValidator(1)
-	vdrs.Add(validator0)
-	vdrs.Add(validator1)
+
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
+
+	vdrs.AddWeight(vdr0, 1)
+	vdrs.AddWeight(vdr1, 1)
 
 	stakerPortion := 0.25
 	period := time.Second
@@ -241,12 +248,12 @@ func TestCalculatesEWMA(t *testing.T) {
 		ewma += spend
 		ewma = time.Duration(float64(ewma) / decayFactor)
 
-		throttler.UtilizeCPU(validator0.ID(), spend)
+		throttler.UtilizeCPU(vdr0, spend)
 		throttler.EndInterval()
 	}
 
 	ewmat := throttler.(*ewmaCPUTracker)
-	sp := ewmat.getSpender(validator0.ID())
+	sp := ewmat.getSpender(vdr0)
 	if sp.cpuEWMA != ewma {
 		t.Fatalf("EWMA Throttler calculated EWMA incorrectly, expected: %s, but calculated: %s", ewma, sp.cpuEWMA)
 	}

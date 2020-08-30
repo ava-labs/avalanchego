@@ -124,8 +124,8 @@ func (et *ewmaCPUTracker) EndInterval() {
 	removed := 0
 	for key, cpuSpender := range et.cpuSpenders {
 		cpuSpender.cpuEWMA = time.Duration(float64(cpuSpender.cpuEWMA) / et.decayFactor)
-		if vdr, exists := et.vdrs.Get(ids.NewShortID(key)); exists {
-			stakerPortion := float64(vdr.Weight()) / float64(stakingWeight)
+		if weight, ok := et.vdrs.GetWeight(ids.NewShortID(key)); ok {
+			stakerPortion := float64(weight) / float64(stakingWeight)
 
 			// Calculate staker allotment here
 			cpuSpender.staking = true

@@ -10,8 +10,13 @@ import (
 )
 
 const (
-	DefaultMaxNonStakerPendingMsgs uint32  = 3
-	DefaultStakerPortion           float64 = 0.2
+	// DefaultMaxNonStakerPendingMsgs rate limits the number of queued messages
+	// from non-stakers.
+	DefaultMaxNonStakerPendingMsgs uint32 = 3
+
+	// DefaultStakerPortion describes the percentage of resources that are
+	// reserved for stakers.
+	DefaultStakerPortion float64 = 0.2
 )
 
 // Throttler provides an interface to register consumption

@@ -241,7 +241,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
 	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
-		m.log.Error("there is already a chain with alias '%s'. Chain not created.", alias)
+		m.log.Debug("there is already a chain with alias '%s'. Chain not created.",
+			alias)
 		return
 	}
 
@@ -345,9 +346,9 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	var validators validators.Set // Validators validating this blockchain
 	var ok bool
 	if m.stakingEnabled {
-		validators, ok = m.validators.GetValidatorSet(chainParams.SubnetID)
+		validators, ok = m.validators.GetValidators(chainParams.SubnetID)
 	} else { // Staking is disabled. Every peer validates every subnet.
-		validators, ok = m.validators.GetValidatorSet(constants.PrimaryNetworkID)
+		validators, ok = m.validators.GetValidators(constants.PrimaryNetworkID)
 	}
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)

@@ -151,8 +151,8 @@ func (et *messageThrottler) EndInterval() {
 	stakingWeight := et.vdrs.Weight()
 
 	for key, msgSpender := range et.msgSpenders {
-		if vdr, exists := et.vdrs.Get(ids.NewShortID(key)); exists {
-			stakerPortion := float64(vdr.Weight()) / float64(stakingWeight)
+		if weight, exists := et.vdrs.GetWeight(ids.NewShortID(key)); exists {
+			stakerPortion := float64(weight) / float64(stakingWeight)
 
 			// Calculate staker allotment here
 			msgSpender.staking = true

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/api"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
@@ -526,49 +527,54 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	validators, err := service.vm.getCurrentValidators(service.vm.DB, args.SubnetID)
-	if err != nil {
-		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
-	}
+	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stop))
+	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
+	defer stopDB.Close()
 
-	reply.Validators = make([]FormattedAPIValidator, validators.Len())
-	if args.SubnetID.Equals(constants.PrimaryNetworkID) {
-		for i, tx := range validators.Txs {
-			switch tx := tx.UnsignedTx.(type) {
-			case *UnsignedAddValidatorTx:
-				weight := json.Uint64(tx.Validator.Weight())
-				reply.Validators[i] = FormattedAPIValidator{
-					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.EndTime().Unix()),
-					StakeAmount: &weight,
-				}
-			case *UnsignedAddDelegatorTx:
-				weight := json.Uint64(tx.Validator.Weight())
-				reply.Validators[i] = FormattedAPIValidator{
-					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.EndTime().Unix()),
-					StakeAmount: &weight,
-				}
-			default: // Shouldn't happen
-				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
-			}
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
+
+	for stopIter.Next() { // Iterates in order of increasing start time
+		txBytes := stopIter.Value()
+
+		tx := Tx{}
+		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-	} else {
-		for i, tx := range validators.Txs {
-			utx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
-			weight := json.Uint64(utx.Validator.Weight())
-			reply.Validators[i] = FormattedAPIValidator{
-				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime: json.Uint64(utx.StartTime().Unix()),
-				EndTime:   json.Uint64(utx.EndTime().Unix()),
+		if err := tx.Sign(service.vm.codec, nil); err != nil {
+			return err
+		}
+
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			weight := json.Uint64(staker.Validator.Weight())
+			reply.Validators = append(reply.Validators, FormattedAPIValidator{
+				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				StartTime:   json.Uint64(staker.StartTime().Unix()),
+				EndTime:     json.Uint64(staker.EndTime().Unix()),
+				StakeAmount: &weight,
+			})
+		case *UnsignedAddValidatorTx:
+			weight := json.Uint64(staker.Validator.Weight())
+			reply.Validators = append(reply.Validators, FormattedAPIValidator{
+				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				StartTime:   json.Uint64(staker.StartTime().Unix()),
+				EndTime:     json.Uint64(staker.EndTime().Unix()),
+				StakeAmount: &weight,
+			})
+		case *UnsignedAddSubnetValidatorTx:
+			weight := json.Uint64(staker.Validator.Weight())
+			reply.Validators = append(reply.Validators, FormattedAPIValidator{
+				ID:        staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				StartTime: json.Uint64(staker.StartTime().Unix()),
+				EndTime:   json.Uint64(staker.EndTime().Unix()),
 				Weight:    &weight,
-			}
+			})
+		default:
+			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
 		}
 	}
-
-	return nil
+	return stopIter.Error()
 }
 
 // GetPendingValidatorsArgs are the arguments for calling GetPendingValidators
@@ -590,47 +596,54 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	validators, err := service.vm.getPendingValidators(service.vm.DB, args.SubnetID)
-	if err != nil {
-		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
-	}
+	startPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, start))
+	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
+	defer startDB.Close()
 
-	reply.Validators = make([]FormattedAPIValidator, validators.Len())
-	for i, tx := range validators.Txs {
-		if args.SubnetID.Equals(constants.PrimaryNetworkID) {
-			switch tx := tx.UnsignedTx.(type) {
-			case *UnsignedAddValidatorTx:
-				weight := json.Uint64(tx.Validator.Weight())
-				reply.Validators[i] = FormattedAPIValidator{
-					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.EndTime().Unix()),
-					StakeAmount: &weight,
-				}
-			case *UnsignedAddDelegatorTx:
-				weight := json.Uint64(tx.Validator.Weight())
-				reply.Validators[i] = FormattedAPIValidator{
-					ID:          tx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-					StartTime:   json.Uint64(tx.StartTime().Unix()),
-					EndTime:     json.Uint64(tx.EndTime().Unix()),
-					StakeAmount: &weight,
-				}
-			default: // Shouldn't happen
-				return fmt.Errorf("couldn't get the reward address of %s", tx.ID())
-			}
-		} else {
-			utx := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
-			weight := json.Uint64(utx.Validator.Weight())
-			reply.Validators[i] = FormattedAPIValidator{
-				ID:        utx.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime: json.Uint64(utx.StartTime().Unix()),
-				EndTime:   json.Uint64(utx.EndTime().Unix()),
+	startIter := startDB.NewIterator()
+	defer startIter.Release()
+
+	for startIter.Next() { // Iterates in order of increasing start time
+		txBytes := startIter.Value()
+
+		tx := Tx{}
+		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(service.vm.codec, nil); err != nil {
+			return err
+		}
+
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			weight := json.Uint64(staker.Validator.Weight())
+			reply.Validators = append(reply.Validators, FormattedAPIValidator{
+				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				StartTime:   json.Uint64(staker.StartTime().Unix()),
+				EndTime:     json.Uint64(staker.EndTime().Unix()),
+				StakeAmount: &weight,
+			})
+		case *UnsignedAddValidatorTx:
+			weight := json.Uint64(staker.Validator.Weight())
+			reply.Validators = append(reply.Validators, FormattedAPIValidator{
+				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				StartTime:   json.Uint64(staker.StartTime().Unix()),
+				EndTime:     json.Uint64(staker.EndTime().Unix()),
+				StakeAmount: &weight,
+			})
+		case *UnsignedAddSubnetValidatorTx:
+			weight := json.Uint64(staker.Validator.Weight())
+			reply.Validators = append(reply.Validators, FormattedAPIValidator{
+				ID:        staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				StartTime: json.Uint64(staker.StartTime().Unix()),
+				EndTime:   json.Uint64(staker.EndTime().Unix()),
 				Weight:    &weight,
-			}
+			})
+		default:
+			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
 		}
 	}
-
-	return nil
+	return startIter.Error()
 }
 
 // SampleValidatorsArgs are the arguments for calling SampleValidators
@@ -655,7 +668,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	validators, ok := service.vm.validators.GetValidatorSet(args.SubnetID)
+	validators, ok := service.vm.vdrMgr.GetValidators(args.SubnetID)
 	if !ok {
 		return fmt.Errorf("couldn't get validators of subnet with ID %s. Does it exist?", args.SubnetID)
 	}

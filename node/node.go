@@ -158,7 +158,9 @@ func (n *Node) initNetworking() error {
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
 	n.vdrs = validators.NewManager()
-	n.vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
+	if err := n.vdrs.Set(constants.PrimaryNetworkID, primaryNetworkValidators); err != nil {
+		return err
+	}
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -198,14 +200,14 @@ type insecureValidatorManager struct {
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
-	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight))
+	_ = i.vdrs.AddWeight(vdrID, i.weight)
 	return false
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 	// Shouldn't error unless the set previously had an error, which should
 	// never happen as described above
-	_ = i.vdrs.Remove(vdrID)
+	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
 	return false
 }
 
@@ -313,7 +315,7 @@ func (n *Node) initNodeID() error {
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
-		if err := n.beacons.Add(validators.NewValidator(peer.ID, 1)); err != nil {
+		if err := n.beacons.AddWeight(peer.ID, 1); err != nil {
 			return err
 		}
 	}
@@ -363,6 +365,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	})
 
 	bootstrapWeight := n.beacons.Weight()
+
 	reqWeight := (3*bootstrapWeight + 3) / 4
 
 	if reqWeight == 0 {
@@ -443,12 +446,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Instead of updating node's validator manager, platform chain makes changes
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
-		primaryNetworkValidators := validators.NewSet()
-		if err := primaryNetworkValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
-			return fmt.Errorf("couldn't add validator to primary network: %w", err)
-		}
 		vdrs = validators.NewManager()
-		vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
 	}
 
 	errs := wrappers.Errs{}
@@ -707,17 +705,17 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initHealthAPI(); err != nil { // Start the Health API
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
+	if err := n.initIPCs(); err != nil { // Start the IPCs
+		return fmt.Errorf("couldn't initialize IPCs: %w", err)
+	}
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
-		return fmt.Errorf("couldn't initialize ipc API: %w", err)
+		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
 	if err := n.initAliases(); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain
 		return fmt.Errorf("couldn't initialize chains: %w", err)
-	}
-	if err := n.initIPCs(); err != nil { // Start the IPCs
-		return fmt.Errorf("couldn't initialize IPCs: %w", err)
 	}
 	return nil
 }
