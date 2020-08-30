@@ -158,7 +158,9 @@ func (n *Node) initNetworking() error {
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
 	n.vdrs = validators.NewManager()
-	n.vdrs.Set(constants.PrimaryNetworkID, primaryNetworkValidators)
+	if err := n.vdrs.Set(constants.PrimaryNetworkID, primaryNetworkValidators); err != nil {
+		return err
+	}
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -443,12 +445,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Instead of updating node's validator manager, platform chain makes changes
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
-		primaryNetworkValidators := validators.NewSet()
-		if err := primaryNetworkValidators.AddWeight(n.ID, 1); err != nil {
-			return fmt.Errorf("couldn't add validator to primary network: %w", err)
-		}
 		vdrs = validators.NewManager()
-		vdrs.Set(constants.PrimaryNetworkID, primaryNetworkValidators)
 	}
 
 	errs := wrappers.Errs{}

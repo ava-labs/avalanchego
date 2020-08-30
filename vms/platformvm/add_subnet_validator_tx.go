@@ -108,21 +108,38 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
-		return nil, nil, nil, nil,
-			permError{fmt.Errorf("time validating subnet [%v, %v] not subset of time validating primary network [%v, %v]",
-				tx.StartTime(), tx.EndTime(),
-				vdr.StartTime(), vdr.EndTime())}
+		return nil, nil, nil, nil, permError{errDSValidatorSubset}
+	}
+	if !isValidator {
+		// Ensure that the period this validator validates the specified subnet
+		// is a subnet of the time they will validate the primary network.
+		vdr, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+		if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+			return nil, nil, nil, nil, permError{errDSValidatorSubset}
+		}
 	}
 
-	// Ensure the proposed validator is not already a validator of the specified subnet
-	vdr, isValidator, err = vm.isValidator(db, tx.Validator.Subnet, tx.Validator.NodeID)
+	// Ensure that the period this validator validates the specified subnet is a
+	// subnet of the time they validate the primary network.
+	_, isValidator, err = vm.isValidator(db, tx.Validator.Subnet, tx.Validator.NodeID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
-	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
-		return nil, nil, nil, nil,
-			permError{fmt.Errorf("already validating subnet between [%v, %v]",
-				vdr.StartTime(), vdr.EndTime())}
+	if isValidator {
+		return nil, nil, nil, nil, permError{fmt.Errorf("already validating subnet between")}
+	}
+
+	// Ensure that the period this validator validates the specified subnet
+	// is a subnet of the time they will validate the primary network.
+	_, willBeValidator, err := vm.willBeValidator(db, tx.Validator.Subnet, tx.Validator.NodeID)
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+	if willBeValidator {
+		return nil, nil, nil, nil, permError{fmt.Errorf("already validating subnet between")}
 	}
 
 	baseTxCredsLen := len(stx.Creds) - 1
@@ -156,7 +173,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 	// Add the validator to the set of pending validators
-	if err := vm.addStaker(onCommitDB, tx.Validator.Subnet, stx); err != nil {
+	if err := vm.enqueueStaker(onCommitDB, tx.Validator.Subnet, stx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

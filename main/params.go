@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	dbVersion = "v0.6.1"
+	dbVersion = "v0.6.5"
 )
 
 // Results of parsing the CLI

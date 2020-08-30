@@ -42,9 +42,8 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 
 	sender.CantGetAcceptedFrontier = false
 
-	peer := validators.GenerateRandomValidator(1)
-	peerID := peer.ID()
-	peers.Add(peer)
+	peer := ids.GenerateTestShortID()
+	peers.AddWeight(peer, 1)
 
 	blocker, _ := queue.New(db)
 
@@ -59,7 +58,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		Config:  commonConfig,
 		Blocked: blocker,
 		VM:      vm,
-	}, peerID, sender, vm
+	}, peer, sender, vm
 }
 
 // Single node in the accepted frontier; no need to fecth parent

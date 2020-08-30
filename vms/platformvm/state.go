@@ -9,14 +9,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/hashing"
-
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
 
@@ -73,17 +72,23 @@ func (vm *VM) getStatus(db database.Database, ID ids.ID) (Status, error) {
 	return Unknown, fmt.Errorf("expected status to be type Status but is type %T", statusIntf)
 }
 
-// Add a staker to subnet [subnetID]
-// A staker may be a validator or a delegator
-func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
-	var staker TimedTx
+// Add a staker to subnet [subnetID]'s pending validator queue. A staker may be
+// a validator or a delegator
+func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+	var (
+		staker   TimedTx
+		priority byte
+	)
 	switch unsignedTx := stakerTx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
+		priority = 1
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
+		priority = 0
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
+		priority = 2
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
@@ -93,47 +98,37 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 	// Sorted by subnet ID then start time then tx ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	// Sorted by subnet ID then stop time then tx ID
-	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
-	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer func() {
-		prefixStartDB.Close()
-		prefixStopDB.Close()
-	}()
+	defer prefixStartDB.Close()
 
-	p := wrappers.Packer{MaxSize: wrappers.LongLen + hashing.HashLen}
+	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
+	p.PackByte(priority)
 	p.PackFixedBytes(stakerID)
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	startKey := p.Bytes
 
-	p = wrappers.Packer{MaxSize: wrappers.LongLen + hashing.HashLen}
-	p.PackLong(uint64(staker.EndTime().Unix()))
-	p.PackFixedBytes(stakerID)
-	if p.Err != nil {
-		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
-	}
-	stopKey := p.Bytes
-
-	if err := prefixStartDB.Put(startKey, txBytes); err != nil {
-		return err
-	}
-	return prefixStopDB.Put(stopKey, txBytes)
+	return prefixStartDB.Put(startKey, txBytes)
 }
 
-// Remove a staker from subnet [subnetID]
-// A staker may be a validator or a delegator
-func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
-	var staker TimedTx
+// Remove a staker from subnet [subnetID]'s pending validator queue. A staker
+// may be a validator or a delegator
+func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+	var (
+		staker   TimedTx
+		priority byte
+	)
 	switch unsignedTx := stakerTx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
+		priority = 1
 	case *UnsignedAddSubnetValidatorTx:
 		staker = unsignedTx
+		priority = 0
 	case *UnsignedAddValidatorTx:
 		staker = unsignedTx
+		priority = 2
 	default:
 		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
@@ -142,33 +137,96 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) 
 	// Sorted by subnet ID then start time then ID
 	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
-	// Sorted by subnet ID then stop time
-	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
-	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-	defer func() {
-		prefixStartDB.Close()
-		prefixStopDB.Close()
-	}()
+	defer prefixStartDB.Close()
 
-	p := wrappers.Packer{MaxSize: wrappers.LongLen + hashing.HashLen}
+	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.StartTime().Unix()))
+	p.PackByte(priority)
 	p.PackFixedBytes(stakerID)
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	startKey := p.Bytes
 
-	p = wrappers.Packer{MaxSize: wrappers.LongLen + hashing.HashLen}
+	return prefixStartDB.Delete(startKey)
+}
+
+// Add a staker to subnet [subnetID]
+// A staker may be a validator or a delegator
+func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+	var (
+		staker   TimedTx
+		priority byte
+	)
+	switch unsignedTx := stakerTx.UnsignedTx.(type) {
+	case *UnsignedAddDelegatorTx:
+		staker = unsignedTx
+		priority = 0
+	case *UnsignedAddSubnetValidatorTx:
+		staker = unsignedTx
+		priority = 1
+	case *UnsignedAddValidatorTx:
+		staker = unsignedTx
+		priority = 2
+	default:
+		return fmt.Errorf("staker is unexpected type %T", stakerTx)
+	}
+	stakerID := staker.ID().Bytes() // Tx ID of this tx
+	txBytes := stakerTx.Bytes()
+
+	// Sorted by subnet ID then stop time then tx ID
+	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	prefixStopDB := prefixdb.NewNested(prefixStop, db)
+	defer prefixStopDB.Close()
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
+	p.PackByte(priority)
 	p.PackFixedBytes(stakerID)
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
 	stopKey := p.Bytes
 
-	if err := prefixStartDB.Delete(startKey); err != nil {
-		return err
+	return prefixStopDB.Put(stopKey, txBytes)
+}
+
+// Remove a staker from subnet [subnetID]
+// A staker may be a validator or a delegator
+func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+	var (
+		staker   TimedTx
+		priority byte
+	)
+	switch unsignedTx := stakerTx.UnsignedTx.(type) {
+	case *UnsignedAddDelegatorTx:
+		staker = unsignedTx
+		priority = 0
+	case *UnsignedAddSubnetValidatorTx:
+		staker = unsignedTx
+		priority = 1
+	case *UnsignedAddValidatorTx:
+		staker = unsignedTx
+		priority = 2
+	default:
+		return fmt.Errorf("staker is unexpected type %T", stakerTx)
 	}
+	stakerID := staker.ID().Bytes() // Tx ID of this tx
+
+	// Sorted by subnet ID then stop time
+	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	prefixStopDB := prefixdb.NewNested(prefixStop, db)
+	defer prefixStopDB.Close()
+
+	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
+	p.PackLong(uint64(staker.EndTime().Unix()))
+	p.PackByte(priority)
+	p.PackFixedBytes(stakerID)
+	if p.Err != nil {
+		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
+	}
+	stopKey := p.Bytes
+
 	return prefixStopDB.Delete(stopKey)
 }
 
@@ -210,6 +268,36 @@ func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error)
 
 // Returns true if [nodeID] is a validator (not a delegator) of subnet [subnetID]
 func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool, error) {
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stop)), db).NewIterator()
+	defer iter.Release()
+
+	for iter.Next() {
+		txBytes := iter.Value()
+		tx := Tx{}
+		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
+			return nil, false, err
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return nil, false, err
+		}
+
+		switch vdr := tx.UnsignedTx.(type) {
+		case *UnsignedAddValidatorTx:
+			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
+				return vdr, true, nil
+			}
+		case *UnsignedAddSubnetValidatorTx:
+			if subnetID.Equals(vdr.Validator.SubnetID()) && vdr.Validator.NodeID.Equals(nodeID) {
+				return vdr, true, nil
+			}
+		}
+	}
+	return nil, false, nil
+}
+
+// Returns true if [nodeID] will be a validator (not a delegator) of subnet
+// [subnetID]
+func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool, error) {
 	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, start)), db).NewIterator()
 	defer iter.Release()
 

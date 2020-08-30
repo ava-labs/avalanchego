@@ -23,8 +23,9 @@ import (
 )
 
 var (
-	errInvalidState  = errors.New("generated output isn't valid state")
-	errInvalidAmount = errors.New("invalid amount")
+	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
+	errInvalidState    = errors.New("generated output isn't valid state")
+	errInvalidAmount   = errors.New("invalid amount")
 
 	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
 	_ TimedTx            = &UnsignedAddDelegatorTx{}
@@ -134,7 +135,18 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
-		return nil, nil, nil, nil, permError{errDSValidatorSubset}
+		return nil, nil, nil, nil, permError{errDelegatorSubset}
+	}
+	if !isValidator {
+		// Ensure that the period this delegator delegates is a subset of the
+		// time the validator will validates.
+		vdr, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+		if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+			return nil, nil, nil, nil, permError{errDelegatorSubset}
+		}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -160,7 +172,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	}
 
 	// If this proposal is committed, update the pending validator set to include the delegator
-	if err := vm.addStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
+	if err := vm.enqueueStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

@@ -249,7 +249,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
 	// (flush to vm.DB) before this is called
 	updateValidators := func() error {
-		return vm.updateVdrMgr()
+		return vm.updateVdrMgr(false)
 	}
 
 	return onCommitDB, onAbortDB, updateValidators, updateValidators, nil

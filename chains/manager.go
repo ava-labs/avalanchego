@@ -238,7 +238,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
 	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
-		m.log.Error("there is already a chain with alias '%s'. Chain not created.", alias)
+		m.log.Debug("there is already a chain with alias '%s'. Chain not created.",
+			alias)
 		return
 	}
 

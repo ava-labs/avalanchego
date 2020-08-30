@@ -95,8 +95,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	}
 	// Register new subnet in validator manager
 	onAccept := func() error {
-		vm.vdrMgr.Set(tx.ID(), validators.NewSet())
-		return nil
+		return vm.vdrMgr.Set(tx.ID(), validators.NewSet())
 	}
 	return onAccept, nil
 }

@@ -84,27 +84,9 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	// If this block is committed, update the validator sets
 	// onAbortDB or onCommitDB should commit (flush to vm.DB) before this is called
 	onCommitFunc := func() error {
-		// For each Subnet, update the node's validator manager to reflect current Subnet membership
-		return vm.updateVdrMgr()
 
-		// If this node started validating a Subnet, create the blockchains that the Subnet validates
-		// TODO this
-		// chains, err := vm.getChains(vm.DB) // all blockchains
-		// if err != nil {
-		// 	return err
-		// }
-		// for subnetID, validatorIDs := range startedValidating {
-		// 	if !validatorIDs.Contains(vm.Ctx.NodeID) {
-		// 		continue
-		// 	}
-		// 	for _, chain := range chains {
-		// 		unsignedChain := chain.UnsignedTx.(*UnsignedCreateChainTx)
-		// 		if bytes.Equal(subnetID[:], unsignedChain.SubnetID.Bytes()) {
-		// 			vm.createChain(chain)
-		// 		}
-		// 	}
-		// }
-		// return nil
+		// For each Subnet, update the node's validator manager to reflect current Subnet membership
+		return vm.updateVdrMgr(false)
 	}
 
 	// State doesn't change if this proposal is aborted

@@ -12,7 +12,7 @@ import (
 // Manager holds the validator set of each subnet
 type Manager interface {
 	// Set a subnet's validator set
-	Set(ids.ID, Set)
+	Set(ids.ID, Set) error
 
 	// AddWeight adds weight to a given validator on the given subnet
 	AddWeight(ids.ID, ids.ShortID, uint64) error
@@ -40,11 +40,18 @@ type manager struct {
 	subnetToVdrs map[[32]byte]Set
 }
 
-func (m *manager) Set(subnetID ids.ID, vdrSet Set) {
+func (m *manager) Set(subnetID ids.ID, newSet Set) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.subnetToVdrs[subnetID.Key()] = vdrSet
+	subnetKey := subnetID.Key()
+
+	oldSet, exists := m.subnetToVdrs[subnetKey]
+	if !exists {
+		m.subnetToVdrs[subnetKey] = newSet
+		return nil
+	}
+	return oldSet.Set(newSet.List())
 }
 
 // AddWeight implements the Manager interface.

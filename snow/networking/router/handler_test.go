@@ -34,8 +34,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	handler := &Handler{}
 	vdrs := validators.NewSet()
-	vdr0 := validators.GenerateRandomValidator(1)
-	vdrs.Add(vdr0)
+	vdr0 := ids.GenerateTestShortID()
+	vdrs.AddWeight(vdr0, 1)
 	handler.Initialize(
 		&engine,
 		vdrs,

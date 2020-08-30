@@ -23,33 +23,33 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 		vm.Ctx.Lock.Unlock()
 	}()
 
-	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID)
+	// ID of validator that should leave DS validator set next
+	toRemoveIntf, err := vm.nextStakerStop(vm.DB, constants.PrimaryNetworkID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// ID of validator that should leave DS validator set next
-	nextToRemove := currentValidators.Peek().UnsignedTx.(*UnsignedAddValidatorTx)
+	toRemove := toRemoveIntf.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	if tx, err := vm.newRewardValidatorTx(nextToRemove.ID()); err != nil {
+	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatalf("should have failed because validator end time doesn't match chain timestamp")
 	}
 
 	// Case 2: Wrong validator
 	if tx, err := vm.newRewardValidatorTx(ids.GenerateTestID()); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err := toRemove.SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatalf("should have failed because validator ID is wrong")
 	}
 
 	// Case 3: Happy path
 	// Advance chain timestamp to time that next validator leaves
-	if err := vm.putTimestamp(vm.DB, nextToRemove.EndTime()); err != nil {
+	if err := vm.putTimestamp(vm.DB, toRemove.EndTime()); err != nil {
 		t.Fatal(err)
 	}
-	tx, err := vm.newRewardValidatorTx(nextToRemove.ID())
+	tx, err := vm.newRewardValidatorTx(toRemove.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,20 +58,16 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Should be one less validator than before
-	oldNumValidators := len(currentValidators.Txs)
-	if currentValidators, err := vm.getCurrentValidators(onCommitDB, constants.PrimaryNetworkID); err != nil {
+	// ID of validator that should leave DS validator set next
+
+	if nextToRemove, err := vm.nextStakerStop(onCommitDB, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
-	} else if numValidators := currentValidators.Len(); numValidators != oldNumValidators-1 {
-		t.Fatalf("Should be %d validators but are %d", oldNumValidators-1, numValidators)
-	} else if currentValidators, err = vm.getCurrentValidators(onAbortDB, constants.PrimaryNetworkID); err != nil {
-		t.Fatal(err)
-	} else if numValidators := currentValidators.Len(); numValidators != oldNumValidators-1 {
-		t.Fatalf("Should be %d validators but there are %d", oldNumValidators-1, numValidators)
+	} else if toRemove.ID().Equals(nextToRemove.ID()) {
+		t.Fatalf("Should have removed the previous validator")
 	}
 
 	// check that stake/reward is given back
-	stakeOwners := nextToRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := toRemove.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 	// Get old balances, balances if tx abort, balances if tx committed
 	for _, stakeOwner := range stakeOwners.List() {
 		stakeOwnerSet := ids.ShortSet{}
@@ -89,13 +85,13 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if onAbortBalance != oldBalance+nextToRemove.Validator.Weight() {
+		if onAbortBalance != oldBalance+toRemove.Validator.Weight() {
 			t.Fatalf("on abort, should have got back staked amount")
 		}
-		expectedReward := reward(nextToRemove.Validator.Duration(), nextToRemove.Validator.Weight(), InflationRate)
-		if onCommitBalance != oldBalance+expectedReward+nextToRemove.Validator.Weight() {
+		expectedReward := reward(toRemove.Validator.Duration(), toRemove.Validator.Weight(), InflationRate)
+		if onCommitBalance != oldBalance+expectedReward+toRemove.Validator.Weight() {
 			t.Fatalf("on commit, should have old balance (%d) + staked amount (%d) + reward (%d) but have %d",
-				oldBalance, nextToRemove.Validator.Weight(), expectedReward, onCommitBalance)
+				oldBalance, toRemove.Validator.Weight(), expectedReward, onCommitBalance)
 		}
 	}
 }
@@ -127,8 +123,8 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	delStartTime := vdrStartTime + 1
-	delEndTime := vdrEndTime - 1
+	delStartTime := vdrStartTime
+	delEndTime := vdrEndTime
 	delTx, err := vm.newAddDelegatorTx(
 		vm.minStake, // stakeAmt
 		delStartTime,
@@ -142,16 +138,13 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	}
 	unsignedDelTx := delTx.UnsignedTx.(*UnsignedAddDelegatorTx)
 
-	currentValidators, err := vm.getCurrentValidators(vm.DB, constants.PrimaryNetworkID)
-	if err != nil {
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, vdrTx); err != nil {
 		t.Fatal(err)
 	}
-	currentValidators.Add(vdrTx)
-	currentValidators.Add(delTx)
-	if err := vm.putCurrentValidators(vm.DB, currentValidators, constants.PrimaryNetworkID); err != nil {
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, delTx); err != nil {
 		t.Fatal(err)
-		// Advance timestamp to when delegator should leave validator set
-	} else if err := vm.putTimestamp(vm.DB, time.Unix(int64(delEndTime), 0)); err != nil {
+	}
+	if err := vm.putTimestamp(vm.DB, time.Unix(int64(delEndTime), 0)); err != nil {
 		t.Fatal(err)
 	}
 

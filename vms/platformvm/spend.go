@@ -536,7 +536,6 @@ func (vm *VM) consumeInputs(
 		if err := vm.removeUTXO(db, utxoID); err != nil {
 			return tempError{err}
 		}
-		vm.Ctx.Log.Error("Consuming UTXOID %s", utxoID)
 	}
 	return nil
 }
