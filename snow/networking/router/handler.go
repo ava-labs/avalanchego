@@ -18,12 +18,6 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
-const (
-	// DefaultStakerPortion defines the default percentage of resources to
-	// allocate to stakers.
-	DefaultStakerPortion float64 = 0.2
-)
-
 // Requirement: A set of nodes spamming messages (potentially costly) shouldn't
 //              impact other node's queries.
 
@@ -120,6 +114,7 @@ func (h *Handler) Initialize(
 	validators validators.Set,
 	msgChan <-chan common.Message,
 	bufferSize int,
+	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	namespace string,
@@ -159,6 +154,7 @@ func (h *Handler) Initialize(
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
+		maxNonStakerPendingMsgs,
 		cpuInterval,
 		stakerMsgPortion,
 		stakerCPUPortion,

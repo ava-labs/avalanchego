@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -39,8 +40,9 @@ func TestShutdown(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -97,8 +99,9 @@ func TestShutdownTimesOut(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

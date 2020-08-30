@@ -36,15 +36,16 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP             utils.IPDesc
-	StakingLocalPort      uint16
-	EnableP2PTLS          bool
-	EnableStaking         bool
-	StakingKeyFile        string
-	StakingCertFile       string
-	DisabledStakingWeight uint64
-	StakerMsgPortion      float64
-	StakerCPUPortion      float64
+	StakingIP               utils.IPDesc
+	StakingLocalPort        uint16
+	EnableP2PTLS            bool
+	EnableStaking           bool
+	StakingKeyFile          string
+	StakingCertFile         string
+	DisabledStakingWeight   uint64
+	MaxNonStakerPendingMsgs uint
+	StakerMsgPortion        float64
+	StakerCPUPortion        float64
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
