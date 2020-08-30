@@ -14,10 +14,13 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
 const (
+	// DefaultStakerPortion defines the default percentage of resources to
+	// allocate to stakers.
 	DefaultStakerPortion float64 = 0.2
 )
 
@@ -235,7 +238,12 @@ func (h *Handler) dispatchMsg(msg message) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
+	if msg.requestID != constants.GossipMsgRequestID {
+		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
+	} else {
+		h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
+	}
+
 	var (
 		err error
 	)
