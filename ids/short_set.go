@@ -80,7 +80,7 @@ func (ids ShortSet) CappedList(size int) []ShortID {
 
 // List converts this set into a list
 func (ids ShortSet) List() []ShortID {
-	idList := make([]ShortID, len(ids), len(ids))
+	idList := make([]ShortID, len(ids))
 	i := 0
 	for id := range ids {
 		idList[i] = NewShortID(id)

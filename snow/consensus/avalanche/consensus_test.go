@@ -19,8 +19,7 @@ import (
 )
 
 var (
-	Genesis = ids.GenerateTestID()
-	Tests   = []func(*testing.T, Factory){
+	Tests = []func(*testing.T, Factory){
 		MetricsTest,
 		ParamsTest,
 		AddTest,
@@ -122,18 +121,21 @@ func ParamsTest(t *testing.T, factory Factory) {
 	ctx := snow.DefaultContextTest()
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Namespace:    fmt.Sprintf("gecko_%s", ctx.ChainID.String()),
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Namespace:         fmt.Sprintf("gecko_%s", ctx.ChainID.String()),
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
 	}
 
-	avl.Initialize(ctx, params, nil)
+	if err := avl.Initialize(ctx, params, nil); err != nil {
+		t.Fatal(err)
+	}
 
 	if p := avl.Parameters(); p.K != params.K {
 		t.Fatalf("Wrong K parameter")
@@ -153,11 +155,12 @@ func AddTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -174,7 +177,9 @@ func AddTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+		t.Fatal(err)
+	}
 
 	if !avl.Finalized() {
 		t.Fatalf("An empty avalanche instance is not finalized")
@@ -248,11 +253,12 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -269,7 +275,9 @@ func VertexIssuedTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+		t.Fatal(err)
+	}
 
 	if !avl.VertexIssued(vts[0]) {
 		t.Fatalf("Genesis Vertex not reported as issued")
@@ -305,11 +313,12 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            2,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    2,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -334,7 +343,9 @@ func TxIssuedTest(t *testing.T, factory Factory) {
 	}}
 	tx1.InputIDsV.Add(utxos[0])
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+		t.Fatal(err)
+	}
 
 	if !avl.TxIssued(tx0) {
 		t.Fatalf("Genesis Tx not reported as issued")
@@ -675,11 +686,12 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Metrics:      prometheus.NewRegistry(),
-			K:            3,
-			Alpha:        2,
-			BetaVirtuous: 1,
-			BetaRogue:    1,
+			Metrics:           prometheus.NewRegistry(),
+			K:                 3,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         1,
+			ConcurrentRepolls: 1,
 		},
 		Parents:   2,
 		BatchSize: 1,
@@ -697,7 +709,9 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 	}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	avl.Initialize(snow.DefaultContextTest(), params, vts)
+	if err := avl.Initialize(snow.DefaultContextTest(), params, vts); err != nil {
+		t.Fatal(err)
+	}
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),

@@ -25,7 +25,6 @@ func TestNewImportTx(t *testing.T) {
 	type test struct {
 		description   string
 		sharedMemory  atomic.SharedMemory
-		feeKeys       []*crypto.PrivateKeySECP256K1R
 		recipientKeys []*crypto.PrivateKeySECP256K1R
 		shouldErr     bool
 	}

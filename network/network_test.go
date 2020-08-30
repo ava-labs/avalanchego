@@ -39,7 +39,7 @@ func (l *testListener) Accept() (net.Conn, error) {
 	select {
 	case c := <-l.inbound:
 		return c, nil
-	case _, _ = <-l.closed:
+	case <-l.closed:
 		return nil, errClosed
 	}
 }
@@ -102,7 +102,7 @@ func (c *testConn) Read(b []byte) (int, error) {
 				return 0, errClosed
 			}
 			c.partialRead = read
-		case _, _ = <-c.closed:
+		case <-c.closed:
 			return 0, errClosed
 		}
 	}
@@ -122,7 +122,7 @@ func (c *testConn) Write(b []byte) (int, error) {
 
 	select {
 	case c.pendingWrites <- newB:
-	case _, _ = <-c.closed:
+	case <-c.closed:
 		return 0, errClosed
 	}
 

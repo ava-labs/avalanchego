@@ -57,17 +57,17 @@ func TestAdd64(t *testing.T) {
 		t.Fatalf("Expected %d, got %d", uint64(1<<63), sum)
 	}
 
-	sum, err = Add64(1, maxUint64)
+	_, err = Add64(1, maxUint64)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}
 
-	sum, err = Add64(maxUint64, 1)
+	_, err = Add64(maxUint64, 1)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}
 
-	sum, err = Add64(maxUint64, maxUint64)
+	_, err = Add64(maxUint64, maxUint64)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}

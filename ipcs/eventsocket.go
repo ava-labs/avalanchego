@@ -15,11 +15,6 @@ import (
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
-type chainEventDipatcher struct {
-	chainID ids.ID
-	events  *triggers.EventDispatcher
-}
-
 // EventSockets is a set of named eventSockets
 type EventSockets struct {
 	consensusSocket *eventSocket

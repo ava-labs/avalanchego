@@ -49,7 +49,6 @@ var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
-	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
@@ -307,7 +306,7 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	}
 	// Verify must be called in the case the that tx was flushed from the unique
 	// cache.
-	return tx, tx.Verify()
+	return tx, tx.verifyWithoutCacheWrites()
 }
 
 /*
@@ -328,7 +327,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
-	if err := tx.Verify(); err != nil {
+	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
@@ -394,7 +393,7 @@ func (vm *VM) GetAtomicUTXOs(
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
-// For address [startAddr], only returns UTXOs whose IDs are greater than [startUtxoID].
+// For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
 // Returns:
 // * The fetched of UTXOs
 // * The address associated with the last UTXO fetched
@@ -609,7 +608,7 @@ func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 		txID: inputTx,
 	}
 
-	if err := parent.Verify(); err != nil {
+	if err := parent.verifyWithoutCacheWrites(); err != nil {
 		return nil, errMissingUTXO
 	} else if status := parent.Status(); status.Decided() {
 		return nil, errMissingUTXO

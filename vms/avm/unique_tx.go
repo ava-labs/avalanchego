@@ -269,8 +269,7 @@ func (tx *UniqueTx) Bytes() []byte {
 	return tx.Tx.Bytes()
 }
 
-// Verify the validity of this transaction
-func (tx *UniqueTx) Verify() error {
+func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 	switch status := tx.Status(); status {
 	case choices.Unknown:
 		return errUnknownTx
@@ -281,6 +280,17 @@ func (tx *UniqueTx) Verify() error {
 	default:
 		return tx.SemanticVerify()
 	}
+}
+
+// Verify the validity of this transaction
+func (tx *UniqueTx) Verify() error {
+	if err := tx.verifyWithoutCacheWrites(); err != nil {
+		return err
+	}
+
+	tx.verifiedState = true
+	tx.vm.pubsub.Publish("verified", tx.ID())
+	return nil
 }
 
 // SyntacticVerify verifies that this transaction is well formed
@@ -310,11 +320,5 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	if err := tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx); err != nil {
-		return err
-	}
-
-	tx.verifiedState = true
-	tx.vm.pubsub.Publish("verified", tx.ID())
-	return nil
+	return tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx)
 }

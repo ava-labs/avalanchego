@@ -17,7 +17,6 @@ var (
 	errWrongTxType         = errors.New("wrong tx type")
 	errWrongOpType         = errors.New("wrong operation type")
 	errWrongUTXOType       = errors.New("wrong utxo type")
-	errWrongOutputType     = errors.New("wrong output type")
 	errWrongInputType      = errors.New("wrong input type")
 	errWrongCredentialType = errors.New("wrong credential type")
 	errWrongOwnerType      = errors.New("wrong owner type")

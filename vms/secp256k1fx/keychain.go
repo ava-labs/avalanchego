@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	errLockedFunds = errors.New("funds currently locked")
-	errCantSpend   = errors.New("unable to spend this UTXO")
+	errCantSpend = errors.New("unable to spend this UTXO")
 )
 
 // Keychain is a collection of keys that can be used to spend outputs

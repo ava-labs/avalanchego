@@ -31,7 +31,7 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	if err := validVertex.Verify(); err != nil {
-		t.Fatalf("Valid vertex failed verification due to: %w", err)
+		t.Fatalf("Valid vertex failed verification due to: %s", err)
 	}
 
 	nonUniqueParentsVtx := &innerVertex{

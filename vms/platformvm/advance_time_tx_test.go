@@ -38,7 +38,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(MinimumStakingDuration)
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
-	addPendingValidatorTx, err := vm.newAddDefaultSubnetValidatorTx(
+	addPendingValidatorTx, err := vm.newAddValidatorTx(
 		vm.minStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
@@ -51,15 +51,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.putPendingValidators(
-		vm.DB,
-		&EventHeap{
-			SortByStartTime: true,
-			Txs:             []*Tx{addPendingValidatorTx},
-		},
-		constants.DefaultSubnetID,
-	)
-	if err != nil {
+	if err := vm.enqueueStaker(vm.DB, constants.PrimaryNetworkID, addPendingValidatorTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,7 +98,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(MinimumStakingDuration)
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
-	addPendingValidatorTx, err := vm.newAddDefaultSubnetValidatorTx(
+	addPendingValidatorTx, err := vm.newAddValidatorTx(
 		vm.minStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
@@ -119,14 +111,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.putPendingValidators(
-		vm.DB,
-		&EventHeap{
-			SortByStartTime: true,
-			Txs:             []*Tx{addPendingValidatorTx},
-		},
-		constants.DefaultSubnetID,
-	); err != nil {
+	if err := vm.enqueueStaker(vm.DB, constants.PrimaryNetworkID, addPendingValidatorTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -139,28 +124,28 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if onCommitCurrentEvents, err := vm.getCurrentValidators(onCommit, constants.DefaultSubnetID); err != nil {
+	if validatorTx, isValidator, err := vm.isValidator(onCommit, constants.PrimaryNetworkID, nodeID); err != nil {
 		t.Fatal(err)
-	} else if onCommitCurrentEvents.Len() != len(keys)+1 { // Each key in [keys] is a validator to start with...then we added a validator
+	} else if !isValidator {
 		t.Fatalf("Should have added the validator to the validator set")
-	}
-
-	if onCommitPendingEvents, err := vm.getPendingValidators(onCommit, constants.DefaultSubnetID); err != nil {
+	} else if !validatorTx.ID().Equals(addPendingValidatorTx.ID()) {
+		t.Fatalf("Added the wrong tx to the validator set")
+	} else if _, willBeValidator, err := vm.willBeValidator(onCommit, constants.PrimaryNetworkID, nodeID); err != nil {
 		t.Fatal(err)
-	} else if onCommitPendingEvents.Len() != 0 {
+	} else if willBeValidator {
 		t.Fatalf("Should have removed the validator from the pending validator set")
 	}
 
-	if onAbortCurrentEvents, err := vm.getCurrentValidators(onAbort, constants.DefaultSubnetID); err != nil {
+	if _, isValidator, err := vm.isValidator(onAbort, constants.PrimaryNetworkID, nodeID); err != nil {
 		t.Fatal(err)
-	} else if onAbortCurrentEvents.Len() != len(keys) {
+	} else if isValidator {
 		t.Fatalf("Shouldn't have added the validator to the validator set")
-	}
-
-	if onAbortPendingEvents, err := vm.getPendingValidators(onAbort, constants.DefaultSubnetID); err != nil {
+	} else if validatorTx, willBeValidator, err := vm.willBeValidator(onAbort, constants.PrimaryNetworkID, nodeID); err != nil {
 		t.Fatal(err)
-	} else if onAbortPendingEvents.Len() != 1 {
+	} else if !willBeValidator {
 		t.Fatalf("Shouldn't have removed the validator from the pending validator set")
+	} else if !validatorTx.ID().Equals(addPendingValidatorTx.ID()) {
+		t.Fatalf("Added the wrong tx to the pending validator set")
 	}
 }
 

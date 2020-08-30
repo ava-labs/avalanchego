@@ -29,8 +29,6 @@ type prefixedState struct {
 
 	tx, utxo, txStatus, funds cache.Cacher
 	uniqueTx                  cache.Deduplicator
-
-	generatedStatus ids.ID
 }
 
 // UniqueTx de-duplicates the transaction.
