@@ -176,14 +176,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		); err != nil {
 			t.Fatal(err)
-		} else if err := vm.putPendingValidators(
-			db,
-			&EventHeap{
-				SortByStartTime: true,
-				Txs:             []*Tx{tx},
-			},
-			constants.PrimaryNetworkID,
-		); err != nil {
+		} else if err := vm.addStaker(db, constants.PrimaryNetworkID, tx); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -302,25 +295,27 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		vdb.Abort()
-		tx, err := vm.newAddDelegatorTx(
-			tt.stakeAmount,
-			tt.startTime,
-			tt.endTime,
-			tt.nodeID,
-			tt.rewardAddress,
-			tt.feeKeys,
-		)
-		if err != nil {
-			t.Fatalf("couldn't build tx in test '%s': %s", tt.description, err)
-		}
-		if tt.setup != nil {
-			tt.setup(vdb)
-		}
-		if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vdb, tx); err != nil && !tt.shouldErr {
-			t.Fatalf("test '%s' shouldn't have errored but got %s", tt.description, err)
-		} else if err == nil && tt.shouldErr {
-			t.Fatalf("expected test '%s' to error but got none", tt.description)
-		}
+		t.Run(tt.description, func(t *testing.T) {
+			vdb.Abort()
+			tx, err := vm.newAddDelegatorTx(
+				tt.stakeAmount,
+				tt.startTime,
+				tt.endTime,
+				tt.nodeID,
+				tt.rewardAddress,
+				tt.feeKeys,
+			)
+			if err != nil {
+				t.Fatalf("couldn't build tx: %s", err)
+			}
+			if tt.setup != nil {
+				tt.setup(vdb)
+			}
+			if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vdb, tx); err != nil && !tt.shouldErr {
+				t.Fatalf("shouldn't have errored but got %s", err)
+			} else if err == nil && tt.shouldErr {
+				t.Fatalf("expected test to error but got none")
+			}
+		})
 	}
 }

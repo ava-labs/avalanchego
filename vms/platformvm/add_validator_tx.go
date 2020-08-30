@@ -134,28 +134,24 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 			startTime)}
 	}
 
-	// Ensure the proposed validator is not already a validator of the specified subnet
-	currentValidators, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
+	_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
-	for _, currentVdr := range vm.getValidators(currentValidators) {
-		if currentVdr.ID().Equals(tx.Validator.NodeID) {
-			return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a primary network validator",
-				tx.Validator.NodeID)}
-		}
+	if isValidator {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a primary network validator",
+			tx.Validator.NodeID)}
 	}
 
-	// Ensure the proposed validator is not already slated to validate for the specified subnet
-	pendingValidators, err := vm.getPendingValidators(db, constants.PrimaryNetworkID)
+	// Ensure that the period this validator validates the specified subnet
+	// is a subnet of the time they will validate the primary network.
+	_, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
-	for _, pendingVdr := range vm.getValidators(pendingValidators) {
-		if pendingVdr.ID().Equals(tx.Validator.NodeID) {
-			return nil, nil, nil, nil, tempError{fmt.Errorf("validator %s is already a pending primary network validator",
-				tx.Validator.NodeID)}
-		}
+	if willBeValidator {
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator %s already is already a primary network validator",
+			tx.Validator.NodeID)}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -181,9 +177,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	}
 
 	// Add validator to set of pending validators
-	pendingValidators.Add(stx)
-	// If this proposal is committed, update the pending validator set to include the validator
-	if err := vm.putPendingValidators(onCommitDB, pendingValidators, constants.PrimaryNetworkID); err != nil {
+	if err := vm.enqueueStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
@@ -193,7 +187,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 	// Produce the UTXOS
-	if err := vm.produceOutputs(onAbortDB, txID, tx.Outs); err != nil {
+	if err := vm.produceOutputs(onAbortDB, txID, outs); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

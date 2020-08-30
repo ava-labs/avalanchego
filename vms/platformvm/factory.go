@@ -28,7 +28,7 @@ type Factory struct {
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
 		chainManager:   f.ChainManager,
-		validators:     f.Validators,
+		vdrMgr:         f.Validators,
 		stakingEnabled: f.StakingEnabled,
 		txFee:          f.Fee,
 		minStake:       f.MinStake,

@@ -158,7 +158,9 @@ func (n *Node) initNetworking() error {
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
 	n.vdrs = validators.NewManager()
-	n.vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
+	if err := n.vdrs.Set(constants.PrimaryNetworkID, primaryNetworkValidators); err != nil {
+		return err
+	}
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -198,14 +200,14 @@ type insecureValidatorManager struct {
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
-	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight))
+	_ = i.vdrs.AddWeight(vdrID, i.weight)
 	return false
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 	// Shouldn't error unless the set previously had an error, which should
 	// never happen as described above
-	_ = i.vdrs.Remove(vdrID)
+	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
 	return false
 }
 
@@ -313,7 +315,7 @@ func (n *Node) initNodeID() error {
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
-		if err := n.beacons.Add(validators.NewValidator(peer.ID, 1)); err != nil {
+		if err := n.beacons.AddWeight(peer.ID, 1); err != nil {
 			return err
 		}
 	}
@@ -363,6 +365,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	})
 
 	bootstrapWeight := n.beacons.Weight()
+
 	reqWeight := (3*bootstrapWeight + 3) / 4
 
 	if reqWeight == 0 {
@@ -442,12 +445,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Instead of updating node's validator manager, platform chain makes changes
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
-		primaryNetworkValidators := validators.NewSet()
-		if err := primaryNetworkValidators.Add(validators.NewValidator(n.ID, 1)); err != nil {
-			return fmt.Errorf("couldn't add validator to primary network: %w", err)
-		}
 		vdrs = validators.NewManager()
-		vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
 	}
 
 	errs := wrappers.Errs{}

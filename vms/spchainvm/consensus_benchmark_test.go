@@ -54,7 +54,7 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+		vdrs.AddWeight(ctx.NodeID, 1)
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
@@ -191,7 +191,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+		vdrs.AddWeight(ctx.NodeID, 1)
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}

@@ -23,8 +23,9 @@ import (
 )
 
 var (
-	errInvalidState  = errors.New("generated output isn't valid state")
-	errInvalidAmount = errors.New("invalid amount")
+	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
+	errInvalidState    = errors.New("generated output isn't valid state")
+	errInvalidAmount   = errors.New("invalid amount")
 
 	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
 	_ TimedTx            = &UnsignedAddDelegatorTx{}
@@ -127,33 +128,24 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 			validatorStartTime)}
 	}
 
-	// Ensure that the period this delegator is running is a subset of the time
-	// the validator is running. First, see if the validator is currently
-	// running.
-	currentValidators, err := vm.getCurrentValidators(db, constants.PrimaryNetworkID)
+	// Ensure that the period this delegator delegates is a subset of the time
+	// the validator validates.
+	vdr, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
-		return nil, nil, nil, nil, permError{fmt.Errorf("couldn't get current validators of primary network: %w", err)}
+		return nil, nil, nil, nil, tempError{err}
 	}
-	pendingValidators, err := vm.getPendingValidators(db, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{fmt.Errorf("couldn't get pending validators of primary network: %w", err)}
+	if isValidator && !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+		return nil, nil, nil, nil, permError{errDelegatorSubset}
 	}
-
-	if validator, err := currentValidators.getPrimaryStaker(tx.Validator.NodeID); err == nil {
-		unsignedValidator := validator.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
-			return nil, nil, nil, nil, permError{errDSValidatorSubset}
-		}
-	} else {
-		// They aren't currently validating, so check to see if they will
-		// validate in the future.
-		validator, err := pendingValidators.getPrimaryStaker(tx.Validator.NodeID)
+	if !isValidator {
+		// Ensure that the period this delegator delegates is a subset of the
+		// time the validator will validates.
+		vdr, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
 		if err != nil {
-			return nil, nil, nil, nil, permError{errDSValidatorSubset}
+			return nil, nil, nil, nil, tempError{err}
 		}
-		unsignedValidator := validator.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !tx.Validator.BoundedBy(unsignedValidator.StartTime(), unsignedValidator.EndTime()) {
-			return nil, nil, nil, nil, permError{errDSValidatorSubset}
+		if !willBeValidator || !tx.Validator.BoundedBy(vdr.StartTime(), vdr.EndTime()) {
+			return nil, nil, nil, nil, permError{errDelegatorSubset}
 		}
 	}
 
@@ -179,10 +171,8 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	// Add the delegator to the pending validators heap
-	pendingValidators.Add(stx)
 	// If this proposal is committed, update the pending validator set to include the delegator
-	if err := vm.putPendingValidators(onCommitDB, pendingValidators, constants.PrimaryNetworkID); err != nil {
+	if err := vm.enqueueStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 

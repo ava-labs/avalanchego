@@ -66,7 +66,7 @@ func (b *blockJob) Execute() error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		if err := b.blk.Verify(); err != nil {
-			b.log.Debug("block %s failed verification during bootstrapping due to %s",
+			return fmt.Errorf("block %s failed verification during bootstrapping due to: %w",
 				b.blk.ID(), err)
 		}
 

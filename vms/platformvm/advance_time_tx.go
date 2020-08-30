@@ -4,14 +4,11 @@
 package platformvm
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
@@ -66,95 +63,30 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 			tx.Timestamp(), currentTimestamp)}
 	}
 
-	// Only allow timestamp to move forward as far as the next validator's end time
-	if nextValidatorEndTime := vm.nextValidatorChangeTime(db, false); tx.Time > uint64(nextValidatorEndTime.Unix()) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s) later than next validator end time (%s)",
-			tx.Timestamp(), nextValidatorEndTime)}
+	// Only allow timestamp to move forward as far as the time of next staker set change time
+	nextStakerChangeTime, err := vm.nextStakerChangeTime(db)
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	} else if tx.Time > uint64(nextStakerChangeTime.Unix()) {
+		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s) later than next staker change time (%s)",
+			tx.Timestamp(), nextStakerChangeTime)}
 	}
-
-	// Only allow timestamp to move forward as far as the next pending validator's start time
-	if nextValidatorStartTime := vm.nextValidatorChangeTime(db, true); tx.Time > uint64(nextValidatorStartTime.Unix()) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s) later than next validator start time (%s)",
-			tx.Timestamp(), nextValidatorStartTime)}
-	}
-
-	// Calculate what the validator sets will be given new timestamp
-	// Move validators from pending to current if their start time is <= new timestamp.
-	// Remove validators from current if their end time <= proposed timestamp
 
 	// Specify what the state of the chain will be if this proposal is committed
 	onCommitDB := versiondb.New(db)
 	if err := vm.putTimestamp(onCommitDB, tx.Timestamp()); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
-
-	current, pending, _, _, err := vm.calculateValidators(db, tx.Timestamp(), constants.PrimaryNetworkID)
-	if err != nil {
+	if err := vm.updateValidators(onCommitDB); err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if err := vm.putCurrentValidators(onCommitDB, current, constants.PrimaryNetworkID); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	} else if err := vm.putPendingValidators(onCommitDB, pending, constants.PrimaryNetworkID); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-
-	// For each Subnet, calculate what current and pending validator sets should be
-	// given new timestamp
-
-	// Key: Subnet ID
-	// Value: IDs of validators that will have started validating this Subnet when
-	// timestamp is advanced to tx.Timestamp()
-	startedValidating := make(map[[32]byte]ids.ShortSet)
-	subnets, err := vm.getSubnets(db)
-	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
-	for _, subnet := range subnets {
-		subnetID := subnet.ID()
-		if current, pending, started, _, err := vm.calculateValidators(db, tx.Timestamp(), subnetID); err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		} else if err := vm.putCurrentValidators(onCommitDB, current, subnetID); err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		} else if err := vm.putPendingValidators(onCommitDB, pending, subnetID); err != nil {
-			return nil, nil, nil, nil, tempError{err}
-		} else {
-			startedValidating[subnet.ID().Key()] = started
-		}
 	}
 
 	// If this block is committed, update the validator sets
 	// onAbortDB or onCommitDB should commit (flush to vm.DB) before this is called
 	onCommitFunc := func() error {
-		// For each Subnet, update the node's validator manager to reflect current Subnet membership
-		subnets, err := vm.getSubnets(vm.DB)
-		if err != nil {
-			return err
-		}
-		for _, subnet := range subnets {
-			if err := vm.updateValidators(subnet.ID()); err != nil {
-				return err
-			}
-		}
-		if err := vm.updateValidators(constants.PrimaryNetworkID); err != nil {
-			return err
-		}
 
-		// If this node started validating a Subnet, create the blockchains that the Subnet validates
-		chains, err := vm.getChains(vm.DB) // all blockchains
-		if err != nil {
-			return err
-		}
-		for subnetID, validatorIDs := range startedValidating {
-			if !validatorIDs.Contains(vm.Ctx.NodeID) {
-				continue
-			}
-			for _, chain := range chains {
-				unsignedChain := chain.UnsignedTx.(*UnsignedCreateChainTx)
-				if bytes.Equal(subnetID[:], unsignedChain.SubnetID.Bytes()) {
-					vm.createChain(chain)
-				}
-			}
-		}
-		return nil
+		// For each Subnet, update the node's validator manager to reflect current Subnet membership
+		return vm.updateVdrMgr(false)
 	}
 
 	// State doesn't change if this proposal is aborted

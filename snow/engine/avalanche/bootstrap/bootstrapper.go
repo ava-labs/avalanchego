@@ -136,7 +136,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 			continue
 		}
 
-		validators, err := b.Validators.Sample(1) // validator to send request to
+		validators, err := b.Beacons.Sample(1) // validator to send request to
 		if err != nil {
 			return fmt.Errorf("dropping request for %s as there are no validators", vtxID)
 		}
