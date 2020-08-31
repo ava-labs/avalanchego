@@ -122,6 +122,8 @@ type Index struct {
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
 // Gets the UTXOs that reference at least one address in [Addresses].
 // Returns at most [limit] addresses.
+// If specified, [SourceChain] is the chain where the atomic UTXOs were exported from. If empty,
+// or the Chain ID of this VM is specified, then GetUTXOs fetches the native UTXOs.
 // If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
 // [StartIndex] defines where to start fetching UTXOs (for pagination.)
 // UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
@@ -130,13 +132,16 @@ type Index struct {
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
 type GetUTXOsArgs struct {
-	Addresses  []string    `json:"addresses"`
-	Limit      json.Uint32 `json:"limit"`
-	StartIndex Index       `json:"startIndex"`
+	Addresses   []string    `json:"addresses"`
+	SourceChain string      `json:"sourceChain"`
+	Limit       json.Uint32 `json:"limit"`
+	StartIndex  Index       `json:"startIndex"`
 }
 
 // GetUTXOsReply defines the GetUTXOs replies returned from the API
 type GetUTXOsReply struct {
+	// Number of UTXOs returned
+	NumFetched json.Uint64 `json:"numFetched"`
 	// The UTXOs
 	UTXOs []formatting.CB58 `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
@@ -156,20 +161,22 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("number of addresses given, %d, exceeds maximum, %d", len(args.Addresses), maxGetUTXOsAddrs)
 	}
 
-	chainID := ids.ID{}
+	sourceChain := ids.ID{}
+	if args.SourceChain == "" {
+		sourceChain = service.vm.ctx.ChainID
+	} else {
+		chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
+		if err != nil {
+			return fmt.Errorf("problem parsing source chainID %q: %w", args.SourceChain, err)
+		}
+		sourceChain = chainID
+	}
 
 	addrSet := ids.ShortSet{}
 	for _, addrStr := range args.Addresses {
-		addrChainID, addr, err := service.vm.ParseAddress(addrStr)
+		addr, err := service.vm.ParseLocalAddress(addrStr)
 		if err != nil {
-			return fmt.Errorf("problem parsing address %q: %w", addrStr, err)
-		}
-		if chainID.IsZero() {
-			chainID = addrChainID
-		}
-		if !chainID.Equals(addrChainID) {
-			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
-				chainID, addrChainID)
+			return fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
 		}
 		addrSet.Add(addr)
 	}
@@ -177,13 +184,9 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
-		addrChainID, addr, err := service.vm.ParseAddress(args.StartIndex.Address)
+		addr, err := service.vm.ParseLocalAddress(args.StartIndex.Address)
 		if err != nil {
-			return fmt.Errorf("couldn't parse start index address: %w", err)
-		}
-		if !chainID.Equals(addrChainID) {
-			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
-				chainID, addrChainID)
+			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
 		}
 		utxo, err := ids.FromString(args.StartIndex.UTXO)
 		if err != nil {
@@ -200,7 +203,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		endUTXOID ids.ID
 		err       error
 	)
-	if chainID.Equals(service.vm.ctx.ChainID) {
+	if sourceChain.Equals(service.vm.ctx.ChainID) {
 		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
 			addrSet,
 			startAddr,
@@ -209,7 +212,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
-			chainID,
+			sourceChain,
 			addrSet,
 			startAddr,
 			startUTXO,
@@ -229,13 +232,14 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		reply.UTXOs[i] = formatting.CB58{Bytes: b}
 	}
 
-	endAddress, err := service.vm.FormatAddress(chainID, endAddr)
+	endAddress, err := service.vm.FormatLocalAddress(endAddr)
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
 
 	reply.EndIndex.Address = endAddress
 	reply.EndIndex.UTXO = endUTXOID.String()
+	reply.NumFetched = json.Uint64(len(utxos))
 	return nil
 }
 
