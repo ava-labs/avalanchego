@@ -363,10 +363,12 @@ func (vm *VMClient) ParseBlock(bytes []byte) (snowman.Block, error) {
 	}, nil
 }
 
-// SaveBlock ...
-// TODO: Implement this
+// SaveBlock persists [blk] in storage.
 func (vm *VMClient) SaveBlock(blk snowman.Block) error {
-	return errors.New("TODO")
+	_, err := vm.client.SaveBlock(context.Background(), &vmproto.SaveBlockRequest{
+		Bytes: blk.Bytes(),
+	})
+	return err
 }
 
 // GetBlock ...
