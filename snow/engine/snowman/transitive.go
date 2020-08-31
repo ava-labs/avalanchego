@@ -418,10 +418,10 @@ func (t *Transitive) Notify(msg common.Message) error {
 		// fails, there is potentially an error in the VM this engine is running
 		if status := blk.Status(); status != choices.Processing {
 			t.Ctx.Log.Warn("attempted to issue a block with status: %s, expected Processing", status)
-			return nil // TODO should we return an error here?
+			return nil
 		} else if t.pending.Contains(blkID) || t.Consensus.Issued(blk) {
 			t.Ctx.Log.Warn("attemped to issue already issued block %s", blkID)
-			return nil // TODO should we return an error here?
+			return nil
 		}
 
 		// The newly created block should be built on top of the preferred block.
