@@ -427,7 +427,6 @@ func (t *Transitive) Notify(msg common.Message) error {
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent()
-		t.Ctx.Log.Debug("Parent: %s", parentID) // TODO remove
 		if pref := t.Consensus.Preference(); !parentID.Equals(pref) {
 			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
@@ -488,7 +487,6 @@ func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) 
 	// We have block [blkID] but it's not yet decided.
 	// Queue it to be added to consensus.
 	return t.issueFrom(vdr, blk)
-
 }
 
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
@@ -576,13 +574,10 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	parentID := blk.Parent()
 	_, parentIssued := t.decidedCache.Get(parentID) // If parent is in decided cache, it was previously issued
 	if !parentIssued {
-		parent, err := t.GetBlock(parentID) // Try to get the parent (returns err if the parent is rejected)
-		if err != nil {
-			parent = &missing.Block{BlkID: parentID}
+		if parent, err := t.GetBlock(parentID); err == nil { // Try to get the parent (returns err if the parent is rejected)
+			parentIssued = t.Consensus.Issued(parent) // If we have block locally, check if it's issued
 		}
-		parentIssued = parentIssued || t.Consensus.Issued(parent) // If we have block locally, check if it's issued
 	}
-
 	if !parentIssued {
 		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
@@ -664,7 +659,6 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// Make sure this block is valid
 	if err := blk.Verify(); err != nil {
-		t.Ctx.Log.Debug("block failed verification due to %s. Dropping block.", err)
 		delete(t.processing, blkID.Key()) // Unpin from memory
 		t.droppedCache.Put(blkID, blk)
 		// if verify fails, then all descendants are also invalid
