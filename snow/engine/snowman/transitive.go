@@ -237,6 +237,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 	if blk.Status() == choices.Processing { // Pin this block in memory until it's decided or dropped
 		t.processing[blk.ID().Key()] = blk
 		t.droppedCache.Evict(blkID)
+		t.numProcessing.Set(float64(len(t.processing)))
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -322,6 +323,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 	} else if blk.Status() == choices.Processing { // Pin this block in memory until it's decided or dropped
 		t.processing[blkID.Key()] = blk
 		t.droppedCache.Evict(blkID)
+		t.numProcessing.Set(float64(len(t.processing)))
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -433,6 +435,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 		t.processing[blkID.Key()] = blk
 		t.droppedCache.Evict(blkID)
+		t.numProcessing.Set(float64(len(t.processing))) // Record metric
 		added, err := t.issueWithAncestors(blk)
 		if err != nil {
 			return err
@@ -664,6 +667,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		// if verify fails, then all descendants are also invalid
 		t.blocked.Abandon(blkID)
 		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.numProcessing.Set(float64(len(t.processing)))
 		return t.errs.Err
 	}
 
@@ -674,6 +678,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		t.decidedCache.Put(blkID, nil)
 		t.droppedCache.Evict(blkID)       // Remove from dropped cache, if it was in there
 		delete(t.processing, blkID.Key()) // This block was rejected. Unpin from memory.
+		t.numProcessing.Set(float64(len(t.processing)))
 	}
 
 	// Add all the oracle blocks if they exist. We call verify on all the blocks
@@ -698,6 +703,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 					t.decidedCache.Put(blk.ID(), nil)
 					t.droppedCache.Evict(blkID)          // Remove from dropped cache, if it was in there
 					delete(t.processing, blk.ID().Key()) // This block was rejected. Unpin from memory.
+					t.numProcessing.Set(float64(len(t.processing)))
 				}
 				added = append(added, blk)
 			}

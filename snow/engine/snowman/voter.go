@@ -74,6 +74,7 @@ func (v *voter) Update() {
 		v.t.droppedCache.Evict(rejectedID) // Remove from dropped cache, if it was in there
 		delete(v.t.processing, rejectedID.Key())
 	}
+	v.t.numProcessing.Set(float64(len(v.t.processing)))
 
 	v.t.VM.SetPreference(v.t.Consensus.Preference())
 

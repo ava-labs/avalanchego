@@ -10,7 +10,7 @@ import (
 )
 
 type metrics struct {
-	numRequests, numBlocked prometheus.Gauge
+	numRequests, numBlocked, numProcessing prometheus.Gauge
 }
 
 // Initialize the metrics
@@ -25,11 +25,17 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		Name:      "blocked",
 		Help:      "Number of blocks that are pending issuance",
 	})
+	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "processing",
+		Help:      "Number of blocks that are currently processing",
+	})
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(m.numRequests),
 		registerer.Register(m.numBlocked),
+		registerer.Register(m.numProcessing),
 	)
 	return errs.Err
 }
