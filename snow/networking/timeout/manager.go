@@ -18,15 +18,20 @@ type Manager struct{ tm timer.AdaptiveTimeoutManager }
 
 // Initialize this timeout manager.
 func (m *Manager) Initialize(
+	initialDuration time.Duration,
+	minimumDuration time.Duration,
+	maximumDuration time.Duration,
+	increaseRatio float64,
+	decreaseValue time.Duration,
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
 	return m.tm.Initialize(
-		time.Second,
-		500*time.Millisecond,
-		10*time.Second,
-		1.1,
-		time.Millisecond,
+		initialDuration,
+		minimumDuration,
+		maximumDuration,
+		increaseRatio,
+		decreaseValue,
 		namespace,
 		registerer,
 	)

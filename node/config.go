@@ -4,6 +4,8 @@
 package node
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
@@ -44,8 +46,15 @@ type Config struct {
 	StakingCertFile         string
 	DisabledStakingWeight   uint64
 	MaxNonStakerPendingMsgs uint
-	StakerMsgPortion        float64
+	StakerMSGPortion        float64
 	StakerCPUPortion        float64
+
+	// Network configuration
+	NetworkInitialTimeout    time.Duration
+	NetworkMinimumTimeout    time.Duration
+	NetworkMaximumTimeout    time.Duration
+	NetworkTimeoutMultiplier float64
+	NetworkTimeoutReduction  time.Duration
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
@@ -53,7 +62,7 @@ type Config struct {
 	// HTTP configuration
 	HTTPHost      string
 	HTTPPort      uint16
-	EnableHTTPS   bool
+	HTTPSEnabled  bool
 	HTTPSKeyFile  string
 	HTTPSCertFile string
 
@@ -83,5 +92,7 @@ type Config struct {
 	IPCDefaultChainIDs []string
 
 	// Router that is used to handle incoming consensus messages
-	ConsensusRouter router.Router
+	ConsensusRouter          router.Router
+	ConsensusGossipFrequency time.Duration
+	ConsensusShutdownTimeout time.Duration
 }

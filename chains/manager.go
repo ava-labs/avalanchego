@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/keystore"
@@ -43,8 +42,6 @@ import (
 
 const (
 	defaultChannelSize = 1024
-	gossipFrequency    = 10 * time.Second
-	shutdownTimeout    = 1 * time.Second
 )
 
 // Manager manages the chains running on this node.
@@ -174,19 +171,8 @@ func New(
 	avaxAssetID ids.ID,
 	xChainID ids.ID,
 	criticalChains ids.Set,
-) (Manager, error) {
-	timeoutManager := timeout.Manager{}
-	err := timeoutManager.Initialize(
-		"gecko",
-		consensusParams.Metrics,
-	)
-	if err != nil {
-		return nil, err
-	}
-	go log.RecoverAndPanic(timeoutManager.Dispatch)
-
-	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
-
+	timeoutManager *timeout.Manager,
+) Manager {
 	m := &manager{
 		stakingEnabled:          stakingEnabled,
 		maxNonStakerPendingMsgs: uint32(maxNonStakerPendingMsgs),
@@ -200,7 +186,7 @@ func New(
 		db:                      db,
 		chainRouter:             rtr,
 		net:                     net,
-		timeoutManager:          &timeoutManager,
+		timeoutManager:          timeoutManager,
 		consensusParams:         consensusParams,
 		validators:              validators,
 		nodeID:                  nodeID,
@@ -214,7 +200,7 @@ func New(
 		chains:                  make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
-	return m, nil
+	return m
 }
 
 // Router that this chain manager is using to route consensus messages to chains
@@ -231,13 +217,6 @@ func (m *manager) CreateChain(chain ChainParameters) {
 
 // Create a chain
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
-	m.log.Info("creating chain:\n"+
-		"    ID: %s\n"+
-		"    VMID:%s",
-		chainParams.ID,
-		chainParams.VMAlias,
-	)
-
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
 	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
@@ -245,6 +224,13 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			alias)
 		return
 	}
+
+	m.log.Info("creating chain:\n"+
+		"    ID: %s\n"+
+		"    VMID:%s",
+		chainParams.ID,
+		chainParams.VMAlias,
+	)
 
 	chain, err := m.buildChain(chainParams)
 	if err != nil {

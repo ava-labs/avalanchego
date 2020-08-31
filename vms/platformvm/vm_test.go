@@ -1539,7 +1539,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize("", prometheus.NewRegistry())
+	timeoutManager.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}

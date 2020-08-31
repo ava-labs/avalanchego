@@ -20,7 +20,15 @@ import (
 
 func TestShutdown(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -70,7 +78,15 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}

@@ -59,7 +59,15 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize("", prometheus.NewRegistry())
+		timeoutManager.Initialize(
+			10*time.Second,
+			500*time.Millisecond,
+			10*time.Second,
+			1.1,
+			time.Millisecond,
+			"",
+			prometheus.NewRegistry(),
+		)
 		go timeoutManager.Dispatch()
 
 		chainRouter := &router.ChainRouter{}
@@ -197,7 +205,15 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize("", prometheus.NewRegistry())
+		timeoutManager.Initialize(
+			10*time.Second,
+			500*time.Millisecond,
+			10*time.Second,
+			1.1,
+			time.Millisecond,
+			"",
+			prometheus.NewRegistry(),
+		)
 		go timeoutManager.Dispatch()
 
 		chainRouter := &router.ChainRouter{}

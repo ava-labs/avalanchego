@@ -38,7 +38,15 @@ func TestSenderContext(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -93,7 +101,15 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -159,7 +175,15 @@ func TestReliableMessages(t *testing.T) {
 
 func TestReliableMessagesToMyself(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}

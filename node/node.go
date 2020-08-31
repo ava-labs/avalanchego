@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/network"
+	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
@@ -216,7 +217,7 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 func (n *Node) Dispatch() error {
 	// Start the HTTP endpoint
 	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
+		if n.Config.HTTPSEnabled {
 			n.Log.Debug("Initializing API server with TLS Enabled")
 			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
 			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
@@ -412,10 +413,31 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
-	n.chainManager, err = chains.New(
+	timeoutManager := timeout.Manager{}
+	if err := timeoutManager.Initialize(
+		n.Config.NetworkInitialTimeout,
+		n.Config.NetworkMinimumTimeout,
+		n.Config.NetworkMaximumTimeout,
+		n.Config.NetworkTimeoutMultiplier,
+		n.Config.NetworkTimeoutReduction,
+		"gecko",
+		n.Config.ConsensusParams.Metrics,
+	); err != nil {
+		return err
+	}
+	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+
+	n.Config.ConsensusRouter.Initialize(
+		n.Log,
+		&timeoutManager,
+		n.Config.ConsensusGossipFrequency,
+		n.Config.ConsensusShutdownTimeout,
+	)
+
+	n.chainManager = chains.New(
 		n.Config.EnableStaking,
 		n.Config.MaxNonStakerPendingMsgs,
-		n.Config.StakerMsgPortion,
+		n.Config.StakerMSGPortion,
 		n.Config.StakerCPUPortion,
 		n.Log,
 		n.LogFactory,
@@ -435,10 +457,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		avaxAssetID,
 		xChainID,
 		criticalChains,
+		&timeoutManager,
 	)
-	if err != nil {
-		return err
-	}
 
 	vdrs := n.vdrs
 

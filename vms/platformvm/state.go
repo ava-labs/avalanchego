@@ -26,9 +26,6 @@ import (
 
 // TODO: Cache prefixed IDs or use different way of keying into database
 const (
-	currentValidatorsPrefix uint64 = iota
-	pendingValidatorsPrefix
-
 	delegator = "delegator"
 	start     = "start"
 	stop      = "stop"
