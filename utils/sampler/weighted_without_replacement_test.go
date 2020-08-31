@@ -18,10 +18,19 @@ var (
 		sampler WeightedWithoutReplacement
 	}{
 		{
-			name: "generic with replacer and heap",
+			name: "generic with replacer and best",
 			sampler: &weightedWithoutReplacementGeneric{
 				u: &uniformReplacer{},
-				w: &weightedHeap{},
+				w: &weightedBest{
+					samplers: []Weighted{
+						&weightedArray{},
+						&weightedHeap{},
+						&weightedUniform{
+							maxWeight: 1 << 10,
+						},
+					},
+					benchmarkIterations: 30,
+				},
 			},
 		},
 	}

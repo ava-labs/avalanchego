@@ -50,19 +50,8 @@ type APIValidator struct {
 	ID          ids.ShortID  `json:"id"`
 }
 
-func (v *APIValidator) weight() uint64 {
-	switch {
-	case v.Weight != nil:
-		return uint64(*v.Weight)
-	case v.StakeAmount != nil:
-		return uint64(*v.StakeAmount)
-	default:
-		return 0
-	}
-}
-
-// APIDefaultSubnetValidator is a validator of the default subnet
-type APIDefaultSubnetValidator struct {
+// APIPrimaryValidator is a validator of the primary network
+type APIPrimaryValidator struct {
 	APIValidator
 
 	RewardAddress     string      `json:"rewardAddress"`
@@ -89,8 +78,8 @@ func (v *FormattedAPIValidator) weight() uint64 {
 	}
 }
 
-// FormattedAPIDefaultSubnetValidator is a formatted validator of the default subnet
-type FormattedAPIDefaultSubnetValidator struct {
+// FormattedAPIPrimaryValidator is a formatted validator of the primary network
+type FormattedAPIPrimaryValidator struct {
 	FormattedAPIValidator
 
 	RewardAddress string `json:"rewardAddress"`
@@ -118,17 +107,17 @@ type APIChain struct {
 // the genesis data of the Platform Chain.
 // [NetworkID] is the ID of the network
 // [UTXOs] are the UTXOs on the Platform Chain that exist at genesis.
-// [Validators] are the validators of the default subnet at genesis.
+// [Validators] are the validators of the primary network at genesis.
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID ids.ID                               `json:"avaxAssetID"`
-	NetworkID   json.Uint32                          `json:"address"`
-	UTXOs       []APIUTXO                            `json:"utxos"`
-	Validators  []FormattedAPIDefaultSubnetValidator `json:"defaultSubnetValidators"`
-	Chains      []APIChain                           `json:"chains"`
-	Time        json.Uint64                          `json:"time"`
-	Message     string                               `json:"message"`
+	AvaxAssetID ids.ID                         `json:"avaxAssetID"`
+	NetworkID   json.Uint32                    `json:"address"`
+	UTXOs       []APIUTXO                      `json:"utxos"`
+	Validators  []FormattedAPIPrimaryValidator `json:"primaryNetworkValidators"`
+	Chains      []APIChain                     `json:"chains"`
+	Time        json.Uint64                    `json:"time"`
+	Message     string                         `json:"message"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -198,7 +187,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		})
 	}
 
-	// Specify the validators that are validating the default subnet at genesis.
+	// Specify the validators that are validating the primary network at genesis.
 	validators := &EventHeap{}
 	for _, validator := range args.Validators {
 		weight := validator.weight()
@@ -217,7 +206,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			return err
 		}
 
-		tx := &Tx{UnsignedTx: &UnsignedAddDefaultSubnetValidatorTx{
+		tx := &Tx{UnsignedTx: &UnsignedAddValidatorTx{
 			BaseTx: BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,

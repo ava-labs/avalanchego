@@ -16,14 +16,10 @@ import (
 )
 
 var (
-	errSpendOverflow                = errors.New("spent amount overflows uint64")
-	errNoKeys                       = errors.New("no keys provided")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 	errWrongLocktime                = errors.New("wrong locktime reported")
 	errUnknownOwners                = errors.New("unknown owners")
 	errCantSign                     = errors.New("can't sign")
-	errInputOverflow                = errors.New("inputs overflowed uint64")
-	errOutputOverflow               = errors.New("outputs overflowed uint64")
 )
 
 // stake the provided amount while deducting the provided fee.
@@ -341,7 +337,7 @@ func (vm *VM) semanticVerifySpend(
 		utxoID := input.UTXOID.InputID()
 		utxo, err := vm.getUTXO(db, utxoID)
 		if err != nil {
-			return tempError{err}
+			return tempError{fmt.Errorf("failed to read consumed UTXO %s due to: %w", utxoID, err)}
 		}
 		utxos[index] = utxo
 	}

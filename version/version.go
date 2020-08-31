@@ -93,9 +93,9 @@ func (v *version) Compatible(o Version) error {
 	switch {
 	case v.App() != o.App():
 		return errDifferentApps
-	case v.Major() != o.Major():
+	case v.Major() > o.Major():
 		return errDifferentMajor
-	case v.Minor() != o.Minor():
+	case v.Major() == o.Major() && v.Minor() > o.Minor():
 		return errDifferentMinor
 	default:
 		return nil

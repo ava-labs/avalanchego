@@ -57,7 +57,7 @@ const (
 var (
 	errEmptyUsername     = errors.New("username can't be the empty string")
 	errUserPassMaxLength = fmt.Errorf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen)
-	errWeakPassword      = errors.New("Failed to create user as the given password is too weak")
+	errWeakPassword      = errors.New("failed to create user as the given password is too weak")
 )
 
 // KeyValuePair ...

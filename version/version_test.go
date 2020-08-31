@@ -4,6 +4,7 @@
 package version
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,54 +36,83 @@ func TestNewVersion(t *testing.T) {
 	assert.False(t, v.Before(v))
 }
 
-func TestIncompatibleApps(t *testing.T) {
-	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
-	v1 := NewDefaultVersion("notavalanche", 1, 2, 3)
-
-	assert.NotNil(t, v0)
-	assert.NotNil(t, v1)
-	assert.Error(t, v0.Compatible(v1))
-	assert.Error(t, v1.Compatible(v0))
-
-	assert.False(t, v0.Before(v1))
-	assert.False(t, v1.Before(v0))
-}
-
-func TestIncompatibleMajor(t *testing.T) {
-	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
-	v1 := NewDefaultVersion("avalanche", 2, 2, 3)
-
-	assert.NotNil(t, v0)
-	assert.NotNil(t, v1)
-	assert.Error(t, v0.Compatible(v1))
-	assert.Error(t, v1.Compatible(v0))
-
-	assert.True(t, v0.Before(v1))
-	assert.False(t, v1.Before(v0))
-}
-
-func TestIncompatibleMinor(t *testing.T) {
-	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
-	v1 := NewDefaultVersion("avalanche", 1, 3, 3)
-
-	assert.NotNil(t, v0)
-	assert.NotNil(t, v1)
-	assert.Error(t, v0.Compatible(v1))
-	assert.Error(t, v1.Compatible(v0))
-
-	assert.True(t, v0.Before(v1))
-	assert.False(t, v1.Before(v0))
-}
-
-func TestCompatiblePatch(t *testing.T) {
-	v0 := NewDefaultVersion("avalanche", 1, 2, 3)
-	v1 := NewDefaultVersion("avalanche", 1, 2, 4)
-
-	assert.NotNil(t, v0)
-	assert.NotNil(t, v1)
-	assert.NoError(t, v0.Compatible(v1))
-	assert.NoError(t, v1.Compatible(v0))
-
-	assert.True(t, v0.Before(v1))
-	assert.False(t, v1.Before(v0))
+func TestComparingVersions(t *testing.T) {
+	tests := []struct {
+		myVersion   Version
+		peerVersion Version
+		compatible  bool
+		before      bool
+	}{
+		{
+			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			compatible:  true,
+			before:      false,
+		},
+		{
+			myVersion:   NewDefaultVersion("avalanche", 1, 2, 4),
+			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			compatible:  true,
+			before:      false,
+		},
+		{
+			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultVersion("avalanche", 1, 2, 4),
+			compatible:  true,
+			before:      true,
+		},
+		{
+			myVersion:   NewDefaultVersion("avalanche", 1, 3, 3),
+			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			compatible:  false,
+			before:      false,
+		},
+		{
+			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultVersion("avalanche", 1, 3, 3),
+			compatible:  true,
+			before:      true,
+		},
+		{
+			myVersion:   NewDefaultVersion("avalanche", 2, 2, 3),
+			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			compatible:  false,
+			before:      false,
+		},
+		{
+			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultVersion("avalanche", 2, 2, 3),
+			compatible:  true,
+			before:      true,
+		},
+		{
+			myVersion:   NewDefaultVersion("avax", 1, 2, 4),
+			peerVersion: NewDefaultVersion("avalanche", 1, 2, 3),
+			compatible:  false,
+			before:      false,
+		},
+		{
+			myVersion:   NewDefaultVersion("avalanche", 1, 2, 3),
+			peerVersion: NewDefaultVersion("avax", 1, 2, 3),
+			compatible:  false,
+			before:      false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s %s", test.myVersion, test.peerVersion), func(t *testing.T) {
+			err := test.myVersion.Compatible(test.peerVersion)
+			if test.compatible && err != nil {
+				t.Fatalf("Expected version to be compatible but returned: %s",
+					err)
+			} else if !test.compatible && err == nil {
+				t.Fatalf("Expected version to be incompatible but returned no error")
+			}
+			before := test.myVersion.Before(test.peerVersion)
+			if test.before && !before {
+				t.Fatalf("Expected version to be before the peer version but wasn't")
+			} else if !test.before && before {
+				t.Fatalf("Expected version not to be before the peer version but was")
+			}
+		})
+	}
 }

@@ -121,7 +121,7 @@ func (dev *Mapper) keepPortMapping(mappedPort chan<- uint16, protocol string,
 					}
 
 					updateTimer.Reset(mapUpdateTimeout)
-				case _, _ = <-dev.closer:
+				case <-dev.closer:
 					return
 				}
 			}

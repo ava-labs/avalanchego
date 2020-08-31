@@ -4,7 +4,6 @@
 package network
 
 import (
-	"bytes"
 	"math"
 	"net"
 	"sync"
@@ -470,8 +469,13 @@ func (p *peer) version(msg Msg) {
 	if err := p.net.version.Compatible(peerVersion); err != nil {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
-		p.discardIP()
-		return
+		if !p.net.beacons.Contains(p.id) {
+			p.discardIP()
+			return
+		}
+		p.net.log.Info("allowing beacon %s to connect with a lower version %s",
+			p.id,
+			peerVersion)
 	}
 
 	if p.ip.IsZero() {
@@ -483,7 +487,7 @@ func (p *peer) version(msg Msg) {
 		if err == nil {
 			// If we have no clue what the peer's IP is, we can't perform any
 			// verification
-			if bytes.Equal(peerIP.IP, localPeerIP.IP) {
+			if peerIP.IP.Equal(localPeerIP.IP) {
 				// if the IPs match, add this ip:port pair to be tracked
 				p.net.stateLock.Lock()
 				p.ip = peerIP

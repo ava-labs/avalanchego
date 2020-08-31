@@ -58,10 +58,6 @@ func (vm *testVM) Clock() *timer.Clock { return &vm.clock }
 
 func (vm *testVM) Logger() logging.Logger { return logging.NoLog{} }
 
-type testCodec struct{}
-
-func (c *testCodec) RegisterStruct(interface{}) {}
-
 type testTx struct{ bytes []byte }
 
 func (tx *testTx) UnsignedBytes() []byte { return tx.bytes }

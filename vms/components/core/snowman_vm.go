@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	errUnmarshalBlockUndefined = errors.New("vm's UnmarshalBlock member is undefined")
-	errBadData                 = errors.New("got unexpected value from database")
+	errBadData = errors.New("got unexpected value from database")
 )
 
 // If the status of this ID is not choices.Accepted,

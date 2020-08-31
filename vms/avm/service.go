@@ -116,7 +116,7 @@ func (service *Service) GetTx(r *http.Request, args *api.JsonTxID, reply *Format
 // Marks a starting or stopping point when fetching UTXOs. Used for pagination.
 type Index struct {
 	Address string `json:"address"` // The address as a string
-	Utxo    string `json:"utxo"`    // The UTXO ID as a string
+	UTXO    string `json:"utxo"`    // The UTXO ID as a string
 }
 
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
@@ -125,7 +125,7 @@ type Index struct {
 // If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
 // [StartIndex] defines where to start fetching UTXOs (for pagination.)
 // UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
-// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.Utxo] will be returned.
+// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.UTXO] will be returned.
 // If [StartIndex] is omitted, gets all UTXOs.
 // If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
 // that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
@@ -176,7 +176,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
-	if args.StartIndex.Address != "" || args.StartIndex.Utxo != "" {
+	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
 		addrChainID, addr, err := service.vm.ParseAddress(args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address: %w", err)
@@ -185,7 +185,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 			return fmt.Errorf("addresses from multiple chains provided: %q and %q",
 				chainID, addrChainID)
 		}
-		utxo, err := ids.FromString(args.StartIndex.Utxo)
+		utxo, err := ids.FromString(args.StartIndex.UTXO)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index utxo: %w", err)
 		}
@@ -235,7 +235,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 	}
 
 	reply.EndIndex.Address = endAddress
-	reply.EndIndex.Utxo = endUTXOID.String()
+	reply.EndIndex.UTXO = endUTXOID.String()
 	return nil
 }
 
@@ -372,8 +372,8 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 		return fmt.Errorf("couldn't get address's UTXOs: %s", err)
 	}
 
-	assetIDs := ids.Set{}                    // IDs of assets the address has a non-zero balance of
-	balances := make(map[[32]byte]uint64, 0) // key: ID (as bytes). value: balance of that asset
+	assetIDs := ids.Set{}                 // IDs of assets the address has a non-zero balance of
+	balances := make(map[[32]byte]uint64) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
 		transferable, ok := utxo.Out.(avax.TransferableOut)
 		if !ok {
@@ -886,17 +886,30 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 
 // SendArgs are arguments for passing into Send requests
 type SendArgs struct {
+	// Username and password of user sending the funds
 	api.UserPass
-	Amount  json.Uint64 `json:"amount"`
-	AssetID string      `json:"assetID"`
-	To      string      `json:"to"`
+
+	// The amount of funds to send
+	Amount json.Uint64 `json:"amount"`
+
+	// ID of the asset being sent
+	AssetID string `json:"assetID"`
+
+	// Address of the recipient
+	To string `json:"to"`
+
+	// Memo field
+	Memo string `json:"memo"`
 }
 
 // Send returns the ID of the newly created transaction
 func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("AVM: Send called with username: %s", args.Username)
 
-	if args.Amount == 0 {
+	memoBytes := []byte(args.Memo)
+	if l := len(memoBytes); l > avax.MaxMemoSize {
+		return fmt.Errorf("max memo length is %d but provided memo field is length %d", avax.MaxMemoSize, l)
+	} else if args.Amount == 0 {
 		return errInvalidAmount
 	}
 
@@ -983,6 +996,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		BlockchainID: service.vm.ctx.ChainID,
 		Outs:         outs,
 		Ins:          ins,
+		Memo:         memoBytes,
 	}}}
 	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
 		return err
@@ -1315,12 +1329,12 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 		return err
 	}
 
-	atomicUtxos, _, _, err := service.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, -1)
+	atomicUTXOs, _, _, err := service.vm.GetAtomicUTXOs(chainID, kc.Addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
 	}
 
-	amountsSpent, importInputs, importKeys, err := service.vm.SpendAll(atomicUtxos, kc)
+	amountsSpent, importInputs, importKeys, err := service.vm.SpendAll(atomicUTXOs, kc)
 	if err != nil {
 		return err
 	}

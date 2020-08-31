@@ -19,12 +19,11 @@ import (
 )
 
 var (
-	errInvalidVMID                   = errors.New("invalid VM ID")
-	errFxIDsNotSortedAndUnique       = errors.New("feature extensions IDs must be sorted and unique")
-	errControlSigsNotSortedAndUnique = errors.New("control signatures must be sorted and unique")
-	errNameTooLong                   = errors.New("name too long")
-	errGenesisTooLong                = errors.New("genesis too long")
-	errIllegalNameCharacter          = errors.New("illegal name character")
+	errInvalidVMID             = errors.New("invalid VM ID")
+	errFxIDsNotSortedAndUnique = errors.New("feature extensions IDs must be sorted and unique")
+	errNameTooLong             = errors.New("name too long")
+	errGenesisTooLong          = errors.New("genesis too long")
+	errIllegalNameCharacter    = errors.New("illegal name character")
 
 	_ UnsignedDecisionTx = &UnsignedCreateChainTx{}
 )
@@ -66,7 +65,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 		return nil
 	case tx.SubnetID.IsZero():
 		return errNoSubnetID
-	case tx.SubnetID.Equals(constants.DefaultSubnetID):
+	case tx.SubnetID.Equals(constants.PrimaryNetworkID):
 		return errDSCantValidate
 	case len(tx.ChainName) > maxNameLen:
 		return errNameTooLong
