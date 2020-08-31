@@ -21,7 +21,7 @@ type Service struct{ vm *VM }
 
 // IssueTxArgs are arguments for passing into IssueTx requests
 type IssueTxArgs struct {
-	Tx formatting.CB58 `json:"tx"`
+	Tx formatting.HexWrapper `json:"tx"`
 }
 
 // IssueTxReply defines the IssueTx replies returned from the API
@@ -80,7 +80,7 @@ type GetUTXOsArgs struct {
 type GetUTXOsReply struct {
 	// Each element is the string repr. of an unspent UTXO that
 	// references an address in the arguments
-	UTXOs []formatting.CB58 `json:"utxos"`
+	UTXOs []formatting.HexWrapper `json:"utxos"`
 }
 
 // GetUTXOs returns the UTXOs such that at least one address in [args.Addresses]
@@ -101,9 +101,9 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return err
 	}
 
-	reply.UTXOs = []formatting.CB58{}
+	reply.UTXOs = []formatting.HexWrapper{}
 	for _, utxo := range utxos {
-		reply.UTXOs = append(reply.UTXOs, formatting.CB58{Bytes: utxo.Bytes()})
+		reply.UTXOs = append(reply.UTXOs, formatting.HexWrapper{Bytes: utxo.Bytes()})
 	}
 	return nil
 }

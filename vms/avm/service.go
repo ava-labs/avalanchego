@@ -49,7 +49,7 @@ type Service struct{ vm *VM }
 
 // FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
 type FormattedTx struct {
-	Tx formatting.CB58 `json:"tx"`
+	Tx formatting.HexWrapper `json:"tx"`
 }
 
 // FormattedAssetID defines a JSON formatted struct containing an assetID as a string
@@ -138,7 +138,7 @@ type GetUTXOsArgs struct {
 // GetUTXOsReply defines the GetUTXOs replies returned from the API
 type GetUTXOsReply struct {
 	// The UTXOs
-	UTXOs []formatting.CB58 `json:"utxos"`
+	UTXOs []formatting.HexWrapper `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
 	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
 	// again and set [StartIndex] to this value.
@@ -220,13 +220,13 @@ func (service *Service) GetUTXOs(r *http.Request, args *GetUTXOsArgs, reply *Get
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	reply.UTXOs = make([]formatting.CB58, len(utxos))
+	reply.UTXOs = make([]formatting.HexWrapper, len(utxos))
 	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i] = formatting.CB58{Bytes: b}
+		reply.UTXOs[i] = formatting.HexWrapper{Bytes: b}
 	}
 
 	endAddress, err := service.vm.FormatAddress(chainID, endAddr)
@@ -1205,9 +1205,9 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
 	api.UserPass
-	AssetID string          `json:"assetID"`
-	Payload formatting.CB58 `json:"payload"`
-	To      string          `json:"to"`
+	AssetID string         `json:"assetID"`
+	Payload formatting.HexWrapper `json:"payload"`
+	To      string         `json:"to"`
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction

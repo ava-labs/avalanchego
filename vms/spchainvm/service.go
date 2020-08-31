@@ -17,7 +17,7 @@ type Service struct{ vm *VM }
 // IssueTxArgs are the arguments for IssueTx.
 // [Tx] is the string representation of the transaction being issued
 type IssueTxArgs struct {
-	Tx formatting.CB58 `json:"tx"`
+	Tx formatting.HexWrapper `json:"tx"`
 }
 
 // IssueTxReply is the reply from IssueTx

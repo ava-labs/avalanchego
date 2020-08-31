@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildGenesis(t *testing.T) {
-	expected := "111DngowbGtZTAwG9sRhy3EA1NeavNNa7AyDkAdo8N43M5ZYq3bJwmm9Ls"
+	expected := "0x00000001015cce6c55d6b509845c8c4e30bed98d391ae7f0000000000000000000000000075bcd15"
 
 	addr, _ := ids.ShortFromString("8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 

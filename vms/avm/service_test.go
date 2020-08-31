@@ -71,7 +71,7 @@ func TestServiceIssueTx(t *testing.T) {
 	}
 
 	tx := NewTx(t, genesisBytes, vm)
-	txArgs.Tx = formatting.CB58{Bytes: tx.Bytes()}
+	txArgs.Tx = formatting.HexWrapper{Bytes: tx.Bytes()}
 	txReply = &api.JsonTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
-	txArgs := &FormattedTx{Tx: formatting.CB58{Bytes: tx.Bytes()}}
+	txArgs := &FormattedTx{Tx: formatting.HexWrapper{Bytes: tx.Bytes()}}
 	txReply := &api.JsonTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
@@ -691,7 +691,7 @@ func TestNFTWorkflow(t *testing.T) {
 			Password: password,
 		},
 		AssetID: assetID.String(),
-		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
+		Payload: formatting.HexWrapper{Bytes: []byte{1, 2, 3, 4, 5}},
 		To:      addrStr,
 	}
 	mintReply := &api.JsonTxID{}

@@ -261,7 +261,7 @@ type GetUTXOsResponse struct {
 	// Number of UTXOs returned
 	NumFetched json.Uint64 `json:"numFetched"`
 	// The UTXOs
-	UTXOs []formatting.CB58 `json:"utxos"`
+	UTXOs []formatting.HexWrapper `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
 	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
 	// again and set [StartIndex] to this value.
@@ -349,13 +349,13 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	response.UTXOs = make([]formatting.CB58, len(utxos))
+	response.UTXOs = make([]formatting.HexWrapper, len(utxos))
 	for i, utxo := range utxos {
 		bytes, err := service.vm.codec.Marshal(utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %s: %s", utxo.InputID(), err)
 		}
-		response.UTXOs[i] = formatting.CB58{Bytes: bytes}
+		response.UTXOs[i] = formatting.HexWrapper{Bytes: bytes}
 	}
 
 	endAddress, err := service.vm.FormatAddress(chainID, endAddr)
@@ -752,7 +752,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys, // Private keys
+		privKeys,                             // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -1045,7 +1045,7 @@ type CreateBlockchainArgs struct {
 	// Human-readable name for the new blockchain, not necessarily unique
 	Name string `json:"name"`
 	// Genesis state of the blockchain being created
-	GenesisData formatting.CB58 `json:"genesisData"`
+	GenesisData formatting.HexWrapper `json:"genesisData"`
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain
@@ -1277,7 +1277,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 // IssueTxArgs ...
 type IssueTxArgs struct {
 	// Raw byte representation of the transaction
-	Tx formatting.CB58 `json:"tx"`
+	Tx formatting.HexWrapper `json:"tx"`
 }
 
 // IssueTxResponse ...
@@ -1309,7 +1309,7 @@ type GetTxArgs struct {
 // GetTxResponse ...
 type GetTxResponse struct {
 	// Raw byte representation of the transaction
-	Tx formatting.CB58 `json:"tx"`
+	Tx formatting.HexWrapper `json:"tx"`
 }
 
 // GetTx gets a tx

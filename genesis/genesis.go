@@ -145,7 +145,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name: "X-Chain",
 		},
 		{
-			GenesisData: formatting.CB58{Bytes: config.EVMBytes},
+			GenesisData: formatting.HexWrapper{Bytes: config.EVMBytes},
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        EVMID,
 			Name:        "C-Chain",

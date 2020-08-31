@@ -103,7 +103,7 @@ func (in *InputPayment) PrefixedString(prefix string) string {
 		formatting.IntFormat(len(in.sigs)-1))
 	for i, sig := range in.sigs {
 		s.WriteString(fmt.Sprintf(sigFormat,
-			prefix, i, sig.index, formatting.CB58{Bytes: sig.sig},
+			prefix, i, sig.index, formatting.HexWrapper{Bytes: sig.sig},
 		))
 	}
 

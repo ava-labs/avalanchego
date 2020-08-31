@@ -32,7 +32,7 @@ type BuildGenesisArgs struct {
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes formatting.CB58 `json:"bytes"`
+	Bytes formatting.HexWrapper `json:"bytes"`
 }
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is

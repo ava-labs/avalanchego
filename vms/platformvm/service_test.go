@@ -86,7 +86,7 @@ func TestAddValidator(t *testing.T) {
 }
 
 func TestCreateBlockchainArgsParsing(t *testing.T) {
-	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
+	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"0x0102030405060708090a00000000000000000000000000000000000000000000"}`
 	args := CreateBlockchainArgs{}
 	err := json.Unmarshal([]byte(jsonString), &args)
 	if err != nil {

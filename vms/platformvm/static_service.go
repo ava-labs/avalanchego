@@ -96,11 +96,11 @@ type FormattedAPIPrimaryValidator struct {
 // [Name] is a human-readable, non-unique name for the chain.
 // [SubnetID] is the ID of the subnet that validates the chain
 type APIChain struct {
-	GenesisData formatting.CB58 `json:"genesisData"`
-	VMID        ids.ID          `json:"vmID"`
-	FxIDs       []ids.ID        `json:"fxIDs"`
-	Name        string          `json:"name"`
-	SubnetID    ids.ID          `json:"subnetID"`
+	GenesisData formatting.HexWrapper `json:"genesisData"`
+	VMID        ids.ID         `json:"vmID"`
+	FxIDs       []ids.ID       `json:"fxIDs"`
+	Name        string         `json:"name"`
+	SubnetID    ids.ID         `json:"subnetID"`
 }
 
 // BuildGenesisArgs are the arguments used to create
@@ -122,7 +122,7 @@ type BuildGenesisArgs struct {
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes formatting.CB58 `json:"bytes"`
+	Bytes formatting.HexWrapper `json:"bytes"`
 }
 
 // Genesis represents a genesis state of the platform chain
