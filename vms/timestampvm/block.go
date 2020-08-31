@@ -51,12 +51,3 @@ func (b *Block) Verify() error {
 
 	return nil
 }
-
-// Accept this block
-func (b *Block) Accept() error {
-	// Persist the block
-	if err := b.VM.SaveBlock(b); err != nil {
-		return errDatabaseSave
-	}
-	return b.Block.Accept()
-}

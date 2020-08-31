@@ -106,11 +106,6 @@ func (ab *AtomicBlock) Accept() error {
 		return errWrongTxType
 	}
 
-	// Write block to disk
-	if err := ab.vm.State.PutBlock(ab.VM.DB, ab); err != nil {
-		return err
-	}
-
 	if err := ab.CommonBlock.Accept(); err != nil {
 		return err
 	}

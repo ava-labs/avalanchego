@@ -42,15 +42,6 @@ func (a *Abort) Verify() error {
 	return nil
 }
 
-// Accept implements the snowman.Block interface
-func (a *Abort) Accept() error {
-	// Write block to disk
-	if err := a.vm.State.PutBlock(a.VM.DB, a); err != nil {
-		return err
-	}
-	return a.DoubleDecisionBlock.Accept()
-}
-
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
 // block, has ID [parentID].
 func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*Abort, error) {

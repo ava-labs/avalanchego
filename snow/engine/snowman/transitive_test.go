@@ -54,6 +54,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	}}
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
+	vm.SaveBlockF = func(snowman.Block) error { return nil }
 	sender.CantGetAcceptedFrontier = false
 
 	te := &Transitive{}
@@ -381,6 +382,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	sender.Default(true)
 
 	vm := &block.TestVM{}
+	vm.SaveBlockF = func(snowman.Block) error { return nil }
 	vm.T = t
 	config.VM = vm
 
@@ -1699,6 +1701,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm.Default(true)
 	vm.CantSetPreference = false
+	vm.SaveBlockF = func(snowman.Block) error { return nil }
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1823,6 +1826,7 @@ func TestPinnedMemory(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
+	vm.SaveBlockF = func(snowman.Block) error { return nil }
 	config.VM = vm
 
 	vm.Default(true)

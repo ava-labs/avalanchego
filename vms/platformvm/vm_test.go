@@ -225,6 +225,8 @@ func defaultVM() (*VM, database.Database) {
 		panic(err)
 	} else if err := blk.Accept(); err != nil {
 		panic(err)
+	} else if err := vm.SaveBlock(blk); err != nil {
+		panic(fmt.Sprintf("couldn't sve block: %s", err))
 	} else {
 		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
@@ -371,10 +373,14 @@ func TestAddValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := commit.Accept(); err != nil { // commit the proposal
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -487,6 +493,8 @@ func TestAddValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil { // should pass verification
 		t.Fatal(err)
 	} else if status, err := vm.getStatus(commit.onAccept(), tx.ID()); err != nil {
@@ -497,6 +505,8 @@ func TestAddValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // reject the proposal
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(abort); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Aborted {
@@ -564,6 +574,8 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
@@ -574,6 +586,8 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // accept the proposal
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -642,6 +656,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if status, err := vm.getStatus(commit.onAccept(), tx.ID()); err != nil {
@@ -652,6 +668,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // reject the proposal
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(abort); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Aborted {
@@ -700,6 +718,8 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
@@ -710,6 +730,8 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -742,6 +764,8 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
@@ -752,6 +776,8 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // reward the genesis validator
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -793,6 +819,8 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
@@ -803,6 +831,8 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -826,6 +856,8 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.(*ProposalBlock).Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(blk); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if status, err := vm.getStatus(commit.onAccept(), block.Tx.ID()); err != nil {
@@ -836,6 +868,8 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(abort); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Aborted {
@@ -888,6 +922,8 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(blk); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -943,6 +979,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(blk); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -989,6 +1027,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
@@ -999,6 +1039,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // add the validator to pending validator set
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -1035,6 +1077,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
@@ -1045,6 +1089,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // move validator addValidatorTx from pending to current
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -1084,6 +1130,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Verify(); err != nil {
@@ -1094,6 +1142,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatalf("status should be Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // remove validator from current validator set
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(commit); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
 		t.Fatal(err)
 	} else if status != Committed {
@@ -1250,6 +1300,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := vm.SaveBlock(blk); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	}
 
 	if err := vm.Bootstrapped(); err != nil {
@@ -1318,6 +1370,8 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	} else if err := firstAdvanceTimeBlk.Accept(); err != nil { // time advances to defaultGenesisTime.Add(time.Second)
 		t.Fatal(err)
+	} else if err := firstVM.SaveBlock(firstAdvanceTimeBlk); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	}
 
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
@@ -1414,8 +1468,12 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	} else if err := firstAdvanceTimeBlk.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := firstVM.SaveBlock(firstAdvanceTimeBlk); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := options[0].Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := firstVM.SaveBlock(options[0]); err != nil { // Normally done by the engine
+		t.Fatalf("couldn't save block: %s", err)
 	} else if err := options[1].Reject(); err != nil {
 		t.Fatal(err)
 	}

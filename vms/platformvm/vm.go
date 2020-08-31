@@ -200,13 +200,13 @@ func (vm *VM) Initialize(
 	// Initialize the inner VM, which has a lot of boiler-plate logic
 	vm.SnowmanVM = &core.SnowmanVM{}
 	if err := vm.SnowmanVM.Initialize(ctx, db, vm.unmarshalBlockFunc, msgs); err != nil {
-		return err
+		return fmt.Errorf("couldn't initialize snowmanVM: %w", err)
 	}
 	vm.fx = &secp256k1fx.Fx{}
 
 	vm.codec = codec.NewDefault()
 	if err := vm.fx.Initialize(vm); err != nil {
-		return err
+		return fmt.Errorf("couldn't initialize fx: %w", err)
 	}
 	vm.codec = Codec
 
@@ -220,29 +220,29 @@ func (vm *VM) Initialize(
 	if !vm.DBInitialized() {
 		genesis := &Genesis{}
 		if err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
-			return err
+			return fmt.Errorf("couldn't unmarshal genesis bytes: %w", err)
 		}
 		if err := genesis.Initialize(); err != nil {
-			return err
+			return fmt.Errorf("couldn't initialize genesis: %w", err)
 		}
 
 		// Persist UTXOs that exist at genesis
 		for _, utxo := range genesis.UTXOs {
 			if err := vm.putUTXO(vm.DB, utxo); err != nil {
-				return err
+				return fmt.Errorf("couldn't put genesis UTXO: %w", err)
 			}
 		}
 
 		// Persist the platform chain's timestamp at genesis
 		time := time.Unix(int64(genesis.Timestamp), 0)
 		if err := vm.State.PutTime(vm.DB, timestampKey, time); err != nil {
-			return err
+			return fmt.Errorf("couldn't put timestamp: %w", err)
 		}
 
 		// Persist primary network validator set at genesis
 		for _, vdrTx := range genesis.Validators {
 			if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, vdrTx); err != nil {
-				return err
+				return fmt.Errorf("couldn't add genesis staker: %w", err)
 			}
 		}
 
@@ -269,7 +269,7 @@ func (vm *VM) Initialize(
 
 		// Persist the chains that exist at genesis
 		if err := vm.putChains(vm.DB, filteredChains); err != nil {
-			return err
+			return fmt.Errorf("couldn't put genesis chains: %w", err)
 		}
 
 		// Create the genesis block and save it as being accepted (We don't just
@@ -278,10 +278,10 @@ func (vm *VM) Initialize(
 		genesisID := ids.NewID(hashing.ComputeHash256Array(genesisBytes))
 		genesisBlock, err := vm.newCommitBlock(genesisID, 0)
 		if err != nil {
-			return err
+			return fmt.Errorf("couldn't create genesis block: %w", err)
 		}
-		if err := vm.State.PutBlock(vm.DB, genesisBlock); err != nil {
-			return err
+		if err := vm.SaveBlock(genesisBlock); err != nil {
+			return fmt.Errorf("couldn't save genesis block: %w", err)
 		}
 		genesisBlock.onAcceptDB = versiondb.New(vm.DB)
 		if err := genesisBlock.CommonBlock.Accept(); err != nil {
@@ -293,7 +293,7 @@ func (vm *VM) Initialize(
 		}
 
 		if err := vm.DB.Commit(); err != nil {
-			return err
+			return fmt.Errorf("couldn't commit DB: %w", err)
 		}
 	}
 
@@ -312,13 +312,13 @@ func (vm *VM) Initialize(
 
 	if err := vm.initSubnets(); err != nil {
 		ctx.Log.Error("failed to initialize Subnets: %s", err)
-		return err
+		return fmt.Errorf("couldn't initialize subnets: %w", err)
 	}
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {
 		vm.Ctx.Log.Warn("could not retrieve existing chains from database: %s", err)
-		return err
+		return fmt.Errorf("couldn't initialize chains: %w", err)
 	}
 
 	lastAcceptedID := vm.LastAccepted()
@@ -331,7 +331,7 @@ func (vm *VM) Initialize(
 	lastAcceptedIntf, err := vm.getBlock(lastAcceptedID)
 	if err != nil {
 		vm.Ctx.Log.Error("Error fetching the last accepted block (%s), %s", vm.Preferred(), err)
-		return err
+		return fmt.Errorf("couldn't get last accepted block %s: %w", lastAcceptedID, err)
 	}
 	if _, ok := lastAcceptedIntf.(decision); !ok {
 		vm.Ctx.Log.Fatal("The last accepted block, %s, must always be a decision block", lastAcceptedID)
@@ -595,7 +595,10 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 
 // SaveBlock saves [blk] to the database.
 func (vm *VM) SaveBlock(blk snowman.Block) error {
-	return vm.State.PutBlock(vm.DB, blk)
+	if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+		return err
+	}
+	return vm.DB.Commit()
 }
 
 // GetBlock implements the snowman.ChainVM interface

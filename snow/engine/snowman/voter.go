@@ -58,8 +58,15 @@ func (v *voter) Update() {
 	}
 	// Unpin accepted and rejected blocks from memory
 	for _, acceptedID := range accepted.List() {
+		acceptedIDKey := acceptedID.Key()
 		v.t.decidedCache.Put(acceptedID, nil)
-		v.t.droppedCache.Evict(acceptedID) // Remove from dropped cache, if it was in there
+		v.t.droppedCache.Evict(acceptedID)       // Remove from dropped cache, if it was in there
+		blk, ok := v.t.processing[acceptedIDKey] // The block we're accepting
+		if !ok {
+			v.t.Ctx.Log.Warn("couldn't find accepted block %s in processing list. Block not saved to VM's database", acceptedID)
+		} else if err := v.t.VM.SaveBlock(blk); err != nil { // Save accepted block in VM's database
+			v.t.Ctx.Log.Warn("couldn't save block %s to VM's database: %s", acceptedID, err)
+		}
 		delete(v.t.processing, acceptedID.Key())
 	}
 	for _, rejectedID := range rejected.List() {
