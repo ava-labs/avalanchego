@@ -95,7 +95,7 @@ func (t *Transitive) Initialize(config Config) error {
 	t.decidedCache = cache.LRU{Size: decidedCacheSize}
 	t.droppedCache = cache.LRU{Size: droppedCacheSize}
 
-	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
+	if err := t.metrics.Initialize(fmt.Sprintf("%s_engine", config.Params.Namespace), config.Params.Metrics); err != nil {
 		return err
 	}
 
@@ -112,7 +112,9 @@ func (t *Transitive) Initialize(config Config) error {
 func (t *Transitive) finishBootstrapping() error {
 	// initialize consensus to the last accepted blockID
 	lastAcceptedID := t.VM.LastAccepted()
-	t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID)
+	params := t.Params
+	params.Namespace = fmt.Sprintf("%s_consensus", params.Namespace)
+	t.Consensus.Initialize(t.Ctx, params, lastAcceptedID)
 
 	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
