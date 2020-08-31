@@ -117,7 +117,7 @@ func TestAvax(t *testing.T) {
 			),
 		},
 		/*signers=*/ []*InputSigner{
-			&InputSigner{Keys: []*crypto.PrivateKeySECP256K1R{
+			{Keys: []*crypto.PrivateKeySECP256K1R{
 				keys[1],
 			}},
 		},
@@ -151,7 +151,7 @@ func TestAvax(t *testing.T) {
 			),
 		},
 		/*outs=*/ nil,
-		/*signers=*/ []*InputSigner{&InputSigner{}},
+		/*signers=*/ []*InputSigner{{}},
 	)
 	ctx.Log.AssertNoError(err)
 	tx2Bytes := tx2.Bytes()
@@ -201,7 +201,7 @@ func TestInvalidSpentTx(t *testing.T) {
 			),
 		},
 		/*signers=*/ []*InputSigner{
-			&InputSigner{Keys: []*crypto.PrivateKeySECP256K1R{
+			{Keys: []*crypto.PrivateKeySECP256K1R{
 				keys[1],
 			}},
 		},
@@ -224,7 +224,7 @@ func TestInvalidSpentTx(t *testing.T) {
 			),
 		},
 		/*signers=*/ []*InputSigner{
-			&InputSigner{Keys: []*crypto.PrivateKeySECP256K1R{
+			{Keys: []*crypto.PrivateKeySECP256K1R{
 				keys[1],
 			}},
 		},
@@ -288,7 +288,7 @@ func TestInvalidTxVerification(t *testing.T) {
 			),
 		},
 		/*signers=*/ []*InputSigner{
-			&InputSigner{Keys: []*crypto.PrivateKeySECP256K1R{
+			{Keys: []*crypto.PrivateKeySECP256K1R{
 				keys[1],
 			}},
 		},
@@ -662,7 +662,7 @@ func TestIssuePendingDependency(t *testing.T) {
 			),
 		},
 		/*signers=*/ []*InputSigner{
-			&InputSigner{Keys: []*crypto.PrivateKeySECP256K1R{
+			{Keys: []*crypto.PrivateKeySECP256K1R{
 				keys[1],
 			}},
 		},
@@ -687,7 +687,7 @@ func TestIssuePendingDependency(t *testing.T) {
 			),
 		},
 		/*signers=*/ []*InputSigner{
-			&InputSigner{},
+			{},
 		},
 	)
 	tx2Bytes := tx2.Bytes()

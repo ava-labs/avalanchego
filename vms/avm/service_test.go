@@ -658,7 +658,7 @@ func TestNFTWorkflow(t *testing.T) {
 		Name:   "BIG COIN",
 		Symbol: "COIN",
 		MinterSets: []Owners{
-			Owners{
+			{
 				Threshold: 1,
 				Minters: []string{
 					addrStr,
