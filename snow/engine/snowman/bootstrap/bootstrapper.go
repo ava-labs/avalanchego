@@ -222,14 +222,12 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			blk:         blk,
 			bs:          b,
 		})
-		if err != nil {
-			return fmt.Errorf("couldn't add block to queue: %w", err)
-		}
-
-		b.numFetched.Inc()
-		b.NumFetched++                                      // Progress tracker
-		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
+		if err == nil {
+			b.numFetched.Inc()
+			b.NumFetched++                                      // Progress tracker
+			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+				b.Ctx.Log.Info("fetched %d blocks", b.NumFetched)
+			}
 		}
 
 		if err := b.Blocked.Commit(); err != nil {
