@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -19,7 +20,15 @@ import (
 
 func TestShutdown(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -39,8 +48,9 @@ func TestShutdown(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -68,7 +78,15 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -97,8 +115,9 @@ func TestShutdownTimesOut(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

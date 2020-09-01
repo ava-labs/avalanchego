@@ -337,7 +337,7 @@ func (vm *VM) semanticVerifySpend(
 		utxoID := input.UTXOID.InputID()
 		utxo, err := vm.getUTXO(db, utxoID)
 		if err != nil {
-			return tempError{err}
+			return tempError{fmt.Errorf("failed to read consumed UTXO %s due to: %w", utxoID, err)}
 		}
 		utxos[index] = utxo
 	}

@@ -26,7 +26,7 @@ type Operation struct {
 	avax.Asset `serialize:"true"`
 
 	UTXOIDs []*avax.UTXOID `serialize:"true" json:"inputIDs"`
-	Op      FxOperation   `serialize:"true" json:"operation"`
+	Op      FxOperation    `serialize:"true" json:"operation"`
 }
 
 // Verify implements the verify.Verifiable interface

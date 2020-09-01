@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -34,15 +35,16 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	handler := &Handler{}
 	vdrs := validators.NewSet()
-	vdr0 := validators.GenerateRandomValidator(1)
-	vdrs.Add(vdr0)
+	vdr0 := ids.GenerateTestShortID()
+	vdrs.AddWeight(vdr0, 1)
 	handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
 		16,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -83,8 +85,9 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		validators,
 		nil,
 		16,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -118,8 +121,9 @@ func TestHandlerClosesOnError(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		16,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

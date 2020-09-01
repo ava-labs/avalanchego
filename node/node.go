@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/network"
+	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
@@ -63,7 +64,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 6, 5)
+	Version       = version.NewDefaultVersion("avalanche", 0, 7, 0)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -158,7 +159,9 @@ func (n *Node) initNetworking() error {
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
 	n.vdrs = validators.NewManager()
-	n.vdrs.PutValidatorSet(constants.PrimaryNetworkID, primaryNetworkValidators)
+	if err := n.vdrs.Set(constants.PrimaryNetworkID, primaryNetworkValidators); err != nil {
+		return err
+	}
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -198,14 +201,14 @@ type insecureValidatorManager struct {
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
-	_ = i.vdrs.Add(validators.NewValidator(vdrID, i.weight, time.Now(), time.Now()))
+	_ = i.vdrs.AddWeight(vdrID, i.weight)
 	return false
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 	// Shouldn't error unless the set previously had an error, which should
 	// never happen as described above
-	_ = i.vdrs.Remove(vdrID)
+	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
 	return false
 }
 
@@ -214,7 +217,7 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 func (n *Node) Dispatch() error {
 	// Start the HTTP endpoint
 	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
+		if n.Config.HTTPSEnabled {
 			n.Log.Debug("Initializing API server with TLS Enabled")
 			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
 			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
@@ -313,7 +316,7 @@ func (n *Node) initNodeID() error {
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peer := range n.Config.BootstrapPeers {
-		if err := n.beacons.Add(validators.NewValidator(peer.ID, 1, time.Now(), timer.MaxTime)); err != nil {
+		if err := n.beacons.AddWeight(peer.ID, 1); err != nil {
 			return err
 		}
 	}
@@ -363,6 +366,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	})
 
 	bootstrapWeight := n.beacons.Weight()
+
 	reqWeight := (3*bootstrapWeight + 3) / 4
 
 	if reqWeight == 0 {
@@ -409,9 +413,31 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
-	n.chainManager, err = chains.New(
+	timeoutManager := timeout.Manager{}
+	if err := timeoutManager.Initialize(
+		n.Config.NetworkInitialTimeout,
+		n.Config.NetworkMinimumTimeout,
+		n.Config.NetworkMaximumTimeout,
+		n.Config.NetworkTimeoutMultiplier,
+		n.Config.NetworkTimeoutReduction,
+		"gecko",
+		n.Config.ConsensusParams.Metrics,
+	); err != nil {
+		return err
+	}
+	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+
+	n.Config.ConsensusRouter.Initialize(
+		n.Log,
+		&timeoutManager,
+		n.Config.ConsensusGossipFrequency,
+		n.Config.ConsensusShutdownTimeout,
+	)
+
+	n.chainManager = chains.New(
 		n.Config.EnableStaking,
-		n.Config.StakerMsgPortion,
+		n.Config.MaxNonStakerPendingMsgs,
+		n.Config.StakerMSGPortion,
 		n.Config.StakerCPUPortion,
 		n.Log,
 		n.LogFactory,
@@ -431,10 +457,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		avaxAssetID,
 		xChainID,
 		criticalChains,
+		&timeoutManager,
 	)
-	if err != nil {
-		return err
-	}
 
 	vdrs := n.vdrs
 
@@ -448,11 +472,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
-			ChainManager:   n.chainManager,
-			Validators:     vdrs,
-			StakingEnabled: n.Config.EnableStaking,
-			Fee:            n.Config.TxFee,
-			MinStake:       n.Config.MinStake,
+			ChainManager:     n.chainManager,
+			Validators:       vdrs,
+			StakingEnabled:   n.Config.EnableStaking,
+			Fee:              n.Config.TxFee,
+			MinStake:         n.Config.MinStake,
+			UptimePercentage: n.Config.UptimeRequirement,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			Fee: n.Config.TxFee,

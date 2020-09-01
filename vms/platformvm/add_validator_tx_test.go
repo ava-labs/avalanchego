@@ -311,13 +311,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.putPendingValidators(vDB, // Put validator in pending validator set
-		&EventHeap{
-			SortByStartTime: true,
-			Txs:             []*Tx{tx},
-		},
-		constants.PrimaryNetworkID,
-	); err != nil {
+	} else if err := vm.addStaker(vDB, constants.PrimaryNetworkID, tx); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")

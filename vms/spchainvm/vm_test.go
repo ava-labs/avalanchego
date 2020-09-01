@@ -79,8 +79,8 @@ func TestPayments(t *testing.T) {
 	sender.Default(true)
 
 	vdrs := validators.NewSet()
-	vdr := validators.GenerateRandomValidator(1)
-	vdrs.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vdrs.AddWeight(vdr, 1)
 
 	ctx.Lock.Lock()
 	consensus := smeng.Transitive{}
@@ -141,7 +141,7 @@ func TestPayments(t *testing.T) {
 
 	queriedVtxIDSet := ids.Set{}
 	queriedVtxIDSet.Add(*queriedVtxID)
-	consensus.Chits(vdr.ID(), *queryRequestID, queriedVtxIDSet)
+	consensus.Chits(vdr, *queryRequestID, queriedVtxIDSet)
 
 	if account := vm.GetAccount(vm.baseDB, keys[0].PublicKey().Address()); account.Balance() != 20*units.KiloAvax-200 {
 		t.Fatalf("Wrong Balance")

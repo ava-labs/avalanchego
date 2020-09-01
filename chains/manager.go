@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/api/keystore"
@@ -43,8 +42,6 @@ import (
 
 const (
 	defaultChannelSize = 1024
-	gossipFrequency    = 10 * time.Second
-	shutdownTimeout    = 1 * time.Second
 )
 
 // Manager manages the chains running on this node.
@@ -115,6 +112,7 @@ type manager struct {
 
 	stakingEnabled                     bool // True iff the network has staking enabled
 	stakerMsgPortion, stakerCPUPortion float64
+	maxNonStakerPendingMsgs            uint32
 	log                                logging.Logger
 	logFactory                         logging.Factory
 	vmManager                          vms.Manager // Manage mappings from vm ID --> vm
@@ -152,6 +150,7 @@ type manager struct {
 // TODO: Make this function take less arguments
 func New(
 	stakingEnabled bool,
+	maxNonStakerPendingMsgs uint,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	log logging.Logger,
@@ -172,46 +171,36 @@ func New(
 	avaxAssetID ids.ID,
 	xChainID ids.ID,
 	criticalChains ids.Set,
-) (Manager, error) {
-	timeoutManager := timeout.Manager{}
-	err := timeoutManager.Initialize(
-		"gecko",
-		consensusParams.Metrics,
-	)
-	if err != nil {
-		return nil, err
-	}
-	go log.RecoverAndPanic(timeoutManager.Dispatch)
-
-	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
-
+	timeoutManager *timeout.Manager,
+) Manager {
 	m := &manager{
-		stakingEnabled:   stakingEnabled,
-		stakerMsgPortion: stakerMsgPortion,
-		stakerCPUPortion: stakerCPUPortion,
-		log:              log,
-		logFactory:       logFactory,
-		vmManager:        vmManager,
-		decisionEvents:   decisionEvents,
-		consensusEvents:  consensusEvents,
-		db:               db,
-		chainRouter:      rtr,
-		net:              net,
-		timeoutManager:   &timeoutManager,
-		consensusParams:  consensusParams,
-		validators:       validators,
-		nodeID:           nodeID,
-		networkID:        networkID,
-		server:           server,
-		keystore:         keystore,
-		atomicMemory:     atomicMemory,
-		avaxAssetID:      avaxAssetID,
-		xChainID:         xChainID,
-		criticalChains:   criticalChains,
-		chains:           make(map[[32]byte]*router.Handler),
+		stakingEnabled:          stakingEnabled,
+		maxNonStakerPendingMsgs: uint32(maxNonStakerPendingMsgs),
+		stakerMsgPortion:        stakerMsgPortion,
+		stakerCPUPortion:        stakerCPUPortion,
+		log:                     log,
+		logFactory:              logFactory,
+		vmManager:               vmManager,
+		decisionEvents:          decisionEvents,
+		consensusEvents:         consensusEvents,
+		db:                      db,
+		chainRouter:             rtr,
+		net:                     net,
+		timeoutManager:          timeoutManager,
+		consensusParams:         consensusParams,
+		validators:              validators,
+		nodeID:                  nodeID,
+		networkID:               networkID,
+		server:                  server,
+		keystore:                keystore,
+		atomicMemory:            atomicMemory,
+		avaxAssetID:             avaxAssetID,
+		xChainID:                xChainID,
+		criticalChains:          criticalChains,
+		chains:                  make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
-	return m, nil
+	return m
 }
 
 // Router that this chain manager is using to route consensus messages to chains
@@ -228,19 +217,20 @@ func (m *manager) CreateChain(chain ChainParameters) {
 
 // Create a chain
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
+	// Assert that there isn't already a chain with an alias in [chain].Aliases
+	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
+	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
+		m.log.Debug("there is already a chain with alias '%s'. Chain not created.",
+			alias)
+		return
+	}
+
 	m.log.Info("creating chain:\n"+
 		"    ID: %s\n"+
 		"    VMID:%s",
 		chainParams.ID,
 		chainParams.VMAlias,
 	)
-
-	// Assert that there isn't already a chain with an alias in [chain].Aliases
-	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
-	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
-		m.log.Error("there is already a chain with alias '%s'. Chain not created.", alias)
-		return
-	}
 
 	chain, err := m.buildChain(chainParams)
 	if err != nil {
@@ -339,18 +329,18 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	consensusParams.Namespace = fmt.Sprintf("gecko_%s", primaryAlias)
 
 	// The validators of this blockchain
-	var validators validators.Set // Validators validating this blockchain
+	var vdrs validators.Set // Validators validating this blockchain
 	var ok bool
 	if m.stakingEnabled {
-		validators, ok = m.validators.GetValidatorSet(chainParams.SubnetID)
+		vdrs, ok = m.validators.GetValidators(chainParams.SubnetID)
 	} else { // Staking is disabled. Every peer validates every subnet.
-		validators, ok = m.validators.GetValidatorSet(constants.PrimaryNetworkID)
+		vdrs, ok = m.validators.GetValidators(constants.PrimaryNetworkID)
 	}
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
 	}
 
-	beacons := validators
+	beacons := vdrs
 	if chainParams.CustomBeacons != nil {
 		beacons = chainParams.CustomBeacons
 	}
@@ -363,7 +353,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		chain, err = m.createAvalancheChain(
 			ctx,
 			chainParams.GenesisData,
-			validators,
+			vdrs,
 			beacons,
 			vm,
 			fxs,
@@ -377,7 +367,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
-			validators,
+			vdrs,
 			beacons,
 			vm,
 			fxs,
@@ -420,6 +410,9 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		go m.net.RegisterConnector(awaiter)
 	}
 
+	if connector, ok := vm.(validators.Connector); ok {
+		go m.net.RegisterConnector(connector)
+	}
 	return chain, nil
 }
 
@@ -510,6 +503,7 @@ func (m *manager) createAvalancheChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.maxNonStakerPendingMsgs,
 		m.stakerMsgPortion,
 		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
@@ -588,6 +582,7 @@ func (m *manager) createSnowmanChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.maxNonStakerPendingMsgs,
 		m.stakerMsgPortion,
 		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),

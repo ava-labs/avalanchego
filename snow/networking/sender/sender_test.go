@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/networking/router"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -37,7 +38,15 @@ func TestSenderContext(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -67,8 +76,9 @@ func TestTimeout(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -91,7 +101,15 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -123,8 +141,9 @@ func TestReliableMessages(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -156,7 +175,15 @@ func TestReliableMessages(t *testing.T) {
 
 func TestReliableMessagesToMyself(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(
+		10*time.Second,
+		500*time.Millisecond,
+		10*time.Second,
+		1.1,
+		time.Millisecond,
+		"",
+		prometheus.NewRegistry(),
+	)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -189,8 +216,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

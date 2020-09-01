@@ -74,8 +74,7 @@ import (
 //	  proposal is being rejected
 
 var (
-	errInvalidBlockType   = errors.New("invalid block type")
-	errEmptyValidatingSet = errors.New("empty validating set")
+	errInvalidBlockType = errors.New("invalid block type")
 )
 
 // Block is the common interface that all staking blocks must have
@@ -205,6 +204,9 @@ func (cdb *CommonDecisionBlock) setBaseDatabase(db database.Database) {
 func (cdb *CommonDecisionBlock) onAccept() database.Database {
 	if cdb.Status().Decided() {
 		return cdb.vm.DB
+	}
+	if cdb.onAcceptDB == nil {
+		panic(":(")
 	}
 	return cdb.onAcceptDB
 }

@@ -18,10 +18,10 @@ import (
 	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
 
 	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
@@ -55,11 +55,19 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1, time.Now(), timer.MaxTime))
+		vdrs.AddWeight(ctx.NodeID, 1)
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize("", prometheus.NewRegistry())
+		timeoutManager.Initialize(
+			10*time.Second,
+			500*time.Millisecond,
+			10*time.Second,
+			1.1,
+			time.Millisecond,
+			"",
+			prometheus.NewRegistry(),
+		)
 		go timeoutManager.Dispatch()
 
 		chainRouter := &router.ChainRouter{}
@@ -112,8 +120,9 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 			vdrs,
 			msgChan,
 			1000,
-			router.DefaultStakerPortion,
-			router.DefaultStakerPortion,
+			throttler.DefaultMaxNonStakerPendingMsgs,
+			throttler.DefaultStakerPortion,
+			throttler.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)
@@ -192,11 +201,19 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1, time.Now(), timer.MaxTime))
+		vdrs.AddWeight(ctx.NodeID, 1)
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize("", prometheus.NewRegistry())
+		timeoutManager.Initialize(
+			10*time.Second,
+			500*time.Millisecond,
+			10*time.Second,
+			1.1,
+			time.Millisecond,
+			"",
+			prometheus.NewRegistry(),
+		)
 		go timeoutManager.Dispatch()
 
 		chainRouter := &router.ChainRouter{}
@@ -254,8 +271,9 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 			vdrs,
 			msgChan,
 			1000,
-			router.DefaultStakerPortion,
-			router.DefaultStakerPortion,
+			throttler.DefaultMaxNonStakerPendingMsgs,
+			throttler.DefaultStakerPortion,
+			throttler.DefaultStakerPortion,
 			"",
 			prometheus.NewRegistry(),
 		)

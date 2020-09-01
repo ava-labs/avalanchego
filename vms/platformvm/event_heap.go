@@ -6,7 +6,6 @@ package platformvm
 import (
 	"bytes"
 	"container/heap"
-	"errors"
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
@@ -17,6 +16,7 @@ type TimedTx interface {
 	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
+	Bytes() []byte
 }
 
 // EventHeap is a collection of timedTxs where elements are ordered by either
@@ -93,18 +93,4 @@ func (h *EventHeap) Pop() interface{} {
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() ([]byte, error) {
 	return Codec.Marshal(h)
-}
-
-// getPrimaryStaker ...
-func (h *EventHeap) getPrimaryStaker(id ids.ShortID) (*Tx, error) {
-	for _, txIntf := range h.Txs {
-		tx, ok := txIntf.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !ok {
-			continue
-		}
-		if id.Equals(tx.Validator.NodeID) {
-			return txIntf, nil
-		}
-	}
-	return nil, errors.New("couldn't find validator in the primary network")
 }
