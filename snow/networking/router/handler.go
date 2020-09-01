@@ -113,6 +113,7 @@ func (h *Handler) Initialize(
 	validators validators.Set,
 	msgChan <-chan common.Message,
 	bufferSize int,
+	maxMessagesPerInterval,
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
@@ -148,11 +149,12 @@ func (h *Handler) Initialize(
 
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
 		validators,
-		h.ctx.Log,
+		h.ctx,
 		&h.metrics,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
+		maxMessagesPerInterval,
 		maxNonStakerPendingMsgs,
 		cpuInterval,
 		stakerMsgPortion,

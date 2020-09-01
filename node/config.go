@@ -49,6 +49,7 @@ type Config struct {
 	StakingKeyFile          string
 	StakingCertFile         string
 	DisabledStakingWeight   uint64
+	MaxMessagesPerInterval  uint
 	MaxNonStakerPendingMsgs uint
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64

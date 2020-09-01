@@ -10,9 +10,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/logging"
 )
 
 func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}, validators.Set) {
@@ -36,13 +36,16 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		cpuInterval / 4,
 	}
 
+	ctx := snow.DefaultContextTest()
+	ctx.Bootstrapped()
 	queue, semaChan := newMultiLevelQueue(
 		vdrs,
-		logging.NoLog{},
+		ctx,
 		metrics,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
+		throttler.DefaultMaxMessagesPerInterval,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		time.Second,
 		throttler.DefaultStakerPortion,
@@ -164,13 +167,16 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		perTier,
 	}
 
+	ctx := snow.DefaultContextTest()
+	ctx.Bootstrapped()
 	queue, semaChan := newMultiLevelQueue(
 		vdrs,
-		logging.NoLog{},
+		ctx,
 		metrics,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
+		throttler.DefaultMaxMessagesPerInterval,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		time.Second,
 		throttler.DefaultStakerPortion,
@@ -259,13 +265,16 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		perTier,
 	}
 
+	ctx := snow.DefaultContextTest()
+	ctx.Bootstrapped()
 	queue, semaChan := newMultiLevelQueue(
 		vdrs,
-		logging.NoLog{},
+		ctx,
 		metrics,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
+		throttler.DefaultMaxMessagesPerInterval,
 		throttler.DefaultMaxNonStakerPendingMsgs,
 		time.Second,
 		throttler.DefaultStakerPortion,

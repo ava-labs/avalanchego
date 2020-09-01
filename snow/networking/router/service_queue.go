@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/throttler"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/networking/tracker"
 	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -31,33 +31,44 @@ type messageQueue interface {
 type multiLevelQueue struct {
 	lock sync.Mutex
 
-	validators   validators.Set
-	cpuTracker   throttler.CPUTracker
-	msgThrottler throttler.CountingThrottler
+	validators validators.Set
 
 	// Tracks total CPU consumption
 	intervalConsumption, tierConsumption, cpuInterval time.Duration
 
-	bufferSize, pendingMessages, currentTier int
+	currentTier int
 
+	resourceManager ResourceManager
+
+	// CPU based prioritization
+	cpuTracker    tracker.TimeTracker
 	queues        []singleLevelQueue
 	cpuRanges     []float64       // CPU Utilization ranges that should be attributed to a corresponding queue
 	cpuAllotments []time.Duration // Allotments of CPU time per cycle that should be spent on each level of queue
+	cpuPortion    float64
+
+	// Message throttling
+	msgTracker                                   tracker.CountingTracker
+	bufferSize, pendingMessages                  int
+	msgPoolSize, stakerReservedMessages          uint32
+	pendingPoolMessages, maxNonStakerPendingMsgs uint32
+	msgPortion                                   float64
 
 	semaChan chan struct{}
 
-	log     logging.Logger
+	ctx     *snow.Context
 	metrics *metrics
 }
 
-// Create MultilevelQueue and counting semaphore for signaling when messages are available
+// newMultiLevelQueue creates a new MultilevelQueue and counting semaphore for signaling when messages are available
 // to read from the queue. The length of consumptionRanges and consumptionAllotments
 // defines the range of priorities for the multi-level queue and the amount of time to
 // spend on each level. Their length must be the same.
 func newMultiLevelQueue(
 	vdrs validators.Set,
-	log logging.Logger,
+	ctx *snow.Context,
 	metrics *metrics,
+	cpuTracker tracker.TimeTracker,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
 	bufferSize int,
@@ -68,15 +79,15 @@ func newMultiLevelQueue(
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
 	singleLevelSize := bufferSize / len(consumptionRanges)
-	cpuTracker := throttler.NewEWMATracker(vdrs, cpuPortion, cpuInterval, log)
-	msgThrottler := throttler.NewMessageThrottler(vdrs, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, log)
+	msgTracker := tracker.NewMessageTracker()
+	resourceManager := NewResourceManager(vdrs, ctx.Log, msgTracker, cpuTracker, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, cpuPortion)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)
 		// An error should only occur while registering (not creating) the gauge and histogram
 		// so if there is a non-nil error, it is safe to log the error and proceed as normal.
 		if err != nil {
-			log.Error("Failed to register metrics for tier %d of message queue", index)
+			ctx.Log.Error("Failed to register metrics for tier %d of message queue", index)
 		}
 		queues[index] = singleLevelQueue{
 			msgs:        make(chan message, singleLevelSize),
@@ -85,18 +96,26 @@ func newMultiLevelQueue(
 		}
 	}
 
+	stakerReservedMessages := uint32(float64(bufferSize) * msgPortion)
+	msgPoolSize := uint32(bufferSize) - stakerReservedMessages
+
 	return &multiLevelQueue{
-		validators:    vdrs,
-		cpuTracker:    cpuTracker,
-		msgThrottler:  msgThrottler,
-		queues:        queues,
-		cpuRanges:     consumptionRanges,
-		cpuAllotments: consumptionAllotments,
-		cpuInterval:   cpuInterval,
-		log:           log,
-		metrics:       metrics,
-		bufferSize:    bufferSize,
-		semaChan:      semaChan,
+		validators:              vdrs,
+		cpuTracker:              cpuTracker,
+		msgTracker:              msgTracker,
+		queues:                  queues,
+		cpuRanges:               consumptionRanges,
+		cpuAllotments:           consumptionAllotments,
+		cpuInterval:             cpuInterval,
+		cpuPortion:              cpuPortion,
+		maxNonStakerPendingMsgs: maxNonStakerPendingMsgs,
+		msgPortion:              msgPortion,
+		msgPoolSize:             msgPoolSize,
+		stakerReservedMessages:  stakerReservedMessages,
+		ctx:                     ctx,
+		metrics:                 metrics,
+		bufferSize:              bufferSize,
+		semaChan:                semaChan,
 	}, semaChan
 }
 
@@ -106,28 +125,7 @@ func (ml *multiLevelQueue) PushMessage(msg message) bool {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	// If the message queue is already full, skip iterating
-	// through the queue levels to return false
-	if ml.pendingMessages >= ml.bufferSize {
-		ml.log.Debug("Dropped message due to a full message queue with %d messages", ml.pendingMessages)
-		return false
-	}
-	// If the message was added successfully, increment the counting sema
-	// and notify the throttler of the pending message
-	if !ml.pushMessage(msg) {
-		ml.log.Verbo("Dropped message during push: %s", msg)
-		ml.metrics.dropped.Inc()
-		return false
-	}
-	ml.pendingMessages++
-	ml.msgThrottler.Add(msg.validatorID)
-	select {
-	case ml.semaChan <- struct{}{}:
-	default:
-		ml.log.Error("Sempahore channel was full after pushing message to the message queue")
-	}
-	ml.metrics.pending.Inc()
-	return true
+	return ml.pushMessage(msg)
 }
 
 // PopMessage attempts to read the next message from the queue
@@ -138,18 +136,19 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 	msg, err := ml.popMessage()
 	if err == nil {
 		ml.pendingMessages--
-		ml.msgThrottler.Remove(msg.validatorID)
+		ml.msgTracker.Remove(msg.validatorID)
 		ml.metrics.pending.Dec()
 	}
 	return msg, err
 }
 
-// UtilizeCPU...
+// UtilizeCPU registers that [duration] was spent processing a message
+// from [vdr]
 func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.cpuTracker.UtilizeCPU(vdr, duration)
+	ml.cpuTracker.UtilizeTime(vdr, duration)
 	ml.intervalConsumption += duration
 	ml.tierConsumption += duration
 	if ml.tierConsumption > ml.cpuAllotments[ml.currentTier] {
@@ -165,7 +164,6 @@ func (ml *multiLevelQueue) EndInterval() {
 	defer ml.lock.Unlock()
 
 	ml.cpuTracker.EndInterval()
-	ml.msgThrottler.EndInterval()
 	ml.metrics.cpu.Observe(float64(ml.intervalConsumption.Milliseconds()))
 	ml.intervalConsumption = 0
 }
@@ -194,8 +192,7 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 			ml.queues[ml.currentTier].waitingTime.Observe(float64(time.Since(msg.received)))
 
 			// Check where messages from this validator currently belong
-			cpu := ml.cpuTracker.GetUtilization(msg.validatorID)
-			correctIndex := ml.getPriorityIndex(cpu)
+			correctIndex := ml.getPriorityIndex(msg.validatorID)
 
 			// If the message is at least the priority of the current tier
 			// or this message comes from the lowest priority queue
@@ -227,24 +224,57 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 // pushMessage adds a message to the appropriate level (or lower)
 // Assumes the lock is held
 func (ml *multiLevelQueue) pushMessage(msg message) bool {
-	validatorID := msg.validatorID
-	if validatorID.IsZero() {
-		ml.log.Warn("Dropping message due to invalid validatorID")
+	// If the message queue is already full, skip iterating
+	// through the queue levels to return false
+	if ml.pendingMessages >= ml.bufferSize {
+		ml.ctx.Log.Debug("Dropped message due to a full message queue with %d messages", ml.pendingMessages)
+		ml.metrics.dropped.Inc()
 		return false
 	}
-	throttle := ml.msgThrottler.Throttle(validatorID)
-	if throttle {
+
+	validatorID := msg.validatorID
+	if validatorID.IsZero() {
+		ml.ctx.Log.Warn("Dropping message due to invalid validatorID")
+		return false
+	}
+
+	success := ml.resourceManager.TakeMessage(msg)
+	if !success {
+		ml.metrics.dropped.Inc()
 		ml.metrics.throttled.Inc()
 		return false
 	}
-	cpu := ml.cpuTracker.GetUtilization(validatorID)
-	queueIndex := ml.getPriorityIndex(cpu)
 
+	// Place the message on the correct queue
+	if !ml.placeMessage(msg) {
+		ml.ctx.Log.Verbo("Dropped message during push: %s", msg)
+		ml.metrics.dropped.Inc()
+		msg.Done()
+		return false
+	}
+
+	ml.pendingMessages++
+	select {
+	case ml.semaChan <- struct{}{}:
+	default:
+		ml.ctx.Log.Error("Sempahore channel was full after pushing message to the message queue")
+	}
+	ml.metrics.pending.Inc()
+	return true
+}
+
+// placeMessage finds the correct index of a message and attempts to place the
+// message at that queue or lower
+func (ml *multiLevelQueue) placeMessage(msg message) bool {
+	// Find the highest index this message could be placed on and waterfall
+	// the message to lower queues if the higher ones are full
+	queueIndex := ml.getPriorityIndex(msg.validatorID)
 	return ml.waterfallMessage(msg, queueIndex)
 }
 
-// Attempt to add the message to the appropriate queue
-// If it's full, waterfall the message to a lower queue if possible
+// waterfallMessage attempts to add the message to the queue at [queueIndex]
+// If that queue is full, it attempts to move the message to a lower queue
+// until it is forced to drop the message.
 func (ml *multiLevelQueue) waterfallMessage(msg message, queueIndex int) bool {
 	for queueIndex < len(ml.queues) {
 		select {
@@ -258,7 +288,10 @@ func (ml *multiLevelQueue) waterfallMessage(msg message, queueIndex int) bool {
 	return false
 }
 
-func (ml *multiLevelQueue) getPriorityIndex(utilization float64) int {
+// indexUtilization returns the highest priority queue that [utilization]
+// falls below the cutoff point for
+func (ml *multiLevelQueue) getPriorityIndex(validatorID ids.ShortID) int {
+	utilization := ml.resourceManager.Utilization(validatorID)
 	for i := 0; i < len(ml.cpuRanges); i++ {
 		if utilization <= ml.cpuRanges[i] {
 			return i

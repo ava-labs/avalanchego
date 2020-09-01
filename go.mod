@@ -12,6 +12,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/elastic/gosigar v0.11.0 // indirect
 	github.com/golang/protobuf v1.4.2
+	github.com/google/martian v2.1.0+incompatible
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/rpc v1.2.0

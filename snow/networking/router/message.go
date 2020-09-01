@@ -46,13 +46,30 @@ type message struct {
 	containers   [][]byte
 	containerIDs ids.Set
 	notification common.Message
+	pool         bool
 	received     time.Time // Time this message was received
 	deadline     time.Time // Time this message must be responded to
+	done         func()
 }
 
+// IsPeriodic returns true if this message is of a type
+// that is sent on a periodic basis
 func (m message) IsPeriodic() bool {
 	return m.requestID == constants.GossipMsgRequestID ||
 		m.messageType == gossipMsg
+}
+
+// SetDone sets the function to call when this message
+// has been processed
+func (m *message) SetDone(f func()) {
+	m.done = f
+}
+
+// Done registers that this message has been processed
+func (m *message) Done() {
+	if m.done != nil {
+		m.done()
+	}
 }
 
 func (m message) String() string {

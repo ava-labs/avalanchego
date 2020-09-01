@@ -59,7 +59,7 @@ type FormattedAssetID struct {
 
 // IssueTx attempts to issue a transaction into consensus
 func (service *Service) IssueTx(r *http.Request, args *FormattedTx, reply *api.JsonTxID) error {
-	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
+	service.vm.ctx.Log.Debug("AVM: IssueTx called with %s", args.Tx)
 
 	txID, err := service.vm.IssueTx(args.Tx.Bytes)
 	if err != nil {
