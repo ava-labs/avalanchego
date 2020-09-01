@@ -54,7 +54,6 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 	}}
 
 	vm.LastAcceptedF = func() ids.ID { return gBlk.ID() }
-	vm.SaveBlockF = func(snowman.Block) error { return nil }
 	sender.CantGetAcceptedFrontier = false
 
 	te := &Transitive{}
@@ -182,9 +181,12 @@ func TestEngineQuery(t *testing.T) {
 	blocked := new(bool)
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		*blocked = true
-		if !(blkID.Equals(blk.ID()) || blkID.Equals(gBlk.ID())) {
-			t.Fatalf("Wrong block requested")
+		if blkID.Equals(gBlk.ID()) {
+			return gBlk, nil
+		} else if blkID.Equals(blk.ID()) {
+			return nil, errUnknownBlock
 		}
+		t.Fatalf("Wrong block requested")
 		return nil, errUnknownBlock
 	}
 
@@ -295,6 +297,13 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
+	vm.SaveBlockF = func(b snowman.Block) error {
+		if !b.ID().Equals(blk1.ID()) && !b.ID().Equals(blk.ID()) {
+			t.Fatal("should have asked to save blk or blk1")
+		}
+		return nil
+	}
+
 	blkSet := ids.Set{}
 	blkSet.Add(blk1.ID())
 	te.Chits(vdr, *queryRequestID, blkSet)
@@ -382,7 +391,6 @@ func TestEngineMultipleQuery(t *testing.T) {
 	sender.Default(true)
 
 	vm := &block.TestVM{}
-	vm.SaveBlockF = func(snowman.Block) error { return nil }
 	vm.T = t
 	config.VM = vm
 
@@ -492,6 +500,14 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
+	vm.SaveBlockF = func(b snowman.Block) error {
+		if b.ID().Equals(blk1.ID()) {
+			return nil
+		}
+		t.Fatal("should have asked to save blk1")
+		return errUnknownBlock
+	}
+
 	blkSet := ids.Set{}
 	blkSet.Add(blk1.ID())
 	te.Chits(vdr0, *queryRequestID, blkSet)
@@ -1342,6 +1358,12 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		return nil, errUnknownBlock
 	}
+	vm.SaveBlockF = func(b snowman.Block) error {
+		if !b.ID().Equals(validBlk.ID()) {
+			t.Fatal("should have saved validBlk")
+		}
+		return nil
+	}
 
 	votes := ids.Set{}
 	votes.Add(invalidBlkID)
@@ -1551,6 +1573,8 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		switch {
 		case blkID.Equals(missingBlk.ID()):
 			return missingBlk, nil
+		case blkID.Equals(gBlk.ID()):
+			return gBlk, nil
 		}
 		return nil, errUnknownBlock
 	}
@@ -1701,7 +1725,6 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm.Default(true)
 	vm.CantSetPreference = false
-	vm.SaveBlockF = func(snowman.Block) error { return nil }
 
 	gBlk := &snowman.TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
@@ -1797,6 +1820,14 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
 	}
 
+	vm.SaveBlockF = func(b snowman.Block) error {
+		if b.ID().Equals(blk.ID()) {
+			return nil
+		}
+		t.Fatal("should have saved blk")
+		return errUnknownBlock
+	}
+
 	te.Chits(vdr1, *queryRequestID, blkSet)
 
 	if status := blk.Status(); status != choices.Accepted {
@@ -1826,7 +1857,6 @@ func TestPinnedMemory(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.SaveBlockF = func(snowman.Block) error { return nil }
 	config.VM = vm
 
 	vm.Default(true)
@@ -1904,6 +1934,15 @@ func TestPinnedMemory(t *testing.T) {
 		}
 		t.Fatalf("asked VM for unexpected block")
 		panic("Should have errored")
+	}
+	vm.SaveBlockF = func(b snowman.Block) error {
+		bID := b.ID()
+		switch {
+		case bID.Equals(blk.ID()):
+			return nil
+		}
+		t.Fatal("asked to save wrong block")
+		return errUnknownBlock
 	}
 
 	// Record chits
@@ -2011,6 +2050,17 @@ func TestPinnedMemory(t *testing.T) {
 	reqID, ok = pushQueryIDs[blk3.ID().Key()]
 	if !ok {
 		t.Fatal("should have sent push query for blk3")
+	}
+	vm.SaveBlockF = func(b snowman.Block) error {
+		bID := b.ID()
+		switch {
+		case bID.Equals(blk2.ID()):
+			return nil
+		case bID.Equals(blk3.ID()):
+			return nil
+		}
+		t.Fatal("asked to save wrong block")
+		return errUnknownBlock
 	}
 	te.Chits(vdr.ID(), reqID, votes)
 	reqID, ok = pushQueryIDs[blk2.ID().Key()]
