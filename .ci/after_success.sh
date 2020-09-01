@@ -8,4 +8,6 @@ TRAVIS_TAG="$DOCKERHUB_REPO:travis-$TRAVIS_BUILD_NUMBER"
 docker tag $DOCKERHUB_REPO:$COMMIT "$TRAVIS_TAG"
 
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-docker push "$TRAVIS_TAG"
+#docker push "$TRAVIS_TAG"
+# following should push all tags
+docker push $DOCKERHUB_REPO 
