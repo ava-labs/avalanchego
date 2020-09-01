@@ -766,7 +766,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys, // Private keys
+		privKeys,                             // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
