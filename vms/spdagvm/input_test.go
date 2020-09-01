@@ -22,7 +22,7 @@ func TestInputPayment(t *testing.T) {
 
 	b := Builder{
 		NetworkID: 0,
-		ChainID:  ids.Empty,
+		ChainID:   ids.Empty,
 	}
 	input := b.NewInputPayment(
 		/*sourceID=*/ txID,

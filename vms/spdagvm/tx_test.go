@@ -45,7 +45,7 @@ func TestTxVerifyBadChainID(t *testing.T) {
 			),
 		},
 		/*signers=*/ []*InputSigner{
-			&InputSigner{Keys: []*crypto.PrivateKeySECP256K1R{
+			{Keys: []*crypto.PrivateKeySECP256K1R{
 				keys[1], // reference to vm_test.go
 			}},
 		},
