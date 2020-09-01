@@ -43,5 +43,5 @@ jobs:
       run: |
         Install-Module -Name AWS.Tools.Installer -Force
         Install-AWSToolsModule AWS.Tools.EC2,AWS.Tools.S3 -CleanUp -Force
-        Write-S3Object -BucketName avalanche-public-builds -File .\build\avalanche-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip -Key windows/avalanche-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+        Write-S3Object -BucketName ${{ secrets.BUCKET }} -File .\build\avalanche-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip -Key windows/avalanche-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 

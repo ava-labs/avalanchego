@@ -38,6 +38,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
+        BUCKET: ${{ secrets.BUCKET }}
 
     - name: Create tgz package structure
       run: ./.github/workflows/build-tgz-pkg.sh
@@ -45,3 +46,4 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         TAG: ${{ steps.get_version.outputs.VERSION }}
+        BUCKET: ${{ secrets.BUCKET }}

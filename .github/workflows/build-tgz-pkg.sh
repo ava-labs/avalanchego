@@ -17,4 +17,4 @@ echo "Build tgz package..."
 cd $PKG_ROOT
 echo "Version: $VERSION"
 tar -czvf "avalanche-linux-$VERSION.tar.gz" avalanche-$VERSION
-aws s3 cp avalanche-linux-$VERSION.tar.gz s3://avalanche-public-builds/linux/
+aws s3 cp avalanche-linux-$VERSION.tar.gz s3://$BUCKET/linux/

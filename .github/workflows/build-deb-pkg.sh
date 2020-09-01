@@ -29,4 +29,4 @@ echo "Tag: $TAG"
 NEW_VERSION_STRING="Version: $TAG"
 sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
 dpkg-deb --build debian avalanche-linux_$TAG.deb
-aws s3 cp avalanche-linux_$TAG.deb s3://avalanche-public-builds/linux/
+aws s3 cp avalanche-linux_$TAG.deb s3://$BUCKET/linux/
