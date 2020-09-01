@@ -7,4 +7,4 @@ wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/ins
 golangci-lint --version
 
 
-golangci-lint run 
+golangci-lint run --max-same-issues 0

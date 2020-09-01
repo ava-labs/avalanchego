@@ -184,15 +184,15 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	// Push two messages from from high priority validator and one from
 	// low priority validator
 	messages := []message{
-		message{
+		{
 			validatorID: validator1.ID(),
 			requestID:   1,
 		},
-		message{
+		{
 			validatorID: validator1.ID(),
 			requestID:   2,
 		},
-		message{
+		{
 			validatorID: validator2.ID(),
 			requestID:   3,
 		},
