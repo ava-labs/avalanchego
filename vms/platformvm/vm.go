@@ -43,7 +43,6 @@ const (
 	utxoSetTypeID
 	txTypeID
 	statusTypeID
-	lastClosedTypeID
 
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second

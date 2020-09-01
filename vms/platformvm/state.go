@@ -579,22 +579,6 @@ func (vm *VM) preferredHeight() (uint64, error) {
 	return preferred.Height(), nil
 }
 
-func (vm *VM) putLastClosed(db database.Database, closedAt time.Time) error {
-	return vm.State.Put(db, lastClosedTypeID, lastClosedKey, closedAt)
-}
-
-// Retrieve a status
-func (vm *VM) getLastClosed(db database.Database) (time.Time, error) {
-	lastClosedIntf, err := vm.State.Get(db, lastClosedTypeID, lastClosedKey)
-	if err != nil {
-		return time.Time{}, err
-	}
-	if lastClosed, ok := lastClosedIntf.(time.Time); ok {
-		return lastClosed, nil
-	}
-	return time.Time{}, fmt.Errorf("expected lastClosed to be type Time but is type %T", lastClosedIntf)
-}
-
 // register each type that we'll be storing in the database
 // so that [vm.State] knows how to unmarshal these types from bytes
 func (vm *VM) registerDBTypes() {
@@ -710,23 +694,6 @@ func (vm *VM) registerDBTypes() {
 		return status, nil
 	}
 	if err := vm.State.RegisterType(statusTypeID, marshalStatusFunc, unmarshalStatusFunc); err != nil {
-		vm.Ctx.Log.Warn(errRegisteringType.Error())
-	}
-
-	marshalLastClosedFunc := func(lastClosedIntf interface{}) ([]byte, error) {
-		if lastClosed, ok := lastClosedIntf.(time.Time); ok {
-			return lastClosed.MarshalBinary()
-		}
-		return nil, fmt.Errorf("expected Time but got type %T", lastClosedIntf)
-	}
-	unmarshalLastClosedFunc := func(bytes []byte) (interface{}, error) {
-		lastClosed := time.Time{}
-		if err := lastClosed.UnmarshalBinary(bytes); err != nil {
-			return nil, err
-		}
-		return lastClosed, nil
-	}
-	if err := vm.State.RegisterType(lastClosedTypeID, marshalLastClosedFunc, unmarshalLastClosedFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
 }
