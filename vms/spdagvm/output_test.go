@@ -24,7 +24,7 @@ func TestOutputPayment(t *testing.T) {
 
 	b := Builder{
 		NetworkID: 0,
-		ChainID:  ids.Empty,
+		ChainID:   ids.Empty,
 	}
 	output := b.NewOutputPayment(
 		/*amount=*/ 12345,
@@ -78,7 +78,7 @@ func TestOutputTakeOrLeave(t *testing.T) {
 
 	b := Builder{
 		NetworkID: 0,
-		ChainID:  ids.Empty,
+		ChainID:   ids.Empty,
 	}
 	output := b.NewOutputTakeOrLeave(
 		/*amount=*/ 12345,

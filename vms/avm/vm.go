@@ -1068,7 +1068,7 @@ func (vm *VM) MintNFT(
 				},
 				GroupID: out.GroupID,
 				Payload: payload,
-				Outputs: []*secp256k1fx.OutputOwners{&secp256k1fx.OutputOwners{
+				Outputs: []*secp256k1fx.OutputOwners{{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{to},
 				}},
