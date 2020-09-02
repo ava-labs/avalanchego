@@ -75,7 +75,9 @@ func (tx *Tx) Bytes() []byte { return tx.bytes }
 // Key returns the public key used to authorize this transaction
 // Key may return nil if Verify returned an error
 // This function also sets [tx]'s public key
-func (tx *Tx) Key(ctx *snow.Context) crypto.PublicKey { return tx.key(ctx, &crypto.FactorySECP256K1R{}) }
+func (tx *Tx) Key(ctx *snow.Context) crypto.PublicKey {
+	return tx.key(ctx, &crypto.FactorySECP256K1R{})
+}
 
 func (tx *Tx) key(ctx *snow.Context, factory *crypto.FactorySECP256K1R) crypto.PublicKey {
 	// Verify must be called to check this error and ensure that the public key is valid
