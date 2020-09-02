@@ -219,7 +219,7 @@ func TestGetTx(t *testing.T) {
 	}
 
 	tests := []test{
-		test{
+		{
 			"standard block",
 			func() (*Tx, error) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
@@ -232,7 +232,7 @@ func TestGetTx(t *testing.T) {
 				)
 			},
 		},
-		test{
+		{
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
@@ -246,7 +246,7 @@ func TestGetTx(t *testing.T) {
 				)
 			},
 		},
-		test{
+		{
 			"atomic block",
 			func() (*Tx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
