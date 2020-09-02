@@ -45,23 +45,23 @@ func TestTransferableOutputSorting(t *testing.T) {
 	c.RegisterType(&TestTransferable{})
 
 	outs := []*TransferableOutput{
-		&TransferableOutput{
+		{
 			Asset: Asset{ID: ids.NewID([32]byte{1})},
 			Out:   &TestTransferable{Val: 1},
 		},
-		&TransferableOutput{
+		{
 			Asset: Asset{ID: ids.Empty},
 			Out:   &TestTransferable{Val: 1},
 		},
-		&TransferableOutput{
+		{
 			Asset: Asset{ID: ids.NewID([32]byte{1})},
 			Out:   &TestTransferable{Val: 0},
 		},
-		&TransferableOutput{
+		{
 			Asset: Asset{ID: ids.Empty},
 			Out:   &TestTransferable{Val: 0},
 		},
-		&TransferableOutput{
+		{
 			Asset: Asset{ID: ids.Empty},
 			Out:   &TestTransferable{Val: 0},
 		},
@@ -193,7 +193,7 @@ func TestTransferableInputSorting(t *testing.T) {
 	c.RegisterType(&TestTransferable{})
 
 	ins := []*TransferableInput{
-		&TransferableInput{
+		{
 			UTXOID: UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 1,
@@ -201,7 +201,7 @@ func TestTransferableInputSorting(t *testing.T) {
 			Asset: Asset{ID: ids.Empty},
 			In:    &TestTransferable{},
 		},
-		&TransferableInput{
+		{
 			UTXOID: UTXOID{
 				TxID:        ids.NewID([32]byte{1}),
 				OutputIndex: 0,
@@ -209,7 +209,7 @@ func TestTransferableInputSorting(t *testing.T) {
 			Asset: Asset{ID: ids.Empty},
 			In:    &TestTransferable{},
 		},
-		&TransferableInput{
+		{
 			UTXOID: UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
@@ -217,7 +217,7 @@ func TestTransferableInputSorting(t *testing.T) {
 			Asset: Asset{ID: ids.Empty},
 			In:    &TestTransferable{},
 		},
-		&TransferableInput{
+		{
 			UTXOID: UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,

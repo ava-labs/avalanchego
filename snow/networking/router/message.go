@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/constants"
 )
 
 type msgType int
@@ -47,6 +48,11 @@ type message struct {
 	notification common.Message
 	received     time.Time // Time this message was received
 	deadline     time.Time // Time this message must be responded to
+}
+
+func (m message) IsPeriodic() bool {
+	return m.requestID == constants.GossipMsgRequestID ||
+		m.messageType == gossipMsg
 }
 
 func (m message) String() string {

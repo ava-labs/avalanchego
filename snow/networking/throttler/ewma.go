@@ -143,7 +143,7 @@ func (et *ewmaCPUTracker) EndInterval() {
 		cpuSpender.staking = false
 		cpuSpender.expectedCPU = defaultMinimumCPUAllotment
 	}
-	et.log.Debug("Removed %d validators from CPU Tracker.", removed)
+	et.log.Verbo("Removed %d validators from CPU Tracker.", removed)
 }
 
 // getSpender returns the [cpuSpender] corresponding to [validatorID]
