@@ -214,7 +214,7 @@ func init() {
 	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMinimumTimeout := fs.Int64("network-minimum-timeout", int64(500*time.Millisecond), "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
 	networkMaximumTimeout := fs.Int64("network-maximum-timeout", int64(10*time.Second), "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
-	fs.Float64Var(&Config.NetworkTimeoutMultiplier, "network-timeout-multiplier", 1.1, "Multiplier of the timeout after a failed request.")
+	fs.Float64Var(&Config.NetworkConfig.TimeoutMultiplier, "network-timeout-multiplier", 1.1, "Multiplier of the timeout after a failed request.")
 	networkTimeoutReduction := fs.Int64("network-timeout-reduction", int64(time.Millisecond), "Reduction of the timeout after a successful request, in nanoseconds.")
 
 	// Plugins:
@@ -473,10 +473,10 @@ func init() {
 	if *networkTimeoutReduction < 0 {
 		errs.Add(errors.New("timeout reduction can't be negative"))
 	}
-	Config.NetworkInitialTimeout = time.Duration(*networkInitialTimeout)
-	Config.NetworkMinimumTimeout = time.Duration(*networkMinimumTimeout)
-	Config.NetworkMaximumTimeout = time.Duration(*networkMaximumTimeout)
-	Config.NetworkTimeoutReduction = time.Duration(*networkTimeoutReduction)
+	Config.NetworkConfig.InitialTimeout = time.Duration(*networkInitialTimeout)
+	Config.NetworkConfig.MinimumTimeout = time.Duration(*networkMinimumTimeout)
+	Config.NetworkConfig.MaximumTimeout = time.Duration(*networkMaximumTimeout)
+	Config.NetworkConfig.TimeoutReduction = time.Duration(*networkTimeoutReduction)
 
 	if *consensusGossipFrequency < 0 {
 		errs.Add(errors.New("gossip frequency can't be negative"))

@@ -47,45 +47,50 @@ func (tq *timeoutQueue) Pop() interface{} {
 	return item
 }
 
+// AdaptiveTimeoutConfig contains the parameters that should be provided to the
+// adaptive timeout manager.
+type AdaptiveTimeoutConfig struct {
+	InitialTimeout    time.Duration
+	MinimumTimeout    time.Duration
+	MaximumTimeout    time.Duration
+	TimeoutMultiplier float64
+	TimeoutReduction  time.Duration
+
+	Namespace  string
+	Registerer prometheus.Registerer
+}
+
 // AdaptiveTimeoutManager is a manager for timeouts.
 type AdaptiveTimeoutManager struct {
 	currentDurationMetric prometheus.Gauge
 
-	minimumDuration time.Duration
-	maximumDuration time.Duration
-	increaseRatio   float64
-	decreaseValue   time.Duration
+	minimumTimeout    time.Duration
+	maximumTimeout    time.Duration
+	timeoutMultiplier float64
+	timeoutReduction  time.Duration
 
-	lock            sync.Mutex
-	currentDuration time.Duration // Amount of time before a timeout
-	timeoutMap      map[[32]byte]*adaptiveTimeout
-	timeoutQueue    timeoutQueue
-	timer           *Timer // Timer that will fire to clear the timeouts
+	lock           sync.Mutex
+	currentTimeout time.Duration // Amount of time before a timeout
+	timeoutMap     map[[32]byte]*adaptiveTimeout
+	timeoutQueue   timeoutQueue
+	timer          *Timer // Timer that will fire to clear the timeouts
 }
 
-// Initialize is a constructor b/c Golang, in its wisdom, doesn't ... have them?
-func (tm *AdaptiveTimeoutManager) Initialize(
-	initialDuration time.Duration,
-	minimumDuration time.Duration,
-	maximumDuration time.Duration,
-	increaseRatio float64,
-	decreaseValue time.Duration,
-	namespace string,
-	registerer prometheus.Registerer,
-) error {
+// Initialize this timeout manager with the provided config
+func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) error {
 	tm.currentDurationMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
+		Namespace: config.Namespace,
 		Name:      "network_timeout",
 		Help:      "Duration of current network timeouts in nanoseconds",
 	})
-	tm.minimumDuration = minimumDuration
-	tm.maximumDuration = maximumDuration
-	tm.increaseRatio = increaseRatio
-	tm.decreaseValue = decreaseValue
-	tm.currentDuration = initialDuration
+	tm.minimumTimeout = config.MinimumTimeout
+	tm.maximumTimeout = config.MaximumTimeout
+	tm.timeoutMultiplier = config.TimeoutMultiplier
+	tm.timeoutReduction = config.TimeoutReduction
+	tm.currentTimeout = config.InitialTimeout
 	tm.timeoutMap = make(map[[32]byte]*adaptiveTimeout)
 	tm.timer = NewTimer(tm.Timeout)
-	return registerer.Register(tm.currentDurationMetric)
+	return config.Registerer.Register(tm.currentDurationMetric)
 }
 
 // Dispatch ...
@@ -144,8 +149,8 @@ func (tm *AdaptiveTimeoutManager) put(id ids.ID, handler func()) time.Time {
 	timeout := &adaptiveTimeout{
 		id:       id,
 		handler:  handler,
-		duration: tm.currentDuration,
-		deadline: currentTime.Add(tm.currentDuration),
+		duration: tm.currentTimeout,
+		deadline: currentTime.Add(tm.currentTimeout),
 	}
 	tm.timeoutMap[id.Key()] = timeout
 	heap.Push(&tm.timeoutQueue, timeout)
@@ -163,32 +168,32 @@ func (tm *AdaptiveTimeoutManager) remove(id ids.ID, currentTime time.Time) {
 
 	if timeout.deadline.Before(currentTime) {
 		// This request is being removed because it timed out.
-		if timeout.duration >= tm.currentDuration {
+		if timeout.duration >= tm.currentTimeout {
 			// If the current timeout duration is less than or equal to the
 			// timeout that was triggered, double the duration.
-			tm.currentDuration = time.Duration(float64(tm.currentDuration) * tm.increaseRatio)
+			tm.currentTimeout = time.Duration(float64(tm.currentTimeout) * tm.timeoutMultiplier)
 
-			if tm.currentDuration > tm.maximumDuration {
+			if tm.currentTimeout > tm.maximumTimeout {
 				// Make sure that we never get stuck in a bad situation
-				tm.currentDuration = tm.maximumDuration
+				tm.currentTimeout = tm.maximumTimeout
 			}
 		}
 	} else {
 		// This request is being removed because it finished successfully.
-		if timeout.duration <= tm.currentDuration {
+		if timeout.duration <= tm.currentTimeout {
 			// If the current timeout duration is greater than or equal to the
 			// timeout that was fullfilled, reduce future timeouts.
-			tm.currentDuration -= tm.decreaseValue
+			tm.currentTimeout -= tm.timeoutReduction
 
-			if tm.currentDuration < tm.minimumDuration {
+			if tm.currentTimeout < tm.minimumTimeout {
 				// Make sure that we never get stuck in a bad situation
-				tm.currentDuration = tm.minimumDuration
+				tm.currentTimeout = tm.minimumTimeout
 			}
 		}
 	}
 
 	// Make sure the metrics report the current timeouts
-	tm.currentDurationMetric.Set(float64(tm.currentDuration))
+	tm.currentDurationMetric.Set(float64(tm.currentTimeout))
 
 	// Remove the timeout from the map
 	delete(tm.timeoutMap, key)

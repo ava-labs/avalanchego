@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 // Config contains all of the configurations of an Avalanche node.
@@ -53,11 +54,7 @@ type Config struct {
 	StakerCPUPortion        float64
 
 	// Network configuration
-	NetworkInitialTimeout    time.Duration
-	NetworkMinimumTimeout    time.Duration
-	NetworkMaximumTimeout    time.Duration
-	NetworkTimeoutMultiplier float64
-	NetworkTimeoutReduction  time.Duration
+	NetworkConfig timer.AdaptiveTimeoutConfig
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer

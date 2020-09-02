@@ -16,19 +16,20 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 func TestShutdown(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize(
-		10*time.Second,
-		500*time.Millisecond,
-		10*time.Second,
-		1.1,
-		time.Millisecond,
-		"",
-		prometheus.NewRegistry(),
-	)
+	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    10 * time.Second,
+		MinimumTimeout:    500 * time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -78,15 +79,15 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	tm.Initialize(
-		10*time.Second,
-		500*time.Millisecond,
-		10*time.Second,
-		1.1,
-		time.Millisecond,
-		"",
-		prometheus.NewRegistry(),
-	)
+	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    10 * time.Second,
+		MinimumTimeout:    500 * time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}

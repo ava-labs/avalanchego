@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
@@ -1637,15 +1638,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize(
-		10*time.Second,
-		500*time.Millisecond,
-		10*time.Second,
-		1.1,
-		time.Millisecond,
-		"",
-		prometheus.NewRegistry(),
-	)
+	timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    10 * time.Second,
+		MinimumTimeout:    500 * time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}

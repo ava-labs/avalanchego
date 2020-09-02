@@ -414,15 +414,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
 	timeoutManager := timeout.Manager{}
-	if err := timeoutManager.Initialize(
-		n.Config.NetworkInitialTimeout,
-		n.Config.NetworkMinimumTimeout,
-		n.Config.NetworkMaximumTimeout,
-		n.Config.NetworkTimeoutMultiplier,
-		n.Config.NetworkTimeoutReduction,
-		"gecko",
-		n.Config.ConsensusParams.Metrics,
-	); err != nil {
+	n.Config.NetworkConfig.Namespace = "gecko"
+	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
