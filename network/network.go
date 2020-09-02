@@ -47,6 +47,8 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 )
 
+func init() { rand.Seed(time.Now().UnixNano()) }
+
 // Network defines the functionality of the networking library.
 type Network interface {
 	// All consensus messages can be sent through this interface. Thread safety
@@ -225,19 +227,22 @@ func NewNetwork(
 	pingFrequency time.Duration,
 ) Network {
 	netw := &network{
-		log:                                log,
-		id:                                 id,
-		ip:                                 ip,
-		networkID:                          networkID,
-		version:                            version,
-		parser:                             parser,
-		listener:                           listener,
-		dialer:                             dialer,
-		serverUpgrader:                     serverUpgrader,
-		clientUpgrader:                     clientUpgrader,
-		vdrs:                               vdrs,
-		beacons:                            beacons,
-		router:                             router,
+		log:            log,
+		id:             id,
+		ip:             ip,
+		networkID:      networkID,
+		version:        version,
+		parser:         parser,
+		listener:       listener,
+		dialer:         dialer,
+		serverUpgrader: serverUpgrader,
+		clientUpgrader: clientUpgrader,
+		vdrs:           vdrs,
+		beacons:        beacons,
+		router:         router,
+		// This field just makes sure we don't connect to ourselves when TLS is
+		// disabled. So, cryptographically secure random number generation isn't
+		// used here.
 		nodeID:                             rand.Uint32(),
 		initialReconnectDelay:              initialReconnectDelay,
 		maxReconnectDelay:                  maxReconnectDelay,
@@ -883,8 +888,9 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = n.initialReconnectDelay
 		}
 
-		// Ignore weak randomness warnings in calculating timeouts because true
-		// randomness is unnecessary here
+		// Randomization is only performed here to distribute reconnection
+		// attempts to a node that previously shut down. This doesn't require
+		// cryptographically secure random number generation.
 		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay

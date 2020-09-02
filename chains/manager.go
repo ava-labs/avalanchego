@@ -115,6 +115,7 @@ type manager struct {
 
 	stakingEnabled                     bool // True iff the network has staking enabled
 	stakerMsgPortion, stakerCPUPortion float64
+	maxNonStakerPendingMsgs            uint32
 	log                                logging.Logger
 	logFactory                         logging.Factory
 	vmManager                          vms.Manager // Manage mappings from vm ID --> vm
@@ -152,6 +153,7 @@ type manager struct {
 // TODO: Make this function take less arguments
 func New(
 	stakingEnabled bool,
+	maxNonStakerPendingMsgs uint,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	log logging.Logger,
@@ -186,29 +188,30 @@ func New(
 	rtr.Initialize(log, &timeoutManager, gossipFrequency, shutdownTimeout)
 
 	m := &manager{
-		stakingEnabled:   stakingEnabled,
-		stakerMsgPortion: stakerMsgPortion,
-		stakerCPUPortion: stakerCPUPortion,
-		log:              log,
-		logFactory:       logFactory,
-		vmManager:        vmManager,
-		decisionEvents:   decisionEvents,
-		consensusEvents:  consensusEvents,
-		db:               db,
-		chainRouter:      rtr,
-		net:              net,
-		timeoutManager:   &timeoutManager,
-		consensusParams:  consensusParams,
-		validators:       validators,
-		nodeID:           nodeID,
-		networkID:        networkID,
-		server:           server,
-		keystore:         keystore,
-		atomicMemory:     atomicMemory,
-		avaxAssetID:      avaxAssetID,
-		xChainID:         xChainID,
-		criticalChains:   criticalChains,
-		chains:           make(map[[32]byte]*router.Handler),
+		stakingEnabled:          stakingEnabled,
+		maxNonStakerPendingMsgs: uint32(maxNonStakerPendingMsgs),
+		stakerMsgPortion:        stakerMsgPortion,
+		stakerCPUPortion:        stakerCPUPortion,
+		log:                     log,
+		logFactory:              logFactory,
+		vmManager:               vmManager,
+		decisionEvents:          decisionEvents,
+		consensusEvents:         consensusEvents,
+		db:                      db,
+		chainRouter:             rtr,
+		net:                     net,
+		timeoutManager:          &timeoutManager,
+		consensusParams:         consensusParams,
+		validators:              validators,
+		nodeID:                  nodeID,
+		networkID:               networkID,
+		server:                  server,
+		keystore:                keystore,
+		atomicMemory:            atomicMemory,
+		avaxAssetID:             avaxAssetID,
+		xChainID:                xChainID,
+		criticalChains:          criticalChains,
+		chains:                  make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
 	return m, nil
@@ -238,7 +241,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
 	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
-		m.log.Error("there is already a chain with alias '%s'. Chain not created.", alias)
+		m.log.Debug("there is already a chain with alias '%s'. Chain not created.",
+			alias)
 		return
 	}
 
@@ -342,9 +346,9 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	var validators validators.Set // Validators validating this blockchain
 	var ok bool
 	if m.stakingEnabled {
-		validators, ok = m.validators.GetValidatorSet(chainParams.SubnetID)
+		validators, ok = m.validators.GetValidators(chainParams.SubnetID)
 	} else { // Staking is disabled. Every peer validates every subnet.
-		validators, ok = m.validators.GetValidatorSet(constants.DefaultSubnetID)
+		validators, ok = m.validators.GetValidators(constants.PrimaryNetworkID)
 	}
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
@@ -510,6 +514,7 @@ func (m *manager) createAvalancheChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.maxNonStakerPendingMsgs,
 		m.stakerMsgPortion,
 		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
@@ -588,6 +593,7 @@ func (m *manager) createSnowmanChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
+		m.maxNonStakerPendingMsgs,
 		m.stakerMsgPortion,
 		m.stakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),

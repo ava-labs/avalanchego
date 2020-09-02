@@ -333,8 +333,7 @@ func TestRPCAPI(t *testing.T) {
 	// Inverse of the above map
 	pkToAddr := map[string]string{}
 
-	pks := []string{}       // List of private keys
-	addresses := []string{} // List of addresses controlled by the private keys
+	pks := []string{} // List of private keys
 
 	// Populate the above data structures using [keys]
 	for _, v := range keys {
@@ -347,7 +346,6 @@ func TestRPCAPI(t *testing.T) {
 		pkToAddr[pk] = address
 
 		pks = append(pks, pk)
-		addresses = append(addresses, address)
 	}
 
 	// Ensure GetAddress and GetBalance return the correct values for the
@@ -537,7 +535,6 @@ func TestMultipleSend(t *testing.T) {
 	addrToPK := map[string]string{}
 	pkToAddr := map[string]string{}
 	pks := []string{}
-	addresses := []string{}
 	for _, v := range keys {
 		cb58 := formatting.CB58{Bytes: v.Bytes()}
 		pk := cb58.String()
@@ -548,7 +545,6 @@ func TestMultipleSend(t *testing.T) {
 		pkToAddr[pk] = address
 
 		pks = append(pks, pk)
-		addresses = append(addresses, address)
 	}
 
 	ctx.Lock.Lock()

@@ -206,6 +206,9 @@ func (cdb *CommonDecisionBlock) onAccept() database.Database {
 	if cdb.Status().Decided() {
 		return cdb.vm.DB
 	}
+	if cdb.onAcceptDB == nil {
+		panic(":(")
+	}
 	return cdb.onAcceptDB
 }
 
@@ -270,11 +273,11 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 
 	// Update the state of the chain in the database
 	if err := ddb.onAcceptDB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB: %s", err)
 		return err
 	}
 	if err := ddb.vm.DB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB: %s", err)
 		return err
 	}
 
@@ -282,7 +285,10 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 		child.setBaseDatabase(ddb.vm.DB)
 	}
 	if ddb.onAcceptFunc != nil {
-		ddb.onAcceptFunc()
+		if err := ddb.onAcceptFunc(); err != nil {
+			ddb.vm.Ctx.Log.Warn("error executing OnAcceptFunc(): %s", err)
+			return err
+		}
 	}
 
 	// remove this block and its parent from memory

@@ -8,13 +8,11 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/json"
-
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/json"
 )
 
 var (
-	errDBError     = errors.New("error getting data from database")
 	errBadData     = errors.New("data must be base 58 repr. of 32 bytes")
 	errNoSuchBlock = errors.New("couldn't get block from database. Does it exist?")
 )

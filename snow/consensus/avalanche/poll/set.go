@@ -112,7 +112,7 @@ func (s *set) Vote(
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
 	delete(s.polls, requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Now().Sub(poll.start).Milliseconds()))
+	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 	return poll.Result(), true
 }

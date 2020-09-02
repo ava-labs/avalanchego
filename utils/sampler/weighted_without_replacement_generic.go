@@ -12,14 +12,6 @@ type weightedWithoutReplacementGeneric struct {
 	w Weighted
 }
 
-// NewWeightedWithoutReplacement returns a new sampler
-func NewWeightedWithoutReplacement() WeightedWithoutReplacement {
-	return &weightedWithoutReplacementGeneric{
-		u: &uniformReplacer{},
-		w: &weightedHeap{},
-	}
-}
-
 func (s *weightedWithoutReplacementGeneric) Initialize(weights []uint64) error {
 	totalWeight := uint64(0)
 	for _, weight := range weights {

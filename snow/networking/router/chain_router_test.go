@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -39,8 +40,9 @@ func TestShutdown(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -53,9 +55,9 @@ func TestShutdown(t *testing.T) {
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Handler shutdown was not called or timed out after 20ms during chainRouter shutdown")
-	case _, _ = <-shutdownCalled:
+	case <-shutdownCalled:
 	}
 
 	select {
@@ -97,8 +99,9 @@ func TestShutdownTimesOut(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -118,8 +121,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	}()
 
 	select {
-	case _, _ = <-engineFinished:
+	case <-engineFinished:
 		t.Fatalf("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
-	case _, _ = <-shutdownFinished:
+	case <-shutdownFinished:
 	}
 }
