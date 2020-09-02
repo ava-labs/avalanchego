@@ -423,8 +423,30 @@ func TestServiceGetUTXOs(t *testing.T) {
 			count: numUTXOs,
 			args: &GetUTXOsArgs{
 				Addresses: []string{
-					pAddr,
+					xAddr,
 				},
+				SourceChain: "P",
+			},
+		},
+		{
+			label:     "invalid source chain ID",
+			shouldErr: true,
+			count:     numUTXOs,
+			args: &GetUTXOsArgs{
+				Addresses: []string{
+					xAddr,
+				},
+				SourceChain: "HomeRunDerby",
+			},
+		},
+		{
+			label: "get all P-chain UTXOs",
+			count: numUTXOs,
+			args: &GetUTXOsArgs{
+				Addresses: []string{
+					xAddr,
+				},
+				SourceChain: "P",
 			},
 		},
 		{
@@ -433,6 +455,15 @@ func TestServiceGetUTXOs(t *testing.T) {
 			args: &GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
+					pAddr,
+				},
+			},
+		},
+		{
+			label:     "get UTXOs for an address on a different chain",
+			shouldErr: true,
+			args: &GetUTXOsArgs{
+				Addresses: []string{
 					pAddr,
 				},
 			},
