@@ -171,7 +171,7 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersR
 
 // ExportUserReply is the reply from ExportUser
 type ExportUserReply struct {
-	User formatting.CB58 `json:"user"`
+	User formatting.HexWrapper `json:"user"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
@@ -218,7 +218,7 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *Expor
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
 	api.UserPass
-	User formatting.CB58 `json:"user"`
+	User formatting.HexWrapper `json:"user"`
 }
 
 // ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
