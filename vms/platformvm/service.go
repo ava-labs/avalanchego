@@ -524,7 +524,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stop))
+	stopPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
 	defer stopDB.Close()
 
@@ -552,12 +552,26 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				StakeAmount: &weight,
 			})
 		case *UnsignedAddValidatorTx:
+			nodeID := staker.Validator.ID()
+			startTime := staker.StartTime()
 			weight := json.Uint64(staker.Validator.Weight())
+			rawUptime, err := service.vm.calculateUptime(service.vm.DB, nodeID, startTime)
+			if err != nil {
+				return err
+			}
+			uptime := json.Float32(rawUptime)
+
+			service.vm.connLock.Lock()
+			_, connected := service.vm.connections[nodeID.Key()]
+			service.vm.connLock.Unlock()
+
 			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(staker.StartTime().Unix()),
+				ID:          nodeID.PrefixedString(constants.NodeIDPrefix),
+				StartTime:   json.Uint64(startTime.Unix()),
 				EndTime:     json.Uint64(staker.EndTime().Unix()),
 				StakeAmount: &weight,
+				Uptime:      &uptime,
+				Connected:   &connected,
 			})
 		case *UnsignedAddSubnetValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
@@ -593,7 +607,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		args.SubnetID = constants.PrimaryNetworkID
 	}
 
-	startPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, start))
+	startPrefix := []byte(fmt.Sprintf("%s%s", args.SubnetID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
 	defer startDB.Close()
 

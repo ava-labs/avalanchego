@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/gecko/cache"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/constants"
@@ -72,15 +74,11 @@ const (
 )
 
 var (
-	// taken from https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go/32620397#32620397
-	maxTime = time.Unix(1<<63-62135596801, 0) // 0 is used because we drop the nano-seconds
+	timestampKey  = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
+	chainsKey     = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
+	subnetsKey    = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
+	lastClosedKey = ids.NewID([32]byte{'l', 'a', 's', 't', ' ', 'c', 'l', 'o', 's', 'e', 'd'})
 
-	timestampKey = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
-	chainsKey    = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
-	subnetsKey   = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
-)
-
-var (
 	errEndOfTime                = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
 	errNoPendingBlocks          = errors.New("no pending blocks")
 	errRegisteringType          = errors.New("error registering type with database")
@@ -88,6 +86,9 @@ var (
 	errInvalidID                = errors.New("invalid ID")
 	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
 	errUnknownTxType            = errors.New("unknown transaction type")
+
+	_ block.ChainVM        = &VM{}
+	_ validators.Connector = &VM{}
 )
 
 // Codec does serialization and deserialization
@@ -174,6 +175,10 @@ type VM struct {
 	// The minimum amount of tokens one must bond to be a staker
 	minStake uint64
 
+	// UptimePercentage is the minimum uptime required to be rewarded for
+	// staking.
+	uptimePercentage float64
+
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
 	timer *timer.Timer
@@ -185,6 +190,11 @@ type VM struct {
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped bool
+
+	bootstrappedTime time.Time
+
+	connLock    sync.Mutex
+	connections map[[20]byte]time.Time
 }
 
 // Initialize this blockchain.
@@ -211,6 +221,7 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
+	vm.connections = make(map[[20]byte]time.Time)
 
 	// Register this VM's types with the database so we can get/put structs to/from it
 	vm.registerDBTypes()
@@ -364,7 +375,6 @@ func (vm *VM) issueTx(tx *Tx) error {
 // Create all chains that exist that this node validates
 // Can only be called after initSubnets()
 func (vm *VM) initBlockchains() error {
-	vm.Ctx.Log.Info("initializing blockchains")
 	blockchains, err := vm.getChains(vm.DB) // get blockchains that exist
 	if err != nil {
 		return err
@@ -378,8 +388,6 @@ func (vm *VM) initBlockchains() error {
 
 // Set the node's validator manager to be up to date
 func (vm *VM) initSubnets() error {
-	vm.Ctx.Log.Info("initializing Subnets")
-
 	if err := vm.updateValidators(vm.DB); err != nil {
 		return err
 	}
@@ -425,12 +433,70 @@ func (vm *VM) Bootstrapping() error { vm.bootstrapped = false; return vm.fx.Boot
 // Bootstrapped marks this VM as bootstrapped
 func (vm *VM) Bootstrapped() error {
 	vm.bootstrapped = true
+	vm.bootstrappedTime = vm.clock.Time()
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		vm.updateVdrMgr(false),
 		vm.fx.Bootstrapped(),
 	)
-	return errs.Err
+	if errs.Errored() {
+		return errs.Err
+	}
+
+	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
+	defer stopDB.Close()
+
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
+
+	for stopIter.Next() { // Iterates in order of increasing start time
+		txBytes := stopIter.Value()
+
+		tx := Tx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return err
+		}
+
+		unsignedTx, ok := tx.UnsignedTx.(*UnsignedAddValidatorTx)
+		if !ok {
+			continue
+		}
+
+		nodeID := unsignedTx.Validator.ID()
+
+		uptime, err := vm.uptime(vm.DB, nodeID)
+		switch {
+		case err == database.ErrNotFound:
+			uptime = &validatorUptime{
+				LastUpdated: uint64(unsignedTx.StartTime().Unix()),
+			}
+		case err != nil:
+			return err
+		}
+
+		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
+		if !vm.bootstrappedTime.After(lastUpdated) {
+			continue
+		}
+
+		durationOffline := vm.bootstrappedTime.Sub(lastUpdated)
+
+		uptime.UpDuration += uint64(durationOffline.Seconds())
+		uptime.LastUpdated = uint64(vm.bootstrappedTime.Unix())
+
+		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
+			return err
+		}
+	}
+	if err := stopIter.Error(); err != nil {
+		return err
+	}
+	return vm.DB.Commit()
 }
 
 // Shutdown this blockchain
@@ -445,6 +511,73 @@ func (vm *VM) Shutdown() error {
 	vm.timer.Stop()
 	vm.Ctx.Lock.Lock()
 
+	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
+	defer stopDB.Close()
+
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
+
+	vm.connLock.Lock()
+	defer vm.connLock.Unlock()
+
+	for stopIter.Next() { // Iterates in order of increasing start time
+		txBytes := stopIter.Value()
+
+		tx := Tx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return err
+		}
+
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddValidatorTx:
+			nodeID := staker.Validator.ID()
+			startTime := staker.StartTime()
+
+			uptime, err := vm.uptime(vm.DB, nodeID)
+			switch {
+			case err == database.ErrNotFound:
+				uptime = &validatorUptime{
+					LastUpdated: uint64(startTime.Unix()),
+				}
+			case err != nil:
+				return err
+			}
+
+			lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
+
+			currentLocalTime := vm.clock.Time()
+			timeConnected := vm.clock.Time()
+			if realTimeConnected, isConnected := vm.connections[nodeID.Key()]; isConnected {
+				timeConnected = realTimeConnected
+			}
+			if timeConnected.Before(vm.bootstrappedTime) {
+				timeConnected = vm.bootstrappedTime
+			}
+			if timeConnected.Before(lastUpdated) {
+				timeConnected = lastUpdated
+			}
+			if timeConnected.After(currentLocalTime) {
+				timeConnected = currentLocalTime
+			}
+
+			uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected).Seconds())
+			uptime.LastUpdated = uint64(currentLocalTime.Unix())
+
+			if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
+				vm.Ctx.Log.Error("failed to write back uptime data")
+			}
+		}
+	}
+	if err := vm.DB.Commit(); err != nil {
+		return err
+	}
+	if err := stopIter.Error(); err != nil {
+		return err
+	}
 	return vm.DB.Close()
 }
 
@@ -519,13 +652,13 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !currentChainTimestamp.Before(maxTime) {
+	if !currentChainTimestamp.Before(timer.MaxTime) {
 		return nil, errEndOfTime
 	}
 
 	// If the chain time would be the time for the next primary network staker to leave,
 	// then we create a block that removes the staker and proposes they receive a staker reward
-	nextValidatorEndtime := maxTime
+	nextValidatorEndtime := timer.MaxTime
 	tx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, err
@@ -664,6 +797,81 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	}
 }
 
+// Connected implements validators.Connector
+func (vm *VM) Connected(vdrID ids.ShortID) bool {
+	// Locking is required here because this is called directly from the
+	// networking library.
+
+	vm.connLock.Lock()
+	defer vm.connLock.Unlock()
+
+	vm.connections[vdrID.Key()] = vm.clock.Time()
+	return false
+}
+
+// Disconnected implements validators.Connector
+func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
+	// Locking is required here because this is called directly from the
+	// networking library.
+
+	vm.connLock.Lock()
+	defer vm.connLock.Unlock()
+
+	vdrKey := vdrID.Key()
+	timeConnected := vm.connections[vdrKey]
+	delete(vm.connections, vdrKey)
+
+	if !vm.bootstrapped {
+		return false
+	}
+
+	txIntf, isValidator, err := vm.isValidator(vm.DB, constants.PrimaryNetworkID, vdrID)
+	if err != nil || !isValidator {
+		return false
+	}
+	tx, ok := txIntf.(*UnsignedAddValidatorTx)
+	if !ok {
+		return false
+	}
+
+	uptime, err := vm.uptime(vm.DB, vdrID)
+	switch {
+	case err == database.ErrNotFound:
+		uptime = &validatorUptime{
+			LastUpdated: uint64(tx.StartTime().Unix()),
+		}
+	case err != nil:
+		return false
+	}
+
+	if timeConnected.Before(vm.bootstrappedTime) {
+		timeConnected = vm.bootstrappedTime
+	}
+
+	lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
+	if timeConnected.Before(lastUpdated) {
+		timeConnected = lastUpdated
+	}
+
+	now := vm.clock.Time()
+	if now.Before(lastUpdated) {
+		now = lastUpdated
+	}
+
+	durationConnected := now.Sub(timeConnected)
+
+	uptime.UpDuration += uint64(durationConnected.Seconds())
+	uptime.LastUpdated = uint64(now.Unix())
+
+	if err := vm.setUptime(vm.DB, vdrID, uptime); err != nil {
+		vm.Ctx.Log.Error("failed to write back uptime data")
+	}
+	if err := vm.DB.Commit(); err != nil {
+		vm.Ctx.Log.Error("failed to commit database changes")
+	}
+	return false
+}
+
 // Check if there is a block ready to be added to consensus
 // If so, notify the consensus engine
 func (vm *VM) resetTimer() {
@@ -696,7 +904,8 @@ func (vm *VM) resetTimer() {
 	if err != nil {
 		vm.Ctx.Log.Error("could not retrieve timestamp from database")
 		return
-	} else if timestamp.Equal(maxTime) {
+	}
+	if timestamp.Equal(timer.MaxTime) {
 		vm.Ctx.Log.Error("Program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred.")
 		return
 	}
@@ -750,7 +959,7 @@ func (vm *VM) nextStakerChangeTime(db database.Database) (time.Time, error) {
 		subnetIDs.Add(subnet.ID())
 	}
 
-	earliest := maxTime
+	earliest := timer.MaxTime
 	for _, subnetID := range subnetIDs.List() {
 		if tx, err := vm.nextStakerStart(db, subnetID); err == nil {
 			if staker, ok := tx.UnsignedTx.(TimedTx); ok {
@@ -797,7 +1006,7 @@ func (vm *VM) updateValidators(db database.Database) error {
 	return nil
 }
 func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, timestamp time.Time) error {
-	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, start))
+	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, db)
 	defer startDB.Close()
 
@@ -863,7 +1072,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 		}
 	}
 
-	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, db)
 	defer stopDB.Close()
 
@@ -949,7 +1158,7 @@ func (vm *VM) updateVdrMgr(force bool) error {
 func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	vdrs := validators.NewSet()
 
-	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	stopPrefix := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
 	defer stopDB.Close()
 	stopIter := stopDB.NewIterator()
@@ -1107,4 +1316,42 @@ func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 	}
 	hrp := constants.GetHRP(vm.Ctx.NetworkID)
 	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+}
+
+func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTime time.Time) (float64, error) {
+	uptime, err := vm.uptime(db, nodeID)
+	switch {
+	case err == database.ErrNotFound:
+		uptime = &validatorUptime{
+			LastUpdated: uint64(startTime.Unix()),
+		}
+	case err != nil:
+		return 0, err
+	}
+
+	vm.connLock.Lock()
+	defer vm.connLock.Unlock()
+
+	upDuration := uptime.UpDuration
+	lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
+
+	currentLocalTime := vm.clock.Time()
+	if currentLocalTime.Before(lastUpdated) {
+		currentLocalTime = lastUpdated
+	}
+	bestPossibleUpDuration := currentLocalTime.Sub(startTime).Seconds()
+
+	if timeConnected, isConnected := vm.connections[nodeID.Key()]; isConnected {
+		if timeConnected.Before(vm.bootstrappedTime) {
+			timeConnected = vm.bootstrappedTime
+		}
+
+		if timeConnected.After(currentLocalTime) {
+			timeConnected = currentLocalTime
+		}
+
+		upDuration += uint64(currentLocalTime.Sub(timeConnected).Seconds())
+	}
+
+	return float64(upDuration) / bestPossibleUpDuration, nil
 }

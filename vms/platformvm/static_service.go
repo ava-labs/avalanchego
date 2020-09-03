@@ -60,11 +60,13 @@ type APIPrimaryValidator struct {
 
 // FormattedAPIValidator allows for a formatted address
 type FormattedAPIValidator struct {
-	StartTime   json.Uint64  `json:"startTime"`
-	EndTime     json.Uint64  `json:"endTime"`
-	Weight      *json.Uint64 `json:"weight,omitempty"`
-	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	ID          string       `json:"nodeID"`
+	StartTime   json.Uint64   `json:"startTime"`
+	EndTime     json.Uint64   `json:"endTime"`
+	Weight      *json.Uint64  `json:"weight,omitempty"`
+	StakeAmount *json.Uint64  `json:"stakeAmount,omitempty"`
+	Uptime      *json.Float32 `json:"uptime,omitempty"`
+	Connected   *bool         `json:"connected,omitempty"`
+	ID          string        `json:"nodeID"`
 }
 
 func (v *FormattedAPIValidator) weight() uint64 {

@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/gecko/database/leveldb"
 	"github.com/ava-labs/gecko/database/memdb"
@@ -166,6 +167,9 @@ func init() {
 	// AVAX fees:
 	fs.Uint64Var(&Config.TxFee, "tx-fee", units.MilliAvax, "Transaction fee, in nAVAX")
 
+	// Uptime requirement:
+	fs.Float64Var(&Config.UptimeRequirement, "uptime-requirement", 0, "Percent of time a validator must be online to receive rewards")
+
 	// Minimum stake, in nAVAX, required to validate the primary network
 	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the primary network")
 
@@ -185,7 +189,7 @@ func init() {
 	// HTTP Server:
 	httpHost := fs.String("http-host", "127.0.0.1", "Address of the HTTP server")
 	httpPort := fs.Uint("http-port", 9650, "Port of the HTTP server")
-	fs.BoolVar(&Config.EnableHTTPS, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
+	fs.BoolVar(&Config.HTTPSEnabled, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
 
@@ -203,8 +207,15 @@ func init() {
 
 	// Throttling:
 	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", 3, "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64Var(&Config.StakerMsgPortion, "staker-msg-reserved", 0.2, "Reserve a portion of the chain message queue's space for stakers.")
+	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", 0.2, "Reserve a portion of the chain message queue's space for stakers.")
 	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", 0.2, "Reserve a portion of the chain's CPU time for stakers.")
+
+	// Network Timeouts:
+	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
+	networkMinimumTimeout := fs.Int64("network-minimum-timeout", int64(500*time.Millisecond), "Minimum timeout value of the adaptive timeout manager, in nanoseconds.")
+	networkMaximumTimeout := fs.Int64("network-maximum-timeout", int64(10*time.Second), "Maximum timeout value of the adaptive timeout manager, in nanoseconds.")
+	fs.Float64Var(&Config.NetworkConfig.TimeoutMultiplier, "network-timeout-multiplier", 1.1, "Multiplier of the timeout after a failed request.")
+	networkTimeoutReduction := fs.Int64("network-timeout-reduction", int64(time.Millisecond), "Reduction of the timeout after a successful request, in nanoseconds.")
 
 	// Plugins:
 	fs.StringVar(&Config.PluginDir, "plugin-dir", defaultPluginDirs[0], "Plugin directory for Avalanche VMs")
@@ -238,6 +249,10 @@ func init() {
 	// IPC
 	ipcsChainIDs := fs.String("ipcs-chain-ids", "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.StringVar(&Config.IPCPath, "ipcs-path", ipcs.DefaultBaseURL, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
+
+	// Router Configuration:
+	consensusGossipFrequency := fs.Int64("consensus-gossip-frequency", int64(10*time.Second), "Frequency of gossiping accepted frontiers.")
+	consensusShutdownTimeout := fs.Int64("consensus-shutdown-timeout", int64(1*time.Second), "Timeout before killing an unresponsive chain.")
 
 	ferr := fs.Parse(os.Args[1:])
 
@@ -444,4 +459,31 @@ func init() {
 	if *ipcsChainIDs != "" {
 		Config.IPCDefaultChainIDs = strings.Split(*ipcsChainIDs, ",")
 	}
+
+	if *networkMinimumTimeout < 1 {
+		errs.Add(errors.New("minimum timeout must be positive"))
+	}
+	if *networkMinimumTimeout > *networkMaximumTimeout {
+		errs.Add(errors.New("maximum timeout can't be less than minimum timeout"))
+	}
+	if *networkInitialTimeout < *networkMinimumTimeout ||
+		*networkInitialTimeout > *networkMaximumTimeout {
+		errs.Add(errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]"))
+	}
+	if *networkTimeoutReduction < 0 {
+		errs.Add(errors.New("timeout reduction can't be negative"))
+	}
+	Config.NetworkConfig.InitialTimeout = time.Duration(*networkInitialTimeout)
+	Config.NetworkConfig.MinimumTimeout = time.Duration(*networkMinimumTimeout)
+	Config.NetworkConfig.MaximumTimeout = time.Duration(*networkMaximumTimeout)
+	Config.NetworkConfig.TimeoutReduction = time.Duration(*networkTimeoutReduction)
+
+	if *consensusGossipFrequency < 0 {
+		errs.Add(errors.New("gossip frequency can't be negative"))
+	}
+	if *consensusShutdownTimeout < 0 {
+		errs.Add(errors.New("gossip frequency can't be negative"))
+	}
+	Config.ConsensusGossipFrequency = time.Duration(*consensusGossipFrequency)
+	Config.ConsensusShutdownTimeout = time.Duration(*consensusShutdownTimeout)
 }

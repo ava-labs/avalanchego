@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/ipcs"
 	"github.com/ava-labs/gecko/network"
+	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
@@ -180,7 +181,7 @@ func (n *Node) initNetworking() error {
 	)
 
 	if !n.Config.EnableStaking {
-		n.Net.RegisterHandler(&insecureValidatorManager{
+		n.Net.RegisterConnector(&insecureValidatorManager{
 			vdrs:   primaryNetworkValidators,
 			weight: n.Config.DisabledStakingWeight,
 		})
@@ -216,7 +217,7 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 func (n *Node) Dispatch() error {
 	// Start the HTTP endpoint
 	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
+		if n.Config.HTTPSEnabled {
 			n.Log.Debug("Initializing API server with TLS Enabled")
 			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
 			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
@@ -385,7 +386,7 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	go connectToBootstrapsTimeout.Dispatch()
 	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
 
-	n.Net.RegisterHandler(awaiter)
+	n.Net.RegisterConnector(awaiter)
 	return nil
 }
 
@@ -412,33 +413,46 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
-	n.chainManager, err = chains.New(
-		n.Config.EnableStaking,
-		n.Config.MaxNonStakerPendingMsgs,
-		n.Config.StakerMsgPortion,
-		n.Config.StakerCPUPortion,
-		n.Log,
-		n.LogFactory,
-		n.vmManager,
-		n.DecisionDispatcher,
-		n.ConsensusDispatcher,
-		n.DB,
-		n.Config.ConsensusRouter,
-		n.Net,
-		n.Config.ConsensusParams,
-		n.vdrs,
-		n.ID,
-		n.Config.NetworkID,
-		&n.APIServer,
-		&n.keystoreServer,
-		&n.sharedMemory,
-		avaxAssetID,
-		xChainID,
-		criticalChains,
-	)
-	if err != nil {
+	timeoutManager := timeout.Manager{}
+	n.Config.NetworkConfig.Namespace = "gecko"
+	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig); err != nil {
 		return err
 	}
+	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+
+	n.Config.ConsensusRouter.Initialize(
+		n.Log,
+		&timeoutManager,
+		n.Config.ConsensusGossipFrequency,
+		n.Config.ConsensusShutdownTimeout,
+	)
+
+	n.chainManager = chains.New(&chains.ManagerConfig{
+		StakingEnabled:          n.Config.EnableStaking,
+		MaxNonStakerPendingMsgs: uint32(n.Config.MaxNonStakerPendingMsgs),
+		StakerMSGPortion:        n.Config.StakerMSGPortion,
+		StakerCPUPortion:        n.Config.StakerCPUPortion,
+		Log:                     n.Log,
+		LogFactory:              n.LogFactory,
+		VMManager:               n.vmManager,
+		DecisionEvents:          n.DecisionDispatcher,
+		ConsensusEvents:         n.ConsensusDispatcher,
+		DB:                      n.DB,
+		Router:                  n.Config.ConsensusRouter,
+		Net:                     n.Net,
+		ConsensusParams:         n.Config.ConsensusParams,
+		Validators:              n.vdrs,
+		NodeID:                  n.ID,
+		NetworkID:               n.Config.NetworkID,
+		Server:                  &n.APIServer,
+		Keystore:                &n.keystoreServer,
+		AtomicMemory:            &n.sharedMemory,
+		AVAXAssetID:             avaxAssetID,
+		XChainID:                xChainID,
+		CriticalChains:          criticalChains,
+		TimeoutManager:          &timeoutManager,
+	})
 
 	vdrs := n.vdrs
 
@@ -452,11 +466,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
-			ChainManager:   n.chainManager,
-			Validators:     vdrs,
-			StakingEnabled: n.Config.EnableStaking,
-			Fee:            n.Config.TxFee,
-			MinStake:       n.Config.MinStake,
+			ChainManager:     n.chainManager,
+			Validators:       vdrs,
+			StakingEnabled:   n.Config.EnableStaking,
+			Fee:              n.Config.TxFee,
+			MinStake:         n.Config.MinStake,
+			UptimePercentage: n.Config.UptimeRequirement,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			Fee: n.Config.TxFee,

@@ -328,8 +328,8 @@ func TestEstablishConnection(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -469,8 +469,8 @@ func TestDoubleTrack(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 	net0.Track(ip1)
@@ -611,8 +611,8 @@ func TestDoubleClose(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -758,8 +758,8 @@ func TestRemoveHandlers(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -787,8 +787,8 @@ func TestRemoveHandlers(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h3)
-	net1.RegisterHandler(h4)
+	net0.RegisterConnector(h3)
+	net1.RegisterConnector(h4)
 
 	err := net0.Close()
 	assert.NoError(t, err)
@@ -914,8 +914,8 @@ func TestTrackConnected(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
