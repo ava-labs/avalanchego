@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/vms/components/missing"
@@ -63,9 +65,13 @@ func (v *voter) Update() {
 		v.t.droppedCache.Evict(acceptedID)       // Remove from dropped cache, if it was in there
 		blk, ok := v.t.processing[acceptedIDKey] // The block we're accepting
 		if !ok {
-			v.t.Ctx.Log.Warn("couldn't find accepted block %s in processing list. Block not saved to VM's database", acceptedID)
+			err := fmt.Errorf("couldn't find accepted block %s in processing list. Block not saved to VM's database", acceptedID)
+			v.t.errs.Add(err)
+			return
 		} else if err := v.t.VM.SaveBlock(blk); err != nil { // Save accepted block in VM's database
-			v.t.Ctx.Log.Warn("couldn't save block %s to VM's database: %s", acceptedID, err)
+			err := fmt.Errorf("couldn't save block %s to VM's database: %s", acceptedID, err)
+			v.t.errs.Add(err)
+			return
 		}
 		delete(v.t.processing, acceptedID.Key())
 	}
@@ -87,6 +93,8 @@ func (v *voter) Update() {
 	v.t.repoll()
 }
 
+// We assume that the number of blocks that require votes to be bubbled
+// is sufficiently small to fit into the dropped cache.
 func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
 	var err error

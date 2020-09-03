@@ -40,7 +40,7 @@ var (
 )
 
 func defaultService(t *testing.T) *Service {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer vm.Ctx.Lock.Unlock()
 	ks := keystore.CreateTestKeystore()

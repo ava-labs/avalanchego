@@ -21,6 +21,7 @@ import (
 
 const (
 	// Size of block cache
+	// Must be larger than common.MaxContainersPerMultiput
 	blockCacheSize = 10000
 )
 
@@ -182,7 +183,10 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		if blk, err = b.VM.ParseBlock(blkBytes); err != nil { // Parse the block from bytes
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
-			return b.fetch(wantedBlkID)
+			if err := b.fetch(wantedBlkID); err != nil {
+				return fmt.Errorf("couldn't fetch %s", wantedBlkID)
+			}
+			break
 		}
 		if i == 0 {
 			tail = blk
@@ -190,7 +194,10 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		blkID := blk.ID()
 		if !blkID.Equals(wantedBlkID) {
 			b.Ctx.Log.Debug("expected the next block to be %s but is %s", wantedBlkID, blkID)
-			return b.fetch(wantedBlkID)
+			if err := b.fetch(wantedBlkID); err != nil {
+				return fmt.Errorf("couldn't fetch %s", wantedBlkID)
+			}
+			break
 		}
 		wantedBlkID = blk.Parent()
 		b.blockCache.Put(blkID, blk) // Put block in cache

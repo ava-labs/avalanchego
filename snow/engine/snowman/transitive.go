@@ -484,7 +484,7 @@ func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) 
 		return false, nil
 	}
 	// We have block [blkID]
-	if status := blk.Status(); status == choices.Accepted || status == choices.Rejected {
+	if blk.Status().Decided() {
 		// block [blkID] has already been decided.
 		t.decidedCache.Put(blkID, nil)
 		return true, nil

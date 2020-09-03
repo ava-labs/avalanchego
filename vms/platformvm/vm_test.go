@@ -176,7 +176,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	return &buildGenesisArgs, buildGenesisResponse.Bytes.Bytes
 }
 
-func defaultVM() (*VM, database.Database) {
+func defaultVM(t *testing.T) (*VM, database.Database) {
 	vm := &VM{
 		SnowmanVM:    &core.SnowmanVM{},
 		chainManager: chains.MockManager{},
@@ -203,10 +203,10 @@ func defaultVM() (*VM, database.Database) {
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis()
 	if err := vm.Initialize(ctx, chainDB, genesisBytes, msgChan, nil); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	// Create a subnet and store it in testSubnet1
@@ -216,17 +216,17 @@ func defaultVM() (*VM, database.Database) {
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
 	); err != nil {
-		panic(err)
+		t.Fatal(err)
 	} else if err := vm.issueTx(tx); err != nil {
-		panic(err)
+		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
-		panic(err)
+		t.Fatal(err)
 	} else if err := blk.Verify(); err != nil {
-		panic(err)
+		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
-		panic(err)
+		t.Fatal(err)
 	} else if err := vm.SaveBlock(blk); err != nil {
-		panic(fmt.Sprintf("couldn't sve block: %s", err))
+		t.Fatalf("couldn't sve block: %s", err)
 	} else {
 		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
@@ -236,7 +236,7 @@ func defaultVM() (*VM, database.Database) {
 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -318,7 +318,7 @@ func TestGenesis(t *testing.T) {
 
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -399,7 +399,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -445,7 +445,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -525,7 +525,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -606,7 +606,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -688,7 +688,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -792,7 +792,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -884,7 +884,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -897,7 +897,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -952,7 +952,7 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's start time (moving the validator from pending to current)
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -1163,7 +1163,7 @@ func TestCreateSubnet(t *testing.T) {
 
 // test asset import
 func TestAtomicImport(t *testing.T) {
-	vm, baseDB := defaultVM()
+	vm, baseDB := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -1248,7 +1248,7 @@ func TestAtomicImport(t *testing.T) {
 
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -1770,14 +1770,14 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestParseAddress(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	if _, err := vm.ParseLocalAddress(testAddress); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestParseAddressInvalid(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	tests := []struct {
 		in   string
 		want string
@@ -1807,7 +1807,7 @@ func TestParseAddressInvalid(t *testing.T) {
 }
 
 func TestFormatAddress(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	tests := []struct {
 		label string
 		in    ids.ShortID
@@ -1829,7 +1829,7 @@ func TestFormatAddress(t *testing.T) {
 }
 
 func TestNextValidatorStartTime(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

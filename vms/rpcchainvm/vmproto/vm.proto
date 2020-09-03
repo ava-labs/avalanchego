@@ -97,13 +97,13 @@ message BlockRejectRequest {
     bytes id = 1;
 }
 
+message BlockRejectResponse {}
+
 message SaveBlockRequest {
     bytes bytes = 1; // The byte representation of the block to be saved
 }
 
 message SaveBlockResponse {}
-
-message BlockRejectResponse {}
 
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
