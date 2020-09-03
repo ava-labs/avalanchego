@@ -105,34 +105,40 @@ type chain struct {
 	Beacons validators.Set
 }
 
+// ManagerConfig ...
+type ManagerConfig struct {
+	StakingEnabled          bool // True iff the network has staking enabled
+	MaxNonStakerPendingMsgs uint32
+	StakerMSGPortion        float64
+	StakerCPUPortion        float64
+	Log                     logging.Logger
+	LogFactory              logging.Factory
+	VMManager               vms.Manager // Manage mappings from vm ID --> vm
+	DecisionEvents          *triggers.EventDispatcher
+	ConsensusEvents         *triggers.EventDispatcher
+	DB                      database.Database
+	Router                  router.Router      // Routes incoming messages to the appropriate chain
+	Net                     network.Network    // Sends consensus messages to other validators
+	ConsensusParams         avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
+	Validators              validators.Manager // Validators validating on this chain
+	NodeID                  ids.ShortID        // The ID of this node
+	NetworkID               uint32             // ID of the network this node is connected to
+	Server                  *api.Server        // Handles HTTP API calls
+	Keystore                *keystore.Keystore
+	AtomicMemory            *atomic.Memory
+	AVAXAssetID             ids.ID
+	XChainID                ids.ID
+	CriticalChains          ids.Set          // Chains that can't exit gracefully
+	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
+}
+
 type manager struct {
 	// Note: The string representation of a chain's ID is also considered to be an alias of the chain
 	// That is, [chainID].String() is an alias for the chain, too
 	ids.Aliaser
+	ManagerConfig
 
-	stakingEnabled                     bool // True iff the network has staking enabled
-	stakerMsgPortion, stakerCPUPortion float64
-	maxNonStakerPendingMsgs            uint32
-	log                                logging.Logger
-	logFactory                         logging.Factory
-	vmManager                          vms.Manager // Manage mappings from vm ID --> vm
-	decisionEvents                     *triggers.EventDispatcher
-	consensusEvents                    *triggers.EventDispatcher
-	db                                 database.Database
-	chainRouter                        router.Router      // Routes incoming messages to the appropriate chain
-	net                                network.Network    // Sends consensus messages to other validators
-	timeoutManager                     *timeout.Manager   // Manages request timeouts when sending messages to other validators
-	consensusParams                    avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
-	validators                         validators.Manager // Validators validating on this chain
-	registrants                        []Registrant       // Those notified when a chain is created
-	nodeID                             ids.ShortID        // The ID of this node
-	networkID                          uint32             // ID of the network this node is connected to
-	server                             *api.Server        // Handles HTTP API calls
-	keystore                           *keystore.Keystore
-	atomicMemory                       *atomic.Memory
-	avaxAssetID                        ids.ID
-	xChainID                           ids.ID
-	criticalChains                     ids.Set // Chains that can't exit gracefully
+	registrants []Registrant // Those notified when a chain is created
 
 	unblocked     bool
 	blockedChains []ChainParameters
@@ -148,63 +154,17 @@ type manager struct {
 //     <sender> sends messages to other validators
 //     <validators> validate this chain
 // TODO: Make this function take less arguments
-func New(
-	stakingEnabled bool,
-	maxNonStakerPendingMsgs uint,
-	stakerMsgPortion,
-	stakerCPUPortion float64,
-	log logging.Logger,
-	logFactory logging.Factory,
-	vmManager vms.Manager,
-	decisionEvents *triggers.EventDispatcher,
-	consensusEvents *triggers.EventDispatcher,
-	db database.Database,
-	rtr router.Router,
-	net network.Network,
-	consensusParams avcon.Parameters,
-	validators validators.Manager,
-	nodeID ids.ShortID,
-	networkID uint32,
-	server *api.Server,
-	keystore *keystore.Keystore,
-	atomicMemory *atomic.Memory,
-	avaxAssetID ids.ID,
-	xChainID ids.ID,
-	criticalChains ids.Set,
-	timeoutManager *timeout.Manager,
-) Manager {
+func New(config *ManagerConfig) Manager {
 	m := &manager{
-		stakingEnabled:          stakingEnabled,
-		maxNonStakerPendingMsgs: uint32(maxNonStakerPendingMsgs),
-		stakerMsgPortion:        stakerMsgPortion,
-		stakerCPUPortion:        stakerCPUPortion,
-		log:                     log,
-		logFactory:              logFactory,
-		vmManager:               vmManager,
-		decisionEvents:          decisionEvents,
-		consensusEvents:         consensusEvents,
-		db:                      db,
-		chainRouter:             rtr,
-		net:                     net,
-		timeoutManager:          timeoutManager,
-		consensusParams:         consensusParams,
-		validators:              validators,
-		nodeID:                  nodeID,
-		networkID:               networkID,
-		server:                  server,
-		keystore:                keystore,
-		atomicMemory:            atomicMemory,
-		avaxAssetID:             avaxAssetID,
-		xChainID:                xChainID,
-		criticalChains:          criticalChains,
-		chains:                  make(map[[32]byte]*router.Handler),
+		ManagerConfig: *config,
+		chains:        make(map[[32]byte]*router.Handler),
 	}
 	m.Initialize()
 	return m
 }
 
 // Router that this chain manager is using to route consensus messages to chains
-func (m *manager) Router() router.Router { return m.chainRouter }
+func (m *manager) Router() router.Router { return m.ManagerConfig.Router }
 
 // Create a chain
 func (m *manager) CreateChain(chain ChainParameters) {
@@ -220,12 +180,12 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
 	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
-		m.log.Debug("there is already a chain with alias '%s'. Chain not created.",
+		m.Log.Debug("there is already a chain with alias '%s'. Chain not created.",
 			alias)
 		return
 	}
 
-	m.log.Info("creating chain:\n"+
+	m.Log.Info("creating chain:\n"+
 		"    ID: %s\n"+
 		"    VMID:%s",
 		chainParams.ID,
@@ -234,7 +194,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	chain, err := m.buildChain(chainParams)
 	if err != nil {
-		m.log.Error("Error while creating new chain: %s", err)
+		m.Log.Error("Error while creating new chain: %s", err)
 		return
 	}
 	chainID := chainParams.ID.Key()
@@ -244,7 +204,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
-	m.log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
+	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
 
 	// Notify those that registered to be notified when a new chain is created
 	m.notifyRegistrants(chain.Ctx, chain.VM)
@@ -252,7 +212,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 // Create a chain
 func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
-	vmID, err := m.vmManager.Lookup(chainParams.VMAlias)
+	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while looking up VM: %s", err)
 	}
@@ -263,32 +223,32 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	// Create the log and context of the chain
-	chainLog, err := m.logFactory.MakeChain(primaryAlias, "")
+	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
 	if err != nil {
 		return nil, fmt.Errorf("error while creating chain's log %s", err)
 	}
 
 	ctx := &snow.Context{
-		NetworkID:   m.networkID,
+		NetworkID:   m.NetworkID,
 		SubnetID:    chainParams.SubnetID,
 		ChainID:     chainParams.ID,
-		NodeID:      m.nodeID,
-		XChainID:    m.xChainID,
-		AVAXAssetID: m.avaxAssetID,
+		NodeID:      m.NodeID,
+		XChainID:    m.XChainID,
+		AVAXAssetID: m.AVAXAssetID,
 
 		Log:                 chainLog,
-		DecisionDispatcher:  m.decisionEvents,
-		ConsensusDispatcher: m.consensusEvents,
-		Keystore:            m.keystore.NewBlockchainKeyStore(chainParams.ID),
-		SharedMemory:        m.atomicMemory.NewSharedMemory(chainParams.ID),
+		DecisionDispatcher:  m.DecisionEvents,
+		ConsensusDispatcher: m.ConsensusEvents,
+		Keystore:            m.Keystore.NewBlockchainKeyStore(chainParams.ID),
+		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
 		BCLookup:            m,
 		SNLookup:            m,
 		Namespace:           fmt.Sprintf("gecko_%s_vm", primaryAlias),
-		Metrics:             m.consensusParams.Metrics,
+		Metrics:             m.ConsensusParams.Metrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
-	vmFactory, err := m.vmManager.GetVMFactory(vmID)
+	vmFactory, err := m.VMManager.GetVMFactory(vmID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting vmFactory: %s", err)
 	}
@@ -302,13 +262,13 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 
 	fxs := make([]*common.Fx, len(chainParams.FxAliases))
 	for i, fxAlias := range chainParams.FxAliases {
-		fxID, err := m.vmManager.Lookup(fxAlias)
+		fxID, err := m.VMManager.Lookup(fxAlias)
 		if err != nil {
 			return nil, fmt.Errorf("error while looking up Fx: %s", err)
 		}
 
 		// Get a factory for the fx we want to use on our chain
-		fxFactory, err := m.vmManager.GetVMFactory(fxID)
+		fxFactory, err := m.VMManager.GetVMFactory(fxID)
 		if err != nil {
 			return nil, fmt.Errorf("error while getting fxFactory: %s", err)
 		}
@@ -325,16 +285,16 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		}
 	}
 
-	consensusParams := m.consensusParams
+	consensusParams := m.ConsensusParams
 	consensusParams.Namespace = fmt.Sprintf("gecko_%s", primaryAlias)
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
 	var ok bool
-	if m.stakingEnabled {
-		vdrs, ok = m.validators.GetValidators(chainParams.SubnetID)
+	if m.StakingEnabled {
+		vdrs, ok = m.Validators.GetValidators(chainParams.SubnetID)
 	} else { // Staking is disabled. Every peer validates every subnet.
-		vdrs, ok = m.validators.GetValidators(constants.PrimaryNetworkID)
+		vdrs, ok = m.Validators.GetValidators(constants.PrimaryNetworkID)
 	}
 	if !ok {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
@@ -382,9 +342,9 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	// Allows messages to be routed to the new chain
-	m.chainRouter.AddChain(chain.Handler)
+	m.ManagerConfig.Router.AddChain(chain.Handler)
 	// If the X or P Chain panics, do not attempt to recover
-	if m.criticalChains.Contains(chainParams.ID) {
+	if m.CriticalChains.Contains(chainParams.ID) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {
@@ -407,11 +367,11 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 				chain.Handler.Shutdown()
 			}
 		})
-		go m.net.RegisterConnector(awaiter)
+		go m.Net.RegisterConnector(awaiter)
 	}
 
 	if connector, ok := vm.(validators.Connector); ok {
-		go m.net.RegisterConnector(connector)
+		go m.Net.RegisterConnector(connector)
 	}
 	return chain, nil
 }
@@ -442,7 +402,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID.Bytes(), m.db)
+	db := prefixdb.New(ctx.ChainID.Bytes(), m.DB)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	vertexDB := prefixdb.New([]byte("vertex"), db)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
@@ -472,7 +432,7 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
+	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
@@ -503,9 +463,9 @@ func (m *manager) createAvalancheChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
-		m.maxNonStakerPendingMsgs,
-		m.stakerMsgPortion,
-		m.stakerCPUPortion,
+		m.MaxNonStakerPendingMsgs,
+		m.StakerMSGPortion,
+		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
@@ -532,7 +492,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	db := prefixdb.New(ctx.ChainID.Bytes(), m.db)
+	db := prefixdb.New(ctx.ChainID.Bytes(), m.DB)
 	vmDB := prefixdb.New([]byte("vm"), db)
 	bootstrappingDB := prefixdb.New([]byte("bs"), db)
 
@@ -552,7 +512,7 @@ func (m *manager) createSnowmanChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	sender.Initialize(ctx, m.net, m.chainRouter, m.timeoutManager)
+	sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager)
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
@@ -582,9 +542,9 @@ func (m *manager) createSnowmanChain(
 		validators,
 		msgChan,
 		defaultChannelSize,
-		m.maxNonStakerPendingMsgs,
-		m.stakerMsgPortion,
-		m.stakerCPUPortion,
+		m.MaxNonStakerPendingMsgs,
+		m.StakerMSGPortion,
+		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
@@ -621,11 +581,11 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 
 // Shutdown stops all the chains
 func (m *manager) Shutdown() {
-	m.chainRouter.Shutdown()
+	m.ManagerConfig.Router.Shutdown()
 }
 
 // LookupVM returns the ID of the VM associated with an alias
-func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.vmManager.Lookup(alias) }
+func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lookup(alias) }
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
