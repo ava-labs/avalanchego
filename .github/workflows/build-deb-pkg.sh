@@ -5,7 +5,7 @@ AVALANCHE_LIB_DIR=$DEBIAN_BASE_DIR/usr/local/lib/avalanche
 TEMPLATE=.github/workflows/debian/template 
 DEBIAN_CONF=$DEBIAN_BASE_DIR/DEBIAN
 
-mkdir -p $PKG_ROOT/$DEBIAN_BASE_DIR
+mkdir -p $DEBIAN_BASE_DIR
 mkdir -p $DEBIAN_CONF
 mkdir -p $AVALANCHE_BUILD_BIN_DIR
 mkdir -p $AVALANCHE_LIB_DIR
