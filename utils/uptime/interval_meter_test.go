@@ -69,6 +69,22 @@ func TestIntervalMeter(t *testing.T) {
 	if uptime := m.Read(); math.Abs(uptime-.625) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .625, uptime)
 	}
+
+	currentTime = currentTime.Add((maxSkippedIntervals + 2) * halflife)
+	m.clock.Set(currentTime)
+
+	if uptime := m.Read(); math.Abs(uptime-1) > epsilon {
+		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
+	}
+
+	m.Stop()
+
+	currentTime = currentTime.Add((maxSkippedIntervals + 2) * halflife)
+	m.clock.Set(currentTime)
+
+	if uptime := m.Read(); math.Abs(uptime-0) > epsilon {
+		t.Fatalf("Wrong uptime value. Expected %d got %f", 0, uptime)
+	}
 }
 
 func TestIntervalMeterTimeTravel(t *testing.T) {
