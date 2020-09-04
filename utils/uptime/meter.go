@@ -6,6 +6,8 @@ package uptime
 import (
 	"math"
 	"time"
+
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 // Meter tracks a continuous exponential moving average of the % of time this
@@ -33,68 +35,43 @@ type meter struct {
 
 	value       float64
 	lastUpdated time.Time
+
+	clock timer.Clock
 }
 
 // NewMeter returns a new Meter with the provided halflife
 func NewMeter(halflife time.Duration) Meter {
-	return &meter{
-		running: false,
-		started: time.Time{},
-
-		halflife:    halflife,
-		value:       0,
-		lastUpdated: time.Now(),
-	}
+	return &meter{halflife: halflife}
 }
 
 func (a *meter) Start() {
 	if a.running {
 		return
 	}
+	a.Read()
 	a.running = true
-
-	t := time.Now()
-	a.offUntil(t)
 }
 
 func (a *meter) Stop() {
 	if !a.running {
 		return
 	}
+	a.Read()
 	a.running = false
-
-	t := time.Now()
-	a.onUntil(t)
 }
 
 func (a *meter) Read() float64 {
-	t := time.Now()
+	currentTime := a.clock.Time()
+	timeSincePreviousUpdate := currentTime.Sub(a.lastUpdated)
+	if timeSincePreviousUpdate <= 0 {
+		return a.value
+	}
+	a.lastUpdated = currentTime
+
+	factor := math.Pow(2, -timeSincePreviousUpdate.Seconds()/a.halflife.Seconds())
+	a.value *= factor
 	if a.running {
-		a.onUntil(t)
-	} else {
-		a.offUntil(t)
+		a.value += 1 - factor
 	}
 	return a.value
-}
-
-func (a *meter) offUntil(t time.Time) {
-	timeOff := t.Sub(a.lastUpdated)
-	if timeOff < 0 {
-		// This should never happen
-		return
-	}
-	factor := math.Pow(2, -timeOff.Seconds()/a.halflife.Seconds())
-	a.value = a.value * factor
-	a.lastUpdated = t
-}
-
-func (a *meter) onUntil(t time.Time) {
-	timeOn := t.Sub(a.lastUpdated)
-	if timeOn < 0 {
-		// This should never happen
-		return
-	}
-	factor := math.Pow(2, -timeOn.Seconds()/a.halflife.Seconds())
-	a.value = a.value*factor + 1 - factor
-	a.lastUpdated = t
 }

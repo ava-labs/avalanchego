@@ -4,55 +4,60 @@
 package uptime
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewMeter(t *testing.T) {
-	m := NewMeter(time.Second)
+func TestNewIntervalMeter(t *testing.T) {
+	m := NewIntervalMeter(time.Second)
 	assert.NotNil(t, m, "should have returned a valid interface")
 }
 
-func TestMeter(t *testing.T) {
+func TestIntervalMeter(t *testing.T) {
 	halflife := time.Second
-	m := &meter{halflife: halflife}
+	m := &intervalMeter{halflife: halflife}
 
 	currentTime := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
 	m.clock.Set(currentTime)
 
+	m.lastUpdated = m.clock.Time()
+	m.nextHalvening = m.lastUpdated.Add(halflife)
+
 	m.Start()
 
-	currentTime = currentTime.Add(halflife)
+	currentTime = currentTime.Add(halflife - 1)
 	m.clock.Set(currentTime)
 
-	if uptime := m.Read(); uptime != .5 {
+	epsilon := 0.0001
+	if uptime := m.Read(); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
 	m.Start()
 
-	if uptime := m.Read(); uptime != .5 {
+	if uptime := m.Read(); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
 	m.Stop()
 
-	if uptime := m.Read(); uptime != .5 {
+	if uptime := m.Read(); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
 	m.Stop()
 
-	if uptime := m.Read(); uptime != .5 {
+	if uptime := m.Read(); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
 	currentTime = currentTime.Add(halflife)
 	m.clock.Set(currentTime)
 
-	if uptime := m.Read(); uptime != .25 {
+	if uptime := m.Read(); math.Abs(uptime-.25) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .25, uptime)
 	}
 
@@ -61,32 +66,28 @@ func TestMeter(t *testing.T) {
 	currentTime = currentTime.Add(halflife)
 	m.clock.Set(currentTime)
 
-	if uptime := m.Read(); uptime != .625 {
+	if uptime := m.Read(); math.Abs(uptime-.625) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .625, uptime)
 	}
 }
 
-func TestMeterTimeTravel(t *testing.T) {
+func TestIntervalMeterTimeTravel(t *testing.T) {
 	halflife := time.Second
-	m := &meter{
-		running: false,
-		started: time.Time{},
-
-		halflife: halflife,
-		value:    0,
-	}
+	m := &intervalMeter{halflife: halflife}
 
 	currentTime := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
 	m.clock.Set(currentTime)
 
 	m.lastUpdated = m.clock.Time()
+	m.nextHalvening = m.lastUpdated.Add(halflife)
 
 	m.Start()
 
-	currentTime = currentTime.Add(halflife)
+	currentTime = currentTime.Add(halflife - 1)
 	m.clock.Set(currentTime)
 
-	if uptime := m.Read(); uptime != .5 {
+	epsilon := 0.0001
+	if uptime := m.Read(); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
@@ -95,7 +96,7 @@ func TestMeterTimeTravel(t *testing.T) {
 	currentTime = currentTime.Add(-halflife)
 	m.clock.Set(currentTime)
 
-	if uptime := m.Read(); uptime != .5 {
+	if uptime := m.Read(); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 
@@ -104,7 +105,7 @@ func TestMeterTimeTravel(t *testing.T) {
 	currentTime = currentTime.Add(halflife / 2)
 	m.clock.Set(currentTime)
 
-	if uptime := m.Read(); uptime != .5 {
+	if uptime := m.Read(); math.Abs(uptime-.5) > epsilon {
 		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
 	}
 }
