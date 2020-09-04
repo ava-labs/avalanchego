@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/tracker"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/timer"
 )
@@ -113,7 +114,6 @@ func (h *Handler) Initialize(
 	validators validators.Set,
 	msgChan <-chan common.Message,
 	bufferSize int,
-	maxMessagesPerInterval,
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
@@ -147,16 +147,17 @@ func (h *Handler) Initialize(
 		cpuInterval / 4,
 	}
 
+	cpuTracker := tracker.NewCPUTracker(cpuInterval)
+
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
 		validators,
 		h.ctx,
 		&h.metrics,
+		cpuTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		maxMessagesPerInterval,
 		maxNonStakerPendingMsgs,
-		cpuInterval,
 		stakerMsgPortion,
 		stakerCPUPortion,
 	)
@@ -483,75 +484,92 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 	var (
 		err          error
 		timeConsumed time.Duration
+		endTime      time.Time
 	)
 	switch msg.messageType {
 	case getAcceptedFrontierMsg:
 		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.getAcceptedFrontier.Observe(float64(timeConsumed.Nanoseconds()))
 	case acceptedFrontierMsg:
 		err = h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.acceptedFrontier.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAcceptedFrontierFailedMsg:
 		err = h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.getAcceptedFrontierFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAcceptedMsg:
 		err = h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.getAccepted.Observe(float64(timeConsumed.Nanoseconds()))
 	case acceptedMsg:
 		err = h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.accepted.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAcceptedFailedMsg:
 		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.getAcceptedFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAncestorsMsg:
 		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.getAncestors.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAncestorsFailedMsg:
 		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.getAncestorsFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case multiPutMsg:
 		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.multiPut.Observe(float64(timeConsumed.Nanoseconds()))
 	case getMsg:
 		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.get.Observe(float64(timeConsumed.Nanoseconds()))
 	case getFailedMsg:
 		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.getFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case putMsg:
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.put.Observe(float64(timeConsumed.Nanoseconds()))
 	case pushQueryMsg:
 		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.pushQuery.Observe(float64(timeConsumed.Nanoseconds()))
 	case pullQueryMsg:
 		err = h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.pullQuery.Observe(float64(timeConsumed.Nanoseconds()))
 	case queryFailedMsg:
 		err = h.engine.QueryFailed(msg.validatorID, msg.requestID)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.queryFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case chitsMsg:
 		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
-		timeConsumed = h.clock.Time().Sub(startTime)
+		endTime = h.clock.Time()
+		timeConsumed = endTime.Sub(startTime)
 		h.chits.Observe(float64(timeConsumed.Nanoseconds()))
 	}
 
-	h.serviceQueue.UtilizeCPU(msg.validatorID, timeConsumed)
+	h.serviceQueue.UtilizeCPU(msg.validatorID, startTime, endTime, timeConsumed)
 
 	return err
 }
@@ -568,4 +586,4 @@ func (h *Handler) sendReliableMsg(msg message) {
 	}
 }
 
-func (h *Handler) endInterval() { h.serviceQueue.EndInterval() }
+func (h *Handler) endInterval() { h.serviceQueue.EndInterval(h.clock.Time()) }

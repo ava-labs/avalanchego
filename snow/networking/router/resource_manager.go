@@ -8,6 +8,15 @@ import (
 	"github.com/ava-labs/gecko/snow/networking/tracker"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
+)
+
+const (
+	// DefaultMaxNonStakerPendingMsgs is the default number of messages that can be taken from
+	// the shared message
+	DefaultMaxNonStakerPendingMsgs uint32 = 20
+	// DefaultStakerPortion is the default amount of CPU time and pending messages to allot to stakers
+	DefaultStakerPortion float64 = 0.375
 )
 
 // ResourceManager defines the interface for the allocation
@@ -28,6 +37,8 @@ type throttler struct {
 
 	stakerCPUPortion float64
 	cpuTracker       tracker.TimeTracker
+
+	clock timer.Clock
 }
 
 // NewResourceManager ...
@@ -96,16 +107,22 @@ func (et *throttler) TakeMessage(msg message) bool {
 	return false
 }
 
-// Utilization returns the utilization value to determine the
-// message priority of [msg]
-func (et *throttler) Utilization(validatorID ids.ShortID) float64 {
-	// weight, exists := et.vdrs.GetWeight(validatorID)
-	// if !exists {
-	// 	return commonUtilization
-	// }
-	// totalWeight := et.vdrs.Weight()
-	// stakerPortion := float64(weight) / float64(totalWeight)
-	// cpuAllotment := stakerPortion * et.stakerCPUPortion
+// Utilization returns the percentage of expected utilization
+// for [vdr] to determine message priority
+func (et *throttler) Utilization(vdr ids.ShortID) float64 {
+	currentTime := et.clock.Time()
+	vdrUtilization := et.cpuTracker.Utilization(vdr, currentTime)
+	numSpenders := et.cpuTracker.Len()
+	poolAllotment := (1 - et.stakerCPUPortion) / float64(numSpenders)
 
-	return 0
+	weight, exists := et.vdrs.GetWeight(vdr)
+	if !exists {
+		return vdrUtilization / poolAllotment
+	}
+
+	totalWeight := et.vdrs.Weight()
+	stakerPortion := float64(weight) / float64(totalWeight)
+	stakerAllotment := stakerPortion*et.stakerCPUPortion + poolAllotment
+
+	return vdrUtilization / stakerAllotment
 }

@@ -9,6 +9,13 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+// CountingTracker is an interface for tracking peers' usage of a discrete resource
+type CountingTracker interface {
+	Add(ids.ShortID)
+	Remove(ids.ShortID)
+	OutstandingCount(ids.ShortID) uint32
+}
+
 // msgTracker implements CountingTracker to keep track of pending messages to peers
 type msgTracker struct {
 	lock sync.Mutex
@@ -31,7 +38,6 @@ func (et *msgTracker) Add(validatorID ids.ShortID) {
 	defer et.lock.Unlock()
 
 	et.msgSpenders[validatorID.Key()]++
-
 }
 
 // Remove implements CountingTracker

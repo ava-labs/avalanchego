@@ -20,10 +20,10 @@ var (
 )
 
 type messageQueue interface {
-	PopMessage() (message, error)          // Pop the next message from the queue
-	PushMessage(message) bool              // Push a message to the queue
-	UtilizeCPU(ids.ShortID, time.Duration) // Registers consumption of CPU time
-	EndInterval()                          // Register end of an interval of real time
+	PopMessage() (message, error)                                // Pop the next message from the queue
+	PushMessage(message) bool                                    // Push a message to the queue
+	UtilizeCPU(ids.ShortID, time.Time, time.Time, time.Duration) // Registers consumption of CPU time
+	EndInterval(time.Time)                                       // Register end of an interval of real time
 	Shutdown()
 }
 
@@ -34,7 +34,7 @@ type multiLevelQueue struct {
 	validators validators.Set
 
 	// Tracks total CPU consumption
-	intervalConsumption, tierConsumption, cpuInterval time.Duration
+	intervalConsumption, tierConsumption time.Duration
 
 	currentTier int
 
@@ -73,7 +73,6 @@ func newMultiLevelQueue(
 	consumptionAllotments []time.Duration,
 	bufferSize int,
 	maxNonStakerPendingMsgs uint32,
-	cpuInterval time.Duration,
 	msgPortion,
 	cpuPortion float64,
 ) (messageQueue, chan struct{}) {
@@ -103,10 +102,10 @@ func newMultiLevelQueue(
 		validators:              vdrs,
 		cpuTracker:              cpuTracker,
 		msgTracker:              msgTracker,
+		resourceManager:         resourceManager,
 		queues:                  queues,
 		cpuRanges:               consumptionRanges,
 		cpuAllotments:           consumptionAllotments,
-		cpuInterval:             cpuInterval,
 		cpuPortion:              cpuPortion,
 		maxNonStakerPendingMsgs: maxNonStakerPendingMsgs,
 		msgPortion:              msgPortion,
@@ -144,11 +143,11 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 
 // UtilizeCPU registers that [duration] was spent processing a message
 // from [vdr]
-func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
+func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, startTime, endTime time.Time, duration time.Duration) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.cpuTracker.UtilizeTime(vdr, duration)
+	ml.cpuTracker.UtilizeTime(vdr, startTime, endTime)
 	ml.intervalConsumption += duration
 	ml.tierConsumption += duration
 	if ml.tierConsumption > ml.cpuAllotments[ml.currentTier] {
@@ -159,11 +158,12 @@ func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
 }
 
 // EndInterval marks the end of a regular interval of CPU time
-func (ml *multiLevelQueue) EndInterval() {
+// at [currentTime]
+func (ml *multiLevelQueue) EndInterval(currentTime time.Time) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.cpuTracker.EndInterval()
+	ml.cpuTracker.EndInterval(currentTime)
 	ml.metrics.cpu.Observe(float64(ml.intervalConsumption.Milliseconds()))
 	ml.intervalConsumption = 0
 }
