@@ -84,7 +84,8 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		*bn = EarliestBlockNumber
 		return nil
 	case "latest":
-		*bn = LatestBlockNumber
+		//*bn = LatestBlockNumber
+		*bn = AcceptedBlockNumber
 		return nil
 	case "pending":
 		*bn = PendingBlockNumber
