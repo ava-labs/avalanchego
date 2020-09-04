@@ -10,32 +10,30 @@ import (
 
 func BenchmarkIntervalMeterSeconds(b *testing.B) {
 	m := NewIntervalMeter(time.Second).(*intervalMeter)
-	m.Start()
 
-	currentTime := m.clock.Time()
+	currentTime := time.Now()
+	m.Start(currentTime)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		currentTime = currentTime.Add(10*time.Second + 500*time.Millisecond)
-		m.clock.Set(currentTime)
 		time.Now()
 
-		m.Read()
+		m.Read(currentTime)
 	}
 }
 
 func BenchmarkIntervalMeterMilliseconds(b *testing.B) {
 	m := NewIntervalMeter(time.Second).(*intervalMeter)
-	m.Start()
 
-	currentTime := m.clock.Time()
+	currentTime := time.Now()
+	m.Start(currentTime)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		currentTime = currentTime.Add(10 * time.Millisecond)
-		m.clock.Set(currentTime)
 		time.Now()
 
-		m.Read()
+		m.Read(currentTime)
 	}
 }

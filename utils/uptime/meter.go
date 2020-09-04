@@ -6,8 +6,6 @@ package uptime
 import (
 	"math"
 	"time"
-
-	"github.com/ava-labs/gecko/utils/timer"
 )
 
 // Meter tracks a continuous exponential moving average of the % of time this
@@ -15,16 +13,16 @@ import (
 type Meter interface {
 	// Start the meter, the read value will be monotonically increasing while
 	// the meter is running.
-	Start()
+	Start(time.Time)
 
 	// Stop the meter, the read value will be exponentially decreasing while the
 	// meter is off.
-	Stop()
+	Stop(time.Time)
 
 	// Read the current value of the meter, this can be used to approximate the
 	// percent of time the meter has been running recently. The definition of
 	// recently depends on the halflife of the decay function.
-	Read() float64
+	Read(time.Time) float64
 }
 
 type meter struct {
@@ -35,8 +33,6 @@ type meter struct {
 
 	value       float64
 	lastUpdated time.Time
-
-	clock timer.Clock
 }
 
 // NewMeter returns a new Meter with the provided halflife
@@ -44,24 +40,23 @@ func NewMeter(halflife time.Duration) Meter {
 	return &meter{halflife: halflife}
 }
 
-func (a *meter) Start() {
+func (a *meter) Start(currentTime time.Time) {
 	if a.running {
 		return
 	}
-	a.Read()
+	a.Read(currentTime)
 	a.running = true
 }
 
-func (a *meter) Stop() {
+func (a *meter) Stop(currentTime time.Time) {
 	if !a.running {
 		return
 	}
-	a.Read()
+	a.Read(currentTime)
 	a.running = false
 }
 
-func (a *meter) Read() float64 {
-	currentTime := a.clock.Time()
+func (a *meter) Read(currentTime time.Time) float64 {
 	timeSincePreviousUpdate := currentTime.Sub(a.lastUpdated)
 	if timeSincePreviousUpdate <= 0 {
 		return a.value

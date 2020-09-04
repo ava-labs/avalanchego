@@ -5,8 +5,6 @@ package uptime
 
 import (
 	"time"
-
-	"github.com/ava-labs/gecko/utils/timer"
 )
 
 const (
@@ -22,36 +20,32 @@ type intervalMeter struct {
 	value         float64
 	nextHalvening time.Time
 	lastUpdated   time.Time
-
-	clock timer.Clock
 }
 
 // NewIntervalMeter returns a new Meter with the provided halflife
 func NewIntervalMeter(halflife time.Duration) Meter {
-	m := &intervalMeter{halflife: halflife}
-	m.lastUpdated = m.clock.Time()
-	m.nextHalvening = m.lastUpdated.Add(halflife)
-	return m
+	return &intervalMeter{halflife: halflife}
 }
 
-func (a *intervalMeter) Start() {
+// TODO change the interface to have all of these functions
+// take a current time argument (reduce calls to get the current time)
+func (a *intervalMeter) Start(currentTime time.Time) {
 	if a.running {
 		return
 	}
-	a.Read()
+	a.Read(currentTime)
 	a.running = true
 }
 
-func (a *intervalMeter) Stop() {
+func (a *intervalMeter) Stop(currentTime time.Time) {
 	if !a.running {
 		return
 	}
-	a.Read()
+	a.Read(currentTime)
 	a.running = false
 }
 
-func (a *intervalMeter) Read() float64 {
-	currentTime := a.clock.Time()
+func (a *intervalMeter) Read(currentTime time.Time) float64 {
 	if !currentTime.After(a.lastUpdated) {
 		return a.value
 	}
