@@ -4,10 +4,10 @@
 package avm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
@@ -21,13 +21,15 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
@@ -35,29 +37,27 @@ import (
 )
 
 const (
-	batchTimeout   = time.Second
-	batchSize      = 30
-	stateCacheSize = 30000
-	idCacheSize    = 30000
-	txCacheSize    = 30000
-	addressSep     = "-"
+	batchTimeout    = time.Second
+	batchSize       = 30
+	stateCacheSize  = 30000
+	idCacheSize     = 30000
+	txCacheSize     = 30000
+	maxUTXOsToFetch = 1024
 )
 
 var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
-	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
+	errInsufficientFunds         = errors.New("insufficient funds")
 )
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
+	metrics
 	ids.Aliaser
-
-	ava      ids.ID
-	platform ids.ID
 
 	// Contains information of where this VM is executing
 	ctx *snow.Context
@@ -92,19 +92,15 @@ type VM struct {
 }
 
 type codecRegistry struct {
+	codec.Codec
 	index         int
 	typeToFxIndex map[reflect.Type]int
-	codec         codec.Codec
 }
 
 func (cr *codecRegistry) RegisterType(val interface{}) error {
 	valType := reflect.TypeOf(val)
 	cr.typeToFxIndex[valType] = cr.index
-	return cr.codec.RegisterType(val)
-}
-func (cr *codecRegistry) Marshal(val interface{}) ([]byte, error) { return cr.codec.Marshal(val) }
-func (cr *codecRegistry) Unmarshal(b []byte, val interface{}) error {
-	return cr.codec.Unmarshal(b, val)
+	return cr.Codec.RegisterType(val)
 }
 
 /*
@@ -133,6 +129,8 @@ func (vm *VM) Initialize(
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		vm.metrics.Initialize(ctx.Namespace, ctx.Metrics),
+
 		vm.pubsub.Register("accepted"),
 		vm.pubsub.Register("rejected"),
 		vm.pubsub.Register("verified"),
@@ -161,9 +159,9 @@ func (vm *VM) Initialize(
 			Fx: fx,
 		}
 		vm.codec = &codecRegistry{
+			Codec:         c,
 			index:         i,
 			typeToFxIndex: vm.typeToFxIndex,
-			codec:         c,
 		}
 		if err := fx.Initialize(vm); err != nil {
 			return err
@@ -173,7 +171,7 @@ func (vm *VM) Initialize(
 	vm.codec = c
 
 	vm.state = &prefixedState{
-		state: &state{State: ava.State{
+		state: &state{State: avax.State{
 			Cache: &cache.LRU{Size: stateCacheSize},
 			DB:    vm.db,
 			Codec: vm.codec,
@@ -211,6 +209,8 @@ func (vm *VM) Initialize(
 // Bootstrapping is called by the consensus engine when it starts bootstrapping
 // this chain
 func (vm *VM) Bootstrapping() error {
+	vm.metrics.numBootstrappingCalls.Inc()
+
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -222,6 +222,8 @@ func (vm *VM) Bootstrapping() error {
 // Bootstrapped is called by the consensus engine when it is done bootstrapping
 // this chain
 func (vm *VM) Bootstrapped() error {
+	vm.metrics.numBootstrappedCalls.Inc()
+
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -248,11 +250,14 @@ func (vm *VM) Shutdown() error {
 
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+	vm.metrics.numCreateHandlersCalls.Inc()
+
 	rpcServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterService(&Service{vm: vm}, "avm") // name this service "avm"
+	// name this service "avm"
+	vm.ctx.Log.AssertNoError(rpcServer.RegisterService(&Service{vm: vm}, "avm"))
 
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
@@ -266,7 +271,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&StaticService{}, "avm") // name this service "avm"
+	// name this service "avm"
+	_ = newServer.RegisterService(&StaticService{}, "avm")
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}
@@ -274,6 +280,8 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 
 // PendingTxs implements the avalanche.DAGVM interface
 func (vm *VM) PendingTxs() []snowstorm.Tx {
+	vm.metrics.numPendingTxsCalls.Inc()
+
 	vm.timer.Cancel()
 
 	txs := vm.txs
@@ -282,17 +290,23 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 }
 
 // ParseTx implements the avalanche.DAGVM interface
-func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) { return vm.parseTx(b) }
+func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
+	vm.metrics.numParseTxCalls.Inc()
+
+	return vm.parseTx(b)
+}
 
 // GetTx implements the avalanche.DAGVM interface
 func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
+	vm.metrics.numGetTxCalls.Inc()
+
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: txID,
 	}
 	// Verify must be called in the case the that tx was flushed from the unique
 	// cache.
-	return tx, tx.Verify()
+	return tx, tx.verifyWithoutCacheWrites()
 }
 
 /*
@@ -305,7 +319,7 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 // If onDecide is specified, the function will be called when the transaction is
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
-func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
+func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if !vm.bootstrapped {
 		return ids.ID{}, errBootstrapping
 	}
@@ -313,57 +327,123 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
-	if err := tx.Verify(); err != nil {
+	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
-	tx.onDecide = onDecide
 	return tx.ID(), nil
 }
 
-// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
-
-	state := ava.NewPrefixedState(smDB, vm.codec)
-
-	utxoIDs := ids.Set{}
-	for _, addr := range addrs.List() {
-		utxos, _ := state.PlatformFunds(addr)
-		utxoIDs.Add(utxos...)
+// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Returns at most [limit] UTXOs.
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Returns:
+// * The fetched of UTXOs
+// * true if all there are no more UTXOs in this range to fetch
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+func (vm *VM) GetAtomicUTXOs(
+	chainID ids.ID,
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
 	}
 
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := state.PlatformUTXO(utxoID)
-		if err != nil {
-			return nil, err
+	addrsList := make([][]byte, addrs.Len())
+	for i, addr := range addrs.List() {
+		addrsList[i] = addr.Bytes()
+	}
+
+	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
+		chainID,
+		addrsList,
+		startAddr.Bytes(),
+		startUTXOID.Bytes(),
+		limit,
+	)
+	if err != nil {
+		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
+	}
+
+	lastAddrID, err := ids.ToShortID(lastAddr)
+	if err != nil {
+		lastAddrID = ids.ShortEmpty
+	}
+	lastUTXOID, err := ids.ToID(lastUTXO)
+	if err != nil {
+		lastUTXOID = ids.Empty
+	}
+
+	utxos := make([]*avax.UTXO, len(allUTXOBytes))
+	for i, utxoBytes := range allUTXOBytes {
+		utxo := &avax.UTXO{}
+		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
 		}
-		utxos = append(utxos, utxo)
+		utxos[i] = utxo
 	}
-	return utxos, nil
+	return utxos, lastAddrID, lastUTXOID, nil
 }
 
-// GetUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
-	utxoIDs := ids.Set{}
-	for _, addr := range addrs.List() {
-		utxos, _ := vm.state.Funds(addr)
-		utxoIDs.Add(utxos...)
+// GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
+// Returns at most [limit] UTXOs.
+// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
+// Only returns UTXOs associated with addresses >= [startAddr].
+// For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
+// Returns:
+// * The fetched of UTXOs
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+func (vm *VM) GetUTXOs(
+	addrs ids.ShortSet,
+	startAddr ids.ShortID,
+	startUTXOID ids.ID,
+	limit int,
+) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+	if limit <= 0 || limit > maxUTXOsToFetch {
+		limit = maxUTXOsToFetch
 	}
 
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
-		utxo, err := vm.state.UTXO(utxoID)
-		if err != nil {
-			return nil, err
+	seen := ids.Set{} // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, limit)
+	lastAddr := ids.ShortEmpty
+	lastIndex := ids.Empty
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+	for _, addr := range addrsList {
+		start := ids.Empty
+		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
+			continue
+		} else if comp == 0 {
+			start = startUTXOID
 		}
-		utxos = append(utxos, utxo)
+		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
+		if err != nil {
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+		}
+		for _, utxoID := range utxoIDs {
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+			utxo, err := vm.state.UTXO(utxoID)
+			if err != nil {
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+			}
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			lastAddr = addr
+			lastIndex = utxoID
+			limit--
+			if limit <= 0 {
+				break // Found [limit] utxos; stop.
+			}
+		}
 	}
-	return utxos, nil
+	return utxos, lastAddr, lastIndex, nil
 }
 
 /*
@@ -420,15 +500,12 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		txBytes, err := vm.codec.Marshal(&tx)
-		if err != nil {
+		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 			return err
 		}
-		tx.Initialize(txBytes)
 
 		txID := tx.ID()
-
-		if err = vm.Alias(txID, genesisTx.Alias); err != nil {
+		if err := vm.Alias(txID, genesisTx.Alias); err != nil {
 			return err
 		}
 	}
@@ -450,16 +527,12 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		tx := Tx{
 			UnsignedTx: &genesisTx.CreateAssetTx,
 		}
-		txBytes, err := vm.codec.Marshal(&tx)
-		if err != nil {
+		if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 			return err
 		}
-		tx.Initialize(txBytes)
 
 		txID := tx.ID()
-
 		vm.ctx.Log.Info("Initializing with AssetID %s", txID)
-
 		if err := vm.state.SetTx(txID, &tx); err != nil {
 			return err
 		}
@@ -476,13 +549,17 @@ func (vm *VM) initState(genesisBytes []byte) error {
 	return vm.state.SetDBInitialized(choices.Processing)
 }
 
-func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
+func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	rawTx := &Tx{}
-	err := vm.codec.Unmarshal(b, rawTx)
+	err := vm.codec.Unmarshal(bytes, rawTx)
 	if err != nil {
 		return nil, err
 	}
-	rawTx.Initialize(b)
+	unsignedBytes, err := vm.codec.Marshal(&rawTx.UnsignedTx)
+	if err != nil {
+		return nil, err
+	}
+	rawTx.Initialize(unsignedBytes, bytes)
 
 	tx := &UniqueTx{
 		TxState: &TxState{
@@ -518,7 +595,7 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 	}
 }
 
-func (vm *VM) getUTXO(utxoID *ava.UTXOID) (*ava.UTXO, error) {
+func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 	inputID := utxoID.InputID()
 	utxo, err := vm.state.UTXO(inputID)
 	if err == nil {
@@ -531,7 +608,7 @@ func (vm *VM) getUTXO(utxoID *ava.UTXOID) (*ava.UTXO, error) {
 		txID: inputTx,
 	}
 
-	if err := parent.Verify(); err != nil {
+	if err := parent.verifyWithoutCacheWrites(); err != nil {
 		return nil, errMissingUTXO
 	} else if status := parent.Status(); status.Decided() {
 		return nil, errMissingUTXO
@@ -565,7 +642,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	if !ok {
 		return false
 	}
-	// TODO: This could be a binary search to import performance... Or perhaps
+	// TODO: This could be a binary search to improve performance... Or perhaps
 	// make a map
 	for _, state := range createAssetTx.States {
 		if state.FxID == uint32(fxID) {
@@ -575,38 +652,61 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	return false
 }
 
-// Parse ...
-func (vm *VM) Parse(addrStr string) ([]byte, error) {
-	if count := strings.Count(addrStr, addressSep); count != 1 {
-		return nil, errInvalidAddress
-	}
-	addressParts := strings.SplitN(addrStr, addressSep, 2)
-	bcAlias := addressParts[0]
-	rawAddr := addressParts[1]
-	bcID, err := vm.ctx.BCLookup.Lookup(bcAlias)
+func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
+	fxIndex, err := vm.getFx(cred)
 	if err != nil {
-		bcID, err = ids.FromString(bcAlias)
-		if err != nil {
-			return nil, err
-		}
+		return err
 	}
-	if !bcID.Equals(vm.ctx.ChainID) {
-		return nil, errWrongBlockchainID
+	fx := vm.fxs[fxIndex].Fx
+
+	utxoAssetID := utxo.AssetID()
+	inAssetID := in.AssetID()
+	if !utxoAssetID.Equals(inAssetID) {
+		return errAssetIDMismatch
 	}
-	cb58 := formatting.CB58{}
-	err = cb58.FromString(rawAddr)
-	return cb58.Bytes, err
+
+	if !vm.verifyFxUsage(fxIndex, inAssetID) {
+		return errIncompatibleFx
+	}
+
+	return fx.VerifyTransfer(tx, in.In, cred, utxo.Out)
 }
 
-// Format ...
-func (vm *VM) Format(b []byte) string {
-	var bcAlias string
-	if alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID); err == nil {
-		bcAlias = alias
-	} else {
-		bcAlias = vm.ctx.ChainID.String()
+func (vm *VM) verifyTransfer(tx UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
+	utxo, err := vm.getUTXO(&in.UTXOID)
+	if err != nil {
+		return err
 	}
-	return fmt.Sprintf("%s%s%s", bcAlias, addressSep, formatting.CB58{Bytes: b})
+	return vm.verifyTransferOfUTXO(tx, in, cred, utxo)
+}
+
+func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiable) error {
+	opAssetID := op.AssetID()
+
+	utxos := []interface{}{}
+	for _, utxoID := range op.UTXOIDs {
+		utxo, err := vm.getUTXO(utxoID)
+		if err != nil {
+			return err
+		}
+
+		utxoAssetID := utxo.AssetID()
+		if !utxoAssetID.Equals(opAssetID) {
+			return errAssetIDMismatch
+		}
+		utxos = append(utxos, utxo.Out)
+	}
+
+	fxIndex, err := vm.getFx(op.Op)
+	if err != nil {
+		return err
+	}
+	fx := vm.fxs[fxIndex].Fx
+
+	if !vm.verifyFxUsage(fxIndex, opAssetID) {
+		return errIncompatibleFx
+	}
+	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
 // LoadUser ...
@@ -614,7 +714,7 @@ func (vm *VM) LoadUser(
 	username string,
 	password string,
 ) (
-	[]*ava.UTXO,
+	[]*avax.UTXO,
 	*secp256k1fx.Keychain,
 	error,
 ) {
@@ -625,15 +725,14 @@ func (vm *VM) LoadUser(
 
 	user := userState{vm: vm}
 
-	// The error is explicitly dropped, as it may just mean that there are no
-	// addresses.
+	// The error is explicitly dropped, as it may just mean that there are no addresses.
 	addresses, _ := user.Addresses(db)
 
-	addrs := ids.Set{}
+	addrs := ids.ShortSet{}
 	for _, addr := range addresses {
-		addrs.Add(ids.NewID(hashing.ComputeHash256Array(addr.Bytes())))
+		addrs.Add(addr)
 	}
-	utxos, err := vm.GetUTXOs(addrs)
+	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
 	}
@@ -652,19 +751,19 @@ func (vm *VM) LoadUser(
 
 // Spend ...
 func (vm *VM) Spend(
-	utxos []*ava.UTXO,
+	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	amounts map[[32]byte]uint64,
 ) (
 	map[[32]byte]uint64,
-	[]*ava.TransferableInput,
+	[]*avax.TransferableInput,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
 	amountsSpent := make(map[[32]byte]uint64, len(amounts))
 	time := vm.clock.Unix()
 
-	ins := []*ava.TransferableInput{}
+	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
@@ -682,7 +781,7 @@ func (vm *VM) Spend(
 			// this utxo can't be spent with the current keys right now
 			continue
 		}
-		input, ok := inputIntf.(ava.TransferableIn)
+		input, ok := inputIntf.(avax.TransferableIn)
 		if !ok {
 			// this input doesn't have an amount, so I don't care about it here
 			continue
@@ -695,9 +794,9 @@ func (vm *VM) Spend(
 		amountsSpent[assetKey] = newAmountSpent
 
 		// add the new input to the array
-		ins = append(ins, &ava.TransferableInput{
+		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  ava.Asset{ID: assetID},
+			Asset:  avax.Asset{ID: assetID},
 			In:     input,
 		})
 		// add the required keys to the array
@@ -710,13 +809,139 @@ func (vm *VM) Spend(
 		}
 	}
 
-	ava.SortTransferableInputsWithSigners(ins, keys)
+	avax.SortTransferableInputsWithSigners(ins, keys)
+	return amountsSpent, ins, keys, nil
+}
+
+// SpendNFT ...
+func (vm *VM) SpendNFT(
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+	assetID ids.ID,
+	groupID uint32,
+	to ids.ShortID,
+) (
+	[]*Operation,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	time := vm.clock.Unix()
+
+	ops := []*Operation{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+
+	for _, utxo := range utxos {
+		// makes sure that the variable isn't overwritten with the next iteration
+		utxo := utxo
+
+		if len(ops) > 0 {
+			// we have already been able to create the operation needed
+			break
+		}
+
+		if !utxo.AssetID().Equals(assetID) {
+			// wrong asset ID
+			continue
+		}
+		out, ok := utxo.Out.(*nftfx.TransferOutput)
+		if !ok {
+			// wrong output type
+			continue
+		}
+		if out.GroupID != groupID {
+			// wrong group id
+			continue
+		}
+		indices, signers, ok := kc.Match(&out.OutputOwners, time)
+		if !ok {
+			// unable to spend the output
+			continue
+		}
+
+		// add the new operation to the array
+		ops = append(ops, &Operation{
+			Asset:   utxo.Asset,
+			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID},
+			Op: &nftfx.TransferOperation{
+				Input: secp256k1fx.Input{
+					SigIndices: indices,
+				},
+				Output: nftfx.TransferOutput{
+					GroupID: out.GroupID,
+					Payload: out.Payload,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{to},
+					},
+				},
+			},
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+	}
+
+	if len(ops) == 0 {
+		return nil, nil, errInsufficientFunds
+	}
+
+	sortOperationsWithSigners(ops, keys, vm.codec)
+	return ops, keys, nil
+}
+
+// SpendAll ...
+func (vm *VM) SpendAll(
+	utxos []*avax.UTXO,
+	kc *secp256k1fx.Keychain,
+) (
+	map[[32]byte]uint64,
+	[]*avax.TransferableInput,
+	[][]*crypto.PrivateKeySECP256K1R,
+	error,
+) {
+	amountsSpent := make(map[[32]byte]uint64)
+	time := vm.clock.Unix()
+
+	ins := []*avax.TransferableInput{}
+	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	for _, utxo := range utxos {
+		assetID := utxo.AssetID()
+		assetKey := assetID.Key()
+		amountSpent := amountsSpent[assetKey]
+
+		inputIntf, signers, err := kc.Spend(utxo.Out, time)
+		if err != nil {
+			// this utxo can't be spent with the current keys right now
+			continue
+		}
+		input, ok := inputIntf.(avax.TransferableIn)
+		if !ok {
+			// this input doesn't have an amount, so I don't care about it here
+			continue
+		}
+		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
+		if err != nil {
+			// there was an error calculating the consumed amount, just error
+			return nil, nil, nil, errSpendOverflow
+		}
+		amountsSpent[assetKey] = newAmountSpent
+
+		// add the new input to the array
+		ins = append(ins, &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  avax.Asset{ID: assetID},
+			In:     input,
+		})
+		// add the required keys to the array
+		keys = append(keys, signers)
+	}
+
+	avax.SortTransferableInputsWithSigners(ins, keys)
 	return amountsSpent, ins, keys, nil
 }
 
 // Mint ...
 func (vm *VM) Mint(
-	utxos []*ava.UTXO,
+	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 	amounts map[[32]byte]uint64,
 	to ids.ShortID,
@@ -759,7 +984,7 @@ func (vm *VM) Mint(
 		// add the operation to the array
 		ops = append(ops, &Operation{
 			Asset:   utxo.Asset,
-			UTXOIDs: []*ava.UTXOID{&utxo.UTXOID},
+			UTXOIDs: []*avax.UTXOID{&utxo.UTXOID},
 			Op: &secp256k1fx.MintOperation{
 				MintInput:  *in,
 				MintOutput: *out,
@@ -789,84 +1014,129 @@ func (vm *VM) Mint(
 	return ops, keys, nil
 }
 
-// SpendAll ...
-func (vm *VM) SpendAll(
-	utxos []*ava.UTXO,
+// MintNFT ...
+func (vm *VM) MintNFT(
+	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
+	assetID ids.ID,
+	payload []byte,
+	to ids.ShortID,
 ) (
-	map[[32]byte]uint64,
-	[]*ava.TransferableInput,
+	[]*Operation,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64)
 	time := vm.clock.Unix()
 
-	ins := []*ava.TransferableInput{}
+	ops := []*Operation{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
+
 	for _, utxo := range utxos {
-		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amountSpent := amountsSpent[assetKey]
+		// makes sure that the variable isn't overwritten with the next iteration
+		utxo := utxo
 
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
-		if err != nil {
-			// this utxo can't be spent with the current keys right now
+		if len(ops) > 0 {
+			// we have already been able to create the operation needed
+			break
+		}
+
+		if !utxo.AssetID().Equals(assetID) {
+			// wrong asset id
 			continue
 		}
-		input, ok := inputIntf.(ava.TransferableIn)
+		out, ok := utxo.Out.(*nftfx.MintOutput)
 		if !ok {
-			// this input doesn't have an amount, so I don't care about it here
+			// wrong output type
 			continue
 		}
-		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
-		if err != nil {
-			// there was an error calculating the consumed amount, just error
-			return nil, nil, nil, errSpendOverflow
-		}
-		amountsSpent[assetKey] = newAmountSpent
 
-		// add the new input to the array
-		ins = append(ins, &ava.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  ava.Asset{ID: assetID},
-			In:     input,
+		indices, signers, ok := kc.Match(&out.OutputOwners, time)
+		if !ok {
+			// unable to spend the output
+			continue
+		}
+
+		// add the operation to the array
+		ops = append(ops, &Operation{
+			Asset: avax.Asset{ID: assetID},
+			UTXOIDs: []*avax.UTXOID{
+				&utxo.UTXOID,
+			},
+			Op: &nftfx.MintOperation{
+				MintInput: secp256k1fx.Input{
+					SigIndices: indices,
+				},
+				GroupID: out.GroupID,
+				Payload: payload,
+				Outputs: []*secp256k1fx.OutputOwners{{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{to},
+				}},
+			},
 		})
 		// add the required keys to the array
 		keys = append(keys, signers)
 	}
 
-	ava.SortTransferableInputsWithSigners(ins, keys)
-	return amountsSpent, ins, keys, nil
+	if len(ops) == 0 {
+		return nil, nil, errAddressesCantMintAsset
+	}
+
+	sortOperationsWithSigners(ops, keys, vm.codec)
+	return ops, keys, nil
 }
 
-// Sign ...
-func (vm *VM) Sign(tx *Tx, keys [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
+// ParseLocalAddress takes in an address for this chain and produces the ID
+func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
+	chainID, addr, err := vm.ParseAddress(addrStr)
 	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
+		return ids.ShortID{}, err
 	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	for _, credKeys := range keys {
-		cred := &secp256k1fx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return fmt.Errorf("problem creating transaction: %w", err)
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
+	if !chainID.Equals(vm.ctx.ChainID) {
+		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
+			vm.ctx.ChainID, chainID)
 	}
+	return addr, nil
+}
 
-	b, err := vm.codec.Marshal(tx)
+// ParseAddress takes in an address and produces the ID of the chain it's for
+// the ID of the address
+func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
+	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
 	if err != nil {
-		return fmt.Errorf("problem creating transaction: %w", err)
+		return ids.ID{}, ids.ShortID{}, err
 	}
-	tx.Initialize(b)
-	return nil
+
+	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+
+	expectedHRP := constants.GetHRP(vm.ctx.NetworkID)
+	if hrp != expectedHRP {
+		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
+			expectedHRP, hrp)
+	}
+
+	addr, err := ids.ToShortID(addrBytes)
+	if err != nil {
+		return ids.ID{}, ids.ShortID{}, err
+	}
+	return chainID, addr, nil
+}
+
+// FormatLocalAddress takes in a raw address and produces the formatted address
+func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
+	return vm.FormatAddress(vm.ctx.ChainID, addr)
+}
+
+// FormatAddress takes in a chainID and a raw address and produces the formatted
+// address
+func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
+	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
+	if err != nil {
+		return "", err
+	}
+	hrp := constants.GetHRP(vm.ctx.NetworkID)
+	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }

@@ -6,7 +6,9 @@ package ids
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -38,6 +40,16 @@ func ShortFromString(idStr string) (ShortID, error) {
 		return ShortID{}, err
 	}
 	return ToShortID(cb58.Bytes)
+}
+
+// ShortFromPrefixedString returns a ShortID assuming the cb58 format is
+// prefixed
+func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
+	if !strings.HasPrefix(idStr, prefix) {
+		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
+	}
+
+	return ShortFromString(strings.TrimPrefix(idStr, prefix))
 }
 
 // MarshalJSON ...
@@ -102,6 +114,11 @@ func (id ShortID) String() string {
 	return cb58.String()
 }
 
+// PrefixedString returns the String representation with a prefix added
+func (id ShortID) PrefixedString(prefix string) string {
+	return prefix + id.String()
+}
+
 type sortShortIDData []ShortID
 
 func (ids sortShortIDData) Less(i, j int) bool {
@@ -118,4 +135,11 @@ func SortShortIDs(ids []ShortID) { sort.Sort(sortShortIDData(ids)) }
 // IsSortedAndUniqueShortIDs returns true if the ids are sorted and unique
 func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
 	return utils.IsSortedAndUnique(sortShortIDData(ids))
+}
+
+// IsUniqueShortIDs returns true iff [ids] are unique
+func IsUniqueShortIDs(ids []ShortID) bool {
+	set := ShortSet{}
+	set.Add(ids...)
+	return set.Len() == len(ids)
 }

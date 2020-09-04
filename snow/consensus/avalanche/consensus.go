@@ -23,7 +23,7 @@ type Consensus interface {
 	// called, the status maps should be immediately updated accordingly.
 	// Assumes each element in the accepted frontier will return accepted from
 	// the join status map.
-	Initialize(*snow.Context, Parameters, []Vertex)
+	Initialize(*snow.Context, Parameters, []Vertex) error
 
 	// Returns the parameters that describe this avalanche instance
 	Parameters() Parameters

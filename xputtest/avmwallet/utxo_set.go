@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 // UTXOSet ...
@@ -19,11 +19,11 @@ type UTXOSet struct {
 
 	// List of UTXOs in this set
 	// This can be used to iterate over. It should not be modified externally.
-	UTXOs []*ava.UTXO
+	UTXOs []*avax.UTXO
 }
 
 // Put ...
-func (us *UTXOSet) Put(utxo *ava.UTXO) {
+func (us *UTXOSet) Put(utxo *avax.UTXO) {
 	if us.utxoMap == nil {
 		us.utxoMap = make(map[[32]byte]int)
 	}
@@ -36,7 +36,7 @@ func (us *UTXOSet) Put(utxo *ava.UTXO) {
 }
 
 // Get ...
-func (us *UTXOSet) Get(id ids.ID) *ava.UTXO {
+func (us *UTXOSet) Get(id ids.ID) *avax.UTXO {
 	if us.utxoMap == nil {
 		return nil
 	}
@@ -48,7 +48,7 @@ func (us *UTXOSet) Get(id ids.ID) *ava.UTXO {
 }
 
 // Remove ...
-func (us *UTXOSet) Remove(id ids.ID) *ava.UTXO {
+func (us *UTXOSet) Remove(id ids.ID) *avax.UTXO {
 	i, ok := us.utxoMap[id.Key()]
 	if !ok {
 		return nil

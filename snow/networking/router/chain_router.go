@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/gecko/utils/constants"
+
 	"github.com/ava-labs/gecko/utils/formatting"
 
 	"github.com/ava-labs/gecko/ids"
@@ -15,17 +17,22 @@ import (
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
+const (
+	defaultCPUInterval = 5 * time.Second
+)
+
 // ChainRouter routes incoming messages from the validator network
 // to the consensus engines that the messages are intended for.
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	log          logging.Logger
-	lock         sync.RWMutex
-	chains       map[[32]byte]*Handler
-	timeouts     *timeout.Manager
-	gossiper     *timer.Repeater
-	closeTimeout time.Duration
+	log              logging.Logger
+	lock             sync.RWMutex
+	chains           map[[32]byte]*Handler
+	timeouts         *timeout.Manager
+	gossiper         *timer.Repeater
+	intervalNotifier *timer.Repeater
+	closeTimeout     time.Duration
 }
 
 // Initialize the router.
@@ -46,9 +53,11 @@ func (sr *ChainRouter) Initialize(
 	sr.chains = make(map[[32]byte]*Handler)
 	sr.timeouts = timeouts
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
+	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
 	sr.closeTimeout = closeTimeout
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
+	go log.RecoverAndPanic(sr.intervalNotifier.Dispatch)
 }
 
 // AddChain registers the specified chain so that incoming
@@ -80,7 +89,7 @@ func (sr *ChainRouter) RemoveChain(chainID ids.ID) {
 
 	ticker := time.NewTicker(sr.closeTimeout)
 	select {
-	case _, _ = <-chain.closed:
+	case <-chain.closed:
 	case <-ticker.C:
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
@@ -247,6 +256,10 @@ func (sr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		if chain.Put(validatorID, requestID, containerID, container) {
 			sr.timeouts.Cancel(validatorID, chainID, requestID)
 		}
+	} else if requestID == constants.GossipMsgRequestID {
+		sr.log.Verbo("Gossiped Put(%s, %s, %d, %s) dropped due to unknown chain. Container:",
+			validatorID, chainID, requestID, containerID, formatting.DumpBytes{Bytes: container},
+		)
 	} else {
 		sr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		sr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
@@ -331,6 +344,9 @@ func (sr *ChainRouter) Shutdown() {
 	sr.chains = map[[32]byte]*Handler{}
 	sr.lock.Unlock()
 
+	sr.gossiper.Stop()
+	sr.intervalNotifier.Stop()
+
 	for _, chain := range prevChains {
 		chain.Shutdown()
 	}
@@ -339,7 +355,7 @@ func (sr *ChainRouter) Shutdown() {
 	timedout := false
 	for _, chain := range prevChains {
 		select {
-		case _, _ = <-chain.closed:
+		case <-chain.closed:
 		case <-ticker.C:
 			timedout = true
 		}
@@ -348,7 +364,6 @@ func (sr *ChainRouter) Shutdown() {
 		sr.log.Warn("timed out while shutting down the chains")
 	}
 	ticker.Stop()
-	sr.gossiper.Stop()
 }
 
 // Gossip accepted containers
@@ -358,5 +373,15 @@ func (sr *ChainRouter) Gossip() {
 
 	for _, chain := range sr.chains {
 		chain.Gossip()
+	}
+}
+
+// EndInterval notifies the chains that the current CPU interval has ended
+func (sr *ChainRouter) EndInterval() {
+	sr.lock.Lock()
+	defer sr.lock.Unlock()
+
+	for _, chain := range sr.chains {
+		chain.endInterval()
 	}
 }

@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	errUnmarshalBlockUndefined = errors.New("vm's UnmarshalBlock member is undefined")
-	errBadData                 = errors.New("got unexpected value from database")
+	errBadData = errors.New("got unexpected value from database")
 )
 
 // If the status of this ID is not choices.Accepted,
@@ -74,7 +73,6 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if block, ok := block.(snowman.Block); ok {
 		return block, nil
 	}
@@ -112,8 +110,8 @@ func (svm *SnowmanVM) DBInitialized() bool {
 }
 
 // SetDBInitialized marks the database as initialized
-func (svm *SnowmanVM) SetDBInitialized() {
-	svm.State.PutStatus(svm.DB, dbInitializedID, choices.Accepted)
+func (svm *SnowmanVM) SetDBInitialized() error {
+	return svm.State.PutStatus(svm.DB, dbInitializedID, choices.Accepted)
 }
 
 // SaveBlock saves [block] to state
@@ -138,17 +136,19 @@ func (svm *SnowmanVM) NotifyBlockReady() {
 //   * The LockOption is the first element of [lockOption]
 //     By default the LockOption is WriteLock
 //     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
-func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ...common.LockOption) *common.HTTPHandler {
+func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ...common.LockOption) (*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterService(service, name)
+	if err := server.RegisterService(service, name); err != nil {
+		return nil, err
+	}
 
 	var lock common.LockOption = common.WriteLock
 	if len(lockOption) != 0 {
 		lock = lockOption[0]
 	}
-	return &common.HTTPHandler{LockOptions: lock, Handler: server}
+	return &common.HTTPHandler{LockOptions: lock, Handler: server}, nil
 }
 
 // Initialize this vm.

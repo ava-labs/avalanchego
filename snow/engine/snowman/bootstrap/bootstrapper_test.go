@@ -42,14 +42,13 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 
 	sender.CantGetAcceptedFrontier = false
 
-	peer := validators.GenerateRandomValidator(1)
-	peerID := peer.ID()
-	peers.Add(peer)
+	peer := ids.GenerateTestShortID()
+	peers.AddWeight(peer, 1)
 
 	blocker, _ := queue.New(db)
 
 	commonConfig := common.Config{
-		Context:    ctx,
+		Ctx:        ctx,
 		Validators: peers,
 		Beacons:    peers,
 		Alpha:      uint64(peers.Len()/2 + 1),
@@ -59,7 +58,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		Config:  commonConfig,
 		Blocked: blocker,
 		VM:      vm,
-	}, peerID, sender, vm
+	}, peer, sender, vm
 }
 
 // Single node in the accepted frontier; no need to fecth parent
@@ -95,7 +94,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -186,7 +185,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -335,7 +334,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -490,7 +489,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -589,7 +588,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -628,7 +627,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -715,7 +714,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Context.ChainID),
+		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {

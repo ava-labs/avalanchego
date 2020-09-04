@@ -15,23 +15,30 @@ import (
 const (
 	defaultMaxSize        = 1 << 18 // default max size, in bytes, of something being marshalled by Marshal()
 	defaultMaxSliceLength = 1 << 18 // default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
-
 	// initial capacity of byte slice that values are marshaled into.
 	// Larger value --> need less memory allocations but possibly have allocated but unused memory
 	// Smaller value --> need more memory allocations but more efficient use of allocated memory
 	initialSliceCap = 256
+	// The current version of the codec. Right now there is only one codec version, but in the future the
+	// codec may change. All serialized blobs begin with the codec version.
+	version = uint16(0)
 )
 
 var (
-	errNil         = errors.New("can't marshal/unmarshal nil pointer or interface")
-	errNeedPointer = errors.New("argument to unmarshal should be a pointer")
+	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
+	errUnmarshalNil      = errors.New("can't unmarshal nil")
+	errNeedPointer       = errors.New("argument to unmarshal must be a pointer")
+	errCantPackVersion   = errors.New("couldn't pack codec version")
+	errCantUnpackVersion = errors.New("couldn't unpack codec version")
 )
 
 // Codec handles marshaling and unmarshaling of structs
 type codec struct {
+	version     uint16
 	maxSize     int
 	maxSliceLen int
 
+	nextTypeID   uint32
 	typeIDToType map[uint32]reflect.Type
 	typeToTypeID map[reflect.Type]uint32
 
@@ -46,6 +53,7 @@ type codec struct {
 
 // Codec marshals and unmarshals
 type Codec interface {
+	Skip(int)
 	RegisterType(interface{}) error
 	Marshal(interface{}) ([]byte, error)
 	Unmarshal([]byte, interface{}) error
@@ -56,6 +64,8 @@ func New(maxSize, maxSliceLen int) Codec {
 	return &codec{
 		maxSize:                maxSize,
 		maxSliceLen:            maxSliceLen,
+		version:                version,
+		nextTypeID:             0,
 		typeIDToType:           map[uint32]reflect.Type{},
 		typeToTypeID:           map[reflect.Type]uint32{},
 		serializedFieldIndices: map[reflect.Type][]int{},
@@ -65,6 +75,9 @@ func New(maxSize, maxSliceLen int) Codec {
 // NewDefault returns a new codec with reasonable default values
 func NewDefault() Codec { return New(defaultMaxSize, defaultMaxSliceLength) }
 
+// Skip some number of type IDs
+func (c *codec) Skip(num int) { c.nextTypeID += uint32(num) }
+
 // RegisterType is used to register types that may be unmarshaled into an interface
 // [val] is a value of the type being registered
 func (c *codec) RegisterType(val interface{}) error {
@@ -72,8 +85,9 @@ func (c *codec) RegisterType(val interface{}) error {
 	if _, exists := c.typeToTypeID[valType]; exists {
 		return fmt.Errorf("type %v has already been registered", valType)
 	}
-	c.typeIDToType[uint32(len(c.typeIDToType))] = reflect.TypeOf(val)
-	c.typeToTypeID[valType] = uint32(len(c.typeIDToType) - 1)
+	c.typeIDToType[c.nextTypeID] = reflect.TypeOf(val)
+	c.typeToTypeID[valType] = c.nextTypeID
+	c.nextTypeID++
 	return nil
 }
 
@@ -93,14 +107,14 @@ func (c *codec) RegisterType(val interface{}) error {
 // To marshal an interface, [value] must be a pointer to the interface
 func (c *codec) Marshal(value interface{}) ([]byte, error) {
 	if value == nil {
-		return nil, errNil // can't marshal nil
+		return nil, errMarshalNil // can't marshal nil
 	}
-
 	p := &wrappers.Packer{MaxSize: c.maxSize, Bytes: make([]byte, 0, initialSliceCap)}
-	if err := c.marshal(reflect.ValueOf(value), p); err != nil {
+	if p.PackShort(c.version); p.Errored() {
+		return nil, errCantPackVersion // Should never happen
+	} else if err := c.marshal(reflect.ValueOf(value), p); err != nil {
 		return nil, err
 	}
-
 	return p.Bytes, nil
 }
 
@@ -111,7 +125,7 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 	switch valueKind {
 	case reflect.Interface, reflect.Ptr, reflect.Invalid:
 		if value.IsNil() { // Can't marshal nil (except nil slices)
-			return errNil
+			return errMarshalNil
 		}
 	}
 
@@ -211,20 +225,18 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 	case len(bytes) > c.maxSize:
 		return fmt.Errorf("byte array exceeds maximum length, %d", c.maxSize)
 	case dest == nil:
-		return errNil
+		return errUnmarshalNil
 	}
-
-	destPtr := reflect.ValueOf(dest)
-	if destPtr.Kind() != reflect.Ptr {
-		return errNeedPointer
-	}
-
 	p := &wrappers.Packer{MaxSize: c.maxSize, Bytes: bytes}
-	destVal := destPtr.Elem()
-	if err := c.unmarshal(p, destVal); err != nil {
+	if destPtr := reflect.ValueOf(dest); destPtr.Kind() != reflect.Ptr {
+		return errNeedPointer
+	} else if codecVersion := p.UnpackShort(); p.Errored() { // Make sure the codec version is correct
+		return errCantUnpackVersion
+	} else if codecVersion != c.version {
+		return fmt.Errorf("expected codec version to be %d but is %d", c.version, codecVersion)
+	} else if err := c.unmarshal(p, destPtr.Elem()); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -364,7 +376,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		value.Set(v)
 		return nil
 	case reflect.Invalid:
-		return errNil
+		return errUnmarshalNil
 	default:
 		return fmt.Errorf("can't unmarshal unknown type %s", value.Kind().String())
 	}

@@ -4,7 +4,6 @@
 package network
 
 import (
-	"bytes"
 	"math"
 	"net"
 	"sync"
@@ -185,6 +184,7 @@ func (p *peer) WriteMessages() {
 
 		p.net.stateLock.Lock()
 		p.pendingBytes -= len(msg)
+		p.net.pendingBytes -= len(msg)
 		p.net.stateLock.Unlock()
 
 		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
@@ -220,10 +220,7 @@ func (p *peer) send(msg Msg) bool {
 	msgBytes := msg.Bytes()
 	newPendingBytes := p.net.pendingBytes + len(msgBytes)
 	newConnPendingBytes := p.pendingBytes + len(msgBytes)
-	if newPendingBytes > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
-		(newPendingBytes > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
-			newConnPendingBytes > p.net.maxNetworkPendingSendBytes/20) { // Check to see if this connection is using too much memory
+	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
 	}
@@ -313,6 +310,13 @@ func (p *peer) handle(msg Msg) {
 	}
 }
 
+func (p *peer) dropMessage(msgLen, connPendingLen, networkPendingLen int) bool {
+	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
+		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
+			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
+}
+
 // assumes the stateLock is not held
 func (p *peer) Close() { p.once.Do(p.close) }
 
@@ -321,8 +325,11 @@ func (p *peer) close() {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
+	if err := p.conn.Close(); err != nil {
+		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
+	}
+
 	p.closed = true
-	p.conn.Close()
 	close(p.sender)
 	p.net.disconnected(p)
 }
@@ -462,8 +469,13 @@ func (p *peer) version(msg Msg) {
 	if err := p.net.version.Compatible(peerVersion); err != nil {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
-		p.discardIP()
-		return
+		if !p.net.beacons.Contains(p.id) {
+			p.discardIP()
+			return
+		}
+		p.net.log.Info("allowing beacon %s to connect with a lower version %s",
+			p.id,
+			peerVersion)
 	}
 
 	if p.ip.IsZero() {
@@ -475,7 +487,7 @@ func (p *peer) version(msg Msg) {
 		if err == nil {
 			// If we have no clue what the peer's IP is, we can't perform any
 			// verification
-			if bytes.Equal(peerIP.IP, localPeerIP.IP) {
+			if peerIP.IP.Equal(localPeerIP.IP) {
 				// if the IPs match, add this ip:port pair to be tracked
 				p.net.stateLock.Lock()
 				p.ip = peerIP

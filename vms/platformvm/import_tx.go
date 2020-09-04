@@ -7,262 +7,247 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/math"
-	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
-	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
-	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
-	errNoImportInputs             = errors.New("no import inputs")
-	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
-	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errUnknownAsset               = errors.New("unknown asset ID")
+	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
+	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
+	errNoImportInputs           = errors.New("tx has no imported inputs")
+	errInputsNotSortedUnique    = errors.New("inputs not sorted and unique")
+
+	_ UnsignedAtomicTx = &UnsignedImportTx{}
 )
 
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
-	// ID of the network this blockchain exists on
-	NetworkID uint32 `serialize:"true"`
+	BaseTx `serialize:"true"`
 
-	// Next unused nonce of account paying the transaction fee and receiving the
-	// inputs of this transaction.
-	Nonce uint64 `serialize:"true"`
+	// Which chain to consume the funds from
+	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
 
-	// Account that this transaction is being sent by. This is needed to ensure the Credentials are replay safe.
-	Account ids.ShortID `serialize:"true"`
-
-	Ins []*ava.TransferableInput `serialize:"true"` // The inputs to this transaction
+	// Inputs that consume UTXOs produced on the chain
+	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
-// ImportTx imports funds from the AVM
-type ImportTx struct {
-	UnsignedImportTx `serialize:"true"`
-
-	Sig   [crypto.SECP256K1RSigLen]byte `serialize:"true"`
-	Creds []verify.Verifiable           `serialize:"true"` // The credentials of this transaction
-
-	vm            *VM
-	id            ids.ID
-	key           crypto.PublicKey // public key of transaction signer
-	unsignedBytes []byte
-	bytes         []byte
-}
-
-func (tx *ImportTx) initialize(vm *VM) error {
-	tx.vm = vm
-	txBytes, err := Codec.Marshal(tx) // byte repr. of the signed tx
-	tx.bytes = txBytes
-	tx.id = ids.NewID(hashing.ComputeHash256Array(txBytes))
-	return err
-}
-
-// ID of this transaction
-func (tx *ImportTx) ID() ids.ID { return tx.id }
-
-// Key returns the public key of the signer of this transaction
-// Precondition: tx.Verify() has been called and returned nil
-func (tx *ImportTx) Key() crypto.PublicKey { return tx.key }
-
-// UnsignedBytes returns the unsigned byte representation of an ImportTx
-func (tx *ImportTx) UnsignedBytes() []byte { return tx.unsignedBytes }
-
-// Bytes returns the byte representation of an ImportTx
-func (tx *ImportTx) Bytes() []byte { return tx.bytes }
-
-// InputUTXOs returns an empty set
-func (tx *ImportTx) InputUTXOs() ids.Set {
+// InputUTXOs returns the UTXOIDs of the imported funds
+func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	set := ids.Set{}
-	for _, in := range tx.Ins {
+	for _, in := range tx.ImportedInputs {
 		set.Add(in.InputID())
 	}
 	return set
 }
 
-// SyntacticVerify this transaction is well-formed
-// Also populates [tx.Key] with the public key that signed this transaction
-func (tx *ImportTx) SyntacticVerify() error {
+// Verify this transaction is well-formed
+func (tx *UnsignedImportTx) Verify(
+	avmID ids.ID,
+	ctx *snow.Context,
+	c codec.Codec,
+	feeAmount uint64,
+	feeAssetID ids.ID,
+) error {
 	switch {
 	case tx == nil:
 		return errNilTx
-	case tx.key != nil:
-		return nil // Only verify the transaction once
-	case tx.NetworkID != tx.vm.Ctx.NetworkID: // verify the transaction is on this network
-		return errWrongNetworkID
-	case tx.id.IsZero():
-		return errInvalidID
-	case len(tx.Ins) == 0:
+	case tx.syntacticallyVerified: // already passed syntactic verification
+		return nil
+	case tx.SourceChain.IsZero():
+		return errWrongChainID
+	case !tx.SourceChain.Equals(avmID):
+		// TODO: remove this check if we allow for P->C swaps
+		return errWrongChainID
+	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
-	case len(tx.Ins) != len(tx.Creds):
-		return errWrongNumberOfCredentials
 	}
 
-	for _, in := range tx.Ins {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+		return err
+	}
+
+	for _, in := range tx.ImportedInputs {
 		if err := in.Verify(); err != nil {
 			return err
 		}
-		if !in.AssetID().Equals(tx.vm.ava) {
-			return errUnknownAsset
-		}
 	}
-	if !ava.IsSortedAndUniqueTransferableInputs(tx.Ins) {
+	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
 
-	for _, cred := range tx.Creds {
-		if err := cred.Verify(); err != nil {
-			return err
-		}
-	}
-
-	unsignedIntf := interface{}(&tx.UnsignedImportTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // byte repr of unsigned tx
-	if err != nil {
-		return err
-	}
-
-	key, err := tx.vm.factory.RecoverPublicKey(unsignedBytes, tx.Sig[:])
-	if err != nil {
-		return err
-	}
-
-	if !tx.Account.Equals(key.Address()) {
-		return errPublicKeySignatureMismatch
-	}
-
-	tx.key = key
-	tx.unsignedBytes = unsignedBytes
+	tx.syntacticallyVerified = true
 	return nil
 }
 
 // SemanticVerify this transaction is valid.
-func (tx *ImportTx) SemanticVerify(db database.Database) error {
-	if err := tx.SyntacticVerify(); err != nil {
-		return err
+func (tx *UnsignedImportTx) SemanticVerify(
+	vm *VM,
+	db database.Database,
+	stx *Tx,
+) TxError {
+	if err := tx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+		return permError{err}
 	}
 
-	amount := uint64(0)
-	for _, in := range tx.Ins {
-		newAmount, err := math.Add64(in.In.Amount(), amount)
+	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
+	for index, input := range tx.Ins {
+		utxoID := input.UTXOID.InputID()
+		utxo, err := vm.getUTXO(db, utxoID)
 		if err != nil {
-			return err
+			return tempError{err}
 		}
-		amount = newAmount
+		utxos[index] = utxo
 	}
 
-	// Deduct tx fee from payer's account
-	account, err := tx.vm.getAccount(db, tx.Key().Address())
+	txID := tx.ID()
+
+	// Consume the UTXOS
+	if err := vm.consumeInputs(db, tx.Ins); err != nil {
+		return tempError{err}
+	}
+	// Produce the UTXOS
+	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
+		return tempError{err}
+	}
+
+	if !vm.bootstrapped {
+		return nil
+	}
+
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+	}
+	allUTXOBytes, err := vm.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
-		return err
-	}
-	account, err = account.Add(amount)
-	if err != nil {
-		return err
-	}
-	account, err = account.Remove(0, tx.Nonce)
-	if err != nil {
-		return err
-	}
-	if err := tx.vm.putAccount(db, account); err != nil {
-		return err
+		return tempError{err}
 	}
 
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
-
-	state := ava.NewPrefixedState(smDB, Codec)
-
-	for i, in := range tx.Ins {
-		cred := tx.Creds[i]
-
-		utxoID := in.UTXOID.InputID()
-		utxo, err := state.AVMUTXO(utxoID)
-		if err != nil {
-			return err
+	for i, utxoBytes := range allUTXOBytes {
+		utxo := &avax.UTXO{}
+		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return tempError{err}
 		}
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-
-		if err := tx.vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
-			return err
-		}
+		utxos[i+len(tx.Ins)] = utxo
 	}
 
-	return nil
+	ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+	copy(ins, tx.Ins)
+	copy(ins[len(tx.Ins):], tx.ImportedInputs)
+
+	return vm.semanticVerifySpendUTXOs(tx, utxos, ins, tx.Outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID)
 }
 
-// Accept this transaction.
-func (tx *ImportTx) Accept(batch database.Batch) error {
-	smDB := tx.vm.Ctx.SharedMemory.GetDatabase(tx.vm.avm)
-	defer tx.vm.Ctx.SharedMemory.ReleaseDatabase(tx.vm.avm)
-
-	vsmDB := versiondb.New(smDB)
-
-	state := ava.NewPrefixedState(vsmDB, Codec)
-	for _, in := range tx.Ins {
-		utxoID := in.UTXOID.InputID()
-		if err := state.SpendAVMUTXO(utxoID); err != nil {
-			return err
-		}
+// Accept this transaction and spend imported inputs
+// We spend imported UTXOs here rather than in semanticVerify because
+// we don't want to remove an imported UTXO in semanticVerify
+// only to have the transaction not be Accepted. This would be inconsistent.
+// Recall that imported UTXOs are not kept in a versionDB.
+func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoIDs[i] = in.InputID().Bytes()
 	}
-
-	sharedBatch, err := vsmDB.CommitBatch()
-	if err != nil {
-		return err
-	}
-
-	return atomic.WriteAll(batch, sharedBatch)
+	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
 }
 
-func (vm *VM) newImportTx(nonce uint64, networkID uint32, ins []*ava.TransferableInput, from [][]*crypto.PrivateKeySECP256K1R, to *crypto.PrivateKeySECP256K1R) (*ImportTx, error) {
-	ava.SortTransferableInputsWithSigners(ins, from)
-
-	tx := &ImportTx{UnsignedImportTx: UnsignedImportTx{
-		NetworkID: networkID,
-		Nonce:     nonce,
-		Account:   to.PublicKey().Address(),
-		Ins:       ins,
-	}}
-
-	unsignedIntf := interface{}(&tx.UnsignedImportTx)
-	unsignedBytes, err := Codec.Marshal(&unsignedIntf) // Byte repr. of unsigned transaction
-	if err != nil {
-		return nil, err
+// Create a new transaction
+func (vm *VM) newImportTx(
+	chainID ids.ID, // chain to import from
+	to ids.ShortID, // Address of recipient
+	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
+) (*Tx, error) {
+	if !vm.Ctx.XChainID.Equals(chainID) {
+		return nil, errWrongChainID
 	}
 
-	hash := hashing.ComputeHash256(unsignedBytes)
+	kc := secp256k1fx.NewKeychain()
+	for _, key := range keys {
+		kc.Add(key)
+	}
 
-	for _, credKeys := range from {
-		cred := &secp256k1fx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return nil, fmt.Errorf("problem creating transaction: %w", err)
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
+	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
+	if err != nil {
+		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
+	}
 
-			cred.Sigs = append(cred.Sigs, fixedSig)
+	importedInputs := []*avax.TransferableInput{}
+	signers := [][]*crypto.PrivateKeySECP256K1R{}
+
+	importedAmount := uint64(0)
+	now := vm.clock.Unix()
+	for _, utxo := range atomicUTXOs {
+		if !utxo.AssetID().Equals(vm.Ctx.AVAXAssetID) {
+			continue
 		}
-		tx.Creds = append(tx.Creds, cred)
+		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
+		if err != nil {
+			continue
+		}
+		input, ok := inputIntf.(avax.TransferableIn)
+		if !ok {
+			continue
+		}
+		importedAmount, err = math.Add64(importedAmount, input.Amount())
+		if err != nil {
+			return nil, err
+		}
+		importedInputs = append(importedInputs, &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  utxo.Asset,
+			In:     input,
+		})
+		signers = append(signers, utxoSigners)
+	}
+	avax.SortTransferableInputsWithSigners(importedInputs, signers)
+
+	if importedAmount == 0 {
+		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
-	sig, err := to.SignHash(hash)
-	if err != nil {
+	ins := []*avax.TransferableInput{}
+	outs := []*avax.TransferableOutput{}
+	if importedAmount < vm.txFee { // imported amount goes toward paying tx fee
+		var baseSigners [][]*crypto.PrivateKeySECP256K1R
+		ins, outs, _, baseSigners, err = vm.stake(vm.DB, keys, 0, vm.txFee-importedAmount)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+		}
+		signers = append(baseSigners, signers...)
+	} else if importedAmount > vm.txFee {
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: importedAmount - vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{to},
+				},
+			},
+		})
+	}
+
+	// Create the transaction
+	utx := &UnsignedImportTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.Ctx.NetworkID,
+			BlockchainID: vm.Ctx.ChainID,
+			Outs:         outs,
+			Ins:          ins,
+		}},
+		SourceChain:    chainID,
+		ImportedInputs: importedInputs,
+	}
+	tx := &Tx{UnsignedTx: utx}
+	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	copy(tx.Sig[:], sig)
-
-	return tx, tx.initialize(vm)
+	return tx, utx.Verify(vm.Ctx.XChainID, vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
 }

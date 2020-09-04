@@ -7,17 +7,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 func TestShutdown(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    10 * time.Second,
+		MinimumTimeout:    500 * time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -34,11 +46,16 @@ func TestShutdown(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
+
 	go handler.Dispatch()
 
 	chainRouter.AddChain(handler)
@@ -47,16 +64,30 @@ func TestShutdown(t *testing.T) {
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Handler shutdown was not called or timed out after 20ms during chainRouter shutdown")
-	case _, _ = <-shutdownCalled:
+	case <-shutdownCalled:
+	}
+
+	select {
+	case <-handler.closed:
+	default:
+		t.Fatal("handler shutdown but never closed its closing channel")
 	}
 }
 
 func TestShutdownTimesOut(t *testing.T) {
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    10 * time.Second,
+		MinimumTimeout:    500 * time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -82,8 +113,12 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
 		1,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -103,8 +138,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	}()
 
 	select {
-	case _, _ = <-engineFinished:
+	case <-engineFinished:
 		t.Fatalf("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
-	case _, _ = <-shutdownFinished:
+	case <-shutdownFinished:
 	}
 }

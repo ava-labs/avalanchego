@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -32,29 +34,35 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	vdrs := validators.NewSet()
+	vdr0 := ids.GenerateTestShortID()
+	vdrs.AddWeight(vdr0, 1)
 	handler.Initialize(
 		&engine,
+		vdrs,
 		nil,
-		2,
+		16,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
 
-	receiveTime := time.Now()
-	handler.clock.Set(receiveTime.Add(time.Second))
+	currentTime := time.Now()
+	handler.clock.Set(currentTime)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, receiveTime)
-	// Set the clock to simulate message timeout
-	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, receiveTime.Add(2*time.Second), ids.Set{})
+	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, currentTime.Add(-time.Second))
+	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, currentTime.Add(time.Second), ids.Set{})
 
 	go handler.Dispatch()
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Calling engine function timed out")
-	case _, _ = <-called:
+	case <-called:
 	}
 }
 
@@ -71,10 +79,15 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	}
 
 	handler := &Handler{}
+	validators := validators.NewSet()
 	handler.Initialize(
 		&engine,
+		validators,
 		nil,
-		1,
+		16,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -85,13 +98,13 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Calling engine function timed out")
-	case _, _ = <-called:
+	case <-called:
 	}
 }
 
-func TestHandlerCallsToClose(t *testing.T) {
+func TestHandlerClosesOnError(t *testing.T) {
 	engine := common.EngineTest{T: t}
 	engine.Default(false)
 
@@ -105,8 +118,12 @@ func TestHandlerCallsToClose(t *testing.T) {
 	handler := &Handler{}
 	handler.Initialize(
 		&engine,
+		validators.NewSet(),
 		nil,
-		1,
+		16,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -121,8 +138,8 @@ func TestHandlerCallsToClose(t *testing.T) {
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
-	case _, _ = <-ticker.C:
+	case <-ticker.C:
 		t.Fatalf("Handler shutdown timed out before calling toClose")
-	case _, _ = <-closed:
+	case <-closed:
 	}
 }

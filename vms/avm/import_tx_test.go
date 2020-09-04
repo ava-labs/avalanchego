@@ -11,17 +11,111 @@ import (
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
+func TestImportTxSyntacticVerify(t *testing.T) {
+	ctx := NewContext(t)
+	c := setupCodec()
+
+	tx := &ImportTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: asset},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 12345,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			}},
+		}},
+		SourceChain: platformChainID,
+		ImportedIns: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID: ids.NewID([32]byte{
+					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
+					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
+					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
+				}),
+				OutputIndex: 0,
+			},
+			Asset: avax.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 54321,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{2},
+				},
+			},
+		}},
+	}
+	tx.Initialize(nil, nil)
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
+	ctx := NewContext(t)
+	c := setupCodec()
+
+	tx := &ImportTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: asset},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 12345,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			}},
+			Memo: make([]byte, avax.MaxMemoSize+1),
+		}},
+		SourceChain: platformChainID,
+		ImportedIns: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID: ids.NewID([32]byte{
+					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
+					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
+					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
+				}),
+				OutputIndex: 0,
+			},
+			Asset: avax.Asset{ID: asset},
+			In: &secp256k1fx.TransferInput{
+				Amt: 54321,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{2},
+				},
+			},
+		}},
+	}
+	tx.Initialize(nil, nil)
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0); err == nil {
+		t.Fatalf("should have errored due to memo field being too long")
+	}
+}
+
 func TestImportTxSerialization(t *testing.T) {
 	expected := []byte{
+		// Codec version
+		0x00, 0x00,
 		// txID:
 		0x00, 0x00, 0x00, 0x03,
 		// networkID:
@@ -35,6 +129,15 @@ func TestImportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 		// number of base inputs:
 		0x00, 0x00, 0x00, 0x00,
+		// Memo length:
+		0x00, 0x00, 0x00, 0x04,
+		// Memo:
+		0x00, 0x01, 0x02, 0x03,
+		// Source Chain ID:
+		0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+		0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+		0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+		0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
 		// number of inputs:
 		0x00, 0x00, 0x00, 0x01,
 		// utxoID:
@@ -58,26 +161,35 @@ func TestImportTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01,
 		// sig index[0]:
 		0x00, 0x00, 0x00, 0x00,
+		// number of credentials:
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: 2,
-			BCID: ids.NewID([32]byte{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID: 2,
+			BlockchainID: ids.NewID([32]byte{
 				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
 				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
 				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
 			}),
-		},
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{TxID: ids.NewID([32]byte{
+			Memo: []byte{0x00, 0x01, 0x02, 0x03},
+		}},
+		SourceChain: ids.NewID([32]byte{
+			0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
+			0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
+			0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
+			0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
+		}),
+		ImportedIns: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{TxID: ids.NewID([32]byte{
 				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
 				0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
 				0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
 			})},
-			Asset: ava.Asset{ID: ids.NewID([32]byte{
+			Asset: avax.Asset{ID: ids.NewID([32]byte{
 				0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
 				0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
 				0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
@@ -91,11 +203,9 @@ func TestImportTxSerialization(t *testing.T) {
 	}}
 
 	c := setupCodec()
-	b, err := c.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
@@ -110,24 +220,20 @@ func TestIssueImportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+	ctx := NewContext(t)
+	ctx.SharedMemory = m.NewSharedMemory(chainID)
+	peerSharedMemory := m.NewSharedMemory(platformChainID)
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	avaID := genesisTx.ID()
+	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
-	vm := &VM{
-		ava:      avaID,
-		platform: platformID,
-	}
+	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
@@ -155,7 +261,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	key := keys[0]
 
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID: ids.NewID([32]byte{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -165,55 +271,33 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
-		Ins: []*ava.TransferableInput{{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		SourceChain: platformChainID,
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: avaID},
+			Asset:  avax.Asset{ID: avaxID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   1000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
-
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err == nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err == nil {
 		t.Fatal(err)
 	}
 
 	// Provide the platform UTXO:
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
-
-	utxo := &ava.UTXO{
+	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  ava.Asset{ID: avaID},
+		Asset:  avax.Asset{ID: avaxID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1000,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -222,15 +306,22 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		},
 	}
-
-	state := ava.NewPrefixedState(smDB, vm.codec)
-	if err := state.FundPlatformUTXO(utxo); err != nil {
+	utxoBytes, err := vm.codec.Marshal(utxo)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	vm.ctx.SharedMemory.ReleaseDatabase(platformID)
+	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		Key:   utxo.InputID().Bytes(),
+		Value: utxoBytes,
+		Traits: [][]byte{
+			key.PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
 
-	if _, err := vm.IssueTx(tx.Bytes(), nil); err != nil {
+	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
 		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
 	}
 	ctx.Lock.Unlock()
@@ -254,11 +345,7 @@ func TestIssueImportTx(t *testing.T) {
 	parsedTx := txs[0]
 	parsedTx.Accept()
 
-	smDB = vm.ctx.SharedMemory.GetDatabase(platformID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
-
-	state = ava.NewPrefixedState(smDB, vm.codec)
-	if _, err := state.PlatformUTXO(utxoID.InputID()); err == nil {
+	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }
@@ -270,20 +357,15 @@ func TestForceAcceptImportTx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDB := memdb.New()
 
-	sm := &atomic.SharedMemory{}
-	sm.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
-	ctx.SharedMemory = sm.NewBlockchainSharedMemory(chainID)
+	ctx := NewContext(t)
+	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
 	platformID := ids.Empty.Prefix(0)
 
-	vm := &VM{
-		ava:      ids.Empty,
-		platform: platformID,
-	}
+	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -319,7 +401,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	utxoID := ava.UTXOID{
+	utxoID := avax.UTXOID{
 		TxID: ids.NewID([32]byte{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
 			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
@@ -329,43 +411,23 @@ func TestForceAcceptImportTx(t *testing.T) {
 	}
 
 	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
-		Ins: []*ava.TransferableInput{{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		SourceChain: platformChainID,
+		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
-			Asset:  ava.Asset{ID: genesisTx.ID()},
+			Asset:  avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt:   1000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
-
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	parsedTx, err := vm.ParseTx(tx.Bytes())
 	if err != nil {
@@ -378,12 +440,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	parsedTx.Accept()
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(platformID)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(platformID)
-
-	state := ava.NewPrefixedState(smDB, vm.codec)
-	utxoSource := utxoID.InputID()
-	if _, err := state.PlatformUTXO(utxoSource); err == nil {
+	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{utxoID.InputID().Bytes()}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
 	}
 }

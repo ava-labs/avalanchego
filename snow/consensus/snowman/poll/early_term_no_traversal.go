@@ -19,7 +19,7 @@ func NewEarlyTermNoTraversalFactory(alpha int) Factory {
 	return &earlyTermNoTraversalFactory{alpha: alpha}
 }
 
-func (f *earlyTermNoTraversalFactory) New(vdrs ids.ShortSet) Poll {
+func (f *earlyTermNoTraversalFactory) New(vdrs ids.ShortBag) Poll {
 	return &earlyTermNoTraversalPoll{
 		polled: vdrs,
 		alpha:  f.alpha,
@@ -31,23 +31,18 @@ func (f *earlyTermNoTraversalFactory) New(vdrs ids.ShortSet) Poll {
 // It terminates as quickly as it can without performing any DAG traversals.
 type earlyTermNoTraversalPoll struct {
 	votes  ids.Bag
-	polled ids.ShortSet
+	polled ids.ShortBag
 	alpha  int
 }
 
 // Vote registers a response for this poll
 func (p *earlyTermNoTraversalPoll) Vote(vdr ids.ShortID, vote ids.ID) {
-	if !p.polled.Contains(vdr) {
-		// if the validator wasn't polled or already responded to this poll, we
-		// should just drop the vote
-		return
-	}
-
+	count := p.polled.Count(vdr)
 	// make sure that a validator can't respond multiple times
 	p.polled.Remove(vdr)
 
 	// track the votes the validator responded with
-	p.votes.Add(vote)
+	p.votes.AddCount(vote, count)
 }
 
 // Drop any future response for this poll
@@ -68,6 +63,8 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 // Result returns the result of this poll
 func (p *earlyTermNoTraversalPoll) Result() ids.Bag { return p.votes }
 
-func (p *earlyTermNoTraversalPoll) String() string {
-	return fmt.Sprintf("waiting on %s", p.polled)
+func (p *earlyTermNoTraversalPoll) PrefixedString(prefix string) string {
+	return fmt.Sprintf("waiting on %s", p.polled.PrefixedString(prefix))
 }
+
+func (p *earlyTermNoTraversalPoll) String() string { return p.PrefixedString("") }

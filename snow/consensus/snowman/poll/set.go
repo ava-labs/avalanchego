@@ -66,7 +66,7 @@ func NewSet(
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
 //         should be made.
-func (s *set) Add(requestID uint32, vdrs ids.ShortSet) bool {
+func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 	if _, exists := s.polls[requestID]; exists {
 		s.log.Debug("dropping poll due to duplicated requestID: %d", requestID)
 		return false
@@ -112,7 +112,7 @@ func (s *set) Vote(
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
 	delete(s.polls, requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Now().Sub(poll.start).Milliseconds()))
+	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 	return poll.Result(), true
 }
@@ -140,7 +140,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) (ids.Bag, bool) {
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
 	delete(s.polls, requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Now().Sub(poll.start).Milliseconds()))
+	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 	return poll.Result(), true
 }
@@ -152,7 +152,7 @@ func (s *set) String() string {
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("current polls: (Size = %d)", len(s.polls)))
 	for requestID, poll := range s.polls {
-		sb.WriteString(fmt.Sprintf("\n    %d: %s", requestID, poll))
+		sb.WriteString(fmt.Sprintf("\n    %d: %s", requestID, poll.PrefixedString("    ")))
 	}
 	return sb.String()
 }

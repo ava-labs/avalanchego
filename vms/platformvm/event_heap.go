@@ -9,18 +9,14 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/validators"
 )
 
 // TimedTx ...
 type TimedTx interface {
-	ProposalTx
-
-	Vdr() validators.Validator
-
 	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
+	Bytes() []byte
 }
 
 // EventHeap is a collection of timedTxs where elements are ordered by either
@@ -32,14 +28,14 @@ type TimedTx interface {
 // Transactions must be syntactically verified before adding to EventHeap to
 // ensure that EventHeap can always by marshalled.
 type EventHeap struct {
-	SortByStartTime bool      `serialize:"true"`
-	Txs             []TimedTx `serialize:"true"`
+	SortByStartTime bool  `serialize:"true"`
+	Txs             []*Tx `serialize:"true"`
 }
 
 func (h *EventHeap) Len() int { return len(h.Txs) }
 func (h *EventHeap) Less(i, j int) bool {
-	iTx := h.Txs[i]
-	jTx := h.Txs[j]
+	iTx := h.Txs[i].UnsignedTx.(TimedTx)
+	jTx := h.Txs[j].UnsignedTx.(TimedTx)
 
 	iTime := iTx.EndTime()
 	jTime := jTx.EndTime()
@@ -52,8 +48,8 @@ func (h *EventHeap) Less(i, j int) bool {
 	case iTime.Unix() < jTime.Unix():
 		return true
 	case iTime == jTime:
-		_, iOk := iTx.(*addDefaultSubnetValidatorTx)
-		_, jOk := jTx.(*addDefaultSubnetValidatorTx)
+		_, iOk := iTx.(*UnsignedAddValidatorTx)
+		_, jOk := jTx.(*UnsignedAddValidatorTx)
 
 		if iOk != jOk {
 			return iOk == h.SortByStartTime
@@ -67,23 +63,24 @@ func (h *EventHeap) Swap(i, j int) { h.Txs[i], h.Txs[j] = h.Txs[j], h.Txs[i] }
 
 // Timestamp returns the timestamp on the top transaction on the heap
 func (h *EventHeap) Timestamp() time.Time {
+	tx := h.Txs[0].UnsignedTx.(TimedTx)
 	if h.SortByStartTime {
-		return h.Txs[0].StartTime()
+		return tx.StartTime()
 	}
-	return h.Txs[0].EndTime()
+	return tx.EndTime()
 }
 
 // Add ...
-func (h *EventHeap) Add(tx TimedTx) { heap.Push(h, tx) }
+func (h *EventHeap) Add(tx *Tx) { heap.Push(h, tx) }
 
 // Peek ...
-func (h *EventHeap) Peek() TimedTx { return h.Txs[0] }
+func (h *EventHeap) Peek() *Tx { return h.Txs[0] }
 
 // Remove ...
-func (h *EventHeap) Remove() TimedTx { return heap.Pop(h).(TimedTx) }
+func (h *EventHeap) Remove() *Tx { return heap.Pop(h).(*Tx) }
 
 // Push implements the heap interface
-func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(TimedTx)) }
+func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(*Tx)) }
 
 // Pop implements the heap interface
 func (h *EventHeap) Pop() interface{} {
@@ -94,9 +91,6 @@ func (h *EventHeap) Pop() interface{} {
 }
 
 // Bytes returns the byte representation of this heap
-func (h *EventHeap) Bytes() []byte {
-	// Assumes the individual transactions have been syntactically verified
-	// so that it can be safely marshalled.
-	bytes, _ := Codec.Marshal(h)
-	return bytes
+func (h *EventHeap) Bytes() ([]byte, error) {
+	return Codec.Marshal(h)
 }

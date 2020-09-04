@@ -43,15 +43,19 @@ type blockJob struct {
 }
 
 func (b *blockJob) ID() ids.ID { return b.blk.ID() }
-func (b *blockJob) MissingDependencies() ids.Set {
+func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
 	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
 		missing.Add(parent.ID())
 	}
-	return missing
+	return missing, nil
 }
 func (b *blockJob) Execute() error {
-	if b.MissingDependencies().Len() != 0 {
+	deps, err := b.MissingDependencies()
+	if err != nil {
+		return err
+	}
+	if deps.Len() != 0 {
 		b.numDropped.Inc()
 		return errors.New("attempting to accept a block with missing dependencies")
 	}
@@ -62,7 +66,7 @@ func (b *blockJob) Execute() error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		if err := b.blk.Verify(); err != nil {
-			b.log.Debug("block %s failed verification during bootstrapping due to %s",
+			return fmt.Errorf("block %s failed verification during bootstrapping due to: %w",
 				b.blk.ID(), err)
 		}
 

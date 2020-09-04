@@ -5,7 +5,6 @@ package network
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"net"
 	"sync"
@@ -21,9 +20,10 @@ import (
 	"github.com/ava-labs/gecko/snow/triggers"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/random"
+	"github.com/ava-labs/gecko/utils/sampler"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/version"
 )
@@ -45,11 +45,9 @@ const (
 	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = time.Minute
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
-
-	// Request ID used when sending a Put message to gossip an accepted container
-	// (ie not sent in response to a Get)
-	GossipMsgRequestID = math.MaxUint32
 )
+
+func init() { rand.Seed(time.Now().UnixNano()) }
 
 // Network defines the functionality of the networking library.
 type Network interface {
@@ -74,11 +72,11 @@ type Network interface {
 	// IP.
 	Track(ip utils.IPDesc)
 
-	// Register a new handler that is called whenever a peer is connected to or
-	// disconnected to. If the handler returns true, then it will never be
-	// called again. Thread safety must be managed internally in the network.
+	// Register a new connector that is called whenever a peer is connected to
+	// or disconnected from. If the connector returns true, then it will never
+	// be called again. Thread safety must be managed internally in the network.
 	// The handler will initially be called with this local node's ID.
-	RegisterHandler(h Handler)
+	RegisterConnector(h validators.Connector)
 
 	// Returns the description of the nodes this network is currently connected
 	// to externally. Thread safety must be managed internally to the network.
@@ -104,8 +102,8 @@ type network struct {
 	dialer         Dialer
 	serverUpgrader Upgrader
 	clientUpgrader Upgrader
-	vdrs           validators.Set // set of current validators in the AVAnet
-	beacons        validators.Set // set of beacons in the AVAnet
+	vdrs           validators.Set // set of current validators in the Avalanche network
+	beacons        validators.Set // set of beacons in the Avalanche network
 	router         router.Router  // router must be thread safe
 
 	nodeID uint32
@@ -142,7 +140,7 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs    map[string]struct{} // set of IPs that resulted in my ID.
 	peers    map[[20]byte]*peer
-	handlers []Handler
+	handlers []validators.Connector
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -228,20 +226,23 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
-	net := &network{
-		log:                                log,
-		id:                                 id,
-		ip:                                 ip,
-		networkID:                          networkID,
-		version:                            version,
-		parser:                             parser,
-		listener:                           listener,
-		dialer:                             dialer,
-		serverUpgrader:                     serverUpgrader,
-		clientUpgrader:                     clientUpgrader,
-		vdrs:                               vdrs,
-		beacons:                            beacons,
-		router:                             router,
+	netw := &network{
+		log:            log,
+		id:             id,
+		ip:             ip,
+		networkID:      networkID,
+		version:        version,
+		parser:         parser,
+		listener:       listener,
+		dialer:         dialer,
+		serverUpgrader: serverUpgrader,
+		clientUpgrader: clientUpgrader,
+		vdrs:           vdrs,
+		beacons:        beacons,
+		router:         router,
+		// This field just makes sure we don't connect to ourselves when TLS is
+		// disabled. So, cryptographically secure random number generation isn't
+		// used here.
 		nodeID:                             rand.Uint32(),
 		initialReconnectDelay:              initialReconnectDelay,
 		maxReconnectDelay:                  maxReconnectDelay,
@@ -258,17 +259,18 @@ func NewNetwork(
 		gossipSize:                         gossipSize,
 		pingPongTimeout:                    pingPongTimeout,
 		pingFrequency:                      pingFrequency,
-
-		disconnectedIPs: make(map[string]struct{}),
-		connectedIPs:    make(map[string]struct{}),
-		retryDelay:      make(map[string]time.Duration),
-		myIPs:           map[string]struct{}{ip.String(): {}},
-		peers:           make(map[[20]byte]*peer),
+		disconnectedIPs:                    make(map[string]struct{}),
+		connectedIPs:                       make(map[string]struct{}),
+		retryDelay:                         make(map[string]time.Duration),
+		myIPs:                              map[string]struct{}{ip.String(): {}},
+		peers:                              make(map[[20]byte]*peer),
 	}
-	net.initialize(registerer)
-	net.executor.Initialize()
-	net.heartbeat()
-	return net
+	if err := netw.initialize(registerer); err != nil {
+		log.Warn("initializing network metrics failed with: %s", err)
+	}
+	netw.executor.Initialize()
+	netw.heartbeat()
+	return netw
 }
 
 // GetAcceptedFrontier implements the Sender interface.
@@ -399,7 +401,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
 	msg, err := n.b.GetAncestors(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	if err != nil {
-		n.log.Error("failed to build GetAncestors message: %w", err)
+		n.log.Error("failed to build GetAncestors message: %s", err)
 		return
 	}
 
@@ -653,8 +655,8 @@ func (n *network) Dispatch() error {
 	}
 }
 
-// RegisterHandler implements the Network interface
-func (n *network) RegisterHandler(h Handler) {
+// RegisterConnector implements the Network interface
+func (n *network) RegisterConnector(h validators.Connector) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
@@ -682,7 +684,7 @@ func (n *network) Peers() []PeerID {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.ip.String(),
-				ID:           peer.id,
+				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr,
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
@@ -702,6 +704,9 @@ func (n *network) Close() error {
 
 	n.closed = true
 	err := n.listener.Close()
+	if err != nil {
+		n.log.Debug("closing network listener failed with: %s", err)
+	}
 
 	peersToClose := []*peer(nil)
 	for _, peer := range n.peers {
@@ -725,7 +730,7 @@ func (n *network) Track(ip utils.IPDesc) {
 
 // assumes the stateLock is not held.
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
-	msg, err := n.b.Put(chainID, GossipMsgRequestID, containerID, container)
+	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
@@ -743,9 +748,16 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 		numToGossip = len(allPeers)
 	}
 
-	sampler := random.Uniform{N: len(allPeers)}
-	for i := 0; i < numToGossip; i++ {
-		if allPeers[sampler.Sample()].send(msg) {
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(allPeers))); err != nil {
+		return err
+	}
+	indices, err := s.Sample(numToGossip)
+	if err != nil {
+		return err
+	}
+	for _, index := range indices {
+		if allPeers[int(index)].send(msg) {
 			n.put.numSent.Inc()
 		} else {
 			n.put.numFailed.Inc()
@@ -819,14 +831,43 @@ func (n *network) gossip() {
 			numNonStakersToSend = len(nonStakers)
 		}
 
-		sampler := random.Uniform{N: len(stakers)}
-		for i := 0; i < numStakersToSend; i++ {
-			stakers[sampler.Sample()].send(msg)
+		s := sampler.NewUniform()
+		if err := s.Initialize(uint64(len(stakers))); err != nil {
+			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
+				err,
+				len(stakers))
+			n.stateLock.Unlock()
+			continue
 		}
-		sampler.N = len(nonStakers)
-		sampler.Replace()
-		for i := 0; i < numNonStakersToSend; i++ {
-			nonStakers[sampler.Sample()].send(msg)
+		stakerIndices, err := s.Sample(numStakersToSend)
+		if err != nil {
+			n.log.Error("failed to select stakers to sample: %s. len(stakers): %d",
+				err,
+				len(stakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		for _, index := range stakerIndices {
+			stakers[int(index)].send(msg)
+		}
+
+		if err := s.Initialize(uint64(len(nonStakers))); err != nil {
+			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
+				err,
+				len(nonStakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		nonStakerIndices, err := s.Sample(numNonStakersToSend)
+		if err != nil {
+			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
+				err,
+				len(nonStakers))
+			n.stateLock.Unlock()
+			continue
+		}
+		for _, index := range nonStakerIndices {
+			nonStakers[int(index)].send(msg)
 		}
 		n.stateLock.Unlock()
 	}
@@ -847,6 +888,9 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = n.initialReconnectDelay
 		}
 
+		// Randomization is only performed here to distribute reconnection
+		// attempts to a node that previously shut down. This doesn't require
+		// cryptographically secure random number generation.
 		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
@@ -918,7 +962,9 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	defer n.stateLock.Unlock()
 
 	if n.closed {
-		p.conn.Close()
+		// the network is closing, so make sure that no further reconnect
+		// attempts are made.
+		_ = p.conn.Close()
 		return nil
 	}
 
@@ -937,17 +983,23 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
-		p.conn.Close()
+		// don't attempt to reconnect to myself, so return nil even if closing
+		// returns an error
+		_ = p.conn.Close()
 		return nil
 	}
 
+	// If I am already connected to this peer, then I should close this new
+	// connection.
 	if _, ok := n.peers[key]; ok {
 		if !p.ip.IsZero() {
 			str := p.ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		p.conn.Close()
+		// I'm already connected to this peer, so don't attempt to reconnect to
+		// this ip, even if an error occurres during closing
+		_ = p.conn.Close()
 		return nil
 	}
 

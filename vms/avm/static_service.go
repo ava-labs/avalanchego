@@ -9,9 +9,10 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
@@ -44,7 +45,7 @@ type BuildGenesisReply struct {
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	errs := wrappers.Errs{}
 
 	c := codec.NewDefault()
@@ -69,9 +70,9 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		asset := GenesisAsset{
 			Alias: assetAlias,
 			CreateAssetTx: CreateAssetTx{
-				BaseTx: BaseTx{
-					BCID: ids.Empty,
-				},
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					BlockchainID: ids.Empty,
+				}},
 				Name:         assetDefinition.Name,
 				Symbol:       assetDefinition.Symbol,
 				Denomination: byte(assetDefinition.Denomination),
@@ -93,11 +94,11 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 						if err := json.Unmarshal(b, &holder); err != nil {
 							return err
 						}
-						cb58 := formatting.CB58{}
-						if err := cb58.FromString(holder.Address); err != nil {
+						_, addrbuff, err := formatting.ParseBech32(holder.Address)
+						if err != nil {
 							return err
 						}
-						addr, err := ids.ToShortID(cb58.Bytes)
+						addr, err := ids.ToShortID(addrbuff)
 						if err != nil {
 							return err
 						}
@@ -126,11 +127,11 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 							},
 						}
 						for _, address := range owners.Minters {
-							cb58 := formatting.CB58{}
-							if err := cb58.FromString(address); err != nil {
+							_, addrbuff, err := formatting.ParseBech32(address)
+							if err != nil {
 								return err
 							}
-							addr, err := ids.ToShortID(cb58.Bytes)
+							addr, err := ids.ToShortID(addrbuff)
 							if err != nil {
 								return err
 							}

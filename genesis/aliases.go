@@ -4,7 +4,7 @@
 package genesis
 
 import (
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/platformvm"
@@ -18,16 +18,16 @@ import (
 // Aliases returns the default aliases based on the network ID
 func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[[32]byte][]string, error) {
 	generalAliases := map[string][]string{
-		"vm/" + platformvm.ID.String():  {"vm/platform"},
-		"vm/" + avm.ID.String():         {"vm/avm"},
-		"vm/" + EVMID.String():          {"vm/evm"},
-		"vm/" + spdagvm.ID.String():     {"vm/spdag"},
-		"vm/" + spchainvm.ID.String():   {"vm/spchain"},
-		"vm/" + timestampvm.ID.String(): {"vm/timestamp"},
-		"bc/" + ids.Empty.String():      {"P", "platform", "bc/P", "bc/platform"},
+		"vm/" + platformvm.ID.String():             {"vm/platform"},
+		"vm/" + avm.ID.String():                    {"vm/avm"},
+		"vm/" + EVMID.String():                     {"vm/evm"},
+		"vm/" + spdagvm.ID.String():                {"vm/spdag"},
+		"vm/" + spchainvm.ID.String():              {"vm/spchain"},
+		"vm/" + timestampvm.ID.String():            {"vm/timestamp"},
+		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
 	}
 	chainAliases := map[[32]byte][]string{
-		ids.Empty.Key(): {"P", "platform"},
+		constants.PlatformChainID.Key(): {"P", "platform"},
 	}
 	vmAliases := map[[32]byte][]string{
 		platformvm.ID.Key():  {"platform"},
@@ -41,7 +41,7 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 		propertyfx.ID.Key():  {"propertyfx"},
 	}
 
-	genesisBytes, err := Genesis(networkID)
+	genesisBytes, _, err := Genesis(networkID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -55,20 +55,21 @@ func Aliases(networkID uint32) (map[string][]string, map[[32]byte][]string, map[
 	}
 
 	for _, chain := range genesis.Chains {
+		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
 		switch {
-		case avm.ID.Equals(chain.VMID):
+		case avm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
 			chainAliases[chain.ID().Key()] = []string{"X", "avm"}
-		case EVMID.Equals(chain.VMID):
+		case EVMID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
 			chainAliases[chain.ID().Key()] = []string{"C", "evm"}
-		case spdagvm.ID.Equals(chain.VMID):
+		case spdagvm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/spdag"}
 			chainAliases[chain.ID().Key()] = []string{"spdag"}
-		case spchainvm.ID.Equals(chain.VMID):
+		case spchainvm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/spchain"}
 			chainAliases[chain.ID().Key()] = []string{"spchain"}
-		case timestampvm.ID.Equals(chain.VMID):
+		case timestampvm.ID.Equals(uChain.VMID):
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
 			chainAliases[chain.ID().Key()] = []string{"timestamp"}
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
@@ -17,7 +18,7 @@ import (
 
 var (
 	txBytes  = []byte{0, 1, 2, 3, 4, 5}
-	sigBytes = [crypto.SECP256K1RSigLen]byte{
+	sigBytes = [crypto.SECP256K1RSigLen]byte{ // signature of addr on txBytes
 		0x0e, 0x33, 0x4e, 0xbc, 0x67, 0xa7, 0x3f, 0xe8,
 		0x24, 0x33, 0xac, 0xa3, 0x47, 0x88, 0xa6, 0x3d,
 		0x58, 0xe5, 0x8e, 0xf0, 0x3a, 0xd5, 0x84, 0xf1,
@@ -33,7 +34,21 @@ var (
 		0x84, 0x5c, 0x8c, 0x4e, 0x30, 0xbe, 0xd9, 0x8d,
 		0x39, 0x1a, 0xe7, 0xf0,
 	}
+	addr       = ids.NewShortID(addrBytes)
+	addr2Bytes [hashing.AddrLen]byte
+	addr2      ids.ShortID
+	sig2Bytes  [crypto.SECP256K1RSigLen]byte // signature of addr2 on txBytes
 )
+
+func init() {
+	cb58 := formatting.CB58{}
+	cb58.FromString("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
+	copy(addr2Bytes[:], cb58.Bytes)
+	addr2 = ids.NewShortID(addr2Bytes)
+	cb58.FromString("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
+	copy(sig2Bytes[:], cb58.Bytes)
+
+}
 
 type testVM struct{ clock timer.Clock }
 
@@ -42,10 +57,6 @@ func (vm *testVM) Codec() codec.Codec { return codec.NewDefault() }
 func (vm *testVM) Clock() *timer.Clock { return &vm.clock }
 
 func (vm *testVM) Logger() logging.Logger { return logging.NoLog{} }
-
-type testCodec struct{}
-
-func (c *testCodec) RegisterStruct(interface{}) {}
 
 type testTx struct{ bytes []byte }
 
@@ -384,7 +395,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 	cred := &Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
 			sigBytes,
-			[crypto.SECP256K1RSigLen]byte{},
+			{},
 		},
 	}
 
@@ -459,7 +470,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 	cred := &Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
 			sigBytes,
-			[crypto.SECP256K1RSigLen]byte{},
+			{},
 		},
 	}
 
@@ -500,7 +511,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 	}
 	cred := &Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			[crypto.SECP256K1RSigLen]byte{},
+			{},
 		},
 	}
 
@@ -956,5 +967,148 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 	err := fx.VerifyOperation(tx, op, cred, utxos)
 	if err == nil {
 		t.Fatalf("Should have errored due to the wrong MintOutput being created")
+	}
+}
+
+func TestVerifyPermission(t *testing.T) {
+	vm := testVM{}
+	fx := Fx{}
+	if err := fx.Initialize(&vm); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	type test struct {
+		description string
+		tx          Tx
+		in          *Input
+		cred        *Credential
+		cg          *OutputOwners
+		shouldErr   bool
+	}
+	tests := []test{
+		{
+			"threshold 0, no sigs, has addrs",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
+			&OutputOwners{
+				Threshold: 0,
+				Addrs:     []ids.ShortID{addr},
+			},
+			true,
+		},
+		{
+			"threshold 0, no sigs, no addrs",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
+			&OutputOwners{
+				Threshold: 0,
+				Addrs:     []ids.ShortID{},
+			},
+			false,
+		},
+		{
+			"threshold 1, 1 sig",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+			false,
+		},
+		{
+			"threshold 0, 1 sig (too many sigs)",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&OutputOwners{
+				Threshold: 0,
+				Addrs:     []ids.ShortID{addr},
+			},
+			true,
+		},
+		{
+			"threshold 1, 0 sigs (too few sigs)",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
+			&OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+			true,
+		},
+		{
+			"threshold 1, 1 incorrect sig",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
+			true,
+		},
+		{
+			"repeated sig",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0, 0}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
+			&OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, addr2},
+			},
+			true,
+		},
+		{
+			"threshold 2, repeated address and repeated sig",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0, 1}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
+			&OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, addr},
+			},
+			true,
+		},
+		{
+			"threshold 2, 2 sigs",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{0, 1}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
+			&OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, addr2},
+			},
+			false,
+		},
+		{
+			"threshold 2, 2 sigs reversed (should be sorted)",
+			&testTx{bytes: txBytes},
+			&Input{SigIndices: []uint32{1, 0}},
+			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sig2Bytes, sigBytes}},
+			&OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, addr2},
+			},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		if err := fx.VerifyPermission(test.tx, test.in, test.cred, test.cg); err != nil && !test.shouldErr {
+			t.Fatalf("test '%s' errored but it shouldn't have: %s", test.description, err)
+		} else if err == nil && test.shouldErr {
+			t.Fatalf("test '%s' should have errored but didn't", test.description)
+		}
 	}
 }

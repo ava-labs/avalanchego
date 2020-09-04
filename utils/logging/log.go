@@ -7,7 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -54,8 +54,7 @@ func (l *Log) run() {
 	l.writeLock.Lock()
 	defer l.writeLock.Unlock()
 
-	err := l.writer.Initialize(l.config)
-	if err != nil {
+	if err := l.writer.Initialize(l.config); err != nil {
 		panic(err)
 	}
 
@@ -81,23 +80,27 @@ func (l *Log) run() {
 		}
 
 		if !l.config.DisableFlushOnWrite {
-			l.writer.Flush()
+			// attempt to flush after the write
+			_ = l.writer.Flush()
 		}
 
 		if now := time.Now(); nextRotation.Before(now) || currentSize > l.config.FileSize {
 			nextRotation = now.Add(l.config.RotationInterval)
 			currentSize = 0
-			l.writer.Flush()
-			l.writer.Close()
+			// attempt to flush before closing
+			_ = l.writer.Flush()
+			// attempt to close the file
+			_ = l.writer.Close()
 
-			err = l.writer.Rotate()
-			if err != nil {
+			if err := l.writer.Rotate(); err != nil {
 				panic(err)
 			}
 		}
 	}
-	l.writer.Flush()
-	l.writer.Close()
+	// attempt to flush when exiting
+	_ = l.writer.Flush()
+	// attempt to close the file when exiting
+	_ = l.writer.Close()
 }
 
 func (l *Log) Write(p []byte) (int, error) {
@@ -146,6 +149,8 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 	if shouldDisplay {
 		if l.config.DisableContextualDisplaying {
 			fmt.Println(fmt.Sprintf(format, args...))
+		} else if l.config.DisplayHighlight == Plain {
+			fmt.Print(output)
 		} else {
 			fmt.Print(level.Color().Wrap(output))
 		}
@@ -346,7 +351,7 @@ func (fw *fileWriter) Rotate() error {
 }
 
 func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
-	filename := path.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
+	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
 	file, err := os.Create(filename)
 	if err != nil {
 		return nil, nil, err

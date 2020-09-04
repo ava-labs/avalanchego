@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	errLockedFunds = errors.New("funds currently locked")
-	errCantSpend   = errors.New("utxo couldn't be spent")
+	errCantSpend = errors.New("unable to spend this UTXO")
 )
 
 // Keychain is a collection of keys that can be used to spend outputs
@@ -80,6 +79,7 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 				SigIndices: sigIndices,
 			}, keys, nil
 		}
+		return nil, nil, errCantSpend
 	case *TransferOutput:
 		if sigIndices, keys, able := kc.Match(&out.OutputOwners, time); able {
 			return &TransferInput{
@@ -89,8 +89,9 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 				},
 			}, keys, nil
 		}
+		return nil, nil, errCantSpend
 	}
-	return nil, nil, errCantSpend
+	return nil, nil, fmt.Errorf("can't spend UTXO because it is unexpected type %T", out)
 }
 
 // Match attempts to match a list of addresses up to the provided threshold
@@ -98,8 +99,8 @@ func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*crypt
 	if time < owners.Locktime {
 		return nil, nil, false
 	}
-	sigs := []uint32{}
-	keys := []*crypto.PrivateKeySECP256K1R{}
+	sigs := make([]uint32, 0, owners.Threshold)
+	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 	for i := uint32(0); i < uint32(len(owners.Addrs)) && uint32(len(keys)) < owners.Threshold; i++ {
 		if key, exists := kc.Get(owners.Addrs[i]); exists {
 			sigs = append(sigs, i)

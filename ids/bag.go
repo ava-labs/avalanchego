@@ -58,8 +58,12 @@ func (b *Bag) Add(ids ...ID) {
 
 // AddCount increases the nubmer of times the id has been seen by count.
 //
-// count must be >= 1
+// count must be >= 0
 func (b *Bag) AddCount(id ID, count int) {
+	if count <= 0 {
+		return
+	}
+
 	b.init()
 
 	totalCount := b.counts[*id.ID] + count
@@ -86,7 +90,7 @@ func (b *Bag) Len() int { return b.size }
 
 // List returns a list of all ids that have been added.
 func (b *Bag) List() []ID {
-	idList := make([]ID, len(b.counts), len(b.counts))
+	idList := make([]ID, len(b.counts))
 	i := 0
 	for id := range b.counts {
 		idList[i] = NewID(id)

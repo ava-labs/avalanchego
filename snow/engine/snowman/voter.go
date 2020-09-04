@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
+// Voter records chits received from [vdr] once its dependencies are met.
 type voter struct {
 	t         *Transitive
 	vdr       ids.ShortID
@@ -17,11 +18,13 @@ type voter struct {
 
 func (v *voter) Dependencies() ids.Set { return v.deps }
 
+// Mark that a dependency has been met.
 func (v *voter) Fulfill(id ids.ID) {
 	v.deps.Remove(id)
 	v.Update()
 }
 
+// Abandon this attempt to record chits.
 func (v *voter) Abandon(id ids.ID) { v.Fulfill(id) }
 
 func (v *voter) Update() {
@@ -45,20 +48,20 @@ func (v *voter) Update() {
 	// must be bubbled to the nearest valid block
 	results = v.bubbleVotes(results)
 
-	v.t.Config.Context.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
-	if err := v.t.consensus.RecordPoll(results); err != nil {
+	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
+	if err := v.t.Consensus.RecordPoll(results); err != nil {
 		v.t.errs.Add(err)
 		return
 	}
 
-	v.t.VM.SetPreference(v.t.consensus.Preference())
+	v.t.VM.SetPreference(v.t.Consensus.Preference())
 
-	if v.t.consensus.Finalized() {
-		v.t.Config.Context.Log.Debug("Snowman engine can quiesce")
+	if v.t.Consensus.Finalized() {
+		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
 		return
 	}
 
-	v.t.Config.Context.Log.Debug("Snowman engine can't quiesce")
+	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
 	v.t.repoll()
 }
 
@@ -71,11 +74,11 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 			continue
 		}
 
-		for blk.Status().Fetched() && !v.t.consensus.Issued(blk) {
+		for blk.Status().Fetched() && !v.t.Consensus.Issued(blk) {
 			blk = blk.Parent()
 		}
 
-		if !blk.Status().Decided() && v.t.consensus.Issued(blk) {
+		if !blk.Status().Decided() && v.t.Consensus.Issued(blk) {
 			bubbledVotes.AddCount(blk.ID(), count)
 		}
 	}

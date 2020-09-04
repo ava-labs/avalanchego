@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-
 	"github.com/ava-labs/gecko/snow/validators"
 )
 
@@ -18,9 +17,9 @@ func TestAwaiter(t *testing.T) {
 	vdrID3 := ids.NewShortID([20]byte{3})
 
 	s := validators.NewSet()
-	s.Add(validators.NewValidator(vdrID0, 1))
-	s.Add(validators.NewValidator(vdrID1, 1))
-	s.Add(validators.NewValidator(vdrID3, 1))
+	s.AddWeight(vdrID0, 1)
+	s.AddWeight(vdrID1, 1)
+	s.AddWeight(vdrID3, 1)
 
 	called := make(chan struct{}, 1)
 	aw := NewAwaiter(s, 3, func() {

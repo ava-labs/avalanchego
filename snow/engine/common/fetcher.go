@@ -11,12 +11,6 @@ type Fetcher struct {
 	// tracks which validators were asked for which containers in which requests
 	OutstandingRequests Requests
 
-	// true if bootstrapping is done
-	Finished bool
-
-	// Non-zero if bootstrapped. Should only be accessed atomically.
-	AtomicBootstrapped uint32
-
 	// Called when bootstrapping is done
 	OnFinished func() error
 }

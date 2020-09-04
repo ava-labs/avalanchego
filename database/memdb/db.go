@@ -98,7 +98,9 @@ func (db *Database) Delete(key []byte) error {
 func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
 
 // NewIterator implements the Database interface
-func (db *Database) NewIterator() database.Iterator { return db.NewIteratorWithStartAndPrefix(nil, nil) }
+func (db *Database) NewIterator() database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
+}
 
 // NewIteratorWithStart implements the Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
@@ -142,7 +144,15 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 func (db *Database) Stat(property string) (string, error) { return "", database.ErrNotFound }
 
 // Compact implements the Database interface
-func (db *Database) Compact(start []byte, limit []byte) error { return nil }
+func (db *Database) Compact(start []byte, limit []byte) error {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.db == nil {
+		return database.ErrClosed
+	}
+	return nil
+}
 
 type keyValue struct {
 	key    []byte

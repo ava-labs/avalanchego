@@ -19,6 +19,10 @@ import (
 // maxSize is the maximum allowed vertex size. It is necessary to deter DoS.
 const maxSize = 1 << 20
 
+const (
+	version uint16 = 0
+)
+
 var (
 	errBadCodec       = errors.New("invalid codec")
 	errBadEpoch       = errors.New("invalid epoch")
@@ -26,6 +30,7 @@ var (
 	errInvalidParents = errors.New("vertex contains non-sorted or duplicated parentIDs")
 	errInvalidTxs     = errors.New("vertex contains non-sorted or duplicated transactions")
 	errNoTxs          = errors.New("vertex contains no transactions")
+	errConflictingTxs = errors.New("vertex contains conflicting transactions")
 )
 
 type innerVertex struct {
@@ -51,9 +56,18 @@ func (vtx *innerVertex) Verify() error {
 		return errNoTxs
 	case !isSortedAndUniqueTxs(vtx.txs):
 		return errInvalidTxs
-	default:
-		return nil
 	}
+
+	inputIDs := ids.Set{}
+	for _, tx := range vtx.txs {
+		inputs := tx.InputIDs()
+		if inputs.Overlaps(inputIDs) {
+			return errConflictingTxs
+		}
+		inputIDs.Union(inputs)
+	}
+
+	return nil
 }
 
 /*
@@ -75,7 +89,7 @@ func (vtx *innerVertex) Verify() error {
 func (vtx *innerVertex) Marshal() ([]byte, error) {
 	p := wrappers.Packer{MaxSize: maxSize}
 
-	p.PackInt(uint32(CustomID))
+	p.PackShort(version)
 	p.PackFixedBytes(vtx.chainID.Bytes())
 	p.PackLong(vtx.height)
 	p.PackInt(0)
@@ -97,7 +111,7 @@ func (vtx *innerVertex) Marshal() ([]byte, error) {
 func (vtx *innerVertex) Unmarshal(b []byte, vm vertex.DAGVM) error {
 	p := wrappers.Packer{Bytes: b}
 
-	if codecID := ID(p.UnpackInt()); codecID != CustomID {
+	if codecID := p.UnpackShort(); codecID != version {
 		p.Add(errBadCodec)
 	}
 

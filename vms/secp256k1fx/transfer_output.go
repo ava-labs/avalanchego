@@ -27,7 +27,7 @@ func (out *TransferOutput) Verify() error {
 	case out == nil:
 		return errNilOutput
 	case out.Amt == 0:
-		return errNoValueInput
+		return errNoValueOutput
 	default:
 		return out.OutputOwners.Verify()
 	}
@@ -35,3 +35,6 @@ func (out *TransferOutput) Verify() error {
 
 // VerifyState ...
 func (out *TransferOutput) VerifyState() error { return out.Verify() }
+
+// Owners ...
+func (out *TransferOutput) Owners() interface{} { return &out.OutputOwners }

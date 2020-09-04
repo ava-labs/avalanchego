@@ -15,7 +15,7 @@ type noEarlyTermFactory struct{}
 // termination
 func NewNoEarlyTermFactory() Factory { return noEarlyTermFactory{} }
 
-func (noEarlyTermFactory) New(vdrs ids.ShortSet) Poll {
+func (noEarlyTermFactory) New(vdrs ids.ShortBag) Poll {
 	return &noEarlyTermPoll{polled: vdrs}
 }
 
@@ -23,22 +23,19 @@ func (noEarlyTermFactory) New(vdrs ids.ShortSet) Poll {
 // query or a timeout occurs
 type noEarlyTermPoll struct {
 	votes  ids.UniqueBag
-	polled ids.ShortSet
+	polled ids.ShortBag
 }
 
 // Vote registers a response for this poll
 func (p *noEarlyTermPoll) Vote(vdr ids.ShortID, votes []ids.ID) {
-	if !p.polled.Contains(vdr) {
-		// if the validator wasn't polled or already responded to this poll, we
-		// should just drop the vote
-		return
-	}
-
+	count := p.polled.Count(vdr)
 	// make sure that a validator can't respond multiple times
 	p.polled.Remove(vdr)
 
-	// track the votes the validator responded with
-	p.votes.Add(uint(p.polled.Len()), votes...)
+	for i := 0; i < count; i++ {
+		// track the votes the validator responded with
+		p.votes.Add(uint(p.polled.Len()+i), votes...)
+	}
 }
 
 // Finished returns true when all validators have voted
@@ -47,6 +44,8 @@ func (p *noEarlyTermPoll) Finished() bool { return p.polled.Len() == 0 }
 // Result returns the result of this poll
 func (p *noEarlyTermPoll) Result() ids.UniqueBag { return p.votes }
 
-func (p *noEarlyTermPoll) String() string {
-	return fmt.Sprintf("waiting on %s", p.polled)
+func (p *noEarlyTermPoll) PrefixedString(prefix string) string {
+	return fmt.Sprintf("waiting on %s", p.polled.PrefixedString(prefix))
 }
+
+func (p *noEarlyTermPoll) String() string { return p.PrefixedString("") }
