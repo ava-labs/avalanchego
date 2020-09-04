@@ -10,11 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/hashing"
-
-	"github.com/ava-labs/gecko/utils/timer"
-
 	jwt "github.com/dgrijalva/jwt-go"
+
+	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 var (

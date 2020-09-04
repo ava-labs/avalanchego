@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"sync"
 
-	pw "github.com/ava-labs/gecko/utils/password"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/api"
@@ -26,6 +24,7 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 
 	jsoncodec "github.com/ava-labs/gecko/utils/json"
+	pw "github.com/ava-labs/gecko/utils/password"
 )
 
 const (
