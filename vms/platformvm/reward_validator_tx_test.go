@@ -121,7 +121,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 		vdrEndTime,
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
-		NumberOfShares/4,
+		PercentDenominator/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 	)
 	if err != nil {

@@ -156,7 +156,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 				ID:        id.PrefixedString(constants.NodeIDPrefix),
 			},
 			RewardAddress:     addr,
-			DelegationFeeRate: NumberOfShares,
+			DelegationFeeRate: PercentDenominator,
 		}
 	}
 
@@ -339,7 +339,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		ID,
 		ID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -415,7 +415,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		ID,
 		ID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -461,7 +461,7 @@ func TestAddValidatorReject(t *testing.T) {
 		uint64(endTime.Unix()),
 		ID,
 		ID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -1898,7 +1898,7 @@ func TestNextValidatorStartTime(t *testing.T) {
 		uint64(endTime.Unix()),                  // end time
 		vm.Ctx.NodeID,                           // node ID
 		ids.GenerateTestShortID(),               // reward address
-		NumberOfShares,                          // shares
+		PercentDenominator,                      // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	assert.NoError(t, err)

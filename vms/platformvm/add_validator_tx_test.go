@@ -43,7 +43,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -63,7 +63,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -83,7 +83,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -113,7 +113,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -137,7 +137,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -177,7 +177,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -197,7 +197,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -217,7 +217,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -237,7 +237,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -269,7 +269,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -285,7 +285,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID, // node ID
 		nodeID, // reward address
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -301,12 +301,12 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,              // stake amount
-		uint64(startTime.Unix()), // start time
+		vm.minStake,                                          // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
-		nodeID,                                  // node ID
+		nodeID, // node ID
 		key2.PublicKey().Address(),              // reward address
-		NumberOfShares,                          // shares
+		PercentDenominator,                      // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
@@ -325,7 +325,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)

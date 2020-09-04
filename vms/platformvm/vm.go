@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
@@ -50,15 +51,24 @@ const (
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
 
-	// NumberOfShares is the number of shares that a delegator is
-	// rewarded
-	NumberOfShares = 1000000
+	// PercentDenominator is the denominator used to calculate percentages
+	PercentDenominator = 1000000
+
+	droppedTxCacheSize = 50
+
+	maxUTXOsToFetch = 1024
 
 	// TODO: Turn these constants into governable parameters
 
-	// InflationRate is the inflation rate from staking
-	// TODO: make inflation rate non-zero
-	InflationRate = 1.00
+	// MaxSubMinConsumptionRate is the % consumption that incentivizes staking
+	// longer
+	MaxSubMinConsumptionRate = 20000 // 2%
+	// MinConsumptionRate is the minimum % consumption of the remaining tokens
+	// to be minted
+	MinConsumptionRate = 100000 // 10%
+
+	// SupplyCap is the maximum amount of AVAX that should ever exist
+	SupplyCap = 720 * units.MegaAvax
 
 	// MinimumStakingDuration is the shortest amount of time a staker can bond
 	// their funds for.
@@ -67,10 +77,6 @@ const (
 	// MaximumStakingDuration is the longest amount of time a staker can bond
 	// their funds for.
 	MaximumStakingDuration = 365 * 24 * time.Hour
-
-	droppedTxCacheSize = 50
-
-	maxUTXOsToFetch = 1024
 )
 
 var (

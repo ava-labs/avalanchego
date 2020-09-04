@@ -44,7 +44,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
 		nodeID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {

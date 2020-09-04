@@ -202,11 +202,11 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		reward := reward(uStakerTx.Validator.Duration(), uStakerTx.Validator.Wght, InflationRate)
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
-		delegatorShares := NumberOfShares - uint64(vdr.Shares)         // parentTx.Shares <= NumberOfShares so no underflow
-		delegatorReward := delegatorShares * (reward / NumberOfShares) // delegatorShares <= NumberOfShares so no overflow
+		delegatorShares := PercentDenominator - uint64(vdr.Shares)         // parentTx.Shares <= NumberOfShares so no underflow
+		delegatorReward := delegatorShares * (reward / PercentDenominator) // delegatorShares <= NumberOfShares so no overflow
 		// Delay rounding as long as possible for small numbers
 		if optimisticReward, err := safemath.Mul64(delegatorShares, reward); err == nil {
-			delegatorReward = optimisticReward / NumberOfShares
+			delegatorReward = optimisticReward / PercentDenominator
 		}
 		delegateeReward := reward - delegatorReward // delegatorReward <= reward so no underflow
 
