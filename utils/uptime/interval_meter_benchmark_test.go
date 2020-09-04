@@ -16,7 +16,7 @@ func BenchmarkIntervalMeterSeconds(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		currentTime = currentTime.Add(4 * time.Second)
+		currentTime = currentTime.Add(10*time.Second + 500*time.Millisecond)
 		m.clock.Set(currentTime)
 		time.Now()
 
