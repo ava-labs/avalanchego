@@ -9,19 +9,19 @@ type test struct {
 
 func TestSufficientlyStrong(t *testing.T) {
 	tests := []test{
-		test{
+		{
 			"",
 			VeryWeak,
 		},
-		test{
+		{
 			"a",
 			VeryWeak,
 		},
-		test{
+		{
 			"password",
 			VeryWeak,
 		},
-		test{
+		{
 			"thisisareallylongandpresumablyverystrongpassword",
 			VeryStrong,
 		},

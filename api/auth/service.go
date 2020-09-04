@@ -27,7 +27,7 @@ func NewService(log logging.Logger, auth *Auth) *common.HTTPHandler {
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Service{Auth: auth, log: log}, "auth")
+	log.AssertNoError(newServer.RegisterService(&Service{Auth: auth, log: log}, "auth"))
 	return &common.HTTPHandler{Handler: newServer}
 }
 

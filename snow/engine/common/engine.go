@@ -14,6 +14,9 @@ type Engine interface {
 
 	// Return the context of the chain this engine is working on
 	Context() *snow.Context
+
+	// Returns true iff the chain is done bootstrapping
+	IsBootstrapped() bool
 }
 
 // Handler defines the functions that are acted on the node
@@ -32,7 +35,8 @@ type ExternalHandler interface {
 }
 
 // FrontierHandler defines how a consensus engine reacts to frontier messages
-// from other validators. Functions only return fatal errors if they occur.
+// from other validators. Returned errors should be treated as fatal and require
+// the chain to shutdown.
 type FrontierHandler interface {
 	// Notify this engine of a request for the accepted frontier of vertices.
 	//

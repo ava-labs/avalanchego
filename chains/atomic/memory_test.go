@@ -16,48 +16,48 @@ var (
 	blockchainID1 = ids.Empty.Prefix(1)
 )
 
-func TestSharedMemorySharedID(t *testing.T) {
-	sm := SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+func TestMemorySharedID(t *testing.T) {
+	m := Memory{}
+	m.Initialize(logging.NoLog{}, memdb.New())
 
-	sharedID0 := sm.sharedID(blockchainID0, blockchainID1)
-	sharedID1 := sm.sharedID(blockchainID1, blockchainID0)
+	sharedID0 := m.sharedID(blockchainID0, blockchainID1)
+	sharedID1 := m.sharedID(blockchainID1, blockchainID0)
 
 	if !sharedID0.Equals(sharedID1) {
 		t.Fatalf("SharedMemory.sharedID should be communitive")
 	}
 }
 
-func TestSharedMemoryMakeReleaseLock(t *testing.T) {
-	sm := SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+func TestMemoryMakeReleaseLock(t *testing.T) {
+	m := Memory{}
+	m.Initialize(logging.NoLog{}, memdb.New())
 
-	sharedID := sm.sharedID(blockchainID0, blockchainID1)
+	sharedID := m.sharedID(blockchainID0, blockchainID1)
 
-	lock0 := sm.makeLock(sharedID)
+	lock0 := m.makeLock(sharedID)
 
-	if lock1 := sm.makeLock(sharedID); lock0 != lock1 {
-		t.Fatalf("SharedMemory.makeLock should have returned the same lock")
+	if lock1 := m.makeLock(sharedID); lock0 != lock1 {
+		t.Fatalf("Memory.makeLock should have returned the same lock")
 	}
-	sm.releaseLock(sharedID)
+	m.releaseLock(sharedID)
 
-	if lock2 := sm.makeLock(sharedID); lock0 != lock2 {
-		t.Fatalf("SharedMemory.makeLock should have returned the same lock")
+	if lock2 := m.makeLock(sharedID); lock0 != lock2 {
+		t.Fatalf("Memory.makeLock should have returned the same lock")
 	}
-	sm.releaseLock(sharedID)
-	sm.releaseLock(sharedID)
+	m.releaseLock(sharedID)
+	m.releaseLock(sharedID)
 
-	if lock3 := sm.makeLock(sharedID); lock0 == lock3 {
-		t.Fatalf("SharedMemory.releaseLock should have returned freed the lock")
+	if lock3 := m.makeLock(sharedID); lock0 == lock3 {
+		t.Fatalf("Memory.releaseLock should have returned freed the lock")
 	}
-	sm.releaseLock(sharedID)
+	m.releaseLock(sharedID)
 }
 
-func TestSharedMemoryUnknownFree(t *testing.T) {
-	sm := SharedMemory{}
-	sm.Initialize(logging.NoLog{}, memdb.New())
+func TestMemoryUnknownFree(t *testing.T) {
+	m := Memory{}
+	m.Initialize(logging.NoLog{}, memdb.New())
 
-	sharedID := sm.sharedID(blockchainID0, blockchainID1)
+	sharedID := m.sharedID(blockchainID0, blockchainID1)
 
 	defer func() {
 		if recover() == nil {
@@ -65,5 +65,5 @@ func TestSharedMemoryUnknownFree(t *testing.T) {
 		}
 	}()
 
-	sm.releaseLock(sharedID)
+	m.releaseLock(sharedID)
 }

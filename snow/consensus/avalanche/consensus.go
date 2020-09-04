@@ -6,7 +6,6 @@ package avalanche
 import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
@@ -24,7 +23,7 @@ type Consensus interface {
 	// called, the status maps should be immediately updated accordingly.
 	// Assumes each element in the accepted frontier will return accepted from
 	// the join status map.
-	Initialize(*snow.Context, Parameters, []Vertex)
+	Initialize(*snow.Context, Parameters, []Vertex) error
 
 	// Returns the parameters that describe this avalanche instance
 	Parameters() Parameters
@@ -68,21 +67,4 @@ type Consensus interface {
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
 	Finalized() bool
-}
-
-// Vertex is a collection of multiple transactions tied to other vertices
-type Vertex interface {
-	choices.Decidable
-
-	// Returns the vertices this vertex depends on
-	Parents() []Vertex
-
-	// Returns the height of this vertex. A vertex's height is defined by one
-	// greater than the maximum height of the parents.
-	Height() uint64
-
-	// Returns a series of state transitions to be performed on acceptance
-	Txs() []snowstorm.Tx
-
-	Bytes() []byte
 }

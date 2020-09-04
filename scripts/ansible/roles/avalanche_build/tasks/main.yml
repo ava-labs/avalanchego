@@ -1,0 +1,13 @@
+- name: Update git clone
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_folder }}"
+    version: "{{ repo_branch }}"
+    update: yes
+
+- name: Build project
+  command: ./scripts/build.sh
+  args:
+    chdir: "{{ repo_folder }}"
+  environment:
+    PATH: /sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin:/snap/bin

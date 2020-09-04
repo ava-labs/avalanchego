@@ -3,6 +3,7 @@ package nftfx
 import (
 	"testing"
 
+	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
@@ -24,7 +25,7 @@ func TestMintOperationVerifyTooLargePayload(t *testing.T) {
 
 func TestMintOperationVerifyInvalidOutput(t *testing.T) {
 	op := MintOperation{
-		Outputs: []*secp256k1fx.OutputOwners{&secp256k1fx.OutputOwners{
+		Outputs: []*secp256k1fx.OutputOwners{{
 			Threshold: 1,
 		}},
 	}
@@ -35,9 +36,16 @@ func TestMintOperationVerifyInvalidOutput(t *testing.T) {
 
 func TestMintOperationOuts(t *testing.T) {
 	op := MintOperation{
-		Outputs: []*secp256k1fx.OutputOwners{&secp256k1fx.OutputOwners{}},
+		Outputs: []*secp256k1fx.OutputOwners{{}},
 	}
 	if outs := op.Outs(); len(outs) != 1 {
 		t.Fatalf("Wrong number of outputs returned")
+	}
+}
+
+func TestMintOperationState(t *testing.T) {
+	intf := interface{}(&MintOperation{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

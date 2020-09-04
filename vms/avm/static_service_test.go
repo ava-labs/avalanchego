@@ -5,11 +5,31 @@ package avm
 
 import (
 	"testing"
+
+	"github.com/ava-labs/gecko/utils/constants"
+
+	"github.com/ava-labs/gecko/utils/formatting"
+)
+
+var addrStrArray = []string{
+	"A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy",
+	"6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv",
+	"6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa",
+	"Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
+}
+
+var (
+	testHRP = constants.NetworkIDToHRP[networkID]
 )
 
 func TestBuildGenesis(t *testing.T) {
 	ss := StaticService{}
-
+	var addrMap = map[string]string{}
+	for _, addrStr := range addrStrArray {
+		cb58 := formatting.CB58{}
+		cb58.FromString(addrStr)
+		addrMap[addrStr], _ = formatting.FormatBech32(testHRP, cb58.Bytes)
+	}
 	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
 			Name:         "myFixedCapAsset",
@@ -19,19 +39,19 @@ func TestBuildGenesis(t *testing.T) {
 				"fixedCap": {
 					Holder{
 						Amount:  100000,
-						Address: "A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy",
+						Address: addrMap["A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy"],
 					},
 					Holder{
 						Amount:  100000,
-						Address: "6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv",
+						Address: addrMap["6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv"],
 					},
 					Holder{
 						Amount:  50000,
-						Address: "6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa",
+						Address: addrMap["6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa"],
 					},
 					Holder{
 						Amount:  50000,
-						Address: "Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
+						Address: addrMap["Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7"],
 					},
 				},
 			},
@@ -44,15 +64,15 @@ func TestBuildGenesis(t *testing.T) {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							"A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy",
-							"6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv",
+							addrMap["A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy"],
+							addrMap["6mxBGnjGDCKgkVe7yfrmvMA7xE7qCv3vv"],
 						},
 					},
 					Owners{
 						Threshold: 2,
 						Minters: []string{
-							"6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa",
-							"Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
+							addrMap["6ncQ19Q2U4MamkCYzshhD8XFjfwAWFzTa"],
+							addrMap["Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7"],
 						},
 					},
 				},
@@ -65,7 +85,7 @@ func TestBuildGenesis(t *testing.T) {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							"A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy",
+							addrMap["A9bTQjfYGBFK3JPRJqF2eh3JYL7cHocvy"],
 						},
 					},
 				},

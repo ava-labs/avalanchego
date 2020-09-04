@@ -36,7 +36,9 @@ func TestCall(t *testing.T) {
 	newServer := rpc.NewServer()
 	newServer.RegisterCodec(json2.NewCodec(), "application/json")
 	newServer.RegisterCodec(json2.NewCodec(), "application/json;charset=UTF-8")
-	newServer.RegisterService(serv, "test")
+	if err := newServer.RegisterService(serv, "test"); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := s.AddRoute(&common.HTTPHandler{Handler: newServer}, new(sync.RWMutex), "vm/lol", "", logging.NoLog{}); err != nil {
 		t.Fatal(err)

@@ -99,13 +99,15 @@ func TestBuildPeerList(t *testing.T) {
 func TestBuildGetAcceptedFrontier(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
+	deadline := uint64(15)
 
-	msg, err := TestBuilder.GetAcceptedFrontier(chainID, requestID)
+	msg, err := TestBuilder.GetAcceptedFrontier(chainID, requestID, deadline)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAcceptedFrontier, msg.Op())
 	assert.Equal(t, chainID.Bytes(), msg.Get(ChainID))
 	assert.Equal(t, requestID, msg.Get(RequestID))
+	assert.Equal(t, deadline, msg.Get(Deadline))
 
 	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
 	assert.NoError(t, err)
@@ -113,6 +115,7 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	assert.Equal(t, GetAcceptedFrontier, parsedMsg.Op())
 	assert.Equal(t, chainID.Bytes(), parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
+	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 }
 
 func TestBuildAcceptedFrontier(t *testing.T) {
@@ -143,17 +146,19 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 func TestBuildGetAccepted(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 	containerIDSet := ids.Set{}
 	containerIDSet.Add(containerID)
 	containerIDs := [][]byte{containerID.Bytes()}
 
-	msg, err := TestBuilder.GetAccepted(chainID, requestID, containerIDSet)
+	msg, err := TestBuilder.GetAccepted(chainID, requestID, deadline, containerIDSet)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetAccepted, msg.Op())
 	assert.Equal(t, chainID.Bytes(), msg.Get(ChainID))
 	assert.Equal(t, requestID, msg.Get(RequestID))
+	assert.Equal(t, deadline, msg.Get(Deadline))
 	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
 	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
@@ -162,6 +167,7 @@ func TestBuildGetAccepted(t *testing.T) {
 	assert.Equal(t, GetAccepted, parsedMsg.Op())
 	assert.Equal(t, chainID.Bytes(), parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
+	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
 }
 
@@ -193,14 +199,16 @@ func TestBuildAccepted(t *testing.T) {
 func TestBuildGet(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := TestBuilder.Get(chainID, requestID, containerID)
+	msg, err := TestBuilder.Get(chainID, requestID, deadline, containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Get, msg.Op())
 	assert.Equal(t, chainID.Bytes(), msg.Get(ChainID))
 	assert.Equal(t, requestID, msg.Get(RequestID))
+	assert.Equal(t, deadline, msg.Get(Deadline))
 	assert.Equal(t, containerID.Bytes(), msg.Get(ContainerID))
 
 	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
@@ -209,6 +217,7 @@ func TestBuildGet(t *testing.T) {
 	assert.Equal(t, Get, parsedMsg.Op())
 	assert.Equal(t, chainID.Bytes(), parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
+	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerID.Bytes(), parsedMsg.Get(ContainerID))
 }
 
@@ -240,15 +249,17 @@ func TestBuildPut(t *testing.T) {
 func TestBuildPushQuery(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 	container := []byte{2}
 
-	msg, err := TestBuilder.PushQuery(chainID, requestID, containerID, container)
+	msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, PushQuery, msg.Op())
 	assert.Equal(t, chainID.Bytes(), msg.Get(ChainID))
 	assert.Equal(t, requestID, msg.Get(RequestID))
+	assert.Equal(t, deadline, msg.Get(Deadline))
 	assert.Equal(t, containerID.Bytes(), msg.Get(ContainerID))
 	assert.Equal(t, container, msg.Get(ContainerBytes))
 
@@ -258,6 +269,7 @@ func TestBuildPushQuery(t *testing.T) {
 	assert.Equal(t, PushQuery, parsedMsg.Op())
 	assert.Equal(t, chainID.Bytes(), parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
+	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerID.Bytes(), parsedMsg.Get(ContainerID))
 	assert.Equal(t, container, parsedMsg.Get(ContainerBytes))
 }
@@ -265,14 +277,16 @@ func TestBuildPushQuery(t *testing.T) {
 func TestBuildPullQuery(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
+	deadline := uint64(15)
 	containerID := ids.Empty.Prefix(1)
 
-	msg, err := TestBuilder.PullQuery(chainID, requestID, containerID)
+	msg, err := TestBuilder.PullQuery(chainID, requestID, deadline, containerID)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, PullQuery, msg.Op())
 	assert.Equal(t, chainID.Bytes(), msg.Get(ChainID))
 	assert.Equal(t, requestID, msg.Get(RequestID))
+	assert.Equal(t, deadline, msg.Get(Deadline))
 	assert.Equal(t, containerID.Bytes(), msg.Get(ContainerID))
 
 	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
@@ -281,6 +295,7 @@ func TestBuildPullQuery(t *testing.T) {
 	assert.Equal(t, PullQuery, parsedMsg.Op())
 	assert.Equal(t, chainID.Bytes(), parsedMsg.Get(ChainID))
 	assert.Equal(t, requestID, parsedMsg.Get(RequestID))
+	assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 	assert.Equal(t, containerID.Bytes(), parsedMsg.Get(ContainerID))
 }
 

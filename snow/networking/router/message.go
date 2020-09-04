@@ -6,9 +6,11 @@ package router
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/constants"
 )
 
 type msgType int
@@ -30,7 +32,6 @@ const (
 	queryFailedMsg
 	notifyMsg
 	gossipMsg
-	shutdownMsg
 	getAncestorsMsg
 	multiPutMsg
 	getAncestorsFailedMsg
@@ -45,17 +46,27 @@ type message struct {
 	containers   [][]byte
 	containerIDs ids.Set
 	notification common.Message
+	received     time.Time // Time this message was received
+	deadline     time.Time // Time this message must be responded to
+}
+
+func (m message) IsPeriodic() bool {
+	return m.requestID == constants.GossipMsgRequestID ||
+		m.messageType == gossipMsg
 }
 
 func (m message) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("\n    messageType: %s", m.messageType.String()))
-	sb.WriteString(fmt.Sprintf("\n    validatorID: %s", m.validatorID.String()))
+	sb.WriteString(fmt.Sprintf("\n    messageType: %s", m.messageType))
+	sb.WriteString(fmt.Sprintf("\n    validatorID: %s", m.validatorID))
 	sb.WriteString(fmt.Sprintf("\n    requestID: %d", m.requestID))
-	sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID.String()))
-	sb.WriteString(fmt.Sprintf("\n    containerIDs: %s", m.containerIDs.String()))
+	sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
+	sb.WriteString(fmt.Sprintf("\n    containerIDs: %s", m.containerIDs))
 	if m.messageType == notifyMsg {
-		sb.WriteString(fmt.Sprintf("\n    notification: %s", m.notification.String()))
+		sb.WriteString(fmt.Sprintf("\n    notification: %s", m.notification))
+	}
+	if !m.deadline.IsZero() {
+		sb.WriteString(fmt.Sprintf("\n    deadline: %s", m.deadline))
 	}
 	return sb.String()
 }
@@ -80,6 +91,8 @@ func (t msgType) String() string {
 		return "Get Message"
 	case getAncestorsMsg:
 		return "Get Ancestors Message"
+	case getAncestorsFailedMsg:
+		return "Get Ancestors Failed Message"
 	case putMsg:
 		return "Put Message"
 	case multiPutMsg:
@@ -98,8 +111,6 @@ func (t msgType) String() string {
 		return "Notify Message"
 	case gossipMsg:
 		return "Gossip Message"
-	case shutdownMsg:
-		return "Shutdown Message"
 	default:
 		return fmt.Sprintf("Unknown Message Type: %d", t)
 	}

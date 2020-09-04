@@ -161,11 +161,15 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		tokenStr, err := getToken(r) // Get the token from the header
 		if err == ErrNoToken {
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, err.Error())
+			// Error is intentionally dropped here as there is nothing left to
+			// do with it.
+			_, _ = io.WriteString(w, err.Error())
 			return
 		} else if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "couldn't parse auth token. Header \"Authorization\" should be \"Bearer TOKEN.GOES.HERE\"")
+			// Error is intentionally dropped here as there is nothing left to
+			// do with it.
+			_, _ = io.WriteString(w, "couldn't parse auth token. Header \"Authorization\" should be \"Bearer TOKEN.GOES.HERE\"")
 			return
 		}
 
@@ -176,12 +180,16 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		})
 		if err != nil { // Probably because signature wrong
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, fmt.Sprintf("invalid auth token: %s", err))
+			// Error is intentionally dropped here as there is nothing left to
+			// do with it.
+			_, _ = io.WriteString(w, fmt.Sprintf("invalid auth token: %s", err))
 			return
 		}
 		if !token.Valid { // Check that token isn't expired
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "invalid auth token. Is it expired?")
+			// Error is intentionally dropped here as there is nothing left to
+			// do with it.
+			_, _ = io.WriteString(w, "invalid auth token. Is it expired?")
 			return
 		}
 
@@ -189,7 +197,9 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		claims, ok := token.Claims.(*endpointClaims)
 		if !ok {
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "expected auth token's claims to be type endpointClaims but is different type")
+			// Error is intentionally dropped here as there is nothing left to
+			// do with it.
+			_, _ = io.WriteString(w, "expected auth token's claims to be type endpointClaims but is different type")
 			return
 		}
 		canAccess := false // true iff the token authorizes access to the API
@@ -201,7 +211,9 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		}
 		if !canAccess {
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "the provided auth token does not allow access to this endpoint")
+			// Error is intentionally dropped here as there is nothing left to
+			// do with it.
+			_, _ = io.WriteString(w, "the provided auth token does not allow access to this endpoint")
 			return
 		}
 
@@ -209,7 +221,9 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		for _, revokedToken := range auth.revoked { // Make sure this token wasn't revoked
 			if revokedToken == tokenStr {
 				w.WriteHeader(http.StatusUnauthorized)
-				io.WriteString(w, "the provided auth token was revoked")
+				// Error is intentionally dropped here as there is nothing left
+				// to do with it.
+				_, _ = io.WriteString(w, "the provided auth token was revoked")
 				auth.lock.RUnlock()
 				return
 			}

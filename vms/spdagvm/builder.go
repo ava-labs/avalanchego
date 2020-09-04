@@ -84,7 +84,7 @@ func (b Builder) NewOutputTakeOrLeave(
 func (b Builder) NewSig(index uint32) *Sig { return &Sig{index: index} }
 
 // NewTxFromUTXOs returns a new transaction where:
-//   * One of the outputs is an Output with [amount] ava that is controlled by [toAddr].
+//   * One of the outputs is an Output with [amount] avax that is controlled by [toAddr].
 //     * This output can't be spent until at least [locktime].
 //   * If there is any "change" there is another output controlled by [changeAddr] with the change.
 //   * The UTXOs consumed to make this transaction are a subset of [utxos].

@@ -16,6 +16,9 @@ var (
 
 // Input ...
 type Input struct {
+	// This input consumes an output, which has an owner list.
+	// This input will be spent with a list of signatures.
+	// SignatureList[i] is the signature of OwnerList[i]
 	SigIndices []uint32 `serialize:"true" json:"signatureIndices"`
 }
 

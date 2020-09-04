@@ -20,11 +20,15 @@ type block struct {
 
 const blockSize = 40 // hashing.HashLen (32) + length of uin64 (8)
 
-func (b *block) Bytes() []byte {
+func (b *block) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, blockSize)}
 	p.PackFixedBytes(b.parentID.Bytes())
 	p.PackLong(b.value)
-	return p.Bytes
+	return p.Bytes, p.Err
+}
+
+func marshalBlock(blk interface{}) ([]byte, error) {
+	return blk.(*block).Bytes()
 }
 
 func unmarshalBlock(bytes []byte) (interface{}, error) {
@@ -56,12 +60,16 @@ type account struct {
 
 const accountSize = 32 + 8 + 8
 
-func (acc *account) Bytes() []byte {
+func (acc *account) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, accountSize)}
 	p.PackFixedBytes(acc.id.Bytes())
 	p.PackLong(acc.balance)
 	p.PackLong(acc.nonce)
-	return p.Bytes
+	return p.Bytes, p.Err
+}
+
+func marshalAccount(acct interface{}) ([]byte, error) {
+	return acct.(*account).Bytes()
 }
 
 func unmarshalAccount(bytes []byte) (interface{}, error) {
@@ -89,7 +97,10 @@ func unmarshalAccount(bytes []byte) (interface{}, error) {
 // Ensure there is an error if someone tries to do a put without registering the type
 func TestPutUnregistered(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -105,7 +116,7 @@ func TestPutUnregistered(t *testing.T) {
 	}
 
 	// register type
-	if err := state.RegisterType(1, unmarshalAccount); err != nil {
+	if err := state.RegisterType(1, marshalAccount, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -119,7 +130,10 @@ func TestPutUnregistered(t *testing.T) {
 // key that doesn't exist
 func TestKeyDoesNotExist(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
@@ -129,7 +143,7 @@ func TestKeyDoesNotExist(t *testing.T) {
 
 	// register type with ID 1
 	typeID := uint64(1)
-	if err := state.RegisterType(typeID, unmarshalAccount); err != nil {
+	if err := state.RegisterType(typeID, marshalAccount, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -142,18 +156,21 @@ func TestKeyDoesNotExist(t *testing.T) {
 // Ensure there is an error if someone tries to register a type ID that already exists
 func TestRegisterExistingTypeID(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
 	// register type with ID 1
 	typeID := uint64(1)
-	if err := state.RegisterType(typeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(typeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
 	// try to register the same type ID
-	if err := state.RegisterType(typeID, unmarshalAccount); err == nil {
+	if err := state.RegisterType(typeID, marshalAccount, unmarshalAccount); err == nil {
 		t.Fatal("Should have errored because typeID already registered")
 	}
 
@@ -162,13 +179,16 @@ func TestRegisterExistingTypeID(t *testing.T) {
 // Ensure there is an error when someone tries to get a value using the wrong typeID
 func TestGetWrongTypeID(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
 	// register type with ID 1
 	blockTypeID := uint64(1)
-	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -178,8 +198,7 @@ func TestGetWrongTypeID(t *testing.T) {
 		value:    5,
 	}
 	blockID := ids.NewID([32]byte{1, 2, 3})
-	err := state.Put(db, blockTypeID, blockID, block)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, blockID, block); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,19 +212,22 @@ func TestGetWrongTypeID(t *testing.T) {
 // key but different type IDs
 func TestSameKeyDifferentTypeID(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
 	// register block type with ID 1
 	blockTypeID := uint64(1)
-	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
 	// register account type with ID 2
 	accountTypeID := uint64(2)
-	if err := state.RegisterType(accountTypeID, unmarshalAccount); err != nil {
+	if err := state.RegisterType(accountTypeID, marshalAccount, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -219,8 +241,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 	}
 
 	// put it using sharedKey
-	err := state.Put(db, accountTypeID, sharedKey, acc)
-	if err != nil {
+	if err = state.Put(db, accountTypeID, sharedKey, acc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -231,8 +252,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 	}
 
 	// put it using sharedKey
-	err = state.Put(db, blockTypeID, sharedKey, block1)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, sharedKey, block1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -264,13 +284,16 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 // Ensure that overwriting a value works
 func TestOverwrite(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
 	// register block type with ID 1
 	blockTypeID := uint64(1)
-	if err := state.RegisterType(blockTypeID, unmarshalBlock); err != nil {
+	if err := state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -283,8 +306,7 @@ func TestOverwrite(t *testing.T) {
 	key := ids.NewID([32]byte{1, 2, 3})
 
 	// put it
-	err := state.Put(db, blockTypeID, key, block1)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, key, block1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -295,8 +317,7 @@ func TestOverwrite(t *testing.T) {
 	}
 
 	// put it with the same key
-	err = state.Put(db, blockTypeID, key, block2)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, key, block2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -316,15 +337,17 @@ func TestOverwrite(t *testing.T) {
 // Put 4 values, 2 of one type and 2 of another
 func TestHappyPath(t *testing.T) {
 	// make a state and a database
-	state := NewState()
+	state, err := NewState()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	defer db.Close()
 
 	accountTypeID := uint64(1)
 
 	// register type account
-	err := state.RegisterType(accountTypeID, unmarshalAccount)
-	if err != nil {
+	if err := state.RegisterType(accountTypeID, marshalAccount, unmarshalAccount); err != nil {
 		t.Fatal(err)
 	}
 
@@ -336,8 +359,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, accountTypeID, acc1.id, acc1)
-	if err != nil {
+	if err = state.Put(db, accountTypeID, acc1.id, acc1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -362,8 +384,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, accountTypeID, acc2.id, acc2)
-	if err != nil {
+	if err = state.Put(db, accountTypeID, acc2.id, acc2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -382,8 +403,7 @@ func TestHappyPath(t *testing.T) {
 
 	// register type block
 	blockTypeID := uint64(2)
-	err = state.RegisterType(blockTypeID, unmarshalBlock)
-	if err != nil {
+	if err := state.RegisterType(blockTypeID, marshalBlock, unmarshalBlock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -395,8 +415,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, blockTypeID, block1ID, block1)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, block1ID, block1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -419,8 +438,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// put it
-	err = state.Put(db, blockTypeID, block2ID, block2)
-	if err != nil {
+	if err = state.Put(db, blockTypeID, block2ID, block2); err != nil {
 		t.Fatal(err)
 	}
 

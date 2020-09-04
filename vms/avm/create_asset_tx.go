@@ -9,23 +9,29 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 const (
+	minNameLen      = 1
 	maxNameLen      = 128
+	minSymbolLen    = 1
 	maxSymbolLen    = 4
 	maxDenomination = 32
 )
 
 var (
 	errInitialStatesNotSortedUnique = errors.New("initial states not sorted and unique")
+	errNameTooShort                 = fmt.Errorf("name is too short, minimum size is %d", minNameLen)
 	errNameTooLong                  = fmt.Errorf("name is too long, maximum size is %d", maxNameLen)
+	errSymbolTooShort               = fmt.Errorf("symbol is too short, minimum size is %d", minSymbolLen)
 	errSymbolTooLong                = fmt.Errorf("symbol is too long, maximum size is %d", maxSymbolLen)
 	errNoFxs                        = errors.New("assets must support at least one Fx")
-	errUnprintableASCIICharacter    = errors.New("unprintable ascii character was provided")
+	errIllegalNameCharacter         = errors.New("asset's name must be made up of only letters and numbers")
+	errIllegalSymbolCharacter       = errors.New("asset's symbol must be all upper case letters")
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
 )
@@ -44,18 +50,18 @@ type CreateAssetTx struct {
 func (t *CreateAssetTx) InitialStates() []*InitialState { return t.States }
 
 // UTXOs returns the UTXOs transaction is producing.
-func (t *CreateAssetTx) UTXOs() []*ava.UTXO {
+func (t *CreateAssetTx) UTXOs() []*avax.UTXO {
 	txID := t.ID()
 	utxos := t.BaseTx.UTXOs()
 
 	for _, state := range t.States {
 		for _, out := range state.Outs {
-			utxos = append(utxos, &ava.UTXO{
-				UTXOID: ava.UTXOID{
+			utxos = append(utxos, &avax.UTXO{
+				UTXOID: avax.UTXOID{
 					TxID:        txID,
 					OutputIndex: uint32(len(utxos)),
 				},
-				Asset: ava.Asset{
+				Asset: avax.Asset{
 					ID: txID,
 				},
 				Out: out,
@@ -67,12 +73,22 @@ func (t *CreateAssetTx) UTXOs() []*ava.UTXO {
 }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *CreateAssetTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
+	case len(t.Name) < minNameLen:
+		return errNameTooShort
 	case len(t.Name) > maxNameLen:
 		return errNameTooLong
+	case len(t.Symbol) < minSymbolLen:
+		return errSymbolTooShort
 	case len(t.Symbol) > maxSymbolLen:
 		return errSymbolTooLong
 	case len(t.States) == 0:
@@ -81,22 +97,20 @@ func (t *CreateAssetTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs
 		return errDenominationTooLarge
 	case strings.TrimSpace(t.Name) != t.Name:
 		return errUnexpectedWhitespace
-	case strings.TrimSpace(t.Symbol) != t.Symbol:
-		return errUnexpectedWhitespace
 	}
 
 	for _, r := range t.Name {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return errUnprintableASCIICharacter
+		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
+			return errIllegalNameCharacter
 		}
 	}
 	for _, r := range t.Symbol {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return errUnprintableASCIICharacter
+		if r > unicode.MaxASCII || !unicode.IsUpper(r) {
+			return errIllegalSymbolCharacter
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
 		return err
 	}
 

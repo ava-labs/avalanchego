@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	errLockedFunds = errors.New("funds currently locked")
-	errCantSpend   = errors.New("utxo couldn't be spent")
+	errCantSpend = errors.New("unable to spend this UTXO")
 )
 
 // Keychain is a collection of keys that can be used to spend outputs
@@ -75,18 +74,14 @@ func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
 func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error) {
 	switch out := out.(type) {
 	case *MintOutput:
-		if sigIndices, keys, able := kc.Match(&out.OutputOwners); able {
-			return &MintInput{
-				Input: Input{
-					SigIndices: sigIndices,
-				},
+		if sigIndices, keys, able := kc.Match(&out.OutputOwners, time); able {
+			return &Input{
+				SigIndices: sigIndices,
 			}, keys, nil
 		}
+		return nil, nil, errCantSpend
 	case *TransferOutput:
-		if time < out.Locktime {
-			return nil, nil, errLockedFunds
-		}
-		if sigIndices, keys, able := kc.Match(&out.OutputOwners); able {
+		if sigIndices, keys, able := kc.Match(&out.OutputOwners, time); able {
 			return &TransferInput{
 				Amt: out.Amt,
 				Input: Input{
@@ -94,14 +89,18 @@ func (kc *Keychain) Spend(out verify.Verifiable, time uint64) (verify.Verifiable
 				},
 			}, keys, nil
 		}
+		return nil, nil, errCantSpend
 	}
-	return nil, nil, errCantSpend
+	return nil, nil, fmt.Errorf("can't spend UTXO because it is unexpected type %T", out)
 }
 
 // Match attempts to match a list of addresses up to the provided threshold
-func (kc *Keychain) Match(owners *OutputOwners) ([]uint32, []*crypto.PrivateKeySECP256K1R, bool) {
-	sigs := []uint32{}
-	keys := []*crypto.PrivateKeySECP256K1R{}
+func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*crypto.PrivateKeySECP256K1R, bool) {
+	if time < owners.Locktime {
+		return nil, nil, false
+	}
+	sigs := make([]uint32, 0, owners.Threshold)
+	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 	for i := uint32(0); i < uint32(len(owners.Addrs)) && uint32(len(keys)) < owners.Threshold; i++ {
 		if key, exists := kc.Get(owners.Addrs[i]); exists {
 			sigs = append(sigs, i)

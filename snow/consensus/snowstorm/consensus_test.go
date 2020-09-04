@@ -9,18 +9,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 var (
-	Red   = &TestTx{Identifier: ids.Empty.Prefix(0)}
-	Green = &TestTx{Identifier: ids.Empty.Prefix(1)}
-	Blue  = &TestTx{Identifier: ids.Empty.Prefix(2)}
-	Alpha = &TestTx{Identifier: ids.Empty.Prefix(3)}
-
 	Tests = []func(*testing.T, Factory){
 		MetricsTest,
 		ParamsTest,
@@ -33,6 +31,7 @@ var (
 		IsVirtuousTest,
 		QuiesceTest,
 		AcceptingDependencyTest,
+		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
 		VacuouslyAcceptedTest,
 		ConflictsTest,
@@ -41,32 +40,44 @@ var (
 		ErrorOnAcceptedTest,
 		ErrorOnRejectingLowerConfidenceConflictTest,
 		ErrorOnRejectingHigherConfidenceConflictTest,
+		UTXOCleanupTest,
 	}
+
+	Red, Green, Blue, Alpha *TestTx
 )
 
 //  R - G - B - A
+func Setup() {
+	Red = &TestTx{}
+	Green = &TestTx{}
+	Blue = &TestTx{}
+	Alpha = &TestTx{}
 
-func init() {
+	for i, color := range []*TestTx{Red, Green, Blue, Alpha} {
+		color.IDV = ids.Empty.Prefix(uint64(i))
+		color.AcceptV = nil
+		color.RejectV = nil
+		color.StatusV = choices.Processing
+
+		color.DependenciesV = nil
+		color.InputIDsV.Clear()
+		color.VerifyV = nil
+		color.BytesV = []byte{byte(i)}
+	}
+
 	X := ids.Empty.Prefix(4)
 	Y := ids.Empty.Prefix(5)
 	Z := ids.Empty.Prefix(6)
 
-	Red.Ins.Add(X)
+	Red.InputIDsV.Add(X)
 
-	Green.Ins.Add(X)
-	Green.Ins.Add(Y)
+	Green.InputIDsV.Add(X)
+	Green.InputIDsV.Add(Y)
 
-	Blue.Ins.Add(Y)
-	Blue.Ins.Add(Z)
+	Blue.InputIDsV.Add(Y)
+	Blue.InputIDsV.Add(Z)
 
-	Alpha.Ins.Add(Z)
-}
-
-func Setup() {
-	Red.Reset()
-	Green.Reset()
-	Blue.Reset()
-	Alpha.Reset()
+	Alpha.InputIDsV.Add(Z)
 }
 
 // Execute all tests against a consensus implementation
@@ -81,9 +92,13 @@ func MetricsTest(t *testing.T, factory Factory) {
 	Setup()
 
 	{
-		params := snowball.Parameters{
-			Metrics: prometheus.NewRegistry(),
-			K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+		params := sbcon.Parameters{
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		}
 		params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_processing",
@@ -92,9 +107,13 @@ func MetricsTest(t *testing.T, factory Factory) {
 		graph.Initialize(snow.DefaultContextTest(), params)
 	}
 	{
-		params := snowball.Parameters{
-			Metrics: prometheus.NewRegistry(),
-			K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+		params := sbcon.Parameters{
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		}
 		params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_accepted",
@@ -103,9 +122,13 @@ func MetricsTest(t *testing.T, factory Factory) {
 		graph.Initialize(snow.DefaultContextTest(), params)
 	}
 	{
-		params := snowball.Parameters{
-			Metrics: prometheus.NewRegistry(),
-			K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+		params := sbcon.Parameters{
+			Metrics:           prometheus.NewRegistry(),
+			K:                 2,
+			Alpha:             2,
+			BetaVirtuous:      1,
+			BetaRogue:         2,
+			ConcurrentRepolls: 1,
 		}
 		params.Metrics.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_rejected",
@@ -120,9 +143,13 @@ func ParamsTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -142,9 +169,13 @@ func IssuedTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -168,9 +199,13 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -189,8 +224,10 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !graph.Finalized() {
@@ -207,9 +244,13 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -230,8 +271,10 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Blue.ID()) {
@@ -246,9 +289,13 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -273,8 +320,10 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 	r := ids.Bag{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 1 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Alpha.ID()) {
@@ -289,9 +338,13 @@ func IndependentTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 2, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      2,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -313,8 +366,10 @@ func IndependentTest(t *testing.T, factory Factory) {
 	ra.SetThreshold(2)
 	ra.AddCount(Red.ID(), 2)
 	ra.AddCount(Alpha.ID(), 2)
-	if err := graph.RecordPoll(ra); err != nil {
+	if updated, err := graph.RecordPoll(ra); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Red.ID()) {
@@ -323,8 +378,10 @@ func IndependentTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if err := graph.RecordPoll(ra); err != nil {
+	} else if updated, err := graph.RecordPoll(ra); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !graph.Finalized() {
@@ -337,9 +394,13 @@ func VirtuousTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -375,9 +436,13 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -415,9 +480,13 @@ func QuiesceTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -440,15 +509,21 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Red},
 	}
-	purple.Ins.Add(ids.Empty.Prefix(8))
-	purple.Deps = []Tx{Red}
+	purple.InputIDsV.Add(ids.Empty.Prefix(8))
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -474,8 +549,10 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	g := ids.Bag{}
 	g.Add(Green.ID())
-	if err := graph.RecordPoll(g); err != nil {
+	if updated, err := graph.RecordPoll(g); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -492,8 +569,10 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	rp := ids.Bag{}
 	rp.Add(Red.ID(), purple.ID())
-	if err := graph.RecordPoll(rp); err != nil {
+	if updated, err := graph.RecordPoll(rp); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -510,8 +589,151 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 
 	r := ids.Bag{}
 	r.Add(Red.ID())
-	if err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(r); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
+	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if Red.Status() != choices.Accepted {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Accepted)
+	} else if Green.Status() != choices.Rejected {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Rejected)
+	} else if purple.Status() != choices.Accepted {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Accepted)
+	}
+}
+
+type singleAcceptTx struct {
+	Tx
+
+	t        *testing.T
+	accepted bool
+}
+
+func (tx *singleAcceptTx) Accept() error {
+	if tx.accepted {
+		tx.t.Fatalf("accept called multiple times")
+	}
+	tx.accepted = true
+	return tx.Tx.Accept()
+}
+
+func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
+	Setup()
+
+	graph := factory.New()
+
+	rawPurple := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Red},
+	}
+	rawPurple.InputIDsV.Add(ids.Empty.Prefix(8))
+
+	purple := &singleAcceptTx{
+		Tx: rawPurple,
+		t:  t,
+	}
+
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	graph.Initialize(snow.DefaultContextTest(), params)
+
+	if err := graph.Add(Red); err != nil {
+		t.Fatal(err)
+	} else if err := graph.Add(Green); err != nil {
+		t.Fatal(err)
+	} else if err := graph.Add(purple); err != nil {
+		t.Fatal(err)
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Red.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Red.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	g := ids.Bag{}
+	g.Add(Green.ID())
+	if updated, err := graph.RecordPoll(g); err != nil {
+		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Green.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Green.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	p := ids.Bag{}
+	p.Add(purple.ID())
+	if updated, err := graph.RecordPoll(p); err != nil {
+		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Green.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Green.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	rp := ids.Bag{}
+	rp.Add(Red.ID(), purple.ID())
+	if updated, err := graph.RecordPoll(rp); err != nil {
+		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
+	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
+		t.Fatalf("Wrong number of preferences.")
+	} else if !prefs.Contains(Green.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", Green.ID())
+	} else if !prefs.Contains(purple.ID()) {
+		t.Fatalf("Wrong preference. Expected %s", purple.ID())
+	} else if Red.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Red.ID(), choices.Processing)
+	} else if Green.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", Green.ID(), choices.Processing)
+	} else if purple.Status() != choices.Processing {
+		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
+	}
+
+	r := ids.Bag{}
+	r.Add(Red.ID())
+	if updated, err := graph.RecordPoll(r); err != nil {
+		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if Red.Status() != choices.Accepted {
@@ -529,15 +751,21 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
 	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Red, Blue},
 	}
-	purple.Ins.Add(ids.Empty.Prefix(8))
-	purple.Deps = []Tx{Red, Blue}
+	purple.InputIDsV.Add(ids.Empty.Prefix(8))
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -567,8 +795,10 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 
 	gp := ids.Bag{}
 	gp.Add(Green.ID(), purple.ID())
-	if err := graph.RecordPoll(gp); err != nil {
+	if updated, err := graph.RecordPoll(gp); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 2 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if !prefs.Contains(Green.ID()) {
@@ -583,8 +813,10 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", Blue.ID(), choices.Processing)
 	} else if purple.Status() != choices.Processing {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
-	} else if err := graph.RecordPoll(gp); err != nil {
+	} else if updated, err := graph.RecordPoll(gp); err != nil {
 		t.Fatal(err)
+	} else if !updated {
+		t.Fatalf("Should have updated the frontiers")
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
 	} else if Red.Status() != choices.Rejected {
@@ -603,14 +835,18 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-	}
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		StatusV: choices.Processing,
+	}}
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -628,9 +864,13 @@ func ConflictsTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -640,31 +880,35 @@ func ConflictsTest(t *testing.T, factory Factory) {
 	insPurple.Add(conflictInputID)
 
 	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-		Ins:        insPurple,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(6),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: insPurple,
 	}
 
 	insOrange := ids.Set{}
 	insOrange.Add(conflictInputID)
 
 	orange := &TestTx{
-		Identifier: ids.Empty.Prefix(6),
-		Stat:       choices.Processing,
-		Ins:        insPurple,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: insOrange,
 	}
 
 	if err := graph.Add(purple); err != nil {
 		t.Fatal(err)
 	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
-	} else if !orangeConflicts.Contains(purple.Identifier) {
+	} else if !orangeConflicts.Contains(purple.IDV) {
 		t.Fatalf("Conflicts does not contain the right transaction")
 	} else if err := graph.Add(orange); err != nil {
 		t.Fatal(err)
 	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
-	} else if !orangeConflicts.Contains(purple.Identifier) {
+	} else if !orangeConflicts.Contains(purple.IDV) {
 		t.Fatalf("Conflicts does not contain the right transaction")
 	}
 }
@@ -674,33 +918,39 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
-	rogue1 := &TestTx{
-		Identifier: ids.Empty.Prefix(0),
-		Stat:       choices.Processing,
-	}
-	rogue2 := &TestTx{
-		Identifier: ids.Empty.Prefix(1),
-		Stat:       choices.Processing,
-	}
+	rogue1 := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(0),
+		StatusV: choices.Processing,
+	}}
+	rogue2 := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(1),
+		StatusV: choices.Processing,
+	}}
 	virtuous := &TestTx{
-		Identifier: ids.Empty.Prefix(2),
-		Deps:       []Tx{rogue1},
-		Stat:       choices.Processing,
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{rogue1},
 	}
 
 	input1 := ids.Empty.Prefix(3)
 	input2 := ids.Empty.Prefix(4)
 
-	rogue1.Ins.Add(input1)
-	rogue2.Ins.Add(input1)
+	rogue1.InputIDsV.Add(input1)
+	rogue2.InputIDsV.Add(input1)
 
-	virtuous.Ins.Add(input2)
+	virtuous.InputIDsV.Add(input2)
 
 	if err := graph.Add(rogue1); err != nil {
 		t.Fatal(err)
@@ -713,8 +963,10 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 	votes := ids.Bag{}
 	votes.Add(rogue1.ID())
 	votes.Add(virtuous.ID())
-	if err := graph.RecordPoll(votes); err != nil {
+	if updated, err := graph.RecordPoll(votes); err != nil {
 		t.Fatal(err)
+	} else if updated {
+		t.Fatalf("Shouldn't have updated the frontiers")
 	} else if status := rogue1.Status(); status != choices.Processing {
 		t.Fatalf("Rogue Tx is %s expected %s", status, choices.Processing)
 	} else if status := rogue2.Status(); status != choices.Processing {
@@ -731,15 +983,19 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		AcceptV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -753,16 +1009,20 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 
 	graph := factory.New()
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
-	purple.Ins.Add(ids.Empty.Prefix(4))
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		AcceptV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
+	purple.InputIDsV.Add(ids.Empty.Prefix(4))
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -772,7 +1032,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 
 	votes := ids.Bag{}
 	votes.Add(purple.ID())
-	if err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on accepting an invalid tx")
 	}
 }
@@ -784,22 +1044,26 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-	}
-	purple.Ins.Add(X)
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		StatusV: choices.Processing,
+	}}
+	purple.InputIDsV.Add(X)
 
-	pink := &TestTx{
-		Identifier: ids.Empty.Prefix(8),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
-	pink.Ins.Add(X)
+	pink := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(8),
+		RejectV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
+	pink.InputIDsV.Add(X)
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -811,7 +1075,7 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	votes := ids.Bag{}
 	votes.Add(purple.ID())
-	if err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
 	}
 }
@@ -823,22 +1087,26 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	X := ids.Empty.Prefix(4)
 
-	purple := &TestTx{
-		Identifier: ids.Empty.Prefix(7),
-		Stat:       choices.Processing,
-	}
-	purple.Ins.Add(X)
+	purple := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(7),
+		StatusV: choices.Processing,
+	}}
+	purple.InputIDsV.Add(X)
 
-	pink := &TestTx{
-		Identifier: ids.Empty.Prefix(8),
-		Stat:       choices.Processing,
-		Validity:   errors.New(""),
-	}
-	pink.Ins.Add(X)
+	pink := &TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.Empty.Prefix(8),
+		RejectV: errors.New(""),
+		StatusV: choices.Processing,
+	}}
+	pink.InputIDsV.Add(X)
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       1, Alpha: 1, BetaVirtuous: 1, BetaRogue: 1,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         1,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -850,9 +1118,56 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	votes := ids.Bag{}
 	votes.Add(purple.ID())
-	if err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
 	}
+}
+
+func UTXOCleanupTest(t *testing.T, factory Factory) {
+	Setup()
+
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 1,
+		Alpha:             1,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
+	}
+	err := graph.Initialize(snow.DefaultContextTest(), params)
+	assert.NoError(t, err)
+
+	err = graph.Add(Red)
+	assert.NoError(t, err)
+
+	err = graph.Add(Green)
+	assert.NoError(t, err)
+
+	redVotes := ids.Bag{}
+	redVotes.Add(Red.ID())
+	changed, err := graph.RecordPoll(redVotes)
+	assert.NoError(t, err)
+	assert.False(t, changed, "shouldn't have accepted the red tx")
+
+	changed, err = graph.RecordPoll(redVotes)
+	assert.NoError(t, err)
+	assert.True(t, changed, "should have accepted the red tx")
+
+	assert.Equal(t, choices.Accepted, Red.Status())
+	assert.Equal(t, choices.Rejected, Green.Status())
+
+	err = graph.Add(Blue)
+	assert.NoError(t, err)
+
+	blueVotes := ids.Bag{}
+	blueVotes.Add(Blue.ID())
+	changed, err = graph.RecordPoll(blueVotes)
+	assert.NoError(t, err)
+	assert.True(t, changed, "should have accepted the blue tx")
+
+	assert.Equal(t, choices.Accepted, Blue.Status())
 }
 
 func StringTest(t *testing.T, factory Factory, prefix string) {
@@ -860,9 +1175,13 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 
 	graph := factory.New()
 
-	params := snowball.Parameters{
-		Metrics: prometheus.NewRegistry(),
-		K:       2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2,
+	params := sbcon.Parameters{
+		Metrics:           prometheus.NewRegistry(),
+		K:                 2,
+		Alpha:             2,
+		BetaVirtuous:      1,
+		BetaRogue:         2,
+		ConcurrentRepolls: 1,
 	}
 	graph.Initialize(snow.DefaultContextTest(), params)
 
@@ -886,18 +1205,20 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	rb.SetThreshold(2)
 	rb.AddCount(Red.ID(), 2)
 	rb.AddCount(Blue.ID(), 2)
-	if err := graph.RecordPoll(rb); err != nil {
+	if changed, err := graph.RecordPoll(rb); err != nil {
 		t.Fatal(err)
+	} else if !changed {
+		t.Fatalf("Should have caused the frontiers to recalculate")
 	} else if err := graph.Add(Blue); err != nil {
 		t.Fatal(err)
 	}
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq Confidence: 1 Bias: 1\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES Confidence: 0 Bias: 0\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc Confidence: 0 Bias: 0\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w Confidence: 1 Bias: 1\n" +
+			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
+			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 0, Confidence = 0)\n" +
+			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 0, Confidence = 0)\n" +
+			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)
@@ -918,16 +1239,18 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	ga.SetThreshold(2)
 	ga.AddCount(Green.ID(), 2)
 	ga.AddCount(Alpha.ID(), 2)
-	if err := graph.RecordPoll(ga); err != nil {
+	if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
+	} else if changed {
+		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
 	}
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq Confidence: 0 Bias: 1\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES Confidence: 1 Bias: 1\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc Confidence: 1 Bias: 1\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w Confidence: 0 Bias: 1\n" +
+			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
+			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 1, Confidence = 1)\n" +
+			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)
@@ -945,16 +1268,18 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 	}
 
 	empty := ids.Bag{}
-	if err := graph.RecordPoll(empty); err != nil {
+	if changed, err := graph.RecordPoll(empty); err != nil {
 		t.Fatal(err)
+	} else if changed {
+		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
 	}
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq Confidence: 0 Bias: 1\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES Confidence: 0 Bias: 1\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc Confidence: 0 Bias: 1\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w Confidence: 0 Bias: 1\n" +
+			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)
@@ -969,16 +1294,18 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Wrong preference. Expected %s", Blue.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if err := graph.RecordPoll(ga); err != nil {
+	} else if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
+	} else if !changed {
+		t.Fatalf("Should have caused the frontiers to recalculate")
 	}
 
 	{
 		expected := prefix + "(\n" +
-			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq Confidence: 0 Bias: 1\n" +
-			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES Confidence: 1 Bias: 2\n" +
-			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc Confidence: 1 Bias: 2\n" +
-			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w Confidence: 0 Bias: 1\n" +
+			"    Choice[0] = ID:  LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
+			"    Choice[1] = ID:  TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES SB(NumSuccessfulPolls = 2, Confidence = 1)\n" +
+			"    Choice[2] = ID:  Zda4gsqTjRaX6XVZekVNi3ovMFPHDRQiGbzYuAb7Nwqy1rGBc SB(NumSuccessfulPolls = 2, Confidence = 1)\n" +
+			"    Choice[3] = ID: 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w SB(NumSuccessfulPolls = 1, Confidence = 0)\n" +
 			")"
 		if str := graph.String(); str != expected {
 			t.Fatalf("Expected %s, got %s", expected, str)
@@ -993,8 +1320,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if err := graph.RecordPoll(ga); err != nil {
+	} else if changed, err := graph.RecordPoll(ga); err != nil {
 		t.Fatal(err)
+	} else if !changed {
+		t.Fatalf("Should have caused the frontiers to recalculate")
 	}
 
 	{
@@ -1016,8 +1345,10 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("%s should have been rejected", Red.ID())
 	} else if Blue.Status() != choices.Rejected {
 		t.Fatalf("%s should have been rejected", Blue.ID())
-	} else if err := graph.RecordPoll(rb); err != nil {
+	} else if changed, err := graph.RecordPoll(rb); err != nil {
 		t.Fatal(err)
+	} else if changed {
+		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
 	}
 
 	{

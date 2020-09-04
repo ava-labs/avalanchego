@@ -59,6 +59,8 @@ func (tx *UniqueTx) refresh() {
 // lookup
 func (tx *UniqueTx) Evict() { tx.t.unique = false } // Lock is already held here
 
+// setStatus sets the status of the UniqueTx in memory and in the database
+// It will set the status in memory even if it fails to set the status in the database
 func (tx *UniqueTx) setStatus(status choices.Status) error {
 	tx.refresh()
 	if tx.t.status != status {
@@ -220,7 +222,8 @@ func (tx *UniqueTx) VerifyTx() error {
 
 // VerifyState the validity of this transaction
 func (tx *UniqueTx) VerifyState() error {
-	tx.VerifyTx()
+	// VerifyTx sets validity to be checked in the next statement, so the error is ignored here.
+	_ = tx.VerifyTx()
 
 	if tx.t.validity != nil || tx.t.verifiedState {
 		return tx.t.validity

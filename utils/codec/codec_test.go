@@ -72,13 +72,13 @@ func TestStruct(t *testing.T) {
 		Member2:      2,
 		MySlice:      []byte{1, 2, 3, 4},
 		MySlice2:     []string{"one", "two", "three"},
-		MySlice3:     []MyInnerStruct{MyInnerStruct{"a"}, MyInnerStruct{"b"}, MyInnerStruct{"c"}},
-		MySlice4:     []*MyInnerStruct2{&MyInnerStruct2{true}, &MyInnerStruct2{}},
+		MySlice3:     []MyInnerStruct{{"a"}, {"b"}, {"c"}},
+		MySlice4:     []*MyInnerStruct2{{true}, {}},
 		MySlice5:     []Foo{&MyInnerStruct2{true}, &MyInnerStruct2{}},
 		MyArray:      [4]byte{5, 6, 7, 8},
 		MyArray2:     [5]string{"four", "five", "six", "seven"},
-		MyArray3:     [3]MyInnerStruct{MyInnerStruct{"d"}, MyInnerStruct{"e"}, MyInnerStruct{"f"}},
-		MyArray4:     [2]*MyInnerStruct2{&MyInnerStruct2{}, &MyInnerStruct2{true}},
+		MyArray3:     [3]MyInnerStruct{{"d"}, {"e"}, {"f"}},
+		MyArray4:     [2]*MyInnerStruct2{{}, {true}},
 		MyInterface:  &MyInnerStruct{"yeet"},
 		InnerStruct3: MyInnerStruct3{
 			Str: "str",
@@ -148,7 +148,7 @@ func TestSlice(t *testing.T) {
 
 // Test marshalling/unmarshalling largest possible slice
 func TestMaxSizeSlice(t *testing.T) {
-	mySlice := make([]string, math.MaxUint16, math.MaxUint16)
+	mySlice := make([]string, math.MaxUint16)
 	mySlice[0] = "first!"
 	mySlice[math.MaxUint16-1] = "last!"
 	codec := NewDefault()
@@ -246,12 +246,12 @@ func TestPointerToStruct(t *testing.T) {
 // Test marshalling a slice of structs
 func TestSliceOfStruct(t *testing.T) {
 	mySlice := []MyInnerStruct3{
-		MyInnerStruct3{
+		{
 			Str: "One",
 			M1:  MyInnerStruct{"Two"},
 			F:   &MyInnerStruct{"Three"},
 		},
-		MyInnerStruct3{
+		{
 			Str: "Four",
 			M1:  MyInnerStruct{"Five"},
 			F:   &MyInnerStruct{"Six"},
@@ -468,18 +468,15 @@ type simpleSliceStruct struct {
 // Test marshalling of nil slice
 func TestNilSliceSerialization(t *testing.T) {
 	codec := NewDefault()
-
 	val := &simpleSliceStruct{}
-	expected := []byte{0, 0, 0, 0} // nil slice marshaled as 0 length slice
+	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version, then nil slice marshaled as 0 length slice
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
 	}
-
 	valUnmarshaled := &simpleSliceStruct{}
 	if err = codec.Unmarshal(result, &valUnmarshaled); err != nil {
 		t.Fatal(err)
@@ -493,7 +490,7 @@ func TestEmptySliceSerialization(t *testing.T) {
 	codec := NewDefault()
 
 	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
-	expected := []byte{0, 0, 0, 0} // 0 for size
+	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version (uint16) and 0 for size (uint32)
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -524,7 +521,7 @@ func TestSliceWithEmptySerialization(t *testing.T) {
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1000),
 	}
-	expected := []byte{0x00, 0x00, 0x03, 0xE8} //1000 for numElts
+	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x03, 0xE8} // codec version (0x00, 0x00) then 1000 for numElts
 	result, err := codec.Marshal(val)
 	if err != nil {
 		t.Fatal(err)
@@ -605,12 +602,9 @@ func TestTooLargeUnmarshal(t *testing.T) {
 	type inner struct {
 		Long uint64 `serialize:"true"`
 	}
-
 	bytes := []byte{0, 0, 0, 0}
-
 	s := inner{}
 	codec := New(3, 1)
-
 	err := codec.Unmarshal(bytes, &s)
 	if err == nil {
 		t.Fatalf("Should have errored due to too many bytes provided")
@@ -641,14 +635,14 @@ func TestUnmarshalInvalidInterface(t *testing.T) {
 	codec.RegisterType(&innerNoInterface{})
 
 	{
-		bytes := []byte{0, 0, 0, 0}
+		bytes := []byte{0, 0, 0, 0, 0, 0}
 		s := outer{}
 		if err := codec.Unmarshal(bytes, &s); err != nil {
 			t.Fatal(err)
 		}
 	}
 	{
-		bytes := []byte{0, 0, 0, 1}
+		bytes := []byte{0, 0, 0, 0, 0, 1}
 		s := outer{}
 		if err := codec.Unmarshal(bytes, &s); err == nil {
 			t.Fatalf("should have errored")

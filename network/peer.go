@@ -4,7 +4,6 @@
 package network
 
 import (
-	"bytes"
 	"math"
 	"net"
 	"sync"
@@ -64,7 +63,7 @@ func (p *peer) Start() {
 	// Initially send the version to the peer
 	go p.Version()
 	go p.requestVersion()
-	// go p.sendPings()
+	go p.sendPings()
 }
 
 func (p *peer) sendPings() {
@@ -107,10 +106,10 @@ func (p *peer) requestVersion() {
 func (p *peer) ReadMessages() {
 	defer p.Close()
 
-	// if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
-	// 	p.net.log.Verbo("error on setting the connection read timeout %s", err)
-	// 	return
-	// }
+	if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
+		p.net.log.Verbo("error on setting the connection read timeout %s", err)
+		return
+	}
 
 	pendingBuffer := wrappers.Packer{}
 	readBuffer := make([]byte, 1<<10)
@@ -185,6 +184,7 @@ func (p *peer) WriteMessages() {
 
 		p.net.stateLock.Lock()
 		p.pendingBytes -= len(msg)
+		p.net.pendingBytes -= len(msg)
 		p.net.stateLock.Unlock()
 
 		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
@@ -220,10 +220,7 @@ func (p *peer) send(msg Msg) bool {
 	msgBytes := msg.Bytes()
 	newPendingBytes := p.net.pendingBytes + len(msgBytes)
 	newConnPendingBytes := p.pendingBytes + len(msgBytes)
-	if newPendingBytes > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
-		(newPendingBytes > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
-			newConnPendingBytes > p.net.maxNetworkPendingSendBytes/20) { // Check to see if this connection is using too much memory
+	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
 	}
@@ -246,11 +243,11 @@ func (p *peer) handle(msg Msg) {
 	currentTime := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, currentTime.Unix())
 
-	// if err := p.conn.SetReadDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
-	// 	p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
-	// 	p.Close()
-	// 	return
-	// }
+	if err := p.conn.SetReadDeadline(currentTime.Add(p.net.pingPongTimeout)); err != nil {
+		p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
+		p.Close()
+		return
+	}
 
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
@@ -313,6 +310,13 @@ func (p *peer) handle(msg Msg) {
 	}
 }
 
+func (p *peer) dropMessage(msgLen, connPendingLen, networkPendingLen int) bool {
+	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
+		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
+			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
+}
+
 // assumes the stateLock is not held
 func (p *peer) Close() { p.once.Do(p.close) }
 
@@ -321,8 +325,11 @@ func (p *peer) close() {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
+	if err := p.conn.Close(); err != nil {
+		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
+	}
+
 	p.closed = true
-	p.conn.Close()
 	close(p.sender)
 	p.net.disconnected(p)
 }
@@ -409,47 +416,32 @@ func (p *peer) version(msg Msg) {
 			networkID,
 			p.net.networkID)
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
-		}
-		p.Close()
+		p.discardIP()
 		return
 	}
 
 	if nodeID := msg.Get(NodeID).(uint32); nodeID == p.net.nodeID {
 		p.net.log.Debug("peer's node ID matches our nodeID")
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			str := p.ip.String()
-			p.net.myIPs[str] = struct{}{}
-			delete(p.net.disconnectedIPs, str)
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
-		}
-		p.Close()
+		p.discardMyIP()
 		return
 	}
 
 	myTime := float64(p.net.clock.Unix())
 	if peerTime := float64(msg.Get(MyTime).(uint64)); math.Abs(peerTime-myTime) > p.net.maxClockDifference.Seconds() {
-		p.net.log.Debug("peer's clock is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
-			uint64(peerTime),
-			uint64(myTime))
-
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
+		if p.net.beacons.Contains(p.id) {
+			p.net.log.Warn("beacon %s has a clock that is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
+				p.id,
+				uint64(peerTime),
+				uint64(myTime))
+		} else {
+			p.net.log.Debug("peer %s has a clock that is too far out of sync with mine. Peer's = %d, Ours = %d (seconds)",
+				p.id,
+				uint64(peerTime),
+				uint64(myTime))
 		}
-		p.Close()
+
+		p.discardIP()
 		return
 	}
 
@@ -458,23 +450,18 @@ func (p *peer) version(msg Msg) {
 	if err != nil {
 		p.net.log.Debug("peer version could not be parsed due to %s", err)
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
-		}
-		p.Close()
+		p.discardIP()
 		return
 	}
 
 	if p.net.version.Before(peerVersion) {
 		if p.net.beacons.Contains(p.id) {
-			p.net.log.Info("beacon attempting to connect with newer version %s. You may want to update your client",
+			p.net.log.Info("beacon %s attempting to connect with newer version %s. You may want to update your client",
+				p.id,
 				peerVersion)
 		} else {
-			p.net.log.Debug("peer attempting to connect with newer version %s. You may want to update your client",
+			p.net.log.Debug("peer %s attempting to connect with newer version %s. You may want to update your client",
+				p.id,
 				peerVersion)
 		}
 	}
@@ -482,15 +469,13 @@ func (p *peer) version(msg Msg) {
 	if err := p.net.version.Compatible(peerVersion); err != nil {
 		p.net.log.Debug("peer version not compatible due to %s", err)
 
-		// By clearing the IP, we will not attempt to reconnect to this peer
-		if !p.ip.IsZero() {
-			p.net.stateLock.Lock()
-			delete(p.net.disconnectedIPs, p.ip.String())
-			p.ip = utils.IPDesc{}
-			p.net.stateLock.Unlock()
+		if !p.net.beacons.Contains(p.id) {
+			p.discardIP()
+			return
 		}
-		p.Close()
-		return
+		p.net.log.Info("allowing beacon %s to connect with a lower version %s",
+			p.id,
+			peerVersion)
 	}
 
 	if p.ip.IsZero() {
@@ -502,7 +487,7 @@ func (p *peer) version(msg Msg) {
 		if err == nil {
 			// If we have no clue what the peer's IP is, we can't perform any
 			// verification
-			if bytes.Equal(peerIP.IP, localPeerIP.IP) {
+			if peerIP.IP.Equal(localPeerIP.IP) {
 				// if the IPs match, add this ip:port pair to be tracked
 				p.net.stateLock.Lock()
 				p.ip = peerIP
@@ -558,8 +543,9 @@ func (p *peer) getAcceptedFrontier(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 
-	p.net.router.GetAcceptedFrontier(p.id, chainID, requestID)
+	p.net.router.GetAcceptedFrontier(p.id, chainID, requestID, deadline)
 }
 
 // assumes the stateLock is not held
@@ -586,6 +572,7 @@ func (p *peer) getAccepted(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 
 	containerIDs := ids.Set{}
 	for _, containerIDBytes := range msg.Get(ContainerIDs).([][]byte) {
@@ -597,7 +584,7 @@ func (p *peer) getAccepted(msg Msg) {
 		containerIDs.Add(containerID)
 	}
 
-	p.net.router.GetAccepted(p.id, chainID, requestID, containerIDs)
+	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
 }
 
 // assumes the stateLock is not held
@@ -624,20 +611,22 @@ func (p *peer) get(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	p.net.router.Get(p.id, chainID, requestID, containerID)
+	p.net.router.Get(p.id, chainID, requestID, deadline, containerID)
 }
 
 func (p *peer) getAncestors(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	p.net.router.GetAncestors(p.id, chainID, requestID, containerID)
+	p.net.router.GetAncestors(p.id, chainID, requestID, deadline, containerID)
 }
 
 // assumes the stateLock is not held
@@ -667,11 +656,12 @@ func (p *peer) pushQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 	container := msg.Get(ContainerBytes).([]byte)
 
-	p.net.router.PushQuery(p.id, chainID, requestID, containerID, container)
+	p.net.router.PushQuery(p.id, chainID, requestID, deadline, containerID, container)
 }
 
 // assumes the stateLock is not held
@@ -679,10 +669,11 @@ func (p *peer) pullQuery(msg Msg) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	p.net.router.PullQuery(p.id, chainID, requestID, containerID)
+	p.net.router.PullQuery(p.id, chainID, requestID, deadline, containerID)
 }
 
 // assumes the stateLock is not held
@@ -702,4 +693,30 @@ func (p *peer) chits(msg Msg) {
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)
+}
+
+// assumes the stateLock is not held
+func (p *peer) discardIP() {
+	// By clearing the IP, we will not attempt to reconnect to this peer
+	if !p.ip.IsZero() {
+		p.net.stateLock.Lock()
+		delete(p.net.disconnectedIPs, p.ip.String())
+		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
+	}
+	p.Close()
+}
+
+// assumes the stateLock is not held
+func (p *peer) discardMyIP() {
+	// By clearing the IP, we will not attempt to reconnect to this peer
+	if !p.ip.IsZero() {
+		p.net.stateLock.Lock()
+		str := p.ip.String()
+		p.net.myIPs[str] = struct{}{}
+		delete(p.net.disconnectedIPs, str)
+		p.ip = utils.IPDesc{}
+		p.net.stateLock.Unlock()
+	}
+	p.Close()
 }

@@ -4,30 +4,17 @@
 package platformvm
 
 import (
-	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
-
-// DecisionTx is an operation that can be decided without being proposed
-type DecisionTx interface {
-	ID() ids.ID
-
-	initialize(vm *VM) error
-
-	// Attempt to verify this transaction with the provided state. The provided
-	// database can be modified arbitrarily. If a nil error is returned, it is
-	// assumped onAccept is non-nil.
-	SemanticVerify(database.Database) (onAccept func(), err error)
-}
 
 // StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
 
-	Txs []DecisionTx `serialize:"true"`
+	Txs []*Tx `serialize:"true" json:"txs"`
 }
 
 // initialize this block
@@ -36,7 +23,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 		return err
 	}
 	for _, tx := range sb.Txs {
-		if err := tx.initialize(vm); err != nil {
+		if err := tx.Sign(vm.codec, nil); err != nil {
 			return err
 		}
 	}
@@ -56,7 +43,7 @@ func (sb *StandardBlock) Verify() error {
 	if !ok {
 		if err := sb.Reject(); err == nil {
 			if err := sb.vm.DB.Commit(); err != nil {
-				sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+				return err
 			}
 		} else {
 			sb.vm.DB.Abort()
@@ -67,20 +54,31 @@ func (sb *StandardBlock) Verify() error {
 	pdb := parent.onAccept()
 
 	sb.onAcceptDB = versiondb.New(pdb)
-	funcs := []func(){}
+	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		onAccept, err := tx.SemanticVerify(sb.onAcceptDB)
+		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
+		if !ok {
+			return errWrongTxType
+		}
+		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptDB, tx)
 		if err != nil {
+			sb.vm.droppedTxCache.Put(tx.ID(), nil) // cache tx as dropped
 			if err := sb.Reject(); err == nil {
 				if err := sb.vm.DB.Commit(); err != nil {
-					sb.vm.Ctx.Log.Error("error committing Standard block as rejected: %s", err)
+					return err
 				}
 			} else {
 				sb.vm.DB.Abort()
 			}
 			return err
 		}
-		if onAccept != nil {
+		if txBytes, err := sb.vm.codec.Marshal(tx); err != nil {
+			return err
+		} else if err := sb.vm.putTx(sb.onAcceptDB, tx.ID(), txBytes); err != nil {
+			return err
+		} else if err := sb.vm.putStatus(sb.onAcceptDB, tx.ID(), Committed); err != nil {
+			return err
+		} else if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
 	}
@@ -88,10 +86,13 @@ func (sb *StandardBlock) Verify() error {
 	if numFuncs := len(funcs); numFuncs == 1 {
 		sb.onAcceptFunc = funcs[0]
 	} else if numFuncs > 1 {
-		sb.onAcceptFunc = func() {
+		sb.onAcceptFunc = func() error {
 			for _, f := range funcs {
-				f()
+				if err := f(); err != nil {
+					return err
+				}
 			}
+			return nil
 		}
 	}
 
@@ -102,19 +103,23 @@ func (sb *StandardBlock) Verify() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, txs []DecisionTx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*StandardBlock, error) {
 	sb := &StandardBlock{
-		SingleDecisionBlock: SingleDecisionBlock{CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-			Block: core.NewBlock(parentID),
-			vm:    vm,
-		}}},
+		SingleDecisionBlock: SingleDecisionBlock{
+			CommonDecisionBlock: CommonDecisionBlock{
+				CommonBlock: CommonBlock{
+					Block: core.NewBlock(parentID, height),
+					vm:    vm,
+				},
+			},
+		},
 		Txs: txs,
 	}
 
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(sb)
-	bytes, err := Codec.Marshal(&blk)
+	bytes, err := vm.codec.Marshal(&blk)
 	if err != nil {
 		return nil, err
 	}

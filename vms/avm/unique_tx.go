@@ -10,12 +10,12 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 var (
 	errAssetIDMismatch = errors.New("asset IDs in the input don't match the utxo")
-	errWrongAssetID    = errors.New("asset ID must be AVA in the atomic tx")
+	errWrongAssetID    = errors.New("asset ID must be AVAX in the atomic tx")
 	errMissingUTXO     = errors.New("missing utxo")
 	errUnknownTx       = errors.New("transaction is unknown")
 	errRejectedTx      = errors.New("transaction is rejected")
@@ -38,16 +38,16 @@ type TxState struct {
 	validity                          error
 
 	inputs     ids.Set
-	inputUTXOs []*ava.UTXOID
-	utxos      []*ava.UTXO
+	inputUTXOs []*avax.UTXOID
+	utxos      []*avax.UTXO
 	deps       []snowstorm.Tx
 
 	status choices.Status
-
-	onDecide func(choices.Status)
 }
 
 func (tx *UniqueTx) refresh() {
+	tx.vm.numTxRefreshes.Inc()
+
 	if tx.TxState == nil {
 		tx.TxState = &TxState{}
 	}
@@ -57,6 +57,8 @@ func (tx *UniqueTx) refresh() {
 	unique := tx.vm.state.UniqueTx(tx)
 	prevTx := tx.Tx
 	if unique == tx {
+		tx.vm.numTxRefreshMisses.Inc()
+
 		// If no one was in the cache, make sure that there wasn't an
 		// intermediate object whose state I must reflect
 		if status, err := tx.vm.state.Status(tx.ID()); err == nil {
@@ -64,6 +66,8 @@ func (tx *UniqueTx) refresh() {
 		}
 		tx.unique = true
 	} else {
+		tx.vm.numTxRefreshHits.Inc()
+
 		// If someone is in the cache, they must be up to date
 
 		// This ensures that every unique tx object points to the same tx state
@@ -75,6 +79,7 @@ func (tx *UniqueTx) refresh() {
 	}
 
 	if prevTx == nil {
+		// TODO: register hits/misses for this
 		if innerTx, err := tx.vm.state.Tx(tx.ID()); err == nil {
 			tx.Tx = innerTx
 		}
@@ -156,10 +161,6 @@ func (tx *UniqueTx) Accept() error {
 
 	tx.deps = nil // Needed to prevent a memory leak
 
-	if tx.onDecide != nil {
-		tx.onDecide(choices.Accepted)
-	}
-
 	return nil
 }
 
@@ -183,10 +184,6 @@ func (tx *UniqueTx) Reject() error {
 	tx.vm.pubsub.Publish("rejected", txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
-
-	if tx.onDecide != nil {
-		tx.onDecide(choices.Rejected)
-	}
 
 	return nil
 }
@@ -247,7 +244,7 @@ func (tx *UniqueTx) InputIDs() ids.Set {
 }
 
 // InputUTXOs returns the utxos that will be consumed on tx acceptance
-func (tx *UniqueTx) InputUTXOs() []*ava.UTXOID {
+func (tx *UniqueTx) InputUTXOs() []*avax.UTXOID {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.inputUTXOs) != 0 {
 		return tx.inputUTXOs
@@ -257,7 +254,7 @@ func (tx *UniqueTx) InputUTXOs() []*ava.UTXOID {
 }
 
 // UTXOs returns the utxos that will be added to the UTXO set on tx acceptance
-func (tx *UniqueTx) UTXOs() []*ava.UTXO {
+func (tx *UniqueTx) UTXOs() []*avax.UTXO {
 	tx.refresh()
 	if tx.Tx == nil || len(tx.utxos) != 0 {
 		return tx.utxos
@@ -272,8 +269,7 @@ func (tx *UniqueTx) Bytes() []byte {
 	return tx.Tx.Bytes()
 }
 
-// Verify the validity of this transaction
-func (tx *UniqueTx) Verify() error {
+func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 	switch status := tx.Status(); status {
 	case choices.Unknown:
 		return errUnknownTx
@@ -284,6 +280,17 @@ func (tx *UniqueTx) Verify() error {
 	default:
 		return tx.SemanticVerify()
 	}
+}
+
+// Verify the validity of this transaction
+func (tx *UniqueTx) Verify() error {
+	if err := tx.verifyWithoutCacheWrites(); err != nil {
+		return err
+	}
+
+	tx.verifiedState = true
+	tx.vm.pubsub.Publish("verified", tx.ID())
+	return nil
 }
 
 // SyntacticVerify verifies that this transaction is well formed
@@ -299,30 +306,19 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, len(tx.vm.fxs))
+	tx.validity = tx.Tx.SyntacticVerify(tx.vm.ctx, tx.vm.codec, tx.vm.ctx.AVAXAssetID, tx.vm.txFee, len(tx.vm.fxs))
 	return tx.validity
 }
 
 // SemanticVerify the validity of this transaction
 func (tx *UniqueTx) SemanticVerify() error {
-	tx.SyntacticVerify()
+	// SyntacticVerify sets the error on validity and is checked in the next
+	// statement
+	_ = tx.SyntacticVerify()
 
 	if tx.validity != nil || tx.verifiedState {
 		return tx.validity
 	}
 
-	if err := tx.Tx.SemanticVerify(tx.vm, tx); err != nil {
-		return err
-	}
-
-	tx.verifiedState = true
-	tx.vm.pubsub.Publish("verified", tx.ID())
-	return nil
-}
-
-// UnsignedBytes returns the unsigned bytes of the transaction
-func (tx *UniqueTx) UnsignedBytes() []byte {
-	b, err := tx.vm.codec.Marshal(&tx.UnsignedTx)
-	tx.vm.ctx.Log.AssertNoError(err)
-	return b
+	return tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx)
 }

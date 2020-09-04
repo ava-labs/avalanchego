@@ -6,27 +6,33 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
+)
+
+var (
+	errNoImportInputs = errors.New("no import inputs")
 )
 
 // ImportTx is a transaction that imports an asset from another blockchain.
 type ImportTx struct {
 	BaseTx `serialize:"true"`
 
-	Ins []*ava.TransferableInput `serialize:"true" json:"importedInputs"` // The inputs to this transaction
+	// Which chain to consume the funds from
+	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
+
+	// The inputs to this transaction
+	ImportedIns []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
-func (t *ImportTx) InputUTXOs() []*ava.UTXOID {
+func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		in.Symbol = true
 		utxos = append(utxos, &in.UTXOID)
 	}
@@ -36,7 +42,7 @@ func (t *ImportTx) InputUTXOs() []*ava.UTXOID {
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *ImportTx) ConsumedAssetIDs() ids.Set {
 	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())
 	}
 	return assets
@@ -45,108 +51,81 @@ func (t *ImportTx) ConsumedAssetIDs() ids.Set {
 // AssetIDs returns the IDs of the assets this transaction depends on
 func (t *ImportTx) AssetIDs() ids.Set {
 	assets := t.BaseTx.AssetIDs()
-	for _, in := range t.Ins {
+	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())
 	}
 	return assets
 }
 
 // NumCredentials returns the number of expected credentials
-func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.Ins) }
-
-var (
-	errNoImportInputs = errors.New("no import inputs")
-)
+func (t *ImportTx) NumCredentials() int { return t.BaseTx.NumCredentials() + len(t.ImportedIns) }
 
 // SyntacticVerify that this transaction is well-formed.
-func (t *ImportTx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *ImportTx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.NetID != ctx.NetworkID:
-		return errWrongNetworkID
-	case !t.BCID.Equals(ctx.ChainID):
-		return errWrongChainID
-	case len(t.Ins) == 0:
+	case t.SourceChain.IsZero():
+		return errWrongBlockchainID
+	case len(t.ImportedIns) == 0:
 		return errNoImportInputs
 	}
 
-	fc := ava.NewFlowChecker()
-	for _, out := range t.Outs {
-		if err := out.Verify(); err != nil {
-			return err
-		}
-		fc.Produce(out.AssetID(), out.Output().Amount())
-	}
-	if !ava.IsSortedTransferableOutputs(t.Outs, c) {
-		return errOutputsNotSorted
-	}
-
-	for _, in := range t.BaseTx.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-	if !ava.IsSortedAndUniqueTransferableInputs(t.BaseTx.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	for _, in := range t.Ins {
-		if err := in.Verify(); err != nil {
-			return err
-		}
-		fc.Consume(in.AssetID(), in.Input().Amount())
-	}
-	if !ava.IsSortedAndUniqueTransferableInputs(t.Ins) {
-		return errInputsNotSortedUnique
-	}
-
-	// TODO: Add the Tx fee to the produced side
-
-	return fc.Verify()
-}
-
-// SemanticVerify that this transaction is well-formed.
-func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error {
-	if err := t.BaseTx.SemanticVerify(vm, uTx, creds); err != nil {
+	if err := t.MetadataVerify(ctx); err != nil {
 		return err
 	}
 
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
+	return avax.VerifyTx(
+		txFee,
+		txFeeAssetID,
+		[][]*avax.TransferableInput{
+			t.Ins,
+			t.ImportedIns,
+		},
+		[][]*avax.TransferableOutput{t.Outs},
+		c,
+	)
+}
 
-	state := ava.NewPrefixedState(smDB, vm.codec)
+// SemanticVerify that this transaction is well-formed.
+func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
+	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
+	if err != nil {
+		return err
+	}
+	if !vm.ctx.SubnetID.Equals(subnetID) || t.SourceChain.Equals(vm.ctx.ChainID) {
+		return errWrongBlockchainID
+	}
+
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
+		return err
+	}
+
+	utxoIDs := make([][]byte, len(t.ImportedIns))
+	for i, in := range t.ImportedIns {
+		utxoIDs[i] = in.UTXOID.InputID().Bytes()
+	}
+	allUTXOBytes, err := vm.ctx.SharedMemory.Get(t.SourceChain, utxoIDs)
+	if err != nil {
+		return err
+	}
 
 	offset := t.BaseTx.NumCredentials()
-	for i, in := range t.Ins {
+	for i, in := range t.ImportedIns {
+		utxo := avax.UTXO{}
+		if err := vm.codec.Unmarshal(allUTXOBytes[i], &utxo); err != nil {
+			return err
+		}
+
 		cred := creds[i+offset]
 
-		fxIndex, err := vm.getFx(cred)
-		if err != nil {
-			return err
-		}
-		fx := vm.fxs[fxIndex].Fx
-
-		utxoID := in.UTXOID.InputID()
-		utxo, err := state.PlatformUTXO(utxoID)
-		if err != nil {
-			return err
-		}
-		utxoAssetID := utxo.AssetID()
-		inAssetID := in.AssetID()
-		if !utxoAssetID.Equals(inAssetID) {
-			return errAssetIDMismatch
-		}
-		if !utxoAssetID.Equals(vm.ava) {
-			return errWrongAssetID
-		}
-
-		if !vm.verifyFxUsage(fxIndex, inAssetID) {
-			return errIncompatibleFx
-		}
-
-		if err := fx.VerifyTransfer(uTx, in.In, cred, utxo.Out); err != nil {
+		if err := vm.verifyTransferOfUTXO(tx, in, cred, &utxo); err != nil {
 			return err
 		}
 	}
@@ -155,23 +134,9 @@ func (t *ImportTx) SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiab
 
 // ExecuteWithSideEffects writes the batch with any additional side effects
 func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
-	smDB := vm.ctx.SharedMemory.GetDatabase(vm.platform)
-	defer vm.ctx.SharedMemory.ReleaseDatabase(vm.platform)
-
-	vsmDB := versiondb.New(smDB)
-
-	state := ava.NewPrefixedState(vsmDB, vm.codec)
-	for _, in := range t.Ins {
-		utxoID := in.UTXOID.InputID()
-		if err := state.SpendPlatformUTXO(utxoID); err != nil {
-			return err
-		}
+	utxoIDs := make([][]byte, len(t.ImportedIns))
+	for i, in := range t.ImportedIns {
+		utxoIDs[i] = in.UTXOID.InputID().Bytes()
 	}
-
-	sharedBatch, err := vsmDB.CommitBatch()
-	if err != nil {
-		return err
-	}
-
-	return atomic.WriteAll(batch, sharedBatch)
+	return vm.ctx.SharedMemory.Remove(t.SourceChain, utxoIDs, batch)
 }

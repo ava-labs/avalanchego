@@ -1,8 +1,8 @@
-
+#!/usr/bin/env ansible-playbook
 ---
 - name: Update the network
   connection: ssh
   gather_facts: false
   hosts: all
   roles:
-    - name: ava-stop
+    - name: avalanche_stop

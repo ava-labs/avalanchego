@@ -131,13 +131,13 @@ func TestKeychainMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, ok := kc.Match(&owners); ok {
+	if _, _, ok := kc.Match(&owners, 0); ok {
 		t.Fatalf("Shouldn't have been able to match with the owners")
 	}
 
 	kc.Add(sks[1])
 
-	if indices, keys, ok := kc.Match(&owners); !ok {
+	if indices, keys, ok := kc.Match(&owners, 1); !ok {
 		t.Fatalf("Should have been able to match with the owners")
 	} else if numIndices := len(indices); numIndices != 1 {
 		t.Fatalf("Should have returned one index")
@@ -151,7 +151,7 @@ func TestKeychainMatch(t *testing.T) {
 
 	kc.Add(sks[2])
 
-	if indices, keys, ok := kc.Match(&owners); !ok {
+	if indices, keys, ok := kc.Match(&owners, 1); !ok {
 		t.Fatalf("Should have been able to match with the owners")
 	} else if numIndices := len(indices); numIndices != 1 {
 		t.Fatalf("Should have returned one index")
@@ -207,7 +207,7 @@ func TestKeychainSpendMint(t *testing.T) {
 
 	if input, keys, err := kc.Spend(&mint, 0); err != nil {
 		t.Fatal(err)
-	} else if input, ok := input.(*MintInput); !ok {
+	} else if input, ok := input.(*Input); !ok {
 		t.Fatalf("Wrong input type returned")
 	} else if err := input.Verify(); err != nil {
 		t.Fatal(err)
@@ -249,9 +249,9 @@ func TestKeychainSpendTransfer(t *testing.T) {
 	}
 
 	transfer := TransferOutput{
-		Amt:      12345,
-		Locktime: 54321,
+		Amt: 12345,
 		OutputOwners: OutputOwners{
+			Locktime:  54321,
 			Threshold: 2,
 			Addrs: []ids.ShortID{
 				sks[1].PublicKey().Address(),

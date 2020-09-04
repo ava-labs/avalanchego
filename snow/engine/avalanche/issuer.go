@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 )
 
+// issuer issues [vtx] into consensus after its dependencies are met.
 type issuer struct {
 	t                 *Transitive
 	vtx               avalanche.Vertex
@@ -16,83 +17,99 @@ type issuer struct {
 	vtxDeps, txDeps   ids.Set
 }
 
+// Register that a vertex we were waiting on has been issued to consensus.
 func (i *issuer) FulfillVtx(id ids.ID) {
 	i.vtxDeps.Remove(id)
 	i.Update()
 }
 
+// Register that a transaction we were waiting on has been issued to consensus.
 func (i *issuer) FulfillTx(id ids.ID) {
 	i.txDeps.Remove(id)
 	i.Update()
 }
 
+// Abandon this attempt to issue
 func (i *issuer) Abandon() {
 	if !i.abandoned {
 		vtxID := i.vtx.ID()
 		i.t.pending.Remove(vtxID)
 		i.abandoned = true
-
-		i.t.vtxBlocked.Abandon(vtxID)
+		i.t.vtxBlocked.Abandon(vtxID) // Inform vertices waiting on this vtx that it won't be issued
 	}
 }
 
+// Issue the poll when all dependencies are met
 func (i *issuer) Update() {
 	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
+	// All dependencies have been met
 	i.issued = true
 
 	vtxID := i.vtx.ID()
-	i.t.pending.Remove(vtxID)
+	i.t.pending.Remove(vtxID) // Remove from set of vertices waiting to be issued.
 
-	txs := i.vtx.Txs()
-	validTxs := []snowstorm.Tx{}
+	// Make sure the transactions in this vertex are valid
+	txs, err := i.vtx.Txs()
+	if err != nil {
+		i.t.errs.Add(err)
+		return
+	}
+	validTxs := make([]snowstorm.Tx, 0, len(txs))
 	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
-			i.t.Config.Context.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
+			i.t.Ctx.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
 		} else {
 			validTxs = append(validTxs, tx)
 		}
 	}
 
+	// Some of the transactions weren't valid. Abandon this vertex.
+	// Take the valid transactions and issue a new vertex with them.
 	if len(validTxs) != len(txs) {
-		i.t.Config.Context.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
-
-		i.t.batch(validTxs, false /*=force*/, false /*=empty*/)
+		i.t.Ctx.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
+		if err := i.t.batch(validTxs, false /*=force*/, false /*=empty*/); err != nil {
+			i.t.errs.Add(err)
+		}
 		i.t.vtxBlocked.Abandon(vtxID)
 		return
 	}
 
-	i.t.Config.Context.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
+	i.t.Ctx.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
 
+	// Add this vertex to consensus.
 	if err := i.t.Consensus.Add(i.vtx); err != nil {
 		i.t.errs.Add(err)
 		return
 	}
 
+	// Issue a poll for this vertex.
 	p := i.t.Consensus.Parameters()
-	vdrs := i.t.Config.Validators.Sample(p.K) // Validators to sample
+	vdrs, err := i.t.Validators.Sample(p.K) // Validators to sample
 
-	vdrSet := ids.ShortSet{} // Validators to sample repr. as a set
+	vdrBag := ids.ShortBag{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
-		vdrSet.Add(vdr.ID())
+		vdrBag.Add(vdr.ID())
 	}
 
-	toSample := ids.ShortSet{} // Copy to a new variable because we may remove an element in sender.Sender
-	toSample.Union(vdrSet)     // and we don't want that to affect the set of validators we wait for [ie vdrSet]
+	vdrSet := ids.ShortSet{}
+	vdrSet.Add(vdrBag.List()...)
 
 	i.t.RequestID++
-	if numVdrs := len(vdrs); numVdrs == p.K && i.t.polls.Add(i.t.RequestID, vdrSet) {
-		i.t.Config.Sender.PushQuery(toSample, i.t.RequestID, vtxID, i.vtx.Bytes())
-	} else if numVdrs < p.K {
-		i.t.Config.Context.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
+	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {
+		i.t.Sender.PushQuery(vdrSet, i.t.RequestID, vtxID, i.vtx.Bytes())
+	} else if err != nil {
+		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
 
+	// Notify vertices waiting on this one that it (and its transactions) have been issued.
 	i.t.vtxBlocked.Fulfill(vtxID)
-	for _, tx := range i.vtx.Txs() {
+	for _, tx := range txs {
 		i.t.txBlocked.Fulfill(tx.ID())
 	}
 
+	// Issue a repoll
 	i.t.errs.Add(i.t.repoll())
 }
 

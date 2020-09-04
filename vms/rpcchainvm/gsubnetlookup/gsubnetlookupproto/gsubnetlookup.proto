@@ -1,0 +1,14 @@
+syntax = "proto3";
+package gsubnetlookupproto;
+
+message SubnetIDRequest {
+    bytes chainID = 1;
+}
+
+message SubnetIDResponse {
+    bytes id = 1;
+}
+
+service SubnetLookup {
+    rpc SubnetID(SubnetIDRequest) returns (SubnetIDResponse);
+}

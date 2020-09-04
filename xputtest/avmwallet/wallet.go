@@ -11,19 +11,18 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-// Wallet is a holder for keys and UTXOs for the Ava DAG.
+// Wallet is a holder for keys and UTXOs for the Avalanche DAG.
 type Wallet struct {
 	networkID uint32
 	chainID   ids.ID
@@ -38,8 +37,7 @@ type Wallet struct {
 	balance map[[32]byte]uint64
 	txFee   uint64
 
-	txsSent int32
-	txs     []*avm.Tx
+	txs []*avm.Tx
 }
 
 // NewWallet returns a new Wallet
@@ -95,8 +93,8 @@ func (w *Wallet) ImportKey(sk *crypto.PrivateKeySECP256K1R) { w.keychain.Add(sk)
 
 // AddUTXO adds a new UTXO to this wallet if this wallet may spend it
 // The UTXO's output must be an OutputPayment
-func (w *Wallet) AddUTXO(utxo *ava.UTXO) {
-	out, ok := utxo.Out.(ava.Transferable)
+func (w *Wallet) AddUTXO(utxo *avax.UTXO) {
+	out, ok := utxo.Out.(avax.TransferableOut)
 	if !ok {
 		return
 	}
@@ -116,7 +114,7 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 
 	assetID := utxo.AssetID()
 	assetKey := assetID.Key()
-	newBalance := w.balance[assetKey] - utxo.Out.(ava.Transferable).Amount()
+	newBalance := w.balance[assetKey] - utxo.Out.(avax.TransferableOut).Amount()
 	if newBalance == 0 {
 		delete(w.balance, assetKey)
 	} else {
@@ -138,7 +136,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 	amountSpent := uint64(0)
 	time := w.clock.Unix()
 
-	ins := []*ava.TransferableInput{}
+	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range w.utxoSet.UTXOs {
 		if !utxo.AssetID().Equals(assetID) {
@@ -148,7 +146,7 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		if err != nil {
 			continue
 		}
-		input, ok := inputIntf.(ava.Transferable)
+		input, ok := inputIntf.(avax.TransferableIn)
 		if !ok {
 			continue
 		}
@@ -158,9 +156,9 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		}
 		amountSpent = spent
 
-		in := &ava.TransferableInput{
+		in := &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  ava.Asset{ID: assetID},
+			Asset:  avax.Asset{ID: assetID},
 			In:     input,
 		}
 
@@ -176,14 +174,14 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		return nil, errors.New("insufficient funds")
 	}
 
-	ava.SortTransferableInputsWithSigners(ins, keys)
+	avax.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*ava.TransferableOutput{&ava.TransferableOutput{
-		Asset: ava.Asset{ID: assetID},
+	outs := []*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:      amount,
-			Locktime: 0,
+			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{destAddr},
 			},
@@ -195,12 +193,12 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		if err != nil {
 			return nil, err
 		}
-		outs = append(outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: assetID},
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:      amountSpent - amount,
-				Locktime: 0,
+				Amt: amountSpent - amount,
 				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{changeAddr},
 				},
@@ -208,45 +206,15 @@ func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (
 		})
 	}
 
-	ava.SortTransferableOutputs(outs, w.codec)
+	avax.SortTransferableOutputs(outs, w.codec)
 
-	tx := &avm.Tx{
-		UnsignedTx: &avm.BaseTx{
-			NetID: w.networkID,
-			BCID:  w.chainID,
-			Outs:  outs,
-			Ins:   ins,
-		},
-	}
-
-	unsignedBytes, err := w.codec.Marshal(&tx.UnsignedTx)
-	if err != nil {
-		return nil, err
-	}
-	hash := hashing.ComputeHash256(unsignedBytes)
-
-	for _, credKeys := range keys {
-		cred := &secp256k1fx.Credential{}
-		for _, key := range credKeys {
-			sig, err := key.SignHash(hash)
-			if err != nil {
-				return nil, err
-			}
-			fixedSig := [crypto.SECP256K1RSigLen]byte{}
-			copy(fixedSig[:], sig)
-
-			cred.Sigs = append(cred.Sigs, fixedSig)
-		}
-		tx.Creds = append(tx.Creds, cred)
-	}
-
-	b, err := w.codec.Marshal(tx)
-	if err != nil {
-		return nil, err
-	}
-	tx.Initialize(b)
-
-	return tx, nil
+	tx := &avm.Tx{UnsignedTx: &avm.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    w.networkID,
+		BlockchainID: w.chainID,
+		Outs:         outs,
+		Ins:          ins,
+	}}}
+	return tx, tx.SignSECP256K1Fx(w.codec, keys)
 }
 
 // GenerateTxs generates the transactions that will be sent

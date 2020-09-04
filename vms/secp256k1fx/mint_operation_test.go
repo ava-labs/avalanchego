@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestMintOperationVerifyNil(t *testing.T) {
@@ -30,9 +31,9 @@ func TestMintOperationOuts(t *testing.T) {
 			},
 		},
 		TransferOutput: TransferOutput{
-			Amt:      1,
-			Locktime: 0,
+			Amt: 1,
 			OutputOwners: OutputOwners{
+				Locktime:  0,
 				Threshold: 1,
 			},
 		},
@@ -41,5 +42,12 @@ func TestMintOperationOuts(t *testing.T) {
 	outs := op.Outs()
 	if len(outs) != 2 {
 		t.Fatalf("Wrong number of outputs")
+	}
+}
+
+func TestMintOperationState(t *testing.T) {
+	intf := interface{}(&MintOperation{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

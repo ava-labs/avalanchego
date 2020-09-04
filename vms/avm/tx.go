@@ -5,13 +5,18 @@ package avm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/gecko/vms/nftfx"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 var (
@@ -20,19 +25,20 @@ var (
 
 // UnsignedTx ...
 type UnsignedTx interface {
-	Initialize(bytes []byte)
+	Initialize(unsignedBytes, bytes []byte)
 	ID() ids.ID
+	UnsignedBytes() []byte
 	Bytes() []byte
 
 	ConsumedAssetIDs() ids.Set
 	AssetIDs() ids.Set
 
 	NumCredentials() int
-	InputUTXOs() []*ava.UTXOID
-	UTXOs() []*ava.UTXO
+	InputUTXOs() []*avax.UTXOID
+	UTXOs() []*avax.UTXO
 
-	SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
-	SemanticVerify(vm *VM, uTx *UniqueTx, creds []verify.Verifiable) error
+	SyntacticVerify(ctx *snow.Context, c codec.Codec, txFeeAssetID ids.ID, txFee uint64, numFxs int) error
+	SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error
 	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
 
@@ -52,13 +58,19 @@ type Tx struct {
 func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
 
 // SyntacticVerify verifies that this transaction is well-formed.
-func (t *Tx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error {
+func (t *Tx) SyntacticVerify(
+	ctx *snow.Context,
+	c codec.Codec,
+	txFeeAssetID ids.ID,
+	txFee uint64,
+	numFxs int,
+) error {
 	switch {
 	case t == nil || t.UnsignedTx == nil:
 		return errNilTx
 	}
 
-	if err := t.UnsignedTx.SyntacticVerify(ctx, c, numFxs); err != nil {
+	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
 		return err
 	}
 
@@ -75,10 +87,70 @@ func (t *Tx) SyntacticVerify(ctx *snow.Context, c codec.Codec, numFxs int) error
 }
 
 // SemanticVerify verifies that this transaction is well-formed.
-func (t *Tx) SemanticVerify(vm *VM, uTx *UniqueTx) error {
+func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx) error {
 	if t == nil {
 		return errNilTx
 	}
 
-	return t.UnsignedTx.SemanticVerify(vm, uTx, t.Creds)
+	return t.UnsignedTx.SemanticVerify(vm, tx, t.Creds)
+}
+
+// SignSECP256K1Fx ...
+func (t *Tx) SignSECP256K1Fx(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(&t.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	hash := hashing.ComputeHash256(unsignedBytes)
+	for _, keys := range signers {
+		cred := &secp256k1fx.Credential{
+			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
+		}
+		for i, key := range keys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			copy(cred.Sigs[i][:], sig)
+		}
+		t.Creds = append(t.Creds, cred)
+	}
+
+	signedBytes, err := c.Marshal(t)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	t.Initialize(unsignedBytes, signedBytes)
+	return nil
+}
+
+// SignNFTFx ...
+func (t *Tx) SignNFTFx(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(&t.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	hash := hashing.ComputeHash256(unsignedBytes)
+	for _, keys := range signers {
+		cred := &nftfx.Credential{Credential: secp256k1fx.Credential{
+			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
+		}}
+		for i, key := range keys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			copy(cred.Sigs[i][:], sig)
+		}
+		t.Creds = append(t.Creds, cred)
+	}
+
+	signedBytes, err := c.Marshal(t)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	t.Initialize(unsignedBytes, signedBytes)
+	return nil
 }

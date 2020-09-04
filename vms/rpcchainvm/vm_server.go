@@ -16,10 +16,19 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/snowman"
+	"github.com/ava-labs/gecko/snow/engine/snowman/block"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
@@ -27,7 +36,7 @@ import (
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
-	vm     snowman.ChainVM
+	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 
 	lock    sync.Mutex
@@ -35,11 +44,12 @@ type VMServer struct {
 	servers []*grpc.Server
 	conns   []*grpc.ClientConn
 
+	ctx      *snow.Context
 	toEngine chan common.Message
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
-func NewServer(vm snowman.ChainVM, broker *plugin.GRPCBroker) *VMServer {
+func NewServer(vm block.ChainVM, broker *plugin.GRPCBroker) *VMServer {
 	return &VMServer{
 		vm:     vm,
 		broker: broker,
@@ -48,32 +58,111 @@ func NewServer(vm snowman.ChainVM, broker *plugin.GRPCBroker) *VMServer {
 
 // Initialize ...
 func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest) (*vmproto.InitializeResponse, error) {
+	subnetID, err := ids.ToID(req.SubnetID)
+	if err != nil {
+		return nil, err
+	}
+	chainID, err := ids.ToID(req.ChainID)
+	if err != nil {
+		return nil, err
+	}
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	xChainID, err := ids.ToID(req.XChainID)
+	if err != nil {
+		return nil, err
+	}
+	avaxAssetID, err := ids.ToID(req.AvaxAssetID)
+	if err != nil {
+		return nil, err
+	}
+
 	dbConn, err := vm.broker.Dial(req.DbServer)
 	if err != nil {
 		return nil, err
 	}
 	msgConn, err := vm.broker.Dial(req.EngineServer)
 	if err != nil {
-		dbConn.Close()
+		// Ignore DB closing error to return the original error
+		_ = dbConn.Close()
+		return nil, err
+	}
+	keystoreConn, err := vm.broker.Dial(req.KeystoreServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
+		return nil, err
+	}
+	sharedMemoryConn, err := vm.broker.Dial(req.SharedMemoryServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
+		_ = keystoreConn.Close()
+		return nil, err
+	}
+	bcLookupConn, err := vm.broker.Dial(req.BcLookupServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
+		_ = keystoreConn.Close()
+		_ = sharedMemoryConn.Close()
+		return nil, err
+	}
+	snLookupConn, err := vm.broker.Dial(req.SnLookupServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
+		_ = keystoreConn.Close()
+		_ = sharedMemoryConn.Close()
+		_ = bcLookupConn.Close()
 		return nil, err
 	}
 
 	dbClient := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
 	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
+	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(keystoreConn), vm.broker)
+	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(sharedMemoryConn))
+	bcLookupClient := galiaslookup.NewClient(galiaslookupproto.NewAliasLookupClient(bcLookupConn))
+	snLookupClient := gsubnetlookup.NewClient(gsubnetlookupproto.NewSubnetLookupClient(snLookupConn))
 
 	toEngine := make(chan common.Message, 1)
 	go func() {
 		for msg := range toEngine {
-			msgClient.Notify(msg)
+			// Nothing to do with the error within the goroutine
+			_ = msgClient.Notify(msg)
 		}
 	}()
 
-	// TODO: Needs to populate a real context
-	ctx := snow.DefaultContextTest()
+	vm.ctx = &snow.Context{
+		NetworkID:           req.NetworkID,
+		SubnetID:            subnetID,
+		ChainID:             chainID,
+		NodeID:              nodeID,
+		XChainID:            xChainID,
+		AVAXAssetID:         avaxAssetID,
+		Log:                 logging.NoLog{},
+		DecisionDispatcher:  nil,
+		ConsensusDispatcher: nil,
+		Keystore:            keystoreClient,
+		SharedMemory:        sharedMemoryClient,
+		BCLookup:            bcLookupClient,
+		SNLookup:            snLookupClient,
+	}
 
-	if err := vm.vm.Initialize(ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
-		dbConn.Close()
-		msgConn.Close()
+	if err := vm.vm.Initialize(vm.ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
+		// Ignore errors closing resources to return the original error
+		_ = dbConn.Close()
+		_ = msgConn.Close()
+		_ = keystoreConn.Close()
+		_ = sharedMemoryConn.Close()
+		_ = bcLookupConn.Close()
+		_ = snLookupConn.Close()
 		close(toEngine)
 		return nil, err
 	}
@@ -81,7 +170,9 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	vm.conns = append(vm.conns, dbConn)
 	vm.conns = append(vm.conns, msgConn)
 	vm.toEngine = toEngine
-	return &vmproto.InitializeResponse{}, nil
+	return &vmproto.InitializeResponse{
+		LastAcceptedID: vm.vm.LastAccepted().Bytes(),
+	}, nil
 }
 
 // Bootstrapping ...
@@ -91,6 +182,7 @@ func (vm *VMServer) Bootstrapping(context.Context, *vmproto.BootstrappingRequest
 
 // Bootstrapped ...
 func (vm *VMServer) Bootstrapped(context.Context, *vmproto.BootstrappedRequest) (*vmproto.BootstrappedResponse, error) {
+	vm.ctx.Bootstrapped()
 	return &vmproto.BootstrappedResponse{}, vm.vm.Bootstrapped()
 }
 
@@ -202,11 +294,6 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceR
 	return &vmproto.SetPreferenceResponse{}, nil
 }
 
-// LastAccepted ...
-func (vm *VMServer) LastAccepted(_ context.Context, _ *vmproto.LastAcceptedRequest) (*vmproto.LastAcceptedResponse, error) {
-	return &vmproto.LastAcceptedResponse{Id: vm.vm.LastAccepted().Bytes()}, nil
-}
-
 // BlockVerify ...
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
 	id, err := ids.ToID(req.Id)
@@ -230,7 +317,9 @@ func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptReque
 	if err != nil {
 		return nil, err
 	}
-	blk.Accept()
+	if err := blk.Accept(); err != nil {
+		return nil, err
+	}
 	return &vmproto.BlockAcceptResponse{}, nil
 }
 
@@ -244,6 +333,8 @@ func (vm *VMServer) BlockReject(_ context.Context, req *vmproto.BlockRejectReque
 	if err != nil {
 		return nil, err
 	}
-	blk.Reject()
+	if err := blk.Reject(); err != nil {
+		return nil, err
+	}
 	return &vmproto.BlockRejectResponse{}, nil
 }

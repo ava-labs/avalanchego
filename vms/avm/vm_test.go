@@ -5,34 +5,40 @@ package avm
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/gecko/api/keystore"
+	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database/memdb"
+	"github.com/ava-labs/gecko/database/mockdb"
+	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 	"github.com/ava-labs/gecko/vms/nftfx"
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-var networkID uint32 = 43110
+var networkID uint32 = 10
 var chainID = ids.NewID([32]byte{5, 4, 3, 2, 1})
+var platformChainID = ids.Empty.Prefix(0)
 
 var keys []*crypto.PrivateKeySECP256K1R
-var ctx *snow.Context
 var asset = ids.NewID([32]byte{1, 2, 3})
+var username = "bobby"
+var password = "StrnasfqewiurPasswdn56d"
 
 func init() {
-	ctx = snow.DefaultContextTest()
-	ctx.NetworkID = networkID
-	ctx.ChainID = chainID
 	cb58 := formatting.CB58{}
 	factory := crypto.FactorySECP256K1R{}
 
@@ -41,11 +47,46 @@ func init() {
 		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
 		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
 	} {
-		ctx.Log.AssertNoError(cb58.FromString(key))
-		pk, err := factory.ToPrivateKey(cb58.Bytes)
-		ctx.Log.AssertNoError(err)
+		_ = cb58.FromString(key)
+		pk, _ := factory.ToPrivateKey(cb58.Bytes)
 		keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
 	}
+}
+
+type snLookup struct {
+	chainsToSubnet map[[32]byte]ids.ID
+}
+
+func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
+	subnetID, ok := sn.chainsToSubnet[chainID.Key()]
+	if !ok {
+		return ids.ID{}, errors.New("")
+	}
+	return subnetID, nil
+}
+
+func NewContext(t *testing.T) *snow.Context {
+	genesisBytes := BuildGenesisTest(t)
+	tx := GetFirstTxFromGenesisTest(genesisBytes, t)
+
+	ctx := snow.DefaultContextTest()
+	ctx.NetworkID = networkID
+	ctx.ChainID = chainID
+	ctx.AVAXAssetID = tx.ID()
+	ctx.XChainID = ids.Empty.Prefix(0)
+	aliaser := ctx.BCLookup.(*ids.Aliaser)
+	aliaser.Alias(chainID, "X")
+	aliaser.Alias(chainID, chainID.String())
+	aliaser.Alias(platformChainID, "P")
+	aliaser.Alias(platformChainID, platformChainID.String())
+
+	sn := &snLookup{
+		chainsToSubnet: make(map[[32]byte]ids.ID),
+	}
+	sn.chainsToSubnet[chainID.Key()] = ctx.SubnetID
+	sn.chainsToSubnet[platformChainID.Key()] = ctx.SubnetID
+	ctx.SNLookup = sn
+	return ctx
 }
 
 func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
@@ -55,33 +96,31 @@ func GetFirstTxFromGenesisTest(genesisBytes []byte, t *testing.T) *Tx {
 		t.Fatal(err)
 	}
 
-	for _, genesisTx := range genesis.Txs {
-		if len(genesisTx.Outs) != 0 {
-			t.Fatal("genesis tx can't have non-new assets")
-		}
-
-		tx := Tx{
-			UnsignedTx: &genesisTx.CreateAssetTx,
-		}
-		txBytes, err := c.Marshal(&tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tx.Initialize(txBytes)
-
-		return &tx
+	if len(genesis.Txs) == 0 {
+		t.Fatal("genesis tx didn't have any txs")
 	}
 
-	t.Fatal("genesis tx didn't have any txs")
-	return nil
+	genesisTx := genesis.Txs[0]
+	if len(genesisTx.Outs) != 0 {
+		t.Fatal("genesis tx can't have non-new assets")
+	}
+
+	tx := Tx{
+		UnsignedTx: &genesisTx.CreateAssetTx,
+	}
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	return &tx
 }
 
 func BuildGenesisTest(t *testing.T) []byte {
 	ss := StaticService{}
 
-	addr0 := keys[0].PublicKey().Address()
-	addr1 := keys[1].PublicKey().Address()
-	addr2 := keys[2].PublicKey().Address()
+	addr0, _ := formatting.FormatBech32(testHRP, keys[0].PublicKey().Address().Bytes())
+	addr1, _ := formatting.FormatBech32(testHRP, keys[1].PublicKey().Address().Bytes())
+	addr2, _ := formatting.FormatBech32(testHRP, keys[2].PublicKey().Address().Bytes())
 
 	args := BuildGenesisArgs{GenesisData: map[string]AssetDefinition{
 		"asset1": {
@@ -91,19 +130,19 @@ func BuildGenesisTest(t *testing.T) []byte {
 				"fixedCap": {
 					Holder{
 						Amount:  100000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  100000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  50000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 					Holder{
 						Amount:  50000,
-						Address: addr0.String(),
+						Address: addr0,
 					},
 				},
 			},
@@ -116,16 +155,16 @@ func BuildGenesisTest(t *testing.T) []byte {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							addr0.String(),
-							addr1.String(),
+							addr0,
+							addr1,
 						},
 					},
 					Owners{
 						Threshold: 2,
 						Minters: []string{
-							addr0.String(),
-							addr1.String(),
-							addr2.String(),
+							addr0,
+							addr1,
+							addr2,
 						},
 					},
 				},
@@ -138,7 +177,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 					Owners{
 						Threshold: 1,
 						Minters: []string{
-							addr0.String(),
+							addr0,
 						},
 					},
 				},
@@ -154,24 +193,43 @@ func BuildGenesisTest(t *testing.T) []byte {
 	return reply.Bytes.Bytes
 }
 
-func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
+func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	genesisBytes := BuildGenesisTest(t)
+	ctx := NewContext(t)
+
+	baseDB := memdb.New()
+
+	m := &atomic.Memory{}
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
+	userKeystore := keystore.CreateTestKeystore()
+	if err := userKeystore.AddUser(username, password); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
+
 	issuer := make(chan common.Message, 1)
 	vm := &VM{}
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
 		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
+		[]*common.Fx{
+			{
+				ID: ids.Empty,
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: nftfx.ID,
+				Fx: &nftfx.Fx{},
+			},
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -186,21 +244,21 @@ func GenesisVM(t *testing.T) ([]byte, chan common.Message, *VM) {
 		t.Fatal(err)
 	}
 
-	return genesisBytes, issuer, vm
+	return genesisBytes, issuer, vm, m
 }
 
 func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
 
-	newTx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+	newTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt: 50000,
 				Input: secp256k1fx.Input{
@@ -210,41 +268,21 @@ func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 				},
 			},
 		}},
-	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&newTx.UnsignedTx)
-	if err != nil {
+	}}}
+	if err := newTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	newTx.Creds = append(newTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(newTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	newTx.Initialize(b)
 	return newTx
 }
 
 func TestTxSerialization(t *testing.T) {
 	expected := []byte{
+		// Codec version:
+		0x00, 0x00,
 		// txID:
 		0x00, 0x00, 0x00, 0x01,
 		// networkID:
-		0x00, 0x00, 0xa8, 0x66,
+		0x00, 0x00, 0x00, 0x0a,
 		// chainID:
 		0x05, 0x04, 0x03, 0x02, 0x01, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -317,6 +355,10 @@ func TestTxSerialization(t *testing.T) {
 		0x92, 0xf0, 0xee, 0x31,
 		// number of inputs:
 		0x00, 0x00, 0x00, 0x00,
+		// Memo length:
+		0x00, 0x00, 0x00, 0x04,
+		// Memo:
+		0x00, 0x01, 0x02, 0x03,
 		// name length:
 		0x00, 0x04,
 		// name:
@@ -336,6 +378,8 @@ func TestTxSerialization(t *testing.T) {
 		// fxID:
 		0x00, 0x00, 0x00, 0x06,
 		// secp256k1 Mint Output:
+		// locktime:
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		// threshold:
 		0x00, 0x00, 0x00, 0x01,
 		// number of addresses:
@@ -349,17 +393,18 @@ func TestTxSerialization(t *testing.T) {
 	}
 
 	unsignedTx := &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Memo:         []byte{0x00, 0x01, 0x02, 0x03},
+		}},
 		Name:         "name",
 		Symbol:       "symb",
 		Denomination: 0,
 		States: []*InitialState{
 			{
 				FxID: 0,
-				Outs: []verify.Verifiable{
+				Outs: []verify.State{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -374,10 +419,10 @@ func TestTxSerialization(t *testing.T) {
 	for _, key := range keys {
 		addr := key.PublicKey().Address()
 
-		unsignedTx.Outs = append(unsignedTx.Outs, &ava.TransferableOutput{
-			Asset: ava.Asset{ID: asset},
+		unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: asset},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: 20 * units.KiloAva,
+				Amt: 20 * units.KiloAvax,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{addr},
@@ -387,11 +432,9 @@ func TestTxSerialization(t *testing.T) {
 	}
 
 	c := setupCodec()
-	b, err := c.Marshal(tx)
-	if err != nil {
+	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	tx.Initialize(b)
 
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
@@ -401,6 +444,7 @@ func TestTxSerialization(t *testing.T) {
 
 func TestInvalidGenesis(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -421,6 +465,7 @@ func TestInvalidGenesis(t *testing.T) {
 
 func TestInvalidFx(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -444,6 +489,7 @@ func TestInvalidFx(t *testing.T) {
 
 func TestFxInitializationFailure(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -458,7 +504,11 @@ func TestFxInitializationFailure(t *testing.T) {
 		/*engineMessenger=*/ make(chan common.Message, 1),
 		/*fxs=*/ []*common.Fx{{
 			ID: ids.Empty,
-			Fx: &testFx{initialize: errUnknownFx},
+			Fx: &FxTest{
+				InitializeF: func(interface{}) error {
+					return errUnknownFx
+				},
+			},
 		}},
 	)
 	if err == nil {
@@ -466,12 +516,9 @@ func TestFxInitializationFailure(t *testing.T) {
 	}
 }
 
-type testTxBytes struct{ unsignedBytes []byte }
-
-func (tx *testTxBytes) UnsignedBytes() []byte { return tx.unsignedBytes }
-
 func TestIssueTx(t *testing.T) {
-	genesisBytes, issuer, vm := GenesisVM(t)
+	genesisBytes, issuer, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -479,7 +526,7 @@ func TestIssueTx(t *testing.T) {
 
 	newTx := NewTx(t, genesisBytes, vm)
 
-	txID, err := vm.IssueTx(newTx.Bytes(), nil)
+	txID, err := vm.IssueTx(newTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,18 +547,18 @@ func TestIssueTx(t *testing.T) {
 }
 
 func TestGenesisGetUTXOs(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
 	}()
 
-	shortAddr := keys[0].PublicKey().Address()
-	addr := ids.NewID(hashing.ComputeHash256Array(shortAddr.Bytes()))
+	addr := keys[0].PublicKey().Address()
 
-	addrs := ids.Set{}
+	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, err := vm.GetUTXOs(addrs)
+	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +571,8 @@ func TestGenesisGetUTXOs(t *testing.T) {
 // Test issuing a transaction that consumes a currently pending UTXO. The
 // transaction should be issued successfully.
 func TestIssueDependentTx(t *testing.T) {
-	genesisBytes, issuer, vm := GenesisVM(t)
+	genesisBytes, issuer, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -534,15 +582,15 @@ func TestIssueDependentTx(t *testing.T) {
 
 	key := keys[0]
 
-	firstTx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        genesisTx.ID(),
 				OutputIndex: 1,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt: 50000,
 				Input: secp256k1fx.Input{
@@ -552,8 +600,8 @@ func TestIssueDependentTx(t *testing.T) {
 				},
 			},
 		}},
-		Outs: []*ava.TransferableOutput{{
-			Asset: ava.Asset{ID: genesisTx.ID()},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 50000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -562,46 +610,24 @@ func TestIssueDependentTx(t *testing.T) {
 				},
 			},
 		}},
-	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&firstTx.UnsignedTx)
-	if err != nil {
+	}}}
+	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	firstTx.Creds = append(firstTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(firstTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstTx.Initialize(b)
-
-	_, err = vm.IssueTx(firstTx.Bytes(), nil)
-	if err != nil {
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	secondTx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
-		Ins: []*ava.TransferableInput{{
-			UTXOID: ava.UTXOID{
+	secondTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        firstTx.ID(),
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: genesisTx.ID()},
+			Asset: avax.Asset{ID: genesisTx.ID()},
 			In: &secp256k1fx.TransferInput{
 				Amt: 50000,
 				Input: secp256k1fx.Input{
@@ -611,34 +637,12 @@ func TestIssueDependentTx(t *testing.T) {
 				},
 			},
 		}},
-	}}
-
-	unsignedBytes, err = vm.codec.Marshal(&secondTx.UnsignedTx)
-	if err != nil {
+	}}}
+	if err := secondTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
 
-	sig, err = key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig = [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	secondTx.Creds = append(secondTx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err = vm.codec.Marshal(secondTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondTx.Initialize(b)
-
-	_, err = vm.IssueTx(secondTx.Bytes(), nil)
-	if err != nil {
+	if _, err := vm.IssueTx(secondTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Lock.Unlock()
@@ -657,6 +661,7 @@ func TestIssueDependentTx(t *testing.T) {
 // Test issuing a transaction that creates an NFT family
 func TestIssueNFT(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -697,16 +702,16 @@ func TestIssueNFT(t *testing.T) {
 	}
 
 	createAssetTx := &Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
 			FxID: 1,
-			Outs: []verify.Verifiable{
+			Outs: []verify.State{
 				&nftfx.MintOutput{
 					GroupID: 1,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -724,25 +729,22 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-
-	b, err := vm.codec.Marshal(createAssetTx)
-	if err != nil {
+	if err := createAssetTx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	createAssetTx.Initialize(b)
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	mintNFTTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
 				TxID:        createAssetTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -756,67 +758,45 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-
-	unsignedBytes, err := vm.codec.Marshal(&mintNFTTx.UnsignedTx)
-	if err != nil {
+	if err := mintNFTTx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	mintNFTTx.Creds = append(mintNFTTx.Creds, &nftfx.Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		}},
-	})
-
-	b, err = vm.codec.Marshal(mintNFTTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mintNFTTx.Initialize(b)
-
-	if _, err = vm.IssueTx(mintNFTTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(mintNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	transferNFTTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
-		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
-				TxID:        mintNFTTx.ID(),
-				OutputIndex: 0,
+	transferNFTTx := &Tx{
+		UnsignedTx: &OperationTx{
+			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
 			}},
-			Op: &nftfx.TransferOperation{
-				Input: secp256k1fx.Input{},
-				Output: nftfx.TransferOutput{
-					GroupID:      1,
-					Payload:      []byte{'h', 'e', 'l', 'l', 'o'},
-					OutputOwners: secp256k1fx.OutputOwners{},
+			Ops: []*Operation{{
+				Asset: avax.Asset{ID: createAssetTx.ID()},
+				UTXOIDs: []*avax.UTXOID{{
+					TxID:        mintNFTTx.ID(),
+					OutputIndex: 0,
+				}},
+				Op: &nftfx.TransferOperation{
+					Input: secp256k1fx.Input{},
+					Output: nftfx.TransferOutput{
+						GroupID:      1,
+						Payload:      []byte{'h', 'e', 'l', 'l', 'o'},
+						OutputOwners: secp256k1fx.OutputOwners{},
+					},
 				},
-			},
-		}},
-	}}
-
-	transferNFTTx.Creds = append(transferNFTTx.Creds, &nftfx.Credential{})
-
-	b, err = vm.codec.Marshal(transferNFTTx)
-	if err != nil {
+			}},
+		},
+		Creds: []verify.Verifiable{
+			&nftfx.Credential{},
+		},
+	}
+	if err := transferNFTTx.SignNFTFx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	transferNFTTx.Initialize(b)
 
-	if _, err = vm.IssueTx(transferNFTTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(transferNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -824,6 +804,7 @@ func TestIssueNFT(t *testing.T) {
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
 	vm := &VM{}
+	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -868,16 +849,16 @@ func TestIssueProperty(t *testing.T) {
 	}
 
 	createAssetTx := &Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
 			FxID: 2,
-			Outs: []verify.Verifiable{
+			Outs: []verify.State{
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
@@ -887,25 +868,22 @@ func TestIssueProperty(t *testing.T) {
 			},
 		}},
 	}}
-
-	b, err := vm.codec.Marshal(createAssetTx)
-	if err != nil {
+	if err := createAssetTx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	createAssetTx.Initialize(b)
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	mintPropertyTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
 				TxID:        createAssetTx.ID(),
 				OutputIndex: 0,
 			}},
@@ -943,24 +921,24 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	})
 
-	b, err = vm.codec.Marshal(mintPropertyTx)
+	signedBytes, err := vm.codec.Marshal(mintPropertyTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mintPropertyTx.Initialize(b)
+	mintPropertyTx.Initialize(unsignedBytes, signedBytes)
 
-	if _, err = vm.IssueTx(mintPropertyTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
 	burnPropertyTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{
-			NetID: networkID,
-			BCID:  chainID,
-		},
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
 		Ops: []*Operation{{
-			Asset: ava.Asset{ID: createAssetTx.ID()},
-			UTXOIDs: []*ava.UTXOID{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
 				TxID:        mintPropertyTx.ID(),
 				OutputIndex: 1,
 			}},
@@ -970,65 +948,441 @@ func TestIssueProperty(t *testing.T) {
 
 	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
 
-	b, err = vm.codec.Marshal(burnPropertyTx)
+	unsignedBytes, err = vm.codec.Marshal(burnPropertyTx.UnsignedTx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	burnPropertyTx.Initialize(b)
+	signedBytes, err = vm.codec.Marshal(burnPropertyTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	burnPropertyTx.Initialize(unsignedBytes, signedBytes)
 
-	if _, err = vm.IssueTx(burnPropertyTx.Bytes(), nil); err != nil {
+	if _, err = vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestVMFormat(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	defer func() {
 		vm.Shutdown()
-		ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	tests := []struct {
-		in       string
+		in       ids.ShortID
 		expected string
 	}{
-		{"", "3D7sudhzUKTYFkYj4Zoe7GgSKhuyP9bYwXunHwhZsmQe1z9Mp-45PJLL"},
+		{ids.ShortEmpty, "X-testing1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqtu2yas"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			if res := vm.Format([]byte(tt.in)); tt.expected != res {
-				t.Errorf("Expected %q, got %q", tt.expected, res)
+	for _, test := range tests {
+		t.Run(test.in.String(), func(t *testing.T) {
+			addrStr, err := vm.FormatLocalAddress(test.in)
+			if err != nil {
+				t.Error(err)
+			}
+			if test.expected != addrStr {
+				t.Errorf("Expected %q, got %q", test.expected, addrStr)
 			}
 		})
 	}
 }
 
-func TestVMFormatAliased(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+func TestTxCached(t *testing.T) {
+	genesisBytes, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
 	}()
 
-	origAliases := ctx.BCLookup
-	defer func() { ctx.BCLookup = origAliases }()
+	newTx := NewTx(t, genesisBytes, vm)
+	txBytes := newTx.Bytes()
 
-	tmpAliases := &ids.Aliaser{}
-	tmpAliases.Initialize()
-	tmpAliases.Alias(ctx.ChainID, "X")
-	ctx.BCLookup = tmpAliases
+	_, err := vm.ParseTx(txBytes)
+	assert.NoError(t, err)
 
-	tests := []struct {
-		in       string
-		expected string
-	}{
-		{"", "X-45PJLL"},
+	db := mockdb.New()
+	called := new(bool)
+	db.OnGet = func([]byte) ([]byte, error) {
+		*called = true
+		return nil, errors.New("")
 	}
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			if res := vm.Format([]byte(tt.in)); tt.expected != res {
-				t.Errorf("Expected %q, got %q", tt.expected, res)
-			}
-		})
+	vm.state.state.DB = db
+	vm.state.state.Cache.Flush()
+
+	_, err = vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+	assert.False(t, *called, "shouldn't have called the DB")
+}
+
+func TestTxNotCached(t *testing.T) {
+	genesisBytes, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := NewTx(t, genesisBytes, vm)
+	txBytes := newTx.Bytes()
+
+	_, err := vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+
+	db := mockdb.New()
+	called := new(bool)
+	db.OnGet = func([]byte) ([]byte, error) {
+		*called = true
+		return nil, errors.New("")
+	}
+	db.OnPut = func([]byte, []byte) error { return nil }
+	vm.state.state.DB = db
+	vm.state.uniqueTx.Flush()
+	vm.state.state.Cache.Flush()
+
+	_, err = vm.ParseTx(txBytes)
+	assert.NoError(t, err)
+	assert.True(t, *called, "should have called the DB")
+}
+
+func TestTxVerifyAfterIssueTx(t *testing.T) {
+	genesisBytes, issuer, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 50000,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	secondTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := secondTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedSecondTx.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedSecondTx.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+	ctx.Lock.Lock()
+
+	txs := vm.PendingTxs()
+	if len(txs) != 1 {
+		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+	parsedFirstTx := txs[0]
+
+	if err := parsedFirstTx.Verify(); err == nil {
+		t.Fatalf("Should have errored due to a missing UTXO")
+	}
+}
+
+func TestTxVerifyAfterGetTx(t *testing.T) {
+	genesisBytes, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 50000,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	secondTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := secondTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedSecondTx.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	parsedFirstTx, err := vm.GetTx(firstTx.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedSecondTx.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedFirstTx.Verify(); err == nil {
+		t.Fatalf("Should have errored due to a missing UTXO")
+	}
+}
+
+func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
+	genesisBytes, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 50000,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	firstTxDescendant := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        firstTx.ID(),
+				OutputIndex: 0,
+			},
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 50000,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := firstTxDescendant.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	secondTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        genesisTx.ID(),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: genesisTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := secondTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedSecondTx.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vm.IssueTx(firstTxDescendant.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	parsedFirstTx, err := vm.GetTx(firstTx.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedSecondTx.Accept(); err != nil {
+		t.Fatal(err)
+	}
+	if err := parsedFirstTx.Verify(); err == nil {
+		t.Fatalf("Should have errored due to a missing UTXO")
 	}
 }
