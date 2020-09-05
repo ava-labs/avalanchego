@@ -207,8 +207,8 @@ func init() {
 
 	// Throttling:
 	fs.UintVar(&Config.MaxNonStakerPendingMsgs, "max-non-staker-pending-msgs", 20, "Maximum number of messages a non-staker is allowed to have pending.")
-	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", 0.2, "Reserve a portion of the chain message queue's space for stakers.")
-	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", 0.2, "Reserve a portion of the chain's CPU time for stakers.")
+	fs.Float64Var(&Config.StakerMSGPortion, "staker-msg-reserved", 0.375, "Reserve a portion of the chain message queue's space for stakers.")
+	fs.Float64Var(&Config.StakerCPUPortion, "staker-cpu-reserved", 0.375, "Reserve a portion of the chain's CPU time for stakers.")
 
 	// Network Timeouts:
 	networkInitialTimeout := fs.Int64("network-initial-timeout", int64(10*time.Second), "Initial timeout value of the adaptive timeout manager, in nanoseconds.")
