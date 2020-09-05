@@ -27,8 +27,7 @@ func NewIntervalMeter(halflife time.Duration) Meter {
 	return &intervalMeter{halflife: halflife}
 }
 
-// TODO change the interface to have all of these functions
-// take a current time argument (reduce calls to get the current time)
+// Start implements the Meter interface
 func (a *intervalMeter) Start(currentTime time.Time) {
 	if a.running {
 		return
@@ -37,6 +36,7 @@ func (a *intervalMeter) Start(currentTime time.Time) {
 	a.running = true
 }
 
+// Stop implements the Meter interface
 func (a *intervalMeter) Stop(currentTime time.Time) {
 	if !a.running {
 		return
@@ -45,6 +45,7 @@ func (a *intervalMeter) Stop(currentTime time.Time) {
 	a.running = false
 }
 
+// Read implements the Meter interface
 func (a *intervalMeter) Read(currentTime time.Time) float64 {
 	if !currentTime.After(a.lastUpdated) {
 		return a.value

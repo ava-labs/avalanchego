@@ -40,6 +40,7 @@ func NewMeter(halflife time.Duration) Meter {
 	return &meter{halflife: halflife}
 }
 
+// Start implements the Meter interface
 func (a *meter) Start(currentTime time.Time) {
 	if a.running {
 		return
@@ -48,6 +49,7 @@ func (a *meter) Start(currentTime time.Time) {
 	a.running = true
 }
 
+// Stop implements the Meter interface
 func (a *meter) Stop(currentTime time.Time) {
 	if !a.running {
 		return
@@ -56,6 +58,7 @@ func (a *meter) Stop(currentTime time.Time) {
 	a.running = false
 }
 
+// Stop implements the Meter interface
 func (a *meter) Read(currentTime time.Time) float64 {
 	timeSincePreviousUpdate := currentTime.Sub(a.lastUpdated)
 	if timeSincePreviousUpdate <= 0 {

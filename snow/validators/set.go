@@ -38,7 +38,7 @@ type Set interface {
 	// AddWeight to a staker.
 	AddWeight(ids.ShortID, uint64) error
 
-	// Get the validator weight from the set.
+	// GetWeight retrieves the validator weight from the set.
 	GetWeight(ids.ShortID) (uint64, bool)
 
 	// RemoveWeight from a staker.

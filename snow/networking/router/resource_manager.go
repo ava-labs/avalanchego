@@ -13,7 +13,7 @@ import (
 
 const (
 	// DefaultMaxNonStakerPendingMsgs is the default number of messages that can be taken from
-	// the shared message
+	// the shared message pool by a single validator
 	DefaultMaxNonStakerPendingMsgs uint32 = 20
 	// DefaultStakerPortion is the default amount of CPU time and pending messages to allot to stakers
 	DefaultStakerPortion float64 = 0.375
@@ -72,9 +72,6 @@ func NewResourceManager(
 }
 
 // TakeMessage attempts to take a message from an available resource
-// It tags the message with the ID of the resource pool it was taken
-// from and registers it with the message tracker if successful
-// Returns true if it finds a resource for the message.
 func (rm *resourceManager) TakeMessage(vdr ids.ShortID) bool {
 	// Attempt to take the message from the pool
 	outstandingPoolMessages := rm.msgTracker.PoolCount()
@@ -105,7 +102,7 @@ func (rm *resourceManager) TakeMessage(vdr ids.ShortID) bool {
 	return false
 }
 
-// ReturnMessage returns a message
+// ReturnMessage returns a message to its resource pool
 func (rm *resourceManager) ReturnMessage(vdr ids.ShortID) {
 	rm.msgTracker.Remove(vdr)
 }

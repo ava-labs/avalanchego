@@ -36,64 +36,64 @@ func NewMessageTracker() CountingTracker {
 }
 
 // Add implements CountingTracker
-func (et *msgTracker) Add(validatorID ids.ShortID) {
-	et.lock.Lock()
-	defer et.lock.Unlock()
+func (mt *msgTracker) Add(validatorID ids.ShortID) {
+	mt.lock.Lock()
+	defer mt.lock.Unlock()
 
-	msgCount := et.getCount(validatorID)
+	msgCount := mt.getCount(validatorID)
 	msgCount.totalMessages++
 }
 
-func (et *msgTracker) AddPool(validatorID ids.ShortID) {
-	et.lock.Lock()
-	defer et.lock.Unlock()
+func (mt *msgTracker) AddPool(validatorID ids.ShortID) {
+	mt.lock.Lock()
+	defer mt.lock.Unlock()
 
-	msgCount := et.getCount(validatorID)
+	msgCount := mt.getCount(validatorID)
 	msgCount.totalMessages++
 	msgCount.poolMessages++
-	et.poolCount++
+	mt.poolCount++
 }
 
 // Remove implements CountingTracker
-func (et *msgTracker) Remove(validatorID ids.ShortID) {
-	et.lock.Lock()
-	defer et.lock.Unlock()
+func (mt *msgTracker) Remove(validatorID ids.ShortID) {
+	mt.lock.Lock()
+	defer mt.lock.Unlock()
 
-	msgCount := et.getCount(validatorID)
+	msgCount := mt.getCount(validatorID)
 
 	msgCount.totalMessages--
 	if msgCount.poolMessages > 0 {
 		msgCount.poolMessages--
-		et.poolCount--
+		mt.poolCount--
 	}
 
 	if msgCount.totalMessages == 0 {
-		delete(et.msgSpenders, validatorID.Key())
+		delete(mt.msgSpenders, validatorID.Key())
 	}
 }
 
 // OutstandingCount implements CountingTracker
-func (et *msgTracker) OutstandingCount(validatorID ids.ShortID) (uint32, uint32) {
-	et.lock.Lock()
-	defer et.lock.Unlock()
+func (mt *msgTracker) OutstandingCount(validatorID ids.ShortID) (uint32, uint32) {
+	mt.lock.Lock()
+	defer mt.lock.Unlock()
 
-	msgCount := et.getCount(validatorID)
+	msgCount := mt.getCount(validatorID)
 	return msgCount.totalMessages, msgCount.poolMessages
 }
 
 // PoolCount implements CountingTracker
-func (et *msgTracker) PoolCount() uint32 { return et.poolCount }
+func (mt *msgTracker) PoolCount() uint32 { return mt.poolCount }
 
 // getCount returns the message count for [validatorID]
 // assumes the lock is held
-func (et *msgTracker) getCount(validatorID ids.ShortID) *msgCount {
+func (mt *msgTracker) getCount(validatorID ids.ShortID) *msgCount {
 	key := validatorID.Key()
-	if msgCount, exists := et.msgSpenders[key]; exists {
+	if msgCount, exists := mt.msgSpenders[key]; exists {
 		return msgCount
 	}
 
 	msgCount := &msgCount{}
-	et.msgSpenders[key] = msgCount
+	mt.msgSpenders[key] = msgCount
 	return msgCount
 }
 

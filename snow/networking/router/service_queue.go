@@ -122,8 +122,10 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 	return msg, err
 }
 
-// UtilizeCPU registers that [duration] was spent processing a message
-// from [vdr]
+// UtilizeCPU registers that the node was processing a message from [vdr]
+// from [startTime] to [endTime] for a period of [duration]
+// startTime, endTime, and duration are all provided since they are
+// already calculated in handler
 func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, startTime, endTime time.Time, duration time.Duration) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
@@ -269,8 +271,8 @@ func (ml *multiLevelQueue) waterfallMessage(msg message, queueIndex int) bool {
 	return false
 }
 
-// indexUtilization returns the highest priority queue that [utilization]
-// falls below the cutoff point for
+// getPriorityIndex finds the correct index to place a message from [vdr]
+// based on its current utilization
 func (ml *multiLevelQueue) getPriorityIndex(validatorID ids.ShortID) int {
 	utilization := ml.resourceManager.Utilization(validatorID)
 	for i := 0; i < len(ml.cpuRanges); i++ {

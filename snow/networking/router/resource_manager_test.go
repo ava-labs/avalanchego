@@ -79,7 +79,7 @@ func TestTakeMessage(t *testing.T) {
 	// Ensure that space is freed up after returning the messages
 	// to the resource manager
 	if success := resourceManager.TakeMessage(nonStakerID); !success {
-		t.Fatal("Failed to take additional message after all previous messages were marked as done.")
+		t.Fatal("Failed to take additional message after all previous messages were returned.")
 	}
 }
 

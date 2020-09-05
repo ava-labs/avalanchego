@@ -12,7 +12,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/elastic/gosigar v0.11.0 // indirect
 	github.com/golang/protobuf v1.4.2
-	github.com/google/martian v2.1.0+incompatible
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/rpc v1.2.0
@@ -34,7 +33,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	go.nanomsg.org/mangos/v3 v3.0.1
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/mobile v0.0.0-20200801112145-973feb4309de
 	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
 	google.golang.org/grpc v1.29.1
 )
