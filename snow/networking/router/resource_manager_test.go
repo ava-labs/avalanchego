@@ -17,12 +17,8 @@ import (
 func TestTakeMessage(t *testing.T) {
 	bufferSize := 8
 	vdrList := make([]validators.Validator, 0, bufferSize)
-	messages := make([]*message, 0, bufferSize)
 	for i := 0; i < bufferSize; i++ {
 		vdr := validators.GenerateRandomValidator(2)
-		messages = append(messages, &message{
-			validatorID: vdr.ID(),
-		})
 		vdrList = append(vdrList, vdr)
 	}
 	nonStakerID := ids.NewShortID([20]byte{16})
@@ -42,27 +38,23 @@ func TestTakeMessage(t *testing.T) {
 		0.5, // Allot half of CPU time to stakers
 	)
 
-	for i, msg := range messages {
-		if success := resourceManager.TakeMessage(msg); !success {
+	for i, vdr := range vdrList {
+		if success := resourceManager.TakeMessage(vdr.ID()); !success {
 			t.Fatalf("Failed to take message %d.", i)
 		}
 	}
 
-	nonStakerMsg1 := &message{validatorID: nonStakerID}
-	if success := resourceManager.TakeMessage(nonStakerMsg1); success {
+	if success := resourceManager.TakeMessage(nonStakerID); success {
 		t.Fatal("Should have throttled message from non-staker when the message pool was empty")
 	}
-	nonStakerMsg1.Done()
 
-	for _, msg := range messages {
-		msg.Done()
+	for _, vdr := range vdrList {
+		resourceManager.ReturnMessage(vdr.ID())
 	}
 
-	nonStakerMsg2 := &message{validatorID: nonStakerID}
-	if success := resourceManager.TakeMessage(nonStakerMsg2); !success {
+	if success := resourceManager.TakeMessage(nonStakerID); !success {
 		t.Fatal("Failed to take additional message after all previous messages were marked as done.")
 	}
-	nonStakerMsg2.Done()
 }
 
 func TestStakerGetsThrottled(t *testing.T) {
@@ -92,9 +84,7 @@ func TestStakerGetsThrottled(t *testing.T) {
 	// cannot take up the entire message queue
 	vdrID := vdrList[0].ID()
 	for i := 0; i < bufferSize; i++ {
-		if success := resourceManager.TakeMessage(&message{
-			validatorID: vdrID,
-		}); !success {
+		if success := resourceManager.TakeMessage(vdrID); !success {
 			// The staker was throttled before taking up the whole message queue
 			return
 		}

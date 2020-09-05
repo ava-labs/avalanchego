@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 )
 
-func TestMessageTracker(t *testing.T) {
+func TestMessageTrackerNoPool(t *testing.T) {
 	msgTracker := NewMessageTracker()
 
 	vdr1 := ids.NewShortID([20]byte{1})
@@ -27,9 +27,9 @@ func TestMessageTracker(t *testing.T) {
 		msgTracker.Add(vdr2)
 	}
 
-	vdr1Count := msgTracker.OutstandingCount(vdr1)
-	vdr2Count := msgTracker.OutstandingCount(vdr2)
-	noMessagesCount := msgTracker.OutstandingCount(noMessagesVdr)
+	vdr1Count, _ := msgTracker.OutstandingCount(vdr1)
+	vdr2Count, _ := msgTracker.OutstandingCount(vdr2)
+	noMessagesCount, _ := msgTracker.OutstandingCount(noMessagesVdr)
 
 	if vdr1Count != expectedVdr1Count {
 		t.Fatalf("Found unexpected count for validator1: %d, expected: %d", vdr1Count, expectedVdr1Count)
@@ -51,9 +51,9 @@ func TestMessageTracker(t *testing.T) {
 		msgTracker.Remove(vdr2)
 	}
 
-	vdr1Count = msgTracker.OutstandingCount(vdr1)
-	vdr2Count = msgTracker.OutstandingCount(vdr2)
-	noMessagesCount = msgTracker.OutstandingCount(noMessagesVdr)
+	vdr1Count, _ = msgTracker.OutstandingCount(vdr1)
+	vdr2Count, _ = msgTracker.OutstandingCount(vdr2)
+	noMessagesCount, _ = msgTracker.OutstandingCount(noMessagesVdr)
 
 	if vdr1Count != 0 {
 		t.Fatalf("Found unexpected count for validator1: %d, expected: %d", vdr1Count, 0)
@@ -66,5 +66,40 @@ func TestMessageTracker(t *testing.T) {
 	if noMessagesCount != 0 {
 		t.Fatalf("Found unexpected count for validator with no messages: %d, expected: %d", noMessagesCount, 0)
 	}
+}
 
+func TestMessageTrackerWithPool(t *testing.T) {
+	msgTracker := NewMessageTracker()
+
+	vdr1 := ids.NewShortID([20]byte{1})
+	vdr2 := ids.NewShortID([20]byte{2})
+
+	msgTracker.AddPool(vdr1)
+	msgTracker.AddPool(vdr2)
+
+	poolCount := msgTracker.PoolCount()
+	if poolCount != 2 {
+		t.Fatalf("Expected pool count to be 2, but found: %d", poolCount)
+	}
+
+	total1, pool1 := msgTracker.OutstandingCount(vdr1)
+	if total1 != 1 || pool1 != 1 {
+		t.Fatalf("Expected total count and pool count to be 1, but found (%d, %d)", total1, pool1)
+	}
+
+	total2, pool2 := msgTracker.OutstandingCount(vdr2)
+	if total2 != 1 || pool2 != 1 {
+		t.Fatalf("Expected total count and pool count to be 1, but found (%d, %d)", total2, pool2)
+	}
+
+	msgTracker.Remove(vdr1)
+	total1, pool1 = msgTracker.OutstandingCount(vdr1)
+	if total1 != 0 || pool1 != 0 {
+		t.Fatalf("Expected total count and pool count to be 0, but found (%d, %d)", total1, pool1)
+	}
+
+	poolCount = msgTracker.PoolCount()
+	if poolCount != 1 {
+		t.Fatalf("Expected pool count to be 1, but found: %d", poolCount)
+	}
 }

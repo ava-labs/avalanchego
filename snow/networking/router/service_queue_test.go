@@ -333,3 +333,91 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		t.Fatal("Expected third message to come from vdr0")
 	}
 }
+
+func TestMultiLevelQueueFreesSpace(t *testing.T) {
+	bufferSize := 8
+	vdrs := validators.NewSet()
+	validator1 := validators.GenerateRandomValidator(2000)
+	validator2 := validators.GenerateRandomValidator(2000)
+	vdrs.Set([]validators.Validator{
+		validator1,
+		validator2,
+	})
+
+	metrics := &metrics{}
+	metrics.Initialize("", prometheus.NewRegistry())
+	// Set tier1 cutoff sufficiently low so that only messages from validators
+	// the message queue has not serviced will be placed on it for the test.
+	tier1 := 0.001
+	tier2 := 1.0
+	tier3 := 2.0
+	tier4 := math.MaxFloat64
+	consumptionRanges := []float64{
+		tier1,
+		tier2,
+		tier3,
+		tier4,
+	}
+
+	perTier := time.Second
+	// Give each tier 1 second of processing time
+	consumptionAllotments := []time.Duration{
+		perTier,
+		perTier,
+		perTier,
+		perTier,
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.Bootstrapped()
+	cpuTracker := tracker.NewCPUTracker(time.Second)
+	queue, semaChan := newMultiLevelQueue(
+		vdrs,
+		ctx,
+		metrics,
+		cpuTracker,
+		consumptionRanges,
+		consumptionAllotments,
+		bufferSize,
+		2,
+		0.5,
+		0.5,
+	)
+
+	for i := 0; i < 4; i++ {
+		validator1.ID()
+		if success := queue.PushMessage(message{
+			validatorID: validator1.ID(),
+		}); !success {
+			t.Fatalf("Failed to push message from validator1 on (Round 1, Iteration %d)", i)
+		}
+		if success := queue.PushMessage(message{
+			validatorID: validator2.ID(),
+		}); !success {
+			t.Fatalf("Failed to push message from validator2 on (Round 1, Iteration %d)", i)
+		}
+	}
+
+	// Empty the message pool
+	for i := 0; i < bufferSize; i++ {
+		<-semaChan
+		if _, err := queue.PopMessage(); err != nil {
+			t.Fatalf("Failed to pop message on iteration %d due to: %s", i, err)
+		}
+	}
+
+	// Fill up message pool again to ensure
+	// popping previous messages freed up space
+	for i := 0; i < 4; i++ {
+		if success := queue.PushMessage(message{
+			validatorID: validator1.ID(),
+		}); !success {
+			t.Fatalf("Failed to push message from validator1 on (Round 2, Iteration %d)", i)
+		}
+		if success := queue.PushMessage(message{
+			validatorID: validator2.ID(),
+		}); !success {
+			t.Fatalf("Failed to push message from validator2 on (Round 2, Iteration %d)", i)
+		}
+	}
+}

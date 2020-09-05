@@ -11,9 +11,11 @@ import (
 
 // CountingTracker is an interface for tracking peers' usage of a discrete resource
 type CountingTracker interface {
-	Add(ids.ShortID)
-	Remove(ids.ShortID)
-	OutstandingCount(ids.ShortID) uint32
+	Add(ids.ShortID)                               // increments total count taken by ID
+	AddPool(ids.ShortID)                           // increments pool messages taken by ID
+	Remove(ids.ShortID)                            // removes a message taken by ID
+	OutstandingCount(ids.ShortID) (uint32, uint32) // returns the total count and pool count
+	PoolCount() uint32                             // returns the total count of messages taken from the pool
 }
 
 // msgTracker implements CountingTracker to keep track of pending messages to peers
@@ -21,14 +23,15 @@ type msgTracker struct {
 	lock sync.Mutex
 
 	// Track peers outstanding messages
-	msgSpenders map[[20]byte]uint32
+	msgSpenders map[[20]byte]*msgCount
+	poolCount   uint32
 }
 
 // NewMessageTracker returns a CountingTracker to track
 // pending messages from peers
 func NewMessageTracker() CountingTracker {
 	return &msgTracker{
-		msgSpenders: make(map[[20]byte]uint32),
+		msgSpenders: make(map[[20]byte]*msgCount),
 	}
 }
 
@@ -37,7 +40,18 @@ func (et *msgTracker) Add(validatorID ids.ShortID) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	et.msgSpenders[validatorID.Key()]++
+	msgCount := et.getCount(validatorID)
+	msgCount.totalMessages++
+}
+
+func (et *msgTracker) AddPool(validatorID ids.ShortID) {
+	et.lock.Lock()
+	defer et.lock.Unlock()
+
+	msgCount := et.getCount(validatorID)
+	msgCount.totalMessages++
+	msgCount.poolMessages++
+	et.poolCount++
 }
 
 // Remove implements CountingTracker
@@ -45,17 +59,44 @@ func (et *msgTracker) Remove(validatorID ids.ShortID) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	key := validatorID.Key()
-	et.msgSpenders[key]--
-	if et.msgSpenders[key] == 0 {
-		delete(et.msgSpenders, key)
+	msgCount := et.getCount(validatorID)
+
+	msgCount.totalMessages--
+	if msgCount.poolMessages > 0 {
+		msgCount.poolMessages--
+		et.poolCount--
+	}
+
+	if msgCount.totalMessages == 0 {
+		delete(et.msgSpenders, validatorID.Key())
 	}
 }
 
 // OutstandingCount implements CountingTracker
-func (et *msgTracker) OutstandingCount(validatorID ids.ShortID) uint32 {
+func (et *msgTracker) OutstandingCount(validatorID ids.ShortID) (uint32, uint32) {
 	et.lock.Lock()
 	defer et.lock.Unlock()
 
-	return et.msgSpenders[validatorID.Key()]
+	msgCount := et.getCount(validatorID)
+	return msgCount.totalMessages, msgCount.poolMessages
+}
+
+// PoolCount implements CountingTracker
+func (et *msgTracker) PoolCount() uint32 { return et.poolCount }
+
+// getCount returns the message count for [validatorID]
+// assumes the lock is held
+func (et *msgTracker) getCount(validatorID ids.ShortID) *msgCount {
+	key := validatorID.Key()
+	if msgCount, exists := et.msgSpenders[key]; exists {
+		return msgCount
+	}
+
+	msgCount := &msgCount{}
+	et.msgSpenders[key] = msgCount
+	return msgCount
+}
+
+type msgCount struct {
+	totalMessages, poolMessages uint32
 }

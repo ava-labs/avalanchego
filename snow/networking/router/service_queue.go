@@ -136,7 +136,6 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 	if err == nil {
 		ml.pendingMessages--
 		ml.msgTracker.Remove(msg.validatorID)
-		msg.Done()
 		ml.metrics.pending.Dec()
 	}
 	return msg, err
@@ -239,7 +238,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 		return false
 	}
 
-	success := ml.resourceManager.TakeMessage(&msg)
+	success := ml.resourceManager.TakeMessage(validatorID)
 	if !success {
 		ml.metrics.dropped.Inc()
 		ml.metrics.throttled.Inc()
@@ -248,9 +247,9 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 
 	// Place the message on the correct queue
 	if !ml.placeMessage(msg) {
-		ml.ctx.Log.Verbo("Dropped message during push: %s", msg)
+		ml.ctx.Log.Verbo("Dropped message while attempting to place it in a queue: %s", msg)
 		ml.metrics.dropped.Inc()
-		msg.Done()
+		ml.resourceManager.ReturnMessage(validatorID)
 		return false
 	}
 
