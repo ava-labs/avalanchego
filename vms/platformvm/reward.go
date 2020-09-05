@@ -24,7 +24,7 @@ type rewardTx struct {
 //
 // RemainingSupply = SupplyCap - ExistingSupply
 // PortionOfExistingSupply = StakedAmount / ExistingSupply
-// PortionOfStakingDuration = MinimumStakingDuration / MaximumStakingDuration
+// PortionOfStakingDuration = StakingDuration / MaximumStakingDuration
 // MintingRate = MinMintingRate + MaxSubMinMintingRate * PortionOfStakingDuration
 // Reward = RemainingSupply * PortionOfExistingSupply * MintingRate * PortionOfStakingDuration
 func Reward(
