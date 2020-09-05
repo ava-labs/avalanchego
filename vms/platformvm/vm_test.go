@@ -161,12 +161,13 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 	}
 
 	buildGenesisArgs := BuildGenesisArgs{
-		NetworkID:   json.Uint32(testNetworkID),
-		AvaxAssetID: avaxAssetID,
-		UTXOs:       genesisUTXOs,
-		Validators:  genesisValidators,
-		Chains:      nil,
-		Time:        json.Uint64(defaultGenesisTime.Unix()),
+		NetworkID:     json.Uint32(testNetworkID),
+		AvaxAssetID:   avaxAssetID,
+		UTXOs:         genesisUTXOs,
+		Validators:    genesisValidators,
+		Chains:        nil,
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 
 	buildGenesisResponse := BuildGenesisReply{}

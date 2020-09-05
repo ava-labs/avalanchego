@@ -134,6 +134,10 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		t.Fatal(err)
 	} else if willBeValidator {
 		t.Fatalf("Should have removed the validator from the pending validator set")
+	} else if tx, err := vm.nextStakerStop(onCommit, constants.PrimaryNetworkID); err != nil {
+		t.Fatal(err)
+	} else if tx.Reward != 1370 { // See rewards tests
+		t.Fatalf("Expected reward of %d but was %d", 1370, tx.Reward)
 	}
 
 	if _, isValidator, err := vm.isValidator(onAbort, constants.PrimaryNetworkID, nodeID); err != nil {

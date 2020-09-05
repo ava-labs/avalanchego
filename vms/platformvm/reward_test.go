@@ -70,6 +70,13 @@ func TestRewards(t *testing.T) {
 			existingAmount: 360 * units.MegaAvax,
 			expectedReward: 274122724713,
 		},
+		// (720M - 360M) * (.005 / 360M) * (10% + 2% * MinimumStakingDuration / MaximumStakingDuration) * MinimumStakingDuration / MaximumStakingDuration
+		{
+			duration:       MinimumStakingDuration,
+			stakeAmount:    minStake,
+			existingAmount: 360 * units.MegaAvax,
+			expectedReward: 1370,
+		},
 		// (720M - 400M) * (1M / 400M) * (10% + 2% * MinimumStakingDuration / MaximumStakingDuration) * MinimumStakingDuration / MaximumStakingDuration
 		{
 			duration:       MinimumStakingDuration,

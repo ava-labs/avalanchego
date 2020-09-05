@@ -45,6 +45,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, err
 	}
 
+	initialSupply := uint64(0)
+
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
@@ -66,6 +68,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				Amount:  json.Uint64(5 * units.MegaAvax),
 				Address: addr,
 			})
+			initialSupply += 5 * units.MegaAvax
 		}
 
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
@@ -110,6 +113,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				Amount:  json.Uint64(5 * units.MegaAvax),
 			},
 		)
+		initialSupply += 5 * units.MegaAvax
 	}
 
 	stakingDuration := 365 * 24 * time.Hour // ~ 1 year
@@ -129,6 +133,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				RewardAddress: destAddr,
 			},
 		)
+		initialSupply += 20 * units.KiloAvax
 	}
 
 	// Specify the chains that exist upon this network's creation
@@ -151,6 +156,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name:        "C-Chain",
 		},
 	}
+
+	platformvmArgs.InitialSupply = json.Uint64(initialSupply)
 
 	platformvmReply := platformvm.BuildGenesisReply{}
 	platformvmSS := platformvm.StaticService{}

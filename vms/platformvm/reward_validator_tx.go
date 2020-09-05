@@ -75,7 +75,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
-	if stakerID := stakerTx.ID(); !stakerID.Equals(tx.TxID) {
+	if stakerID := stakerTx.Tx.ID(); !stakerID.Equals(tx.TxID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
 			tx.TxID,
 			stakerID)}
@@ -87,7 +87,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	staker, ok := stakerTx.UnsignedTx.(TimedTx)
+	staker, ok := stakerTx.Tx.UnsignedTx.(TimedTx)
 	if !ok {
 		return nil, nil, nil, nil, permError{errWrongTxType}
 	}
@@ -111,7 +111,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	nodeID := ids.ShortID{}
 	startTime := time.Time{}
-	switch uStakerTx := stakerTx.UnsignedTx.(type) {
+	switch uStakerTx := stakerTx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddValidatorTx:
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
@@ -133,8 +133,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		}
 
 		// Provide the reward here
-		if reward := reward(uStakerTx.Validator.Duration(), uStakerTx.Validator.Wght, InflationRate); reward > 0 {
-			outIntf, err := vm.fx.CreateOutput(reward, uStakerTx.RewardsOwner)
+		if stakerTx.Reward > 0 {
+			outIntf, err := vm.fx.CreateOutput(stakerTx.Reward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
@@ -150,6 +150,18 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
+				return nil, nil, nil, nil, tempError{err}
+			}
+
+			currentSupply, err := vm.getCurrentSupply(onAbortDB)
+			if err != nil {
+				return nil, nil, nil, nil, tempError{err}
+			}
+			newSupply, err := safemath.Sub64(currentSupply, stakerTx.Reward)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+			if err := vm.putCurrentSupply(onAbortDB, newSupply); err != nil {
 				return nil, nil, nil, nil, tempError{err}
 			}
 		}
@@ -198,17 +210,27 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 		}
 
-		// If reward given, it will be this amount
-		reward := reward(uStakerTx.Validator.Duration(), uStakerTx.Validator.Wght, InflationRate)
+		currentSupply, err := vm.getCurrentSupply(onAbortDB)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+		newSupply, err := safemath.Sub64(currentSupply, stakerTx.Reward)
+		if err != nil {
+			return nil, nil, nil, nil, permError{err}
+		}
+		if err := vm.putCurrentSupply(onAbortDB, newSupply); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
-		delegatorShares := PercentDenominator - uint64(vdr.Shares)         // parentTx.Shares <= NumberOfShares so no underflow
-		delegatorReward := delegatorShares * (reward / PercentDenominator) // delegatorShares <= NumberOfShares so no overflow
+		delegatorShares := PercentDenominator - uint64(vdr.Shares)                  // parentTx.Shares <= NumberOfShares so no underflow
+		delegatorReward := delegatorShares * (stakerTx.Reward / PercentDenominator) // delegatorShares <= NumberOfShares so no overflow
 		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := safemath.Mul64(delegatorShares, reward); err == nil {
+		if optimisticReward, err := safemath.Mul64(delegatorShares, stakerTx.Reward); err == nil {
 			delegatorReward = optimisticReward / PercentDenominator
 		}
-		delegateeReward := reward - delegatorReward // delegatorReward <= reward so no underflow
+		delegateeReward := stakerTx.Reward - delegatorReward // delegatorReward <= reward so no underflow
 
 		offset := 0
 

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	toRemove := toRemoveIntf.UnsignedTx.(*UnsignedAddValidatorTx)
+	toRemove := toRemoveIntf.Tx.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
@@ -67,7 +68,7 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 
 	if nextToRemove, err := vm.nextStakerStop(onCommitDB, constants.PrimaryNetworkID); err != nil {
 		t.Fatal(err)
-	} else if toRemove.ID().Equals(nextToRemove.ID()) {
+	} else if toRemove.ID().Equals(nextToRemove.Tx.ID()) {
 		t.Fatalf("Should have removed the previous validator")
 	}
 
@@ -141,12 +142,17 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unsignedDelTx := delTx.UnsignedTx.(*UnsignedAddDelegatorTx)
 
-	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, vdrTx); err != nil {
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *vdrTx,
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, delTx); err != nil {
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 1000000,
+		Tx:     *delTx,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := vm.putTimestamp(vm.DB, time.Unix(int64(delEndTime), 0)); err != nil {
@@ -167,11 +173,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	delDestSet := ids.ShortSet{}
 	delDestSet.Add(delRewardAddress)
 
-	expectedReward := reward(
-		time.Unix(int64(delEndTime), 0).Sub(time.Unix(int64(delStartTime), 0)), // duration
-		unsignedDelTx.Validator.Weight(),                                       // amount
-		InflationRate,                                                          // inflation rate
-	)
+	expectedReward := uint64(1000000)
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
@@ -216,6 +218,12 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	assert.NoError(t, err)
 	if delReward != 0 {
 		t.Fatal("expected delegatee balance to stay the same")
+	}
+
+	if supply, err := vm.getCurrentSupply(onAbortDB); err != nil {
+		t.Fatal(err)
+	} else if supply != 360*units.MegaAvax-expectedReward {
+		t.Fatalf("should have removed un-rewarded tokens from the potential supply")
 	}
 }
 

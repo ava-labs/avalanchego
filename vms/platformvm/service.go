@@ -534,27 +534,31 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
-		tx := Tx{}
+		tx := rewardTx{}
 		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(service.vm.codec, nil); err != nil {
+		if err := tx.Tx.Sign(service.vm.codec, nil); err != nil {
 			return err
 		}
 
-		switch staker := tx.UnsignedTx.(type) {
+		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
+			potentialReward := json.Uint64(tx.Reward)
 			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(staker.StartTime().Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
-				StakeAmount: &weight,
+				ID:              staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				StartTime:       json.Uint64(staker.StartTime().Unix()),
+				EndTime:         json.Uint64(staker.EndTime().Unix()),
+				StakeAmount:     &weight,
+				PotentialReward: &potentialReward,
 			})
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
 			weight := json.Uint64(staker.Validator.Weight())
+			potentialReward := json.Uint64(tx.Reward)
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
 			rawUptime, err := service.vm.calculateUptime(service.vm.DB, nodeID, startTime)
 			if err != nil {
 				return err
@@ -566,12 +570,14 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			service.vm.connLock.Unlock()
 
 			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          nodeID.PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(startTime.Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
-				StakeAmount: &weight,
-				Uptime:      &uptime,
-				Connected:   &connected,
+				ID:              nodeID.PrefixedString(constants.NodeIDPrefix),
+				StartTime:       json.Uint64(startTime.Unix()),
+				EndTime:         json.Uint64(staker.EndTime().Unix()),
+				StakeAmount:     &weight,
+				PotentialReward: &potentialReward,
+				DelegationFee:   &delegationFee,
+				Uptime:          &uptime,
+				Connected:       &connected,
 			})
 		case *UnsignedAddSubnetValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
@@ -582,7 +588,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				Weight:    &weight,
 			})
 		default:
-			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
+			return fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
 		}
 	}
 	return stopIter.Error()
@@ -635,12 +641,21 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				StakeAmount: &weight,
 			})
 		case *UnsignedAddValidatorTx:
+			nodeID := staker.Validator.ID()
 			weight := json.Uint64(staker.Validator.Weight())
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
+
+			service.vm.connLock.Lock()
+			_, connected := service.vm.connections[nodeID.Key()]
+			service.vm.connLock.Unlock()
+
 			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(staker.StartTime().Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
-				StakeAmount: &weight,
+				ID:            nodeID.PrefixedString(constants.NodeIDPrefix),
+				StartTime:     json.Uint64(staker.StartTime().Unix()),
+				EndTime:       json.Uint64(staker.EndTime().Unix()),
+				StakeAmount:   &weight,
+				DelegationFee: &delegationFee,
+				Connected:     &connected,
 			})
 		case *UnsignedAddSubnetValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
@@ -655,6 +670,18 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		}
 	}
 	return startIter.Error()
+}
+
+// GetCurrentSupplyReply are the results from calling GetCurrentSupply
+type GetCurrentSupplyReply struct {
+	Supply json.Uint64 `json:"supply"`
+}
+
+// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
+func (service *Service) GetCurrentSupply(_ *http.Request, _ *struct{}, reply *GetCurrentSupplyReply) error {
+	supply, err := service.vm.getCurrentSupply(service.vm.DB)
+	reply.Supply = json.Uint64(supply)
+	return err
 }
 
 // SampleValidatorsArgs are the arguments for calling SampleValidators

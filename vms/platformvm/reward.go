@@ -37,6 +37,11 @@ var (
 	consumptionInterval        = new(big.Int).SetUint64(uint64(MaximumStakingDuration))
 )
 
+type rewardTx struct {
+	Reward uint64 `serialize:"true"`
+	Tx     Tx     `serialize:"true"`
+}
+
 // Reward returns the amount of tokens to reward the staker with.
 //
 // RemainingSupply = SupplyCap - ExistingSupply

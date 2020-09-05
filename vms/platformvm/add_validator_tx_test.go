@@ -301,17 +301,20 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,                                          // stake amount
-		uint64(startTime.Unix()),                             // start time
+		vm.minStake,              // stake amount
+		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
-		nodeID, // node ID
+		nodeID,                                  // node ID
 		key2.PublicKey().Address(),              // reward address
 		PercentDenominator,                      // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.addStaker(vDB, constants.PrimaryNetworkID, tx); err != nil {
+	} else if err := vm.addStaker(vDB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")
