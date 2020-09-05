@@ -129,15 +129,3 @@ func (rm *resourceManager) Utilization(vdr ids.ShortID) float64 {
 
 	return vdrUtilization / stakerAllotment
 }
-
-type infiniteResourcePool struct{}
-
-func (i *infiniteResourcePool) TakeMessage(vdr ids.ShortID) bool { return true }
-
-func (i *infiniteResourcePool) ReturnMessage(vdr ids.ShortID) {}
-
-func (i *infiniteResourcePool) Utilization(vdr ids.ShortID) float64 { return 0 }
-
-func newInfiniteResourcePoolManager() ResourceManager {
-	return &infiniteResourcePool{}
-}

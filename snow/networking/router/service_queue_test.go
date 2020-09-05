@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/networking/tracker"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
@@ -38,8 +37,6 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		cpuInterval / 4,
 	}
 
-	ctx := snow.DefaultContextTest()
-	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(cpuInterval)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := newInfiniteResourcePoolManager()
@@ -157,8 +154,6 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 		perTier,
 	}
 
-	ctx := snow.DefaultContextTest()
-	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := NewResourceManager(
@@ -270,8 +265,6 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 		perTier,
 	}
 
-	ctx := snow.DefaultContextTest()
-	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := NewResourceManager(
@@ -378,8 +371,6 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 		perTier,
 	}
 
-	ctx := snow.DefaultContextTest()
-	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(time.Second)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := NewResourceManager(
@@ -438,5 +429,61 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 		}); !success {
 			t.Fatalf("Failed to push message from validator2 on (Round 2, Iteration %d)", i)
 		}
+	}
+}
+
+func TestMultiLevelQueueThrottles(t *testing.T) {
+	bufferSize := 8
+	vdrs := validators.NewSet()
+	validator1 := validators.GenerateRandomValidator(2000)
+	validator2 := validators.GenerateRandomValidator(2000)
+	vdrs.Set([]validators.Validator{
+		validator1,
+		validator2,
+	})
+
+	metrics := &metrics{}
+	metrics.Initialize("", prometheus.NewRegistry())
+	// Set tier1 cutoff sufficiently low so that only messages from validators
+	// the message queue has not serviced will be placed on it for the test.
+	tier1 := 0.001
+	tier2 := 1.0
+	tier3 := 2.0
+	tier4 := math.MaxFloat64
+	consumptionRanges := []float64{
+		tier1,
+		tier2,
+		tier3,
+		tier4,
+	}
+
+	perTier := time.Second
+	// Give each tier 1 second of processing time
+	consumptionAllotments := []time.Duration{
+		perTier,
+		perTier,
+		perTier,
+		perTier,
+	}
+
+	cpuTracker := tracker.NewCPUTracker(time.Second)
+	msgTracker := tracker.NewMessageTracker()
+	resourceManager := newNoResourcesManager()
+	queue, _ := newMultiLevelQueue(
+		resourceManager,
+		cpuTracker,
+		msgTracker,
+		consumptionRanges,
+		consumptionAllotments,
+		bufferSize,
+		logging.NoLog{},
+		metrics,
+	)
+
+	success := queue.PushMessage(message{
+		validatorID: ids.NewShortID([20]byte{1}),
+	})
+	if success {
+		t.Fatal("Expected multi-level queue to throttle message when there were no resources available")
 	}
 }
