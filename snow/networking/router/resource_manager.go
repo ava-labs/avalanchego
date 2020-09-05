@@ -22,7 +22,7 @@ const (
 // ResourceManager defines the interface for the allocation
 // of resources from different pools
 type ResourceManager interface {
-	TakeMessage(message) bool
+	TakeMessage(*message) bool
 	Utilization(ids.ShortID) float64
 }
 
@@ -74,7 +74,7 @@ func NewResourceManager(
 // It tags the message with the ID of the resource pool it was taken
 // from and registers it with the message tracker if successful
 // Returns true if it finds a resource for the message.
-func (et *throttler) TakeMessage(msg message) bool {
+func (et *throttler) TakeMessage(msg *message) bool {
 	// Attempt to take the message from the pool
 	messageID := msg.validatorID
 	outstandingPoolMessages := et.msgTracker.OutstandingCount(ids.ShortEmpty)
@@ -90,12 +90,14 @@ func (et *throttler) TakeMessage(msg message) bool {
 	}
 
 	// Attempt to take the message from the individual allotment
-	weight, _ := et.vdrs.GetWeight(messageID)
+	weight, isStaker := et.vdrs.GetWeight(messageID)
 	totalWeight := et.vdrs.Weight()
 	stakerPortion := float64(weight) / float64(totalWeight)
 	messageAllotment := uint32(stakerPortion * float64(et.reservedMessages))
 	messageCount := et.msgTracker.OutstandingCount(messageID)
-	if messageCount < messageAllotment {
+	// Allow at least one message per staker, even when staking
+	// portion rounds message allotment down to 0
+	if messageCount <= messageAllotment && isStaker {
 		et.msgTracker.Add(messageID)
 		msg.SetDone(func() {
 			et.msgTracker.Remove(messageID)
