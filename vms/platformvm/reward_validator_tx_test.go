@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/gecko/chains"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
@@ -18,7 +20,6 @@ import (
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
@@ -94,10 +95,9 @@ func TestUnsignedRewardValidatorTxSemanticVerify(t *testing.T) {
 		if onAbortBalance != oldBalance+toRemove.Validator.Weight() {
 			t.Fatalf("on abort, should have got back staked amount")
 		}
-		expectedReward := reward(toRemove.Validator.Duration(), toRemove.Validator.Weight(), InflationRate)
-		if onCommitBalance != oldBalance+expectedReward+toRemove.Validator.Weight() {
+		if onCommitBalance != oldBalance+toRemove.Validator.Weight() {
 			t.Fatalf("on commit, should have old balance (%d) + staked amount (%d) + reward (%d) but have %d",
-				oldBalance, toRemove.Validator.Weight(), expectedReward, onCommitBalance)
+				oldBalance, toRemove.Validator.Weight(), 0, onCommitBalance)
 		}
 	}
 }
@@ -183,7 +183,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	assert.NoError(t, err)
 	vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance)
 	assert.NoError(t, err)
-	if vdrReward == 0 && InflationRate > 1.0 {
+	if vdrReward == 0 {
 		t.Fatal("expected delegatee balance to increase because of reward")
 	}
 
@@ -193,7 +193,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	assert.NoError(t, err)
 	delReward, err := math.Sub64(commitDelBalance, oldDelBalance)
 	assert.NoError(t, err)
-	if delReward == 0 && InflationRate > 1.0 {
+	if delReward == 0 {
 		t.Fatal("expected delegator balance to increase because of reward")
 	}
 
