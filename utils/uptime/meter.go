@@ -68,7 +68,7 @@ func (a *meter) Read() float64 {
 	}
 	a.lastUpdated = currentTime
 
-	factor := math.Pow(2, -timeSincePreviousUpdate.Seconds()/a.halflife.Seconds())
+	factor := math.Pow(2, -float64(timeSincePreviousUpdate)/float64(a.halflife))
 	a.value *= factor
 	if a.running {
 		a.value += 1 - factor
