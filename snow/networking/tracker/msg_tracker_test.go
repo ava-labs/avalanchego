@@ -75,6 +75,7 @@ func TestMessageTrackerWithPool(t *testing.T) {
 	vdr2 := ids.NewShortID([20]byte{2})
 
 	msgTracker.AddPool(vdr1)
+	msgTracker.Add(vdr1)
 	msgTracker.AddPool(vdr2)
 
 	poolCount := msgTracker.PoolCount()
@@ -83,15 +84,16 @@ func TestMessageTrackerWithPool(t *testing.T) {
 	}
 
 	total1, pool1 := msgTracker.OutstandingCount(vdr1)
-	if total1 != 1 || pool1 != 1 {
-		t.Fatalf("Expected total count and pool count to be 1, but found (%d, %d)", total1, pool1)
+	if total1 != 2 || pool1 != 1 {
+		t.Fatalf("Expected (2, 1), but found (%d, %d)", total1, pool1)
 	}
 
 	total2, pool2 := msgTracker.OutstandingCount(vdr2)
 	if total2 != 1 || pool2 != 1 {
-		t.Fatalf("Expected total count and pool count to be 1, but found (%d, %d)", total2, pool2)
+		t.Fatalf("Expected (1, 1), but found (%d, %d)", total2, pool2)
 	}
 
+	msgTracker.Remove(vdr1)
 	msgTracker.Remove(vdr1)
 	total1, pool1 = msgTracker.OutstandingCount(vdr1)
 	if total1 != 0 || pool1 != 0 {
@@ -101,5 +103,11 @@ func TestMessageTrackerWithPool(t *testing.T) {
 	poolCount = msgTracker.PoolCount()
 	if poolCount != 1 {
 		t.Fatalf("Expected pool count to be 1, but found: %d", poolCount)
+	}
+
+	msgTracker.Remove(vdr2)
+	poolCount = msgTracker.PoolCount()
+	if poolCount != 0 {
+		t.Fatalf("Expected pool count to be 0, but found: %d", poolCount)
 	}
 }

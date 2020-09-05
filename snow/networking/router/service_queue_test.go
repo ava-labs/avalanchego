@@ -10,13 +10,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/networking/tracker"
 	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/logging"
 )
 
-func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}, validators.Set) {
-	vdrs := validators.NewSet()
+// returns a new multi-level queue that will never throttle or prioritize
+func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}) {
 	metrics := &metrics{}
 	metrics.Initialize("", prometheus.NewRegistry())
 	consumptionRanges := []float64{
@@ -39,36 +41,31 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 	ctx := snow.DefaultContextTest()
 	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(cpuInterval)
+	msgTracker := tracker.NewMessageTracker()
+	resourceManager := newInfiniteResourcePoolManager()
 	queue, semaChan := newMultiLevelQueue(
-		vdrs,
-		ctx,
-		metrics,
+		resourceManager,
 		cpuTracker,
+		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
+		logging.NoLog{},
+		metrics,
 	)
 
-	return queue, semaChan, vdrs
+	return queue, semaChan
 }
 
 func TestMultiLevelQueueSendsMessages(t *testing.T) {
 	bufferSize := 8
-	queue, semaChan, vdrs := setupMultiLevelQueue(t, bufferSize)
-	vdrList := []validators.Validator{}
+	queue, semaChan := setupMultiLevelQueue(t, bufferSize)
 	messages := []message{}
 	for i := 0; i < bufferSize; i++ {
-		vdr := validators.GenerateRandomValidator(2)
 		messages = append(messages, message{
-			validatorID: vdr.ID(),
+			validatorID: ids.NewShortID([20]byte{byte(i)}),
 		})
-		vdrList = append(vdrList, vdr)
 	}
-
-	vdrs.Set(vdrList)
 
 	for _, msg := range messages {
 		queue.PushMessage(msg)
@@ -96,22 +93,17 @@ func TestMultiLevelQueueSendsMessages(t *testing.T) {
 	}
 }
 
-func TestExtraMessageDeadlock(t *testing.T) {
+func TestExtraMessageNoDeadlock(t *testing.T) {
 	bufferSize := 8
 	oversizedBuffer := bufferSize * 2
-	queue, semaChan, vdrs := setupMultiLevelQueue(t, bufferSize)
+	queue, semaChan := setupMultiLevelQueue(t, bufferSize)
 
-	vdrList := []validators.Validator{}
 	messages := []message{}
 	for i := 0; i < oversizedBuffer; i++ {
-		vdr := validators.GenerateRandomValidator(2)
 		messages = append(messages, message{
-			validatorID: vdr.ID(),
+			validatorID: ids.NewShortID([20]byte{byte(i)}),
 		})
-		vdrList = append(vdrList, vdr)
 	}
-
-	vdrs.Set(vdrList)
 
 	// Test messages are dropped when full to avoid blocking when
 	// adding a message to a queue or to the counting semaphore channel
@@ -168,17 +160,26 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(time.Second)
-	queue, semaChan := newMultiLevelQueue(
+	msgTracker := tracker.NewMessageTracker()
+	resourceManager := NewResourceManager(
 		vdrs,
-		ctx,
-		metrics,
+		logging.NoLog{},
+		msgTracker,
 		cpuTracker,
-		consumptionRanges,
-		consumptionAllotments,
-		bufferSize,
+		uint32(bufferSize),
 		DefaultMaxNonStakerPendingMsgs,
 		DefaultStakerPortion,
 		DefaultStakerPortion,
+	)
+	queue, semaChan := newMultiLevelQueue(
+		resourceManager,
+		cpuTracker,
+		msgTracker,
+		consumptionRanges,
+		consumptionAllotments,
+		bufferSize,
+		logging.NoLog{},
+		metrics,
 	)
 
 	// Utilize CPU such that the next message from validator2 will be placed on a lower
@@ -272,17 +273,26 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(time.Second)
-	queue, semaChan := newMultiLevelQueue(
+	msgTracker := tracker.NewMessageTracker()
+	resourceManager := NewResourceManager(
 		vdrs,
-		ctx,
-		metrics,
+		logging.NoLog{},
+		msgTracker,
 		cpuTracker,
-		consumptionRanges,
-		consumptionAllotments,
-		bufferSize,
+		uint32(bufferSize),
 		DefaultMaxNonStakerPendingMsgs,
 		DefaultStakerPortion,
 		DefaultStakerPortion,
+	)
+	queue, semaChan := newMultiLevelQueue(
+		resourceManager,
+		cpuTracker,
+		msgTracker,
+		consumptionRanges,
+		consumptionAllotments,
+		bufferSize,
+		logging.NoLog{},
+		metrics,
 	)
 
 	queue.PushMessage(message{
@@ -371,17 +381,26 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.Bootstrapped()
 	cpuTracker := tracker.NewCPUTracker(time.Second)
-	queue, semaChan := newMultiLevelQueue(
+	msgTracker := tracker.NewMessageTracker()
+	resourceManager := NewResourceManager(
 		vdrs,
-		ctx,
-		metrics,
+		logging.NoLog{},
+		msgTracker,
 		cpuTracker,
+		uint32(bufferSize),
+		DefaultMaxNonStakerPendingMsgs,
+		DefaultStakerPortion,
+		DefaultStakerPortion,
+	)
+	queue, semaChan := newMultiLevelQueue(
+		resourceManager,
+		cpuTracker,
+		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
-		2,
-		0.5,
-		0.5,
+		logging.NoLog{},
+		metrics,
 	)
 
 	for i := 0; i < 4; i++ {

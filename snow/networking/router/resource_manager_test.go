@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
+// Test frees space
+
 func TestTakeMessage(t *testing.T) {
 	bufferSize := 8
 	vdrList := make([]validators.Validator, 0, bufferSize)
@@ -52,6 +54,8 @@ func TestTakeMessage(t *testing.T) {
 		resourceManager.ReturnMessage(vdr.ID())
 	}
 
+	// Ensure that space is freed up after returning the messages
+	// to the resource manager
 	if success := resourceManager.TakeMessage(nonStakerID); !success {
 		t.Fatal("Failed to take additional message after all previous messages were marked as done.")
 	}

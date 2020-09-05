@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/networking/tracker"
-	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -31,8 +30,6 @@ type messageQueue interface {
 type multiLevelQueue struct {
 	lock sync.Mutex
 
-	validators validators.Set
-
 	// Tracks total CPU consumption
 	intervalConsumption, tierConsumption time.Duration
 
@@ -48,15 +45,12 @@ type multiLevelQueue struct {
 	cpuPortion    float64
 
 	// Message throttling
-	msgTracker                                   tracker.CountingTracker
-	bufferSize, pendingMessages                  int
-	msgPoolSize, stakerReservedMessages          uint32
-	pendingPoolMessages, maxNonStakerPendingMsgs uint32
-	msgPortion                                   float64
+	msgTracker                  tracker.CountingTracker
+	bufferSize, pendingMessages int
 
 	semaChan chan struct{}
 
-	ctx     *snow.Context
+	log     logging.Logger
 	metrics *metrics
 }
 
@@ -65,28 +59,24 @@ type multiLevelQueue struct {
 // defines the range of priorities for the multi-level queue and the amount of time to
 // spend on each level. Their length must be the same.
 func newMultiLevelQueue(
-	vdrs validators.Set,
-	ctx *snow.Context,
-	metrics *metrics,
+	resourceManager ResourceManager,
 	cpuTracker tracker.TimeTracker,
+	msgTracker tracker.CountingTracker,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
 	bufferSize int,
-	maxNonStakerPendingMsgs uint32,
-	msgPortion,
-	cpuPortion float64,
+	log logging.Logger,
+	metrics *metrics,
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
 	singleLevelSize := bufferSize / len(consumptionRanges)
-	msgTracker := tracker.NewMessageTracker()
-	resourceManager := NewResourceManager(vdrs, ctx.Log, msgTracker, cpuTracker, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, cpuPortion)
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)
 		// An error should only occur while registering (not creating) the gauge and histogram
 		// so if there is a non-nil error, it is safe to log the error and proceed as normal.
 		if err != nil {
-			ctx.Log.Error("Failed to register metrics for tier %d of message queue", index)
+			log.Error("Failed to register metrics for tier %d of message queue", index)
 		}
 		queues[index] = singleLevelQueue{
 			msgs:        make(chan message, singleLevelSize),
@@ -95,26 +85,17 @@ func newMultiLevelQueue(
 		}
 	}
 
-	stakerReservedMessages := uint32(float64(bufferSize) * msgPortion)
-	msgPoolSize := uint32(bufferSize) - stakerReservedMessages
-
 	return &multiLevelQueue{
-		validators:              vdrs,
-		cpuTracker:              cpuTracker,
-		msgTracker:              msgTracker,
-		resourceManager:         resourceManager,
-		queues:                  queues,
-		cpuRanges:               consumptionRanges,
-		cpuAllotments:           consumptionAllotments,
-		cpuPortion:              cpuPortion,
-		maxNonStakerPendingMsgs: maxNonStakerPendingMsgs,
-		msgPortion:              msgPortion,
-		msgPoolSize:             msgPoolSize,
-		stakerReservedMessages:  stakerReservedMessages,
-		ctx:                     ctx,
-		metrics:                 metrics,
-		bufferSize:              bufferSize,
-		semaChan:                semaChan,
+		cpuTracker:      cpuTracker,
+		msgTracker:      msgTracker,
+		resourceManager: resourceManager,
+		queues:          queues,
+		cpuRanges:       consumptionRanges,
+		cpuAllotments:   consumptionAllotments,
+		log:             log,
+		metrics:         metrics,
+		bufferSize:      bufferSize,
+		semaChan:        semaChan,
 	}, semaChan
 }
 
@@ -224,17 +205,17 @@ func (ml *multiLevelQueue) popMessage() (message, error) {
 // pushMessage adds a message to the appropriate level (or lower)
 // Assumes the lock is held
 func (ml *multiLevelQueue) pushMessage(msg message) bool {
-	// If the message queue is already full, skip iterating
-	// through the queue levels to return false
+	// If the message queue is already full, skip asking
+	// the resource maanger for message space
 	if ml.pendingMessages >= ml.bufferSize {
-		ml.ctx.Log.Debug("Dropped message due to a full message queue with %d messages", ml.pendingMessages)
+		ml.log.Debug("Dropped message due to a full message queue with %d messages", ml.pendingMessages)
 		ml.metrics.dropped.Inc()
 		return false
 	}
 
 	validatorID := msg.validatorID
 	if validatorID.IsZero() {
-		ml.ctx.Log.Warn("Dropping message due to invalid validatorID")
+		ml.log.Warn("Dropping message due to invalid validatorID")
 		return false
 	}
 
@@ -247,7 +228,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 
 	// Place the message on the correct queue
 	if !ml.placeMessage(msg) {
-		ml.ctx.Log.Verbo("Dropped message while attempting to place it in a queue: %s", msg)
+		ml.log.Verbo("Dropped message while attempting to place it in a queue: %s", msg)
 		ml.metrics.dropped.Inc()
 		ml.resourceManager.ReturnMessage(validatorID)
 		return false
@@ -257,7 +238,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 	select {
 	case ml.semaChan <- struct{}{}:
 	default:
-		ml.ctx.Log.Error("Sempahore channel was full after pushing message to the message queue")
+		ml.log.Error("Sempahore channel was full after pushing message to the message queue")
 	}
 	ml.metrics.pending.Inc()
 	return true

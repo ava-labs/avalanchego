@@ -27,7 +27,7 @@ type ResourceManager interface {
 	Utilization(ids.ShortID) float64
 }
 
-type throttler struct {
+type resourceManager struct {
 	log  logging.Logger
 	vdrs validators.Set
 
@@ -57,7 +57,7 @@ func NewResourceManager(
 	reservedMessages := uint32(stakerMsgPortion * float64(bufferSize))
 	poolMessages := bufferSize - reservedMessages
 
-	return &throttler{
+	return &resourceManager{
 		vdrs:       vdrs,
 		msgTracker: msgTracker,
 		cpuTracker: cpuTracker,
@@ -75,57 +75,69 @@ func NewResourceManager(
 // It tags the message with the ID of the resource pool it was taken
 // from and registers it with the message tracker if successful
 // Returns true if it finds a resource for the message.
-func (et *throttler) TakeMessage(vdr ids.ShortID) bool {
+func (rm *resourceManager) TakeMessage(vdr ids.ShortID) bool {
 	// Attempt to take the message from the pool
-	outstandingPoolMessages := et.msgTracker.PoolCount()
-	totalPeerMessages, peerPoolMessages := et.msgTracker.OutstandingCount(vdr)
-	if outstandingPoolMessages < et.poolMessages && peerPoolMessages < et.maxNonStakerPendingMsgs {
-		et.msgTracker.AddPool(vdr)
+	outstandingPoolMessages := rm.msgTracker.PoolCount()
+	totalPeerMessages, peerPoolMessages := rm.msgTracker.OutstandingCount(vdr)
+	if outstandingPoolMessages < rm.poolMessages && peerPoolMessages < rm.maxNonStakerPendingMsgs {
+		rm.msgTracker.AddPool(vdr)
 		return true
 	}
 
 	// Attempt to take the message from the individual allotment
-	weight, isStaker := et.vdrs.GetWeight(vdr)
+	weight, isStaker := rm.vdrs.GetWeight(vdr)
 	if !isStaker {
-		et.log.Verbo("Throttling message from non-staker %s. %d/%d.", vdr, peerPoolMessages, et.poolMessages)
+		rm.log.Verbo("Throttling message from non-staker %s. %d/%d.", vdr, peerPoolMessages, rm.poolMessages)
 		return false
 	}
-	totalWeight := et.vdrs.Weight()
+	totalWeight := rm.vdrs.Weight()
 	stakerPortion := float64(weight) / float64(totalWeight)
-	messageAllotment := uint32(stakerPortion * float64(et.reservedMessages))
+	messageAllotment := uint32(stakerPortion * float64(rm.reservedMessages))
 	messageCount := totalPeerMessages - peerPoolMessages
 	// Allow at least one message per staker, even when staking
 	// portion rounds message allotment down to 0
 	if messageCount <= messageAllotment {
-		et.msgTracker.Add(vdr)
+		rm.msgTracker.Add(vdr)
 		return true
 	}
 
-	et.log.Debug("Throttling message from staker %s. %d/%d. %d/%d.", vdr, messageCount, messageAllotment, peerPoolMessages, et.poolMessages)
+	rm.log.Debug("Throttling message from staker %s. %d/%d. %d/%d.", vdr, messageCount, messageAllotment, peerPoolMessages, rm.poolMessages)
 	return false
 }
 
 // ReturnMessage returns a message
-func (et *throttler) ReturnMessage(vdr ids.ShortID) {
-	et.msgTracker.Remove(vdr)
+func (rm *resourceManager) ReturnMessage(vdr ids.ShortID) {
+	rm.msgTracker.Remove(vdr)
 }
 
 // Utilization returns the percentage of expected utilization
 // for [vdr] to determine message priority
-func (et *throttler) Utilization(vdr ids.ShortID) float64 {
-	currentTime := et.clock.Time()
-	vdrUtilization := et.cpuTracker.Utilization(vdr, currentTime)
-	numSpenders := et.cpuTracker.Len()
-	poolAllotment := (1 - et.stakerCPUPortion) / float64(numSpenders)
+func (rm *resourceManager) Utilization(vdr ids.ShortID) float64 {
+	currentTime := rm.clock.Time()
+	vdrUtilization := rm.cpuTracker.Utilization(vdr, currentTime)
+	numSpenders := rm.cpuTracker.Len()
+	poolAllotment := (1 - rm.stakerCPUPortion) / float64(numSpenders)
 
-	weight, exists := et.vdrs.GetWeight(vdr)
+	weight, exists := rm.vdrs.GetWeight(vdr)
 	if !exists {
 		return vdrUtilization / poolAllotment
 	}
 
-	totalWeight := et.vdrs.Weight()
+	totalWeight := rm.vdrs.Weight()
 	stakerPortion := float64(weight) / float64(totalWeight)
-	stakerAllotment := stakerPortion*et.stakerCPUPortion + poolAllotment
+	stakerAllotment := stakerPortion*rm.stakerCPUPortion + poolAllotment
 
 	return vdrUtilization / stakerAllotment
+}
+
+type infiniteResourcePool struct{}
+
+func (i *infiniteResourcePool) TakeMessage(vdr ids.ShortID) bool { return true }
+
+func (i *infiniteResourcePool) ReturnMessage(vdr ids.ShortID) {}
+
+func (i *infiniteResourcePool) Utilization(vdr ids.ShortID) float64 { return 0 }
+
+func newInfiniteResourcePoolManager() ResourceManager {
+	return &infiniteResourcePool{}
 }
