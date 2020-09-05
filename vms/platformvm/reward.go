@@ -43,10 +43,10 @@ func Reward(
 
 	reward := new(big.Int).SetUint64(SupplyCap - rawMaxExistingAmount)
 	reward.Mul(reward, adjustedConsumptionRateNumerator)
-	reward.Div(reward, adjustedConsumptionRateDenominator)
 	reward.Mul(reward, stakedAmount)
-	reward.Div(reward, maxExistingAmount)
 	reward.Mul(reward, duration)
+	reward.Div(reward, adjustedConsumptionRateDenominator)
+	reward.Div(reward, maxExistingAmount)
 	reward.Div(reward, consumptionInterval)
 
 	return reward.Uint64()
