@@ -14,11 +14,10 @@ func TestSocketSendAndReceive(t *testing.T) {
 
 	// Create socket and client; wait for client to connect
 	socket := NewSocket(socketName, nil)
+	socket.accept, connCh = newTestAcceptFn()
 	if err := socket.Listen(); err != nil {
 		t.Fatal("Failed to listen on socket:", err.Error())
 	}
-
-	socket.accept, connCh = newTestAcceptFn()
 
 	client, err := Dial(socketName)
 	if err != nil {
