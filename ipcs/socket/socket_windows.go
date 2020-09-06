@@ -11,7 +11,7 @@ import (
 
 // Listen starts listening on the socket for new connection
 func (s *Socket) Listen() error {
-	l, err := winio.ListenPipe(windowsPipeName(addr), nil)
+	l, err := winio.ListenPipe(windowsPipeName(s.addr), nil)
 	if err != nil {
 		return err
 	}
