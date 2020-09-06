@@ -4,7 +4,6 @@
 package uptime
 
 import (
-	"math"
 	"time"
 )
 
@@ -23,53 +22,4 @@ type Meter interface {
 	// percent of time the meter has been running recently. The definition of
 	// recently depends on the halflife of the decay function.
 	Read(time.Time) float64
-}
-
-type meter struct {
-	running bool
-	started time.Time
-
-	halflife time.Duration
-
-	value       float64
-	lastUpdated time.Time
-}
-
-// NewMeter returns a new Meter with the provided halflife
-func NewMeter(halflife time.Duration) Meter {
-	return &meter{halflife: halflife}
-}
-
-// Start implements the Meter interface
-func (a *meter) Start(currentTime time.Time) {
-	if a.running {
-		return
-	}
-	a.Read(currentTime)
-	a.running = true
-}
-
-// Stop implements the Meter interface
-func (a *meter) Stop(currentTime time.Time) {
-	if !a.running {
-		return
-	}
-	a.Read(currentTime)
-	a.running = false
-}
-
-// Stop implements the Meter interface
-func (a *meter) Read(currentTime time.Time) float64 {
-	timeSincePreviousUpdate := currentTime.Sub(a.lastUpdated)
-	if timeSincePreviousUpdate <= 0 {
-		return a.value
-	}
-	a.lastUpdated = currentTime
-
-	factor := math.Pow(2, -timeSincePreviousUpdate.Seconds()/a.halflife.Seconds())
-	a.value *= factor
-	if a.running {
-		a.value += 1 - factor
-	}
-	return a.value
 }

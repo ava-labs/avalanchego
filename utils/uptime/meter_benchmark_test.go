@@ -4,36 +4,36 @@
 package uptime
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
 
-func BenchmarkMeterSeconds(b *testing.B) {
-	m := NewMeter(time.Second).(*meter)
-	m.Start(time.Now())
+func BenchmarkMeters(b *testing.B) {
+	for _, meterDef := range meters {
+		period := time.Second + 500*time.Millisecond
+		name := fmt.Sprintf("%s-%s", meterDef.name, period)
+		b.Run(name, func(b *testing.B) {
+			m := meterDef.factory.New(halflife)
+			MeterBenchmark(b, m, period)
+		})
 
-	currentTime := time.Now()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		currentTime = currentTime.Add(10*time.Second + 500*time.Millisecond)
-		time.Now()
-
-		m.Read(currentTime)
+		period = time.Millisecond
+		name = fmt.Sprintf("%s-%s", meterDef.name, period)
+		b.Run(name, func(b *testing.B) {
+			m := meterDef.factory.New(halflife)
+			MeterBenchmark(b, m, period)
+		})
 	}
 }
 
-func BenchmarkMeterMilliseconds(b *testing.B) {
-	m := NewMeter(time.Second).(*meter)
-
+func MeterBenchmark(b *testing.B, m Meter, period time.Duration) {
 	currentTime := time.Now()
 	m.Start(currentTime)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		currentTime = currentTime.Add(10 * time.Millisecond)
-		time.Now()
-
+		currentTime = currentTime.Add(period)
 		m.Read(currentTime)
 	}
 }
