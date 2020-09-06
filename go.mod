@@ -7,7 +7,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200812190859-4cb0e71f3c0e // indirect
-	github.com/ava-labs/coreth v0.2.13
+	github.com/ava-labs/coreth v0.2.13 // indirect
 	github.com/ava-labs/go-ethereum v1.9.3
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
