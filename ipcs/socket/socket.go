@@ -26,6 +26,7 @@ type Socket struct {
 	log logging.Logger
 
 	addr     string
+	accept   acceptFn
 	connLock *sync.RWMutex
 	conns    []net.Conn
 
@@ -41,12 +42,36 @@ func NewSocket(addr string, log logging.Logger) *Socket {
 		log: log,
 
 		addr:     addr,
+		accept:   accept,
 		connLock: &sync.RWMutex{},
 
 		listeningCh: make(chan struct{}),
 		quitCh:      make(chan struct{}),
 		doneCh:      make(chan struct{}),
 	}
+}
+
+// Listen starts listening on the socket for new connection
+func (s *Socket) Listen() error {
+	l, err := listen(s.addr)
+	if err != nil {
+		return err
+	}
+
+	// Start a loop that accepts new connections to told to quit
+	go func() {
+		for {
+			select {
+			case <-s.quitCh:
+				close(s.doneCh)
+				return
+			default:
+				s.accept(s, l)
+			}
+		}
+	}()
+
+	return nil
 }
 
 // Send writes the given message to all connection clients
@@ -125,6 +150,18 @@ func (c *Client) Recv() ([]byte, error) {
 // Close closes the underlying socket connection
 func (c *Client) Close() error {
 	return c.Conn.Close()
+}
+
+type acceptFn func(*Socket, net.Listener)
+
+func accept(s *Socket, l net.Listener) {
+	conn, err := l.Accept()
+	if err != nil {
+		s.log.Error("socket accept error: %s", err.Error())
+	}
+	s.connLock.Lock()
+	s.conns = append(s.conns, conn)
+	s.connLock.Unlock()
 }
 
 // isTimeoutError checks if an error is a timeout as per the net.Error interface

@@ -9,43 +9,21 @@ import (
 	"github.com/Microsoft/go-winio"
 )
 
-// Listen starts listening on the socket for new connection
-func (s *Socket) Listen() error {
-	l, err := winio.ListenPipe(windowsPipeName(s.addr), nil)
-	if err != nil {
-		return err
-	}
-	// Start a loop that accepts new connections to told to quit
-	go func() {
-		for {
-			select {
-			case <-s.quitCh:
-				close(s.doneCh)
-				return
-			default:
-				conn, err := l.Accept()
-				if err != nil {
-					s.log.Error("socket accept error: %s", err.Error())
-				}
-				s.connLock.Lock()
-				s.conns = append(s.conns, conn)
-				s.connLock.Unlock()
-			}
-		}
-	}()
-
-	return nil
+// listen creates a net.Listen backed by a Windows named pipe
+func listen(addr string) (net.Listener, error) {
+	return winio.ListenPipe(windowsPipeName(addr), nil)
 }
 
+// Dial creates a new *Client connected to a Windows named pipe
 func Dial(addr string) (*Client, error) {
 	c, err := winio.DialPipe(windowsPipeName(addr), nil)
 	if err != nil {
 		return nil, err
 	}
-
 	return &Client{c}, nil
 }
 
+// windowsPipeName turns an address into a valid Windows named pipes name
 func windowsPipeName(addr string) string {
-	return `\\.pipe\` + addr
+	return `\\.\pipe\` + addr
 }
