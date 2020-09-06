@@ -30,9 +30,8 @@ type Socket struct {
 	connLock *sync.RWMutex
 	conns    []net.Conn
 
-	listeningCh chan struct{}
-	quitCh      chan struct{}
-	doneCh      chan struct{}
+	quitCh chan struct{}
+	doneCh chan struct{}
 }
 
 // NewSocket creates a new socket object for the given address. It does not open
@@ -45,9 +44,8 @@ func NewSocket(addr string, log logging.Logger) *Socket {
 		accept:   accept,
 		connLock: &sync.RWMutex{},
 
-		listeningCh: make(chan struct{}),
-		quitCh:      make(chan struct{}),
-		doneCh:      make(chan struct{}),
+		quitCh: make(chan struct{}),
+		doneCh: make(chan struct{}),
 	}
 }
 
@@ -152,8 +150,11 @@ func (c *Client) Close() error {
 	return c.Conn.Close()
 }
 
+// acceptFn takes accepts connections from a Listener and gives them to a Socket
 type acceptFn func(*Socket, net.Listener)
 
+// accept is the default acceptFn for sockets. It accepts the next connection
+// from the given listen and adds it to the Socket's connection list
 func accept(s *Socket, l net.Listener) {
 	conn, err := l.Accept()
 	if err != nil {
