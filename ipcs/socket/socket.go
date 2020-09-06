@@ -56,7 +56,7 @@ func (s *Socket) Listen() error {
 		return err
 	}
 
-	// Start a loop that accepts new connections to told to quit
+	// Start a loop that accepts new connections until told to quit
 	go func() {
 		for {
 			select {
