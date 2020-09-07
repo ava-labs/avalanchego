@@ -10,15 +10,25 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
+const (
+	// DefaultMaxMessageSize is the number of bytes to cap messages at by default
+	DefaultMaxMessageSize = 10000000
+)
+
 var (
 	// ErrTimeout is returned when a socket operation times out
 	ErrTimeout = errors.New("timeout")
+
+	// ErrMessageTooLarge is returned when reading a message that is larger than
+	// our max size
+	ErrMessageTooLarge = errors.New("message to large")
 )
 
 // Socket manages sending messages over a socket to many subscribed clients
@@ -119,6 +129,7 @@ func (s *Socket) Close() error {
 // Client is a read-only connection to a socket
 type Client struct {
 	net.Conn
+	maxMessageSize int64
 }
 
 // Recv waits for a message from the socket. It's guaranteed to either return a
@@ -133,6 +144,10 @@ func (c *Client) Recv() ([]byte, error) {
 		return nil, err
 	}
 
+	if sz > atomic.LoadInt64(&c.maxMessageSize) {
+		return nil, ErrMessageTooLarge
+	}
+
 	// Create buffer for entire message and read it all in
 	msg := make([]byte, sz)
 	if _, err := io.ReadFull(c.Conn, msg); err != nil {
@@ -143,6 +158,11 @@ func (c *Client) Recv() ([]byte, error) {
 	}
 
 	return msg, nil
+}
+
+// SetMaxMessageSize sets the maximum size to allow for messages
+func (c *Client) SetMaxMessageSize(s int64) {
+	atomic.StoreInt64(&c.maxMessageSize, s)
 }
 
 // Close closes the underlying socket connection

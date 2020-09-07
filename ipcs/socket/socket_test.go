@@ -7,9 +7,10 @@ import (
 
 func TestSocketSendAndReceive(t *testing.T) {
 	var (
+		connCh     chan net.Conn
 		socketName = "/tmp/pipe-test.sock"
 		msg        = append([]byte("avalanche"), make([]byte, 1000000)...)
-		connCh     chan net.Conn
+		msgLen     = int64(len(msg))
 	)
 
 	// Create socket and client; wait for client to connect
@@ -27,8 +28,10 @@ func TestSocketSendAndReceive(t *testing.T) {
 
 	// Start sending in the background
 	go func() {
-		if err := socket.Send(msg); err != nil {
-			t.Fatal("Failed to send to socket:", err.Error())
+		for {
+			if err := socket.Send(msg); err != nil {
+				t.Fatal("Failed to send to socket:", err.Error())
+			}
 		}
 	}()
 
@@ -39,6 +42,16 @@ func TestSocketSendAndReceive(t *testing.T) {
 	}
 	if string(receivedMsg) != string(msg) {
 		t.Fatal("Received incorrect message:", string(msg))
+	}
+
+	// Test max message size
+	client.SetMaxMessageSize(msgLen)
+	if _, err = client.Recv(); err != nil {
+		t.Fatal("Failed to receive from socket:", err.Error())
+	}
+	client.SetMaxMessageSize(msgLen - 1)
+	if _, err = client.Recv(); err != ErrMessageTooLarge {
+		t.Fatal("Should have received message too large error, got:", err)
 	}
 }
 

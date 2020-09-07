@@ -22,7 +22,7 @@ func Dial(addr string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{c}, nil
+	return &Client{Conn: c, maxMessageSize: DefaultMaxMessageSize}, nil
 }
 
 // windowsPipeName turns an address into a valid Windows named pipes name

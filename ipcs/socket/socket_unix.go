@@ -47,7 +47,7 @@ func Dial(addr string) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{c}, nil
+	return &Client{Conn: c, maxMessageSize: DefaultMaxMessageSize}, nil
 }
 
 // removeIfStaleUnixSocket takes in a path and removes it iff it is a socket
