@@ -498,48 +498,43 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // Otherwise, some txs may not be put into vertices that are issued.
 // If [empty], will always result in a new poll.
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
-	// Problem:
-	// 		this allocates memory for at least [BatchSize] txs when in reality
-	// 		there can often be no transactions and there are seldom more than
-	// 		30 txs in practice leading to systemic overallocation of memory
-	//
-	// Solution:
-	// 		start with txs len(45)
-	// 		take slices of the txs array
-	// 		this should not behave any differently than a current call to batch
-	// 		so all tests should still pass
-	batch := make([]snowstorm.Tx, 0, t.Params.BatchSize)
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
 	issued := false
 	orphans := t.Consensus.Orphans()
-	for _, tx := range txs {
+	start := 0
+	end := 0
+	for end < len(txs) {
+		tx := txs[end]
 		inputs := tx.InputIDs()
-		overlaps := consumed.Overlaps(inputs) // See if this tx shares inputs with another one in this batch
-		if len(batch) >= t.Params.BatchSize || (force && overlaps) {
-			// The batch is big enough to issue, or we need to issue this batch
-			// because we're forcing each tx to be issued but adding [tx] to
-			// this batch would result in a vertex with conflicting txs.
-			if err := t.issueBatch(batch); err != nil {
+		overlaps := consumed.Overlaps(inputs)
+		if end-start >= t.Params.BatchSize || (force && overlaps) {
+			if err := t.issueBatch(txs[start:end]); err != nil {
 				return err
 			}
-			batch = make([]snowstorm.Tx, 0, t.Params.BatchSize)
+			start = end
 			consumed.Clear()
 			issued = true
 			overlaps = false
 		}
+
 		if txID := tx.ID(); !overlaps && // should never allow conflicting txs in the same vertex
 			!issuedTxs.Contains(txID) && // shouldn't issue duplicated transactions to the same vertex
 			(force || t.Consensus.IsVirtuous(tx)) && // force allows for a conflict to be issued
 			(!t.Consensus.TxIssued(tx) || orphans.Contains(txID)) { // should only reissue orphaned txs
-			batch = append(batch, tx)
+			end++
 			issuedTxs.Add(txID)
 			consumed.Union(inputs)
+		} else {
+			newLen := len(txs) - 1
+			txs[end] = txs[newLen]
+			txs[newLen] = nil
+			txs = txs[:newLen]
 		}
 	}
 
-	if len(batch) > 0 {
-		return t.issueBatch(batch)
+	if end > start {
+		return t.issueBatch(txs[start:end])
 	} else if empty && !issued {
 		t.issueRepoll()
 	}
