@@ -6,6 +6,7 @@ package socket
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -23,9 +24,6 @@ const (
 )
 
 var (
-	// ErrTimeout is returned when a socket operation times out
-	ErrTimeout = errors.New("timeout")
-
 	// ErrMessageTooLarge is returned when reading a message that is larger than
 	// our max size
 	ErrMessageTooLarge = errors.New("message to large")
@@ -99,7 +97,7 @@ func (s *Socket) Send(msg []byte) error {
 	var err error
 	for _, conn := range conns {
 		if _, err = conn.Write(msg); err != nil {
-			return err
+			return fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err)
 		}
 	}
 	return nil
@@ -139,7 +137,7 @@ func (c *Client) Recv() ([]byte, error) {
 	var sz int64
 	if err := binary.Read(c.Conn, binary.BigEndian, &sz); err != nil {
 		if isTimeoutError(err) {
-			return nil, ErrTimeout
+			return nil, errReadTimeout{c.Conn.RemoteAddr()}
 		}
 		return nil, err
 	}
@@ -152,7 +150,7 @@ func (c *Client) Recv() ([]byte, error) {
 	msg := make([]byte, sz)
 	if _, err := io.ReadFull(c.Conn, msg); err != nil {
 		if isTimeoutError(err) {
-			return nil, ErrTimeout
+			return nil, errReadTimeout{c.Conn.RemoteAddr()}
 		}
 		return nil, err
 	}
@@ -168,6 +166,16 @@ func (c *Client) SetMaxMessageSize(s int64) {
 // Close closes the underlying socket connection
 func (c *Client) Close() error {
 	return c.Conn.Close()
+}
+
+// errReadTimeout is returned a socket read times out
+type errReadTimeout struct {
+	addr net.Addr
+}
+
+// Error implements the error interface
+func (e errReadTimeout) Error() string {
+	return fmt.Sprintf("read from %s timed out", e.addr)
 }
 
 // acceptFn takes accepts connections from a Listener and gives them to a Socket
