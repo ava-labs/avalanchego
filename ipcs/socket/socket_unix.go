@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+var (
+	staleSocketTimeout = 100 * time.Millisecond
+)
+
 func listen(addr string) (net.Listener, error) {
 	uAddr, err := net.ResolveUnixAddr("unix", addr)
 	if err != nil {
@@ -59,7 +63,7 @@ func removeIfStaleUnixSocket(socketPath string) error {
 	}
 
 	// Try to connect
-	conn, err := net.DialTimeout("unix", socketPath, 100*time.Millisecond)
+	conn, err := net.DialTimeout("unix", socketPath, staleSocketTimeout)
 
 	switch {
 	// The connection was refused so this socket is stale; remove it
