@@ -20,7 +20,7 @@ import (
 
 const (
 	// DefaultMaxMessageSize is the number of bytes to cap messages at by default
-	DefaultMaxMessageSize = 10000000
+	DefaultMaxMessageSize = 1 << 21
 )
 
 var (
