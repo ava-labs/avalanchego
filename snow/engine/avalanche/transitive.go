@@ -358,9 +358,7 @@ func (t *Transitive) repoll() error {
 	}
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		if err := t.batch(nil, false /*=force*/, true /*=empty*/); err != nil {
-			return err
-		}
+		t.issueRepoll()
 	}
 	return nil
 }
@@ -500,6 +498,16 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 // Otherwise, some txs may not be put into vertices that are issued.
 // If [empty], will always result in a new poll.
 func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
+	// Problem:
+	// 		this allocates memory for at least [BatchSize] txs when in reality
+	// 		there can often be no transactions and there are seldom more than
+	// 		30 txs in practice leading to systemic overallocation of memory
+	//
+	// Solution:
+	// 		start with txs len(45)
+	// 		take slices of the txs array
+	// 		this should not behave any differently than a current call to batch
+	// 		so all tests should still pass
 	batch := make([]snowstorm.Tx, 0, t.Params.BatchSize)
 	issuedTxs := ids.Set{}
 	consumed := ids.Set{}
