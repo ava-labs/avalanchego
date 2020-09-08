@@ -490,96 +490,48 @@ func (h *Handler) shutdownDispatch() {
 }
 
 func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
-	var (
-		err          error
-		timeConsumed time.Duration
-		endTime      time.Time
-	)
+	var err error
 	switch msg.messageType {
 	case getAcceptedFrontierMsg:
 		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.getAcceptedFrontier.Observe(float64(timeConsumed.Nanoseconds()))
 	case acceptedFrontierMsg:
 		err = h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.acceptedFrontier.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAcceptedFrontierFailedMsg:
 		err = h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.getAcceptedFrontierFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAcceptedMsg:
 		err = h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.getAccepted.Observe(float64(timeConsumed.Nanoseconds()))
 	case acceptedMsg:
 		err = h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.accepted.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAcceptedFailedMsg:
 		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.getAcceptedFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAncestorsMsg:
 		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.getAncestors.Observe(float64(timeConsumed.Nanoseconds()))
 	case getAncestorsFailedMsg:
 		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.getAncestorsFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case multiPutMsg:
 		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.multiPut.Observe(float64(timeConsumed.Nanoseconds()))
 	case getMsg:
 		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.get.Observe(float64(timeConsumed.Nanoseconds()))
 	case getFailedMsg:
 		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.getFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case putMsg:
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.put.Observe(float64(timeConsumed.Nanoseconds()))
 	case pushQueryMsg:
 		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.pushQuery.Observe(float64(timeConsumed.Nanoseconds()))
 	case pullQueryMsg:
 		err = h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.pullQuery.Observe(float64(timeConsumed.Nanoseconds()))
 	case queryFailedMsg:
 		err = h.engine.QueryFailed(msg.validatorID, msg.requestID)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.queryFailed.Observe(float64(timeConsumed.Nanoseconds()))
 	case chitsMsg:
 		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
-		endTime = h.clock.Time()
-		timeConsumed = endTime.Sub(startTime)
-		h.chits.Observe(float64(timeConsumed.Nanoseconds()))
 	}
+	endTime := h.clock.Time()
+	timeConsumed := endTime.Sub(startTime)
+
+	histogram := h.getMSGHistogram(msg.messageType)
+	histogram.Observe(float64(timeConsumed))
 
 	h.serviceQueue.UtilizeCPU(msg.validatorID, startTime, endTime, timeConsumed)
-
 	return err
 }
 

@@ -154,3 +154,42 @@ func (m *metrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus
 	}
 	return gauge, histogram, errs.Err
 }
+
+func (m *metrics) getMSGHistogram(msg msgType) prometheus.Histogram {
+	switch msg {
+	case getAcceptedFrontierMsg:
+		return m.getAcceptedFrontier
+	case acceptedFrontierMsg:
+		return m.acceptedFrontier
+	case getAcceptedFrontierFailedMsg:
+		return m.getAcceptedFrontierFailed
+	case getAcceptedMsg:
+		return m.getAccepted
+	case acceptedMsg:
+		return m.accepted
+	case getAcceptedFailedMsg:
+		return m.getAcceptedFailed
+	case getAncestorsMsg:
+		return m.getAncestors
+	case getAncestorsFailedMsg:
+		return m.getAncestorsFailed
+	case multiPutMsg:
+		return m.multiPut
+	case getMsg:
+		return m.get
+	case getFailedMsg:
+		return m.getFailed
+	case putMsg:
+		return m.put
+	case pushQueryMsg:
+		return m.pushQuery
+	case pullQueryMsg:
+		return m.pullQuery
+	case queryFailedMsg:
+		return m.queryFailed
+	case chitsMsg:
+		return m.chits
+	default:
+		panic(fmt.Sprintf("unknown message type %s", msg))
+	}
+}
