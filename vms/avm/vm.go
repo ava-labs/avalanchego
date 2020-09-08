@@ -712,8 +712,8 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 // LoadUser returns:
 // 1) The UTXOs that reference one or more addresses controlled by the given user
 // 2) A keychain that contains this user's keys
-// If [addrsToUse] has positive length, returns UTXOs controlled by the given user
-// that are in [addrsToUse]. Otherwise, gets all UTXOs controlled by the user.
+// If [addrsToUse] has positive length, returns UTXOs that reference one or more
+// addresses controlled by the given user that are also in [addrsToUse].
 func (vm *VM) LoadUser(
 	username string,
 	password string,
