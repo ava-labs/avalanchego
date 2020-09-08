@@ -36,7 +36,7 @@ type Socket struct {
 	addr     string
 	accept   acceptFn
 	connLock *sync.RWMutex
-	conns    []net.Conn
+	conns    map[net.Conn]struct{}
 
 	quitCh chan struct{}
 	doneCh chan struct{}
@@ -51,6 +51,7 @@ func NewSocket(addr string, log logging.Logger) *Socket {
 		addr:     addr,
 		accept:   accept,
 		connLock: &sync.RWMutex{},
+		conns:    map[net.Conn]struct{}{},
 
 		quitCh: make(chan struct{}),
 		doneCh: make(chan struct{}),
@@ -89,8 +90,10 @@ func (s *Socket) Send(msg []byte) error {
 
 	// Get a copy of connections
 	s.connLock.RLock()
-	conns := make([]net.Conn, len(s.conns))
-	copy(conns, s.conns)
+	conns := make([]net.Conn, 0, len(s.conns))
+	for c := range s.conns {
+		conns = append(conns, c)
+	}
 	s.connLock.RUnlock()
 
 	// Write to each connection
@@ -98,6 +101,7 @@ func (s *Socket) Send(msg []byte) error {
 	errs := wrappers.Errs{}
 	for _, conn := range conns {
 		if _, err = conn.Write(msg); err != nil {
+			s.removeConn(conn)
 			errs.Add(fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err))
 		}
 	}
@@ -119,10 +123,16 @@ func (s *Socket) Close() error {
 
 	// Close all connections that were open at the time of shutdown
 	errs := wrappers.Errs{}
-	for _, conn := range conns {
+	for conn := range conns {
 		errs.Add(conn.Close())
 	}
 	return errs.Err
+}
+
+func (s *Socket) removeConn(c net.Conn) {
+	s.connLock.Lock()
+	delete(s.conns, c)
+	s.connLock.Unlock()
 }
 
 // Client is a read-only connection to a socket
@@ -190,7 +200,7 @@ func accept(s *Socket, l net.Listener) {
 		s.log.Error("socket accept error: %s", err.Error())
 	}
 	s.connLock.Lock()
-	s.conns = append(s.conns, conn)
+	s.conns[conn] = struct{}{}
 	s.connLock.Unlock()
 }
 
