@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/gecko/api/auth"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
@@ -52,9 +51,9 @@ func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host st
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
-	s.auth = &auth.Auth{
-		Enabled:        authEnabled,
-		HashedPassword: hashing.ComputeHash256([]byte(authPassword)),
+	s.auth = &auth.Auth{Enabled: authEnabled}
+	if err := s.auth.Password.Set(authPassword); err != nil {
+		return err
 	}
 	if authEnabled { // only create auth service if token authorization is required
 		s.log.Info("API authorization is enabled. Auth token must be passed in header of API requests (except requests to auth service.)")

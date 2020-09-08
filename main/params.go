@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/gecko/api/auth"
 	"github.com/ava-labs/gecko/database/leveldb"
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/genesis"
@@ -430,7 +429,7 @@ func init() {
 			errs.Add(errors.New("api-auth-password must be provided if api-require-auth is true"))
 			return
 		}
-		if !password.SufficientlyStrong(Config.APIAuthPassword, auth.RequiredPasswordStrength) {
+		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
 			errs.Add(errors.New("api-auth-password is not strong enough. Add more characters"))
 			return
 		}

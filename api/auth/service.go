@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -14,6 +15,11 @@ import (
 
 const (
 	maxEndpoints = 128
+)
+
+var (
+	errNoPassword = errors.New("argument 'password' not given")
+	errNoToken    = errors.New("argument 'token' not given")
 )
 
 // Service ...
@@ -63,10 +69,11 @@ type Token struct {
 func (s *Service) NewToken(_ *http.Request, args *NewTokenArgs, reply *Token) error {
 	s.log.Info("Auth: NewToken called")
 	if args.Password.Password == "" {
-		return fmt.Errorf("argument 'password' not given")
+		return errNoPassword
 	}
 	if l := len(args.Endpoints); l < 1 || l > maxEndpoints {
-		return fmt.Errorf("argument 'endpoints' must have between %d and %d elements, but has %d", 1, maxEndpoints, l)
+		return fmt.Errorf("argument 'endpoints' must have between %d and %d elements, but has %d",
+			1, maxEndpoints, l)
 	}
 	token, err := s.newToken(args.Password.Password, args.Endpoints)
 	reply.Token = token
@@ -83,9 +90,9 @@ type RevokeTokenArgs struct {
 func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, reply *Success) error {
 	s.log.Info("Auth: RevokeToken called")
 	if args.Password.Password == "" {
-		return fmt.Errorf("password not given")
+		return errNoPassword
 	} else if args.Token.Token == "" {
-		return fmt.Errorf("token not given")
+		return errNoToken
 	}
 	reply.Success = true
 	return s.revokeToken(args.Token.Token, args.Password.Password)
@@ -101,9 +108,7 @@ type ChangePasswordArgs struct {
 // Changing the password makes tokens issued under a previous password invalid
 func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, reply *Success) error {
 	s.log.Info("Auth: ChangePassword called")
-	if err := s.changePassword(args.OldPassword, args.NewPassword); err != nil {
-		return err
-	}
+
 	reply.Success = true
-	return nil
+	return s.changePassword(args.OldPassword, args.NewPassword)
 }
