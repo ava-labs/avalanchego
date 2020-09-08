@@ -6,7 +6,6 @@ package rpcchainvm
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"google.golang.org/grpc"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/missing"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup/galiaslookupproto"
@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup"
@@ -53,10 +54,8 @@ type VMClient struct {
 	bcLookup     *galiaslookup.Server
 	snLookup     *gsubnetlookup.Server
 
-	lock    sync.Mutex
-	closed  bool
-	servers []*grpc.Server
-	conns   []*grpc.ClientConn
+	serverCloser grpcutils.ServerCloser
+	conns        []*grpc.ClientConn
 
 	ctx  *snow.Context
 	blks map[[32]byte]*BlockClient
@@ -152,97 +151,43 @@ func (vm *VMClient) Initialize(
 }
 
 func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
 	server := grpc.NewServer(opts...)
-
-	if vm.closed {
-		server.Stop()
-	} else {
-		vm.servers = append(vm.servers, server)
-	}
-
+	vm.serverCloser.Add(server)
 	rpcdbproto.RegisterDatabaseServer(server, vm.db)
 	return server
 }
 
 func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
 	server := grpc.NewServer(opts...)
-
-	if vm.closed {
-		server.Stop()
-	} else {
-		vm.servers = append(vm.servers, server)
-	}
-
+	vm.serverCloser.Add(server)
 	messengerproto.RegisterMessengerServer(server, vm.messenger)
 	return server
 }
 
 func (vm *VMClient) startKeystoreServer(opts []grpc.ServerOption) *grpc.Server {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
 	server := grpc.NewServer(opts...)
-
-	if vm.closed {
-		server.Stop()
-	} else {
-		vm.servers = append(vm.servers, server)
-	}
-
+	vm.serverCloser.Add(server)
 	gkeystoreproto.RegisterKeystoreServer(server, vm.keystore)
 	return server
 }
 
 func (vm *VMClient) startSharedMemoryServer(opts []grpc.ServerOption) *grpc.Server {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
 	server := grpc.NewServer(opts...)
-
-	if vm.closed {
-		server.Stop()
-	} else {
-		vm.servers = append(vm.servers, server)
-	}
-
+	vm.serverCloser.Add(server)
 	gsharedmemoryproto.RegisterSharedMemoryServer(server, vm.sharedMemory)
 	return server
 }
 
 func (vm *VMClient) startBCLookupServer(opts []grpc.ServerOption) *grpc.Server {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
 	server := grpc.NewServer(opts...)
-
-	if vm.closed {
-		server.Stop()
-	} else {
-		vm.servers = append(vm.servers, server)
-	}
-
+	vm.serverCloser.Add(server)
 	galiaslookupproto.RegisterAliasLookupServer(server, vm.bcLookup)
 	return server
 }
 
 func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
 	server := grpc.NewServer(opts...)
-
-	if vm.closed {
-		server.Stop()
-	} else {
-		vm.servers = append(vm.servers, server)
-	}
-
+	vm.serverCloser.Add(server)
 	gsubnetlookupproto.RegisterSubnetLookupServer(server, vm.snLookup)
 	return server
 }
@@ -261,41 +206,21 @@ func (vm *VMClient) Bootstrapped() error {
 
 // Shutdown ...
 func (vm *VMClient) Shutdown() error {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
+	errs := wrappers.Errs{}
+	_, err := vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{})
+	errs.Add(err)
 
-	if vm.closed {
-		return nil
-	}
-
-	vm.closed = true
-
-	if _, err := vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{}); err != nil {
-		return err
-	}
-
-	for _, server := range vm.servers {
-		server.Stop()
-	}
+	vm.serverCloser.Stop()
 	for _, conn := range vm.conns {
-		if err := conn.Close(); err != nil {
-			return err
-		}
+		errs.Add(conn.Close())
 	}
 
 	vm.proc.Kill()
-	return nil
+	return errs.Err
 }
 
 // CreateHandlers ...
 func (vm *VMClient) CreateHandlers() map[string]*common.HTTPHandler {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
-	if vm.closed {
-		return nil
-	}
-
 	resp, err := vm.client.CreateHandlers(context.Background(), &vmproto.CreateHandlersRequest{})
 	vm.ctx.Log.AssertNoError(err)
 
