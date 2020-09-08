@@ -35,41 +35,36 @@ type APIUTXO struct {
 	Address string      `json:"address"`
 }
 
-// APIValidator is a validator.
+// APIStaker is the representation of a staker sent via APIs.
 // [Amount] is the amount of tokens being staked.
+// [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
-// [ID] is the node ID of the staker
-// [Address] is the address where the staked $AVAX (and, if applicable, reward)
-// is sent when this staker is done staking.
-type APIValidator struct {
+// [NodeID] is the node ID of the staker
+type APIStaker struct {
 	StartTime   json.Uint64  `json:"startTime"`
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	Address     string       `json:"address,omitempty"`
-	ID          ids.ShortID  `json:"id"`
+	NodeID      string       `json:"nodeID"`
 }
 
-// APIPrimaryValidator is a validator of the primary network
+// APIPrimaryValidator is the repr. of a primary network validator sent over APIs.
 type APIPrimaryValidator struct {
-	APIValidator
-
-	RewardAddress     string      `json:"rewardAddress"`
-	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
+	APIStaker
+	// The address the staking reward, if applicable, will go to
+	RewardAddress     string        `json:"rewardAddress"`
+	DelegationFeeRate json.Float32  `json:"delegationFeeRate"`
+	Uptime            *json.Float32 `json:"uptime,omitempty"`
+	Connected         *bool         `json:"connected,omitempty"`
 }
 
-// FormattedAPIValidator allows for a formatted address
-type FormattedAPIValidator struct {
-	StartTime   json.Uint64   `json:"startTime"`
-	EndTime     json.Uint64   `json:"endTime"`
-	Weight      *json.Uint64  `json:"weight,omitempty"`
-	StakeAmount *json.Uint64  `json:"stakeAmount,omitempty"`
-	Uptime      *json.Float32 `json:"uptime,omitempty"`
-	Connected   *bool         `json:"connected,omitempty"`
-	ID          string        `json:"nodeID"`
+// APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.
+type APIPrimaryDelegator struct {
+	APIStaker
+	RewardAddress string `json:"rewardAddress"`
 }
 
-func (v *FormattedAPIValidator) weight() uint64 {
+func (v *APIStaker) weight() uint64 {
 	switch {
 	case v.Weight != nil:
 		return uint64(*v.Weight)
@@ -78,16 +73,6 @@ func (v *FormattedAPIValidator) weight() uint64 {
 	default:
 		return 0
 	}
-}
-
-// FormattedAPIPrimaryValidator is a formatted validator of the primary network
-type FormattedAPIPrimaryValidator struct {
-	FormattedAPIValidator
-
-	RewardAddress string `json:"rewardAddress"`
-
-	// Delegation fee rate as a percentage. Must be in [0,100].
-	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
 // APIChain defines a chain that exists
@@ -113,13 +98,13 @@ type APIChain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID ids.ID                         `json:"avaxAssetID"`
-	NetworkID   json.Uint32                    `json:"address"`
-	UTXOs       []APIUTXO                      `json:"utxos"`
-	Validators  []FormattedAPIPrimaryValidator `json:"primaryNetworkValidators"`
-	Chains      []APIChain                     `json:"chains"`
-	Time        json.Uint64                    `json:"time"`
-	Message     string                         `json:"message"`
+	AvaxAssetID ids.ID                `json:"avaxAssetID"`
+	NetworkID   json.Uint32           `json:"address"`
+	UTXOs       []APIUTXO             `json:"utxos"`
+	Validators  []APIPrimaryValidator `json:"primaryNetworkValidators"`
+	Chains      []APIChain            `json:"chains"`
+	Time        json.Uint64           `json:"time"`
+	Message     string                `json:"message"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -203,7 +188,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if err != nil {
 			return err
 		}
-		nodeID, err := ids.ShortFromPrefixedString(validator.ID, constants.NodeIDPrefix)
+		nodeID, err := ids.ShortFromPrefixedString(validator.NodeID, constants.NodeIDPrefix)
 		if err != nil {
 			return err
 		}

@@ -140,7 +140,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]FormattedAPIPrimaryValidator, len(keys))
+	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
 		id := key.PublicKey().Address()
@@ -148,12 +148,12 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = FormattedAPIPrimaryValidator{
-			FormattedAPIValidator: FormattedAPIValidator{
+		genesisValidators[i] = APIPrimaryValidator{
+			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				ID:        id.PrefixedString(constants.NodeIDPrefix),
+				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
 			},
 			RewardAddress:     addr,
 			DelegationFeeRate: NumberOfShares,

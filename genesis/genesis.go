@@ -119,12 +119,12 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		weight := json.Uint64(20 * units.KiloAvax)
 		destAddr := config.FundedAddresses[i%len(config.FundedAddresses)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.FormattedAPIPrimaryValidator{
-				FormattedAPIValidator: platformvm.FormattedAPIValidator{
+			platformvm.APIPrimaryValidator{
+				APIStaker: platformvm.APIStaker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					Weight:    &weight,
-					ID:        validatorID.PrefixedString(constants.NodeIDPrefix),
+					NodeID:    validatorID.PrefixedString(constants.NodeIDPrefix),
 				},
 				RewardAddress: destAddr,
 			},

@@ -514,7 +514,8 @@ type GetCurrentValidatorsArgs struct {
 
 // GetCurrentValidatorsReply are the results from calling GetCurrentValidators
 type GetCurrentValidatorsReply struct {
-	Validators []FormattedAPIValidator `json:"validators"`
+	Validators []interface{} `json:"validators"`
+	Delegators []interface{} `json:"delegators"`
 }
 
 // GetCurrentValidators returns the list of current validators
@@ -545,11 +546,19 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(staker.StartTime().Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
-				StakeAmount: &weight,
+			var rewardAddr string
+			rewardOwner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if ok && len(rewardOwner.Addrs) > 0 {
+				rewardAddr, _ = service.vm.FormatLocalAddress(rewardOwner.Addrs[0])
+			}
+			reply.Delegators = append(reply.Delegators, APIPrimaryDelegator{
+				APIStaker: APIStaker{
+					StartTime:   json.Uint64(staker.StartTime().Unix()),
+					EndTime:     json.Uint64(staker.EndTime().Unix()),
+					StakeAmount: &weight,
+					NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+				},
+				RewardAddress: rewardAddr,
 			})
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
@@ -565,18 +574,28 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			_, connected := service.vm.connections[nodeID.Key()]
 			service.vm.connLock.Unlock()
 
-			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          nodeID.PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(startTime.Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
-				StakeAmount: &weight,
-				Uptime:      &uptime,
-				Connected:   &connected,
+			var rewardAddr string
+			rewardOwner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if ok && len(rewardOwner.Addrs) > 0 {
+				rewardAddr, _ = service.vm.FormatLocalAddress(rewardOwner.Addrs[0])
+			}
+
+			reply.Validators = append(reply.Validators, APIPrimaryValidator{
+				APIStaker: APIStaker{
+					NodeID:      nodeID.PrefixedString(constants.NodeIDPrefix),
+					StartTime:   json.Uint64(startTime.Unix()),
+					EndTime:     json.Uint64(staker.EndTime().Unix()),
+					StakeAmount: &weight,
+				},
+				Uptime:            &uptime,
+				Connected:         &connected,
+				RewardAddress:     rewardAddr,
+				DelegationFeeRate: json.Float32(staker.Shares / 10000),
 			})
 		case *UnsignedAddSubnetValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:        staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+			reply.Validators = append(reply.Validators, APIStaker{
+				NodeID:    staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
 				EndTime:   json.Uint64(staker.EndTime().Unix()),
 				Weight:    &weight,
@@ -597,7 +616,8 @@ type GetPendingValidatorsArgs struct {
 
 // GetPendingValidatorsReply are the results from calling GetPendingValidators
 type GetPendingValidatorsReply struct {
-	Validators []FormattedAPIValidator `json:"validators"`
+	Validators []interface{} `json:"validators"`
+	Delegators []interface{} `json:"delegators"`
 }
 
 // GetPendingValidators returns the list of pending validators
@@ -628,24 +648,27 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+			reply.Delegators = append(reply.Delegators, APIStaker{
+				NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime:   json.Uint64(staker.StartTime().Unix()),
 				EndTime:     json.Uint64(staker.EndTime().Unix()),
 				StakeAmount: &weight,
 			})
 		case *UnsignedAddValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:          staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
-				StartTime:   json.Uint64(staker.StartTime().Unix()),
-				EndTime:     json.Uint64(staker.EndTime().Unix()),
-				StakeAmount: &weight,
+			reply.Validators = append(reply.Validators, APIPrimaryValidator{
+				APIStaker: APIStaker{
+					NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+					StartTime:   json.Uint64(staker.StartTime().Unix()),
+					EndTime:     json.Uint64(staker.EndTime().Unix()),
+					StakeAmount: &weight,
+				},
+				DelegationFeeRate: json.Float32(staker.Shares / 10000),
 			})
 		case *UnsignedAddSubnetValidatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
-			reply.Validators = append(reply.Validators, FormattedAPIValidator{
-				ID:        staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
+			reply.Validators = append(reply.Validators, APIStaker{
+				NodeID:    staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				StartTime: json.Uint64(staker.StartTime().Unix()),
 				EndTime:   json.Uint64(staker.EndTime().Unix()),
 				Weight:    &weight,
@@ -710,7 +733,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 
 // AddValidatorArgs are the arguments to AddValidator
 type AddValidatorArgs struct {
-	FormattedAPIPrimaryValidator
+	APIPrimaryValidator
 
 	api.UserPass
 }
@@ -729,10 +752,10 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	}
 
 	var nodeID ids.ShortID
-	if args.ID == "" {
+	if args.NodeID == "" {
 		nodeID = service.vm.Ctx.NodeID
 	} else {
-		nID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+		nID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 		if err != nil {
 			return err
 		}
@@ -775,7 +798,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 // AddDelegatorArgs are the arguments to AddDelegator
 type AddDelegatorArgs struct {
-	FormattedAPIValidator
+	APIPrimaryDelegator
 	api.UserPass
 	RewardAddress string `json:"rewardAddress"`
 }
@@ -792,10 +815,10 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	}
 
 	var nodeID ids.ShortID
-	if args.ID == "" { // If ID unspecified, use this node's ID as validator ID
+	if args.NodeID == "" { // If ID unspecified, use this node's ID as validator ID
 		nodeID = service.vm.Ctx.NodeID
 	} else {
-		nID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+		nID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 		if err != nil {
 			return err
 		}
@@ -837,7 +860,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
 type AddSubnetValidatorArgs struct {
-	FormattedAPIValidator
+	APIStaker
 	api.UserPass
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
@@ -852,9 +875,9 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		return errNoSubnetID
 	}
 
-	nodeID, err := ids.ShortFromPrefixedString(args.ID, constants.NodeIDPrefix)
+	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 	if err != nil {
-		return fmt.Errorf("error parsing nodeID: '%s': %w", args.ID, err)
+		return fmt.Errorf("error parsing nodeID: '%s': %w", args.NodeID, err)
 	}
 
 	subnetID, err := ids.FromString(args.SubnetID)
