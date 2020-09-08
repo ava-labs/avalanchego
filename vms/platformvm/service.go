@@ -1369,10 +1369,13 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	return nil
 }
 
-// GetMinStake returns the minimum staking amount in nAVAX.
-func (service *Service) GetMinStake(_ *http.Request, args *struct{}, reply *struct {
+// GetMinStakeReply is the response from calling GetMinStake.
+type GetMinStakeReply struct {
 	MinStake json.Uint64 `json:"minStake"`
-}) error {
+}
+
+// GetMinStake returns the minimum staking amount in nAVAX.
+func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinStakeReply) error {
 	reply.MinStake = json.Uint64(service.vm.minStake)
 	return nil
 }
