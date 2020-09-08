@@ -37,7 +37,6 @@ var (
 
 var (
 	errNoTxs          = errors.New("no transactions")
-	errUnknownBlock   = errors.New("unknown block")
 	errUnsupportedFXs = errors.New("unsupported feature extensions")
 )
 
@@ -116,10 +115,16 @@ func (vm *VM) Initialize(
 	return nil
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown implements the snowman.ChainVM interface
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
-		return
+		return nil
 	}
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
@@ -127,9 +132,8 @@ func (vm *VM) Shutdown() {
 	vm.ctx.Lock.Unlock()
 	vm.timer.Stop()
 	vm.ctx.Lock.Lock()
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
-	}
+
+	return vm.baseDB.Close()
 }
 
 // BuildBlock implements the snowman.ChainVM interface
@@ -205,9 +209,10 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Service{vm: vm}, "spchain") // Name the API service "spchain"
+	// Name the API service "spchain"
+	vm.ctx.Log.AssertNoError(newServer.RegisterService(&Service{vm: vm}, "spchain"))
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{LockOptions: common.WriteLock, Handler: newServer},
+		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}
 }
 
@@ -217,9 +222,10 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&StaticService{}, "spchain") // Name the API service "spchain"
+	// Name the API service "spchain"
+	_ = newServer.RegisterService(&StaticService{}, "spchain")
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer},
+		"": {LockOptions: common.NoLock, Handler: newServer},
 	}
 }
 

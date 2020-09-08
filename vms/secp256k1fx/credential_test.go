@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestCredentialVerify(t *testing.T) {
@@ -31,6 +32,8 @@ func TestCredentialSerialize(t *testing.T) {
 	c := codec.NewDefault()
 
 	expected := []byte{
+		// Codec version
+		0x00, 0x00,
 		// length:
 		0x00, 0x00, 0x00, 0x02,
 		// sig[0]
@@ -55,7 +58,7 @@ func TestCredentialSerialize(t *testing.T) {
 		0x00,
 	}
 	cred := Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{
-		[crypto.SECP256K1RSigLen]byte{
+		{
 			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 			0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 			0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -66,7 +69,7 @@ func TestCredentialSerialize(t *testing.T) {
 			0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
 			0x00,
 		},
-		[crypto.SECP256K1RSigLen]byte{
+		{
 			0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
 			0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
 			0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
@@ -90,5 +93,12 @@ func TestCredentialSerialize(t *testing.T) {
 
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
+	}
+}
+
+func TestCredentialNotState(t *testing.T) {
+	intf := interface{}(&Credential{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

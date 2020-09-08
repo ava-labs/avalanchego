@@ -8,15 +8,15 @@ import (
 	"sync"
 
 	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/snow/engine/common"
-
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
 // A VMFactory creates new instances of a VM
 type VMFactory interface {
-	New() (interface{}, error)
+	New(*snow.Context) (interface{}, error)
 }
 
 // Manager is a VM manager.
@@ -110,7 +110,7 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 	vmFactory, err := m.GetVMFactory(vmID)
 	m.log.AssertNoError(err)
 	m.log.Debug("adding static API for VM with ID %s", vmID)
-	vm, err := vmFactory.New()
+	vm, err := vmFactory.New(nil)
 	if err != nil {
 		return
 	}
@@ -119,7 +119,9 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 	if !ok {
 		staticVM, ok := vm.(common.VM)
 		if ok {
-			staticVM.Shutdown()
+			if err := staticVM.Shutdown(); err != nil {
+				m.log.Error("shutting down static API endpoints errored with: %s", err)
+			}
 		}
 		return
 	}

@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/gecko/utils"
 )
 
-// Peer contains the specification of an Ava node that can be communicated with.
+// Peer contains the specification of an Avalanche node that can be communicated with.
 type Peer struct {
 	// IP of the peer
 	IP utils.IPDesc

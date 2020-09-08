@@ -11,26 +11,38 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
+	zxcvbn "github.com/nbutton23/zxcvbn-go"
+
+	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/chains/atomic"
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/encdb"
+	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/database/prefixdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/codec"
 
 	jsoncodec "github.com/ava-labs/gecko/utils/json"
-	zxcvbn "github.com/nbutton23/zxcvbn-go"
 )
 
 const (
 	// maxUserPassLen is the maximum length of the username or password allowed
 	maxUserPassLen = 1024
 
-	// requiredPassScore defines the score a password must achieve to be accepted
-	// as a password with strong characteristics by the zxcvbn package
+	// maxCheckedPassLen limits the length of the password that should be
+	// strength checked.
+	//
+	// As per issue https://github.com/ava-labs/gecko/issues/195 it was found
+	// the longer the length of password the slower zxcvbn.PasswordStrength()
+	// performs. To avoid performance issues, and a DoS vector, we only check
+	// the first 50 characters of the password.
+	maxCheckedPassLen = 50
+
+	// requiredPassScore defines the score a password must achieve to be
+	// accepted as a password with strong characteristics by the zxcvbn package
 	//
 	// The scoring mechanism defined is as follows;
 	//
@@ -45,7 +57,7 @@ const (
 var (
 	errEmptyUsername     = errors.New("username can't be the empty string")
 	errUserPassMaxLength = fmt.Errorf("CreateUser call rejected due to username or password exceeding maximum length of %d chars", maxUserPassLen)
-	errWeakPassword      = errors.New("Failed to create user as the given password is too weak. A stronger password is one of 8 or more characters containing attributes of upper and lowercase letters, numbers, and/or special characters")
+	errWeakPassword      = errors.New("failed to create user as the given password is too weak")
 )
 
 // KeyValuePair ...
@@ -79,7 +91,7 @@ type Keystore struct {
 	//    UserDB        BlockchainDB
 	//                 /      |     \
 	//               Usr     Usr    Usr
-	//            /   |   \
+	//             /  |  \
 	//          BID  BID  BID
 }
 
@@ -93,13 +105,15 @@ func (ks *Keystore) Initialize(log logging.Logger, db database.Database) {
 }
 
 // CreateHandler returns a new service object that can send requests to thisAPI.
-func (ks *Keystore) CreateHandler() *common.HTTPHandler {
+func (ks *Keystore) CreateHandler() (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(ks, "keystore")
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}
+	if err := newServer.RegisterService(ks, "keystore"); err != nil {
+		return nil, err
+	}
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer}, nil
 }
 
 // Get the user whose name is [username]
@@ -119,59 +133,19 @@ func (ks *Keystore) getUser(username string) (*User, error) {
 	return usr, ks.codec.Unmarshal(usrBytes, usr)
 }
 
-// CreateUserArgs are arguments for passing into CreateUser requests
-type CreateUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// CreateUserReply is the response from calling CreateUser
-type CreateUserReply struct {
-	Success bool `json:"success"`
-}
-
 // CreateUser creates an empty user with the provided username and password
-func (ks *Keystore) CreateUser(_ *http.Request, args *CreateUserArgs, reply *CreateUserReply) error {
+func (ks *Keystore) CreateUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("CreateUser called with %.*s", maxUserPassLen, args.Username)
-
-	if len(args.Username) > maxUserPassLen || len(args.Password) > maxUserPassLen {
-		return errUserPassMaxLength
-	}
-
-	if args.Username == "" {
-		return errEmptyUsername
-	}
-	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
-		return fmt.Errorf("user already exists: %s", args.Username)
-	}
-
-	if zxcvbn.PasswordStrength(args.Password, nil).Score < requiredPassScore {
-		return errWeakPassword
-	}
-
-	usr := &User{}
-	if err := usr.Initialize(args.Password); err != nil {
+	ks.log.Info("Keystore: CreateUser called with %.*s", maxUserPassLen, args.Username)
+	if err := ks.AddUser(args.Username, args.Password); err != nil {
 		return err
 	}
 
-	usrBytes, err := ks.codec.Marshal(usr)
-	if err != nil {
-		return err
-	}
-
-	if err := ks.userDB.Put([]byte(args.Username), usrBytes); err != nil {
-		return err
-	}
-	ks.users[args.Username] = usr
 	reply.Success = true
 	return nil
 }
-
-// ListUsersArgs are the arguments to ListUsers
-type ListUsersArgs struct{}
 
 // ListUsersReply is the reply from ListUsers
 type ListUsersReply struct {
@@ -179,11 +153,11 @@ type ListUsersReply struct {
 }
 
 // ListUsers lists all the registered usernames
-func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListUsersReply) error {
+func (ks *Keystore) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersReply) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("ListUsers called")
+	ks.log.Info("Keystore: ListUsers called")
 
 	reply.Users = []string{}
 
@@ -195,23 +169,17 @@ func (ks *Keystore) ListUsers(_ *http.Request, args *ListUsersArgs, reply *ListU
 	return it.Error()
 }
 
-// ExportUserArgs are the arguments to ExportUser
-type ExportUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
 // ExportUserReply is the reply from ExportUser
 type ExportUserReply struct {
 	User formatting.CB58 `json:"user"`
 }
 
 // ExportUser exports a serialized encoding of a user's information complete with encrypted database values
-func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *ExportUserReply) error {
+func (ks *Keystore) ExportUser(_ *http.Request, args *api.UserPass, reply *ExportUserReply) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("ExportUser called for %s", args.Username)
+	ks.log.Info("Keystore: ExportUser called for %s", args.Username)
 
 	usr, err := ks.getUser(args.Username)
 	if err != nil {
@@ -249,22 +217,21 @@ func (ks *Keystore) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Exp
 
 // ImportUserArgs are arguments for ImportUser
 type ImportUserArgs struct {
-	Username string          `json:"username"`
-	Password string          `json:"password"`
-	User     formatting.CB58 `json:"user"`
+	api.UserPass
+	User formatting.CB58 `json:"user"`
 }
 
-// ImportUserReply is the response for ImportUser
-type ImportUserReply struct {
-	Success bool `json:"success"`
-}
-
-// ImportUser imports a serialized encoding of a user's information complete with encrypted database values, integrity checks the password, and adds it to the database
-func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *ImportUserReply) error {
+// ImportUser imports a serialized encoding of a user's information complete with encrypted database values,
+// integrity checks the password, and adds it to the database
+func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("ImportUser called for %s", args.Username)
+	ks.log.Info("Keystore: ImportUser called for %s", args.Username)
+
+	if args.Username == "" {
+		return errEmptyUsername
+	}
 
 	if usr, err := ks.getUser(args.Username); err == nil || usr != nil {
 		return fmt.Errorf("user already exists: %s", args.Username)
@@ -291,7 +258,9 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	userDataDB := prefixdb.New([]byte(args.Username), ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
-		dataBatch.Put(kvp.Key, kvp.Value)
+		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
+			return fmt.Errorf("error on database put: %w", err)
+		}
 	}
 
 	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
@@ -304,23 +273,12 @@ func (ks *Keystore) ImportUser(r *http.Request, args *ImportUserArgs, reply *Imp
 	return nil
 }
 
-// DeleteUserArgs are arguments for passing into DeleteUser requests
-type DeleteUserArgs struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// DeleteUserReply is the response from calling DeleteUser
-type DeleteUserReply struct {
-	Success bool `json:"success"`
-}
-
 // DeleteUser deletes user with the provided username and password.
-func (ks *Keystore) DeleteUser(_ *http.Request, args *DeleteUserArgs, reply *DeleteUserReply) error {
+func (ks *Keystore) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
-	ks.log.Verbo("DeleteUser called with %s", args.Username)
+	ks.log.Info("Keystore: DeleteUser called with %s", args.Username)
 
 	if args.Username == "" {
 		return errEmptyUsername
@@ -381,6 +339,8 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 	ks.lock.Lock()
 	defer ks.lock.Unlock()
 
+	ks.log.Info("Keystore: GetDatabase called with %s from %s", username, bID)
+
 	usr, err := ks.getUser(username)
 	if err != nil {
 		return nil, err
@@ -398,4 +358,52 @@ func (ks *Keystore) GetDatabase(bID ids.ID, username, password string) (database
 	}
 
 	return encDB, nil
+}
+
+// AddUser attempts to register this username and password as a new user of the
+// keystore.
+func (ks *Keystore) AddUser(username, password string) error {
+	if len(username) > maxUserPassLen || len(password) > maxUserPassLen {
+		return errUserPassMaxLength
+	}
+
+	if username == "" {
+		return errEmptyUsername
+	}
+	if usr, err := ks.getUser(username); err == nil || usr != nil {
+		return fmt.Errorf("user already exists: %s", username)
+	}
+
+	checkPass := password
+	if len(password) > maxCheckedPassLen {
+		checkPass = password[:maxCheckedPassLen]
+	}
+
+	if zxcvbn.PasswordStrength(checkPass, nil).Score < requiredPassScore {
+		return errWeakPassword
+	}
+
+	usr := &User{}
+	if err := usr.Initialize(password); err != nil {
+		return err
+	}
+
+	usrBytes, err := ks.codec.Marshal(usr)
+	if err != nil {
+		return err
+	}
+
+	if err := ks.userDB.Put([]byte(username), usrBytes); err != nil {
+		return err
+	}
+	ks.users[username] = usr
+
+	return nil
+}
+
+// CreateTestKeystore returns a new keystore that can be utilized for testing
+func CreateTestKeystore() *Keystore {
+	ks := &Keystore{}
+	ks.Initialize(logging.NoLog{}, memdb.New())
+	return ks
 }

@@ -8,8 +8,8 @@ import (
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 // Consensus is a snowball instance deciding between an unbounded number of
@@ -19,17 +19,18 @@ type Consensus interface {
 	fmt.Stringer
 
 	// Takes in the context, alpha, betaVirtuous, and betaRogue
-	Initialize(*snow.Context, snowball.Parameters)
+	Initialize(*snow.Context, sbcon.Parameters) error
 
 	// Returns the parameters that describe this snowstorm instance
-	Parameters() snowball.Parameters
+	Parameters() sbcon.Parameters
 
 	// Returns true if transaction <Tx> is virtuous.
 	// That is, no transaction has been added that conflicts with <Tx>
 	IsVirtuous(Tx) bool
 
-	// Adds a new transaction to vote on
-	Add(Tx)
+	// Adds a new transaction to vote on. Returns if a critical error has
+	// occurred.
+	Add(Tx) error
 
 	// Returns true iff transaction <Tx> has been added
 	Issued(Tx) bool
@@ -45,8 +46,9 @@ type Consensus interface {
 	Conflicts(Tx) ids.Set
 
 	// Collects the results of a network poll. Assumes all transactions
-	// have been previously added
-	RecordPoll(ids.Bag)
+	// have been previously added. Returns true is any statuses or preferences
+	// changed. Returns if a critical error has occurred.
+	RecordPoll(ids.Bag) (bool, error)
 
 	// Returns true iff all remaining transactions are rogue. Note, it is
 	// possible that after returning quiesce, a new decision may be added such
@@ -57,38 +59,10 @@ type Consensus interface {
 	// possible that after returning finalized, a new decision may be added such
 	// that this instance is no longer finalized.
 	Finalized() bool
-}
 
-// Tx consumes state.
-type Tx interface {
-	choices.Decidable
+	// Accept the provided tx remove it from the graph
+	accept(txID ids.ID) error
 
-	// Dependencies is a list of transactions upon which this transaction
-	// depends. Each element of Dependencies must be verified before Verify is
-	// called on this transaction.
-	//
-	// Similarly, each element of Dependencies must be accepted before this
-	// transaction is accepted.
-	Dependencies() []Tx
-
-	// InputIDs is a set where each element is the ID of a piece of state that
-	// will be consumed if this transaction is accepted.
-	//
-	// In the context of a UTXO-based payments system, for example, this would
-	// be the IDs of the UTXOs consumed by this transaction
-	InputIDs() ids.Set
-
-	// Verify that the state transition this transaction would make if it were
-	// accepted is valid. If the state transition is invalid, a non-nil error
-	// should be returned.
-	//
-	// It is guaranteed that when Verify is called, all the dependencies of
-	// this transaction have already been successfully verified.
-	Verify() error
-
-	// Bytes returns the binary representation of this transaction.
-	//
-	// This is used for sending transactions to peers. Another node should be
-	// able to parse these bytes to the same transaction.
-	Bytes() []byte
+	// Reject all the provided txs and remove them from the graph
+	reject(txIDs ...ids.ID) error
 }

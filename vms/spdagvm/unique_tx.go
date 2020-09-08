@@ -59,6 +59,8 @@ func (tx *UniqueTx) refresh() {
 // lookup
 func (tx *UniqueTx) Evict() { tx.t.unique = false } // Lock is already held here
 
+// setStatus sets the status of the UniqueTx in memory and in the database
+// It will set the status in memory even if it fails to set the status in the database
 func (tx *UniqueTx) setStatus(status choices.Status) error {
 	tx.refresh()
 	if tx.t.status != status {
@@ -80,17 +82,17 @@ func (tx *UniqueTx) addEvents(finalized func(choices.Status)) {
 func (tx *UniqueTx) ID() ids.ID { return tx.txID }
 
 // Accept is called when the transaction was finalized as accepted by consensus
-func (tx *UniqueTx) Accept() {
+func (tx *UniqueTx) Accept() error {
 	if err := tx.setStatus(choices.Accepted); err != nil {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
-		return
+		return err
 	}
 
 	// Remove spent UTXOs
 	for _, utxoID := range tx.InputIDs().List() {
 		if err := tx.vm.state.SpendUTXO(utxoID); err != nil {
 			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
-			return
+			return err
 		}
 	}
 
@@ -98,7 +100,7 @@ func (tx *UniqueTx) Accept() {
 	for _, utxo := range tx.utxos() {
 		if err := tx.vm.state.FundUTXO(utxo); err != nil {
 			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxoID, err)
-			return
+			return err
 		}
 	}
 
@@ -110,16 +112,18 @@ func (tx *UniqueTx) Accept() {
 
 	if err := tx.vm.db.Commit(); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", tx.txID, err)
+		return err
 	}
 
 	tx.t.deps = nil // Needed to prevent a memory leak
+	return nil
 }
 
 // Reject is called when the transaction was finalized as rejected by consensus
-func (tx *UniqueTx) Reject() {
+func (tx *UniqueTx) Reject() error {
 	if err := tx.setStatus(choices.Rejected); err != nil {
 		tx.vm.ctx.Log.Error("Failed to reject tx %s due to %s", tx.txID, err)
-		return
+		return err
 	}
 
 	tx.vm.ctx.Log.Debug("Rejecting Tx: %s", tx.ID())
@@ -132,9 +136,11 @@ func (tx *UniqueTx) Reject() {
 
 	if err := tx.vm.db.Commit(); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit reject %s due to %s", tx.txID, err)
+		return err
 	}
 
 	tx.t.deps = nil // Needed to prevent a memory leak
+	return nil
 }
 
 // Status returns the current status of this transaction
@@ -216,7 +222,8 @@ func (tx *UniqueTx) VerifyTx() error {
 
 // VerifyState the validity of this transaction
 func (tx *UniqueTx) VerifyState() error {
-	tx.VerifyTx()
+	// VerifyTx sets validity to be checked in the next statement, so the error is ignored here.
+	_ = tx.VerifyTx()
 
 	if tx.t.validity != nil || tx.t.verifiedState {
 		return tx.t.validity

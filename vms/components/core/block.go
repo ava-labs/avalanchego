@@ -24,7 +24,8 @@ var (
 // Block's methods can be over-written by structs that embed this struct.
 type Block struct {
 	Metadata
-	PrntID ids.ID `serialize:"true"` // parent's ID
+	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
+	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
 	VM     *SnowmanVM
 }
 
@@ -34,12 +35,14 @@ type Block struct {
 func (b *Block) Initialize(bytes []byte, vm *SnowmanVM) {
 	b.VM = vm
 	b.Metadata.Initialize(bytes)
-	status := b.VM.State.GetStatus(vm.DB, b.ID())
-	b.SetStatus(status)
+	b.SetStatus(choices.Unknown) // don't set status until it is queried
 }
 
 // ParentID returns [b]'s parent's ID
 func (b *Block) ParentID() ids.ID { return b.PrntID }
+
+// Height returns this block's height. The genesis block has height 0.
+func (b *Block) Height() uint64 { return b.Hght }
 
 // Parent returns [b]'s parent
 func (b *Block) Parent() snowman.Block {
@@ -53,18 +56,27 @@ func (b *Block) Parent() snowman.Block {
 // Accept sets this block's status to Accepted and sets lastAccepted to this
 // block's ID and saves this info to b.vm.DB
 // Recall that b.vm.DB.Commit() must be called to persist to the DB
-func (b *Block) Accept() {
-	b.SetStatus(choices.Accepted)                           // Change state of this block
-	b.VM.State.PutStatus(b.VM.DB, b.ID(), choices.Accepted) // Persist data
-	b.VM.State.PutLastAccepted(b.VM.DB, b.ID())
-	b.VM.LastAcceptedID = b.ID() // Change state of VM
+func (b *Block) Accept() error {
+	b.SetStatus(choices.Accepted) // Change state of this block
+	blkID := b.ID()
+
+	// Persist data
+	if err := b.VM.State.PutStatus(b.VM.DB, blkID, choices.Accepted); err != nil {
+		return err
+	}
+	if err := b.VM.State.PutLastAccepted(b.VM.DB, blkID); err != nil {
+		return err
+	}
+
+	b.VM.LastAcceptedID = blkID // Change state of VM
+	return nil
 }
 
 // Reject sets this block's status to Rejected and saves the status in state
 // Recall that b.vm.DB.Commit() must be called to persist to the DB
-func (b *Block) Reject() {
+func (b *Block) Reject() error {
 	b.SetStatus(choices.Rejected)
-	b.VM.State.PutStatus(b.VM.DB, b.ID(), choices.Rejected)
+	return b.VM.State.PutStatus(b.VM.DB, b.ID(), choices.Rejected)
 }
 
 // Status returns the status of this block
@@ -98,6 +110,6 @@ func (b *Block) Verify() (bool, error) {
 }
 
 // NewBlock returns a new *Block
-func NewBlock(parentID ids.ID) *Block {
-	return &Block{PrntID: parentID}
+func NewBlock(parentID ids.ID, height uint64) *Block {
+	return &Block{PrntID: parentID, Hght: height}
 }

@@ -3,16 +3,12 @@
 
 package logging
 
-import (
-	"path"
-
-	"github.com/ava-labs/gecko/ids"
-)
+import "path/filepath"
 
 // Factory ...
 type Factory interface {
 	Make() (Logger, error)
-	MakeChain(chainID ids.ID, subdir string) (Logger, error)
+	MakeChain(chainID string, subdir string) (Logger, error)
 	MakeSubdir(subdir string) (Logger, error)
 	Close()
 }
@@ -41,10 +37,10 @@ func (f *factory) Make() (Logger, error) {
 }
 
 // MakeChain ...
-func (f *factory) MakeChain(chainID ids.ID, subdir string) (Logger, error) {
+func (f *factory) MakeChain(chainID string, subdir string) (Logger, error) {
 	config := f.config
-	config.MsgPrefix = "chain " + chainID.String()
-	config.Directory = path.Join(config.Directory, "chain", chainID.String(), subdir)
+	config.MsgPrefix = chainID + " Chain"
+	config.Directory = filepath.Join(config.Directory, "chain", chainID, subdir)
 
 	log, err := New(config)
 	if err == nil {
@@ -56,7 +52,7 @@ func (f *factory) MakeChain(chainID ids.ID, subdir string) (Logger, error) {
 // MakeSubdir ...
 func (f *factory) MakeSubdir(subdir string) (Logger, error) {
 	config := f.config
-	config.Directory = path.Join(config.Directory, subdir)
+	config.Directory = filepath.Join(config.Directory, subdir)
 
 	log, err := New(config)
 	if err == nil {

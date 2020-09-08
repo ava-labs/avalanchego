@@ -18,9 +18,10 @@ import (
 // database, writing changes to the underlying database only when commit is
 // called.
 type Database struct {
-	lock sync.RWMutex
-	mem  map[string]valueDelete
-	db   database.Database
+	lock  sync.RWMutex
+	mem   map[string]valueDelete
+	db    database.Database
+	batch database.Batch
 }
 
 type valueDelete struct {
@@ -31,8 +32,9 @@ type valueDelete struct {
 // New returns a new prefixed database
 func New(db database.Database) *Database {
 	return &Database{
-		mem: make(map[string]valueDelete, memdb.DefaultSize),
-		db:  db,
+		mem:   make(map[string]valueDelete, memdb.DefaultSize),
+		db:    db,
+		batch: db.NewBatch(),
 	}
 }
 
@@ -95,7 +97,9 @@ func (db *Database) Delete(key []byte) error {
 func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
 
 // NewIterator implements the database.Database interface
-func (db *Database) NewIterator() database.Iterator { return db.NewIteratorWithStartAndPrefix(nil, nil) }
+func (db *Database) NewIterator() database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
+}
 
 // NewIteratorWithStart implements the database.Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
@@ -169,6 +173,7 @@ func (db *Database) SetDatabase(newDB database.Database) error {
 	}
 
 	db.db = newDB
+	db.batch = newDB.NewBatch()
 	return nil
 }
 
@@ -192,6 +197,7 @@ func (db *Database) Commit() error {
 	if err := batch.Write(); err != nil {
 		return err
 	}
+	batch.Reset()
 	db.abort()
 	return nil
 }
@@ -206,7 +212,10 @@ func (db *Database) Abort() {
 
 func (db *Database) abort() { db.mem = make(map[string]valueDelete, memdb.DefaultSize) }
 
-// CommitBatch returns a batch that will commit all pending writes to the underlying database
+// CommitBatch returns a batch that contains all uncommitted puts/deletes.
+// Calling Write() on the returned batch causes the puts/deletes to be
+// written to the underlying database. The returned batch should be written before
+// future calls to this DB unless the batch will never be written.
 func (db *Database) CommitBatch() (database.Batch, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -214,26 +223,25 @@ func (db *Database) CommitBatch() (database.Batch, error) {
 	return db.commitBatch()
 }
 
+// Put all of the puts/deletes in memory into db.batch
+// and return the batch
 func (db *Database) commitBatch() (database.Batch, error) {
 	if db.mem == nil {
 		return nil, database.ErrClosed
 	}
 
-	batch := db.db.NewBatch()
+	db.batch.Reset()
 	for key, value := range db.mem {
 		if value.delete {
-			if err := batch.Delete([]byte(key)); err != nil {
+			if err := db.batch.Delete([]byte(key)); err != nil {
 				return nil, err
 			}
-		} else if err := batch.Put([]byte(key), value.value); err != nil {
+		} else if err := db.batch.Put([]byte(key), value.value); err != nil {
 			return nil, err
 		}
 	}
-	if err := batch.Write(); err != nil {
-		return nil, err
-	}
 
-	return batch, nil
+	return db.batch, nil
 }
 
 // Close implements the database.Database interface
@@ -244,6 +252,7 @@ func (db *Database) Close() error {
 	if db.mem == nil {
 		return database.ErrClosed
 	}
+	db.batch = nil
 	db.mem = nil
 	db.db = nil
 	return nil
@@ -298,7 +307,11 @@ func (b *batch) Write() error {
 
 // Reset implements the Database interface
 func (b *batch) Reset() {
-	b.writes = b.writes[:0]
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.size = 0
 }
 

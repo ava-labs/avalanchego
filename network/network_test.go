@@ -39,7 +39,7 @@ func (l *testListener) Accept() (net.Conn, error) {
 	select {
 	case c := <-l.inbound:
 		return c, nil
-	case _, _ = <-l.closed:
+	case <-l.closed:
 		return nil, errClosed
 	}
 }
@@ -102,7 +102,7 @@ func (c *testConn) Read(b []byte) (int, error) {
 				return 0, errClosed
 			}
 			c.partialRead = read
-		case _, _ = <-c.closed:
+		case <-c.closed:
 			return 0, errClosed
 		}
 	}
@@ -122,7 +122,7 @@ func (c *testConn) Write(b []byte) (int, error) {
 
 	select {
 	case c.pendingWrites <- newB:
-	case _, _ = <-c.closed:
+	case <-c.closed:
 		return 0, errClosed
 	}
 
@@ -196,6 +196,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		caller,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -280,6 +281,7 @@ func TestEstablishConnection(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -296,6 +298,7 @@ func TestEstablishConnection(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -325,8 +328,8 @@ func TestEstablishConnection(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -419,6 +422,7 @@ func TestDoubleTrack(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -435,6 +439,7 @@ func TestDoubleTrack(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -464,8 +469,8 @@ func TestDoubleTrack(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 	net0.Track(ip1)
@@ -559,6 +564,7 @@ func TestDoubleClose(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -575,6 +581,7 @@ func TestDoubleClose(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -604,8 +611,8 @@ func TestDoubleClose(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -704,6 +711,7 @@ func TestRemoveHandlers(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -720,6 +728,7 @@ func TestRemoveHandlers(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -749,8 +758,8 @@ func TestRemoveHandlers(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -778,8 +787,8 @@ func TestRemoveHandlers(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h3)
-	net1.RegisterHandler(h4)
+	net0.RegisterConnector(h3)
+	net1.RegisterConnector(h4)
 
 	err := net0.Close()
 	assert.NoError(t, err)
@@ -858,6 +867,7 @@ func TestTrackConnected(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -874,6 +884,7 @@ func TestTrackConnected(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)
@@ -903,8 +914,8 @@ func TestTrackConnected(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -999,6 +1010,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
+		vdrs,
 		handler,
 	)
 	assert.NotNil(t, net0)
@@ -1015,6 +1027,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		caller1,
 		serverUpgrader,
 		clientUpgrader,
+		vdrs,
 		vdrs,
 		handler,
 	)

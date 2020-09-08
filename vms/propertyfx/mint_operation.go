@@ -19,8 +19,8 @@ type MintOperation struct {
 }
 
 // Outs ...
-func (op *MintOperation) Outs() []verify.Verifiable {
-	return []verify.Verifiable{
+func (op *MintOperation) Outs() []verify.State {
+	return []verify.State{
 		&op.MintOutput,
 		&op.OwnedOutput,
 	}

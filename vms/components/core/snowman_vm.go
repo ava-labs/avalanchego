@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	errUnmarshalBlockUndefined = errors.New("vm's UnmarshalBlock member is undefined")
-	errBadData                 = errors.New("got unexpected value from database")
+	errBadData = errors.New("got unexpected value from database")
 )
 
 // If the status of this ID is not choices.Accepted,
@@ -74,22 +73,34 @@ func (svm *SnowmanVM) GetBlock(ID ids.ID) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if block, ok := block.(snowman.Block); ok {
 		return block, nil
 	}
 	return nil, errBadData // Should never happen
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (svm *SnowmanVM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (svm *SnowmanVM) Bootstrapped() error { return nil }
+
 // Shutdown this vm
-func (svm *SnowmanVM) Shutdown() {
+func (svm *SnowmanVM) Shutdown() error {
 	if svm.DB == nil {
-		return
+		return nil
 	}
 
-	svm.DB.Commit()              // Flush DB
-	svm.DB.GetDatabase().Close() // close underlying database
-	svm.DB.Close()               // close versionDB
+	// flush DB
+	if err := svm.DB.Commit(); err != nil {
+		return err
+	}
+
+	// close underlying database
+	if err := svm.DB.GetDatabase().Close(); err != nil {
+		return err
+	}
+	return svm.DB.Close() // close versionDB
 }
 
 // DBInitialized returns true iff [svm]'s database has values in it already
@@ -99,8 +110,8 @@ func (svm *SnowmanVM) DBInitialized() bool {
 }
 
 // SetDBInitialized marks the database as initialized
-func (svm *SnowmanVM) SetDBInitialized() {
-	svm.State.PutStatus(svm.DB, dbInitializedID, choices.Accepted)
+func (svm *SnowmanVM) SetDBInitialized() error {
+	return svm.State.PutStatus(svm.DB, dbInitializedID, choices.Accepted)
 }
 
 // SaveBlock saves [block] to state
@@ -114,7 +125,7 @@ func (svm *SnowmanVM) NotifyBlockReady() {
 	select {
 	case svm.ToEngine <- common.PendingTxs:
 	default:
-		svm.Ctx.Log.Warn("dropping message to consensus engine")
+		svm.Ctx.Log.Debug("dropping message to consensus engine")
 	}
 }
 
@@ -125,17 +136,19 @@ func (svm *SnowmanVM) NotifyBlockReady() {
 //   * The LockOption is the first element of [lockOption]
 //     By default the LockOption is WriteLock
 //     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
-func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ...common.LockOption) *common.HTTPHandler {
+func (svm *SnowmanVM) NewHandler(name string, service interface{}, lockOption ...common.LockOption) (*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterService(service, name)
+	if err := server.RegisterService(service, name); err != nil {
+		return nil, err
+	}
 
 	var lock common.LockOption = common.WriteLock
 	if len(lockOption) != 0 {
 		lock = lockOption[0]
 	}
-	return &common.HTTPHandler{LockOptions: lock, Handler: server}
+	return &common.HTTPHandler{LockOptions: lock, Handler: server}, nil
 }
 
 // Initialize this vm.

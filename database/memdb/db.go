@@ -13,8 +13,10 @@ import (
 	"github.com/ava-labs/gecko/utils"
 )
 
-// DefaultSize is the default initial size of the memory database
-const DefaultSize = 1 << 10
+const (
+	// DefaultSize is the default initial size of the memory database
+	DefaultSize = 1 << 10
+)
 
 // Database is an ephemeral key-value store that implements the Database
 // interface.
@@ -96,7 +98,9 @@ func (db *Database) Delete(key []byte) error {
 func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
 
 // NewIterator implements the Database interface
-func (db *Database) NewIterator() database.Iterator { return db.NewIteratorWithStartAndPrefix(nil, nil) }
+func (db *Database) NewIterator() database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
+}
 
 // NewIteratorWithStart implements the Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
@@ -140,7 +144,15 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 func (db *Database) Stat(property string) (string, error) { return "", database.ErrNotFound }
 
 // Compact implements the Database interface
-func (db *Database) Compact(start []byte, limit []byte) error { return nil }
+func (db *Database) Compact(start []byte, limit []byte) error {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.db == nil {
+		return database.ErrClosed
+	}
+	return nil
+}
 
 type keyValue struct {
 	key    []byte
@@ -191,7 +203,11 @@ func (b *batch) Write() error {
 
 // Reset implements the Batch interface
 func (b *batch) Reset() {
-	b.writes = b.writes[:0]
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.size = 0
 }
 

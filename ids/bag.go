@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+const (
+	minBagSize = 16
+)
+
 // Bag is a multiset of IDs.
 //
 // A bag has the ability to split and filter on it's bits for ease of use for
@@ -25,7 +29,7 @@ type Bag struct {
 
 func (b *Bag) init() {
 	if b.counts == nil {
-		b.counts = make(map[[32]byte]int)
+		b.counts = make(map[[32]byte]int, minBagSize)
 	}
 }
 
@@ -54,8 +58,12 @@ func (b *Bag) Add(ids ...ID) {
 
 // AddCount increases the nubmer of times the id has been seen by count.
 //
-// count must be >= 1
+// count must be >= 0
 func (b *Bag) AddCount(id ID, count int) {
+	if count <= 0 {
+		return
+	}
+
 	b.init()
 
 	totalCount := b.counts[*id.ID] + count
@@ -72,16 +80,21 @@ func (b *Bag) AddCount(id ID, count int) {
 }
 
 // Count returns the number of times the id has been added.
-func (b *Bag) Count(id ID) int { return b.counts[*id.ID] }
+func (b *Bag) Count(id ID) int {
+	b.init()
+	return b.counts[*id.ID]
+}
 
 // Len returns the number of times an id has been added.
 func (b *Bag) Len() int { return b.size }
 
 // List returns a list of all ids that have been added.
 func (b *Bag) List() []ID {
-	idList := []ID(nil)
+	idList := make([]ID, len(b.counts))
+	i := 0
 	for id := range b.counts {
-		idList = append(idList, NewID(id))
+		idList[i] = NewID(id)
+		i++
 	}
 	return idList
 }

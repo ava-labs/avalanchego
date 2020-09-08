@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/nodb"
 	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/codec"
 )
 
 // Database encrypts all values that are provided
@@ -101,7 +101,9 @@ func (db *Database) NewBatch() database.Batch {
 }
 
 // NewIterator implements the Database interface
-func (db *Database) NewIterator() database.Iterator { return db.NewIteratorWithStartAndPrefix(nil, nil) }
+func (db *Database) NewIterator() database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
+}
 
 // NewIteratorWithStart implements the Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
@@ -201,7 +203,11 @@ func (b *batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
-	b.writes = b.writes[:0]
+	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
+		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	} else {
+		b.writes = b.writes[:0]
+	}
 	b.Batch.Reset()
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/formatting"
@@ -49,7 +50,7 @@ func GenesisAccounts() []Account {
 		accounts = append(accounts,
 			Account{
 				id:      key.PublicKey().Address(),
-				balance: 20 * units.KiloAva,
+				balance: 20 * units.KiloAvax,
 			})
 	}
 	return accounts
@@ -59,7 +60,10 @@ func TestPayments(t *testing.T) {
 	genesisAccounts := GenesisAccounts()
 
 	codec := Codec{}
-	genesisData, _ := codec.MarshalGenesis(genesisAccounts)
+	genesisData, err := codec.MarshalGenesis(genesisAccounts)
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := memdb.New()
 	bootstrappingDB := memdb.New()
 
@@ -75,15 +79,15 @@ func TestPayments(t *testing.T) {
 	sender.Default(true)
 
 	vdrs := validators.NewSet()
-	vdr := validators.GenerateRandomValidator(1)
-	vdrs.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vdrs.AddWeight(vdr, 1)
 
 	ctx.Lock.Lock()
 	consensus := smeng.Transitive{}
 	consensus.Initialize(smeng.Config{
-		BootstrapConfig: smeng.BootstrapConfig{
+		Config: bootstrap.Config{
 			Config: common.Config{
-				Context:    ctx,
+				Ctx:        ctx,
 				Validators: vdrs,
 				Beacons:    validators.NewSet(),
 				Sender:     sender,
@@ -137,11 +141,11 @@ func TestPayments(t *testing.T) {
 
 	queriedVtxIDSet := ids.Set{}
 	queriedVtxIDSet.Add(*queriedVtxID)
-	consensus.Chits(vdr.ID(), *queryRequestID, queriedVtxIDSet)
+	consensus.Chits(vdr, *queryRequestID, queriedVtxIDSet)
 
-	if account := vm.GetAccount(vm.baseDB, keys[0].PublicKey().Address()); account.Balance() != 20*units.KiloAva-200 {
+	if account := vm.GetAccount(vm.baseDB, keys[0].PublicKey().Address()); account.Balance() != 20*units.KiloAvax-200 {
 		t.Fatalf("Wrong Balance")
-	} else if account := vm.GetAccount(vm.baseDB, keys[1].PublicKey().Address()); account.Balance() != 20*units.KiloAva+200 {
+	} else if account := vm.GetAccount(vm.baseDB, keys[1].PublicKey().Address()); account.Balance() != 20*units.KiloAvax+200 {
 		t.Fatalf("Wrong Balance")
 	}
 }

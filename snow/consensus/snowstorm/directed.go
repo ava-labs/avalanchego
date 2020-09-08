@@ -4,16 +4,11 @@
 package snowstorm
 
 import (
-	"bytes"
-	"fmt"
-	"sort"
-	"strings"
-
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/events"
-	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/snow/choices"
+
+	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
 // DirectedFactory implements Factory by returning a directed struct
@@ -25,434 +20,377 @@ func (DirectedFactory) New() Consensus { return &Directed{} }
 // Directed is an implementation of a multi-color, non-transitive, snowball
 // instance
 type Directed struct {
-	metrics
-
-	ctx    *snow.Context
-	params snowball.Parameters
-
-	// Each element of preferences is the ID of a transaction that is preferred.
-	// That is, each transaction has no out edges
-	preferences ids.Set
-
-	// Each element of virtuous is the ID of a transaction that is virtuous.
-	// That is, each transaction that has no incident edges
-	virtuous ids.Set
-
-	// Each element is in the virtuous set and is still being voted on
-	virtuousVoting ids.Set
-
-	// Key: UTXO ID
-	// Value: IDs of transactions that consume the UTXO specified in the key
-	spends map[[32]byte]ids.Set
+	common
 
 	// Key: Transaction ID
 	// Value: Node that represents this transaction in the conflict graph
-	nodes map[[32]byte]*flatNode
+	txs map[[32]byte]*directedTx
 
-	// Keep track of whether dependencies have been accepted or rejected
-	pendingAccept, pendingReject events.Blocker
-
-	// Number of times RecordPoll has been called
-	currentVote int
+	// Key: UTXO ID
+	// Value: IDs of transactions that consume the UTXO specified in the key
+	utxos map[[32]byte]ids.Set
 }
 
-type flatNode struct {
-	bias, confidence, lastVote int
+type directedTx struct {
+	snowball
 
-	pendingAccept, accepted, rogue bool
-	ins, outs                      ids.Set
+	// pendingAccept identifies if this transaction has been marked as accepted
+	// once its transitive dependencies have also been accepted
+	pendingAccept bool
 
+	// ins is the set of txIDs that this tx conflicts with that are less
+	// preferred than this tx
+	ins ids.Set
+
+	// outs is the set of txIDs that this tx conflicts with that are more
+	// preferred than this tx
+	outs ids.Set
+
+	// tx is the actual transaction this node represents
 	tx Tx
 }
 
 // Initialize implements the Consensus interface
-func (dg *Directed) Initialize(ctx *snow.Context, params snowball.Parameters) {
-	ctx.Log.AssertDeferredNoError(params.Valid)
+func (dg *Directed) Initialize(
+	ctx *snow.Context,
+	params sbcon.Parameters,
+) error {
+	dg.txs = make(map[[32]byte]*directedTx)
+	dg.utxos = make(map[[32]byte]ids.Set)
 
-	dg.ctx = ctx
-	dg.params = params
-
-	if err := dg.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
-		dg.ctx.Log.Error("%s", err)
-	}
-
-	dg.spends = make(map[[32]byte]ids.Set)
-	dg.nodes = make(map[[32]byte]*flatNode)
+	return dg.common.Initialize(ctx, params)
 }
-
-// Parameters implements the Snowstorm interface
-func (dg *Directed) Parameters() snowball.Parameters { return dg.params }
 
 // IsVirtuous implements the Consensus interface
 func (dg *Directed) IsVirtuous(tx Tx) bool {
-	id := tx.ID()
-	if node, exists := dg.nodes[id.Key()]; exists {
+	txID := tx.ID()
+	// If the tx is currently processing, we should just return if was
+	// registered as rogue or not.
+	if node, exists := dg.txs[txID.Key()]; exists {
 		return !node.rogue
 	}
-	for _, input := range tx.InputIDs().List() {
-		if _, exists := dg.spends[input.Key()]; exists {
+
+	// The tx isn't processing, so we need to check to see if it conflicts with
+	// any of the other txs that are currently processing.
+	for _, utxoID := range tx.InputIDs().List() {
+		if _, exists := dg.utxos[utxoID.Key()]; exists {
+			// A currently processing tx names the same input as the provided
+			// tx, so the provided tx would be rogue.
 			return false
 		}
 	}
+
+	// This tx is virtuous as far as this consensus instance knows.
 	return true
 }
 
 // Conflicts implements the Consensus interface
 func (dg *Directed) Conflicts(tx Tx) ids.Set {
-	id := tx.ID()
 	conflicts := ids.Set{}
-
-	if node, exists := dg.nodes[id.Key()]; exists {
+	if node, exists := dg.txs[tx.ID().Key()]; exists {
+		// If the tx is currently processing, the conflicting txs are just the
+		// union of the inbound conflicts and the outbound conflicts.
 		conflicts.Union(node.ins)
 		conflicts.Union(node.outs)
 	} else {
+		// If the tx isn't currently processing, the conflicting txs are the
+		// union of all the txs that spend an input that this tx spends.
 		for _, input := range tx.InputIDs().List() {
-			if spends, exists := dg.spends[input.Key()]; exists {
+			if spends, exists := dg.utxos[input.Key()]; exists {
 				conflicts.Union(spends)
 			}
 		}
-		conflicts.Remove(id)
 	}
-
 	return conflicts
 }
 
 // Add implements the Consensus interface
-func (dg *Directed) Add(tx Tx) {
-	if dg.Issued(tx) {
-		return // Already inserted
+func (dg *Directed) Add(tx Tx) error {
+	if shouldVote, err := dg.shouldVote(dg, tx); !shouldVote || err != nil {
+		return err
 	}
 
 	txID := tx.ID()
-	bytes := tx.Bytes()
+	txNode := &directedTx{tx: tx}
 
-	dg.ctx.DecisionDispatcher.Issue(dg.ctx.ChainID, txID, bytes)
-	inputs := tx.InputIDs()
-	// If there are no inputs, Tx is vacuously accepted
-	if inputs.Len() == 0 {
-		tx.Accept()
-		dg.ctx.DecisionDispatcher.Accept(dg.ctx.ChainID, txID, bytes)
-		dg.metrics.Issued(txID)
-		dg.metrics.Accepted(txID)
-		return
-	}
-
-	fn := &flatNode{tx: tx}
-
-	// Note: Below, for readability, we sometimes say "transaction" when we actually mean
-	// "the flatNode representing a transaction."
-	// For each UTXO input to Tx:
-	// * Get all transactions that consume that UTXO
-	// * Add edges from Tx to those transactions in the conflict graph
-	// * Mark those transactions as rogue
-	for _, inputID := range inputs.List() {
+	// For each UTXO consumed by the tx:
+	// * Add edges between this tx and txs that consume this UTXO
+	// * Mark this tx as attempting to consume this UTXO
+	for _, inputID := range tx.InputIDs().List() {
 		inputKey := inputID.Key()
-		spends := dg.spends[inputKey] // Transactions spending this UTXO
 
-		// Add edges to conflict graph
-		fn.outs.Union(spends)
+		// Get the set of txs that are currently processing that also consume
+		// this UTXO
+		spenders := dg.utxos[inputKey]
 
-		// Mark transactions conflicting with Tx as rogue
-		for _, conflictID := range spends.List() {
+		// Add all the txs that spend this UTXO to this txs conflicts. These
+		// conflicting txs must be preferred over this tx. We know this because
+		// this tx currently has a bias of 0 and the tie goes to the tx whose
+		// bias was updated first.
+		txNode.outs.Union(spenders)
+
+		// Update txs conflicting with tx to account for its issuance
+		for _, conflictID := range spenders.List() {
 			conflictKey := conflictID.Key()
-			conflict := dg.nodes[conflictKey]
 
+			// Get the node that contains this conflicting tx
+			conflict := dg.txs[conflictKey]
+
+			// This conflicting tx can't be virtuous anymore. So, we attempt to
+			// remove it from all of the virtuous sets.
 			dg.virtuous.Remove(conflictID)
 			dg.virtuousVoting.Remove(conflictID)
 
+			// This tx should be set to rogue if it wasn't rogue before.
 			conflict.rogue = true
+
+			// This conflicting tx is preferred over the tx being inserted, as
+			// described above. So we add the conflict to the inbound set.
 			conflict.ins.Add(txID)
-
-			dg.nodes[conflictKey] = conflict
 		}
-		// Add Tx to list of transactions consuming UTXO whose ID is id
-		spends.Add(txID)
-		dg.spends[inputKey] = spends
-	}
-	fn.rogue = fn.outs.Len() != 0 // Mark this transaction as rogue if it has conflicts
 
-	// Add the node representing Tx to the node set
-	dg.nodes[txID.Key()] = fn
-	if !fn.rogue {
-		// I'm not rogue
+		// Add this tx to list of txs consuming the current UTXO
+		spenders.Add(txID)
+
+		// Because this isn't a pointer, we should re-map the set.
+		dg.utxos[inputKey] = spenders
+	}
+
+	// Mark this transaction as rogue if had any conflicts registered above
+	txNode.rogue = txNode.outs.Len() != 0
+
+	if !txNode.rogue {
+		// If this tx is currently virtuous, add it to the virtuous sets
 		dg.virtuous.Add(txID)
 		dg.virtuousVoting.Add(txID)
 
-		// If I'm not rogue, I must be preferred
+		// If a tx is virtuous, it must be preferred.
 		dg.preferences.Add(txID)
 	}
-	dg.metrics.Issued(txID)
 
-	// Tx can be accepted only if the transactions it depends on are also accepted
-	// If any transactions that Tx depends on are rejected, reject Tx
-	toReject := &directedRejector{
-		dg: dg,
-		fn: fn,
-	}
-	for _, dependency := range tx.Dependencies() {
-		if !dependency.Status().Decided() {
-			toReject.deps.Add(dependency.ID())
-		}
-	}
-	dg.pendingReject.Register(toReject)
+	// Add this tx to the set of currently processing txs
+	dg.txs[txID.Key()] = txNode
+
+	// If a tx that this tx depends on is rejected, this tx should also be
+	// rejected.
+	dg.registerRejector(dg, tx)
+	return nil
 }
 
 // Issued implements the Consensus interface
 func (dg *Directed) Issued(tx Tx) bool {
+	// If the tx is either Accepted or Rejected, then it must have been issued
+	// previously.
 	if tx.Status().Decided() {
 		return true
 	}
-	_, ok := dg.nodes[tx.ID().Key()]
+
+	// If the tx is currently processing, then it must have been issued.
+	_, ok := dg.txs[tx.ID().Key()]
 	return ok
 }
 
-// Virtuous implements the Consensus interface
-func (dg *Directed) Virtuous() ids.Set { return dg.virtuous }
-
-// Preferences implements the Consensus interface
-func (dg *Directed) Preferences() ids.Set { return dg.preferences }
-
 // RecordPoll implements the Consensus interface
-func (dg *Directed) RecordPoll(votes ids.Bag) {
+func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
+	// Increase the vote ID. This is only updated here and is used to reset the
+	// confidence values of transactions lazily.
 	dg.currentVote++
 
+	// This flag tracks if the Avalanche instance needs to recompute its
+	// frontiers. Frontiers only need to be recalculated if preferences change
+	// or if a tx was accepted.
+	changed := false
+
+	// We only want to iterate over txs that received alpha votes
 	votes.SetThreshold(dg.params.Alpha)
-	threshold := votes.Threshold() // Each element is ID of transaction preferred by >= Alpha poll respondents
-	for _, toInc := range threshold.List() {
-		incKey := toInc.Key()
-		fn, exist := dg.nodes[incKey]
+	// Get the set of IDs that meet this alpha threshold
+	metThreshold := votes.Threshold()
+	for _, txID := range metThreshold.List() {
+		// Get the node this tx represents
+		txNode, exist := dg.txs[txID.Key()]
 		if !exist {
-			// Votes for decided consumers are ignored
+			// This tx may have already been accepted because of tx
+			// dependencies. If this is the case, we can just drop the vote.
 			continue
 		}
 
-		if fn.lastVote+1 != dg.currentVote {
-			fn.confidence = 0
+		txNode.RecordSuccessfulPoll(dg.currentVote)
+
+		dg.ctx.Log.Verbo("Updated TxID=%s to have consensus state=%s",
+			txID, &txNode.snowball)
+
+		// If the tx should be accepted, then we should defer its acceptance
+		// until its dependencies are decided. If this tx was already marked to
+		// be accepted, we shouldn't register it again.
+		if !txNode.pendingAccept &&
+			txNode.Finalized(dg.params.BetaVirtuous, dg.params.BetaRogue) {
+			// Mark that this tx is pending acceptance so acceptance is only
+			// registered once.
+			txNode.pendingAccept = true
+
+			dg.registerAcceptor(dg, txNode.tx)
+			if dg.errs.Errored() {
+				return changed, dg.errs.Err
+			}
 		}
-		fn.lastVote = dg.currentVote
 
-		dg.ctx.Log.Verbo("Increasing (bias, confidence) of %s from (%d, %d) to (%d, %d)", toInc, fn.bias, fn.confidence, fn.bias+1, fn.confidence+1)
-
-		fn.bias++
-		fn.confidence++
-
-		if !fn.pendingAccept &&
-			((!fn.rogue && fn.confidence >= dg.params.BetaVirtuous) ||
-				fn.confidence >= dg.params.BetaRogue) {
-			dg.deferAcceptance(fn)
-		}
-		if !fn.accepted {
-			dg.redirectEdges(fn)
+		if txNode.tx.Status() != choices.Accepted {
+			// If this tx wasn't accepted, then this instance is only changed if
+			// preferences changed.
+			changed = dg.redirectEdges(txNode) || changed
+		} else {
+			// By accepting a tx, the state of this instance has changed.
+			changed = true
 		}
 	}
-}
-
-// Quiesce implements the Consensus interface
-func (dg *Directed) Quiesce() bool {
-	numVirtuous := dg.virtuousVoting.Len()
-	dg.ctx.Log.Verbo("Conflict graph has %d voting virtuous transactions and %d transactions", numVirtuous, len(dg.nodes))
-	return numVirtuous == 0
-}
-
-// Finalized implements the Consensus interface
-func (dg *Directed) Finalized() bool {
-	numNodes := len(dg.nodes)
-	dg.ctx.Log.Verbo("Conflict graph has %d pending transactions", numNodes)
-	return numNodes == 0
+	return changed, dg.errs.Err
 }
 
 func (dg *Directed) String() string {
-	nodes := []*flatNode{}
-	for _, fn := range dg.nodes {
-		nodes = append(nodes, fn)
+	nodes := make([]*snowballNode, 0, len(dg.txs))
+	for _, txNode := range dg.txs {
+		nodes = append(nodes, &snowballNode{
+			txID:               txNode.tx.ID(),
+			numSuccessfulPolls: txNode.numSuccessfulPolls,
+			confidence:         txNode.Confidence(dg.currentVote),
+		})
 	}
-	sortFlatNodes(nodes)
-
-	sb := strings.Builder{}
-
-	sb.WriteString("DG(")
-
-	format := fmt.Sprintf(
-		"\n    Choice[%s] = ID: %%50s Confidence: %s Bias: %%d",
-		formatting.IntFormat(len(dg.nodes)-1),
-		formatting.IntFormat(dg.params.BetaRogue-1))
-
-	for i, fn := range nodes {
-		confidence := fn.confidence
-		if fn.lastVote != dg.currentVote {
-			confidence = 0
-		}
-		sb.WriteString(fmt.Sprintf(format,
-			i, fn.tx.ID(), confidence, fn.bias))
-	}
-
-	if len(nodes) > 0 {
-		sb.WriteString("\n")
-	}
-	sb.WriteString(")")
-
-	return sb.String()
+	return ConsensusString("DG", nodes)
 }
 
-func (dg *Directed) deferAcceptance(fn *flatNode) {
-	fn.pendingAccept = true
+// accept the named txID and remove it from the graph
+func (dg *Directed) accept(txID ids.ID) error {
+	txKey := txID.Key()
+	txNode := dg.txs[txKey]
+	// We are accepting the tx, so we should remove the node from the graph.
+	delete(dg.txs, txKey)
 
-	toAccept := &directedAccepter{
-		dg: dg,
-		fn: fn,
-	}
-	for _, dependency := range fn.tx.Dependencies() {
-		if !dependency.Status().Decided() {
-			toAccept.deps.Add(dependency.ID())
-		}
+	// This tx is consuming all the UTXOs from its inputs, so we can prune them
+	// all from memory
+	for _, inputID := range txNode.tx.InputIDs().List() {
+		delete(dg.utxos, inputID.Key())
 	}
 
-	dg.virtuousVoting.Remove(fn.tx.ID())
-	dg.pendingAccept.Register(toAccept)
+	// This tx is now accepted, so it shouldn't be part of the virtuous set or
+	// the preferred set. Its status as Accepted implies these descriptions.
+	dg.virtuous.Remove(txID)
+	dg.preferences.Remove(txID)
+
+	// Reject all the txs that conflicted with this tx.
+	if err := dg.reject(txNode.ins.List()...); err != nil {
+		return err
+	}
+	// While it is typically true that a tx this is being accepted is preferred,
+	// it is possible for this to not be the case. So this is handled for
+	// completeness.
+	if err := dg.reject(txNode.outs.List()...); err != nil {
+		return err
+	}
+	return dg.acceptTx(txNode.tx)
 }
 
-func (dg *Directed) reject(ids ...ids.ID) {
-	for _, conflict := range ids {
-		conflictKey := conflict.Key()
-		conf := dg.nodes[conflictKey]
-		delete(dg.nodes, conflictKey)
+// reject all the named txIDs and remove them from the graph
+func (dg *Directed) reject(conflictIDs ...ids.ID) error {
+	for _, conflictID := range conflictIDs {
+		conflictKey := conflictID.Key()
+		conflict := dg.txs[conflictKey]
 
-		dg.preferences.Remove(conflict)
+		// This tx is no longer an option for consuming the UTXOs from its
+		// inputs, so we should remove their reference to this tx.
+		for _, inputID := range conflict.tx.InputIDs().List() {
+			inputKey := inputID.Key()
+			txIDs, exists := dg.utxos[inputKey]
+			if !exists {
+				// This UTXO may no longer exist because it was removed due to
+				// the acceptance of a tx. If that is the case, there is nothing
+				// left to remove from memory.
+				continue
+			}
+			txIDs.Remove(conflictID)
+			if txIDs.Len() == 0 {
+				// If this tx was the last tx consuming this UTXO, we should
+				// prune the UTXO from memory entirely.
+				delete(dg.utxos, inputKey)
+			} else {
+				// If this UTXO still has txs consuming it, then we should make
+				// sure this update is written back to the UTXOs map.
+				dg.utxos[inputKey] = txIDs
+			}
+		}
+
+		// We are rejecting the tx, so we should remove it from the graph
+		delete(dg.txs, conflictKey)
+
+		// While it's statistically unlikely that something being rejected is
+		// preferred, it is handled for completion.
+		dg.preferences.Remove(conflictID)
 
 		// remove the edge between this node and all its neighbors
-		dg.removeConflict(conflict, conf.ins.List()...)
-		dg.removeConflict(conflict, conf.outs.List()...)
+		dg.removeConflict(conflictID, conflict.ins.List()...)
+		dg.removeConflict(conflictID, conflict.outs.List()...)
 
-		// Mark it as rejected
-		conf.tx.Reject()
-		dg.ctx.DecisionDispatcher.Reject(dg.ctx.ChainID, conf.tx.ID(), conf.tx.Bytes())
-		dg.metrics.Rejected(conflict)
-
-		dg.pendingAccept.Abandon(conflict)
-		dg.pendingReject.Fulfill(conflict)
-	}
-}
-
-func (dg *Directed) redirectEdges(fn *flatNode) {
-	for _, conflictID := range fn.outs.List() {
-		dg.redirectEdge(fn, conflictID)
-	}
-}
-
-// Set the confidence of all conflicts to 0
-// Change the direction of edges if needed
-func (dg *Directed) redirectEdge(fn *flatNode, conflictID ids.ID) {
-	nodeID := fn.tx.ID()
-	if conflict := dg.nodes[conflictID.Key()]; fn.bias > conflict.bias {
-		conflict.confidence = 0
-
-		// Change the edge direction
-		conflict.ins.Remove(nodeID)
-		conflict.outs.Add(nodeID)
-		dg.preferences.Remove(conflictID) // This consumer now has an out edge
-
-		fn.ins.Add(conflictID)
-		fn.outs.Remove(conflictID)
-		if fn.outs.Len() == 0 {
-			// If I don't have out edges, I'm preferred
-			dg.preferences.Add(nodeID)
+		if err := dg.rejectTx(conflict.tx); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
-func (dg *Directed) removeConflict(id ids.ID, ids ...ids.ID) {
-	for _, neighborID := range ids {
+// redirectEdges attempts to turn outbound edges into inbound edges if the
+// preferences have changed
+func (dg *Directed) redirectEdges(tx *directedTx) bool {
+	changed := false
+	for _, conflictID := range tx.outs.List() {
+		changed = dg.redirectEdge(tx, conflictID) || changed
+	}
+	return changed
+}
+
+// Change the direction of this edge if needed. Returns true if the direction
+// was switched.
+func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
+	conflict := dg.txs[conflictID.Key()]
+	if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {
+		return false
+	}
+
+	// Because this tx has a higher preference than the conflicting tx, we must
+	// ensure that the edge is directed towards this tx.
+	nodeID := txNode.tx.ID()
+
+	// Change the edge direction according to the conflict tx
+	conflict.ins.Remove(nodeID)
+	conflict.outs.Add(nodeID)
+	dg.preferences.Remove(conflictID) // This conflict has an outbound edge
+
+	// Change the edge direction according to this tx
+	txNode.ins.Add(conflictID)
+	txNode.outs.Remove(conflictID)
+	if txNode.outs.Len() == 0 {
+		// If this tx doesn't have any outbound edges, it's preferred
+		dg.preferences.Add(nodeID)
+	}
+	return true
+}
+
+func (dg *Directed) removeConflict(txID ids.ID, neighborIDs ...ids.ID) {
+	for _, neighborID := range neighborIDs {
 		neighborKey := neighborID.Key()
-		// If the neighbor doesn't exist, they may have already been rejected
-		if neighbor, exists := dg.nodes[neighborKey]; exists {
-			neighbor.ins.Remove(id)
-			neighbor.outs.Remove(id)
+		neighbor, exists := dg.txs[neighborKey]
+		if !exists {
+			// If the neighbor doesn't exist, they may have already been
+			// rejected, so this mapping can be skipped.
+			continue
+		}
 
-			if neighbor.outs.Len() == 0 {
-				// Make sure to mark the neighbor as preferred if needed
-				dg.preferences.Add(neighborID)
-			}
+		// Remove any edge to this tx.
+		neighbor.ins.Remove(txID)
+		neighbor.outs.Remove(txID)
 
-			dg.nodes[neighborKey] = neighbor
+		if neighbor.outs.Len() == 0 {
+			// If this tx should now be preferred, make sure its status is
+			// updated.
+			dg.preferences.Add(neighborID)
 		}
 	}
 }
-
-type directedAccepter struct {
-	dg       *Directed
-	deps     ids.Set
-	rejected bool
-	fn       *flatNode
-}
-
-func (a *directedAccepter) Dependencies() ids.Set { return a.deps }
-
-func (a *directedAccepter) Fulfill(id ids.ID) {
-	a.deps.Remove(id)
-	a.Update()
-}
-
-func (a *directedAccepter) Abandon(id ids.ID) { a.rejected = true }
-
-func (a *directedAccepter) Update() {
-	// If I was rejected or I am still waiting on dependencies to finish do nothing.
-	if a.rejected || a.deps.Len() != 0 {
-		return
-	}
-
-	id := a.fn.tx.ID()
-	delete(a.dg.nodes, id.Key())
-
-	for _, inputID := range a.fn.tx.InputIDs().List() {
-		delete(a.dg.spends, inputID.Key())
-	}
-	a.dg.virtuous.Remove(id)
-	a.dg.preferences.Remove(id)
-
-	// Reject the conflicts
-	a.dg.reject(a.fn.ins.List()...)
-	a.dg.reject(a.fn.outs.List()...) // Should normally be empty
-
-	// Mark it as accepted
-	a.fn.accepted = true
-	a.fn.tx.Accept()
-	a.dg.ctx.DecisionDispatcher.Accept(a.dg.ctx.ChainID, id, a.fn.tx.Bytes())
-	a.dg.metrics.Accepted(id)
-
-	a.dg.pendingAccept.Fulfill(id)
-	a.dg.pendingReject.Abandon(id)
-}
-
-// directedRejector implements Blockable
-type directedRejector struct {
-	dg       *Directed
-	deps     ids.Set
-	rejected bool // true if the transaction represented by fn has been rejected
-	fn       *flatNode
-}
-
-func (r *directedRejector) Dependencies() ids.Set { return r.deps }
-
-func (r *directedRejector) Fulfill(id ids.ID) {
-	if r.rejected {
-		return
-	}
-	r.rejected = true
-	r.dg.reject(r.fn.tx.ID())
-}
-
-func (*directedRejector) Abandon(id ids.ID) {}
-
-func (*directedRejector) Update() {}
-
-type sortFlatNodeData []*flatNode
-
-func (fnd sortFlatNodeData) Less(i, j int) bool {
-	return bytes.Compare(
-		fnd[i].tx.ID().Bytes(),
-		fnd[j].tx.ID().Bytes()) == -1
-}
-func (fnd sortFlatNodeData) Len() int      { return len(fnd) }
-func (fnd sortFlatNodeData) Swap(i, j int) { fnd[j], fnd[i] = fnd[i], fnd[j] }
-
-func sortFlatNodes(nodes []*flatNode) { sort.Sort(sortFlatNodeData(nodes)) }

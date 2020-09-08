@@ -11,8 +11,8 @@ import (
 type Job interface {
 	ID() ids.ID
 
-	MissingDependencies() ids.Set
-	Execute()
+	MissingDependencies() (ids.Set, error)
+	Execute() error
 
 	Bytes() []byte
 }

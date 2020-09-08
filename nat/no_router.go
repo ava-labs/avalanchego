@@ -5,24 +5,62 @@ package nat
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"time"
 )
 
 var (
-	errNoRouter = errors.New("no nat enabled router was discovered")
+	errNoRouterCantMapPorts = errors.New("can't map ports without a known router")
+	errFetchingIP           = errors.New("getting outbound IP failed")
 )
 
-type noRouter struct{}
+const googleDNSServer = "8.8.8.8:80"
 
-func (noRouter) MapPort(_ NetworkProtocol, _, _ uint16, _ string, _ time.Duration) error {
-	return errNoRouter
+type noRouter struct {
+	ip    net.IP
+	ipErr error
 }
 
-func (noRouter) UnmapPort(_ NetworkProtocol, _, _ uint16) error {
-	return errNoRouter
+func (noRouter) MapPort(_ string, intPort, extPort uint16, _ string, _ time.Duration) error {
+	return errNoRouterCantMapPorts
 }
 
-func (noRouter) IP() (net.IP, error) {
-	return nil, errNoRouter
+func (noRouter) UnmapPort(string, uint16, uint16) error {
+	return nil
+}
+
+func (r noRouter) ExternalIP() (net.IP, error) {
+	return r.ip, r.ipErr
+}
+
+func (noRouter) GetPortMappingEntry(uint16, string) (string, uint16, string, error) {
+	return "", 0, "", fmt.Errorf("port mapping not found")
+}
+
+func getOutboundIP() (net.IP, error) {
+	conn, err := net.Dial("udp", googleDNSServer)
+	if err != nil {
+		return nil, err
+	}
+
+	addr := conn.LocalAddr()
+	if err := conn.Close(); err != nil {
+		return nil, err
+	}
+
+	udpAddr, ok := addr.(*net.UDPAddr)
+	if !ok {
+		return nil, errFetchingIP
+	}
+	return udpAddr.IP, nil
+}
+
+// NewNoRouter returns a router that assumes the network is public
+func NewNoRouter() Router {
+	ip, err := getOutboundIP()
+	return &noRouter{
+		ip:    ip,
+		ipErr: err,
+	}
 }

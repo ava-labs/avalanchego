@@ -6,7 +6,6 @@ package platformvm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
@@ -17,28 +16,12 @@ var (
 	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 )
 
-// AtomicTx is an operation that can be decided without being proposed, but must have special control over database commitment
-type AtomicTx interface {
-	initialize(vm *VM) error
-
-	ID() ids.ID
-
-	// UTXOs this tx consumes
-	InputUTXOs() ids.Set
-
-	// Attempt to verify this transaction with the provided state. The provided
-	// database can be modified arbitrarily.
-	SemanticVerify(database.Database) error
-
-	Accept(database.Batch) error
-}
-
 // AtomicBlock being accepted results in the transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx AtomicTx `serialize:"true"`
+	Tx Tx `serialize:"true" json:"tx"`
 
 	inputs ids.Set
 }
@@ -48,7 +31,16 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes); err != nil {
 		return err
 	}
-	return ab.Tx.initialize(vm)
+	unsignedBytes, err := vm.codec.Marshal(&ab.Tx.UnsignedTx)
+	if err != nil {
+		return err
+	}
+	signedBytes, err := ab.vm.codec.Marshal(&ab.Tx)
+	if err != nil {
+		return err
+	}
+	ab.Tx.Initialize(unsignedBytes, signedBytes)
+	return nil
 }
 
 // Reject implements the snowman.Block interface
@@ -68,10 +60,13 @@ func (ab *AtomicBlock) conflicts(s ids.Set) bool {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (ab *AtomicBlock) Verify() error {
+	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	if !ok {
+		return errWrongTxType
+	}
+	ab.inputs = tx.InputUTXOs()
+
 	parentBlock := ab.parentBlock()
-
-	ab.inputs = ab.Tx.InputUTXOs()
-
 	if parentBlock.conflicts(ab.inputs) {
 		return errConflictingParentTxs
 	}
@@ -86,7 +81,14 @@ func (ab *AtomicBlock) Verify() error {
 	pdb := parent.onAccept()
 
 	ab.onAcceptDB = versiondb.New(pdb)
-	if err := ab.Tx.SemanticVerify(ab.onAcceptDB); err != nil {
+	if err := tx.SemanticVerify(ab.vm, ab.onAcceptDB, &ab.Tx); err != nil {
+		ab.vm.droppedTxCache.Put(ab.Tx.ID(), nil) // cache tx as dropped
+		return err
+	}
+	txBytes := ab.Tx.Bytes()
+	if err := ab.vm.putTx(ab.onAcceptDB, ab.Tx.ID(), txBytes); err != nil {
+		return err
+	} else if err := ab.vm.putStatus(ab.onAcceptDB, ab.Tx.ID(), Committed); err != nil {
 		return err
 	}
 
@@ -96,44 +98,59 @@ func (ab *AtomicBlock) Verify() error {
 }
 
 // Accept implements the snowman.Block interface
-func (ab *AtomicBlock) Accept() {
+func (ab *AtomicBlock) Accept() error {
 	ab.vm.Ctx.Log.Verbo("Accepting block with ID %s", ab.ID())
 
-	ab.CommonBlock.Accept()
+	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	if !ok {
+		return errWrongTxType
+	}
+
+	if err := ab.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
 	if err := ab.onAcceptDB.Commit(); err != nil {
 		ab.vm.Ctx.Log.Error("unable to commit onAcceptDB")
+		return err
 	}
 
 	batch, err := ab.vm.DB.CommitBatch()
 	if err != nil {
 		ab.vm.Ctx.Log.Fatal("unable to commit vm's DB")
+		return err
 	}
 	defer ab.vm.DB.Abort()
 
-	if err := ab.Tx.Accept(batch); err != nil {
+	if err := tx.Accept(ab.vm.Ctx, batch); err != nil {
 		ab.vm.Ctx.Log.Error("unable to atomically commit block")
+		return err
 	}
 
 	for _, child := range ab.children {
 		child.setBaseDatabase(ab.vm.DB)
 	}
 	if ab.onAcceptFunc != nil {
-		ab.onAcceptFunc()
+		if err := ab.onAcceptFunc(); err != nil {
+			return err
+		}
 	}
 
 	ab.free()
+	return nil
 }
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, tx AtomicTx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
-		CommonDecisionBlock: CommonDecisionBlock{CommonBlock: CommonBlock{
-			Block: core.NewBlock(parentID),
-			vm:    vm,
-		}},
+		CommonDecisionBlock: CommonDecisionBlock{
+			CommonBlock: CommonBlock{
+				Block: core.NewBlock(parentID, height),
+				vm:    vm,
+			},
+		},
 		Tx: tx,
 	}
 

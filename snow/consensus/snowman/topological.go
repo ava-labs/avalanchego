@@ -9,6 +9,10 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 )
 
+const (
+	minMapSize = 16
+)
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
@@ -66,9 +70,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 
 	ts.head = rootID
 	ts.blocks = map[[32]byte]*snowmanBlock{
-		rootID.Key(): &snowmanBlock{
-			sm: ts,
-		},
+		rootID.Key(): {sm: ts},
 	}
 	ts.tail = rootID
 }
@@ -77,7 +79,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
 
 // Add implements the Snowman interface
-func (ts *Topological) Add(blk Block) {
+func (ts *Topological) Add(blk Block) error {
 	parent := blk.Parent()
 	parentID := parent.ID()
 	parentKey := parentID.Key()
@@ -95,13 +97,15 @@ func (ts *Topological) Add(blk Block) {
 		// If the ancestor is missing, this means the ancestor must have already
 		// been pruned. Therefore, the dependent should be transitively
 		// rejected.
-		blk.Reject()
+		if err := blk.Reject(); err != nil {
+			return err
+		}
 
 		// Notify anyone listening that this block was rejected.
 		ts.ctx.DecisionDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
 		ts.ctx.ConsensusDispatcher.Reject(ts.ctx.ChainID, blkID, blkBytes)
 		ts.metrics.Rejected(blkID)
-		return
+		return nil
 	}
 
 	// add the block as a child of its parent, and add the block to the tree
@@ -115,6 +119,7 @@ func (ts *Topological) Add(blk Block) {
 	if ts.tail.Equals(parentID) {
 		ts.tail = blkID
 	}
+	return nil
 }
 
 // Issued implements the Snowman interface
@@ -154,18 +159,28 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // The complexity of this function is:
 // - Runtime = 3 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
-func (ts *Topological) RecordPoll(votes ids.Bag) {
-	// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
-	kahnGraph, leaves := ts.calculateInDegree(votes)
+func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
+	var voteStack []votes
+	if voteBag.Len() >= ts.params.Alpha {
+		// If there is no way for an alpha majority to occur, there is no need
+		// to perform any traversals.
 
-	// Runtime = |live set| ; Space = |live set|
-	voteStack := ts.pushVotes(kahnGraph, leaves)
+		// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
+		kahnGraph, leaves := ts.calculateInDegree(voteBag)
+
+		// Runtime = |live set| ; Space = |live set|
+		voteStack = ts.pushVotes(kahnGraph, leaves)
+	}
 
 	// Runtime = |live set| ; Space = Constant
-	preferred := ts.vote(voteStack)
+	preferred, err := ts.vote(voteStack)
+	if err != nil {
+		return err
+	}
 
 	// Runtime = |live set| ; Space = Constant
 	ts.tail = ts.getPreferredDecendent(preferred)
+	return nil
 }
 
 // Finalized implements the Snowman interface
@@ -176,7 +191,7 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 // the non-transitively applied votes. Also returns the list of leaf blocks.
 func (ts *Topological) calculateInDegree(
 	votes ids.Bag) (map[[32]byte]kahnNode, []ids.ID) {
-	kahns := make(map[[32]byte]kahnNode)
+	kahns := make(map[[32]byte]kahnNode, minMapSize)
 	leaves := ids.Set{}
 
 	for _, vote := range votes.List() {
@@ -246,7 +261,7 @@ func (ts *Topological) calculateInDegree(
 // votes
 func (ts *Topological) pushVotes(
 	kahnNodes map[[32]byte]kahnNode, leaves []ids.ID) []votes {
-	voteStack := []votes(nil)
+	voteStack := make([]votes, 0, len(kahnNodes))
 	for len(leaves) > 0 {
 		// pop a leaf off the stack
 		newLeavesSize := len(leaves) - 1
@@ -292,7 +307,7 @@ func (ts *Topological) pushVotes(
 }
 
 // apply votes to the branch that received an Alpha threshold
-func (ts *Topological) vote(voteStack []votes) ids.ID {
+func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.
 	if len(voteStack) == 0 {
@@ -301,7 +316,7 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 		headKey := ts.head.Key()
 		headBlock := ts.blocks[headKey]
 		headBlock.shouldFalter = true
-		return ts.tail
+		return ts.tail, nil
 	}
 
 	// keep track of the new preferred block
@@ -341,7 +356,9 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 
 		// Only accept when you are finalized and the head.
 		if parentBlock.sb.Finalized() && ts.head.Equals(vote.parentID) {
-			ts.accept(parentBlock)
+			if err := ts.accept(parentBlock); err != nil {
+				return ids.ID{}, err
+			}
 
 			// by accepting the child of parentBlock, the last accepted block is
 			// no longer voteParentID, but its child. So, voteParentID can be
@@ -393,7 +410,7 @@ func (ts *Topological) vote(voteStack []votes) ids.ID {
 			}
 		}
 	}
-	return newPreferred
+	return newPreferred, nil
 }
 
 // Get the preferred decendent of the provided block ID
@@ -409,7 +426,7 @@ func (ts *Topological) getPreferredDecendent(blkID ids.ID) ids.ID {
 // accept the preferred child of the provided snowman block. By accepting the
 // preferred child, all other children will be rejected. When these children are
 // rejected, all their descendants will be rejected.
-func (ts *Topological) accept(n *snowmanBlock) {
+func (ts *Topological) accept(n *snowmanBlock) error {
 	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
 
@@ -417,7 +434,9 @@ func (ts *Topological) accept(n *snowmanBlock) {
 
 	// Get the child and accept it
 	child := n.children[pref.Key()]
-	child.Accept()
+	if err := child.Accept(); err != nil {
+		return err
+	}
 
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
@@ -431,7 +450,7 @@ func (ts *Topological) accept(n *snowmanBlock) {
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.
 
-	rejects := []ids.ID(nil)
+	rejects := make([]ids.ID, 0, len(n.children)-1)
 	for childIDKey, child := range n.children {
 		childID := ids.NewID(childIDKey)
 		if childID.Equals(pref) {
@@ -439,7 +458,9 @@ func (ts *Topological) accept(n *snowmanBlock) {
 			continue
 		}
 
-		child.Reject()
+		if err := child.Reject(); err != nil {
+			return err
+		}
 
 		// Notify anyone listening that this block was rejected.
 		bytes := child.Bytes()
@@ -452,11 +473,11 @@ func (ts *Topological) accept(n *snowmanBlock) {
 	}
 
 	// reject all the descendants of the blocks we just rejected
-	ts.rejectTransitively(rejects)
+	return ts.rejectTransitively(rejects)
 }
 
 // Takes in a list of rejected ids and rejects all descendants of these IDs
-func (ts *Topological) rejectTransitively(rejected []ids.ID) {
+func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 	// the rejected array is treated as a queue, with the next element at index
 	// 0 and the last element at the end of the slice.
 	for len(rejected) > 0 {
@@ -471,7 +492,9 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) {
 		delete(ts.blocks, rejectedKey)
 
 		for childIDKey, child := range rejectedNode.children {
-			child.Reject()
+			if err := child.Reject(); err != nil {
+				return err
+			}
 
 			// Notify anyone listening that this block was rejected.
 			childID := ids.NewID(childIDKey)
@@ -484,4 +507,5 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) {
 			rejected = append(rejected, childID)
 		}
 	}
+	return nil
 }

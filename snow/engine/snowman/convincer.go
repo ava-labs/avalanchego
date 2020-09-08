@@ -7,8 +7,10 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/wrappers"
 )
 
+// convincer sends chits to [vdr] once all its dependencies are met
 type convincer struct {
 	consensus snowman.Consensus
 	sender    common.Sender
@@ -16,19 +18,22 @@ type convincer struct {
 	requestID uint32
 	abandoned bool
 	deps      ids.Set
+	errs      *wrappers.Errs
 }
 
 func (c *convincer) Dependencies() ids.Set { return c.deps }
 
+// Mark that a dependency has been met
 func (c *convincer) Fulfill(id ids.ID) {
 	c.deps.Remove(id)
 	c.Update()
 }
 
+// Abandon this attempt to send chits.
 func (c *convincer) Abandon(ids.ID) { c.abandoned = true }
 
 func (c *convincer) Update() {
-	if c.abandoned || c.deps.Len() != 0 {
+	if c.abandoned || c.deps.Len() != 0 || c.errs.Errored() {
 		return
 	}
 

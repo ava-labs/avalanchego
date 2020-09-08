@@ -21,8 +21,16 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/vms/components/missing"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup"
+	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
 	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
@@ -38,8 +46,12 @@ type VMClient struct {
 	broker *plugin.GRPCBroker
 	proc   *plugin.Client
 
-	db        *rpcdb.DatabaseServer
-	messenger *messenger.Server
+	db           *rpcdb.DatabaseServer
+	messenger    *messenger.Server
+	keystore     *gkeystore.Server
+	sharedMemory *gsharedmemory.Server
+	bcLookup     *galiaslookup.Server
+	snLookup     *gsubnetlookup.Server
 
 	lock    sync.Mutex
 	closed  bool
@@ -48,6 +60,8 @@ type VMClient struct {
 
 	ctx  *snow.Context
 	blks map[[32]byte]*BlockClient
+
+	lastAccepted ids.ID
 }
 
 // NewClient returns a database instance connected to a remote database instance
@@ -80,6 +94,10 @@ func (vm *VMClient) Initialize(
 
 	vm.db = rpcdb.NewServer(db)
 	vm.messenger = messenger.NewServer(toEngine)
+	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
+	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, db)
+	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
+	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 
 	// start the db server
 	dbBrokerID := vm.broker.NextId()
@@ -89,12 +107,48 @@ func (vm *VMClient) Initialize(
 	messengerBrokerID := vm.broker.NextId()
 	go vm.broker.AcceptAndServe(messengerBrokerID, vm.startMessengerServer)
 
-	_, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
-		DbServer:     dbBrokerID,
-		GenesisBytes: genesisBytes,
-		EngineServer: messengerBrokerID,
+	// start the keystore server
+	keystoreBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(keystoreBrokerID, vm.startKeystoreServer)
+
+	// start the shared memory server
+	sharedMemoryBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(sharedMemoryBrokerID, vm.startSharedMemoryServer)
+
+	// start the blockchain alias server
+	bcLookupBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(bcLookupBrokerID, vm.startBCLookupServer)
+
+	// start the subnet alias server
+	snLookupBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(snLookupBrokerID, vm.startSNLookupServer)
+
+	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
+		NetworkID:          ctx.NetworkID,
+		SubnetID:           ctx.SubnetID.Bytes(),
+		ChainID:            ctx.ChainID.Bytes(),
+		NodeID:             ctx.NodeID.Bytes(),
+		XChainID:           ctx.XChainID.Bytes(),
+		AvaxAssetID:        ctx.AVAXAssetID.Bytes(),
+		GenesisBytes:       genesisBytes,
+		DbServer:           dbBrokerID,
+		EngineServer:       messengerBrokerID,
+		KeystoreServer:     keystoreBrokerID,
+		SharedMemoryServer: sharedMemoryBrokerID,
+		BcLookupServer:     bcLookupBrokerID,
+		SnLookupServer:     snLookupBrokerID,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	lastAccepted, err := ids.ToID(resp.LastAcceptedID)
+	if err != nil {
+		return err
+	}
+
+	vm.lastAccepted = lastAccepted
+	return nil
 }
 
 func (vm *VMClient) startDBServer(opts []grpc.ServerOption) *grpc.Server {
@@ -129,27 +183,108 @@ func (vm *VMClient) startMessengerServer(opts []grpc.ServerOption) *grpc.Server 
 	return server
 }
 
+func (vm *VMClient) startKeystoreServer(opts []grpc.ServerOption) *grpc.Server {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+
+	server := grpc.NewServer(opts...)
+
+	if vm.closed {
+		server.Stop()
+	} else {
+		vm.servers = append(vm.servers, server)
+	}
+
+	gkeystoreproto.RegisterKeystoreServer(server, vm.keystore)
+	return server
+}
+
+func (vm *VMClient) startSharedMemoryServer(opts []grpc.ServerOption) *grpc.Server {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+
+	server := grpc.NewServer(opts...)
+
+	if vm.closed {
+		server.Stop()
+	} else {
+		vm.servers = append(vm.servers, server)
+	}
+
+	gsharedmemoryproto.RegisterSharedMemoryServer(server, vm.sharedMemory)
+	return server
+}
+
+func (vm *VMClient) startBCLookupServer(opts []grpc.ServerOption) *grpc.Server {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+
+	server := grpc.NewServer(opts...)
+
+	if vm.closed {
+		server.Stop()
+	} else {
+		vm.servers = append(vm.servers, server)
+	}
+
+	galiaslookupproto.RegisterAliasLookupServer(server, vm.bcLookup)
+	return server
+}
+
+func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+
+	server := grpc.NewServer(opts...)
+
+	if vm.closed {
+		server.Stop()
+	} else {
+		vm.servers = append(vm.servers, server)
+	}
+
+	gsubnetlookupproto.RegisterSubnetLookupServer(server, vm.snLookup)
+	return server
+}
+
+// Bootstrapping ...
+func (vm *VMClient) Bootstrapping() error {
+	_, err := vm.client.Bootstrapping(context.Background(), &vmproto.BootstrappingRequest{})
+	return err
+}
+
+// Bootstrapped ...
+func (vm *VMClient) Bootstrapped() error {
+	_, err := vm.client.Bootstrapped(context.Background(), &vmproto.BootstrappedRequest{})
+	return err
+}
+
 // Shutdown ...
-func (vm *VMClient) Shutdown() {
+func (vm *VMClient) Shutdown() error {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 
 	if vm.closed {
-		return
+		return nil
 	}
 
 	vm.closed = true
 
-	vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{})
+	if _, err := vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{}); err != nil {
+		return err
+	}
 
 	for _, server := range vm.servers {
 		server.Stop()
 	}
 	for _, conn := range vm.conns {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			return err
+		}
 	}
 
 	vm.proc.Kill()
+	return nil
 }
 
 // CreateHandlers ...
@@ -265,15 +400,7 @@ func (vm *VMClient) SetPreference(id ids.ID) {
 }
 
 // LastAccepted ...
-func (vm *VMClient) LastAccepted() ids.ID {
-	resp, err := vm.client.LastAccepted(context.Background(), &vmproto.LastAcceptedRequest{})
-	vm.ctx.Log.AssertNoError(err)
-
-	id, err := ids.ToID(resp.Id)
-	vm.ctx.Log.AssertNoError(err)
-
-	return id
-}
+func (vm *VMClient) LastAccepted() ids.ID { return vm.lastAccepted }
 
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
@@ -289,23 +416,28 @@ type BlockClient struct {
 func (b *BlockClient) ID() ids.ID { return b.id }
 
 // Accept ...
-func (b *BlockClient) Accept() {
+func (b *BlockClient) Accept() error {
 	delete(b.vm.blks, b.id.Key())
 	b.status = choices.Accepted
 	_, err := b.vm.client.BlockAccept(context.Background(), &vmproto.BlockAcceptRequest{
 		Id: b.id.Bytes(),
 	})
-	b.vm.ctx.Log.AssertNoError(err)
+	if err != nil {
+		return err
+	}
+
+	b.vm.lastAccepted = b.id
+	return nil
 }
 
 // Reject ...
-func (b *BlockClient) Reject() {
+func (b *BlockClient) Reject() error {
 	delete(b.vm.blks, b.id.Key())
 	b.status = choices.Rejected
 	_, err := b.vm.client.BlockReject(context.Background(), &vmproto.BlockRejectRequest{
 		Id: b.id.Bytes(),
 	})
-	b.vm.ctx.Log.AssertNoError(err)
+	return err
 }
 
 // Status ...

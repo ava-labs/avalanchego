@@ -8,14 +8,15 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 func TestOutputAmount(t *testing.T) {
 	out := TransferOutput{
-		Amt:      1,
-		Locktime: 1,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.ShortEmpty,
@@ -29,9 +30,9 @@ func TestOutputAmount(t *testing.T) {
 
 func TestOutputVerify(t *testing.T) {
 	out := TransferOutput{
-		Amt:      1,
-		Locktime: 1,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.ShortEmpty,
@@ -54,9 +55,9 @@ func TestOutputVerifyNil(t *testing.T) {
 
 func TestOutputVerifyNoValue(t *testing.T) {
 	out := TransferOutput{
-		Amt:      0,
-		Locktime: 1,
+		Amt: 0,
 		OutputOwners: OutputOwners{
+			Locktime:  1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.ShortEmpty,
@@ -71,9 +72,9 @@ func TestOutputVerifyNoValue(t *testing.T) {
 
 func TestOutputVerifyUnspendable(t *testing.T) {
 	out := TransferOutput{
-		Amt:      1,
-		Locktime: 1,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  1,
 			Threshold: 2,
 			Addrs: []ids.ShortID{
 				ids.ShortEmpty,
@@ -88,9 +89,9 @@ func TestOutputVerifyUnspendable(t *testing.T) {
 
 func TestOutputVerifyUnoptimized(t *testing.T) {
 	out := TransferOutput{
-		Amt:      1,
-		Locktime: 1,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  1,
 			Threshold: 0,
 			Addrs: []ids.ShortID{
 				ids.ShortEmpty,
@@ -105,9 +106,9 @@ func TestOutputVerifyUnoptimized(t *testing.T) {
 
 func TestOutputVerifyUnsorted(t *testing.T) {
 	out := TransferOutput{
-		Amt:      1,
-		Locktime: 1,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID([20]byte{1}),
@@ -123,9 +124,9 @@ func TestOutputVerifyUnsorted(t *testing.T) {
 
 func TestOutputVerifyDuplicated(t *testing.T) {
 	out := TransferOutput{
-		Amt:      1,
-		Locktime: 1,
+		Amt: 1,
 		OutputOwners: OutputOwners{
+			Locktime:  1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.ShortEmpty,
@@ -143,6 +144,8 @@ func TestOutputSerialize(t *testing.T) {
 	c := codec.NewDefault()
 
 	expected := []byte{
+		// Codec version
+		0x00, 0x00,
 		// amount:
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x39,
 		// locktime:
@@ -161,9 +164,9 @@ func TestOutputSerialize(t *testing.T) {
 		0x43, 0xab, 0x08, 0x59,
 	}
 	out := TransferOutput{
-		Amt:      12345,
-		Locktime: 54321,
+		Amt: 12345,
 		OutputOwners: OutputOwners{
+			Locktime:  54321,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID([20]byte{
@@ -196,9 +199,9 @@ func TestOutputSerialize(t *testing.T) {
 
 func TestOutputAddresses(t *testing.T) {
 	out := TransferOutput{
-		Amt:      12345,
-		Locktime: 54321,
+		Amt: 12345,
 		OutputOwners: OutputOwners{
+			Locktime:  54321,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				ids.NewShortID([20]byte{
@@ -229,5 +232,12 @@ func TestOutputAddresses(t *testing.T) {
 	}
 	if addr := addrs[1]; !bytes.Equal(addr, out.Addrs[1].Bytes()) {
 		t.Fatalf("Wrong address returned")
+	}
+}
+
+func TestTransferOutputState(t *testing.T) {
+	intf := interface{}(&TransferOutput{})
+	if _, ok := intf.(verify.State); !ok {
+		t.Fatalf("should be marked as state")
 	}
 }

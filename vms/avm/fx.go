@@ -19,6 +19,12 @@ type Fx interface {
 	// return an error if the VM is incompatible.
 	Initialize(vm interface{}) error
 
+	// Notify this Fx that the VM is in bootstrapping
+	Bootstrapping() error
+
+	// Notify this Fx that the VM is bootstrapped
+	Bootstrapped() error
+
 	// VerifyTransfer verifies that the specified transaction can spend the
 	// provided utxo with no restrictions on the destination. If the transaction
 	// can't spend the output based on the input and credential, a non-nil error
@@ -36,5 +42,5 @@ type Fx interface {
 type FxOperation interface {
 	verify.Verifiable
 
-	Outs() []verify.Verifiable
+	Outs() []verify.State
 }

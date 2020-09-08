@@ -5,6 +5,7 @@ package timestampvm
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/gecko/database"
@@ -12,7 +13,7 @@ import (
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/core"
 )
 
@@ -65,7 +66,7 @@ func (vm *VM) Initialize(
 
 		// Create the genesis block
 		// Timestamp of genesis block is 0. It has no parent.
-		genesisBlock, err := vm.NewBlock(ids.Empty, genesisDataArr, time.Unix(0, 0))
+		genesisBlock, err := vm.NewBlock(ids.Empty, 0, genesisDataArr, time.Unix(0, 0))
 		if err != nil {
 			vm.Ctx.Log.Error("error while creating genesis block: %v", err)
 			return err
@@ -78,9 +79,13 @@ func (vm *VM) Initialize(
 
 		// Accept the genesis block
 		// Sets [vm.lastAccepted] and [vm.preferred]
-		genesisBlock.Accept()
+		if err := genesisBlock.Accept(); err != nil {
+			return fmt.Errorf("error accepting genesis block: %w", err)
+		}
 
-		vm.SetDBInitialized()
+		if err := vm.SetDBInitialized(); err != nil {
+			return fmt.Errorf("error while setting db to initialized: %w", err)
+		}
 
 		// Flush VM's database to underlying db
 		if err := vm.DB.Commit(); err != nil {
@@ -95,7 +100,8 @@ func (vm *VM) Initialize(
 // Keys: The path extension for this VM's API (empty in this case)
 // Values: The handler for the API
 func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
-	handler := vm.NewHandler("timestamp", &Service{vm})
+	handler, err := vm.NewHandler("timestamp", &Service{vm})
+	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{
 		"": handler,
 	}
@@ -123,8 +129,14 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		defer vm.NotifyBlockReady()
 	}
 
+	preferredIntf, err := vm.GetBlock(vm.Preferred())
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get preferred block")
+	}
+	preferredHeight := preferredIntf.(*Block).Height()
+
 	// Build the block
-	block, err := vm.NewBlock(vm.Preferred(), value, time.Now())
+	block, err := vm.NewBlock(vm.Preferred(), preferredHeight+1, value, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -154,19 +166,16 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 // - the block's data is [data]
 // - the block's timestamp is [timestamp]
 // The block is persisted in storage
-func (vm *VM) NewBlock(parentID ids.ID, data [dataLen]byte, timestamp time.Time) (*Block, error) {
+func (vm *VM) NewBlock(parentID ids.ID, height uint64, data [dataLen]byte, timestamp time.Time) (*Block, error) {
 	block := &Block{
-		Block:     core.NewBlock(parentID),
+		Block:     core.NewBlock(parentID, height),
 		Data:      data,
 		Timestamp: timestamp.Unix(),
 	}
-
 	blockBytes, err := vm.codec.Marshal(block)
 	if err != nil {
 		return nil, err
 	}
-
 	block.Initialize(blockBytes, &vm.SnowmanVM)
-
 	return block, nil
 }

@@ -15,12 +15,14 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/networking/handler"
+	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/snow/networking/sender"
+	"github.com/ava-labs/gecko/snow/networking/throttler"
 	"github.com/ava-labs/gecko/snow/networking/timeout"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 
 	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
 	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
@@ -54,15 +56,23 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+		vdrs.AddWeight(ctx.NodeID, 1)
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize(2 * time.Second)
+		timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:    10 * time.Second,
+			MinimumTimeout:    500 * time.Millisecond,
+			MaximumTimeout:    10 * time.Second,
+			TimeoutMultiplier: 1.1,
+			TimeoutReduction:  time.Millisecond,
+			Namespace:         "",
+			Registerer:        prometheus.NewRegistry(),
+		})
 		go timeoutManager.Dispatch()
 
-		router := &router.ChainRouter{}
-		router.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
+		chainRouter := &router.ChainRouter{}
+		chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 		// Initialize the VM
 		vm := &VM{}
@@ -77,14 +87,14 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		// Passes messages from the consensus engine to the network
 		sender := sender.Sender{}
 
-		sender.Initialize(ctx, externalSender, router, &timeoutManager)
+		sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
 		// The engine handles consensus
 		engine := smeng.Transitive{}
 		engine.Initialize(smeng.Config{
-			BootstrapConfig: smeng.BootstrapConfig{
+			Config: bootstrap.Config{
 				Config: common.Config{
-					Context:    ctx,
+					Ctx:        ctx,
 					Validators: vdrs,
 					Beacons:    beacons,
 					Alpha:      uint64(beacons.Len()/2 + 1),
@@ -105,11 +115,21 @@ func ConsensusLeader(numBlocks, numTxsPerBlock int, b *testing.B) {
 		})
 
 		// Asynchronously passes messages from the network to the consensus engine
-		handler := &handler.Handler{}
-		handler.Initialize(&engine, msgChan, 1000)
+		handler := &router.Handler{}
+		handler.Initialize(
+			&engine,
+			vdrs,
+			msgChan,
+			1000,
+			throttler.DefaultMaxNonStakerPendingMsgs,
+			throttler.DefaultStakerPortion,
+			throttler.DefaultStakerPortion,
+			"",
+			prometheus.NewRegistry(),
+		)
 
 		// Allow incoming messages to be routed to the new chain
-		router.AddChain(handler)
+		chainRouter.AddChain(handler)
 		go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 		engine.Startup()
@@ -182,15 +202,23 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		msgChan := make(chan common.Message, 1000)
 
 		vdrs := validators.NewSet()
-		vdrs.Add(validators.NewValidator(ctx.NodeID, 1))
+		vdrs.AddWeight(ctx.NodeID, 1)
 		beacons := validators.NewSet()
 
 		timeoutManager := timeout.Manager{}
-		timeoutManager.Initialize(2 * time.Second)
+		timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:    10 * time.Second,
+			MinimumTimeout:    500 * time.Millisecond,
+			MaximumTimeout:    10 * time.Second,
+			TimeoutMultiplier: 1.1,
+			TimeoutReduction:  time.Millisecond,
+			Namespace:         "",
+			Registerer:        prometheus.NewRegistry(),
+		})
 		go timeoutManager.Dispatch()
 
-		router := &router.ChainRouter{}
-		router.Initialize(logging.NoLog{}, &timeoutManager, time.Hour)
+		chainRouter := &router.ChainRouter{}
+		chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 		wg := sync.WaitGroup{}
 		wg.Add(numBlocks)
@@ -210,14 +238,14 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		// Passes messages from the consensus engine to the network
 		sender := sender.Sender{}
 
-		sender.Initialize(ctx, externalSender, router, &timeoutManager)
+		sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
 		// The engine handles consensus
 		engine := smeng.Transitive{}
 		engine.Initialize(smeng.Config{
-			BootstrapConfig: smeng.BootstrapConfig{
+			Config: bootstrap.Config{
 				Config: common.Config{
-					Context:    ctx,
+					Ctx:        ctx,
 					Validators: vdrs,
 					Beacons:    beacons,
 					Alpha:      uint64(beacons.Len()/2 + 1),
@@ -238,11 +266,21 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 		})
 
 		// Asynchronously passes messages from the network to the consensus engine
-		handler := &handler.Handler{}
-		handler.Initialize(&engine, msgChan, 1000)
+		handler := &router.Handler{}
+		handler.Initialize(
+			&engine,
+			vdrs,
+			msgChan,
+			1000,
+			throttler.DefaultMaxNonStakerPendingMsgs,
+			throttler.DefaultStakerPortion,
+			throttler.DefaultStakerPortion,
+			"",
+			prometheus.NewRegistry(),
+		)
 
 		// Allow incoming messages to be routed to the new chain
-		router.AddChain(handler)
+		chainRouter.AddChain(handler)
 		go ctx.Log.RecoverAndPanic(handler.Dispatch)
 
 		engine.Startup()
@@ -250,7 +288,7 @@ func ConsensusFollower(numBlocks, numTxsPerBlock int, b *testing.B) {
 
 		b.StartTimer()
 		for _, block := range blocks {
-			router.Put(ctx.NodeID, ctx.ChainID, 0, block.ID(), block.Bytes())
+			chainRouter.Put(ctx.NodeID, ctx.ChainID, 0, block.ID(), block.Bytes())
 		}
 		wg.Wait()
 		b.StopTimer()

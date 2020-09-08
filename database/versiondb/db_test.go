@@ -299,6 +299,10 @@ func TestCommitBatch(t *testing.T) {
 
 	if err := db.Put(key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
+	} else if has, err := baseDB.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("Unexpected result of db.Has: %v", has)
 	}
 
 	batch, err := db.CommitBatch()
@@ -307,7 +311,11 @@ func TestCommitBatch(t *testing.T) {
 	}
 	db.Abort()
 
-	if err := batch.Write(); err != nil {
+	if has, err := db.Has(key1); err != nil {
+		t.Fatalf("Unexpected error on db.Has: %s", err)
+	} else if has {
+		t.Fatalf("Unexpected result of db.Has: %v", has)
+	} else if err := batch.Write(); err != nil {
 		t.Fatalf("Unexpected error on batch.Write: %s", err)
 	}
 

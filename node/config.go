@@ -4,15 +4,18 @@
 package node
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
-// Config contains all of the configurations of an Ava node.
+// Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	// protocol to use for opening the network interface
 	Nat nat.Router
@@ -21,7 +24,13 @@ type Config struct {
 	NetworkID uint32
 
 	// Transaction fee configuration
-	AvaTxFee uint64
+	TxFee uint64
+
+	// Staking uptime requirements
+	UptimeRequirement float64
+
+	// Minimum stake, in nAVAX, required to validate the primary network
+	MinStake uint64
 
 	// Assertions configuration
 	EnableAssertions bool
@@ -33,10 +42,19 @@ type Config struct {
 	DB database.Database
 
 	// Staking configuration
-	StakingIP       utils.IPDesc
-	EnableStaking   bool
-	StakingKeyFile  string
-	StakingCertFile string
+	StakingIP               utils.IPDesc
+	StakingLocalPort        uint16
+	EnableP2PTLS            bool
+	EnableStaking           bool
+	StakingKeyFile          string
+	StakingCertFile         string
+	DisabledStakingWeight   uint64
+	MaxNonStakerPendingMsgs uint
+	StakerMSGPortion        float64
+	StakerCPUPortion        float64
+
+	// Network configuration
+	NetworkConfig timer.AdaptiveTimeoutConfig
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
@@ -44,12 +62,13 @@ type Config struct {
 	// HTTP configuration
 	HTTPHost      string
 	HTTPPort      uint16
-	EnableHTTPS   bool
+	HTTPSEnabled  bool
 	HTTPSKeyFile  string
 	HTTPSCertFile string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
+	InfoAPIEnabled     bool
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
@@ -67,9 +86,13 @@ type Config struct {
 	ThroughputPort          uint16
 	ThroughputServerEnabled bool
 
-	// IPCEnabled configuration
-	IPCEnabled bool
+	// IPC configuration
+	IPCAPIEnabled      bool
+	IPCPath            string
+	IPCDefaultChainIDs []string
 
 	// Router that is used to handle incoming consensus messages
-	ConsensusRouter router.Router
+	ConsensusRouter          router.Router
+	ConsensusGossipFrequency time.Duration
+	ConsensusShutdownTimeout time.Duration
 }

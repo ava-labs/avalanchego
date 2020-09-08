@@ -46,7 +46,7 @@ type LiveBlock struct {
 func (lb *LiveBlock) ID() ids.ID { return lb.block.id }
 
 // Accept is called when this block is finalized as accepted by consensus
-func (lb *LiveBlock) Accept() {
+func (lb *LiveBlock) Accept() error {
 	bID := lb.ID()
 	lb.vm.ctx.Log.Debug("Accepted block %s", bID)
 
@@ -55,11 +55,13 @@ func (lb *LiveBlock) Accept() {
 
 	if err := lb.db.Commit(); err != nil {
 		lb.vm.ctx.Log.Debug("Failed to accept block %s due to %s", bID, err)
-		return
+		return err
 	}
 
 	for _, child := range lb.children {
-		child.setBaseDatabase(lb.vm.baseDB)
+		if err := child.setBaseDatabase(lb.vm.baseDB); err != nil {
+			return err
+		}
 	}
 
 	delete(lb.vm.currentBlocks, bID.Key())
@@ -74,15 +76,16 @@ func (lb *LiveBlock) Accept() {
 	if lb.vm.onAccept != nil {
 		lb.vm.onAccept(bID)
 	}
+	return nil
 }
 
 // Reject is called when this block is finalized as rejected by consensus
-func (lb *LiveBlock) Reject() {
+func (lb *LiveBlock) Reject() error {
 	lb.vm.ctx.Log.Debug("Rejected block %s", lb.ID())
 
 	if err := lb.vm.state.SetStatus(lb.vm.baseDB, lb.ID(), choices.Rejected); err != nil {
 		lb.vm.ctx.Log.Debug("Failed to reject block %s due to %s", lb.ID(), err)
-		return
+		return err
 	}
 
 	lb.status = choices.Rejected
@@ -96,6 +99,7 @@ func (lb *LiveBlock) Reject() {
 			tx.onDecide(choices.Rejected)
 		}
 	}
+	return nil
 }
 
 // Status returns the current status of this block
@@ -244,4 +248,4 @@ func (lb *LiveBlock) database() database.Database {
 	return lb.db
 }
 
-func (lb *LiveBlock) setBaseDatabase(db database.Database) { lb.db.SetDatabase(db) }
+func (lb *LiveBlock) setBaseDatabase(db database.Database) error { return lb.db.SetDatabase(db) }

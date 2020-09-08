@@ -4,18 +4,21 @@
 package avm
 
 import (
+	"math"
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
-func TestStateIDs(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+// Test function IDs when argument start is empty
+func TestStateIDsNoStart(t *testing.T) {
+	_, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -23,28 +26,43 @@ func TestStateIDs(t *testing.T) {
 
 	state := vm.state.state
 
-	id0 := ids.NewID([32]byte{0xff, 0})
-	id1 := ids.NewID([32]byte{0xff, 0})
-	id2 := ids.NewID([32]byte{0xff, 0})
+	id0 := ids.NewID([32]byte{0x00, 0})
+	id1 := ids.NewID([32]byte{0x01, 0})
+	id2 := ids.NewID([32]byte{0x02, 0})
 
-	if _, err := state.IDs(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
+	if _, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil {
+		t.Fatal(err)
 	}
 
 	expected := []ids.ID{id0, id1}
-	if err := state.SetIDs(ids.Empty, expected); err != nil {
-		t.Fatal(err)
+	for _, id := range expected {
+		if err := state.AddID(ids.Empty.Bytes(), id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	result, err := state.IDs(ids.Empty)
+	result, err := state.IDs(ids.Empty.Bytes(), []byte{}, 0)
+	if err != nil {
+		t.Fatal(err)
+	} else if len(result) != 0 {
+		t.Fatal("result should have length 0 because limit is 0")
+	}
+
+	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, 1)
+	if err != nil {
+		t.Fatal(err)
+	} else if len(result) != 1 {
+		t.Fatal("result should have length 0 because limit is 1")
+	}
+
+	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if len(result) != len(expected) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
-
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -52,20 +70,34 @@ func TestStateIDs(t *testing.T) {
 		}
 	}
 
-	expected = []ids.ID{id1, id2}
-	if err := state.SetIDs(ids.Empty, expected); err != nil {
-		t.Fatal(err)
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty.Bytes(), id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	result, err = state.IDs(ids.Empty)
+	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
+	} else if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
 	}
 
-	if len(result) != len(expected) {
+	expected = []ids.ID{id1, id2}
+	for _, id := range expected {
+		if err := state.AddID(ids.Empty.Bytes(), id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	if err != nil {
+		t.Fatal(err)
+	} else if len(result) != len(expected) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -75,15 +107,14 @@ func TestStateIDs(t *testing.T) {
 
 	state.Cache.Flush()
 
-	result, err = state.IDs(ids.Empty)
+	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if len(result) != len(expected) {
+	} else if len(result) != len(expected) {
 		t.Fatalf("Returned the wrong number of ids")
 	}
 
+	ids.SortIDs(result)
 	for i, resultID := range result {
 		expectedID := expected[i]
 		if !expectedID.Equals(resultID) {
@@ -95,41 +126,80 @@ func TestStateIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during cache lookup")
-	}
-
-	state.Cache.Flush()
-
-	result, err = state.IDs(ids.Empty)
-	if err == nil {
-		t.Fatalf("Should have errored during parsing")
-	}
-
 	statusResult, err := state.Status(ids.Empty)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if statusResult != choices.Accepted {
+	} else if statusResult != choices.Accepted {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{ids.ID{}}); err == nil {
-		t.Fatalf("Should have errored during serialization")
+	for _, id := range expected {
+		if err := state.RemoveID(ids.Empty.Bytes(), id); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{}); err != nil {
+	result, err = state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32)
+	if err != nil {
+		t.Fatal(err)
+	} else if len(result) != 0 {
+		t.Fatalf("Should have returned 0 IDs")
+	} else if err := state.AddID(ids.Empty.Bytes(), ids.ID{}); err == nil {
+		t.Fatalf("Should have errored during serialization")
+	} else if err := state.RemoveID(ids.Empty.Bytes(), ids.ID{}); err == nil {
+		t.Fatalf("Should have errored during serialization")
+	}
+}
+
+func TestStateIDsWithStart(t *testing.T) {
+	_, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	state := vm.state.state
+	id0 := ids.NewID([32]byte{0x00, 0})
+	id1 := ids.NewID([32]byte{0x01, 0})
+	id2 := ids.NewID([32]byte{0x02, 0})
+
+	// State should be empty to start
+	if _, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := state.IDs(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
+	// Put all three IDs
+	if err := state.AddID(ids.Empty.Bytes(), id0); err != nil {
+		t.Fatal(err)
+	} else if err := state.AddID(ids.Empty.Bytes(), id1); err != nil {
+		t.Fatal(err)
+	} else if err := state.AddID(ids.Empty.Bytes(), id2); err != nil {
+		t.Fatal(err)
+	}
+
+	if result, err := state.IDs(ids.Empty.Bytes(), []byte{}, math.MaxInt32); err != nil { // start at beginning
+		t.Fatal(err)
+	} else if len(result) != 3 {
+		t.Fatalf("result should have all 3 IDs but has %d", len(result))
+	} else if result, err := state.IDs(ids.Empty.Bytes(), id0.Bytes(), math.MaxInt32); err != nil { // start after id0
+		t.Fatal(err)
+	} else if len(result) != 2 {
+		t.Fatalf("result should have 2 IDs but has %d", len(result))
+	} else if (!result[0].Equals(id1) && !result[1].Equals(id1)) || (!result[0].Equals(id2) && !result[1].Equals(id2)) {
+		t.Fatal("result should have id1 and id2")
+	} else if result, err := state.IDs(ids.Empty.Bytes(), id1.Bytes(), math.MaxInt32); err != nil { // start after id1
+		t.Fatal(err)
+	} else if len(result) != 1 {
+		t.Fatalf("result should have 1 IDs but has %d", len(result))
+	} else if !result[0].Equals(id2) {
+		t.Fatal("result should be id2")
 	}
 }
 
 func TestStateStatuses(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -153,14 +223,7 @@ func TestStateStatuses(t *testing.T) {
 		t.Fatalf("Should have returned the %s status", choices.Accepted)
 	}
 
-	if err := state.SetIDs(ids.Empty, []ids.ID{ids.Empty}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := state.Status(ids.Empty); err == nil {
-		t.Fatalf("Should have errored when reading ids")
-	}
-
-	if err := state.SetStatus(ids.Empty, choices.Accepted); err != nil {
+	if err := state.AddID(ids.Empty.Bytes(), ids.Empty); err != nil {
 		t.Fatal(err)
 	}
 
@@ -182,7 +245,8 @@ func TestStateStatuses(t *testing.T) {
 }
 
 func TestStateUTXOs(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -190,19 +254,19 @@ func TestStateUTXOs(t *testing.T) {
 
 	state := vm.state.state
 
-	vm.codec.RegisterType(&ava.TestVerifiable{})
+	vm.codec.RegisterType(&avax.TestVerifiable{})
 
 	if _, err := state.UTXO(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	utxo := &ava.UTXO{
-		UTXOID: ava.UTXOID{
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
 			TxID:        ids.Empty,
 			OutputIndex: 1,
 		},
-		Asset: ava.Asset{ID: ids.Empty},
-		Out:   &ava.TestVerifiable{},
+		Asset: avax.Asset{ID: ids.Empty},
+		Out:   &avax.TestVerifiable{},
 	}
 
 	if err := state.SetUTXO(ids.Empty, utxo); err != nil {
@@ -237,7 +301,7 @@ func TestStateUTXOs(t *testing.T) {
 		t.Fatalf("Should have errored when reading utxo")
 	}
 
-	if err := state.SetUTXO(ids.Empty, &ava.UTXO{}); err == nil {
+	if err := state.SetUTXO(ids.Empty, &avax.UTXO{}); err == nil {
 		t.Fatalf("Should have errored packing the utxo")
 	}
 
@@ -257,7 +321,8 @@ func TestStateUTXOs(t *testing.T) {
 }
 
 func TestStateTXs(t *testing.T) {
-	_, _, vm := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
+	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
 		ctx.Lock.Unlock()
@@ -265,23 +330,23 @@ func TestStateTXs(t *testing.T) {
 
 	state := vm.state.state
 
-	vm.codec.RegisterType(&ava.TestTransferable{})
+	vm.codec.RegisterType(&avax.TestTransferable{})
 
 	if _, err := state.Tx(ids.Empty); err == nil {
 		t.Fatalf("Should have errored when reading tx")
 	}
 
-	tx := &Tx{UnsignedTx: &BaseTx{
-		NetID: networkID,
-		BCID:  chainID,
-		Ins: []*ava.TransferableInput{&ava.TransferableInput{
-			UTXOID: ava.UTXOID{
+	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
-			Asset: ava.Asset{ID: asset},
+			Asset: avax.Asset{ID: asset},
 			In: &secp256k1fx.TransferInput{
-				Amt: 20 * units.KiloAva,
+				Amt: 20 * units.KiloAvax,
 				Input: secp256k1fx.Input{
 					SigIndices: []uint32{
 						0,
@@ -289,32 +354,10 @@ func TestStateTXs(t *testing.T) {
 				},
 			},
 		}},
-	}}
-
-	unsignedBytes, err := vm.codec.Marshal(tx.UnsignedTx)
-	if err != nil {
+	}}}
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-
-	key := keys[0]
-	sig, err := key.Sign(unsignedBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixedSig := [crypto.SECP256K1RSigLen]byte{}
-	copy(fixedSig[:], sig)
-
-	tx.Creds = append(tx.Creds, &secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		},
-	})
-
-	b, err := vm.codec.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.Initialize(b)
 
 	if err := state.SetTx(ids.Empty, tx); err != nil {
 		t.Fatal(err)

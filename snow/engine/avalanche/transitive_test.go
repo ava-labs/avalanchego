@@ -15,11 +15,13 @@ import (
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/consensus/snowball"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/gecko/snow/engine/common"
 	"github.com/ava-labs/gecko/snow/validators"
 )
 
 var (
+	errUnknownVertex = errors.New("unknown vertex")
 	errFailedParsing = errors.New("failed parsing")
 	errMissing       = errors.New("missing")
 )
@@ -27,14 +29,15 @@ var (
 func TestEngineShutdown(t *testing.T) {
 	config := DefaultConfig()
 	vmShutdownCalled := false
-	vm := &VMTest{}
-	vm.ShutdownF = func() { vmShutdownCalled = true }
+	vm := &vertex.TestVM{}
+	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
 	config.VM = vm
 
 	transitive := &Transitive{}
 
 	transitive.Initialize(config)
 	transitive.finishBootstrapping()
+	transitive.Ctx.Bootstrapped()
 	transitive.Shutdown()
 	if !vmShutdownCalled {
 		t.Fatal("Shutting down the Transitive did not shutdown the VM")
@@ -44,12 +47,11 @@ func TestEngineShutdown(t *testing.T) {
 func TestEngineAdd(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -58,31 +60,34 @@ func TestEngineAdd(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	st.cantEdge = false
+	manager.CantEdge = false
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	if !te.Context().ChainID.Equals(ids.Empty) {
+	if !te.Ctx.ChainID.Equals(ids.Empty) {
 		t.Fatalf("Wrong chain ID")
 	}
 
-	vtx := &Vtx{
-		parents: []avalanche.Vertex{
-			&Vtx{
-				id:     GenerateID(),
-				status: choices.Unknown,
-			},
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-		id:     GenerateID(),
-		status: choices.Processing,
-		bytes:  []byte{1},
+		ParentsV: []avalanche.Vertex{
+			&avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Unknown,
+			}},
+		},
+		BytesV: []byte{1},
 	}
 
 	asked := new(bool)
@@ -93,24 +98,24 @@ func TestEngineAdd(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.ID().Equals(inVdr) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
-		if !vtx.parents[0].ID().Equals(vtxID) {
+		if !vtx.ParentsV[0].ID().Equals(vtxID) {
 			t.Fatalf("Asking for wrong vertex")
 		}
 	}
 
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		if !bytes.Equal(b, vtx.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
 		return vtx, nil
 	}
 
-	te.Put(vdr.ID(), 0, vtx.ID(), vtx.Bytes())
+	te.Put(vdr, 0, vtx.ID(), vtx.Bytes())
 
-	st.parseVertex = nil
+	manager.ParseVertexF = nil
 
 	if !*asked {
 		t.Fatalf("Didn't ask for a missing vertex")
@@ -120,11 +125,11 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatalf("Should have been blocking on request")
 	}
 
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) { return nil, errFailedParsing }
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) { return nil, errFailedParsing }
 
-	te.Put(vdr.ID(), *reqID, vtx.parents[0].ID(), nil)
+	te.Put(vdr, *reqID, vtx.ParentsV[0].ID(), nil)
 
-	st.parseVertex = nil
+	manager.ParseVertexF = nil
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Should have finished blocking issue")
@@ -134,12 +139,11 @@ func TestEngineAdd(t *testing.T) {
 func TestEngineQuery(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -148,39 +152,42 @@ func TestEngineQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
-	utxos := []ids.ID{GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+		BytesV:   []byte{0, 1, 2, 3},
 	}
-	tx0.Ins.Add(utxos[0])
 
-	vtx0 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
-	}
-
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -195,9 +202,10 @@ func TestEngineQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	vertexed := new(bool)
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if *vertexed {
 			t.Fatalf("Sent multiple requests")
 		}
@@ -214,7 +222,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.ID().Equals(inVdr) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if !vtx0.ID().Equals(vtxID) {
@@ -222,7 +230,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	te.PullQuery(vdr.ID(), 0, vtx0.ID())
+	te.PullQuery(vdr, 0, vtx0.ID())
 	if !*vertexed {
 		t.Fatalf("Didn't request vertex")
 	}
@@ -239,7 +247,7 @@ func TestEngineQuery(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -254,19 +262,19 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Sent multiple chits")
 		}
 		*chitted = true
-		if !Matches(prefs.List(), []ids.ID{vtx0.ID()}) {
+		if prefs.Len() != 1 || !prefs.Contains(vtx0.ID()) {
 			t.Fatalf("Wrong chits preferences")
 		}
 	}
 
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		if !bytes.Equal(b, vtx0.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
 		return vtx0, nil
 	}
-	te.Put(vdr.ID(), 0, vtx0.ID(), vtx0.Bytes())
-	st.parseVertex = nil
+	te.Put(vdr, 0, vtx0.ID(), vtx0.Bytes())
+	manager.ParseVertexF = nil
 
 	if !*queried {
 		t.Fatalf("Didn't ask for preferences")
@@ -275,18 +283,24 @@ func TestEngineQuery(t *testing.T) {
 		t.Fatalf("Didn't provide preferences")
 	}
 
-	vtx1 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{5, 4, 3, 2, 1, 9},
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+		BytesV:   []byte{5, 4, 3, 2, 1, 9},
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if vtxID.Equals(vtx0.ID()) {
-			return &Vtx{status: choices.Processing}, nil
+			return &avalanche.TestVertex{
+				TestDecidable: choices.TestDecidable{
+					StatusV: choices.Unknown,
+				},
+			}, nil
 		}
 		if vtxID.Equals(vtx1.ID()) {
 			return nil, errUnknownVertex
@@ -301,7 +315,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.ID().Equals(inVdr) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if !vtx1.ID().Equals(vtxID) {
@@ -311,7 +325,7 @@ func TestEngineQuery(t *testing.T) {
 
 	s := ids.Set{}
 	s.Add(vtx1.ID())
-	te.Chits(vdr.ID(), *queryRequestID, s)
+	te.Chits(vdr, *queryRequestID, s)
 
 	*queried = false
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
@@ -321,7 +335,7 @@ func TestEngineQuery(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -330,14 +344,18 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		if !bytes.Equal(b, vtx1.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
 
-		st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+		manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 			if vtxID.Equals(vtx0.ID()) {
-				return &Vtx{status: choices.Processing}, nil
+				return &avalanche.TestVertex{
+					TestDecidable: choices.TestDecidable{
+						StatusV: choices.Processing,
+					},
+				}, nil
 			}
 			if vtxID.Equals(vtx1.ID()) {
 				return vtx1, nil
@@ -348,8 +366,8 @@ func TestEngineQuery(t *testing.T) {
 
 		return vtx1, nil
 	}
-	te.Put(vdr.ID(), 0, vtx1.ID(), vtx1.Bytes())
-	st.parseVertex = nil
+	te.Put(vdr, 0, vtx1.ID(), vtx1.Bytes())
+	manager.ParseVertexF = nil
 
 	if vtx0.Status() != choices.Accepted {
 		t.Fatalf("Should have executed vertex")
@@ -360,7 +378,7 @@ func TestEngineQuery(t *testing.T) {
 
 	_ = te.polls.String() // Shouldn't panic
 
-	te.QueryFailed(vdr.ID(), *queryRequestID)
+	te.QueryFailed(vdr, *queryRequestID)
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Should have finished blocking")
 	}
@@ -382,16 +400,16 @@ func TestEngineMultipleQuery(t *testing.T) {
 		BatchSize: 1,
 	}
 
-	vdr0 := validators.GenerateRandomValidator(1)
-	vdr1 := validators.GenerateRandomValidator(1)
-	vdr2 := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr0)
-	vals.Add(vdr1)
-	vals.Add(vdr2)
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
+	vdr2 := ids.GenerateTestShortID()
+
+	vals.AddWeight(vdr0, 1)
+	vals.AddWeight(vdr1, 1)
+	vals.AddWeight(vdr2, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -400,23 +418,23 @@ func TestEngineMultipleQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
-	utxos := []ids.ID{GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID()}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -427,22 +445,26 @@ func TestEngineMultipleQuery(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
-	}
-	tx0.Ins.Add(utxos[0])
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
 
-	vtx0 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
 	}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
@@ -453,7 +475,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr0.ID(), vdr1.ID(), vdr2.ID())
+		vdrSet.Add(vdr0, vdr1, vdr2)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -462,17 +484,19 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	te.insert(vtx0)
+	te.issue(vtx0)
 
-	vtx1 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
 	}
 
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -495,7 +519,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr0.ID().Equals(inVdr) {
+		if !vdr0.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if !vtx1.ID().Equals(vtxID) {
@@ -510,14 +534,14 @@ func TestEngineMultipleQuery(t *testing.T) {
 	s2 := ids.Set{}
 	s2.Add(vtx0.ID())
 
-	te.Chits(vdr0.ID(), *queryRequestID, s0)
-	te.QueryFailed(vdr1.ID(), *queryRequestID)
-	te.Chits(vdr2.ID(), *queryRequestID, s2)
+	te.Chits(vdr0, *queryRequestID, s0)
+	te.QueryFailed(vdr1, *queryRequestID)
+	te.Chits(vdr2, *queryRequestID, s2)
 
 	// Should be dropped because the query was marked as failed
-	te.Chits(vdr1.ID(), *queryRequestID, s0)
+	te.Chits(vdr1, *queryRequestID, s0)
 
-	te.GetFailed(vdr0.ID(), *reqID)
+	te.GetFailed(vdr0, *reqID)
 
 	if vtx0.Status() != choices.Accepted {
 		t.Fatalf("Should have executed vertex")
@@ -530,62 +554,69 @@ func TestEngineMultipleQuery(t *testing.T) {
 func TestEngineBlockedIssue(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
-	utxos := []ids.ID{GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
 	}
-	tx0.Ins.Add(utxos[0])
 
-	vtx0 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
-	}
-
-	vtx1 := &Vtx{
-		parents: []avalanche.Vertex{&Vtx{
-			id:     vtx0.ID(),
-			status: choices.Unknown,
-		}},
-		id:     GenerateID(),
-		txs:    []snowstorm.Tx{tx0},
-		height: 1,
-		status: choices.Processing,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{
+			&avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+				IDV:     vtx0.IDV,
+				StatusV: choices.Unknown,
+			}},
+		},
+		HeightV: 1,
+		TxsV:    []snowstorm.Tx{tx0},
 	}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	te.insert(vtx1)
+	te.issue(vtx1)
 
-	vtx1.parents[0] = vtx0
-	te.insert(vtx0)
+	vtx1.ParentsV[0] = vtx0
+	te.issue(vtx0)
 
-	if !Matches(te.Consensus.Preferences().List(), []ids.ID{vtx1.ID()}) {
+	if prefs := te.Consensus.Preferences(); prefs.Len() != 1 || !prefs.Contains(vtx1.ID()) {
 		t.Fatalf("Should have issued vtx1")
 	}
 }
@@ -593,15 +624,14 @@ func TestEngineBlockedIssue(t *testing.T) {
 func TestEngineAbandonResponse(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -609,44 +639,48 @@ func TestEngineAbandonResponse(t *testing.T) {
 
 	sender.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
-	utxos := []ids.ID{GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
 	}
-	tx0.Ins.Add(utxos[0])
 
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
-	}
-
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) { return nil, errUnknownVertex }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) { return nil, errUnknownVertex }
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	reqID := new(uint32)
 	sender.GetF = func(vID ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 	}
 
-	te.PullQuery(vdr.ID(), 0, vtx.ID())
-	te.GetFailed(vdr.ID(), *reqID)
+	te.PullQuery(vdr, 0, vtx.ID())
+	te.GetFailed(vdr, *reqID)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Should have removed blocking event")
@@ -656,43 +690,45 @@ func TestEngineAbandonResponse(t *testing.T) {
 func TestEngineScheduleRepoll(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
-	utxos := []ids.ID{GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{Identifier: GenerateID()},
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
 	}
-	tx0.Ins.Add(utxos[0])
 
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
-	}
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st := &stateTest{t: t}
-	config.State = st
-
-	st.Default(true)
-	st.cantEdge = false
+	manager.Default(true)
+	manager.CantEdge = false
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -704,13 +740,14 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	requestID := new(uint32)
 	sender.PushQueryF = func(_ ids.ShortSet, reqID uint32, _ ids.ID, _ []byte) {
 		*requestID = reqID
 	}
 
-	te.insert(vtx)
+	te.issue(vtx)
 
 	sender.PushQueryF = nil
 
@@ -722,7 +759,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 		}
 	}
 
-	te.QueryFailed(vdr.ID(), *requestID)
+	te.QueryFailed(vdr, *requestID)
 
 	if !*repolled {
 		t.Fatalf("Should have issued a noop")
@@ -741,62 +778,59 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	vm := &VMTest{}
+	vm := &vertex.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	gTx := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Accepted,
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	utxos := []ids.ID{ids.GenerateTestID()}
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
+	tx0.InputIDsV.Add(utxos[0])
 
-	utxos := []ids.ID{GenerateID()}
-
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
-	tx0.Ins.Add(utxos[0])
+	tx1.InputIDsV.Add(utxos[0])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
-		},
-	}
-	tx1.Ins.Add(utxos[0])
-
-	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -806,23 +840,23 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 		t.Fatalf("Unknown vertex")
 		panic("Should have errored")
 	}
-	st.buildVertex = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-		consumers := []snowstorm.Tx{}
-		for _, tx := range txs {
-			consumers = append(consumers, tx)
-		}
-		return &Vtx{
-			parents: []avalanche.Vertex{gVtx, mVtx},
-			id:      GenerateID(),
-			txs:     consumers,
-			status:  choices.Processing,
-			bytes:   []byte{1},
+	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+		return &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentsV: []avalanche.Vertex{gVtx, mVtx},
+			HeightV:  1,
+			TxsV:     txs,
+			BytesV:   []byte{1},
 		}, nil
 	}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	sender.CantPushQuery = false
 
@@ -842,62 +876,59 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	vm := &VMTest{}
+	vm := &vertex.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	gTx := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Accepted,
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	utxos := []ids.ID{ids.GenerateTestID()}
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
+	tx0.InputIDsV.Add(utxos[0])
 
-	utxos := []ids.ID{GenerateID()}
-
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
-	tx0.Ins.Add(utxos[0])
+	tx1.InputIDsV.Add(utxos[0])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
-		},
-	}
-	tx1.Ins.Add(utxos[0])
-
-	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -911,18 +942,18 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	st.buildVertex = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-		consumers := []snowstorm.Tx{}
-		for _, tx := range txs {
-			consumers = append(consumers, tx)
-		}
-		return &Vtx{
-			parents: []avalanche.Vertex{gVtx, mVtx},
-			id:      GenerateID(),
-			txs:     consumers,
-			status:  choices.Processing,
-			bytes:   []byte{1},
+	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+		return &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentsV: []avalanche.Vertex{gVtx, mVtx},
+			HeightV:  1,
+			TxsV:     txs,
+			BytesV:   []byte{1},
 		}, nil
 	}
 
@@ -947,29 +978,28 @@ func TestEngineIssueRepoll(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -983,10 +1013,11 @@ func TestEngineIssueRepoll(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	sender.PullQueryF = func(vdrs ids.ShortSet, _ uint32, vtxID ids.ID) {
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !vdrs.Equals(vdrSet) {
 			t.Fatalf("Wrong query recipients")
 		}
@@ -1011,88 +1042,88 @@ func TestEngineReissue(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	vm := &VMTest{}
+	vm := &vertex.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	gTx := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Accepted,
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
+	tx0.InputIDsV.Add(utxos[0])
 
-	utxos := []ids.ID{GenerateID(), GenerateID()}
-
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
-	tx0.Ins.Add(utxos[0])
+	tx1.InputIDsV.Add(utxos[1])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
+	tx2 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
-	tx1.Ins.Add(utxos[1])
+	tx2.InputIDsV.Add(utxos[1])
 
-	tx2 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
+	tx3 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
-	tx2.Ins.Add(utxos[1])
+	tx3.InputIDsV.Add(utxos[0])
 
-	tx3 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-	}
-	tx3.Ins.Add(utxos[0])
-
-	vtx := &Vtx{
-		parents: []avalanche.Vertex{gVtx, mVtx},
-		txs:     []snowstorm.Tx{tx2},
-		id:      GenerateID(),
-		status:  choices.Processing,
-		bytes:   []byte{42},
+		ParentsV: []avalanche.Vertex{gVtx, mVtx},
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx2},
+		BytesV:   []byte{42},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1108,19 +1139,19 @@ func TestEngineReissue(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	lastVtx := new(Vtx)
-	st.buildVertex = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-		consumers := []snowstorm.Tx{}
-		for _, tx := range txs {
-			consumers = append(consumers, tx)
-		}
-		lastVtx = &Vtx{
-			parents: []avalanche.Vertex{gVtx, mVtx},
-			id:      GenerateID(),
-			txs:     consumers,
-			status:  choices.Processing,
-			bytes:   []byte{1},
+	lastVtx := new(avalanche.TestVertex)
+	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+		lastVtx = &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentsV: []avalanche.Vertex{gVtx, mVtx},
+			HeightV:  1,
+			TxsV:     txs,
+			BytesV:   []byte{1},
 		}
 		return lastVtx, nil
 	}
@@ -1140,23 +1171,23 @@ func TestEngineReissue(t *testing.T) {
 	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
 	te.Notify(common.PendingTxs)
 
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		if !bytes.Equal(b, vtx.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
 		return vtx, nil
 	}
-	te.Put(vdr.ID(), 0, vtx.ID(), vtx.Bytes())
-	st.parseVertex = nil
+	te.Put(vdr, 0, vtx.ID(), vtx.Bytes())
+	manager.ParseVertexF = nil
 
 	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx3} }
 	te.Notify(common.PendingTxs)
 
 	s := ids.Set{}
 	s.Add(vtx.ID())
-	te.Chits(vdr.ID(), *queryRequestID, s)
+	te.Chits(vdr, *queryRequestID, s)
 
-	if len(lastVtx.txs) != 1 || !lastVtx.txs[0].ID().Equals(tx0.ID()) {
+	if len(lastVtx.TxsV) != 1 || !lastVtx.TxsV[0].ID().Equals(tx0.ID()) {
 		t.Fatalf("Should have re-issued the tx")
 	}
 }
@@ -1174,62 +1205,59 @@ func TestEngineLargeIssue(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	vm := &VMTest{}
+	vm := &vertex.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	gTx := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Accepted,
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
+	tx0.InputIDsV.Add(utxos[0])
 
-	utxos := []ids.ID{GenerateID(), GenerateID()}
-
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{gTx},
 	}
-	tx0.Ins.Add(utxos[0])
+	tx1.InputIDsV.Add(utxos[1])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{gTx},
-			Stat:       choices.Processing,
-		},
-	}
-	tx1.Ins.Add(utxos[1])
-
-	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1243,19 +1271,19 @@ func TestEngineLargeIssue(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	lastVtx := new(Vtx)
-	st.buildVertex = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-		consumers := []snowstorm.Tx{}
-		for _, tx := range txs {
-			consumers = append(consumers, tx)
-		}
-		lastVtx = &Vtx{
-			parents: []avalanche.Vertex{gVtx, mVtx},
-			id:      GenerateID(),
-			txs:     consumers,
-			status:  choices.Processing,
-			bytes:   []byte{1},
+	lastVtx := new(avalanche.TestVertex)
+	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+		lastVtx = &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentsV: []avalanche.Vertex{gVtx, mVtx},
+			HeightV:  1,
+			TxsV:     txs,
+			BytesV:   []byte{1},
 		}
 		return lastVtx, nil
 	}
@@ -1265,7 +1293,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
 	te.Notify(common.PendingTxs)
 
-	if len(lastVtx.txs) != 1 || !lastVtx.txs[0].ID().Equals(tx1.ID()) {
+	if len(lastVtx.TxsV) != 1 || !lastVtx.TxsV[0].ID().Equals(tx1.ID()) {
 		t.Fatalf("Should have issued txs differently")
 	}
 }
@@ -1282,22 +1310,22 @@ func TestEngineGetVertex(t *testing.T) {
 
 	vdr := validators.GenerateRandomValidator(1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
-	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1311,6 +1339,7 @@ func TestEngineGetVertex(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	sender.PutF = func(v ids.ShortID, _ uint32, vtxID ids.ID, vtx []byte) {
 		if !v.Equals(vdr.ID()) {
@@ -1337,32 +1366,34 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1376,13 +1407,14 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	queried := new(bool)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, _ uint32, vtxID ids.ID, vtx []byte) {
 		*queried = true
 	}
 
-	te.insert(vtx)
+	te.issue(vtx)
 
 	if *queried {
 		t.Fatalf("Unknown query")
@@ -1392,10 +1424,11 @@ func TestEngineInsufficientValidators(t *testing.T) {
 func TestEnginePushGossip(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
 	vals := validators.NewSet()
-	vals.Add(vdr)
 	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1404,32 +1437,34 @@ func TestEnginePushGossip(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1445,14 +1480,15 @@ func TestEnginePushGossip(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	requested := new(bool)
 	sender.GetF = func(vdr ids.ShortID, _ uint32, vtxID ids.ID) {
 		*requested = true
 	}
 
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
-		if bytes.Equal(b, vtx.bytes) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
+		if bytes.Equal(b, vtx.BytesV) {
 			return vtx, nil
 		}
 		t.Fatalf("Unknown vertex bytes")
@@ -1461,7 +1497,7 @@ func TestEnginePushGossip(t *testing.T) {
 
 	sender.CantPushQuery = false
 	sender.CantChits = false
-	te.PushQuery(vdr.ID(), 0, vtx.ID(), vtx.Bytes())
+	te.PushQuery(vdr, 0, vtx.ID(), vtx.Bytes())
 
 	if *requested {
 		t.Fatalf("Shouldn't have requested the vertex")
@@ -1471,10 +1507,11 @@ func TestEnginePushGossip(t *testing.T) {
 func TestEngineSingleQuery(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
 	vals := validators.NewSet()
-	vals.Add(vdr)
 	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1483,32 +1520,34 @@ func TestEngineSingleQuery(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1524,20 +1563,22 @@ func TestEngineSingleQuery(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	sender.CantPushQuery = false
 	sender.CantPullQuery = false
 
-	te.insert(vtx)
+	te.issue(vtx)
 }
 
 func TestEngineParentBlockingInsert(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
 	vals := validators.NewSet()
-	vals.Add(vdr)
 	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1546,48 +1587,54 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	missingVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   []byte{0, 1, 2, 3},
+	missingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	parentVtx := &Vtx{
-		parents: []avalanche.Vertex{missingVtx},
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	parentVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{missingVtx},
+		HeightV:  2,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	blockingVtx := &Vtx{
-		parents: []avalanche.Vertex{parentVtx},
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	blockingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{parentVtx},
+		HeightV:  3,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1601,9 +1648,10 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	te.insert(parentVtx)
-	te.insert(blockingVtx)
+	te.issue(parentVtx)
+	te.issue(blockingVtx)
 
 	if len(te.vtxBlocked) != 2 {
 		t.Fatalf("Both inserts should be blocking")
@@ -1611,8 +1659,8 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 
 	sender.CantPushQuery = false
 
-	missingVtx.status = choices.Processing
-	te.insert(missingVtx)
+	missingVtx.StatusV = choices.Processing
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1622,10 +1670,11 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 func TestEngineBlockingChitRequest(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
 	vals := validators.NewSet()
-	vals.Add(vdr)
 	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1634,48 +1683,54 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	missingVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   []byte{0, 1, 2, 3},
+	missingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	parentVtx := &Vtx{
-		parents: []avalanche.Vertex{missingVtx},
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{1, 1, 2, 3},
+	parentVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{missingVtx},
+		HeightV:  2,
+		BytesV:   []byte{1, 1, 2, 3},
 	}
 
-	blockingVtx := &Vtx{
-		parents: []avalanche.Vertex{parentVtx},
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{2, 1, 2, 3},
+	blockingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{parentVtx},
+		HeightV:  3,
+		BytesV:   []byte{2, 1, 2, 3},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1689,10 +1744,11 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	te.insert(parentVtx)
+	te.issue(parentVtx)
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(blockingVtx.ID()):
 			return blockingVtx, nil
@@ -1700,7 +1756,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		t.Fatalf("Unknown vertex")
 		panic("Should have errored")
 	}
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, blockingVtx.Bytes()):
 			return blockingVtx, nil
@@ -1709,7 +1765,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te.PushQuery(vdr.ID(), 0, blockingVtx.ID(), blockingVtx.Bytes())
+	te.PushQuery(vdr, 0, blockingVtx.ID(), blockingVtx.Bytes())
 
 	if len(te.vtxBlocked) != 3 {
 		t.Fatalf("Both inserts and the query should be blocking")
@@ -1718,8 +1774,8 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	missingVtx.status = choices.Processing
-	te.insert(missingVtx)
+	missingVtx.StatusV = choices.Processing
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1729,10 +1785,11 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 func TestEngineBlockingChitResponse(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
 	vals := validators.NewSet()
-	vals.Add(vdr)
 	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1741,48 +1798,54 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	issuedVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	issuedVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	missingVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   []byte{0, 1, 2, 3},
+	missingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{1, 1, 2, 3},
 	}
 
-	blockingVtx := &Vtx{
-		parents: []avalanche.Vertex{missingVtx},
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{2, 1, 2, 3},
+	blockingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{missingVtx},
+		HeightV:  2,
+		BytesV:   []byte{2, 1, 2, 3},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1796,14 +1859,15 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	te.insert(blockingVtx)
+	te.issue(blockingVtx)
 
 	queryRequestID := new(uint32)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -1812,9 +1876,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	te.insert(issuedVtx)
+	te.issue(issuedVtx)
 
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(blockingVtx.ID()):
 			return blockingVtx, nil
@@ -1825,7 +1889,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	voteSet := ids.Set{}
 	voteSet.Add(blockingVtx.ID())
-	te.Chits(vdr.ID(), *queryRequestID, voteSet)
+	te.Chits(vdr, *queryRequestID, voteSet)
 
 	if len(te.vtxBlocked) != 2 {
 		t.Fatalf("The insert should be blocking, as well as the chit response")
@@ -1835,8 +1899,8 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	missingVtx.status = choices.Processing
-	te.insert(missingVtx)
+	missingVtx.StatusV = choices.Processing
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1846,10 +1910,11 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 func TestEngineMissingTx(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
 	vals := validators.NewSet()
-	vals.Add(vdr)
 	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1858,48 +1923,54 @@ func TestEngineMissingTx(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
-	mVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx, mVtx}
 
-	issuedVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{0, 1, 2, 3},
+	issuedVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	missingVtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   []byte{0, 1, 2, 3},
+	missingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{1, 1, 2, 3},
 	}
 
-	blockingVtx := &Vtx{
-		parents: []avalanche.Vertex{missingVtx},
-		id:      GenerateID(),
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{2, 1, 2, 3},
+	blockingVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{missingVtx},
+		HeightV:  2,
+		BytesV:   []byte{2, 1, 2, 3},
 	}
 
-	st.edge = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -1913,14 +1984,15 @@ func TestEngineMissingTx(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	te.insert(blockingVtx)
+	te.issue(blockingVtx)
 
 	queryRequestID := new(uint32)
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -1929,9 +2001,9 @@ func TestEngineMissingTx(t *testing.T) {
 		}
 	}
 
-	te.insert(issuedVtx)
+	te.issue(issuedVtx)
 
-	st.getVertex = func(id ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case id.Equals(blockingVtx.ID()):
 			return blockingVtx, nil
@@ -1942,7 +2014,7 @@ func TestEngineMissingTx(t *testing.T) {
 
 	voteSet := ids.Set{}
 	voteSet.Add(blockingVtx.ID())
-	te.Chits(vdr.ID(), *queryRequestID, voteSet)
+	te.Chits(vdr, *queryRequestID, voteSet)
 
 	if len(te.vtxBlocked) != 2 {
 		t.Fatalf("The insert should be blocking, as well as the chit response")
@@ -1952,8 +2024,8 @@ func TestEngineMissingTx(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	missingVtx.status = choices.Processing
-	te.insert(missingVtx)
+	missingVtx.StatusV = choices.Processing
+	te.issue(missingVtx)
 
 	if len(te.vtxBlocked) != 0 {
 		t.Fatalf("Both inserts should not longer be blocking")
@@ -1963,54 +2035,54 @@ func TestEngineMissingTx(t *testing.T) {
 func TestEngineIssueBlockingTx(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx}
-	utxos := []ids.ID{GenerateID(), GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		DependenciesV: []snowstorm.Tx{tx0},
 	}
-	tx0.Ins.Add(utxos[0])
+	tx1.InputIDsV.Add(utxos[1])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Deps:       []snowstorm.Tx{tx0},
-			Stat:       choices.Processing,
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-	}
-	tx1.Ins.Add(utxos[1])
-
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0, tx1},
-		height:  1,
-		status:  choices.Processing,
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0, tx1},
 	}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	te.insert(vtx)
+	te.issue(vtx)
 
 	if prefs := te.Consensus.Preferences(); !prefs.Contains(vtx.ID()) {
 		t.Fatalf("Vertex should be preferred")
@@ -2020,13 +2092,11 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 func TestEngineReissueAbortedVertex(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-	vdrID := vdr.ID()
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -2035,44 +2105,48 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	sender.Default(true)
 	sender.CantGetAcceptedFrontier = false
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx}
 
-	vtxID0 := GenerateID()
-	vtxID1 := GenerateID()
+	vtxID0 := ids.GenerateTestID()
+	vtxID1 := ids.GenerateTestID()
 
 	vtxBytes0 := []byte{0}
 	vtxBytes1 := []byte{1}
 
-	vtx0 := &Vtx{
-		parents: vts,
-		id:      vtxID0,
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   vtxBytes0,
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID0,
+			StatusV: choices.Unknown,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   vtxBytes0,
 	}
-	vtx1 := &Vtx{
-		parents: []avalanche.Vertex{vtx0},
-		id:      vtxID1,
-		height:  2,
-		status:  choices.Processing,
-		bytes:   vtxBytes1,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID1,
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  2,
+		BytesV:   vtxBytes1,
 	}
 
-	st.edge = func() []ids.ID {
+	manager.EdgeF = func() []ids.ID {
 		return []ids.ID{gVtx.ID()}
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -2084,15 +2158,16 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	st.edge = nil
-	st.getVertex = nil
+	manager.EdgeF = nil
+	manager.GetVertexF = nil
 
 	requestID := new(uint32)
 	sender.GetF = func(vID ids.ShortID, reqID uint32, vtxID ids.ID) {
 		*requestID = reqID
 	}
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtxBytes1):
 			return vtx1, nil
@@ -2100,7 +2175,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(vtxID1):
 			return vtx1, nil
@@ -2109,12 +2184,12 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	te.PushQuery(vdrID, 0, vtxID1, vtx1.Bytes())
+	te.PushQuery(vdr, 0, vtxID1, vtx1.Bytes())
 
 	sender.GetF = nil
-	st.parseVertex = nil
+	manager.ParseVertexF = nil
 
-	te.GetFailed(vdrID, *requestID)
+	te.GetFailed(vdr, *requestID)
 
 	requested := new(bool)
 	sender.GetF = func(_ ids.ShortID, _ uint32, vtxID ids.ID) {
@@ -2122,7 +2197,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 			*requested = true
 		}
 	}
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(vtxID1):
 			return vtx1, nil
@@ -2131,7 +2206,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	te.PullQuery(vdrID, 0, vtxID1)
+	te.PullQuery(vdr, 0, vtxID1)
 
 	if !*requested {
 		t.Fatalf("Should have requested the missing vertex")
@@ -2141,14 +2216,12 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-	vdrID := vdr.ID()
-
 	vals := validators.NewSet()
 	config.Validators = vals
 	config.Beacons = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -2156,64 +2229,71 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 
 	sender.Default(true)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	st.Default(true)
+	manager.Default(true)
 
-	vm := &VMTest{}
+	vm := &vertex.TestVM{}
 	vm.T = t
 	config.VM = vm
 
 	vm.Default(true)
 
-	utxos := []ids.ID{GenerateID(), GenerateID()}
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
 
-	txID0 := GenerateID()
-	txID1 := GenerateID()
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	txID0 := ids.GenerateTestID()
+	txID1 := ids.GenerateTestID()
 
 	txBytes0 := []byte{0}
 	txBytes1 := []byte{1}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: txID0,
-			Stat:       choices.Processing,
+	tx0 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     txID0,
+			StatusV: choices.Processing,
 		},
-		bytes: txBytes0,
+		BytesV: txBytes0,
 	}
-	tx0.Ins.Add(utxos[0])
+	tx0.InputIDsV.Add(utxos[0])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: txID1,
-			Deps:       []snowstorm.Tx{tx0},
-			Stat:       choices.Processing,
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     txID1,
+			StatusV: choices.Processing,
 		},
-		bytes: txBytes1,
+		DependenciesV: []snowstorm.Tx{tx0},
+		BytesV:        txBytes1,
 	}
-	tx1.Ins.Add(utxos[1])
+	tx1.InputIDsV.Add(utxos[1])
 
-	vtxID0 := GenerateID()
-	vtxID1 := GenerateID()
+	vtxID0 := ids.GenerateTestID()
+	vtxID1 := ids.GenerateTestID()
 
 	vtxBytes0 := []byte{2}
 	vtxBytes1 := []byte{3}
 
-	vtx0 := &Vtx{
-		id:     vtxID0,
-		txs:    []snowstorm.Tx{tx0},
-		height: 1,
-		status: choices.Processing,
-		bytes:  vtxBytes0,
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID0,
+			StatusV: choices.Processing,
+		},
+		HeightV: 1,
+		TxsV:    []snowstorm.Tx{tx0},
+		BytesV:  vtxBytes0,
 	}
-	vtx1 := &Vtx{
-		parents: []avalanche.Vertex{vtx0},
-		id:      vtxID1,
-		txs:     []snowstorm.Tx{tx1},
-		height:  2,
-		status:  choices.Processing,
-		bytes:   vtxBytes1,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     vtxID1,
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx1},
+		BytesV:   vtxBytes1,
 	}
 
 	requested := new(bool)
@@ -2222,8 +2302,8 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
-		if !vdrs.Contains(vdrID) {
-			t.Fatalf("Should have requested from %s", vdrID)
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("Should have requested from %s", vdr)
 		}
 		*requested = true
 		*requestID = reqID
@@ -2247,8 +2327,8 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
-		if !vdrs.Contains(vdrID) {
-			t.Fatalf("Should have requested from %s", vdrID)
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("Should have requested from %s", vdr)
 		}
 		if !acceptedFrontier.Equals(proposedAccepted) {
 			t.Fatalf("Wrong proposedAccepted vertices.\nExpected: %s\nGot: %s", acceptedFrontier, proposedAccepted)
@@ -2257,13 +2337,13 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		*requestID = reqID
 	}
 
-	te.AcceptedFrontier(vdrID, *requestID, acceptedFrontier)
+	te.AcceptedFrontier(vdr, *requestID, acceptedFrontier)
 
 	if !*requested {
 		t.Fatalf("Should have requested from the validators during AcceptedFrontier")
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(vtxID0):
 			return nil, errMissing
@@ -2272,8 +2352,8 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown vertex requested")
 	}
 
-	sender.GetF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
-		if !vdrID.Equals(inVdr) {
+	sender.GetAncestorsF = func(inVdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
 		if !vtx0.ID().Equals(vtxID) {
@@ -2282,9 +2362,9 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		*requestID = reqID
 	}
 
-	te.Accepted(vdrID, *requestID, acceptedFrontier)
+	te.Accepted(vdr, *requestID, acceptedFrontier)
 
-	st.getVertex = nil
+	manager.GetVertexF = nil
 	sender.GetF = nil
 
 	vm.ParseTxF = func(b []byte) (snowstorm.Tx, error) {
@@ -2295,7 +2375,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtxBytes0):
 			return vtx0, nil
@@ -2303,10 +2383,10 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	st.edge = func() []ids.ID {
+	manager.EdgeF = func() []ids.ID {
 		return []ids.ID{vtxID0}
 	}
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(vtxID0):
 			return vtx0, nil
@@ -2315,12 +2395,12 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	te.Put(vdrID, *requestID, vtxID0, vtxBytes0)
+	te.MultiPut(vdr, *requestID, [][]byte{vtxBytes0})
 
 	vm.ParseTxF = nil
-	st.parseVertex = nil
-	st.edge = nil
-	st.getVertex = nil
+	manager.ParseVertexF = nil
+	manager.EdgeF = nil
+	manager.GetVertexF = nil
 
 	if tx0.Status() != choices.Accepted {
 		t.Fatalf("Should have accepted %s", txID0)
@@ -2329,7 +2409,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Should have accepted %s", vtxID0)
 	}
 
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtxBytes1):
 			return vtx1, nil
@@ -2338,7 +2418,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 	sender.ChitsF = func(inVdr ids.ShortID, _ uint32, chits ids.Set) {
-		if !inVdr.Equals(vdrID) {
+		if !inVdr.Equals(vdr) {
 			t.Fatalf("Sent to the wrong validator")
 		}
 
@@ -2353,8 +2433,8 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
-		if !vdrs.Contains(vdrID) {
-			t.Fatalf("Should have requested from %s", vdrID)
+		if !vdrs.Contains(vdr) {
+			t.Fatalf("Should have requested from %s", vdr)
 		}
 
 		if !vtxID1.Equals(vtxID) {
@@ -2364,7 +2444,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 			t.Fatalf("Sent wrong query bytes")
 		}
 	}
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(vtxID1):
 			return vtx1, nil
@@ -2373,90 +2453,91 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown bytes provided")
 	}
 
-	te.PushQuery(vdrID, 0, vtxID1, vtxBytes1)
+	te.PushQuery(vdr, 0, vtxID1, vtxBytes1)
 
-	st.parseVertex = nil
+	manager.ParseVertexF = nil
 	sender.ChitsF = nil
 	sender.PushQueryF = nil
-	st.getVertex = nil
+	manager.GetVertexF = nil
 }
 
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx}
-	utxos := []ids.ID{GenerateID(), GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		VerifyV: errors.New(""),
 	}
-	tx0.Ins.Add(utxos[0])
+	tx1.InputIDsV.Add(utxos[1])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
-			Validity:   errors.New(""),
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
 	}
-	tx1.Ins.Add(utxos[1])
-
-	vtx0 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
-	}
-
-	vtx1 := &Vtx{
-		parents: []avalanche.Vertex{vtx0},
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx1},
-		height:  2,
-		status:  choices.Processing,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx1},
 	}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	te.Config.Sender = sender
+	te.Sender = sender
 
 	reqID := new(uint32)
 	sender.PushQueryF = func(_ ids.ShortSet, requestID uint32, _ ids.ID, _ []byte) {
 		*reqID = requestID
 	}
 
-	te.insert(vtx0)
+	te.issue(vtx0)
 
 	sender.PushQueryF = func(ids.ShortSet, uint32, ids.ID, []byte) {
 		t.Fatalf("should have failed verification")
 	}
 
-	te.insert(vtx1)
+	te.issue(vtx1)
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(vtx0.ID()):
 			return vtx0, nil
@@ -2468,7 +2549,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	votes := ids.Set{}
 	votes.Add(vtx1.ID())
-	te.Chits(vdr.ID(), *reqID, votes)
+	te.Chits(vdr, *reqID, votes)
 
 	if status := vtx0.Status(); status != choices.Accepted {
 		t.Fatalf("should have accepted the vertex due to transitive voting")
@@ -2478,71 +2559,70 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEnginePartiallyValidVertex(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	vts := []avalanche.Vertex{gVtx}
-	utxos := []ids.ID{GenerateID(), GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	tx1 := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
+		VerifyV: errors.New(""),
 	}
-	tx0.Ins.Add(utxos[0])
+	tx1.InputIDsV.Add(utxos[1])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
-			Validity:   errors.New(""),
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-	}
-	tx1.Ins.Add(utxos[1])
-
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0, tx1},
-		height:  1,
-		status:  choices.Processing,
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0, tx1},
 	}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	expectedVtxID := GenerateID()
-	st.buildVertex = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-		consumers := []snowstorm.Tx{}
-		for _, tx := range txs {
-			consumers = append(consumers, tx)
-		}
-		return &Vtx{
-			parents: vts,
-			id:      expectedVtxID,
-			txs:     consumers,
-			status:  choices.Processing,
-			bytes:   []byte{1},
+	expectedVtxID := ids.GenerateTestID()
+	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+		return &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     expectedVtxID,
+				StatusV: choices.Processing,
+			},
+			ParentsV: vts,
+			HeightV:  1,
+			TxsV:     txs,
+			BytesV:   []byte{1},
 		}, nil
 	}
 
 	sender := &common.SenderTest{}
 	sender.T = t
-	te.Config.Sender = sender
+	te.Sender = sender
 
 	sender.PushQueryF = func(_ ids.ShortSet, _ uint32, vtxID ids.ID, _ []byte) {
 		if !expectedVtxID.Equals(vtxID) {
@@ -2550,7 +2630,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 		}
 	}
 
-	te.insert(vtx)
+	te.issue(vtx)
 }
 
 func TestEngineGossip(t *testing.T) {
@@ -2562,20 +2642,21 @@ func TestEngineGossip(t *testing.T) {
 
 	sender.Default(true)
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-	}
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
-	st.edge = func() []ids.ID { return []ids.ID{gVtx.ID()} }
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID()} }
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID.Equals(gVtx.ID()):
 			return gVtx, nil
@@ -2607,71 +2688,73 @@ func TestEngineGossip(t *testing.T) {
 func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-	secondVdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
-	vals.Add(secondVdr)
+	vdr := ids.GenerateTestShortID()
+	secondVdr := ids.GenerateTestShortID()
+
+	vals.AddWeight(vdr, 1)
+	vals.AddWeight(secondVdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
 	config.Sender = sender
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-		bytes:  []byte{0},
+	gVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		BytesV: []byte{0},
 	}
 
 	vts := []avalanche.Vertex{gVtx}
-	utxos := []ids.ID{GenerateID(), GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx1.InputIDsV.Add(utxos[1])
+
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
 		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+		BytesV:   []byte{1},
 	}
-	tx0.Ins.Add(utxos[0])
-
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-	}
-	tx1.Ins.Add(utxos[1])
-
-	vtx0 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   []byte{1},
-	}
-
-	vtx1 := &Vtx{
-		parents: []avalanche.Vertex{vtx0},
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx1},
-		height:  2,
-		status:  choices.Processing,
-		bytes:   []byte{2},
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx1},
+		BytesV:   []byte{2},
 	}
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	parsed := new(bool)
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtx1.Bytes()):
 			*parsed = true
@@ -2680,7 +2763,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if !*parsed {
 			return nil, errUnknownVertex
 		}
@@ -2695,7 +2778,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr.ID()) {
+		if !reqVdr.Equals(vdr) {
 			t.Fatalf("Wrong validator requested")
 		}
 		if !vtxID.Equals(vtx0.ID()) {
@@ -2703,12 +2786,12 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr.ID(), 0, vtx1.ID(), vtx1.Bytes())
+	te.PushQuery(vdr, 0, vtx1.ID(), vtx1.Bytes())
 
-	te.Put(secondVdr.ID(), *reqID, vtx0.ID(), []byte{3})
+	te.Put(secondVdr, *reqID, vtx0.ID(), []byte{3})
 
 	*parsed = false
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtx0.Bytes()):
 			*parsed = true
@@ -2717,7 +2800,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if !*parsed {
 			return nil, errUnknownVertex
 		}
@@ -2731,9 +2814,9 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	vtx0.status = choices.Processing
+	vtx0.StatusV = choices.Processing
 
-	te.Put(vdr.ID(), *reqID, vtx0.ID(), vtx0.Bytes())
+	te.Put(vdr, *reqID, vtx0.ID(), vtx0.Bytes())
 
 	prefs := te.Consensus.Preferences()
 	if !prefs.Contains(vtx1.ID()) {
@@ -2744,71 +2827,73 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	config := DefaultConfig()
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
 	config.Sender = sender
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-		bytes:  []byte{0},
+	gVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		BytesV: []byte{0},
 	}
 
 	vts := []avalanche.Vertex{gVtx}
-	utxos := []ids.ID{GenerateID(), GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx1.InputIDsV.Add(utxos[1])
+
+	vtx0 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
 		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+		BytesV:   []byte{1},
 	}
-	tx0.Ins.Add(utxos[0])
 
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-	}
-	tx1.Ins.Add(utxos[1])
-
-	vtx0 := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Unknown,
-		bytes:   []byte{1},
+		ParentsV: []avalanche.Vertex{vtx0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{tx1},
+		BytesV:   []byte{2},
 	}
 
-	vtx1 := &Vtx{
-		parents: []avalanche.Vertex{vtx0},
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx1},
-		height:  2,
-		status:  choices.Processing,
-		bytes:   []byte{2},
-	}
-
-	randomVtxID := GenerateID()
+	randomVtxID := ids.GenerateTestID()
 
 	te := &Transitive{}
 	te.Initialize(config)
 	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
 
 	parsed := new(bool)
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtx1.Bytes()):
 			*parsed = true
@@ -2817,7 +2902,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if !*parsed {
 			return nil, errUnknownVertex
 		}
@@ -2832,7 +2917,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr.ID()) {
+		if !reqVdr.Equals(vdr) {
 			t.Fatalf("Wrong validator requested")
 		}
 		if !vtxID.Equals(vtx0.ID()) {
@@ -2840,15 +2925,15 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr.ID(), 0, vtx1.ID(), vtx1.Bytes())
+	te.PushQuery(vdr, 0, vtx1.ID(), vtx1.Bytes())
 
 	sender.GetF = nil
 	sender.CantGet = false
 
-	te.PushQuery(vdr.ID(), *reqID, randomVtxID, []byte{3})
+	te.PushQuery(vdr, *reqID, randomVtxID, []byte{3})
 
 	*parsed = false
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtx0.Bytes()):
 			*parsed = true
@@ -2857,7 +2942,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if !*parsed {
 			return nil, errUnknownVertex
 		}
@@ -2871,9 +2956,9 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	vtx0.status = choices.Processing
+	vtx0.StatusV = choices.Processing
 
-	te.Put(vdr.ID(), *reqID, vtx0.ID(), vtx0.Bytes())
+	te.Put(vdr, *reqID, vtx0.ID(), vtx0.Bytes())
 
 	prefs := te.Consensus.Preferences()
 	if !prefs.Contains(vtx1.ID()) {
@@ -2885,61 +2970,66 @@ func TestEngineAggressivePolling(t *testing.T) {
 	config := DefaultConfig()
 
 	config.Params.ConcurrentRepolls = 3
-
-	vdr := validators.GenerateRandomValidator(1)
+	config.Params.BetaRogue = 3
 
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
 	config.Sender = sender
 
-	st := &stateTest{t: t}
-	config.State = st
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
 
-	gVtx := &Vtx{
-		id:     GenerateID(),
-		status: choices.Accepted,
-		bytes:  []byte{0},
+	gVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		BytesV: []byte{0},
 	}
 
 	vts := []avalanche.Vertex{gVtx}
-	utxos := []ids.ID{GenerateID(), GenerateID()}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
-	tx0 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
+	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx0.InputIDsV.Add(utxos[0])
+
+	tx1 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx1.InputIDsV.Add(utxos[1])
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
 		},
-	}
-	tx0.Ins.Add(utxos[0])
-
-	tx1 := &TestTx{
-		TestTx: snowstorm.TestTx{
-			Identifier: GenerateID(),
-			Stat:       choices.Processing,
-		},
-	}
-	tx1.Ins.Add(utxos[1])
-
-	vtx := &Vtx{
-		parents: vts,
-		id:      GenerateID(),
-		txs:     []snowstorm.Tx{tx0},
-		height:  1,
-		status:  choices.Processing,
-		bytes:   []byte{1},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx0},
+		BytesV:   []byte{1},
 	}
 
 	te := &Transitive{}
-	te.Initialize(config)
-	te.finishBootstrapping()
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.finishBootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+	te.Ctx.Bootstrapped()
 
 	parsed := new(bool)
-	st.parseVertex = func(b []byte) (avalanche.Vertex, error) {
+	manager.ParseVertexF = func(b []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(b, vtx.Bytes()):
 			*parsed = true
@@ -2948,7 +3038,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	st.getVertex = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVertexF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if !*parsed {
 			return nil, errUnknownVertex
 		}
@@ -2966,12 +3056,236 @@ func TestEngineAggressivePolling(t *testing.T) {
 	numPullQueries := new(int)
 	sender.PullQueryF = func(ids.ShortSet, uint32, ids.ID) { *numPullQueries++ }
 
-	te.Put(vdr.ID(), 0, vtx.ID(), vtx.Bytes())
+	te.Put(vdr, 0, vtx.ID(), vtx.Bytes())
 
 	if *numPushQueries != 1 {
 		t.Fatalf("should have issued one push query")
 	}
 	if *numPullQueries != 2 {
-		t.Fatalf("should have issued one pull query")
+		t.Fatalf("should have issued two pull queries")
+	}
+}
+
+func TestEngineDuplicatedIssuance(t *testing.T) {
+	config := DefaultConfig()
+	config.Params.BatchSize = 1
+	config.Params.BetaVirtuous = 5
+	config.Params.BetaRogue = 5
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+	sender.CantGetAcceptedFrontier = false
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
+
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
+
+	manager.Default(true)
+
+	vm := &vertex.TestVM{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	tx := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []snowstorm.Tx{gTx},
+	}
+	tx.InputIDsV.Add(utxos[0])
+
+	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case id.Equals(gVtx.ID()):
+			return gVtx, nil
+		case id.Equals(mVtx.ID()):
+			return mVtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	te := &Transitive{}
+	te.Initialize(config)
+	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
+
+	lastVtx := new(avalanche.TestVertex)
+	manager.BuildVertexF = func(_ ids.Set, txs []snowstorm.Tx) (avalanche.Vertex, error) {
+		lastVtx = &avalanche.TestVertex{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentsV: []avalanche.Vertex{gVtx, mVtx},
+			HeightV:  1,
+			TxsV:     txs,
+			BytesV:   []byte{1},
+		}
+		return lastVtx, nil
+	}
+
+	sender.CantPushQuery = false
+
+	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx} }
+	te.Notify(common.PendingTxs)
+
+	if len(lastVtx.TxsV) != 1 || !lastVtx.TxsV[0].ID().Equals(tx.ID()) {
+		t.Fatalf("Should have issued txs differently")
+	}
+
+	manager.BuildVertexF = func(ids.Set, []snowstorm.Tx) (avalanche.Vertex, error) {
+		t.Fatalf("shouldn't have attempted to issue a duplicated tx")
+		return nil, nil
+	}
+
+	te.Notify(common.PendingTxs)
+}
+
+func TestEngineDoubleChit(t *testing.T) {
+	config := DefaultConfig()
+
+	config.Params.Alpha = 2
+	config.Params.K = 2
+
+	vals := validators.NewSet()
+	config.Validators = vals
+
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
+
+	vals.AddWeight(vdr0, 1)
+	vals.AddWeight(vdr1, 1)
+
+	sender := &common.SenderTest{}
+	sender.T = t
+	config.Sender = sender
+
+	sender.Default(true)
+	sender.CantGetAcceptedFrontier = false
+
+	manager := &vertex.TestManager{T: t}
+	config.Manager = manager
+
+	manager.Default(true)
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	vts := []avalanche.Vertex{gVtx, mVtx}
+	utxos := []ids.ID{ids.GenerateTestID()}
+
+	tx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Processing,
+	}}
+	tx.InputIDsV.Add(utxos[0])
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{tx},
+		BytesV:   []byte{1, 1, 2, 3},
+	}
+
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case id.Equals(gVtx.ID()):
+			return gVtx, nil
+		case id.Equals(mVtx.ID()):
+			return mVtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	te := &Transitive{}
+	te.Initialize(config)
+	te.finishBootstrapping()
+	te.Ctx.Bootstrapped()
+
+	reqID := new(uint32)
+	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, vtxID ids.ID, _ []byte) {
+		*reqID = requestID
+		if inVdrs.Len() != 2 {
+			t.Fatalf("Wrong number of validators")
+		}
+		if !vtxID.Equals(vtx.ID()) {
+			t.Fatalf("Wrong vertex requested")
+		}
+	}
+	manager.GetVertexF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch {
+		case id.Equals(vtx.ID()):
+			return vtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	te.issue(vtx)
+
+	votes := ids.Set{}
+	votes.Add(vtx.ID())
+
+	if status := tx.Status(); status != choices.Processing {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr0, *reqID, votes)
+
+	if status := tx.Status(); status != choices.Processing {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr0, *reqID, votes)
+
+	if status := tx.Status(); status != choices.Processing {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
+	}
+
+	te.Chits(vdr1, *reqID, votes)
+
+	if status := tx.Status(); status != choices.Accepted {
+		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Accepted)
 	}
 }

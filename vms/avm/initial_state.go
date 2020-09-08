@@ -8,19 +8,21 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 var (
-	errNilInitialState = errors.New("nil initial state is not valid")
-	errNilFxOutput     = errors.New("nil feature extension output is not valid")
+	errNilInitialState  = errors.New("nil initial state is not valid")
+	errNilFxOutput      = errors.New("nil feature extension output is not valid")
+	errOutputsNotSorted = errors.New("outputs not sorted")
 )
 
 // InitialState ...
 type InitialState struct {
-	FxID uint32              `serialize:"true" json:"fxID"`
-	Outs []verify.Verifiable `serialize:"true" json:"outputs"`
+	FxID uint32         `serialize:"true" json:"fxID"`
+	Outs []verify.State `serialize:"true" json:"outputs"`
 }
 
 // Verify implements the verify.Verifiable interface
@@ -40,7 +42,7 @@ func (is *InitialState) Verify(c codec.Codec, numFxs int) error {
 			return err
 		}
 	}
-	if !isSortedVerifiables(is.Outs, c) {
+	if !isSortedState(is.Outs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -48,14 +50,14 @@ func (is *InitialState) Verify(c codec.Codec, numFxs int) error {
 }
 
 // Sort ...
-func (is *InitialState) Sort(c codec.Codec) { sortVerifiables(is.Outs, c) }
+func (is *InitialState) Sort(c codec.Codec) { sortState(is.Outs, c) }
 
-type innerSortVerifiables struct {
-	vers  []verify.Verifiable
+type innerSortState struct {
+	vers  []verify.State
 	codec codec.Codec
 }
 
-func (vers *innerSortVerifiables) Less(i, j int) bool {
+func (vers *innerSortState) Less(i, j int) bool {
 	iVer := vers.vers[i]
 	jVer := vers.vers[j]
 
@@ -69,14 +71,14 @@ func (vers *innerSortVerifiables) Less(i, j int) bool {
 	}
 	return bytes.Compare(iBytes, jBytes) == -1
 }
-func (vers *innerSortVerifiables) Len() int      { return len(vers.vers) }
-func (vers *innerSortVerifiables) Swap(i, j int) { v := vers.vers; v[j], v[i] = v[i], v[j] }
+func (vers *innerSortState) Len() int      { return len(vers.vers) }
+func (vers *innerSortState) Swap(i, j int) { v := vers.vers; v[j], v[i] = v[i], v[j] }
 
-func sortVerifiables(vers []verify.Verifiable, c codec.Codec) {
-	sort.Sort(&innerSortVerifiables{vers: vers, codec: c})
+func sortState(vers []verify.State, c codec.Codec) {
+	sort.Sort(&innerSortState{vers: vers, codec: c})
 }
-func isSortedVerifiables(vers []verify.Verifiable, c codec.Codec) bool {
-	return sort.IsSorted(&innerSortVerifiables{vers: vers, codec: c})
+func isSortedState(vers []verify.State, c codec.Codec) bool {
+	return sort.IsSorted(&innerSortState{vers: vers, codec: c})
 }
 
 type innerSortInitialState []*InitialState
@@ -87,5 +89,5 @@ func (iss innerSortInitialState) Swap(i, j int)      { iss[j], iss[i] = iss[i], 
 
 func sortInitialStates(iss []*InitialState) { sort.Sort(innerSortInitialState(iss)) }
 func isSortedAndUniqueInitialStates(iss []*InitialState) bool {
-	return sort.IsSorted(innerSortInitialState(iss))
+	return utils.IsSortedAndUnique(innerSortInitialState(iss))
 }

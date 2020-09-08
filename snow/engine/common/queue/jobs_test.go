@@ -5,12 +5,14 @@ package queue
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 )
 
+// Test that creating a new queue can be created and that it is initially empty.
 func TestNew(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -29,6 +31,8 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// Test that a job can be added to a queue, and then the job can be removed from
+// the queue after a shutdown.
 func TestPushPop(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -45,8 +49,8 @@ func TestPushPop(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id },
-		MissingDependenciesF: func() ids.Set { return ids.Set{} },
-		ExecuteF:             func() {},
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		ExecuteF:             func() error { return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
@@ -94,6 +98,8 @@ func TestPushPop(t *testing.T) {
 	}
 }
 
+// Test that executing a job will cause a dependent job to be placed on to the
+// ready queue
 func TestExecute(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -111,19 +117,19 @@ func TestExecute(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id0 },
-		MissingDependenciesF: func() ids.Set { return ids.Set{} },
-		ExecuteF:             func() { *executed0 = true },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		ExecuteF:             func() error { *executed0 = true; return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
-	id1 := ids.Empty.Prefix(0)
+	id1 := ids.Empty.Prefix(1)
 	executed1 := new(bool)
 	job1 := &TestJob{
 		T: t,
 
 		IDF:                  func() ids.ID { return id1 },
-		MissingDependenciesF: func() ids.Set { return ids.Set{id0.Key(): true} },
-		ExecuteF:             func() { *executed1 = true },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{id0.Key(): true}, nil },
+		ExecuteF:             func() error { *executed1 = true; return nil },
 		BytesF:               func() []byte { return []byte{1} },
 	}
 
@@ -159,7 +165,7 @@ func TestExecute(t *testing.T) {
 		t.Fatalf("Returned wrong job")
 	}
 
-	job1.MissingDependenciesF = func() ids.Set { return ids.Set{} }
+	job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
 	parser.ParseF = func(b []byte) (Job, error) {
 		if !bytes.Equal(b, []byte{1}) {
 			t.Fatalf("Unknown job")
@@ -182,7 +188,8 @@ func TestExecute(t *testing.T) {
 	}
 }
 
-func TestDuplicatedPush(t *testing.T) {
+// Test that a job that is ready to be executed can only be added once
+func TestDuplicatedExecutablePush(t *testing.T) {
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
@@ -198,8 +205,8 @@ func TestDuplicatedPush(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id },
-		MissingDependenciesF: func() ids.Set { return ids.Set{} },
-		ExecuteF:             func() {},
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		ExecuteF:             func() error { return nil },
 		BytesF:               func() []byte { return []byte{0} },
 	}
 
@@ -241,6 +248,119 @@ func TestDuplicatedPush(t *testing.T) {
 	}
 
 	if returnedBlockable != job {
+		t.Fatalf("Returned wrong job")
+	}
+
+	if hasNext, err := jobs.HasNext(); err != nil {
+		t.Fatal(err)
+	} else if hasNext {
+		t.Fatalf("Shouldn't have a container ready to pop")
+	}
+}
+
+// Test that a job that isn't ready to be executed can only be added once
+func TestDuplicatedNotExecutablePush(t *testing.T) {
+	parser := &TestParser{T: t}
+	db := memdb.New()
+
+	jobs, err := New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jobs.SetParser(parser)
+
+	id0 := ids.Empty.Prefix(0)
+	id1 := ids.Empty.Prefix(1)
+	job1 := &TestJob{
+		T: t,
+
+		IDF: func() ids.ID { return id1 },
+		MissingDependenciesF: func() (ids.Set, error) {
+			s := ids.Set{}
+			s.Add(id0)
+			return s, nil
+		},
+		ExecuteF: func() error { return nil },
+		BytesF:   func() []byte { return []byte{1} },
+	}
+	job0 := &TestJob{
+		T: t,
+
+		IDF:                  func() ids.ID { return id0 },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		ExecuteF: func() error {
+			job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{}, nil }
+			return nil
+		},
+		BytesF: func() []byte { return []byte{0} },
+	}
+
+	if err := jobs.Push(job1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := jobs.Push(job1); err == nil {
+		t.Fatalf("should have errored on pushing a duplicate job")
+	}
+
+	if err := jobs.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	jobs, err = New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jobs.SetParser(parser)
+
+	if err := jobs.Push(job0); err != nil {
+		t.Fatal(err)
+	}
+
+	if hasNext, err := jobs.HasNext(); err != nil {
+		t.Fatal(err)
+	} else if !hasNext {
+		t.Fatalf("Should have a container ready to pop")
+	}
+
+	parser.ParseF = func(b []byte) (Job, error) {
+		if bytes.Equal(b, []byte{0}) {
+			return job0, nil
+		}
+		if bytes.Equal(b, []byte{1}) {
+			return job1, nil
+		}
+		t.Fatalf("Unknown job")
+		return nil, errors.New("Unknown job")
+	}
+
+	returnedBlockable, err := jobs.Pop()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if returnedBlockable != job0 {
+		t.Fatalf("Returned wrong job")
+	}
+
+	if err := jobs.Execute(job0); err != nil {
+		t.Fatal(err)
+	}
+
+	if hasNext, err := jobs.HasNext(); err != nil {
+		t.Fatal(err)
+	} else if !hasNext {
+		t.Fatalf("Should have a container ready to pop")
+	}
+
+	returnedBlockable, err = jobs.Pop()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if returnedBlockable != job1 {
 		t.Fatalf("Returned wrong job")
 	}
 

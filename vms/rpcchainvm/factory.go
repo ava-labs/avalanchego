@@ -5,8 +5,12 @@ package rpcchainvm
 
 import (
 	"errors"
+	"io/ioutil"
+	"log"
 	"os/exec"
 
+	"github.com/ava-labs/gecko/snow"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
 
@@ -15,21 +19,37 @@ var (
 )
 
 // Factory ...
-type Factory struct {
-	Path string
-}
+type Factory struct{ Path string }
 
 // New ...
-func (f *Factory) New() (interface{}, error) {
-	client := plugin.NewClient(&plugin.ClientConfig{
+func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
+	// Ignore warning from launching an executable with a variable command
+	// because the command is a controlled and required input
+	// #nosec G204
+	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command("sh", "-c", f.Path),
+		Cmd:             exec.Command(f.Path),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
 		},
-	})
+	}
+	if ctx != nil {
+		log.SetOutput(ctx.Log)
+		config.Stderr = ctx.Log
+		config.Logger = hclog.New(&hclog.LoggerOptions{
+			Output: ctx.Log,
+			Level:  hclog.Info,
+		})
+	} else {
+		log.SetOutput(ioutil.Discard)
+		config.Stderr = ioutil.Discard
+		config.Logger = hclog.New(&hclog.LoggerOptions{
+			Output: ioutil.Discard,
+		})
+	}
+	client := plugin.NewClient(config)
 
 	rpcClient, err := client.Client()
 	if err != nil {

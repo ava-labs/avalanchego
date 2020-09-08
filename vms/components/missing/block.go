@@ -21,11 +21,14 @@ type Block struct{ BlkID ids.ID }
 // ID ...
 func (mb *Block) ID() ids.ID { return mb.BlkID }
 
+// Height ...
+func (mb *Block) Height() uint64 { return 0 }
+
 // Accept ...
-func (*Block) Accept() { panic(errMissingBlock) }
+func (*Block) Accept() error { return errMissingBlock }
 
 // Reject ...
-func (*Block) Reject() { panic(errMissingBlock) }
+func (*Block) Reject() error { return errMissingBlock }
 
 // Status ...
 func (*Block) Status() choices.Status { return choices.Unknown }

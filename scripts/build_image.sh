@@ -4,25 +4,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
-export GOPATH="$SRC_DIR/.build_image_gopath"
-WORKPREFIX="$GOPATH/src/github.com/ava-labs/"
-DOCKER="${DOCKER:-docker}"
-keep_existing=0
-while getopts 'k' opt
-do
-    case $opt in
-    (k) keep_existing=1;;
-    esac
-done
-if [[ "$keep_existing" != 1 ]]; then
-    rm -rf "$WORKPREFIX"
-fi
 
-if [[ ! -d "$WORKPREFIX" ]]; then
-    mkdir -p "$WORKPREFIX"
-    git config --global credential.helper cache
-    git clone https://github.com/ava-labs/gecko.git "$WORKPREFIX/gecko"
+SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
+
+if [[ $# -eq 0 ]]; then
+    "$SRC_DIR/build_local_image.sh"
+elif [[ $# -eq 2 ]]; then
+    "$SRC_DIR/build_image_from_remote.sh" $@
+else
+    echo "Build image requires either no arguments to build from local source or two arguments to specify a remote and branch."
 fi
-GECKO_COMMIT="$(git --git-dir="$WORKPREFIX/gecko/.git" rev-parse --short HEAD)"
-"${DOCKER}" build -t "gecko-$GECKO_COMMIT" "$SRC_DIR" -f "$SRC_DIR/Dockerfile.deploy"

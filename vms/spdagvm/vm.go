@@ -36,7 +36,6 @@ const (
 )
 
 var (
-	errNoKeys          = errors.New("no private keys were provided")
 	errUnknownUTXOType = errors.New("utxo has unknown output type")
 	errAsset           = errors.New("assetID must be blank")
 	errAmountOverflow  = errors.New("the amount of this transaction plus the transaction fee overflows")
@@ -128,10 +127,16 @@ func (vm *VM) Initialize(
 	return vm.db.Commit()
 }
 
+// Bootstrapping marks this VM as bootstrapping
+func (vm *VM) Bootstrapping() error { return nil }
+
+// Bootstrapped marks this VM as bootstrapped
+func (vm *VM) Bootstrapped() error { return nil }
+
 // Shutdown implements the avalanche.DAGVM interface
-func (vm *VM) Shutdown() {
+func (vm *VM) Shutdown() error {
 	if vm.timer == nil {
-		return
+		return nil
 	}
 
 	// There is a potential deadlock if the timer is about to execute a timeout.
@@ -139,9 +144,8 @@ func (vm *VM) Shutdown() {
 	vm.ctx.Lock.Unlock()
 	vm.timer.Stop()
 	vm.ctx.Lock.Lock()
-	if err := vm.baseDB.Close(); err != nil {
-		vm.ctx.Log.Error("Closing the database failed with %s", err)
-	}
+
+	return vm.baseDB.Close()
 }
 
 // CreateHandlers makes new service objects with references to the vm
@@ -150,9 +154,10 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&Service{vm: vm}, "spdag") // name this service "spdag"
+	// name this service "spdag"
+	vm.ctx.Log.AssertNoError(newServer.RegisterService(&Service{vm: vm}, "spdag"))
 	return map[string]*common.HTTPHandler{
-		"": &common.HTTPHandler{Handler: newServer},
+		"": {Handler: newServer},
 	}
 }
 
@@ -162,11 +167,12 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 	codec := jsoncodec.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	newServer.RegisterService(&StaticService{}, "spdag") // name this service "spdag"
+	// name this service "spdag"
+	_ = newServer.RegisterService(&StaticService{}, "spdag")
 	return map[string]*common.HTTPHandler{
 		// NoLock because the static functions probably wont be stateful (i.e. no
 		// write operations)
-		"": &common.HTTPHandler{LockOptions: common.NoLock, Handler: newServer},
+		"": {LockOptions: common.NoLock, Handler: newServer},
 	}
 }
 
@@ -202,7 +208,9 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	// cache.
 	if err := tx.VerifyState(); err != nil {
 		vm.ctx.Log.Debug("GetTx resulted in fetching a tx that failed verification: %s", err)
-		tx.setStatus(choices.Rejected)
+		if err := tx.setStatus(choices.Rejected); err != nil {
+			return nil, err
+		}
 	}
 
 	return tx, nil
@@ -539,7 +547,9 @@ func (vm *VM) wrapTx(rawTx *Tx, finalized func(choices.Status)) (*UniqueTx, erro
 		if err := vm.state.SetTx(tx.ID(), tx.t.tx); err != nil {
 			return nil, err
 		}
-		tx.setStatus(choices.Processing)
+		if err := tx.setStatus(choices.Processing); err != nil {
+			return nil, err
+		}
 	}
 
 	tx.addEvents(finalized)

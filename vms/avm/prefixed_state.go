@@ -7,15 +7,13 @@ import (
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/components/ava"
+	"github.com/ava-labs/gecko/vms/components/avax"
 )
 
 const (
 	txID uint64 = iota
 	utxoID
 	txStatusID
-	fundsID
 	dbInitializedID
 )
 
@@ -28,8 +26,8 @@ var (
 type prefixedState struct {
 	state *state
 
-	tx, utxo, txStatus, funds cache.Cacher
-	uniqueTx                  cache.Deduplicator
+	tx, utxo, txStatus cache.Cacher
+	uniqueTx           cache.Deduplicator
 }
 
 // UniqueTx de-duplicates the transaction.
@@ -46,12 +44,12 @@ func (s *prefixedState) SetTx(id ids.ID, tx *Tx) error {
 }
 
 // UTXO attempts to load a utxo from storage.
-func (s *prefixedState) UTXO(id ids.ID) (*ava.UTXO, error) {
+func (s *prefixedState) UTXO(id ids.ID) (*avax.UTXO, error) {
 	return s.state.UTXO(uniqueID(id, utxoID, s.utxo))
 }
 
 // SetUTXO saves the provided utxo to storage.
-func (s *prefixedState) SetUTXO(id ids.ID, utxo *ava.UTXO) error {
+func (s *prefixedState) SetUTXO(id ids.ID, utxo *avax.UTXO) error {
 	return s.state.SetUTXO(uniqueID(id, utxoID, s.utxo), utxo)
 }
 
@@ -74,15 +72,11 @@ func (s *prefixedState) SetDBInitialized(status choices.Status) error {
 	return s.state.SetStatus(dbInitialized, status)
 }
 
-// Funds returns the mapping from the 32 byte representation of an address to a
-// list of utxo IDs that reference the address.
-func (s *prefixedState) Funds(id ids.ID) ([]ids.ID, error) {
-	return s.state.IDs(uniqueID(id, fundsID, s.funds))
-}
-
-// SetFunds saves the mapping from address to utxo IDs to storage.
-func (s *prefixedState) SetFunds(id ids.ID, idSlice []ids.ID) error {
-	return s.state.SetIDs(uniqueID(id, fundsID, s.funds), idSlice)
+// Funds returns a list of UTXO IDs such that each UTXO references [addr].
+// All returned UTXO IDs have IDs greater than [start], where ids.Empty is the "least" ID.
+// Returns at most [limit] UTXO IDs.
+func (s *prefixedState) Funds(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	return s.state.IDs(addr, start.Bytes(), limit)
 }
 
 // SpendUTXO consumes the provided utxo.
@@ -95,7 +89,7 @@ func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 		return err
 	}
 
-	addressable, ok := utxo.Out.(ava.Addressable)
+	addressable, ok := utxo.Out.(avax.Addressable)
 	if !ok {
 		return nil
 	}
@@ -105,12 +99,7 @@ func (s *prefixedState) SpendUTXO(utxoID ids.ID) error {
 
 func (s *prefixedState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Remove(utxoID)
-		if err := s.SetFunds(addrID, utxos.List()); err != nil {
+		if err := s.state.RemoveID(addr, utxoID); err != nil {
 			return err
 		}
 	}
@@ -118,13 +107,13 @@ func (s *prefixedState) removeUTXO(addrs [][]byte, utxoID ids.ID) error {
 }
 
 // FundUTXO adds the provided utxo to the database
-func (s *prefixedState) FundUTXO(utxo *ava.UTXO) error {
+func (s *prefixedState) FundUTXO(utxo *avax.UTXO) error {
 	utxoID := utxo.InputID()
 	if err := s.SetUTXO(utxoID, utxo); err != nil {
 		return err
 	}
 
-	addressable, ok := utxo.Out.(ava.Addressable)
+	addressable, ok := utxo.Out.(avax.Addressable)
 	if !ok {
 		return nil
 	}
@@ -134,12 +123,7 @@ func (s *prefixedState) FundUTXO(utxo *ava.UTXO) error {
 
 func (s *prefixedState) addUTXO(addrs [][]byte, utxoID ids.ID) error {
 	for _, addr := range addrs {
-		addrID := ids.NewID(hashing.ComputeHash256Array(addr))
-		utxos := ids.Set{}
-		funds, _ := s.Funds(addrID)
-		utxos.Add(funds...)
-		utxos.Add(utxoID)
-		if err := s.SetFunds(addrID, utxos.List()); err != nil {
+		if err := s.state.AddID(addr, utxoID); err != nil {
 			return err
 		}
 	}

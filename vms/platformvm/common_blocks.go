@@ -6,14 +6,13 @@ package platformvm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/missing"
-
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
+	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowman"
 	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/gecko/vms/components/missing"
 )
 
 // When one stakes, one must specify the time one will start to validate and
@@ -29,8 +28,8 @@ import (
 //
 // When one is done staking:
 // * The staking set decides whether the staker should receive either:
-//   ** Only the $AVA that the staker put up as a bond
-//	 ** The $AVA the staker put up as a bond, and also a reward for staking
+//   ** Only the tokens that the staker put up as a bond
+//	 ** The tokens the staker put up as a bond, and also a reward for staking
 //
 // This chain has three types of blocks:
 // 1. A proposal block
@@ -75,8 +74,7 @@ import (
 //	  proposal is being rejected
 
 var (
-	errInvalidBlockType   = errors.New("invalid block type")
-	errEmptyValidatingSet = errors.New("empty validating set")
+	errInvalidBlockType = errors.New("invalid block type")
 )
 
 // Block is the common interface that all staking blocks must have
@@ -88,6 +86,9 @@ type Block interface {
 	// [vm] is the vm the block exists in
 	// [bytes] is the byte representation of this block
 	initialize(vm *VM, bytes []byte) error
+
+	// This block's height
+	Height() uint64
 
 	conflicts(ids.Set) bool
 
@@ -129,10 +130,10 @@ type CommonBlock struct {
 }
 
 // Reject implements the snowman.Block interface
-func (cb *CommonBlock) Reject() {
+func (cb *CommonBlock) Reject() error {
 	defer cb.free() // remove this block from memory
 
-	cb.Block.Reject()
+	return cb.Block.Reject()
 }
 
 // free removes this block from memory
@@ -180,7 +181,7 @@ type CommonDecisionBlock struct {
 	onAcceptDB *versiondb.Database
 
 	// to be executed if this block is accepted
-	onAcceptFunc func()
+	onAcceptFunc func() error
 }
 
 // initialize this block
@@ -204,6 +205,9 @@ func (cdb *CommonDecisionBlock) onAccept() database.Database {
 	if cdb.Status().Decided() {
 		return cdb.vm.DB
 	}
+	if cdb.onAcceptDB == nil {
+		panic(":(")
+	}
 	return cdb.onAcceptDB
 }
 
@@ -213,27 +217,34 @@ type SingleDecisionBlock struct {
 }
 
 // Accept implements the snowman.Block interface
-func (sdb *SingleDecisionBlock) Accept() {
+func (sdb *SingleDecisionBlock) Accept() error {
 	sdb.VM.Ctx.Log.Verbo("Accepting block with ID %s", sdb.ID())
 
-	sdb.CommonBlock.Accept()
+	if err := sdb.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
 	if err := sdb.onAcceptDB.Commit(); err != nil {
 		sdb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+		return err
 	}
 	if err := sdb.vm.DB.Commit(); err != nil {
 		sdb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+		return err
 	}
 
 	for _, child := range sdb.children {
 		child.setBaseDatabase(sdb.vm.DB)
 	}
 	if sdb.onAcceptFunc != nil {
-		sdb.onAcceptFunc()
+		if err := sdb.onAcceptFunc(); err != nil {
+			return err
+		}
 	}
 
 	sdb.free()
+	return nil
 }
 
 // DoubleDecisionBlock contains the accept for a pair of blocks
@@ -242,35 +253,45 @@ type DoubleDecisionBlock struct {
 }
 
 // Accept implements the snowman.Block interface
-func (ddb *DoubleDecisionBlock) Accept() {
+func (ddb *DoubleDecisionBlock) Accept() error {
 	ddb.VM.Ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
 
 	parent, ok := ddb.parentBlock().(*ProposalBlock)
 	if !ok {
 		ddb.vm.Ctx.Log.Error("double decision block should only follow a proposal block")
-		return
+		return errInvalidBlockType
 	}
 
-	parent.CommonBlock.Accept()
+	if err := parent.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
-	ddb.CommonBlock.Accept()
+	if err := ddb.CommonBlock.Accept(); err != nil {
+		return err
+	}
 
 	// Update the state of the chain in the database
 	if err := ddb.onAcceptDB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB")
+		ddb.vm.Ctx.Log.Warn("unable to commit onAcceptDB: %s", err)
+		return err
 	}
 	if err := ddb.vm.DB.Commit(); err != nil {
-		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB")
+		ddb.vm.Ctx.Log.Warn("unable to commit vm's DB: %s", err)
+		return err
 	}
 
 	for _, child := range ddb.children {
 		child.setBaseDatabase(ddb.vm.DB)
 	}
 	if ddb.onAcceptFunc != nil {
-		ddb.onAcceptFunc()
+		if err := ddb.onAcceptFunc(); err != nil {
+			ddb.vm.Ctx.Log.Warn("error executing OnAcceptFunc(): %s", err)
+			return err
+		}
 	}
 
 	// remove this block and its parent from memory
 	parent.free()
 	ddb.free()
+	return nil
 }

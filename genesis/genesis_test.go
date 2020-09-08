@@ -4,9 +4,11 @@
 package genesis
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/platformvm"
 	"github.com/ava-labs/gecko/vms/spchainvm"
@@ -14,14 +16,20 @@ import (
 )
 
 func TestNetworkName(t *testing.T) {
-	if name := NetworkName(MainnetID); name != MainnetName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, MainnetName)
+	if name := NetworkName(constants.MainnetID); name != constants.MainnetName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.MainnetName)
 	}
-	if name := NetworkName(TestnetID); name != CascadeName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, CascadeName)
+	if name := NetworkName(constants.CascadeID); name != constants.CascadeName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.CascadeName)
 	}
-	if name := NetworkName(CascadeID); name != CascadeName {
-		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, CascadeName)
+	if name := NetworkName(constants.DenaliID); name != constants.DenaliName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.DenaliName)
+	}
+	if name := NetworkName(constants.EverestID); name != constants.EverestName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.EverestName)
+	}
+	if name := NetworkName(constants.TestnetID); name != constants.EverestName {
+		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, constants.EverestName)
 	}
 	if name := NetworkName(4294967295); name != "network-4294967295" {
 		t.Fatalf("NetworkID was incorrectly named. Result: %s ; Expected: %s", name, "network-4294967295")
@@ -29,36 +37,52 @@ func TestNetworkName(t *testing.T) {
 }
 
 func TestNetworkID(t *testing.T) {
-	id, err := NetworkID(MainnetName)
+	id, err := NetworkID(constants.MainnetName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != MainnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", MainnetID, id)
+	if id != constants.MainnetID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.MainnetID, id)
 	}
 
-	id, err = NetworkID(TestnetName)
+	id, err = NetworkID(constants.CascadeName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != TestnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
-	}
-
-	id, err = NetworkID(CascadeName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != TestnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
+	if id != constants.CascadeID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.CascadeID, id)
 	}
 
 	id, err = NetworkID("cAsCaDe")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != TestnetID {
-		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", TestnetID, id)
+	if id != constants.CascadeID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.CascadeID, id)
+	}
+
+	id, err = NetworkID(constants.DenaliName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != constants.DenaliID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.DenaliID, id)
+	}
+
+	id, err = NetworkID("dEnAlI")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != constants.DenaliID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.DenaliID, id)
+	}
+
+	id, err = NetworkID(constants.TestnetName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != constants.TestnetID {
+		t.Fatalf("Returned wrong network. Expected: %d ; Returned %d", constants.TestnetID, id)
 	}
 
 	id, err = NetworkID("network-4294967295")
@@ -91,7 +115,10 @@ func TestNetworkID(t *testing.T) {
 }
 
 func TestAliases(t *testing.T) {
-	generalAliases, _, _, _ := Aliases(LocalID)
+	generalAliases, _, _, err := Aliases(constants.LocalID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
@@ -106,7 +133,7 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes, err := Genesis(LocalID)
+	genesisBytes, _, err := Genesis(constants.LocalID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,67 +150,103 @@ func TestVMGenesis(t *testing.T) {
 		expectedID string
 	}{
 		{
-			networkID:  CascadeID,
+			networkID:  constants.EverestID,
 			vmID:       avm.ID,
-			expectedID: "4ktRjsAKxgMr2aEzv9SWmrU7Xk5FniHUrVCX4P1TZSfTLZWFM",
+			expectedID: "jnUjZSRt16TcRnZzmh5aMhavwVHz3zBrSN8GfFMTQkzUnoBxC",
 		},
 		{
-			networkID:  LocalID,
+			networkID:  constants.DenaliID,
 			vmID:       avm.ID,
-			expectedID: "4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH",
+			expectedID: "2ku4ACFiovQnp2bDQ9MUib3q4mChtHZioAn3LqNfQA3ovA1dHP",
 		},
 		{
-			networkID:  CascadeID,
-			vmID:       EVMID,
-			expectedID: "2mUYSXfLrDtigwbzj1LxKVsHwELghc5sisoXrzJwLqAAQHF4i",
+			networkID:  constants.CascadeID,
+			vmID:       avm.ID,
+			expectedID: "oMrNBf9aQ7kPDEPxfww7rsUntfJ3w7qNTowdRzMPejAJNC2p5",
 		},
 		{
-			networkID:  LocalID,
+			networkID:  constants.LocalID,
+			vmID:       avm.ID,
+			expectedID: "v4hFSZTNNVdyomeMoXa77dAz4CdxU3cziSb45TB7mfXUmy7C7",
+		},
+		{
+			networkID:  constants.EverestID,
 			vmID:       EVMID,
-			expectedID: "tZGm6RCkeGpVETUTp11DW3UYFZmm69zfqxchpHrSF7wgy8rmw",
+			expectedID: "saMG5YgNsFxzjz4NMkEkt3bAH6hVxWdZkWcEnGB3Z15pcAmsK",
+		},
+		{
+			networkID:  constants.DenaliID,
+			vmID:       EVMID,
+			expectedID: "8ghyBLuZmgciT5f2nDiHBdjze5rqf5xPxHMYu41xxqENYwhFB",
+		},
+		{
+			networkID:  constants.CascadeID,
+			vmID:       EVMID,
+			expectedID: "uZeMkrvmMMkw31hnJ31heDTPCFcdwT2qP7XefqiPkJjnLMonw",
+		},
+		{
+			networkID:  constants.LocalID,
+			vmID:       EVMID,
+			expectedID: "2m6aMgMBJWsmT4Hv448n6sNAwGMFfugBvdU6PdY5oxZge4qb1W",
 		},
 	}
 
 	for _, test := range tests {
-		genesisTx, err := VMGenesis(test.networkID, test.vmID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if result := genesisTx.ID().String(); test.expectedID != result {
-			t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
-				test.vmID,
-				test.networkID,
-				test.expectedID,
-				result)
-		}
+		name := fmt.Sprintf("%s-%s",
+			constants.NetworkIDToNetworkName[test.networkID],
+			test.vmID,
+		)
+		t.Run(name, func(t *testing.T) {
+			genesisTx, err := VMGenesis(test.networkID, test.vmID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result := genesisTx.ID().String(); test.expectedID != result {
+				t.Fatalf("%s genesisID with networkID %d was expected to be %s but was %s",
+					test.vmID,
+					test.networkID,
+					test.expectedID,
+					result)
+			}
+		})
 	}
 }
 
-func TestAVAAssetID(t *testing.T) {
+func TestAVAXAssetID(t *testing.T) {
 	tests := []struct {
 		networkID  uint32
 		expectedID string
 	}{
 		{
-			networkID:  CascadeID,
-			expectedID: "21d7KVtPrubc5fHr6CGNcgbUb4seUjmZKr35ZX7BZb5iP8pXWA",
+			networkID:  constants.EverestID,
+			expectedID: "nznftJBicce1PfWQeNEVBmDyweZZ6zcM3p78z9Hy9Hhdhfaxm",
 		},
 		{
-			networkID:  LocalID,
-			expectedID: "n8XH5JY1EX5VYqDeAhB4Zd4GKxi9UNQy6oPpMsCAj1Q6xkiiL",
+			networkID:  constants.DenaliID,
+			expectedID: "bi7tCZzj11ExAL1wsSKeSdFmJcS2S3rEL5GtPfrTWk6SS4yG6",
+		},
+		{
+			networkID:  constants.CascadeID,
+			expectedID: "bi7tCZzj11ExAL1wsSKeSdFmJcS2S3rEL5GtPfrTWk6SS4yG6",
+		},
+		{
+			networkID:  constants.LocalID,
+			expectedID: "SSUAMrVdqYuvybAMGNitTYSAnE4T5fVdVDB82ped1qQ9f8DDM",
 		},
 	}
 
 	for _, test := range tests {
-		avaID, err := AVAAssetID(test.networkID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if result := avaID.String(); test.expectedID != result {
-			t.Fatalf("AVA assetID with networkID %d was expected to be %s but was %s",
-				test.networkID,
-				test.expectedID,
-				result)
-		}
+		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+			_, avaxAssetID, err := Genesis(test.networkID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result := avaxAssetID.String(); test.expectedID != result {
+				t.Fatalf("AVAX assetID with networkID %d was expected to be %s but was %s",
+					test.networkID,
+					test.expectedID,
+					result)
+			}
+		})
 	}
 }

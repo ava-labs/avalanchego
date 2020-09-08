@@ -6,7 +6,7 @@ import (
 )
 
 // MockManager implements Manager but does nothing. Always returns nil error.
-// To be used only in tests (namely in package platformvm)
+// To be used only in tests
 type MockManager struct{}
 
 // Router ...
@@ -22,10 +22,22 @@ func (mm MockManager) ForceCreateChain(ChainParameters) {}
 func (mm MockManager) AddRegistrant(Registrant) {}
 
 // Lookup ...
-func (mm MockManager) Lookup(string) (ids.ID, error) { return ids.ID{}, nil }
+func (mm MockManager) Lookup(s string) (ids.ID, error) {
+	id, err := ids.FromString(s)
+	if err == nil {
+		return id, nil
+	}
+	return ids.ID{}, nil
+}
 
 // LookupVM ...
-func (mm MockManager) LookupVM(string) (ids.ID, error) { return ids.ID{}, nil }
+func (mm MockManager) LookupVM(s string) (ids.ID, error) {
+	id, err := ids.FromString(s)
+	if err == nil {
+		return id, nil
+	}
+	return ids.ID{}, nil
+}
 
 // Aliases ...
 func (mm MockManager) Aliases(ids.ID) []string { return nil }
@@ -35,3 +47,9 @@ func (mm MockManager) Alias(ids.ID, string) error { return nil }
 
 // Shutdown ...
 func (mm MockManager) Shutdown() {}
+
+// SubnetID ...
+func (mm MockManager) SubnetID(ids.ID) (ids.ID, error) { return ids.ID{}, nil }
+
+// IsBootstrapped ...
+func (mm MockManager) IsBootstrapped(ids.ID) bool { return false }

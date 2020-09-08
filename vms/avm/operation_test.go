@@ -7,18 +7,18 @@ import (
 	"testing"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/vms/components/codec"
+	"github.com/ava-labs/gecko/utils/codec"
+	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/verify"
 )
 
 type testOperable struct {
-	ava.TestTransferable `serialize:"true"`
+	avax.TestTransferable `serialize:"true"`
 
-	Outputs []verify.Verifiable `serialize:"true"`
+	Outputs []verify.State `serialize:"true"`
 }
 
-func (o *testOperable) Outs() []verify.Verifiable { return o.Outputs }
+func (o *testOperable) Outs() []verify.State { return o.Outputs }
 
 func TestOperationVerifyNil(t *testing.T) {
 	c := codec.NewDefault()
@@ -31,7 +31,7 @@ func TestOperationVerifyNil(t *testing.T) {
 func TestOperationVerifyEmpty(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
-		Asset: ava.Asset{ID: ids.Empty},
+		Asset: avax.Asset{ID: ids.Empty},
 	}
 	if err := op.Verify(c); err == nil {
 		t.Fatalf("Should have errored due to empty operation")
@@ -41,13 +41,13 @@ func TestOperationVerifyEmpty(t *testing.T) {
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
-		Asset: ava.Asset{ID: ids.Empty},
-		UTXOIDs: []*ava.UTXOID{
-			&ava.UTXOID{
+		Asset: avax.Asset{ID: ids.Empty},
+		UTXOIDs: []*avax.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
-			&ava.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 0,
 			},
@@ -62,9 +62,9 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 func TestOperationVerify(t *testing.T) {
 	c := codec.NewDefault()
 	op := &Operation{
-		Asset: ava.Asset{ID: ids.Empty},
-		UTXOIDs: []*ava.UTXOID{
-			&ava.UTXOID{
+		Asset: avax.Asset{ID: ids.Empty},
+		UTXOIDs: []*avax.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
@@ -81,20 +81,20 @@ func TestOperationSorting(t *testing.T) {
 	c.RegisterType(&testOperable{})
 
 	ops := []*Operation{
-		&Operation{
-			Asset: ava.Asset{ID: ids.Empty},
-			UTXOIDs: []*ava.UTXOID{
-				&ava.UTXOID{
+		{
+			Asset: avax.Asset{ID: ids.Empty},
+			UTXOIDs: []*avax.UTXOID{
+				{
 					TxID:        ids.Empty,
 					OutputIndex: 1,
 				},
 			},
 			Op: &testOperable{},
 		},
-		&Operation{
-			Asset: ava.Asset{ID: ids.Empty},
-			UTXOIDs: []*ava.UTXOID{
-				&ava.UTXOID{
+		{
+			Asset: avax.Asset{ID: ids.Empty},
+			UTXOIDs: []*avax.UTXOID{
+				{
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
@@ -110,9 +110,9 @@ func TestOperationSorting(t *testing.T) {
 		t.Fatalf("Should be sorted")
 	}
 	ops = append(ops, &Operation{
-		Asset: ava.Asset{ID: ids.Empty},
-		UTXOIDs: []*ava.UTXOID{
-			&ava.UTXOID{
+		Asset: avax.Asset{ID: ids.Empty},
+		UTXOIDs: []*avax.UTXOID{
+			{
 				TxID:        ids.Empty,
 				OutputIndex: 1,
 			},
@@ -121,5 +121,12 @@ func TestOperationSorting(t *testing.T) {
 	})
 	if isSortedAndUniqueOperations(ops, c) {
 		t.Fatalf("Shouldn't be unique")
+	}
+}
+
+func TestOperationTxNotState(t *testing.T) {
+	intf := interface{}(&OperationTx{})
+	if _, ok := intf.(verify.State); ok {
+		t.Fatalf("shouldn't be marked as state")
 	}
 }

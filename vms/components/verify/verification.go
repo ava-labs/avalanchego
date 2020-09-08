@@ -8,6 +8,12 @@ type Verifiable interface {
 	Verify() error
 }
 
+// State that can be verified
+type State interface {
+	Verifiable
+	VerifyState() error
+}
+
 // All returns nil if all the verifiables were verified with no errors
 func All(verifiables ...Verifiable) error {
 	for _, verifiable := range verifiables {
