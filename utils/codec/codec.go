@@ -185,6 +185,10 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		if p.Err != nil {
 			return p.Err
 		}
+		if containerTyp := reflect.TypeOf(value.Interface()).Elem().Kind(); containerTyp == reflect.Uint8 {
+			p.PackFixedBytes(value.Bytes())
+			return p.Err
+		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
 			if err := c.marshal(value.Index(i), p); err != nil {
 				return err
@@ -305,6 +309,10 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		if numElts > c.maxSliceLen {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
 				numElts, c.maxSliceLen)
+		}
+		if containerTyp := reflect.TypeOf(value.Interface()).Elem().Kind(); containerTyp == reflect.Uint8 {
+			value.SetBytes(p.UnpackFixedBytes(numElts))
+			return p.Err
 		}
 		// set [value] to be a slice of the appropriate type/capacity (right now it is nil)
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
