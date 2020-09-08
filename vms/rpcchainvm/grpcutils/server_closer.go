@@ -36,5 +36,6 @@ func (s *ServerCloser) Stop() {
 	for _, server := range s.servers {
 		server.Stop()
 	}
+	s.closed = true
 	s.servers = nil
 }
