@@ -2,4 +2,4 @@ avalanche_binary: ~/go/src/github.com/ava-labs/gecko/build/avalanche
 repo_folder: ~/go/src/github.com/ava-labs/gecko
 repo_name: ava-labs/gecko
 repo_url: https://github.com/{{ repo_name }}
-repo_branch: master
+repo_branch: dev
