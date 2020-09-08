@@ -26,6 +26,9 @@ import (
 const (
 	// Max number of addresses that can be passed in as argument to GetUTXOs
 	maxGetUTXOsAddrs = 1024
+
+	// Max number of addresses that can be passed in as argument to GetStake
+	maxGetStakeAddrs = 256
 )
 
 var (
@@ -1366,5 +1369,89 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	} else {
 		*response = Unknown
 	}
+	return nil
+}
+
+// GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively staked on the Primary Network
+// This method assumes that each stake output has only owner
+// This method assumes only AVAX can be staked
+// This method only concerns itself with the Primary Network, not subnets
+// TODO: Improve the performance of this method by maintaining this data
+// in a data structure rather than re-calculating it by iterating over stakers
+func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, response *struct {
+	Staked json.Uint64 `json:"staked"`
+}) error {
+	service.vm.Ctx.Log.Info("Platform: GetStake called")
+
+	if len(args.Addresses) > maxGetStakeAddrs {
+		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
+	}
+
+	addrs := ids.ShortSet{}
+	for _, addrStr := range args.Addresses { // Prrse addresses from string
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse address %s: %w", addrStr, err)
+		}
+		addrs.Add(addr)
+	}
+
+	var totalStake uint64
+
+	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
+	defer stopDB.Close()
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
+
+	var err error
+	for stopIter.Next() { // Iterates in order of increasing start time
+		txBytes := stopIter.Value()
+
+		tx := Tx{}
+		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(service.vm.codec, nil); err != nil {
+			return err
+		}
+
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			for _, stake := range staker.Stake {
+				if stake.AssetID() != service.vm.Ctx.AVAXAssetID {
+					continue
+				}
+				if secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput); ok && len(secpOut.Addrs) > 0 {
+					if !addrs.Contains(secpOut.Addrs[0]) {
+						continue
+					}
+					totalStake, err = math.Add64(totalStake, stake.Out.Amount())
+					if err != nil {
+						return err
+					}
+				}
+			}
+		case *UnsignedAddValidatorTx:
+			for _, stake := range staker.Stake {
+				if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
+					continue
+				}
+				if secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput); ok && len(secpOut.Addrs) > 0 {
+					if !addrs.Contains(secpOut.Addrs[0]) {
+						continue
+					}
+					totalStake, err = math.Add64(totalStake, stake.Out.Amount())
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	if err := stopIter.Error(); err != nil {
+		return fmt.Errorf("iterator errored: %w", err)
+	}
+	response.Staked = json.Uint64(totalStake)
 	return nil
 }

@@ -6,6 +6,10 @@ package platformvm
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+
+	cjson "github.com/ava-labs/gecko/utils/json"
+
 	"strings"
 	"testing"
 
@@ -291,5 +295,82 @@ func TestGetTx(t *testing.T) {
 		} else if !bytes.Equal(response.Tx.Bytes, tx.Bytes()) {
 			t.Fatalf("failed test '%s': byte representation of tx in response is incorrect", test.description)
 		}
+	}
+}
+
+// Test method GetStake
+func TestGetStake(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+
+	// Ensure GetStake is correct for each of the genesis validators
+	genesis, _ := defaultGenesis()
+	addrs := []string{}
+	for _, validator := range genesis.Validators {
+		addr := fmt.Sprintf("P-%s", validator.RewardAddress)
+		addrs = append(addrs, addr)
+		args := api.JsonAddresses{
+			Addresses: []string{addr},
+		}
+		response := struct {
+			Staked cjson.Uint64 `json:"staked"`
+		}{}
+		if err := service.GetStake(nil, &args, &response); err != nil {
+			t.Fatal(err)
+		}
+		if uint64(response.Staked) != defaultWeight {
+			t.Fatalf("expected stake to be %d but is %d", defaultWeight, response.Staked)
+		}
+	}
+
+	// Make sure this works for multiple addresses
+	args := api.JsonAddresses{
+		Addresses: addrs,
+	}
+	response := struct {
+		Staked cjson.Uint64 `json:"staked"`
+	}{}
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if int(response.Staked) != len(genesis.Validators)*defaultWeight {
+		t.Fatalf("expected stake to be %d but is %d", len(genesis.Validators)*defaultWeight, response.Staked)
+	}
+
+	// Make sure this works for delegators
+	// Get the old amount of stake for keys[0]
+	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	args.Addresses = []string{addr}
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	oldStake := response.Staked
+
+	// Add a delegator
+	stakeAmt := minStake + 12345
+	tx, err := service.vm.newAddValidatorTx(
+		stakeAmt,
+		uint64(defaultGenesisTime.Unix()),
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		0,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
 	}
 }
