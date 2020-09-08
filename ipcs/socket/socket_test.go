@@ -67,7 +67,7 @@ func newTestAcceptFn() (acceptFn, chan net.Conn) {
 		}
 
 		s.connLock.Lock()
-		s.conns = append(s.conns, conn)
+		s.conns[conn] = struct{}{}
 		s.connLock.Unlock()
 
 		connCh <- conn
