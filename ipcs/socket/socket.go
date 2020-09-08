@@ -95,12 +95,13 @@ func (s *Socket) Send(msg []byte) error {
 
 	// Write to each connection
 	var err error
+	errs := wrappers.Errs{}
 	for _, conn := range conns {
 		if _, err = conn.Write(msg); err != nil {
-			return fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err)
+			errs.Add(fmt.Errorf("failed to write message to %s: %w", conn.RemoteAddr(), err))
 		}
 	}
-	return nil
+	return errs.Err
 }
 
 // Close closes the socket by cutting off new connections, closing all
