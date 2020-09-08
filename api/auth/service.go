@@ -7,8 +7,9 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/snow/engine/common"
-	cjson "github.com/ava-labs/gecko/utils/json"
 	"github.com/ava-labs/gecko/utils/logging"
+
+	cjson "github.com/ava-labs/gecko/utils/json"
 )
 
 const (

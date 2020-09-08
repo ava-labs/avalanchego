@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -13,19 +12,16 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 
-	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/password"
 	"github.com/ava-labs/gecko/utils/timer"
 )
 
 const (
+	// Endpoint is the base of the auth URL
+	Endpoint = "auth"
+
 	headerKey      = "Authorization"
 	headerValStart = "Bearer "
-	// Endpoint is the base of the auth URL
-	Endpoint       = "auth"
-	maxPasswordLen = 1024
-	// RequiredPasswordStrength defines the minimum strength of a password
-	RequiredPasswordStrength = password.OK
 )
 
 var (
@@ -35,16 +31,18 @@ var (
 	// ErrNoToken is returned by GetToken if no token is provided
 	ErrNoToken = errors.New("auth token not provided")
 
-	errWrongPassword = errors.New("incorrect password")
+	errWrongPassword      = errors.New("incorrect password")
+	errInvalidTokenFormat = errors.New("token is invalid format")
+	errSamePassword       = errors.New("new password can't be same as old password")
 )
 
 // Auth handles HTTP API authorization for this node
 type Auth struct {
-	lock           sync.RWMutex // Prevent race condition when accessing password
-	Enabled        bool         // True iff API calls need auth token
-	clock          timer.Clock  // Tells the time. Can be faked for testing
-	HashedPassword []byte       // Hash of the password. Can be changed via API call.
-	revoked        []string     // List of tokens that have been revoked
+	lock     sync.RWMutex  // Prevent race condition when accessing password
+	Enabled  bool          // True iff API calls need auth token
+	clock    timer.Clock   // Tells the time. Can be faked for testing
+	Password password.Hash // Hash of the password. Can be changed via API call.
+	revoked  []string      // List of tokens that have been revoked
 }
 
 // Custom claim type used for API access token
@@ -65,7 +63,7 @@ func getToken(r *http.Request) (string, error) {
 		return "", ErrNoToken
 	}
 	if !strings.HasPrefix(rawHeader, headerValStart) {
-		return "", errors.New("token is invalid format")
+		return "", errInvalidTokenFormat
 	}
 	return rawHeader[len(headerValStart):], nil // Returns actual auth token. Slice guaranteed to not go OOB
 }
@@ -76,7 +74,7 @@ func getToken(r *http.Request) (string, error) {
 func (auth *Auth) newToken(password string, endpoints []string) (string, error) {
 	auth.lock.RLock()
 	defer auth.lock.RUnlock()
-	if !bytes.Equal(hashing.ComputeHash256([]byte(password)), auth.HashedPassword) {
+	if !auth.Password.Check(password) {
 		return "", errWrongPassword
 	}
 	canAccessAll := false
@@ -97,7 +95,7 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 		claims.Endpoints = endpoints
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(auth.HashedPassword) // Sign the token and return its string repr.
+	return token.SignedString(auth.Password.Password[:]) // Sign the token and return its string repr.
 
 }
 
@@ -110,12 +108,12 @@ func (auth *Auth) newToken(password string, endpoints []string) (string, error) 
 func (auth *Auth) revokeToken(tokenStr string, password string) error {
 	auth.lock.Lock()
 	defer auth.lock.Unlock()
-	if !bytes.Equal(auth.HashedPassword, hashing.ComputeHash256([]byte(password))) {
+	if !auth.Password.Check(password) {
 		return errWrongPassword
 	}
 
 	token, err := jwt.Parse(tokenStr, func(*jwt.Token) (interface{}, error) { // See if token is well-formed and signature is right
-		return auth.HashedPassword, nil
+		return auth.Password.Password[:], nil
 	})
 	if err == nil && token.Valid { // Only need to revoke if the token is valid
 		auth.revoked = append(auth.revoked, tokenStr)
@@ -123,26 +121,32 @@ func (auth *Auth) revokeToken(tokenStr string, password string) error {
 	return nil
 }
 
-// Change the password required to generate new tokens and to revoke tokens
-// [oldPassword] is the current password
-// [newPassword] is the new password. It can't be the empty string and it can't have length > maxPasswordLen.
-// Changing the password makes tokens issued under a previous password invalid
+// Change the password required to create and revoke tokens.
+// [oldPassword] is the current password.
+// [newPassword] is the new password. It can't be the empty string and it can't
+//               be unreasonably long.
+// Changing the password makes tokens issued under a previous password invalid.
 func (auth *Auth) changePassword(oldPassword, newPassword string) error {
+	if oldPassword == newPassword {
+		return errSamePassword
+	}
+
 	auth.lock.Lock()
 	defer auth.lock.Unlock()
-	if !bytes.Equal(auth.HashedPassword, hashing.ComputeHash256([]byte(oldPassword))) {
+
+	if !auth.Password.Check(oldPassword) {
 		return errWrongPassword
-	} else if len(newPassword) == 0 {
-		return errors.New("newPassword can't be empty")
-	} else if len(newPassword) > maxPasswordLen {
-		return fmt.Errorf("new password length exceeds maximum length, %d", maxPasswordLen)
-	} else if oldPassword == newPassword {
-		return errors.New("new password can't be same as old password")
-	} else if !password.SufficientlyStrong(newPassword, RequiredPasswordStrength) {
-		return errors.New("new password isn't strong enough. Add more characters")
 	}
-	auth.HashedPassword = hashing.ComputeHash256([]byte(newPassword))
-	auth.revoked = []string{} // All the revoked tokens are now invalid; no need to mark specifically as revoked
+	if err := password.IsValid(newPassword, password.OK); err != nil {
+		return err
+	}
+	if err := auth.Password.Set(newPassword); err != nil {
+		return err
+	}
+
+	// All the revoked tokens are now invalid; no need to mark specifically as
+	// revoked.
+	auth.revoked = nil
 	return nil
 }
 
@@ -176,7 +180,7 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 		token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) { // See if token is well-formed and signature is right
 			auth.lock.RLock()
 			defer auth.lock.RUnlock()
-			return auth.HashedPassword, nil
+			return auth.Password.Password[:], nil
 		})
 		if err != nil { // Probably because signature wrong
 			w.WriteHeader(http.StatusUnauthorized)

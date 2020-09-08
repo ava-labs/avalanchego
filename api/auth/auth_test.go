@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,14 +11,19 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/gecko/utils/password"
 )
 
 var (
 	testPassword   = "password!@#$%$#@!"
-	hashedPassword = hashing.ComputeHash256([]byte(testPassword))
+	hashedPassword = password.Hash{}
 )
+
+func init() {
+	if err := hashedPassword.Set(testPassword); err != nil {
+		panic(err)
+	}
+}
 
 var (
 	// Always returns 200 (http.StatusOK)
@@ -28,8 +32,8 @@ var (
 
 func TestNewTokenWrongPassword(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 	if _, err := auth.newToken("", []string{"endpoint1, endpoint2"}); err == nil {
 		t.Fatal("should have failed because password is wrong")
@@ -40,8 +44,8 @@ func TestNewTokenWrongPassword(t *testing.T) {
 
 func TestNewTokenHappyPath(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 	now := time.Now()
 	auth.clock.Set(now)
@@ -57,7 +61,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 	token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
 		auth.lock.RLock()
 		defer auth.lock.RUnlock()
-		return auth.HashedPassword, nil
+		return auth.Password.Password[:], nil
 	})
 	if err != nil {
 		t.Fatalf("couldn't parse new token: %s", err)
@@ -77,8 +81,8 @@ func TestNewTokenHappyPath(t *testing.T) {
 
 func TestTokenHasWrongSig(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	// Make a token
@@ -109,8 +113,8 @@ func TestTokenHasWrongSig(t *testing.T) {
 
 func TestChangePassword(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	password2 := "fejhkefjhefjhefhje"
@@ -124,7 +128,7 @@ func TestChangePassword(t *testing.T) {
 		t.Fatal("should have succeeded")
 	}
 
-	if !bytes.Equal(auth.HashedPassword, hashing.ComputeHash256([]byte(password2))) {
+	if !auth.Password.Check(password2) {
 		t.Fatal("password should have been changed")
 	}
 
@@ -164,8 +168,8 @@ func TestGetToken(t *testing.T) {
 
 func TestRevokeToken(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	// Make a token
@@ -184,8 +188,8 @@ func TestRevokeToken(t *testing.T) {
 
 func TestWrapHandlerHappyPath(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	// Make a token
@@ -210,8 +214,8 @@ func TestWrapHandlerHappyPath(t *testing.T) {
 
 func TestWrapHandlerRevokedToken(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	// Make a token
@@ -239,9 +243,8 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 
 func TestWrapHandlerExpiredToken(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
-		clock:          timer.Clock{},
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 	auth.clock.Set(time.Now().Add(-2 * TokenLifespan))
 
@@ -267,8 +270,8 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 
 func TestWrapHandlerNoAuthToken(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
@@ -285,8 +288,8 @@ func TestWrapHandlerNoAuthToken(t *testing.T) {
 
 func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	// Make a token
@@ -312,8 +315,8 @@ func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 
 func TestWrapHandlerAuthEndpoint(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	// Make a token
@@ -335,8 +338,8 @@ func TestWrapHandlerAuthEndpoint(t *testing.T) {
 
 func TestWrapHandlerAccessAll(t *testing.T) {
 	auth := Auth{
-		Enabled:        true,
-		HashedPassword: hashedPassword,
+		Enabled:  true,
+		Password: hashedPassword,
 	}
 
 	// Make a token that allows access to all endpoints
@@ -360,8 +363,8 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 
 func TestWrapHandlerAuthDisabled(t *testing.T) {
 	auth := Auth{
-		Enabled:        false,
-		HashedPassword: hashedPassword,
+		Enabled:  false,
+		Password: hashedPassword,
 	}
 
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/foo/info", "/ext/auth"}

@@ -1,35 +1,92 @@
 package password
 
-import "testing"
-
-type test struct {
-	password string
-	expected Strength
-}
+import (
+	"fmt"
+	"testing"
+)
 
 func TestSufficientlyStrong(t *testing.T) {
-	tests := []test{
+	tests := []struct {
+		password string
+		expected Strength
+	}{
 		{
-			"",
-			VeryWeak,
+			password: "",
+			expected: VeryWeak,
 		},
 		{
-			"a",
-			VeryWeak,
+			password: "a",
+			expected: VeryWeak,
 		},
 		{
-			"password",
-			VeryWeak,
+			password: "password",
+			expected: VeryWeak,
 		},
 		{
-			"thisisareallylongandpresumablyverystrongpassword",
-			VeryStrong,
+			password: "thisisareallylongandpresumablyverystrongpassword",
+			expected: VeryStrong,
 		},
 	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s-%d", test.password, test.expected), func(t *testing.T) {
+			if !SufficientlyStrong(test.password, test.expected) {
+				t.Fatalf("expected %q to be rated stronger", test.password)
+			}
+		})
+	}
+}
 
-	for _, tt := range tests {
-		if !SufficientlyStrong(tt.password, tt.expected) {
-			t.Fatalf("expected %s to be rated stronger", tt.password)
-		}
+func TestIsValid(t *testing.T) {
+	tests := []struct {
+		password  string
+		expected  Strength
+		shouldErr bool
+	}{
+		{
+			password:  "",
+			expected:  VeryWeak,
+			shouldErr: true,
+		},
+		{
+			password:  "a",
+			expected:  VeryWeak,
+			shouldErr: false,
+		},
+		{
+			password:  "password",
+			expected:  VeryWeak,
+			shouldErr: false,
+		},
+		{
+			password:  "thisisareallylongandpresumablyverystrongpassword",
+			expected:  VeryStrong,
+			shouldErr: false,
+		},
+		{
+			password:  string(make([]byte, maxPassLen)),
+			expected:  VeryWeak,
+			shouldErr: false,
+		},
+		{
+			password:  string(make([]byte, maxPassLen+1)),
+			expected:  VeryWeak,
+			shouldErr: true,
+		},
+		{
+			password:  "password",
+			expected:  Weak,
+			shouldErr: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s-%d", test.password, test.expected), func(t *testing.T) {
+			err := IsValid(test.password, test.expected)
+			if err == nil && test.shouldErr {
+				t.Fatalf("expected %q to be invalid", test.password)
+			}
+			if err != nil && !test.shouldErr {
+				t.Fatalf("expected %q to be valid but returned %s", test.password, err)
+			}
+		})
 	}
 }
