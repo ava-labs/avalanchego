@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/tracker"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -19,10 +18,10 @@ var (
 )
 
 type messageQueue interface {
-	PopMessage() (message, error)                                // Pop the next message from the queue
-	PushMessage(message) bool                                    // Push a message to the queue
-	UtilizeCPU(ids.ShortID, time.Time, time.Time, time.Duration) // Registers consumption of CPU time
-	EndInterval(time.Time)                                       // Register end of an interval of real time
+	PopMessage() (message, error)          // Pop the next message from the queue
+	PushMessage(message) bool              // Push a message to the queue
+	UtilizeCPU(ids.ShortID, time.Duration) // Registers consumption of CPU time
+	EndInterval(time.Time)                 // Register end of an interval of real time
 	Shutdown()
 }
 
@@ -38,14 +37,12 @@ type multiLevelQueue struct {
 	resourceManager ResourceManager
 
 	// CPU based prioritization
-	cpuTracker    tracker.TimeTracker
 	queues        []singleLevelQueue
 	cpuRanges     []float64       // CPU Utilization ranges that should be attributed to a corresponding queue
 	cpuAllotments []time.Duration // Allotments of CPU time per cycle that should be spent on each level of queue
 	cpuPortion    float64
 
 	// Message throttling
-	msgTracker                  tracker.CountingTracker
 	bufferSize, pendingMessages int
 
 	semaChan chan struct{}
@@ -60,8 +57,6 @@ type multiLevelQueue struct {
 // spend on each level. Their length must be the same.
 func newMultiLevelQueue(
 	resourceManager ResourceManager,
-	cpuTracker tracker.TimeTracker,
-	msgTracker tracker.CountingTracker,
 	consumptionRanges []float64,
 	consumptionAllotments []time.Duration,
 	bufferSize int,
@@ -86,8 +81,6 @@ func newMultiLevelQueue(
 	}
 
 	return &multiLevelQueue{
-		cpuTracker:      cpuTracker,
-		msgTracker:      msgTracker,
 		resourceManager: resourceManager,
 		queues:          queues,
 		cpuRanges:       consumptionRanges,
@@ -115,8 +108,8 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 
 	msg, err := ml.popMessage()
 	if err == nil {
+		ml.resourceManager.ReturnMessage(msg.validatorID)
 		ml.pendingMessages--
-		ml.msgTracker.Remove(msg.validatorID)
 		ml.metrics.pending.Dec()
 	}
 	return msg, err
@@ -126,11 +119,10 @@ func (ml *multiLevelQueue) PopMessage() (message, error) {
 // from [startTime] to [endTime] for a period of [duration]
 // startTime, endTime, and duration are all provided since they are
 // already calculated in handler
-func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, startTime, endTime time.Time, duration time.Duration) {
+func (ml *multiLevelQueue) UtilizeCPU(vdr ids.ShortID, duration time.Duration) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.cpuTracker.UtilizeTime(vdr, startTime, endTime)
 	ml.intervalConsumption += duration
 	ml.tierConsumption += duration
 	if ml.tierConsumption > ml.cpuAllotments[ml.currentTier] {
@@ -146,7 +138,6 @@ func (ml *multiLevelQueue) EndInterval(currentTime time.Time) {
 	ml.lock.Lock()
 	defer ml.lock.Unlock()
 
-	ml.cpuTracker.EndInterval(currentTime)
 	ml.metrics.cpu.Observe(float64(ml.intervalConsumption.Milliseconds()))
 	ml.intervalConsumption = 0
 }
@@ -217,6 +208,7 @@ func (ml *multiLevelQueue) pushMessage(msg message) bool {
 
 	validatorID := msg.validatorID
 	if validatorID.IsZero() {
+		ml.metrics.dropped.Inc()
 		ml.log.Warn("Dropping message due to invalid validatorID")
 		return false
 	}

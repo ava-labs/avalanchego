@@ -95,6 +95,8 @@ type Handler struct {
 	closed           chan struct{}
 	msgChan          <-chan common.Message
 
+	cpuTracker tracker.TimeTracker
+
 	clock timer.Clock
 
 	serviceQueue messageQueue
@@ -147,13 +149,13 @@ func (h *Handler) Initialize(
 		cpuInterval / 4,
 	}
 
-	cpuTracker := tracker.NewCPUTracker(cpuInterval)
+	h.cpuTracker = tracker.NewCPUTracker(cpuInterval)
 	msgTracker := tracker.NewMessageTracker()
 	resourceManager := NewResourceManager(
 		validators,
 		h.ctx.Log,
 		msgTracker,
-		cpuTracker,
+		h.cpuTracker,
 		uint32(bufferSize),
 		maxNonStakerPendingMsgs,
 		stakerMsgPortion,
@@ -162,8 +164,6 @@ func (h *Handler) Initialize(
 
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
 		resourceManager,
-		cpuTracker,
-		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
@@ -531,7 +531,8 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 	histogram := h.getMSGHistogram(msg.messageType)
 	histogram.Observe(float64(timeConsumed))
 
-	h.serviceQueue.UtilizeCPU(msg.validatorID, startTime, endTime, timeConsumed)
+	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)
+	h.serviceQueue.UtilizeCPU(msg.validatorID, timeConsumed)
 	return err
 }
 
@@ -547,4 +548,8 @@ func (h *Handler) sendReliableMsg(msg message) {
 	}
 }
 
-func (h *Handler) endInterval() { h.serviceQueue.EndInterval(h.clock.Time()) }
+func (h *Handler) endInterval() {
+	endTime := h.clock.Time()
+	h.cpuTracker.EndInterval(endTime)
+	h.serviceQueue.EndInterval(endTime)
+}

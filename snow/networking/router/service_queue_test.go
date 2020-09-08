@@ -37,13 +37,9 @@ func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan stru
 		cpuInterval / 4,
 	}
 
-	cpuTracker := tracker.NewCPUTracker(cpuInterval)
-	msgTracker := tracker.NewMessageTracker()
 	resourceManager := newInfiniteResourcePoolManager()
 	queue, semaChan := newMultiLevelQueue(
 		resourceManager,
-		cpuTracker,
-		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
@@ -168,8 +164,6 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	)
 	queue, semaChan := newMultiLevelQueue(
 		resourceManager,
-		cpuTracker,
-		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
@@ -182,7 +176,8 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	startTime := time.Now()
 	duration := perTier / 2
 	endTime := startTime.Add(duration)
-	queue.UtilizeCPU(validator2.ID(), startTime, endTime, duration)
+	queue.UtilizeCPU(validator2.ID(), duration)
+	cpuTracker.UtilizeTime(validator2.ID(), startTime, endTime)
 
 	// Push two messages from from high priority validator and one from
 	// low priority validator
@@ -217,7 +212,7 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	startTime = endTime
 	duration = perTier
 	endTime = startTime.Add(duration)
-	queue.UtilizeCPU(validator1.ID(), startTime, endTime, duration)
+	queue.UtilizeCPU(validator1.ID(), duration)
 
 	<-semaChan
 	if msg2, err := queue.PopMessage(); err != nil {
@@ -279,8 +274,6 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	)
 	queue, semaChan := newMultiLevelQueue(
 		resourceManager,
-		cpuTracker,
-		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
@@ -302,11 +295,9 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	})
 
 	<-semaChan
-	msg, err := queue.PopMessage()
-	if err != nil {
+	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping first message errored: %s", err)
-	}
-	if !msg.validatorID.Equals(vdr0.ID()) {
+	} else if !msg.validatorID.Equals(vdr0.ID()) {
 		t.Fatal("Expected first message to come from vdr0")
 	}
 
@@ -316,23 +307,20 @@ func TestMultiLevelQueuePushesDownOldMessages(t *testing.T) {
 	startTime := time.Now()
 	duration := time.Second / 2
 	endTime := startTime.Add(duration)
-	queue.UtilizeCPU(vdr0.ID(), startTime, endTime, duration)
+	queue.UtilizeCPU(vdr0.ID(), duration)
+	cpuTracker.UtilizeTime(vdr0.ID(), startTime, endTime)
 
 	<-semaChan
-	msg, err = queue.PopMessage()
-	if err != nil {
+	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping second message errored: %s", err)
-	}
-	if !msg.validatorID.Equals(vdr1.ID()) {
+	} else if !msg.validatorID.Equals(vdr1.ID()) {
 		t.Fatal("Expected second message to come from vdr1 after vdr0 dropped in priority")
 	}
 
 	<-semaChan
-	msg, err = queue.PopMessage()
-	if err != nil {
+	if msg, err := queue.PopMessage(); err != nil {
 		t.Fatalf("Popping third message errored: %s", err)
-	}
-	if !msg.validatorID.Equals(vdr0.ID()) {
+	} else if !msg.validatorID.Equals(vdr0.ID()) {
 		t.Fatal("Expected third message to come from vdr0")
 	}
 }
@@ -385,8 +373,6 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 	)
 	queue, semaChan := newMultiLevelQueue(
 		resourceManager,
-		cpuTracker,
-		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
@@ -414,6 +400,7 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 		if _, err := queue.PopMessage(); err != nil {
 			t.Fatalf("Failed to pop message on iteration %d due to: %s", i, err)
 		}
+
 	}
 
 	// Fill up message pool again to ensure
@@ -466,13 +453,9 @@ func TestMultiLevelQueueThrottles(t *testing.T) {
 		perTier,
 	}
 
-	cpuTracker := tracker.NewCPUTracker(time.Second)
-	msgTracker := tracker.NewMessageTracker()
 	resourceManager := newNoResourcesManager()
 	queue, _ := newMultiLevelQueue(
 		resourceManager,
-		cpuTracker,
-		msgTracker,
 		consumptionRanges,
 		consumptionAllotments,
 		bufferSize,
