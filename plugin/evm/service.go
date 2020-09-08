@@ -44,7 +44,8 @@ type SnowmanAPI struct{ vm *VM }
 // NetAPI offers network related API methods
 type NetAPI struct{ vm *VM }
 
-type AvaAPI struct{ vm *VM }
+// AvaxAPI offers Avalanche network related API methods
+type AvaxAPI struct{ vm *VM }
 
 // NewNetAPI creates a new net API instance.
 func NewNetAPI(vm *VM) *NetAPI { return &NetAPI{vm} }
@@ -144,7 +145,7 @@ type ExportKeyReply struct {
 }
 
 // ExportKey returns a private key from the provided user
-func (service *AvaAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
+func (service *AvaxAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Info("Platform: ExportKey called")
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -168,7 +169,7 @@ type ImportKeyArgs struct {
 }
 
 // ImportKey adds a private key to the provided user
-func (service *AvaAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
+func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
 	service.vm.ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
 	if service.vm.ctx.Keystore == nil {
 		return fmt.Errorf("oh no")
@@ -223,7 +224,7 @@ type ImportAVAXArgs struct {
 
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
-func (service *AvaAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
+func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("Platform: ImportAVAX called")
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
@@ -271,7 +272,7 @@ type ExportAVAXArgs struct {
 
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *AvaAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
 	service.vm.ctx.Log.Info("Platform: ExportAVAX called")
 
 	if args.Amount == 0 {
