@@ -185,6 +185,10 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		if p.Err != nil {
 			return p.Err
 		}
+		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
+			p.PackFixedBytes(value.Bytes())
+			return p.Err
+		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
 			if err := c.marshal(value.Index(i), p); err != nil {
 				return err
@@ -193,6 +197,11 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		return nil
 	case reflect.Array:
 		numElts := value.Len()
+		if elemKind := value.Type().Kind(); elemKind == reflect.Uint8 {
+			sliceVal := value.Convert(reflect.TypeOf([]byte{}))
+			p.PackFixedBytes(sliceVal.Bytes())
+			return p.Err
+		}
 		if numElts > c.maxSliceLen {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
@@ -306,6 +315,10 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
 				numElts, c.maxSliceLen)
 		}
+		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
+			value.SetBytes(p.UnpackFixedBytes(numElts))
+			return p.Err
+		}
 		// set [value] to be a slice of the appropriate type/capacity (right now it is nil)
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
 		// Unmarshal each element into the appropriate index of the slice
@@ -316,7 +329,18 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		}
 		return nil
 	case reflect.Array:
-		for i := 0; i < value.Len(); i++ {
+		numElts := value.Len()
+		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
+			unpackedBytes := p.UnpackFixedBytes(numElts)
+			if p.Errored() {
+				return p.Err
+			}
+			// Get a slice to the underlying array value
+			underlyingSlice := value.Slice(0, numElts).Interface().([]byte)
+			copy(underlyingSlice, unpackedBytes)
+			return nil
+		}
+		for i := 0; i < numElts; i++ {
 			if err := c.unmarshal(p, value.Index(i)); err != nil {
 				return fmt.Errorf("couldn't unmarshal array element: %s", err)
 			}
