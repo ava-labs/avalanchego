@@ -130,7 +130,7 @@ func (c *codec) Marshal(value interface{}) ([]byte, error) {
 
 // marshal writes the byte representation of [value] to [p]
 // [value]'s underlying value must not be a nil pointer or interface
-// c.lock lock should be held for the duration of this function
+// c.lock should be held for the duration of this function
 func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 	valueKind := value.Kind()
 	switch valueKind {
@@ -266,7 +266,7 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
-// c.lock lock should be held for the duration of this function
+// c.lock should be held for the duration of this function
 func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Uint8:
