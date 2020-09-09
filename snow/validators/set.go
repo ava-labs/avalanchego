@@ -129,7 +129,7 @@ func (s *set) set(vdrs []Validator) error {
 		i := len(s.vdrSlice)
 		s.vdrMap[vdrID.Key()] = i
 		s.vdrSlice = append(s.vdrSlice, &validator{
-			id:     vdr.ID(),
+			nodeID: vdr.ID(),
 			weight: vdr.Weight(),
 		})
 		s.vdrWeights = append(s.vdrWeights, w)
@@ -167,7 +167,7 @@ func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
 	i, ok := s.vdrMap[vdrIDKey]
 	if !ok {
 		vdr = &validator{
-			id: vdrID,
+			nodeID: vdrID,
 		}
 		i = len(s.vdrSlice)
 		s.vdrSlice = append(s.vdrSlice, vdr)

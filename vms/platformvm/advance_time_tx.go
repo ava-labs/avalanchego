@@ -81,11 +81,11 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	// If this block is committed, update the validator sets
-	// onAbortDB or onCommitDB should commit (flush to vm.DB) before this is called
+	// If this block is committed, update the validator sets.
+	// onCommitDB will be committed to vm.DB before this is called.
 	onCommitFunc := func() error {
-
-		// For each Subnet, update the node's validator manager to reflect current Subnet membership
+		// For each Subnet, update the node's validator manager to reflect
+		// current Subnet membership
 		return vm.updateVdrMgr(false)
 	}
 

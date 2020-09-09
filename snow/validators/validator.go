@@ -15,18 +15,20 @@ type Validator interface {
 	// ID returns the node ID of this validator
 	ID() ids.ShortID
 
-	// Returns this validator's weight
+	// Weight that can be used for weighted sampling. If this validator is
+	// validating the primary network, returns the amount of AVAX staked.
 	Weight() uint64
 }
 
+// validator is a struct that contains the base values required by the validator
+// interface.
 type validator struct {
-	id     ids.ShortID
+	nodeID ids.ShortID
 	weight uint64
 }
 
-func (v *validator) ID() ids.ShortID {
-	return v.id
-}
+func (v *validator) ID() ids.ShortID { return v.nodeID }
+func (v *validator) Weight() uint64  { return v.weight }
 
 func (v *validator) addWeight(weight uint64) {
 	newTotalWeight, err := safemath.Add64(weight, v.weight)
@@ -44,6 +46,23 @@ func (v *validator) removeWeight(weight uint64) {
 	v.weight = newTotalWeight
 }
 
-func (v *validator) Weight() uint64 {
-	return v.weight
+// NewValidator returns a validator object that implements the Validator
+// interface
+func NewValidator(
+	nodeID ids.ShortID,
+	weight uint64,
+) Validator {
+	return &validator{
+		nodeID: nodeID,
+		weight: weight,
+	}
+}
+
+// GenerateRandomValidator creates a random validator with the provided weight
+func GenerateRandomValidator(weight uint64) Validator {
+	nodeID := ids.GenerateTestShortID()
+	return NewValidator(
+		nodeID,
+		weight,
+	)
 }

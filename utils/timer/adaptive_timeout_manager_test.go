@@ -15,15 +15,15 @@ import (
 
 func TestAdaptiveTimeoutManager(t *testing.T) {
 	tm := AdaptiveTimeoutManager{}
-	tm.Initialize(
-		time.Millisecond,         // initialDuration
-		time.Millisecond,         // minimumDuration
-		time.Hour,                // maximumDuration
-		2,                        // increaseRatio
-		time.Microsecond,         // decreaseValue
-		"gecko",                  // namespace
-		prometheus.NewRegistry(), // registerer
-	)
+	tm.Initialize(&AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    time.Hour,
+		TimeoutMultiplier: 2,
+		TimeoutReduction:  time.Microsecond,
+		Namespace:         "gecko",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	var lock sync.Mutex

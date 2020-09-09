@@ -74,8 +74,7 @@ import (
 //	  proposal is being rejected
 
 var (
-	errInvalidBlockType   = errors.New("invalid block type")
-	errEmptyValidatingSet = errors.New("empty validating set")
+	errInvalidBlockType = errors.New("invalid block type")
 )
 
 // Block is the common interface that all staking blocks must have

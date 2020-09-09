@@ -4,12 +4,15 @@
 package node
 
 import (
+	"time"
+
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/nat"
 	"github.com/ava-labs/gecko/snow/consensus/avalanche"
 	"github.com/ava-labs/gecko/snow/networking/router"
 	"github.com/ava-labs/gecko/utils"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/timer"
 )
 
 // Config contains all of the configurations of an Avalanche node.
@@ -22,6 +25,9 @@ type Config struct {
 
 	// Transaction fee configuration
 	TxFee uint64
+
+	// Staking uptime requirements
+	UptimeRequirement float64
 
 	// Minimum stake, in nAVAX, required to validate the primary network
 	MinStake uint64
@@ -44,18 +50,23 @@ type Config struct {
 	StakingCertFile         string
 	DisabledStakingWeight   uint64
 	MaxNonStakerPendingMsgs uint
-	StakerMsgPortion        float64
+	StakerMSGPortion        float64
 	StakerCPUPortion        float64
+
+	// Network configuration
+	NetworkConfig timer.AdaptiveTimeoutConfig
 
 	// Bootstrapping configuration
 	BootstrapPeers []*Peer
 
 	// HTTP configuration
-	HTTPHost      string
-	HTTPPort      uint16
-	EnableHTTPS   bool
-	HTTPSKeyFile  string
-	HTTPSCertFile string
+	HTTPHost            string
+	HTTPPort            uint16
+	HTTPSEnabled        bool
+	HTTPSKeyFile        string
+	HTTPSCertFile       string
+	APIRequireAuthToken bool
+	APIAuthPassword     string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
@@ -83,5 +94,7 @@ type Config struct {
 	IPCDefaultChainIDs []string
 
 	// Router that is used to handle incoming consensus messages
-	ConsensusRouter router.Router
+	ConsensusRouter          router.Router
+	ConsensusGossipFrequency time.Duration
+	ConsensusShutdownTimeout time.Duration
 }

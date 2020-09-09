@@ -7,10 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/gecko/chains"
+	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
@@ -211,5 +216,429 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	assert.NoError(t, err)
 	if delReward != 0 {
 		t.Fatal("expected delegatee balance to stay the same")
+	}
+}
+
+func TestOptimisticUptime(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+	db := memdb.New()
+
+	firstVM := &VM{
+		SnowmanVM:        &core.SnowmanVM{},
+		chainManager:     chains.MockManager{},
+		uptimePercentage: .2,
+	}
+	firstVM.vdrMgr = validators.NewManager()
+	firstVM.clock.Set(defaultGenesisTime)
+
+	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
+	firstMsgChan := make(chan common.Message, 1)
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstVM.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fast forward clock to time for genesis validators to leave
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+
+	if err := firstVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstVM.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+	firstCtx.Lock.Unlock()
+
+	secondVM := &VM{
+		SnowmanVM:        &core.SnowmanVM{},
+		chainManager:     chains.MockManager{},
+		uptimePercentage: .20,
+	}
+
+	secondVM.vdrMgr = validators.NewManager()
+
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer func() {
+		secondVM.Shutdown()
+		secondCtx.Lock.Unlock()
+	}()
+
+	secondMsgChan := make(chan common.Message, 1)
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secondVM.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secondVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	secondVM.clock.Set(defaultValidateEndTime)
+
+	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
+	if err != nil {
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil {
+		t.Fatal(err)
+	} else if commit, ok := options[0].(*Commit); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := block.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if err := commit.Accept(); err != nil { // advance the timestamp
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(secondVM.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if timestamp, err := secondVM.getTimestamp(secondVM.DB); err != nil { // Verify that chain's timestamp has advanced
+		t.Fatal(err)
+	} else if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+
+	if blk, err = secondVM.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block = blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil { // Assert preferences are correct
+		t.Fatal(err)
+	} else if commit, ok := options[0].(*Commit); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(commit.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(secondVM.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if _, isValidator, err := secondVM.isValidator(secondVM.DB, constants.PrimaryNetworkID, keys[1].PublicKey().Address()); err != nil {
+		// Verify that genesis validator was removed from current validator set
+		t.Fatal(err)
+	} else if isValidator {
+		t.Fatal("should have removed a genesis validator")
+	}
+}
+
+func TestObservedUptime(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+	db := memdb.New()
+
+	firstVM := &VM{
+		SnowmanVM:        &core.SnowmanVM{},
+		chainManager:     chains.MockManager{},
+		uptimePercentage: .2,
+	}
+	firstVM.vdrMgr = validators.NewManager()
+	firstVM.clock.Set(defaultGenesisTime)
+
+	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
+	firstMsgChan := make(chan common.Message, 1)
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstVM.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+	firstCtx.Lock.Unlock()
+
+	firstVM.Connected(keys[1].PublicKey().Address())
+
+	firstCtx.Lock.Lock()
+	// Fast forward clock to time for genesis validators to leave
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+
+	if err := firstVM.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+	firstCtx.Lock.Unlock()
+
+	secondVM := &VM{
+		SnowmanVM:        &core.SnowmanVM{},
+		chainManager:     chains.MockManager{},
+		uptimePercentage: .20,
+	}
+
+	secondVM.vdrMgr = validators.NewManager()
+
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer func() {
+		secondVM.Shutdown()
+		secondCtx.Lock.Unlock()
+	}()
+
+	secondMsgChan := make(chan common.Message, 1)
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secondVM.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secondVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	secondVM.clock.Set(defaultValidateEndTime)
+
+	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
+	if err != nil {
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil {
+		t.Fatal(err)
+	} else if commit, ok := options[0].(*Commit); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := block.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if err := commit.Accept(); err != nil { // advance the timestamp
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(secondVM.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if timestamp, err := secondVM.getTimestamp(secondVM.DB); err != nil { // Verify that chain's timestamp has advanced
+		t.Fatal(err)
+	} else if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+
+	if blk, err = secondVM.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block = blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil { // Assert preferences are correct
+		t.Fatal(err)
+	} else if commit, ok := options[0].(*Commit); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(commit.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(secondVM.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if _, isValidator, err := secondVM.isValidator(secondVM.DB, constants.PrimaryNetworkID, keys[1].PublicKey().Address()); err != nil {
+		// Verify that genesis validator was removed from current validator set
+		t.Fatal(err)
+	} else if isValidator {
+		t.Fatal("should have removed a genesis validator")
+	}
+}
+
+func TestUptimeDisallowed(t *testing.T) {
+	_, genesisBytes := defaultGenesis()
+	db := memdb.New()
+
+	firstVM := &VM{
+		SnowmanVM:        &core.SnowmanVM{},
+		chainManager:     chains.MockManager{},
+		uptimePercentage: .2,
+	}
+	firstVM.vdrMgr = validators.NewManager()
+	firstVM.clock.Set(defaultGenesisTime)
+
+	firstCtx := defaultContext()
+	firstCtx.Lock.Lock()
+
+	firstMsgChan := make(chan common.Message, 1)
+	if err := firstVM.Initialize(firstCtx, db, genesisBytes, firstMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fast forward clock to time for genesis validators to leave
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+
+	if err := firstVM.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstVM.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+	firstCtx.Lock.Unlock()
+
+	secondVM := &VM{
+		SnowmanVM:        &core.SnowmanVM{},
+		chainManager:     chains.MockManager{},
+		uptimePercentage: .21,
+	}
+
+	secondVM.vdrMgr = validators.NewManager()
+
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondCtx := defaultContext()
+	secondCtx.Lock.Lock()
+	defer func() {
+		secondVM.Shutdown()
+		secondCtx.Lock.Unlock()
+	}()
+
+	secondMsgChan := make(chan common.Message, 1)
+	if err := secondVM.Initialize(secondCtx, db, genesisBytes, secondMsgChan, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secondVM.Bootstrapping(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secondVM.Bootstrapped(); err != nil {
+		t.Fatal(err)
+	}
+
+	secondVM.clock.Set(defaultValidateEndTime)
+
+	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
+	if err != nil {
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil {
+		t.Fatal(err)
+	} else if commit, ok := options[0].(*Commit); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := block.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if err := commit.Accept(); err != nil { // advance the timestamp
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(secondVM.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if timestamp, err := secondVM.getTimestamp(secondVM.DB); err != nil { // Verify that chain's timestamp has advanced
+		t.Fatal(err)
+	} else if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+
+	if blk, err = secondVM.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block = blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil { // Assert preferences are correct
+		t.Fatal(err)
+	} else if commit, ok := options[1].(*Commit); !ok {
+		t.Fatal(errShouldPrefAbort)
+	} else if abort, ok := options[0].(*Abort); !ok {
+		t.Fatal(errShouldPrefAbort)
+	} else if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(commit.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
+		t.Fatal(err)
+	} else if status, err := secondVM.getStatus(secondVM.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if _, isValidator, err := secondVM.isValidator(secondVM.DB, constants.PrimaryNetworkID, keys[1].PublicKey().Address()); err != nil {
+		// Verify that genesis validator was removed from current validator set
+		t.Fatal(err)
+	} else if isValidator {
+		t.Fatal("should have removed a genesis validator")
 	}
 }

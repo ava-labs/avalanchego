@@ -26,12 +26,9 @@ import (
 
 // TODO: Cache prefixed IDs or use different way of keying into database
 const (
-	currentValidatorsPrefix uint64 = iota
-	pendingValidatorsPrefix
-
-	delegator = "delegator"
-	start     = "start"
-	stop      = "stop"
+	startDBPrefix  = "start"
+	stopDBPrefix   = "stop"
+	uptimeDBPrefix = "uptime"
 )
 
 var (
@@ -96,7 +93,7 @@ func (vm *VM) enqueueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	txBytes := stakerTx.Bytes()
 
 	// Sorted by subnet ID then start time then tx ID
-	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
+	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
 	defer prefixStartDB.Close()
 
@@ -135,7 +132,7 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 	stakerID := staker.ID().Bytes() // Tx ID of this tx
 
 	// Sorted by subnet ID then start time then ID
-	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, start))
+	prefixStart := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	prefixStartDB := prefixdb.NewNested(prefixStart, db)
 	defer prefixStartDB.Close()
 
@@ -175,7 +172,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 	txBytes := stakerTx.Bytes()
 
 	// Sorted by subnet ID then stop time then tx ID
-	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
 	defer prefixStopDB.Close()
 
@@ -214,7 +211,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) 
 	stakerID := staker.ID().Bytes() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time
-	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stop))
+	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
 	prefixStopDB := prefixdb.NewNested(prefixStop, db)
 	defer prefixStopDB.Close()
 
@@ -232,7 +229,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) 
 
 // Returns the pending staker that will start staking next
 func (vm *VM) nextStakerStart(db database.Database, subnetID ids.ID) (*Tx, error) {
-	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, start)), db).NewIterator()
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix)), db).NewIterator()
 	defer iter.Release()
 
 	if !iter.Next() {
@@ -250,7 +247,7 @@ func (vm *VM) nextStakerStart(db database.Database, subnetID ids.ID) (*Tx, error
 
 // Returns the current staker that will stop staking next
 func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error) {
-	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stop)), db).NewIterator()
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix)), db).NewIterator()
 	defer iter.Release()
 
 	if !iter.Next() {
@@ -268,7 +265,7 @@ func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error)
 
 // Returns true if [nodeID] is a validator (not a delegator) of subnet [subnetID]
 func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool, error) {
-	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stop)), db).NewIterator()
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix)), db).NewIterator()
 	defer iter.Release()
 
 	for iter.Next() {
@@ -298,7 +295,7 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 // Returns true if [nodeID] will be a validator (not a delegator) of subnet
 // [subnetID]
 func (vm *VM) willBeValidator(db database.Database, subnetID ids.ID, nodeID ids.ShortID) (TimedTx, bool, error) {
-	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, start)), db).NewIterator()
+	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix)), db).NewIterator()
 	defer iter.Release()
 
 	for iter.Next() {
@@ -699,7 +696,44 @@ func (vm *VM) registerDBTypes() {
 	if err := vm.State.RegisterType(statusTypeID, marshalStatusFunc, unmarshalStatusFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
+}
 
+type validatorUptime struct {
+	UpDuration  uint64 `serialize:"true"` // In seconds
+	LastUpdated uint64 `serialize:"true"` // Unix time in seconds
+}
+
+func (vm *VM) uptime(db database.Database, nodeID ids.ShortID) (*validatorUptime, error) {
+	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
+	defer uptimeDB.Close()
+
+	uptimeBytes, err := uptimeDB.Get(nodeID.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	uptime := validatorUptime{}
+	if err := Codec.Unmarshal(uptimeBytes, &uptime); err != nil {
+		return nil, err
+	}
+	return &uptime, nil
+}
+func (vm *VM) setUptime(db database.Database, nodeID ids.ShortID, uptime *validatorUptime) error {
+	uptimeBytes, err := Codec.Marshal(uptime)
+	if err != nil {
+		return err
+	}
+
+	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
+	defer uptimeDB.Close()
+
+	return uptimeDB.Put(nodeID.Bytes(), uptimeBytes)
+}
+func (vm *VM) deleteUptime(db database.Database, nodeID ids.ShortID) error {
+	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
+	defer uptimeDB.Close()
+
+	return uptimeDB.Delete(nodeID.Bytes())
 }
 
 // Unmarshal a Block from bytes and initialize it

@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/gecko/database"
 	"github.com/ava-labs/gecko/database/versiondb"
@@ -39,6 +40,9 @@ type UnsignedRewardValidatorTx struct {
 
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true" json:"txID"`
+
+	// Marks if this validator should be rewarded according to this node.
+	shouldPreferCommit bool
 }
 
 // SemanticVerify this transaction performs a valid state transition.
@@ -105,6 +109,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
+	nodeID := ids.ShortID{}
+	startTime := time.Time{}
 	switch uStakerTx := stakerTx.UnsignedTx.(type) {
 	case *UnsignedAddValidatorTx:
 		// Refund the stake here
@@ -146,6 +152,16 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}); err != nil {
 				return nil, nil, nil, nil, tempError{err}
 			}
+		}
+
+		// Handle reward preferences
+		nodeID = uStakerTx.Validator.ID()
+		startTime = uStakerTx.StartTime()
+		if err := vm.deleteUptime(onCommitDB, nodeID); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+		if err := vm.deleteUptime(onAbortDB, nodeID); err != nil {
+			return nil, nil, nil, nil, tempError{err}
 		}
 	case *UnsignedAddDelegatorTx:
 		// We're removing a delegator
@@ -241,6 +257,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				return nil, nil, nil, nil, tempError{err}
 			}
 		}
+		nodeID = uStakerTx.Validator.ID()
+		startTime = vdrTx.StartTime()
 	default:
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
@@ -248,10 +266,14 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	// Regardless of whether this tx is committed or aborted, update the
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
 	// (flush to vm.DB) before this is called
-	updateValidators := func() error {
-		return vm.updateVdrMgr(false)
+	updateValidators := func() error { return vm.updateVdrMgr(false) }
+
+	uptime, err := vm.calculateUptime(vm.DB, nodeID, startTime)
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 
+	tx.shouldPreferCommit = uptime >= vm.uptimePercentage
 	return onCommitDB, onAbortDB, updateValidators, updateValidators, nil
 }
 
@@ -262,7 +284,9 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 //
 // TODO: A validator should receive a reward only if they are sufficiently
 // responsive and correct during the time they are validating.
-func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool { return true }
+func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
+	return tx.shouldPreferCommit
+}
 
 // RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.

@@ -10,26 +10,14 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Manager registers and fires timeouts for the snow API.
 type Manager struct{ tm timer.AdaptiveTimeoutManager }
 
 // Initialize this timeout manager.
-func (m *Manager) Initialize(
-	namespace string,
-	registerer prometheus.Registerer,
-) error {
-	return m.tm.Initialize(
-		time.Second,
-		500*time.Millisecond,
-		10*time.Second,
-		1.1,
-		time.Millisecond,
-		namespace,
-		registerer,
-	)
+func (m *Manager) Initialize(config *timer.AdaptiveTimeoutConfig) error {
+	return m.tm.Initialize(config)
 }
 
 // Dispatch ...

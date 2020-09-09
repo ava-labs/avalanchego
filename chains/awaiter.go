@@ -5,7 +5,6 @@ package chains
 
 import (
 	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
 	"github.com/ava-labs/gecko/snow/validators"
 	"github.com/ava-labs/gecko/utils/math"
 )
@@ -19,7 +18,7 @@ type awaitConnected struct {
 
 // NewAwaiter returns a new handler that will await for a sufficient number of
 // validators to be connected.
-func NewAwaiter(vdrs validators.Set, reqWeight uint64, connected func()) network.Handler {
+func NewAwaiter(vdrs validators.Set, reqWeight uint64, connected func()) validators.Connector {
 	return &awaitConnected{
 		vdrs:      vdrs,
 		reqWeight: reqWeight,
