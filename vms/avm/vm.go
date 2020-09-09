@@ -709,10 +709,15 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
-// LoadUser ...
+// LoadUser returns:
+// 1) The UTXOs that reference one or more addresses controlled by the given user
+// 2) A keychain that contains this user's keys
+// If [addrsToUse] has positive length, returns UTXOs that reference one or more
+// addresses controlled by the given user that are also in [addrsToUse].
 func (vm *VM) LoadUser(
 	username string,
 	password string,
+	addrsToUse ids.ShortSet,
 ) (
 	[]*avax.UTXO,
 	*secp256k1fx.Keychain,
@@ -722,15 +727,25 @@ func (vm *VM) LoadUser(
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user: %w", err)
 	}
+	// Drop any potential error closing the database to report the original
+	// error
+	defer db.Close()
 
 	user := userState{vm: vm}
+
+	// true iff we should only return UTXOs that reference one or more addresses in [addrsToUse]
+	filterAddresses := len(addrsToUse) > 0
 
 	// The error is explicitly dropped, as it may just mean that there are no addresses.
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.ShortSet{}
 	for _, addr := range addresses {
-		addrs.Add(addr)
+		if !filterAddresses {
+			addrs.Add(addr)
+		} else if filterAddresses && addrsToUse.Contains(addr) {
+			addrs.Add(addr)
+		}
 	}
 	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
@@ -738,7 +753,7 @@ func (vm *VM) LoadUser(
 	}
 
 	kc := secp256k1fx.NewKeychain()
-	for _, addr := range addresses {
+	for _, addr := range addrs.List() {
 		sk, err := user.Key(db, addr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("problem retrieving private key: %w", err)
@@ -746,7 +761,7 @@ func (vm *VM) LoadUser(
 		kc.Add(sk)
 	}
 
-	return utxos, kc, nil
+	return utxos, kc, db.Close()
 }
 
 // Spend ...

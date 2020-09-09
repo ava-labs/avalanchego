@@ -74,10 +74,9 @@ const (
 )
 
 var (
-	timestampKey  = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
-	chainsKey     = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
-	subnetsKey    = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
-	lastClosedKey = ids.NewID([32]byte{'l', 'a', 's', 't', ' ', 'c', 'l', 'o', 's', 'e', 'd'})
+	timestampKey = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
+	chainsKey    = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
+	subnetsKey   = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
 
 	errEndOfTime                = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
 	errNoPendingBlocks          = errors.New("no pending blocks")
