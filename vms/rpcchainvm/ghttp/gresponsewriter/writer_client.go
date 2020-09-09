@@ -115,13 +115,20 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, err
 	}
 
-	conn := gconn.NewClient(gconnproto.NewConnClient(connConn), &addr{
-		network: resp.LocalNetwork,
-		str:     resp.LocalString,
-	}, &addr{
-		network: resp.RemoteNetwork,
-		str:     resp.RemoteString,
-	}, connConn, readerConn, writerConn)
+	conn := gconn.NewClient(
+		gconnproto.NewConnClient(connConn),
+		&addr{
+			network: resp.LocalNetwork,
+			str:     resp.LocalString,
+		},
+		&addr{
+			network: resp.RemoteNetwork,
+			str:     resp.RemoteString,
+		},
+		connConn,
+		readerConn,
+		writerConn,
+	)
 
 	reader := greader.NewClient(greaderproto.NewReaderClient(readerConn))
 	writer := gwriter.NewClient(gwriterproto.NewWriterClient(writerConn))

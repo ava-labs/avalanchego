@@ -40,8 +40,8 @@ func TestSenderContext(t *testing.T) {
 func TestTimeout(t *testing.T) {
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
 		MaximumTimeout:    10 * time.Second,
 		TimeoutMultiplier: 1.1,
 		TimeoutReduction:  time.Millisecond,
@@ -103,8 +103,8 @@ func TestTimeout(t *testing.T) {
 func TestReliableMessages(t *testing.T) {
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
 		MaximumTimeout:    10 * time.Second,
 		TimeoutMultiplier: 1.1,
 		TimeoutReduction:  time.Millisecond,
@@ -177,8 +177,8 @@ func TestReliableMessages(t *testing.T) {
 func TestReliableMessagesToMyself(t *testing.T) {
 	tm := timeout.Manager{}
 	tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
 		MaximumTimeout:    10 * time.Second,
 		TimeoutMultiplier: 1.1,
 		TimeoutReduction:  time.Millisecond,

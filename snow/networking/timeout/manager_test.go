@@ -17,8 +17,8 @@ import (
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
 	manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
 		MaximumTimeout:    10 * time.Second,
 		TimeoutMultiplier: 1.1,
 		TimeoutReduction:  time.Millisecond,
@@ -38,8 +38,8 @@ func TestManagerFire(t *testing.T) {
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
 	manager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
 		MaximumTimeout:    10 * time.Second,
 		TimeoutMultiplier: 1.1,
 		TimeoutReduction:  time.Millisecond,

@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/gecko/utils/password"
 	"github.com/ava-labs/gecko/utils/sampler"
 	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
@@ -192,6 +193,8 @@ func init() {
 	fs.BoolVar(&Config.HTTPSEnabled, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
+	fs.BoolVar(&Config.APIRequireAuthToken, "api-require-auth", false, "Require authorization token to call HTTP APIs")
+	fs.StringVar(&Config.APIAuthPassword, "api-auth-password", "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
 
 	// Bootstrapping:
 	bootstrapIPs := fs.String("bootstrap-ips", "default", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
@@ -421,6 +424,16 @@ func init() {
 	// HTTP:
 	Config.HTTPHost = *httpHost
 	Config.HTTPPort = uint16(*httpPort)
+	if Config.APIRequireAuthToken {
+		if Config.APIAuthPassword == "" {
+			errs.Add(errors.New("api-auth-password must be provided if api-require-auth is true"))
+			return
+		}
+		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
+			errs.Add(errors.New("api-auth-password is not strong enough. Add more characters"))
+			return
+		}
+	}
 
 	// Logging:
 	if *logsDir != "" {

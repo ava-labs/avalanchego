@@ -11,8 +11,6 @@ import (
 	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/platformvm"
-	"github.com/ava-labs/gecko/vms/spchainvm"
-	"github.com/ava-labs/gecko/vms/spdagvm"
 )
 
 func TestNetworkName(t *testing.T) {
@@ -124,10 +122,6 @@ func TestAliases(t *testing.T) {
 	} else if _, exists := generalAliases["vm/"+avm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	} else if _, exists := generalAliases["vm/"+EVMID.String()]; !exists {
-		t.Fatalf("Should have a custom alias from the vm")
-	} else if _, exists := generalAliases["vm/"+spdagvm.ID.String()]; !exists {
-		t.Fatalf("Should have a custom alias from the vm")
-	} else if _, exists := generalAliases["vm/"+spchainvm.ID.String()]; !exists {
 		t.Fatalf("Should have a custom alias from the vm")
 	}
 }

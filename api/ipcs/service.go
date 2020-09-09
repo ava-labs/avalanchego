@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	_ "go.nanomsg.org/mangos/v3/transport/ipc" // registers the IPC transport
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/gecko/api"

@@ -67,8 +67,8 @@ var (
 
 	minStake = 5 * units.MilliAvax
 
-	// amount all genesis validators stake in defaultVM
-	defaultStakeAmount uint64 = 100 * minStake
+	// amount all genesis validators have in defaultVM
+	defaultBalance uint64 = 100 * minStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -135,7 +135,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 			panic(err)
 		}
 		genesisUTXOs[i] = APIUTXO{
-			Amount:  json.Uint64(defaultStakeAmount),
+			Amount:  json.Uint64(defaultBalance),
 			Address: addr,
 		}
 	}
@@ -1640,8 +1640,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	timeoutManager := timeout.Manager{}
 	timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    10 * time.Second,
-		MinimumTimeout:    500 * time.Millisecond,
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
 		MaximumTimeout:    10 * time.Second,
 		TimeoutMultiplier: 1.1,
 		TimeoutReduction:  time.Millisecond,
