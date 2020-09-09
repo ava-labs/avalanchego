@@ -24,8 +24,8 @@ var (
 
 // Service ...
 type Service struct {
+	*Auth // has to be a reference to the same Auth inside the API server
 	log   logging.Logger
-	*Auth // has to be a reference to the same Auth inside the API sever
 }
 
 // NewService returns a new auth API service

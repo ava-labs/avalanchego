@@ -40,13 +40,20 @@ type Server struct {
 	router *router
 	// Listens for HTTP traffic on this address
 	listenAddress string
-	// Handles authorization. Must be non-nil after initialization, even if token authorization is off.
-	// Assumes the auth service is the only endpoint whose path ends with /auth
+	// Handles authorization. Must be non-nil after initialization, even if
+	// token authorization is off.
 	auth *auth.Auth
 }
 
 // Initialize creates the API server at the provided host and port
-func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host string, port uint16, authEnabled bool, authPassword string) error {
+func (s *Server) Initialize(
+	log logging.Logger,
+	factory logging.Factory,
+	host string,
+	port uint16,
+	authEnabled bool,
+	authPassword string,
+) error {
 	s.log = log
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
@@ -55,12 +62,15 @@ func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host st
 	if err := s.auth.Password.Set(authPassword); err != nil {
 		return err
 	}
-	if authEnabled { // only create auth service if token authorization is required
-		s.log.Info("API authorization is enabled. Auth token must be passed in header of API requests (except requests to auth service.)")
-		authService := auth.NewService(s.log, s.auth)
-		return s.AddRoute(authService, &sync.RWMutex{}, auth.Endpoint, "", s.log)
+	if !authEnabled {
+		return nil
 	}
-	return nil
+
+	// only create auth service if token authorization is required
+	s.log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
+	authService := auth.NewService(s.log, s.auth)
+	return s.AddRoute(authService, &sync.RWMutex{}, auth.Endpoint, "", s.log)
+
 }
 
 // Dispatch starts the API server

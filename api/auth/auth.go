@@ -38,20 +38,27 @@ var (
 
 // Auth handles HTTP API authorization for this node
 type Auth struct {
-	lock     sync.RWMutex  // Prevent race condition when accessing password
 	Enabled  bool          // True iff API calls need auth token
-	clock    timer.Clock   // Tells the time. Can be faked for testing
 	Password password.Hash // Hash of the password. Can be changed via API call.
-	revoked  []string      // List of tokens that have been revoked
+
+	lock    sync.RWMutex // Prevent race condition when accessing password
+	clock   timer.Clock  // Tells the time. Can be faked for testing
+	revoked []string     // List of tokens that have been revoked
 }
 
 // Custom claim type used for API access token
 type endpointClaims struct {
+	jwt.StandardClaims
+
 	// Each element is an endpoint that the token allows access to
 	// If endpoints has an element "*", allows access to all API endpoints
 	// In this case, "*" should be the only element of [endpoints]
 	Endpoints []string
-	jwt.StandardClaims
+}
+
+// getTokenKey returns the key to use when making and parsing tokens
+func (auth *Auth) getTokenKey(*jwt.Token) (interface{}, error) {
+	return auth.Password.Password[:], nil
 }
 
 // getToken gets the JWT token from the request header
@@ -112,10 +119,14 @@ func (auth *Auth) revokeToken(tokenStr string, password string) error {
 		return errWrongPassword
 	}
 
-	token, err := jwt.Parse(tokenStr, func(*jwt.Token) (interface{}, error) { // See if token is well-formed and signature is right
-		return auth.Password.Password[:], nil
-	})
-	if err == nil && token.Valid { // Only need to revoke if the token is valid
+	// See if token is well-formed and signature is right
+	token, err := jwt.Parse(tokenStr, auth.getTokenKey)
+	if err != nil {
+		return err
+	}
+
+	// Only need to revoke if the token is valid
+	if token.Valid {
 		auth.revoked = append(auth.revoked, tokenStr)
 	}
 	return nil
@@ -177,11 +188,10 @@ func (auth *Auth) WrapHandler(h http.Handler) http.Handler {
 			return
 		}
 
-		token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) { // See if token is well-formed and signature is right
-			auth.lock.RLock()
-			defer auth.lock.RUnlock()
-			return auth.Password.Password[:], nil
-		})
+		auth.lock.RLock()
+		token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, auth.getTokenKey)
+		auth.lock.RUnlock()
+
 		if err != nil { // Probably because signature wrong
 			w.WriteHeader(http.StatusUnauthorized)
 			// Error is intentionally dropped here as there is nothing left to
