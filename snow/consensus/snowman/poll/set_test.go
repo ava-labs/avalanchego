@@ -6,9 +6,10 @@ package poll
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanche-go/ids"
 	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestNewSetErrorOnMetrics(t *testing.T) {

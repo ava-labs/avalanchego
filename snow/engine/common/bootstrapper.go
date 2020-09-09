@@ -4,8 +4,9 @@
 package common
 
 import (
-	stdmath "math"
 	"time"
+
+	stdmath "math"
 
 	"github.com/ava-labs/avalanche-go/ids"
 	"github.com/ava-labs/avalanche-go/utils/math"

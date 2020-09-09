@@ -10,8 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanche-go/ids"
 	"github.com/ava-labs/avalanche-go/utils/formatting"
-	safemath "github.com/ava-labs/avalanche-go/utils/math"
 	"github.com/ava-labs/avalanche-go/utils/sampler"
+
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 const (

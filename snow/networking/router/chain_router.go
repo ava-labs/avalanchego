@@ -7,12 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/utils/constants"
-
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-
 	"github.com/ava-labs/avalanche-go/ids"
 	"github.com/ava-labs/avalanche-go/snow/networking/timeout"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
 	"github.com/ava-labs/avalanche-go/utils/logging"
 	"github.com/ava-labs/avalanche-go/utils/timer"
 )

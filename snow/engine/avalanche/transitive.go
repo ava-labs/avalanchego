@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/utils/sampler"
-
 	"github.com/ava-labs/avalanche-go/ids"
 	"github.com/ava-labs/avalanche-go/network"
 	"github.com/ava-labs/avalanche-go/snow/choices"
@@ -21,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanche-go/snow/events"
 	"github.com/ava-labs/avalanche-go/utils/constants"
 	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/sampler"
 	"github.com/ava-labs/avalanche-go/utils/wrappers"
 )
 

@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/snow/validators"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanche-go/ids"
 	"github.com/ava-labs/avalanche-go/snow"
 	"github.com/ava-labs/avalanche-go/snow/engine/common"
 	"github.com/ava-labs/avalanche-go/snow/networking/throttler"
+	"github.com/ava-labs/avalanche-go/snow/validators"
 )
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {

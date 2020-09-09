@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanche-go/utils/constants"
-
 	"github.com/ava-labs/avalanche-go/utils/formatting"
 )
 

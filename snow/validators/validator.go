@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/ava-labs/avalanche-go/ids"
+
 	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
