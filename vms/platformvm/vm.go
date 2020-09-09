@@ -259,7 +259,8 @@ func (vm *VM) Initialize(
 			return err
 		}
 
-		if err := vm.putCurrentSupply(vm.DB, genesis.InitialSupply); err != nil {
+		// TODO: change InitialSupply to genesis.InitialSupply.
+		if err := vm.putCurrentSupply(vm.DB, InitialSupply); err != nil {
 			return err
 		}
 

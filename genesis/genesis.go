@@ -161,6 +161,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	platformvmArgs.InitialSupply = json.Uint64(initialSupply)
+	platformvm.InitialSupply = initialSupply
 
 	platformvmReply := platformvm.BuildGenesisReply{}
 	platformvmSS := platformvm.StaticService{}

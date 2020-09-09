@@ -172,6 +172,8 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
+	// TODO: Remove
+	InitialSupply = 360 * units.MegaAvax
 
 	buildGenesisResponse := BuildGenesisReply{}
 	platformvmSS := StaticService{}

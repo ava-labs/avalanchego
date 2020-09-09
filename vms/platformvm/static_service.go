@@ -124,13 +124,19 @@ type BuildGenesisReply struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs         []*avax.UTXO `serialize:"true"`
-	Validators    []*Tx        `serialize:"true"`
-	Chains        []*Tx        `serialize:"true"`
-	Timestamp     uint64       `serialize:"true"`
-	InitialSupply uint64       `serialize:"true"`
-	Message       string       `serialize:"true"`
+	UTXOs      []*avax.UTXO `serialize:"true"`
+	Validators []*Tx        `serialize:"true"`
+	Chains     []*Tx        `serialize:"true"`
+	Timestamp  uint64       `serialize:"true"`
+	// InitialSupply uint64       `serialize:"true"`
+	Message string `serialize:"true"`
 }
+
+var (
+	// InitialSupply is a hack to keep the genesis the same on the Everest
+	// testnet. TODO: move this field into the Genesis.
+	InitialSupply uint64
+)
 
 // Initialize ...
 func (g *Genesis) Initialize() error {
@@ -253,7 +259,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			VMID:        chain.VMID,
 			FxIDs:       chain.FxIDs,
 			GenesisData: chain.GenesisData.Bytes,
-			SubnetAuth:  &secp256k1fx.Input{},
+			SubnetAuth:  &secp256k1fx.OutputOwners{},
 		}}
 		if err := tx.Sign(Codec, nil); err != nil {
 			return err
@@ -264,12 +270,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 	// genesis holds the genesis state
 	genesis := Genesis{
-		UTXOs:         utxos,
-		Validators:    validators.Txs,
-		Chains:        chains,
-		Timestamp:     uint64(args.Time),
-		InitialSupply: uint64(args.InitialSupply),
-		Message:       args.Message,
+		UTXOs:      utxos,
+		Validators: validators.Txs,
+		Chains:     chains,
+		Timestamp:  uint64(args.Time),
+		Message:    args.Message,
 	}
 
 	// Marshal genesis to bytes
