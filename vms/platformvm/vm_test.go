@@ -155,7 +155,10 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 				Weight:    &weight,
 				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
 			},
-			RewardAddress:     addr,
+			RewardOwner: &APIOwner{
+				Threshold: 1,
+				Addresses: []string{addr},
+			},
 			DelegationFeeRate: NumberOfShares,
 		}
 	}

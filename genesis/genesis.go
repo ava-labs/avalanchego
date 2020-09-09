@@ -126,7 +126,10 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					Weight:    &weight,
 					NodeID:    validatorID.PrefixedString(constants.NodeIDPrefix),
 				},
-				RewardAddress: destAddr,
+				RewardOwner: &platformvm.APIOwner{
+					Threshold: 1,
+					Addresses: []string{destAddr},
+				},
 			},
 		)
 	}

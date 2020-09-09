@@ -31,7 +31,10 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 			Weight:  &weight,
 			NodeID:  nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{
@@ -71,7 +74,10 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 			Weight:    &weight,
 			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{
@@ -112,7 +118,10 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 			Weight:    &weight,
 			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{
@@ -153,7 +162,10 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	validator2 := APIPrimaryValidator{
@@ -163,7 +175,10 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	validator3 := APIPrimaryValidator{
@@ -173,7 +188,10 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			Weight:    &weight,
 			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{

@@ -48,11 +48,18 @@ type APIStaker struct {
 	NodeID      string       `json:"nodeID"`
 }
 
+// APIOwner is the repr. of a reward owner sent over APIs.
+type APIOwner struct {
+	Locktime  json.Uint64 `json:"locktime"`
+	Threshold json.Uint32 `json:"threshold"`
+	Addresses []string    `json:"addresses"`
+}
+
 // APIPrimaryValidator is the repr. of a primary network validator sent over APIs.
 type APIPrimaryValidator struct {
 	APIStaker
-	// The address the staking reward, if applicable, will go to
-	RewardAddress     string        `json:"rewardAddress"`
+	// The owner the staking reward, if applicable, will go to
+	RewardOwner       *APIOwner     `json:"rewardOwner,omitempty"`
 	DelegationFeeRate json.Float32  `json:"delegationFeeRate"`
 	Uptime            *json.Float32 `json:"uptime,omitempty"`
 	Connected         *bool         `json:"connected,omitempty"`
@@ -61,7 +68,7 @@ type APIPrimaryValidator struct {
 // APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.
 type APIPrimaryDelegator struct {
 	APIStaker
-	RewardAddress string `json:"rewardAddress"`
+	RewardOwner *APIOwner `json:"rewardOwner,omitempty"`
 }
 
 func (v *APIStaker) weight() uint64 {
@@ -184,14 +191,23 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if uint64(validator.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
-		addrID, err := bech32ToID(validator.RewardAddress)
-		if err != nil {
-			return err
-		}
 		nodeID, err := ids.ShortFromPrefixedString(validator.NodeID, constants.NodeIDPrefix)
 		if err != nil {
 			return err
 		}
+
+		owner := &secp256k1fx.OutputOwners{
+			Locktime:  uint64(validator.RewardOwner.Locktime),
+			Threshold: uint32(validator.RewardOwner.Threshold),
+		}
+		for _, addrStr := range validator.RewardOwner.Addresses {
+			addrID, err := bech32ToID(addrStr)
+			if err != nil {
+				return err
+			}
+			owner.Addrs = append(owner.Addrs, addrID)
+		}
+		ids.SortShortIDs(owner.Addrs)
 
 		tx := &Tx{UnsignedTx: &UnsignedAddValidatorTx{
 			BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -207,18 +223,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			Stake: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: args.AvaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: weight,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{addrID},
-					},
+					Amt:          weight,
+					OutputOwners: *owner,
 				},
 			}},
-			RewardsOwner: &secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addrID},
-			},
+			RewardsOwner: owner,
 		}}
 		if err := tx.Sign(Codec, nil); err != nil {
 			return err

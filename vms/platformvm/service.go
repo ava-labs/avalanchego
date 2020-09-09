@@ -577,10 +577,21 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		switch staker := tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
 			weight := json.Uint64(staker.Validator.Weight())
-			var rewardAddr string
-			rewardOwner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
-			if ok && len(rewardOwner.Addrs) > 0 {
-				rewardAddr, _ = service.vm.FormatLocalAddress(rewardOwner.Addrs[0])
+
+			var rewardOwner *APIOwner
+			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if ok {
+				rewardOwner = &APIOwner{
+					Locktime:  json.Uint64(owner.Locktime),
+					Threshold: json.Uint32(owner.Threshold),
+				}
+				for _, addr := range owner.Addrs {
+					addrStr, err := service.vm.FormatLocalAddress(addr)
+					if err != nil {
+						return err
+					}
+					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
+				}
 			}
 			reply.Delegators = append(reply.Delegators, APIPrimaryDelegator{
 				APIStaker: APIStaker{
@@ -589,7 +600,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					StakeAmount: &weight,
 					NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
 				},
-				RewardAddress: rewardAddr,
+				RewardOwner: rewardOwner,
 			})
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
@@ -605,10 +616,20 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			_, connected := service.vm.connections[nodeID.Key()]
 			service.vm.connLock.Unlock()
 
-			var rewardAddr string
-			rewardOwner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
-			if ok && len(rewardOwner.Addrs) > 0 {
-				rewardAddr, _ = service.vm.FormatLocalAddress(rewardOwner.Addrs[0])
+			var rewardOwner *APIOwner
+			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if ok {
+				rewardOwner = &APIOwner{
+					Locktime:  json.Uint64(owner.Locktime),
+					Threshold: json.Uint32(owner.Threshold),
+				}
+				for _, addr := range owner.Addrs {
+					addrStr, err := service.vm.FormatLocalAddress(addr)
+					if err != nil {
+						return err
+					}
+					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
+				}
 			}
 
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
@@ -620,7 +641,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				},
 				Uptime:            &uptime,
 				Connected:         &connected,
-				RewardAddress:     rewardAddr,
+				RewardOwner:       rewardOwner,
 				DelegationFeeRate: json.Float32(staker.Shares / 10000),
 			})
 		case *UnsignedAddSubnetValidatorTx:
@@ -764,9 +785,12 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 
 // AddValidatorArgs are the arguments to AddValidator
 type AddValidatorArgs struct {
-	APIPrimaryValidator
-
 	api.UserPass
+
+	APIStaker
+	// The address the staking reward, if applicable, will go to
+	RewardAddress     string       `json:"rewardAddress"`
+	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
 // AddValidator creates and signs and issues a transaction to add a
@@ -822,7 +846,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys,                             // Private keys
+		privKeys, // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -840,8 +864,8 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 // AddDelegatorArgs are the arguments to AddDelegator
 type AddDelegatorArgs struct {
-	APIPrimaryDelegator
 	api.UserPass
+	APIStaker
 	RewardAddress string `json:"rewardAddress"`
 }
 
