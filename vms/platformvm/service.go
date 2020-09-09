@@ -27,6 +27,9 @@ import (
 const (
 	// Max number of addresses that can be passed in as argument to GetUTXOs
 	maxGetUTXOsAddrs = 1024
+
+	// Max number of addresses that can be passed in as argument to GetStake
+	maxGetStakeAddrs = 256
 )
 
 var (
@@ -1470,6 +1473,133 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	} else {
 		*response = Unknown
 	}
+	return nil
+}
+
+// GetStakeReply is the response from calling GetStake.
+type GetStakeReply struct {
+	Staked json.Uint64 `json:"staked"`
+}
+
+// GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
+// staked on the Primary Network.
+//
+// This method assumes that each stake output has only owner
+// This method assumes only AVAX can be staked
+// This method only concerns itself with the Primary Network, not subnets
+// TODO: Improve the performance of this method by maintaining this data
+// in a data structure rather than re-calculating it by iterating over stakers
+func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, response *GetStakeReply) error {
+	service.vm.Ctx.Log.Info("Platform: GetStake called")
+
+	if len(args.Addresses) > maxGetStakeAddrs {
+		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
+	}
+
+	addrs := ids.ShortSet{}
+	for _, addrStr := range args.Addresses { // Parse addresses from string
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse address %s: %w", addrStr, err)
+		}
+		addrs.Add(addr)
+	}
+
+	// Takes in byte repr. of a staker.
+	// Returns the amount staked that belongs to an address in [addrs]
+	helper := func(stakerBytes []byte) (uint64, error) {
+		tx := Tx{}
+		if err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
+			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(service.vm.codec, nil); err != nil {
+			return 0, err
+		}
+
+		var outs []*avax.TransferableOutput
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			outs = staker.Stake
+		case *UnsignedAddValidatorTx:
+			outs = staker.Stake
+		}
+
+		var (
+			amount uint64
+			err    error
+		)
+		for _, stake := range outs {
+			if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
+				continue
+			}
+			secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput)
+			if !ok {
+				continue
+			}
+			contains := false
+			for _, addr := range secpOut.Addrs {
+				if addrs.Contains(addr) {
+					contains = true
+					break
+				}
+			}
+			if !contains {
+				continue
+			}
+			amount, err = math.Add64(amount, stake.Out.Amount())
+			if err != nil {
+				return 0, err
+			}
+		}
+		return amount, nil
+	}
+
+	var totalStake uint64
+
+	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, service.vm.DB)
+	defer stopDB.Close()
+	stopIter := stopDB.NewIterator()
+	defer stopIter.Release()
+
+	for stopIter.Next() { // Iterates over current stakers
+		stakerBytes := stopIter.Value()
+		staked, err := helper(stakerBytes)
+		if err != nil {
+			return err
+		}
+		totalStake, err = math.Add64(totalStake, staked)
+		if err != nil {
+			return err
+		}
+	}
+	if err := stopIter.Error(); err != nil {
+		return fmt.Errorf("iterator errored: %w", err)
+	}
+
+	// Iterate over pending validators
+	startPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
+	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
+	defer startDB.Close()
+	startIter := startDB.NewIterator()
+	defer startIter.Release()
+
+	for startIter.Next() { // Iterates over current stakers
+		stakerBytes := startIter.Value()
+		staked, err := helper(stakerBytes)
+		if err != nil {
+			return err
+		}
+		totalStake, err = math.Add64(totalStake, staked)
+		if err != nil {
+			return err
+		}
+	}
+	if err := stopIter.Error(); err != nil {
+		return fmt.Errorf("iterator errored: %w", err)
+	}
+
+	response.Staked = json.Uint64(totalStake)
 	return nil
 }
 
