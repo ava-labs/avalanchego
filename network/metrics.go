@@ -6,9 +6,10 @@ package network
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanche-go/utils/constants"
 	"github.com/ava-labs/avalanche-go/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type messageMetrics struct {
