@@ -9,10 +9,21 @@ import (
 )
 
 var (
-	maxSubMinConsumptionRate   = new(big.Int).SetUint64(MaxSubMinConsumptionRate)
-	minConsumptionRate         = new(big.Int).SetUint64(MinConsumptionRate)
+	// maxSubMinConsumptionRate is the difference between the maximum
+	// consumption rate of the remaining tokens and the minimum.
+	maxSubMinConsumptionRate = new(big.Int).SetUint64(MaxSubMinConsumptionRate)
+
+	// minConsumptionRate is the consumption rate to use when calculating a
+	// validator period with duration 0.
+	minConsumptionRate = new(big.Int).SetUint64(MinConsumptionRate)
+
+	// consumptionRateDenominator is the magnitude offset used to emulate
+	// floating point fractions.
 	consumptionRateDenominator = new(big.Int).SetUint64(PercentDenominator)
-	consumptionInterval        = new(big.Int).SetUint64(uint64(MaximumStakingDuration))
+
+	// consumptionInterval is the period that should be used to calculate the
+	// consumption rate given a duration.
+	consumptionInterval = new(big.Int).SetUint64(uint64(MaximumStakingDuration))
 )
 
 type rewardTx struct {
