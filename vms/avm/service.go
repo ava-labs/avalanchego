@@ -439,7 +439,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		return errNoHolders
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
@@ -543,7 +543,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		return errNoMinters
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
@@ -644,7 +644,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return errNoMinters
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
@@ -918,6 +918,11 @@ type SendArgs struct {
 	// Address of the recipient
 	To string `json:"to"`
 
+	// The addresses to send funds from
+	// If empty, will send from any addresses
+	// controlled by the given user
+	From []string `json:"from"`
+
 	// Memo field
 	Memo string `json:"memo"`
 }
@@ -946,7 +951,15 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'From' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
@@ -1060,7 +1073,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
@@ -1153,7 +1166,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
@@ -1247,7 +1260,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
@@ -1344,7 +1357,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
@@ -1459,7 +1472,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 		return errInvalidAmount
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password)
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
 	if err != nil {
 		return err
 	}
