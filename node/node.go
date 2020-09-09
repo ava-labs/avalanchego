@@ -48,8 +48,6 @@ import (
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/rpcchainvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/ava-labs/gecko/vms/spchainvm"
-	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
 
 	ipcsapi "github.com/ava-labs/gecko/api/ipcs"
@@ -486,10 +484,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
-		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
-			TxFee: n.Config.TxFee,
-		}),
-		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
