@@ -4,9 +4,9 @@
 package snowman
 
 import (
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/bootstrap"
 )
 
 // Config wraps all the parameters needed for a snowman engine

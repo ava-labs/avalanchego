@@ -6,7 +6,8 @@ package network
 import (
 	"fmt"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -17,19 +18,19 @@ type messageMetrics struct {
 func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registerer) error {
 	mm.numSent = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: "gecko",
+			Namespace: constants.PlatformName,
 			Name:      fmt.Sprintf("%s_sent", msgType),
 			Help:      fmt.Sprintf("Number of %s messages sent", msgType),
 		})
 	mm.numFailed = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: "gecko",
+			Namespace: constants.PlatformName,
 			Name:      fmt.Sprintf("%s_failed", msgType),
 			Help:      fmt.Sprintf("Number of %s messages that failed to be sent", msgType),
 		})
 	mm.numReceived = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: "gecko",
+			Namespace: constants.PlatformName,
 			Name:      fmt.Sprintf("%s_received", msgType),
 			Help:      fmt.Sprintf("Number of %s messages received", msgType),
 		})
@@ -64,7 +65,7 @@ type metrics struct {
 func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	m.numPeers = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: "gecko",
+			Namespace: constants.PlatformName,
 			Name:      "peers",
 			Help:      "Number of network peers",
 		})

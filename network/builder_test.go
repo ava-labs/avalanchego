@@ -7,8 +7,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils"
 	"github.com/stretchr/testify/assert"
 )
 

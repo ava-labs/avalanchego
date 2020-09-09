@@ -4,8 +4,8 @@
 package snowman
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
 )
 
 // issuer issues [blk] into to consensus after its dependencies are met.

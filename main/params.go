@@ -14,23 +14,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/gecko/database/leveldb"
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/genesis"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/ipcs"
-	"github.com/ava-labs/gecko/nat"
-	"github.com/ava-labs/gecko/node"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/staking"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/password"
-	"github.com/ava-labs/gecko/utils/sampler"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/database/leveldb"
+	"github.com/ava-labs/avalanche-go/database/memdb"
+	"github.com/ava-labs/avalanche-go/genesis"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/ipcs"
+	"github.com/ava-labs/avalanche-go/nat"
+	"github.com/ava-labs/avalanche-go/node"
+	"github.com/ava-labs/avalanche-go/snow/networking/router"
+	"github.com/ava-labs/avalanche-go/staking"
+	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/password"
+	"github.com/ava-labs/avalanche-go/utils/sampler"
+	"github.com/ava-labs/avalanche-go/utils/units"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 )
 
 const (
@@ -44,14 +44,15 @@ var (
 	defaultNetworkName = constants.TestnetName
 
 	homeDir                = os.ExpandEnv("$HOME")
-	defaultDbDir           = filepath.Join(homeDir, ".gecko", "db")
-	defaultStakingKeyPath  = filepath.Join(homeDir, ".gecko", "staking", "staker.key")
-	defaultStakingCertPath = filepath.Join(homeDir, ".gecko", "staking", "staker.crt")
+	dataDirName            = fmt.Sprintf(".%s", constants.AppName)
+	defaultDbDir           = filepath.Join(homeDir, dataDirName, "db")
+	defaultStakingKeyPath  = filepath.Join(homeDir, dataDirName, "staking", "staker.key")
+	defaultStakingCertPath = filepath.Join(homeDir, dataDirName, "staking", "staker.crt")
 	defaultPluginDirs      = []string{
 		filepath.Join(".", "build", "plugins"),
 		filepath.Join(".", "plugins"),
-		filepath.Join("/", "usr", "local", "lib", "gecko"),
-		filepath.Join(homeDir, ".gecko", "plugins"),
+		filepath.Join("/", "usr", "local", "lib", constants.AppName),
+		filepath.Join(homeDir, dataDirName, "plugins"),
 	}
 )
 
@@ -157,7 +158,7 @@ func init() {
 		return
 	}
 
-	fs := flag.NewFlagSet("gecko", flag.ContinueOnError)
+	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
 
 	// If this is true, print the version and quit.
 	version := fs.Bool("version", false, "If true, print version and quit")
@@ -198,7 +199,7 @@ func init() {
 
 	// Bootstrapping:
 	bootstrapIPs := fs.String("bootstrap-ips", "default", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	bootstrapIDs := fs.String("bootstrap-ids", "default", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Staking:
 	consensusPort := fs.Uint("staking-port", 9651, "Port of the consensus server")

@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/rpcdb/rpcdbproto"
 )
 
 var (

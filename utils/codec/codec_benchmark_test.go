@@ -6,7 +6,7 @@ package codec
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 )
 
 // BenchmarkMarshal benchmarks the codec's marshal function

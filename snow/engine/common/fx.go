@@ -4,7 +4,7 @@
 package common
 
 import (
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // Fx wraps an instance of a feature extension

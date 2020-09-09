@@ -12,8 +12,8 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 
-	"github.com/ava-labs/gecko/utils/password"
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanche-go/utils/password"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 )
 
 const (

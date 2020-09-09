@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/formatting"
-	safemath "github.com/ava-labs/gecko/utils/math"
-	"github.com/ava-labs/gecko/utils/sampler"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
+	"github.com/ava-labs/avalanche-go/utils/sampler"
 )
 
 const (

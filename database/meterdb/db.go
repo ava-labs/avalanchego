@@ -4,9 +4,9 @@
 package meterdb
 
 import (
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 
-	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/avalanche-go/database"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

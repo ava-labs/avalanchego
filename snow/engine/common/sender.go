@@ -4,7 +4,7 @@
 package common
 
 import (
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // Sender defines how a consensus engine sends messages and requests to other

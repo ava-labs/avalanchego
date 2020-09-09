@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
 )
 
 func TestBaseTxMarshalJSON(t *testing.T) {

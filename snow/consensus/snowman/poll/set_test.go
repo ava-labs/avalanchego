@@ -6,8 +6,8 @@ package poll
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

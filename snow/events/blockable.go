@@ -4,7 +4,7 @@
 package events
 
 import (
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // Blockable defines what an object must implement to be able to block on events

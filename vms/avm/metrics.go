@@ -6,7 +6,7 @@ package avm
 import (
 	"fmt"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

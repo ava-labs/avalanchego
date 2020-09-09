@@ -4,7 +4,7 @@
 package network
 
 import (
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 )
 
 // Field that may be packed into a message

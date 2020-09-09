@@ -8,36 +8,36 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/api/keystore"
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/state"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/sender"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms"
+	"github.com/ava-labs/avalanche-go/api"
+	"github.com/ava-labs/avalanche-go/api/keystore"
+	"github.com/ava-labs/avalanche-go/chains/atomic"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/prefixdb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/network"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
+	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/state"
+	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanche-go/snow/networking/router"
+	"github.com/ava-labs/avalanche-go/snow/networking/sender"
+	"github.com/ava-labs/avalanche-go/snow/networking/timeout"
+	"github.com/ava-labs/avalanche-go/snow/triggers"
+	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/vms"
 
-	avcon "github.com/ava-labs/gecko/snow/consensus/avalanche"
-	aveng "github.com/ava-labs/gecko/snow/engine/avalanche"
-	avbootstrap "github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
+	avcon "github.com/ava-labs/avalanche-go/snow/consensus/avalanche"
+	aveng "github.com/ava-labs/avalanche-go/snow/engine/avalanche"
+	avbootstrap "github.com/ava-labs/avalanche-go/snow/engine/avalanche/bootstrap"
 
-	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
-	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
-	smbootstrap "github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
+	smcon "github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	smeng "github.com/ava-labs/avalanche-go/snow/engine/snowman"
+	smbootstrap "github.com/ava-labs/avalanche-go/snow/engine/snowman/bootstrap"
 )
 
 const (
@@ -243,7 +243,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
 		BCLookup:            m,
 		SNLookup:            m,
-		Namespace:           fmt.Sprintf("gecko_%s_vm", primaryAlias),
+		Namespace:           fmt.Sprintf("avalanche_%s_vm", primaryAlias),
 		Metrics:             m.ConsensusParams.Metrics,
 	}
 
@@ -286,7 +286,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	consensusParams := m.ConsensusParams
-	consensusParams.Namespace = fmt.Sprintf("gecko_%s", primaryAlias)
+	consensusParams.Namespace = fmt.Sprintf("avalanche_%s", primaryAlias)
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain

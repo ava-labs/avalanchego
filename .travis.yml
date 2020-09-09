@@ -6,7 +6,7 @@ go:
 env:
   global:
   - CODECOV_TOKEN="8c18c993-fc6e-4706-998b-01ddc7987804"
-  - GECKO_HOME=$GOPATH/src/github.com/$TRAVIS_REPO_SLUG/
+  - AVALANCHE_HOME=$GOPATH/src/github.com/$TRAVIS_REPO_SLUG/
   - E2E_TEST_HOME=$GOPATH/src/github.com/ava-labs/avalanche-testing/
   - COMMIT=${TRAVIS_COMMIT::8}
   - DOCKERHUB_REPO=avaplatform/gecko

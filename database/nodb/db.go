@@ -4,7 +4,7 @@
 package nodb
 
 import (
-	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/avalanche-go/database"
 )
 
 // Database is a lightning fast key value store with probabilistic operations.

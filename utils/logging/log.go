@@ -12,6 +12,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ava-labs/avalanche-go/utils/constants"
+)
+
+var (
+	filePrefix = fmt.Sprintf("%s/", constants.AppName)
 )
 
 // Log ...
@@ -162,8 +168,8 @@ func (l *Log) format(level Level, format string, args ...interface{}) string {
 	if _, file, no, ok := runtime.Caller(3); ok {
 		loc = fmt.Sprintf("%s#%d", file, no)
 	}
-	if i := strings.Index(loc, "gecko/"); i != -1 {
-		loc = loc[i+5:]
+	if i := strings.Index(loc, filePrefix); i != -1 {
+		loc = loc[i+len(filePrefix):]
 	}
 	text := fmt.Sprintf("%s: %s", loc, fmt.Sprintf(format, args...))
 
