@@ -389,10 +389,17 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 }
 
 // initAPIServer initializes the server that handles HTTP calls
-func (n *Node) initAPIServer() {
+func (n *Node) initAPIServer() error {
 	n.Log.Info("Initializing API server")
 
-	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
+	return n.APIServer.Initialize(
+		n.Log,
+		n.LogFactory,
+		n.Config.HTTPHost,
+		n.Config.HTTPPort,
+		n.Config.APIRequireAuthToken,
+		n.Config.APIAuthPassword,
+	)
 }
 
 // Create the vmManager, chainManager and register the following vms:
@@ -680,7 +687,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 
 	// Start HTTP APIs
-	n.initAPIServer()                           // Start the API Server
+	if err := n.initAPIServer(); err != nil { // Start the API Server
+		return fmt.Errorf("couldn't initialize API server: %w", err)
+	}
 	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
 		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}

@@ -1,24 +1,24 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package keystore
+package password
 
 import (
 	"testing"
 )
 
-func TestUser(t *testing.T) {
-	usr := User{}
-	if err := usr.Initialize("heytherepal"); err != nil {
+func TestHash(t *testing.T) {
+	h := Hash{}
+	if err := h.Set("heytherepal"); err != nil {
 		t.Fatal(err)
 	}
-	if !usr.CheckPassword("heytherepal") {
+	if !h.Check("heytherepal") {
 		t.Fatalf("Should have verified the password")
 	}
-	if usr.CheckPassword("heytherepal!") {
+	if h.Check("heytherepal!") {
 		t.Fatalf("Shouldn't have verified the password")
 	}
-	if usr.CheckPassword("") {
+	if h.Check("") {
 		t.Fatalf("Shouldn't have verified the password")
 	}
 }
