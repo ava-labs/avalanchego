@@ -48,8 +48,6 @@ import (
 	"github.com/ava-labs/gecko/vms/propertyfx"
 	"github.com/ava-labs/gecko/vms/rpcchainvm"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/ava-labs/gecko/vms/spchainvm"
-	"github.com/ava-labs/gecko/vms/spdagvm"
 	"github.com/ava-labs/gecko/vms/timestampvm"
 
 	ipcsapi "github.com/ava-labs/gecko/api/ipcs"
@@ -391,10 +389,17 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 }
 
 // initAPIServer initializes the server that handles HTTP calls
-func (n *Node) initAPIServer() {
+func (n *Node) initAPIServer() error {
 	n.Log.Info("Initializing API server")
 
-	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
+	return n.APIServer.Initialize(
+		n.Log,
+		n.LogFactory,
+		n.Config.HTTPHost,
+		n.Config.HTTPPort,
+		n.Config.APIRequireAuthToken,
+		n.Config.APIAuthPassword,
+	)
 }
 
 // Create the vmManager, chainManager and register the following vms:
@@ -479,10 +484,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
-		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
-			TxFee: n.Config.TxFee,
-		}),
-		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
@@ -686,7 +687,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 
 	// Start HTTP APIs
-	n.initAPIServer()                           // Start the API Server
+	if err := n.initAPIServer(); err != nil { // Start the API Server
+		return fmt.Errorf("couldn't initialize API server: %w", err)
+	}
 	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
 		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}

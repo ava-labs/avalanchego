@@ -727,6 +727,9 @@ func (vm *VM) LoadUser(
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user: %w", err)
 	}
+	// Drop any potential error closing the database to report the original
+	// error
+	defer db.Close()
 
 	user := userState{vm: vm}
 
@@ -758,7 +761,7 @@ func (vm *VM) LoadUser(
 		kc.Add(sk)
 	}
 
-	return utxos, kc, nil
+	return utxos, kc, db.Close()
 }
 
 // Spend ...
