@@ -350,7 +350,34 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmt := minStake + 12345
-	tx, err := service.vm.newAddValidatorTx(
+	tx, err := service.vm.newAddDelegatorTx(
+		stakeAmt,
+		uint64(defaultGenesisTime.Unix()),
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	}
+	oldStake = response.Staked
+
+	// Make sure this works for pending stakers
+	// Add a pending staker
+	stakeAmt = minStake + 54321
+	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
@@ -362,10 +389,9 @@ func TestGetStake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+	if err := service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
 		t.Fatal(err)
 	}
-
 	// Make sure the delegator has the right stake (old stake + stakeAmt)
 	if err := service.GetStake(nil, &args, &response); err != nil {
 		t.Fatal(err)

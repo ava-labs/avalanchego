@@ -1388,12 +1388,56 @@ func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, respo
 	}
 
 	addrs := ids.ShortSet{}
-	for _, addrStr := range args.Addresses { // Prrse addresses from string
+	for _, addrStr := range args.Addresses { // Parse addresses from string
 		addr, err := service.vm.ParseLocalAddress(addrStr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse address %s: %w", addrStr, err)
 		}
 		addrs.Add(addr)
+	}
+
+	// Takes in byte repr. of a staker.
+	// Returns the amount staked that belongs to an address in [addrs]
+	helper := func(stakerBytes []byte) (uint64, error) {
+		tx := Tx{}
+		if err := service.vm.codec.Unmarshal(stakerBytes, &tx); err != nil {
+			return 0, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		}
+		if err := tx.Sign(service.vm.codec, nil); err != nil {
+			return 0, err
+		}
+
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			for _, stake := range staker.Stake {
+				if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
+					continue
+				}
+				secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput)
+				if !ok || len(secpOut.Addrs) == 0 {
+					return 0, nil
+				}
+				if !addrs.Contains(secpOut.Addrs[0]) {
+					return 0, nil
+				}
+				return stake.Out.Amount(), nil
+			}
+		case *UnsignedAddValidatorTx:
+			for _, stake := range staker.Stake {
+				if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
+					continue
+				}
+				secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput)
+				if !ok || len(secpOut.Addrs) == 0 {
+					return 0, nil
+				}
+				if !addrs.Contains(secpOut.Addrs[0]) {
+					return 0, nil
+				}
+				return stake.Out.Amount(), nil
+			}
+		}
+		return 0, nil
 	}
 
 	var totalStake uint64
@@ -1404,54 +1448,43 @@ func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, respo
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	var err error
-	for stopIter.Next() { // Iterates in order of increasing start time
-		txBytes := stopIter.Value()
-
-		tx := Tx{}
-		if err := service.vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
-		}
-		if err := tx.Sign(service.vm.codec, nil); err != nil {
+	for stopIter.Next() { // Iterates over current stakers
+		stakerBytes := stopIter.Value()
+		staked, err := helper(stakerBytes)
+		if err != nil {
 			return err
 		}
-
-		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
-			for _, stake := range staker.Stake {
-				if stake.AssetID() != service.vm.Ctx.AVAXAssetID {
-					continue
-				}
-				if secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput); ok && len(secpOut.Addrs) > 0 {
-					if !addrs.Contains(secpOut.Addrs[0]) {
-						continue
-					}
-					totalStake, err = math.Add64(totalStake, stake.Out.Amount())
-					if err != nil {
-						return err
-					}
-				}
-			}
-		case *UnsignedAddValidatorTx:
-			for _, stake := range staker.Stake {
-				if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
-					continue
-				}
-				if secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput); ok && len(secpOut.Addrs) > 0 {
-					if !addrs.Contains(secpOut.Addrs[0]) {
-						continue
-					}
-					totalStake, err = math.Add64(totalStake, stake.Out.Amount())
-					if err != nil {
-						return err
-					}
-				}
-			}
+		totalStake, err = math.Add64(totalStake, staked)
+		if err != nil {
+			return err
 		}
 	}
 	if err := stopIter.Error(); err != nil {
 		return fmt.Errorf("iterator errored: %w", err)
 	}
+
+	// Iterate over pending validators
+	startPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
+	startDB := prefixdb.NewNested(startPrefix, service.vm.DB)
+	defer startDB.Close()
+	startIter := startDB.NewIterator()
+	defer startIter.Release()
+
+	for startIter.Next() { // Iterates over current stakers
+		stakerBytes := startIter.Value()
+		staked, err := helper(stakerBytes)
+		if err != nil {
+			return err
+		}
+		totalStake, err = math.Add64(totalStake, staked)
+		if err != nil {
+			return err
+		}
+	}
+	if err := stopIter.Error(); err != nil {
+		return fmt.Errorf("iterator errored: %w", err)
+	}
+
 	response.Staked = json.Uint64(totalStake)
 	return nil
 }
