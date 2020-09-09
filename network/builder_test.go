@@ -7,9 +7,10 @@ import (
 	"net"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanche-go/ids"
 	"github.com/ava-labs/avalanche-go/utils"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
