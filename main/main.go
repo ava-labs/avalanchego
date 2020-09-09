@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/ava-labs/avalanche-go/nat"
 	"github.com/ava-labs/avalanche-go/node"
@@ -37,9 +36,7 @@ func main() {
 		return
 	}
 
-	config := Config.LoggingConfig
-	config.Directory = filepath.Join(config.Directory, "node")
-	factory := logging.NewFactory(config)
+	factory := logging.NewFactory(Config.LoggingConfig)
 	defer factory.Close()
 
 	log, err := factory.Make()
