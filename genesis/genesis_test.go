@@ -146,42 +146,42 @@ func TestVMGenesis(t *testing.T) {
 		{
 			networkID:  constants.EverestID,
 			vmID:       avm.ID,
-			expectedID: "jnUjZSRt16TcRnZzmh5aMhavwVHz3zBrSN8GfFMTQkzUnoBxC",
+			expectedID: "CQYQYFc5UchSXcxNK75UPfSkf9iXXvfZqftRhfXath4JaxQjR",
 		},
 		{
 			networkID:  constants.DenaliID,
 			vmID:       avm.ID,
-			expectedID: "2ku4ACFiovQnp2bDQ9MUib3q4mChtHZioAn3LqNfQA3ovA1dHP",
+			expectedID: "CPqbS52BCHgxdxhvH8ELMuEDbcduEDMEhfMQTLiUftrvwcf61",
 		},
 		{
 			networkID:  constants.CascadeID,
 			vmID:       avm.ID,
-			expectedID: "oMrNBf9aQ7kPDEPxfww7rsUntfJ3w7qNTowdRzMPejAJNC2p5",
+			expectedID: "2FMMbutr6ZR4deeJQ3U5uVgiuvxnfc7wGrkVv6y2o8JwrhG9gz",
 		},
 		{
 			networkID:  constants.LocalID,
 			vmID:       avm.ID,
-			expectedID: "v4hFSZTNNVdyomeMoXa77dAz4CdxU3cziSb45TB7mfXUmy7C7",
+			expectedID: "2P14wP6TYcetS5PAACK9nwSaGxY32qNvCQztw6jcHoNVNWMGcv",
 		},
 		{
 			networkID:  constants.EverestID,
 			vmID:       EVMID,
-			expectedID: "saMG5YgNsFxzjz4NMkEkt3bAH6hVxWdZkWcEnGB3Z15pcAmsK",
+			expectedID: "2aUMsnB39oCq8D35Y8x1R12ghjHz26QPCphXE5YXsyey5Mfz3V",
 		},
 		{
 			networkID:  constants.DenaliID,
 			vmID:       EVMID,
-			expectedID: "8ghyBLuZmgciT5f2nDiHBdjze5rqf5xPxHMYu41xxqENYwhFB",
+			expectedID: "2GiRVhpWTmJcSEkHzMaVcnezUa68kKJouoqsH8NMR8tb8E4Ut5",
 		},
 		{
 			networkID:  constants.CascadeID,
 			vmID:       EVMID,
-			expectedID: "uZeMkrvmMMkw31hnJ31heDTPCFcdwT2qP7XefqiPkJjnLMonw",
+			expectedID: "RFK5ybh7KeoikDaR1oF1KNs6FApi4wuRQY1BV2WjumQ7Ast1X",
 		},
 		{
 			networkID:  constants.LocalID,
 			vmID:       EVMID,
-			expectedID: "2m6aMgMBJWsmT4Hv448n6sNAwGMFfugBvdU6PdY5oxZge4qb1W",
+			expectedID: "E4HBwwHxuroHfFrcnf8eTbEUAGWfG9gXYNnx6izxaL31SzUVH",
 		},
 	}
 

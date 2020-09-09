@@ -358,7 +358,10 @@ func TestGetStake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
 		t.Fatal(err)
 	}
 

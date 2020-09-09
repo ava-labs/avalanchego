@@ -150,12 +150,12 @@ func (vm *VM) dequeueStaker(db database.Database, subnetID ids.ID, stakerTx *Tx)
 
 // Add a staker to subnet [subnetID]
 // A staker may be a validator or a delegator
-func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+func (vm *VM) addStaker(db database.Database, subnetID ids.ID, tx *rewardTx) error {
 	var (
 		staker   TimedTx
 		priority byte
 	)
-	switch unsignedTx := stakerTx.UnsignedTx.(type) {
+	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
 		priority = 0
@@ -166,10 +166,15 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 		staker = unsignedTx
 		priority = 2
 	default:
-		return fmt.Errorf("staker is unexpected type %T", stakerTx)
+		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
-	txBytes := stakerTx.Bytes()
+
+	txBytes, err := vm.codec.Marshal(tx)
+	if err != nil {
+		return err
+	}
+
+	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time then tx ID
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
@@ -179,7 +184,7 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(txID)
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -190,12 +195,12 @@ func (vm *VM) addStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) err
 
 // Remove a staker from subnet [subnetID]
 // A staker may be a validator or a delegator
-func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) error {
+func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, tx *rewardTx) error {
 	var (
 		staker   TimedTx
 		priority byte
 	)
-	switch unsignedTx := stakerTx.UnsignedTx.(type) {
+	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		staker = unsignedTx
 		priority = 0
@@ -206,9 +211,10 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) 
 		staker = unsignedTx
 		priority = 2
 	default:
-		return fmt.Errorf("staker is unexpected type %T", stakerTx)
+		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
 	}
-	stakerID := staker.ID().Bytes() // Tx ID of this tx
+
+	txID := tx.Tx.ID().Bytes() // Tx ID of this tx
 
 	// Sorted by subnet ID then stop time
 	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
@@ -218,7 +224,7 @@ func (vm *VM) removeStaker(db database.Database, subnetID ids.ID, stakerTx *Tx) 
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(staker.EndTime().Unix()))
 	p.PackByte(priority)
-	p.PackFixedBytes(stakerID)
+	p.PackFixedBytes(txID)
 	if p.Err != nil {
 		return fmt.Errorf("couldn't serialize validator key: %w", p.Err)
 	}
@@ -246,7 +252,7 @@ func (vm *VM) nextStakerStart(db database.Database, subnetID ids.ID) (*Tx, error
 }
 
 // Returns the current staker that will stop staking next
-func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error) {
+func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*rewardTx, error) {
 	iter := prefixdb.NewNested([]byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix)), db).NewIterator()
 	defer iter.Release()
 
@@ -256,11 +262,11 @@ func (vm *VM) nextStakerStop(db database.Database, subnetID ids.ID) (*Tx, error)
 	// Key: [Staker stop time] | [Tx ID]
 	// Value: Byte repr. of tx that added this validator
 
-	tx := Tx{}
+	tx := rewardTx{}
 	if err := Codec.Unmarshal(iter.Value(), &tx); err != nil {
 		return nil, err
 	}
-	return &tx, tx.Sign(vm.codec, nil)
+	return &tx, tx.Tx.Sign(vm.codec, nil)
 }
 
 // Returns true if [nodeID] is a validator (not a delegator) of subnet [subnetID]
@@ -270,15 +276,15 @@ func (vm *VM) isValidator(db database.Database, subnetID ids.ID, nodeID ids.Shor
 
 	for iter.Next() {
 		txBytes := iter.Value()
-		tx := Tx{}
+		tx := rewardTx{}
 		if err := Codec.Unmarshal(txBytes, &tx); err != nil {
 			return nil, false, err
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return nil, false, err
 		}
 
-		switch vdr := tx.UnsignedTx.(type) {
+		switch vdr := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			if subnetID.Equals(constants.PrimaryNetworkID) && vdr.Validator.NodeID.Equals(nodeID) {
 				return vdr, true, nil
@@ -696,6 +702,38 @@ func (vm *VM) registerDBTypes() {
 	if err := vm.State.RegisterType(statusTypeID, marshalStatusFunc, unmarshalStatusFunc); err != nil {
 		vm.Ctx.Log.Warn(errRegisteringType.Error())
 	}
+
+	marshalCurrentSupplyFunc := func(currentSupplyIntf interface{}) ([]byte, error) {
+		if currentSupply, ok := currentSupplyIntf.(uint64); ok {
+			return vm.codec.Marshal(currentSupply)
+		}
+		return nil, fmt.Errorf("expected uint64 but got type %T", currentSupplyIntf)
+	}
+	unmarshalCurrentSupplyFunc := func(bytes []byte) (interface{}, error) {
+		var currentSupply uint64
+		if err := Codec.Unmarshal(bytes, &currentSupply); err != nil {
+			return nil, err
+		}
+		return currentSupply, nil
+	}
+	if err := vm.State.RegisterType(currentSupplyTypeID, marshalCurrentSupplyFunc, unmarshalCurrentSupplyFunc); err != nil {
+		vm.Ctx.Log.Warn(errRegisteringType.Error())
+	}
+}
+
+func (vm *VM) getCurrentSupply(db database.Database) (uint64, error) {
+	currentSupplyIntf, err := vm.State.Get(db, currentSupplyTypeID, currentSupplyKey)
+	if err != nil {
+		return 0, err
+	}
+	if currentSupply, ok := currentSupplyIntf.(uint64); ok {
+		return currentSupply, nil
+	}
+	return 0, fmt.Errorf("expected current supply to be uint64 but is type %T", currentSupplyIntf)
+}
+
+func (vm *VM) putCurrentSupply(db database.Database, currentSupply uint64) error {
+	return vm.State.Put(db, currentSupplyTypeID, currentSupplyKey, currentSupply)
 }
 
 type validatorUptime struct {

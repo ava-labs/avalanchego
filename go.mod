@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
+	github.com/Microsoft/go-winio v0.4.14
 	github.com/ava-labs/coreth v0.2.14-rc.1 // indirect
 	github.com/ava-labs/go-ethereum v1.9.3
 	github.com/btcsuite/btcutil v1.0.2
@@ -26,8 +27,8 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
-	go.nanomsg.org/mangos/v3 v3.0.1
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
 	google.golang.org/grpc v1.29.1
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )

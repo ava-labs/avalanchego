@@ -27,10 +27,13 @@ import (
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/gecko/utils/units"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/components/core"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/gecko/utils/math"
 )
 
 const (
@@ -43,6 +46,7 @@ const (
 	utxoSetTypeID
 	txTypeID
 	statusTypeID
+	currentSupplyTypeID
 
 	// Delta is the synchrony bound used for safe decision making
 	Delta = 10 * time.Second
@@ -50,15 +54,24 @@ const (
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
 
-	// NumberOfShares is the number of shares that a delegator is
-	// rewarded
-	NumberOfShares = 1000000
+	// PercentDenominator is the denominator used to calculate percentages
+	PercentDenominator = 1000000
+
+	droppedTxCacheSize = 50
+
+	maxUTXOsToFetch = 1024
 
 	// TODO: Turn these constants into governable parameters
 
-	// InflationRate is the inflation rate from staking
-	// TODO: make inflation rate non-zero
-	InflationRate = 1.00
+	// MaxSubMinConsumptionRate is the % consumption that incentivizes staking
+	// longer
+	MaxSubMinConsumptionRate = 20000 // 2%
+	// MinConsumptionRate is the minimum % consumption of the remaining tokens
+	// to be minted
+	MinConsumptionRate = 100000 // 10%
+
+	// SupplyCap is the maximum amount of AVAX that should ever exist
+	SupplyCap = 720 * units.MegaAvax
 
 	// MinimumStakingDuration is the shortest amount of time a staker can bond
 	// their funds for.
@@ -67,16 +80,13 @@ const (
 	// MaximumStakingDuration is the longest amount of time a staker can bond
 	// their funds for.
 	MaximumStakingDuration = 365 * 24 * time.Hour
-
-	droppedTxCacheSize = 50
-
-	maxUTXOsToFetch = 1024
 )
 
 var (
-	timestampKey = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
-	chainsKey    = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
-	subnetsKey   = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
+	timestampKey     = ids.NewID([32]byte{'t', 'i', 'm', 'e'})
+	chainsKey        = ids.NewID([32]byte{'c', 'h', 'a', 'i', 'n', 's'})
+	subnetsKey       = ids.NewID([32]byte{'s', 'u', 'b', 'n', 'e', 't', 's'})
+	currentSupplyKey = ids.NewID([32]byte{'c', 'u', 'r', 'r', 'e', 't', ' ', 's', 'u', 'p', 'p', 'l', 'y'})
 
 	errEndOfTime                = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
 	errNoPendingBlocks          = errors.New("no pending blocks")
@@ -249,9 +259,17 @@ func (vm *VM) Initialize(
 			return err
 		}
 
+		if err := vm.putCurrentSupply(vm.DB, genesis.InitialSupply); err != nil {
+			return err
+		}
+
 		// Persist primary network validator set at genesis
 		for _, vdrTx := range genesis.Validators {
-			if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, vdrTx); err != nil {
+			tx := rewardTx{
+				Reward: 0,
+				Tx:     *vdrTx,
+			}
+			if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, &tx); err != nil {
 				return err
 			}
 		}
@@ -453,15 +471,15 @@ func (vm *VM) Bootstrapped() error {
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
-		tx := Tx{}
+		tx := rewardTx{}
 		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return err
 		}
 
-		unsignedTx, ok := tx.UnsignedTx.(*UnsignedAddValidatorTx)
+		unsignedTx, ok := tx.Tx.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !ok {
 			continue
 		}
@@ -523,15 +541,15 @@ func (vm *VM) Shutdown() error {
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
-		tx := Tx{}
+		tx := rewardTx{}
 		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return err
 		}
 
-		switch staker := tx.UnsignedTx.(type) {
+		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddValidatorTx:
 			nodeID := staker.Validator.ID()
 			startTime := staker.StartTime()
@@ -662,13 +680,13 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	staker, ok := tx.UnsignedTx.(TimedTx)
+	staker, ok := tx.Tx.UnsignedTx.(TimedTx)
 	if !ok {
 		return nil, fmt.Errorf("expected staker tx to be TimedTx but got %T", tx)
 	}
 	nextValidatorEndtime = staker.EndTime()
 	if currentChainTimestamp.Equal(nextValidatorEndtime) {
-		rewardValidatorTx, err := vm.newRewardValidatorTx(tx.ID())
+		rewardValidatorTx, err := vm.newRewardValidatorTx(tx.Tx.ID())
 		if err != nil {
 			return nil, err
 		}
@@ -968,7 +986,7 @@ func (vm *VM) nextStakerChangeTime(db database.Database) (time.Time, error) {
 			}
 		}
 		if tx, err := vm.nextStakerStop(db, subnetID); err == nil {
-			if staker, ok := tx.UnsignedTx.(TimedTx); ok {
+			if staker, ok := tx.Tx.UnsignedTx.(TimedTx); ok {
 				if endTime := staker.EndTime(); endTime.Before(earliest) {
 					earliest = endTime
 				}
@@ -1004,6 +1022,20 @@ func (vm *VM) updateValidators(db database.Database) error {
 	}
 	return nil
 }
+
+func (vm *VM) calculateReward(db database.Database, duration time.Duration, stakeAmount uint64) (uint64, error) {
+	currentSupply, err := vm.getCurrentSupply(db)
+	if err != nil {
+		return 0, err
+	}
+	reward := Reward(duration, stakeAmount, currentSupply)
+	newSupply, err := safemath.Add64(currentSupply, reward)
+	if err != nil {
+		return 0, err
+	}
+	return reward, vm.putCurrentSupply(db, newSupply)
+}
+
 func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, timestamp time.Time) error {
 	startPrefix := []byte(fmt.Sprintf("%s%s", subnetID, startDBPrefix))
 	startDB := prefixdb.NewNested(startPrefix, db)
@@ -1035,7 +1067,17 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
-			if err := vm.addStaker(db, subnetID, &tx); err != nil {
+
+			reward, err := vm.calculateReward(db, staker.Validator.Duration(), staker.Validator.Wght)
+			if err != nil {
+				return fmt.Errorf("couldn't calculate reward for staker: %w", err)
+			}
+
+			rTx := rewardTx{
+				Reward: reward,
+				Tx:     tx,
+			}
+			if err := vm.addStaker(db, subnetID, &rTx); err != nil {
 				return fmt.Errorf("couldn't add staker: %w", err)
 			}
 		case *UnsignedAddValidatorTx:
@@ -1049,7 +1091,17 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
-			if err := vm.addStaker(db, subnetID, &tx); err != nil {
+
+			reward, err := vm.calculateReward(db, staker.Validator.Duration(), staker.Validator.Wght)
+			if err != nil {
+				return fmt.Errorf("couldn't calculate reward for staker: %w", err)
+			}
+
+			rTx := rewardTx{
+				Reward: reward,
+				Tx:     tx,
+			}
+			if err := vm.addStaker(db, subnetID, &rTx); err != nil {
 				return fmt.Errorf("couldn't add staker: %w", err)
 			}
 		case *UnsignedAddSubnetValidatorTx:
@@ -1063,7 +1115,12 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 			if err := vm.dequeueStaker(db, subnetID, &tx); err != nil {
 				return fmt.Errorf("couldn't dequeue staker: %w", err)
 			}
-			if err := vm.addStaker(db, subnetID, &tx); err != nil {
+
+			rTx := rewardTx{
+				Reward: 0,
+				Tx:     tx,
+			}
+			if err := vm.addStaker(db, subnetID, &rTx); err != nil {
 				return fmt.Errorf("couldn't add staker: %w", err)
 			}
 		default:
@@ -1081,15 +1138,15 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
-		tx := Tx{}
+		tx := rewardTx{}
 		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return err
 		}
 
-		switch staker := tx.UnsignedTx.(type) {
+		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
 			if !subnetID.Equals(constants.PrimaryNetworkID) {
 				return fmt.Errorf("AddDelegatorTx is invalid for subnet %s",
@@ -1118,7 +1175,7 @@ func (vm *VM) updateSubnetValidators(db database.Database, subnetID ids.ID, time
 				return fmt.Errorf("couldn't remove staker: %w", err)
 			}
 		default:
-			return fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
+			return fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
 		}
 	}
 
@@ -1166,16 +1223,16 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
-		tx := Tx{}
+		tx := rewardTx{}
 		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
 			return fmt.Errorf("couldn't unmarshal validator tx: %w", err)
 		}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Tx.Sign(vm.codec, nil); err != nil {
 			return err
 		}
 
 		var err error
-		switch staker := tx.UnsignedTx.(type) {
+		switch staker := tx.Tx.UnsignedTx.(type) {
 		case *UnsignedAddDelegatorTx:
 			err = vdrs.AddWeight(staker.Validator.NodeID, staker.Validator.Weight())
 		case *UnsignedAddValidatorTx:
@@ -1183,7 +1240,7 @@ func (vm *VM) updateVdrSet(subnetID ids.ID) error {
 		case *UnsignedAddSubnetValidatorTx:
 			err = vdrs.AddWeight(staker.Validator.NodeID, staker.Validator.Weight())
 		default:
-			err = fmt.Errorf("expected validator but got %T", tx.UnsignedTx)
+			err = fmt.Errorf("expected validator but got %T", tx.Tx.UnsignedTx)
 		}
 		if err != nil {
 			return err

@@ -27,7 +27,7 @@ var (
 	errWeightTooSmall = errors.New("weight of this validator is too low")
 	errStakeTooShort  = errors.New("staking period is too short")
 	errStakeTooLong   = errors.New("staking period is too long")
-	errTooManyShares  = fmt.Errorf("a staker can only require at most %d shares from delegators", NumberOfShares)
+	errTooManyShares  = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 
 	_ UnsignedProposalTx = &UnsignedAddValidatorTx{}
 	_ TimedTx            = &UnsignedAddValidatorTx{}
@@ -99,7 +99,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 		return errInvalidAmount
 	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
-	case tx.Shares > NumberOfShares: // Ensure delegators shares are in the allowed amount
+	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
 	}
 

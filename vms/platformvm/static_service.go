@@ -59,16 +59,18 @@ type APIOwner struct {
 type APIPrimaryValidator struct {
 	APIStaker
 	// The owner the staking reward, if applicable, will go to
-	RewardOwner       *APIOwner     `json:"rewardOwner,omitempty"`
-	DelegationFeeRate json.Float32  `json:"delegationFeeRate"`
-	Uptime            *json.Float32 `json:"uptime,omitempty"`
-	Connected         *bool         `json:"connected,omitempty"`
+	RewardOwner     *APIOwner     `json:"rewardOwner,omitempty"`
+	PotentialReward *json.Uint64  `json:"potentialReward,omitempty"`
+	DelegationFee   json.Float32  `json:"delegationFee"`
+	Uptime          *json.Float32 `json:"uptime,omitempty"`
+	Connected       *bool         `json:"connected,omitempty"`
 }
 
 // APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.
 type APIPrimaryDelegator struct {
 	APIStaker
-	RewardOwner *APIOwner `json:"rewardOwner,omitempty"`
+	RewardOwner     *APIOwner    `json:"rewardOwner,omitempty"`
+	PotentialReward *json.Uint64 `json:"potentialReward,omitempty"`
 }
 
 func (v *APIStaker) weight() uint64 {
@@ -105,13 +107,14 @@ type APIChain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID ids.ID                `json:"avaxAssetID"`
-	NetworkID   json.Uint32           `json:"address"`
-	UTXOs       []APIUTXO             `json:"utxos"`
-	Validators  []APIPrimaryValidator `json:"primaryNetworkValidators"`
-	Chains      []APIChain            `json:"chains"`
-	Time        json.Uint64           `json:"time"`
-	Message     string                `json:"message"`
+	AvaxAssetID   ids.ID                `json:"avaxAssetID"`
+	NetworkID     json.Uint32           `json:"address"`
+	UTXOs         []APIUTXO             `json:"utxos"`
+	Validators    []APIPrimaryValidator `json:"primaryNetworkValidators"`
+	Chains        []APIChain            `json:"chains"`
+	Time          json.Uint64           `json:"time"`
+	InitialSupply json.Uint64           `json:"initialSupply"`
+	Message       string                `json:"message"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -121,11 +124,12 @@ type BuildGenesisReply struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs      []*avax.UTXO `serialize:"true"`
-	Validators []*Tx        `serialize:"true"`
-	Chains     []*Tx        `serialize:"true"`
-	Timestamp  uint64       `serialize:"true"`
-	Message    string       `serialize:"true"`
+	UTXOs         []*avax.UTXO `serialize:"true"`
+	Validators    []*Tx        `serialize:"true"`
+	Chains        []*Tx        `serialize:"true"`
+	Timestamp     uint64       `serialize:"true"`
+	InitialSupply uint64       `serialize:"true"`
+	Message       string       `serialize:"true"`
 }
 
 // Initialize ...
@@ -249,7 +253,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			VMID:        chain.VMID,
 			FxIDs:       chain.FxIDs,
 			GenesisData: chain.GenesisData.Bytes,
-			SubnetAuth:  &secp256k1fx.OutputOwners{},
+			SubnetAuth:  &secp256k1fx.Input{},
 		}}
 		if err := tx.Sign(Codec, nil); err != nil {
 			return err
@@ -260,11 +264,12 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 	// genesis holds the genesis state
 	genesis := Genesis{
-		UTXOs:      utxos,
-		Validators: validators.Txs,
-		Chains:     chains,
-		Timestamp:  uint64(args.Time),
-		Message:    args.Message,
+		UTXOs:         utxos,
+		Validators:    validators.Txs,
+		Chains:        chains,
+		Timestamp:     uint64(args.Time),
+		InitialSupply: uint64(args.InitialSupply),
+		Message:       args.Message,
 	}
 
 	// Marshal genesis to bytes
