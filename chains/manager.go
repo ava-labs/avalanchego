@@ -243,7 +243,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 		SharedMemory:        m.AtomicMemory.NewSharedMemory(chainParams.ID),
 		BCLookup:            m,
 		SNLookup:            m,
-		Namespace:           fmt.Sprintf("avalanche_%s_vm", primaryAlias),
+		Namespace:           fmt.Sprintf("%s_%s_vm", constants.PlatformName, primaryAlias),
 		Metrics:             m.ConsensusParams.Metrics,
 	}
 
@@ -286,7 +286,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	consensusParams := m.ConsensusParams
-	consensusParams.Namespace = fmt.Sprintf("avalanche_%s", primaryAlias)
+	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
 	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
