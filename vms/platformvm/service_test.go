@@ -78,7 +78,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddValidator(t *testing.T) {
-	expectedJSONString := `{"startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000","username":"","password":""}`
+	expectedJSONString := `{"username":"","password":"","startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
@@ -310,7 +310,7 @@ func TestGetStake(t *testing.T) {
 	genesis, _ := defaultGenesis()
 	addrs := []string{}
 	for _, validator := range genesis.Validators {
-		addr := fmt.Sprintf("P-%s", validator.RewardAddress)
+		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
 		addrs = append(addrs, addr)
 		args := api.JsonAddresses{
 			Addresses: []string{addr},
@@ -358,7 +358,10 @@ func TestGetStake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
 		t.Fatal(err)
 	}
 

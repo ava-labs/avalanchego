@@ -7,7 +7,7 @@ GECKO_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 DOCKER_REPO="avaplatform"
 
 E2E_TESTING_REMOTE="https://github.com/ava-labs/avalanche-testing.git"
-E2E_TAG="v0.8.4-dev"
+E2E_TAG="v0.9.1-dev"
 
 mkdir -p "$E2E_TEST_HOME"
 git clone "$E2E_TESTING_REMOTE" "$E2E_TEST_HOME"
@@ -19,8 +19,8 @@ go mod edit -replace github.com/ava-labs/gecko="$GECKO_HOME"
 bash "./scripts/rebuild_initializer_binary.sh"
 
 
-TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:everest-dev"
-BYZANTINE_IMAGE="$DOCKER_REPO/gecko-byzantine:everest-dev"
+TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:everest-0.9.1-dev"
+BYZANTINE_IMAGE="$DOCKER_REPO/gecko-byzantine:everest-api-update"
 
 docker pull "$TESTING_CONTROLLER_IMAGE"
 

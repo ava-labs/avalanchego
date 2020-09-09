@@ -172,11 +172,14 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
 			rewardAddress,                           // Reward Address
-			NumberOfShares,                          // subnet
+			PercentDenominator,                      // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		); err != nil {
 			t.Fatal(err)
-		} else if err := vm.addStaker(db, constants.PrimaryNetworkID, tx); err != nil {
+		} else if err := vm.addStaker(db, constants.PrimaryNetworkID, &rewardTx{
+			Reward: 0,
+			Tx:     *tx,
+		}); err != nil {
 			t.Fatal(err)
 		}
 	}

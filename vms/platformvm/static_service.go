@@ -35,41 +35,45 @@ type APIUTXO struct {
 	Address string      `json:"address"`
 }
 
-// APIValidator is a validator.
+// APIStaker is the representation of a staker sent via APIs.
 // [Amount] is the amount of tokens being staked.
+// [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
-// [ID] is the node ID of the staker
-// [Address] is the address where the staked $AVAX (and, if applicable, reward)
-// is sent when this staker is done staking.
-type APIValidator struct {
+// [NodeID] is the node ID of the staker
+type APIStaker struct {
 	StartTime   json.Uint64  `json:"startTime"`
 	EndTime     json.Uint64  `json:"endTime"`
 	Weight      *json.Uint64 `json:"weight,omitempty"`
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	Address     string       `json:"address,omitempty"`
-	ID          ids.ShortID  `json:"id"`
+	NodeID      string       `json:"nodeID"`
 }
 
-// APIPrimaryValidator is a validator of the primary network
+// APIOwner is the repr. of a reward owner sent over APIs.
+type APIOwner struct {
+	Locktime  json.Uint64 `json:"locktime"`
+	Threshold json.Uint32 `json:"threshold"`
+	Addresses []string    `json:"addresses"`
+}
+
+// APIPrimaryValidator is the repr. of a primary network validator sent over APIs.
 type APIPrimaryValidator struct {
-	APIValidator
-
-	RewardAddress     string      `json:"rewardAddress"`
-	DelegationFeeRate json.Uint32 `json:"delegationFeeRate"`
+	APIStaker
+	// The owner the staking reward, if applicable, will go to
+	RewardOwner     *APIOwner     `json:"rewardOwner,omitempty"`
+	PotentialReward *json.Uint64  `json:"potentialReward,omitempty"`
+	DelegationFee   json.Float32  `json:"delegationFee"`
+	Uptime          *json.Float32 `json:"uptime,omitempty"`
+	Connected       *bool         `json:"connected,omitempty"`
 }
 
-// FormattedAPIValidator allows for a formatted address
-type FormattedAPIValidator struct {
-	StartTime   json.Uint64   `json:"startTime"`
-	EndTime     json.Uint64   `json:"endTime"`
-	Weight      *json.Uint64  `json:"weight,omitempty"`
-	StakeAmount *json.Uint64  `json:"stakeAmount,omitempty"`
-	Uptime      *json.Float32 `json:"uptime,omitempty"`
-	Connected   *bool         `json:"connected,omitempty"`
-	ID          string        `json:"nodeID"`
+// APIPrimaryDelegator is the repr. of a primary network delegator sent over APIs.
+type APIPrimaryDelegator struct {
+	APIStaker
+	RewardOwner     *APIOwner    `json:"rewardOwner,omitempty"`
+	PotentialReward *json.Uint64 `json:"potentialReward,omitempty"`
 }
 
-func (v *FormattedAPIValidator) weight() uint64 {
+func (v *APIStaker) weight() uint64 {
 	switch {
 	case v.Weight != nil:
 		return uint64(*v.Weight)
@@ -78,16 +82,6 @@ func (v *FormattedAPIValidator) weight() uint64 {
 	default:
 		return 0
 	}
-}
-
-// FormattedAPIPrimaryValidator is a formatted validator of the primary network
-type FormattedAPIPrimaryValidator struct {
-	FormattedAPIValidator
-
-	RewardAddress string `json:"rewardAddress"`
-
-	// Delegation fee rate as a percentage. Must be in [0,100].
-	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
 // APIChain defines a chain that exists
@@ -113,13 +107,14 @@ type APIChain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID ids.ID                         `json:"avaxAssetID"`
-	NetworkID   json.Uint32                    `json:"address"`
-	UTXOs       []APIUTXO                      `json:"utxos"`
-	Validators  []FormattedAPIPrimaryValidator `json:"primaryNetworkValidators"`
-	Chains      []APIChain                     `json:"chains"`
-	Time        json.Uint64                    `json:"time"`
-	Message     string                         `json:"message"`
+	AvaxAssetID   ids.ID                `json:"avaxAssetID"`
+	NetworkID     json.Uint32           `json:"address"`
+	UTXOs         []APIUTXO             `json:"utxos"`
+	Validators    []APIPrimaryValidator `json:"primaryNetworkValidators"`
+	Chains        []APIChain            `json:"chains"`
+	Time          json.Uint64           `json:"time"`
+	InitialSupply json.Uint64           `json:"initialSupply"`
+	Message       string                `json:"message"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -133,8 +128,15 @@ type Genesis struct {
 	Validators []*Tx        `serialize:"true"`
 	Chains     []*Tx        `serialize:"true"`
 	Timestamp  uint64       `serialize:"true"`
-	Message    string       `serialize:"true"`
+	// InitialSupply uint64       `serialize:"true"`
+	Message string `serialize:"true"`
 }
+
+var (
+	// InitialSupply is a hack to keep the genesis the same on the Everest
+	// testnet. TODO: move this field into the Genesis.
+	InitialSupply uint64
+)
 
 // Initialize ...
 func (g *Genesis) Initialize() error {
@@ -199,14 +201,23 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if uint64(validator.EndTime) <= uint64(args.Time) {
 			return errValidatorAddsNoValue
 		}
-		addrID, err := bech32ToID(validator.RewardAddress)
+		nodeID, err := ids.ShortFromPrefixedString(validator.NodeID, constants.NodeIDPrefix)
 		if err != nil {
 			return err
 		}
-		nodeID, err := ids.ShortFromPrefixedString(validator.ID, constants.NodeIDPrefix)
-		if err != nil {
-			return err
+
+		owner := &secp256k1fx.OutputOwners{
+			Locktime:  uint64(validator.RewardOwner.Locktime),
+			Threshold: uint32(validator.RewardOwner.Threshold),
 		}
+		for _, addrStr := range validator.RewardOwner.Addresses {
+			addrID, err := bech32ToID(addrStr)
+			if err != nil {
+				return err
+			}
+			owner.Addrs = append(owner.Addrs, addrID)
+		}
+		ids.SortShortIDs(owner.Addrs)
 
 		tx := &Tx{UnsignedTx: &UnsignedAddValidatorTx{
 			BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -222,18 +233,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			Stake: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: args.AvaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: weight,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs:     []ids.ShortID{addrID},
-					},
+					Amt:          weight,
+					OutputOwners: *owner,
 				},
 			}},
-			RewardsOwner: &secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addrID},
-			},
+			RewardsOwner: owner,
 		}}
 		if err := tx.Sign(Codec, nil); err != nil {
 			return err
