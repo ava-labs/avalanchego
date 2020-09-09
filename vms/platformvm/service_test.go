@@ -8,19 +8,20 @@ import (
 	"encoding/json"
 	"fmt"
 
-	cjson "github.com/ava-labs/gecko/utils/json"
-
 	"strings"
 	"testing"
 
 	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-
 	"github.com/ava-labs/gecko/api/keystore"
 	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/gecko/utils/constants"
 	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/vms/avm"
+	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/gecko/vms/secp256k1fx"
+
+	cjson "github.com/ava-labs/gecko/utils/json"
 )
 
 var (
@@ -314,9 +315,7 @@ func TestGetStake(t *testing.T) {
 		args := api.JsonAddresses{
 			Addresses: []string{addr},
 		}
-		response := struct {
-			Staked cjson.Uint64 `json:"staked"`
-		}{}
+		response := GetStakeReply{}
 		if err := service.GetStake(nil, &args, &response); err != nil {
 			t.Fatal(err)
 		}
@@ -329,9 +328,7 @@ func TestGetStake(t *testing.T) {
 	args := api.JsonAddresses{
 		Addresses: addrs,
 	}
-	response := struct {
-		Staked cjson.Uint64 `json:"staked"`
-	}{}
+	response := GetStakeReply{}
 	if err := service.GetStake(nil, &args, &response); err != nil {
 		t.Fatal(err)
 	}
@@ -389,6 +386,51 @@ func TestGetStake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
+		t.Fatal(err)
+	}
+	// Make sure the delegator has the right stake (old stake + stakeAmt)
+	if err := service.GetStake(nil, &args, &response); err != nil {
+		t.Fatal(err)
+	}
+	if uint64(response.Staked) != uint64(oldStake)+stakeAmt {
+		t.Fatalf("expected stake to be %d but is %d", uint64(oldStake)+stakeAmt, response.Staked)
+	}
+	oldStake += cjson.Uint64(stakeAmt)
+
+	// Make sure this works for pending stakers
+	// Add a pending staker
+	stakeAmt = minStake + 54321
+	tx, err = service.vm.newAddValidatorTx(
+		stakeAmt,
+		uint64(defaultGenesisTime.Unix()),
+		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		ids.GenerateTestShortID(),
+		ids.GenerateTestShortID(),
+		0,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stake := tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake
+	stake = append(stake, &avax.TransferableOutput{
+		Asset: avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
+		},
+	})
+	stake[0], stake[1] = stake[1], stake[0]
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake = stake
+	if err := tx.Sign(service.vm.codec, nil); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx); err != nil {
 		t.Fatal(err)
 	}

@@ -164,8 +164,6 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 }
 
 // GetTxFee returns the transaction fee in nAVAX.
-// Note that the transaction fee is a command line argument and this node's view
-// of the transaction fee may be different than another node's.
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *struct {
 	Fee json.Uint64 `json:"txFee"`
 }) error {
