@@ -620,9 +620,9 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 			uptime := json.Float32(rawUptime)
 
-			service.vm.connLock.Lock()
+			service.vm.uptimeLock.Lock()
 			_, connected := service.vm.connections[nodeID.Key()]
-			service.vm.connLock.Unlock()
+			service.vm.uptimeLock.Unlock()
 
 			var rewardOwner *APIOwner
 			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
@@ -723,9 +723,9 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			weight := json.Uint64(staker.Validator.Weight())
 			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
 
-			service.vm.connLock.Lock()
+			service.vm.uptimeLock.Lock()
 			_, connected := service.vm.connections[nodeID.Key()]
-			service.vm.connLock.Unlock()
+			service.vm.uptimeLock.Unlock()
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
 				APIStaker: APIStaker{
 					NodeID:      staker.Validator.ID().PrefixedString(constants.NodeIDPrefix),
@@ -877,7 +877,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys,                             // Private keys
+		privKeys, // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
