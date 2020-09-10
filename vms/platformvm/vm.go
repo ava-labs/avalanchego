@@ -451,7 +451,7 @@ func (vm *VM) Bootstrapping() error { vm.bootstrapped = false; return vm.fx.Boot
 // Bootstrapped marks this VM as bootstrapped
 func (vm *VM) Bootstrapped() error {
 	vm.bootstrapped = true
-	vm.bootstrappedTime = vm.clock.Time()
+	vm.bootstrappedTime = time.Unix(vm.clock.Time().Unix(), 0)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -504,7 +504,7 @@ func (vm *VM) Bootstrapped() error {
 
 		durationOffline := vm.bootstrappedTime.Sub(lastUpdated)
 
-		uptime.UpDuration += uint64(durationOffline.Seconds())
+		uptime.UpDuration += uint64(durationOffline / time.Second)
 		uptime.LastUpdated = uint64(vm.bootstrappedTime.Unix())
 
 		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
@@ -585,7 +585,7 @@ func (vm *VM) Shutdown() error {
 			continue
 		}
 
-		uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected).Seconds())
+		uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
 		uptime.LastUpdated = uint64(currentLocalTime.Unix())
 
 		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
@@ -825,7 +825,7 @@ func (vm *VM) Connected(vdrID ids.ShortID) bool {
 	vm.uptimeLock.Lock()
 	defer vm.uptimeLock.Unlock()
 
-	vm.connections[vdrID.Key()] = vm.clock.Time()
+	vm.connections[vdrID.Key()] = time.Unix(vm.clock.Time().Unix(), 0)
 	return false
 }
 
@@ -878,7 +878,7 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
 		return false
 	}
 
-	uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected).Seconds())
+	uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
 	uptime.LastUpdated = uint64(currentLocalTime.Unix())
 
 	if err := vm.setUptime(vm.DB, vdrID, uptime); err != nil {
@@ -1403,9 +1403,9 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 
 		durationConnected := currentLocalTime.Sub(timeConnected)
 		if durationConnected > 0 {
-			upDuration += uint64(durationConnected.Seconds())
+			upDuration += uint64(durationConnected / time.Second)
 		}
 	}
-	bestPossibleUpDuration := currentLocalTime.Sub(startTime).Seconds()
-	return float64(upDuration) / bestPossibleUpDuration, nil
+	bestPossibleUpDuration := uint64(currentLocalTime.Sub(startTime) / time.Second)
+	return float64(upDuration) / float64(bestPossibleUpDuration), nil
 }
