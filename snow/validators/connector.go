@@ -3,7 +3,7 @@
 
 package validators
 
-import "github.com/ava-labs/gecko/ids"
+import "github.com/ava-labs/avalanche-go/ids"
 
 // Connector represents a handler that is called when a connection is marked as
 // connected or disconnected

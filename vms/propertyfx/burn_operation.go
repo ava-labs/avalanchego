@@ -1,8 +1,8 @@
 package propertyfx
 
 import (
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 // BurnOperation ...

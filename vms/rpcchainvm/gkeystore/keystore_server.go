@@ -10,12 +10,12 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/rpcdb"
-	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/grpcutils"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/rpcdb"
+	"github.com/ava-labs/avalanche-go/database/rpcdb/rpcdbproto"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/grpcutils"
 )
 
 // Server is a messenger that is managed over RPC.

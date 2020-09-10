@@ -4,9 +4,9 @@
 package platformvm
 
 import (
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/avalanche-go/database/versiondb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/vms/components/core"
 )
 
 // StandardBlock being accepted results in the transactions contained in the

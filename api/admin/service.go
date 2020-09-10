@@ -9,12 +9,12 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/api"
+	"github.com/ava-labs/avalanche-go/chains"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/utils/logging"
 
-	cjson "github.com/ava-labs/gecko/utils/json"
+	cjson "github.com/ava-labs/avalanche-go/utils/json"
 )
 
 const (

@@ -1,7 +1,7 @@
 package nftfx
 
 import (
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 // MintOutput ...

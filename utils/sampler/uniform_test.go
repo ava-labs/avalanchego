@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/avalanche-go/utils"
 )
 
 var (

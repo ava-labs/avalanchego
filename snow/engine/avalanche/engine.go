@@ -4,7 +4,7 @@
 package avalanche
 
 import (
-	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
 )
 
 // Engine describes the events that can occur on a consensus instance

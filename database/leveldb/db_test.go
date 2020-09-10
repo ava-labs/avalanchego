@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/avalanche-go/database"
 )
 
 func TestInterface(t *testing.T) {

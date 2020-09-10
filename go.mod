@@ -1,4 +1,4 @@
-module github.com/ava-labs/gecko
+module github.com/ava-labs/avalanche-go
 
 go 1.14
 

@@ -4,26 +4,13 @@
 package constants
 
 import (
-	"math"
 	"regexp"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // Const variables to be exported
 const (
-	NodeIDPrefix    string = "NodeID-"
-	SecretKeyPrefix string = "PrivateKey-"
-	// Request ID used when sending a Put message to gossip an accepted container
-	// (ie not sent in response to a Get)
-	GossipMsgRequestID = math.MaxUint32
-)
-
-// Variables to be exported
-var (
-	PrimaryNetworkID = ids.Empty
-	PlatformChainID  = ids.Empty
-
 	MainnetID  uint32 = 1
 	CascadeID  uint32 = 2
 	DenaliID   uint32 = 3
@@ -47,6 +34,12 @@ var (
 	LocalHRP    = "local"
 	UnitTestHRP = "testing"
 	FallbackHRP = "custom"
+)
+
+// Variables to be exported
+var (
+	PrimaryNetworkID = ids.Empty
+	PlatformChainID  = ids.Empty
 
 	NetworkIDToNetworkName = map[uint32]string{
 		MainnetID:  MainnetName,

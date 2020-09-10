@@ -4,7 +4,7 @@
 package snowman
 
 import (
-	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/choices"
 )
 
 // Block is a possible decision that dictates the next canonical block.

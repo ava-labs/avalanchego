@@ -6,10 +6,10 @@ package prefixdb
 import (
 	"sync"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/nodb"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/nodb"
+	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
 )
 
 // Database partitions a database into a sub-database by prefixing all keys with

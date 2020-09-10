@@ -8,8 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 type adaptiveTimeout struct {

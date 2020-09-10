@@ -4,11 +4,12 @@
 package common
 
 import (
-	stdmath "math"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/math"
+	stdmath "math"
+
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/math"
 )
 
 const (
