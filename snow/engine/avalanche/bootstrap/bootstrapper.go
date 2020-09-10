@@ -348,7 +348,7 @@ func (b *Bootstrapper) finish() error {
 		return nil
 	}
 
-	b.Ctx.Log.Info("finished fetching %d vertices. executing transaction state transitions...",
+	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
 		b.NumFetched)
 	if err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher); err != nil {
 		return err

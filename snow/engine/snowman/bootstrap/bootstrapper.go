@@ -241,7 +241,7 @@ func (b *Bootstrapper) finish() error {
 	if b.IsBootstrapped() {
 		return nil
 	}
-	b.Ctx.Log.Info("bootstrapping finished fetching %d blocks. executing state transitions...",
+	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
 		b.NumFetched)
 
 	if err := b.executeAll(b.Blocked); err != nil {
