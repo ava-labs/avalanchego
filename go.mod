@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200812190859-4cb0e71f3c0e // indirect
-	github.com/ava-labs/gecko v0.6.1-rc.1
+	github.com/ava-labs/gecko v0.8.0-alpha
 	github.com/ava-labs/go-ethereum v1.9.3
 	github.com/cespare/cp v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
