@@ -202,7 +202,7 @@ type VM struct {
 
 	bootstrappedTime time.Time
 
-	connLock    sync.Mutex
+	uptimeLock  sync.Mutex
 	connections map[[20]byte]time.Time
 }
 
@@ -451,7 +451,7 @@ func (vm *VM) Bootstrapping() error { vm.bootstrapped = false; return vm.fx.Boot
 // Bootstrapped marks this VM as bootstrapped
 func (vm *VM) Bootstrapped() error {
 	vm.bootstrapped = true
-	vm.bootstrappedTime = vm.clock.Time()
+	vm.bootstrappedTime = time.Unix(vm.clock.Time().Unix(), 0)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -504,7 +504,7 @@ func (vm *VM) Bootstrapped() error {
 
 		durationOffline := vm.bootstrappedTime.Sub(lastUpdated)
 
-		uptime.UpDuration += uint64(durationOffline.Seconds())
+		uptime.UpDuration += uint64(durationOffline / time.Second)
 		uptime.LastUpdated = uint64(vm.bootstrappedTime.Unix())
 
 		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
@@ -536,8 +536,8 @@ func (vm *VM) Shutdown() error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	vm.connLock.Lock()
-	defer vm.connLock.Unlock()
+	vm.uptimeLock.Lock()
+	defer vm.uptimeLock.Unlock()
 
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
@@ -550,44 +550,46 @@ func (vm *VM) Shutdown() error {
 			return err
 		}
 
-		switch staker := tx.Tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
-			nodeID := staker.Validator.ID()
-			startTime := staker.StartTime()
+		staker, ok := tx.Tx.UnsignedTx.(*UnsignedAddValidatorTx)
+		if !ok {
+			continue
+		}
+		nodeID := staker.Validator.ID()
+		startTime := staker.StartTime()
 
-			uptime, err := vm.uptime(vm.DB, nodeID)
-			switch {
-			case err == database.ErrNotFound:
-				uptime = &validatorUptime{
-					LastUpdated: uint64(startTime.Unix()),
-				}
-			case err != nil:
-				return err
+		uptime, err := vm.uptime(vm.DB, nodeID)
+		switch {
+		case err == database.ErrNotFound:
+			uptime = &validatorUptime{
+				LastUpdated: uint64(startTime.Unix()),
 			}
+		case err != nil:
+			return err
+		}
 
-			lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
+		currentLocalTime := vm.clock.Time()
+		timeConnected := currentLocalTime
+		if realTimeConnected, isConnected := vm.connections[nodeID.Key()]; isConnected {
+			timeConnected = realTimeConnected
+		}
+		if timeConnected.Before(vm.bootstrappedTime) {
+			timeConnected = vm.bootstrappedTime
+		}
 
-			currentLocalTime := vm.clock.Time()
-			timeConnected := vm.clock.Time()
-			if realTimeConnected, isConnected := vm.connections[nodeID.Key()]; isConnected {
-				timeConnected = realTimeConnected
-			}
-			if timeConnected.Before(vm.bootstrappedTime) {
-				timeConnected = vm.bootstrappedTime
-			}
-			if timeConnected.Before(lastUpdated) {
-				timeConnected = lastUpdated
-			}
-			if timeConnected.After(currentLocalTime) {
-				timeConnected = currentLocalTime
-			}
+		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
+		if timeConnected.Before(lastUpdated) {
+			timeConnected = lastUpdated
+		}
 
-			uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected).Seconds())
-			uptime.LastUpdated = uint64(currentLocalTime.Unix())
+		if !timeConnected.Before(currentLocalTime) {
+			continue
+		}
 
-			if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
-				vm.Ctx.Log.Error("failed to write back uptime data")
-			}
+		uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
+		uptime.LastUpdated = uint64(currentLocalTime.Unix())
+
+		if err := vm.setUptime(vm.DB, nodeID, uptime); err != nil {
+			vm.Ctx.Log.Error("failed to write back uptime data")
 		}
 	}
 	if err := vm.DB.Commit(); err != nil {
@@ -820,10 +822,10 @@ func (vm *VM) Connected(vdrID ids.ShortID) bool {
 	// Locking is required here because this is called directly from the
 	// networking library.
 
-	vm.connLock.Lock()
-	defer vm.connLock.Unlock()
+	vm.uptimeLock.Lock()
+	defer vm.uptimeLock.Unlock()
 
-	vm.connections[vdrID.Key()] = vm.clock.Time()
+	vm.connections[vdrID.Key()] = time.Unix(vm.clock.Time().Unix(), 0)
 	return false
 }
 
@@ -832,8 +834,8 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
 	// Locking is required here because this is called directly from the
 	// networking library.
 
-	vm.connLock.Lock()
-	defer vm.connLock.Unlock()
+	vm.uptimeLock.Lock()
+	defer vm.uptimeLock.Unlock()
 
 	vdrKey := vdrID.Key()
 	timeConnected := vm.connections[vdrKey]
@@ -871,15 +873,13 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
 		timeConnected = lastUpdated
 	}
 
-	now := vm.clock.Time()
-	if now.Before(lastUpdated) {
-		now = lastUpdated
+	currentLocalTime := vm.clock.Time()
+	if !currentLocalTime.After(lastUpdated) {
+		return false
 	}
 
-	durationConnected := now.Sub(timeConnected)
-
-	uptime.UpDuration += uint64(durationConnected.Seconds())
-	uptime.LastUpdated = uint64(now.Unix())
+	uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
+	uptime.LastUpdated = uint64(currentLocalTime.Unix())
 
 	if err := vm.setUptime(vm.DB, vdrID, uptime); err != nil {
 		vm.Ctx.Log.Error("failed to write back uptime data")
@@ -1376,6 +1376,9 @@ func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 }
 
 func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTime time.Time) (float64, error) {
+	vm.uptimeLock.Lock()
+	defer vm.uptimeLock.Unlock()
+
 	uptime, err := vm.uptime(db, nodeID)
 	switch {
 	case err == database.ErrNotFound:
@@ -1386,29 +1389,23 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 		return 0, err
 	}
 
-	vm.connLock.Lock()
-	defer vm.connLock.Unlock()
-
 	upDuration := uptime.UpDuration
-	lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
-
 	currentLocalTime := vm.clock.Time()
-	if currentLocalTime.Before(lastUpdated) {
-		currentLocalTime = lastUpdated
-	}
-	bestPossibleUpDuration := currentLocalTime.Sub(startTime).Seconds()
-
 	if timeConnected, isConnected := vm.connections[nodeID.Key()]; isConnected {
 		if timeConnected.Before(vm.bootstrappedTime) {
 			timeConnected = vm.bootstrappedTime
 		}
 
-		if timeConnected.After(currentLocalTime) {
-			timeConnected = currentLocalTime
+		lastUpdated := time.Unix(int64(uptime.LastUpdated), 0)
+		if timeConnected.Before(lastUpdated) {
+			timeConnected = lastUpdated
 		}
 
-		upDuration += uint64(currentLocalTime.Sub(timeConnected).Seconds())
+		durationConnected := currentLocalTime.Sub(timeConnected)
+		if durationConnected > 0 {
+			upDuration += uint64(durationConnected / time.Second)
+		}
 	}
-
-	return float64(upDuration) / bestPossibleUpDuration, nil
+	bestPossibleUpDuration := uint64(currentLocalTime.Sub(startTime) / time.Second)
+	return float64(upDuration) / float64(bestPossibleUpDuration), nil
 }
