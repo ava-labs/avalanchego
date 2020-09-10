@@ -10,7 +10,7 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (

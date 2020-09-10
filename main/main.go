@@ -6,11 +6,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanche-go/nat"
-	"github.com/ava-labs/avalanche-go/node"
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/utils/crypto"
-	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanchego/nat"
+	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (

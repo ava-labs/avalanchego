@@ -4,7 +4,7 @@
 package snowman
 
 import (
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // Engine describes the events that can occur to a Snowman instance.

@@ -6,13 +6,13 @@ package node
 import (
 	"time"
 
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/nat"
-	"github.com/ava-labs/avalanche-go/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanche-go/snow/networking/router"
-	"github.com/ava-labs/avalanche-go/utils"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/nat"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 // Config contains all of the configurations of an Avalanche node.

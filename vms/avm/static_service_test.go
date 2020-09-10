@@ -6,8 +6,8 @@ package avm
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 var addrStrArray = []string{

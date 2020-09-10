@@ -12,4 +12,4 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Direct
 COMMIT_HASH="$(git --git-dir="$AVALANCHE_PATH/.git" rev-parse --short HEAD)"
 echo "Building Docker image based off of local repo at commit $COMMIT_HASH"
 
-docker build -t "avalanche-go-$COMMIT_HASH" "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+docker build -t "avalanchego-$COMMIT_HASH" "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"

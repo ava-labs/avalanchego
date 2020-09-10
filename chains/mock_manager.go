@@ -1,8 +1,8 @@
 package chains
 
 import (
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/networking/router"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
 )
 
 // MockManager implements Manager but does nothing. Always returns nil error.

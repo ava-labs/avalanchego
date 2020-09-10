@@ -4,13 +4,13 @@
 package genesis
 
 import (
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/vms/avm"
-	"github.com/ava-labs/avalanche-go/vms/nftfx"
-	"github.com/ava-labs/avalanche-go/vms/platformvm"
-	"github.com/ava-labs/avalanche-go/vms/propertyfx"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
-	"github.com/ava-labs/avalanche-go/vms/timestampvm"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/timestampvm"
 )
 
 // Aliases returns the default aliases based on the network ID

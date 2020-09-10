@@ -5,12 +5,12 @@ set -o nounset
 set -o pipefail
 
 # Note: this script will build a docker image by cloning a remote version of
-# avalanche-go into a temporary location and using that version's Dockerfile to
+# avalanchego into a temporary location and using that version's Dockerfile to
 # build the image.
 
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
-REMOTE="https://github.com/ava-labs/avalanche-go.git"
+REMOTE="https://github.com/ava-labs/avalanchego.git"
 BRANCH="master"
 
 if [[ $# -eq 2 ]]; then
@@ -38,7 +38,7 @@ if [[ "$keep_existing" != 1 ]]; then
 fi
 
 # Clone the remote and checkout the specified branch to build the Docker image
-AVALANCHE_CLONE="$WORKPREFIX/avalanche-go"
+AVALANCHE_CLONE="$WORKPREFIX/avalanchego"
 
 if [[ ! -d "$WORKPREFIX" ]]; then
     mkdir -p "$WORKPREFIX"
@@ -49,4 +49,4 @@ fi
 
 AVALANCHE_COMMIT="$(git --git-dir="$AVALANCHE_CLONE/.git" rev-parse --short HEAD)"
 
-"${DOCKER}" build -t "avalanche-go-$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"
+"${DOCKER}" build -t "avalanchego-$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"

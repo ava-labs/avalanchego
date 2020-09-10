@@ -4,8 +4,8 @@
 package node
 
 import (
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // Peer contains the specification of an Avalanche node that can be communicated with.

@@ -6,7 +6,7 @@ package crypto
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // NumVerifies is the number of verifications to run per operation

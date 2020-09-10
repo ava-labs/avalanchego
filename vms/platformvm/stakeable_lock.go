@@ -3,7 +3,7 @@ package platformvm
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var (
