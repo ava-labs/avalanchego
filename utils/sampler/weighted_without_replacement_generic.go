@@ -4,20 +4,12 @@
 package sampler
 
 import (
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 type weightedWithoutReplacementGeneric struct {
 	u Uniform
 	w Weighted
-}
-
-// NewWeightedWithoutReplacement returns a new sampler
-func NewWeightedWithoutReplacement() WeightedWithoutReplacement {
-	return &weightedWithoutReplacementGeneric{
-		u: &uniformReplacer{},
-		w: &weightedHeap{},
-	}
 }
 
 func (s *weightedWithoutReplacementGeneric) Initialize(weights []uint64) error {

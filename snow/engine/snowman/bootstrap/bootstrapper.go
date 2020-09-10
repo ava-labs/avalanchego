@@ -8,13 +8,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
 )
 
 // Config ...
@@ -131,9 +131,9 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 		return nil
 	}
 
-	validators, err := b.Validators.Sample(1) // validator to send request to
+	validators, err := b.Beacons.Sample(1) // validator to send request to
 	if err != nil {
-		return fmt.Errorf("Dropping request for %s as there are no validators", blkID)
+		return fmt.Errorf("dropping request for %s as there are no validators", blkID)
 	}
 	validatorID := validators[0].ID()
 	b.RequestID++

@@ -12,28 +12,28 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/nftfx"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/cache"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/versiondb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/vms/nftfx"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 
-	cjson "github.com/ava-labs/gecko/utils/json"
-	safemath "github.com/ava-labs/gecko/utils/math"
+	cjson "github.com/ava-labs/avalanche-go/utils/json"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 const (
@@ -49,7 +49,6 @@ var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
-	errInvalidAddress            = errors.New("invalid address")
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
@@ -307,7 +306,7 @@ func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	}
 	// Verify must be called in the case the that tx was flushed from the unique
 	// cache.
-	return tx, tx.Verify()
+	return tx, tx.verifyWithoutCacheWrites()
 }
 
 /*
@@ -328,7 +327,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
-	if err := tx.Verify(); err != nil {
+	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return ids.ID{}, err
 	}
 	vm.issueTx(tx)
@@ -394,7 +393,7 @@ func (vm *VM) GetAtomicUTXOs(
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
-// For address [startAddr], only returns UTXOs whose IDs are greater than [startUtxoID].
+// For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
 // Returns:
 // * The fetched of UTXOs
 // * The address associated with the last UTXO fetched
@@ -609,7 +608,7 @@ func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 		txID: inputTx,
 	}
 
-	if err := parent.Verify(); err != nil {
+	if err := parent.verifyWithoutCacheWrites(); err != nil {
 		return nil, errMissingUTXO
 	} else if status := parent.Status(); status.Decided() {
 		return nil, errMissingUTXO
@@ -710,10 +709,15 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
-// LoadUser ...
+// LoadUser returns:
+// 1) The UTXOs that reference one or more addresses controlled by the given user
+// 2) A keychain that contains this user's keys
+// If [addrsToUse] has positive length, returns UTXOs that reference one or more
+// addresses controlled by the given user that are also in [addrsToUse].
 func (vm *VM) LoadUser(
 	username string,
 	password string,
+	addrsToUse ids.ShortSet,
 ) (
 	[]*avax.UTXO,
 	*secp256k1fx.Keychain,
@@ -723,15 +727,25 @@ func (vm *VM) LoadUser(
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user: %w", err)
 	}
+	// Drop any potential error closing the database to report the original
+	// error
+	defer db.Close()
 
 	user := userState{vm: vm}
+
+	// true iff we should only return UTXOs that reference one or more addresses in [addrsToUse]
+	filterAddresses := len(addrsToUse) > 0
 
 	// The error is explicitly dropped, as it may just mean that there are no addresses.
 	addresses, _ := user.Addresses(db)
 
 	addrs := ids.ShortSet{}
 	for _, addr := range addresses {
-		addrs.Add(addr)
+		if !filterAddresses {
+			addrs.Add(addr)
+		} else if filterAddresses && addrsToUse.Contains(addr) {
+			addrs.Add(addr)
+		}
 	}
 	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
 	if err != nil {
@@ -739,7 +753,7 @@ func (vm *VM) LoadUser(
 	}
 
 	kc := secp256k1fx.NewKeychain()
-	for _, addr := range addresses {
+	for _, addr := range addrs.List() {
 		sk, err := user.Key(db, addr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("problem retrieving private key: %w", err)
@@ -747,7 +761,7 @@ func (vm *VM) LoadUser(
 		kc.Add(sk)
 	}
 
-	return utxos, kc, nil
+	return utxos, kc, db.Close()
 }
 
 // Spend ...
@@ -1069,7 +1083,7 @@ func (vm *VM) MintNFT(
 				},
 				GroupID: out.GroupID,
 				Payload: payload,
-				Outputs: []*secp256k1fx.OutputOwners{&secp256k1fx.OutputOwners{
+				Outputs: []*secp256k1fx.OutputOwners{{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{to},
 				}},

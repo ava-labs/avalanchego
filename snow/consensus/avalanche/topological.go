@@ -4,10 +4,10 @@
 package avalanche
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowstorm"
 )
 
 const (
@@ -59,26 +59,34 @@ type kahnNode struct {
 }
 
 // Initialize implements the Avalanche interface
-func (ta *Topological) Initialize(ctx *snow.Context, params Parameters, frontier []Vertex) {
-	ctx.Log.AssertDeferredNoError(params.Valid)
+func (ta *Topological) Initialize(
+	ctx *snow.Context,
+	params Parameters,
+	frontier []Vertex,
+) error {
+	if err := params.Valid(); err != nil {
+		return err
+	}
 
 	ta.ctx = ctx
 	ta.params = params
 
 	if err := ta.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
-		ta.ctx.Log.Error("%s", err)
+		return err
 	}
 
 	ta.nodes = make(map[[32]byte]Vertex, minMapSize)
 
 	ta.cg = &snowstorm.Directed{}
-	ta.cg.Initialize(ctx, params.Parameters)
+	if err := ta.cg.Initialize(ctx, params.Parameters); err != nil {
+		return err
+	}
 
 	ta.frontier = make(map[[32]byte]Vertex, minMapSize)
 	for _, vtx := range frontier {
 		ta.frontier[vtx.ID().Key()] = vtx
 	}
-	ctx.Log.AssertNoError(ta.updateFrontiers())
+	return ta.updateFrontiers()
 }
 
 // Parameters implements the Avalanche interface

@@ -6,15 +6,15 @@ package platformvm
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
+	"github.com/ava-labs/avalanche-go/vms/avm"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -43,7 +43,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(tx *UnsignedCreateChainTx) *UnsignedCreateChainTx { tx = nil; return tx },
+			setup:       func(*UnsignedCreateChainTx) *UnsignedCreateChainTx { return nil },
 		},
 		{
 			description: "vm ID is empty",
@@ -146,7 +146,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 
 // Ensure SemanticVerify fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -174,7 +174,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 // Ensure SemanticVerify fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -214,7 +214,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // Ensure SemanticVerify fails when the Subnet the blockchain specifies as
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -239,7 +239,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 }
 
 func TestCreateChainTxAlreadyExists(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -272,7 +272,7 @@ func TestCreateChainTxAlreadyExists(t *testing.T) {
 
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()

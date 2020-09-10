@@ -1,5 +1,5 @@
-avalanche_binary: ~/go/src/github.com/ava-labs/gecko/build/avalanche
-repo_folder: ~/go/src/github.com/ava-labs/gecko
-repo_name: ava-labs/gecko
+avalanche_binary: ~/go/src/github.com/ava-labs/avalanche-go/build/avalanche
+repo_folder: ~/go/src/github.com/ava-labs/avalanche-go
+repo_name: ava-labs/avalanche-go
 repo_url: https://github.com/{{ repo_name }}
-repo_branch: master
+repo_branch: dev

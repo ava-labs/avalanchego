@@ -4,8 +4,8 @@
 package timestampvm
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
 )
 
 // ID is a unique identifier for this VM

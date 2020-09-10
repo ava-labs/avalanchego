@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/avalanche-go/utils"
 )
 
 var (
@@ -21,6 +21,14 @@ var (
 		{
 			name:    "replacer",
 			sampler: &uniformReplacer{},
+		},
+		{
+			name:    "resampler",
+			sampler: &uniformResample{},
+		},
+		{
+			name:    "best",
+			sampler: NewBestUniform(30),
 		},
 	}
 	uniformTests = []struct {

@@ -14,13 +14,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/version"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/networking/router"
+	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/version"
 )
 
 var (
@@ -39,7 +39,7 @@ func (l *testListener) Accept() (net.Conn, error) {
 	select {
 	case c := <-l.inbound:
 		return c, nil
-	case _, _ = <-l.closed:
+	case <-l.closed:
 		return nil, errClosed
 	}
 }
@@ -102,7 +102,7 @@ func (c *testConn) Read(b []byte) (int, error) {
 				return 0, errClosed
 			}
 			c.partialRead = read
-		case _, _ = <-c.closed:
+		case <-c.closed:
 			return 0, errClosed
 		}
 	}
@@ -122,7 +122,7 @@ func (c *testConn) Write(b []byte) (int, error) {
 
 	select {
 	case c.pendingWrites <- newB:
-	case _, _ = <-c.closed:
+	case <-c.closed:
 		return 0, errClosed
 	}
 
@@ -328,8 +328,8 @@ func TestEstablishConnection(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -469,8 +469,8 @@ func TestDoubleTrack(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 	net0.Track(ip1)
@@ -611,8 +611,8 @@ func TestDoubleClose(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -758,8 +758,8 @@ func TestRemoveHandlers(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -787,8 +787,8 @@ func TestRemoveHandlers(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h3)
-	net1.RegisterHandler(h4)
+	net0.RegisterConnector(h3)
+	net1.RegisterConnector(h4)
 
 	err := net0.Close()
 	assert.NoError(t, err)
@@ -914,8 +914,8 @@ func TestTrackConnected(t *testing.T) {
 		},
 	}
 
-	net0.RegisterHandler(h0)
-	net1.RegisterHandler(h1)
+	net0.RegisterConnector(h0)
+	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 

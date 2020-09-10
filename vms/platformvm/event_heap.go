@@ -6,10 +6,9 @@ package platformvm
 import (
 	"bytes"
 	"container/heap"
-	"errors"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // TimedTx ...
@@ -17,6 +16,7 @@ type TimedTx interface {
 	ID() ids.ID
 	StartTime() time.Time
 	EndTime() time.Time
+	Bytes() []byte
 }
 
 // EventHeap is a collection of timedTxs where elements are ordered by either
@@ -48,8 +48,8 @@ func (h *EventHeap) Less(i, j int) bool {
 	case iTime.Unix() < jTime.Unix():
 		return true
 	case iTime == jTime:
-		_, iOk := iTx.(*UnsignedAddDefaultSubnetValidatorTx)
-		_, jOk := jTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		_, iOk := iTx.(*UnsignedAddValidatorTx)
+		_, jOk := jTx.(*UnsignedAddValidatorTx)
 
 		if iOk != jOk {
 			return iOk == h.SortByStartTime
@@ -93,18 +93,4 @@ func (h *EventHeap) Pop() interface{} {
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() ([]byte, error) {
 	return Codec.Marshal(h)
-}
-
-// getDefaultSubnetStaker ...
-func (h *EventHeap) getDefaultSubnetStaker(id ids.ShortID) (*Tx, error) {
-	for _, txIntf := range h.Txs {
-		tx, ok := txIntf.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
-		if !ok {
-			continue
-		}
-		if id.Equals(tx.Validator.NodeID) {
-			return txIntf, nil
-		}
-	}
-	return nil, errors.New("couldn't find validator in the default subnet")
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
+	sbcon "github.com/ava-labs/avalanche-go/snow/consensus/snowball"
 )
 
 func TestConflictGraphEquality(t *testing.T) {
@@ -19,7 +19,7 @@ func TestConflictGraphEquality(t *testing.T) {
 	colorsPerConsumer := 2
 	maxInputConflicts := 2
 	numNodes := 100
-	params := snowball.Parameters{
+	params := sbcon.Parameters{
 		Metrics:      prometheus.NewRegistry(),
 		K:            20,
 		Alpha:        11,

@@ -4,8 +4,8 @@
 package common
 
 import (
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/snow"
 )
 
 // VM describes the interface that all consensus VMs must implement

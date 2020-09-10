@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
 )
 
 func TestBaseTxMarshalJSON(t *testing.T) {
-	vm , _ := defaultVM()
+	vm, _ := defaultVM()
 	vm.Ctx.Lock.Lock()
 	defer func() {
 		vm.Shutdown()
@@ -24,14 +24,14 @@ func TestBaseTxMarshalJSON(t *testing.T) {
 		BlockchainID: blockchainID,
 		NetworkID:    4,
 		Ins: []*avax.TransferableInput{
-			&avax.TransferableInput{
+			{
 				UTXOID: avax.UTXOID{TxID: utxoTxID, OutputIndex: 5},
 				Asset:  avax.Asset{ID: assetID},
 				In:     &avax.TestTransferable{Val: 100},
 			},
 		},
 		Outs: []*avax.TransferableOutput{
-			&avax.TransferableOutput{
+			{
 				Asset: avax.Asset{ID: assetID},
 				Out:   &avax.TestTransferable{Val: 100},
 			},

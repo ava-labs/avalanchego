@@ -10,13 +10,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanche-go/snow/validators"
 )
 
 var (
@@ -26,15 +26,14 @@ var (
 	Genesis = ids.GenerateTestID()
 )
 
-func setup(t *testing.T) (validators.Validator, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
+func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
 	config := DefaultConfig()
-
-	vdr := validators.GenerateRandomValidator(1)
 
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -118,7 +117,7 @@ func TestEngineAdd(t *testing.T) {
 			t.Fatalf("Asked multiple times")
 		}
 		*asked = true
-		if !vdr.ID().Equals(inVdr) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if !blkID.Equals(blk.Parent().ID()) {
@@ -133,7 +132,7 @@ func TestEngineAdd(t *testing.T) {
 		return blk, nil
 	}
 
-	te.Put(vdr.ID(), 0, blk.ID(), blk.Bytes())
+	te.Put(vdr, 0, blk.ID(), blk.Bytes())
 
 	vm.ParseBlockF = nil
 
@@ -147,7 +146,7 @@ func TestEngineAdd(t *testing.T) {
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errUnknownBytes }
 
-	te.Put(vdr.ID(), *reqID, blk.Parent().ID(), nil)
+	te.Put(vdr, *reqID, blk.Parent().ID(), nil)
 
 	vm.ParseBlockF = nil
 
@@ -189,7 +188,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 		*asked = true
 		*getRequestID = requestID
-		if !vdr.ID().Equals(inVdr) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if !blk.ID().Equals(blkID) {
@@ -197,7 +196,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	te.PullQuery(vdr.ID(), 15, blk.ID())
+	te.PullQuery(vdr, 15, blk.ID())
 	if !*blocked {
 		t.Fatalf("Didn't request block")
 	}
@@ -214,7 +213,7 @@ func TestEngineQuery(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -246,7 +245,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 		return blk, nil
 	}
-	te.Put(vdr.ID(), *getRequestID, blk.ID(), blk.Bytes())
+	te.Put(vdr, *getRequestID, blk.ID(), blk.Bytes())
 	vm.ParseBlockF = nil
 
 	if !*queried {
@@ -284,7 +283,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 		*asked = true
 		*getRequestID = requestID
-		if !vdr.ID().Equals(inVdr) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if !blk1.ID().Equals(blkID) {
@@ -293,7 +292,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 	blkSet := ids.Set{}
 	blkSet.Add(blk1.ID())
-	te.Chits(vdr.ID(), *queryRequestID, blkSet)
+	te.Chits(vdr, *queryRequestID, blkSet)
 
 	*queried = false
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
@@ -303,7 +302,7 @@ func TestEngineQuery(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -330,7 +329,7 @@ func TestEngineQuery(t *testing.T) {
 
 		return blk1, nil
 	}
-	te.Put(vdr.ID(), *getRequestID, blk1.ID(), blk1.Bytes())
+	te.Put(vdr, *getRequestID, blk1.ID(), blk1.Bytes())
 	vm.ParseBlockF = nil
 
 	if blk1.Status() != choices.Accepted {
@@ -342,7 +341,7 @@ func TestEngineQuery(t *testing.T) {
 
 	_ = te.polls.String() // Shouldn't panic
 
-	te.QueryFailed(vdr.ID(), *queryRequestID)
+	te.QueryFailed(vdr, *queryRequestID)
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have finished blocking")
 	}
@@ -360,16 +359,16 @@ func TestEngineMultipleQuery(t *testing.T) {
 		ConcurrentRepolls: 1,
 	}
 
-	vdr0 := validators.GenerateRandomValidator(1)
-	vdr1 := validators.GenerateRandomValidator(1)
-	vdr2 := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr0)
-	vals.Add(vdr1)
-	vals.Add(vdr2)
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
+	vdr2 := ids.GenerateTestShortID()
+
+	vals.AddWeight(vdr0, 1)
+	vals.AddWeight(vdr1, 1)
+	vals.AddWeight(vdr2, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -428,7 +427,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr0.ID(), vdr1.ID(), vdr2.ID())
+		vdrSet.Add(vdr0, vdr1, vdr2)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -470,7 +469,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 		*asked = true
 		*getRequestID = requestID
-		if !vdr0.ID().Equals(inVdr) {
+		if !vdr0.Equals(inVdr) {
 			t.Fatalf("Asking wrong validator for block")
 		}
 		if !blk1.ID().Equals(blkID) {
@@ -479,8 +478,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 	blkSet := ids.Set{}
 	blkSet.Add(blk1.ID())
-	te.Chits(vdr0.ID(), *queryRequestID, blkSet)
-	te.Chits(vdr1.ID(), *queryRequestID, blkSet)
+	te.Chits(vdr0, *queryRequestID, blkSet)
+	te.Chits(vdr1, *queryRequestID, blkSet)
 
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
@@ -506,7 +505,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		*queried = true
 		*secondQueryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr0.ID(), vdr1.ID(), vdr2.ID())
+		vdrSet.Add(vdr0, vdr1, vdr2)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -514,12 +513,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
-	te.Put(vdr0.ID(), *getRequestID, blk1.ID(), blk1.Bytes())
+	te.Put(vdr0, *getRequestID, blk1.ID(), blk1.Bytes())
 
 	// Should be dropped because the query was already filled
 	blkSet = ids.Set{}
 	blkSet.Add(blk0.ID())
-	te.Chits(vdr2.ID(), *queryRequestID, blkSet)
+	te.Chits(vdr2, *queryRequestID, blkSet)
 
 	if blk1.Status() != choices.Accepted {
 		t.Fatalf("Should have executed block")
@@ -579,7 +578,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 	}
 
 	te.issue(blk)
-	te.QueryFailed(vdr.ID(), 1)
+	te.QueryFailed(vdr, 1)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed blocking event")
@@ -601,7 +600,7 @@ func TestEngineFetchBlock(t *testing.T) {
 
 	added := new(bool)
 	sender.PutF = func(inVdr ids.ShortID, requestID uint32, blkID ids.ID, blk []byte) {
-		if !vdr.ID().Equals(inVdr) {
+		if !vdr.Equals(inVdr) {
 			t.Fatalf("Wrong validator")
 		}
 		if requestID != 123 {
@@ -613,7 +612,7 @@ func TestEngineFetchBlock(t *testing.T) {
 		*added = true
 	}
 
-	te.Get(vdr.ID(), 123, gBlk.ID())
+	te.Get(vdr, 123, gBlk.ID())
 
 	if !*added {
 		t.Fatalf("Should have sent block to peer")
@@ -656,7 +655,7 @@ func TestEnginePushQuery(t *testing.T) {
 			t.Fatalf("Sent chit multiple times")
 		}
 		*chitted = true
-		if !inVdr.Equals(vdr.ID()) {
+		if !inVdr.Equals(vdr) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
 		if requestID != 20 {
@@ -678,7 +677,7 @@ func TestEnginePushQuery(t *testing.T) {
 		}
 		*queried = true
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -687,7 +686,7 @@ func TestEnginePushQuery(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr.ID(), 20, blk.ID(), blk.Bytes())
+	te.PushQuery(vdr, 20, blk.ID(), blk.Bytes())
 
 	if !*chitted {
 		t.Fatalf("Should have sent a chit to the peer")
@@ -719,7 +718,7 @@ func TestEngineBuildBlock(t *testing.T) {
 		}
 		*queried = true
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -745,7 +744,7 @@ func TestEngineRepoll(t *testing.T) {
 		}
 		*queried = true
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -770,16 +769,16 @@ func TestVoteCanceling(t *testing.T) {
 		ConcurrentRepolls: 1,
 	}
 
-	vdr0 := validators.GenerateRandomValidator(1)
-	vdr1 := validators.GenerateRandomValidator(1)
-	vdr2 := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr0)
-	vals.Add(vdr1)
-	vals.Add(vdr2)
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
+	vdr2 := ids.GenerateTestShortID()
+
+	vals.AddWeight(vdr0, 1)
+	vals.AddWeight(vdr1, 1)
+	vals.AddWeight(vdr2, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -838,7 +837,7 @@ func TestVoteCanceling(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr0.ID(), vdr1.ID(), vdr2.ID())
+		vdrSet.Add(vdr0, vdr1, vdr2)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -853,7 +852,7 @@ func TestVoteCanceling(t *testing.T) {
 		t.Fatalf("Shouldn't have finished blocking issue")
 	}
 
-	te.QueryFailed(vdr0.ID(), *queryRequestID)
+	te.QueryFailed(vdr0, *queryRequestID)
 
 	if te.polls.Len() != 1 {
 		t.Fatalf("Shouldn't have finished blocking issue")
@@ -863,7 +862,7 @@ func TestVoteCanceling(t *testing.T) {
 	sender.PullQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID) {
 		*repolled = true
 	}
-	te.QueryFailed(vdr1.ID(), *queryRequestID)
+	te.QueryFailed(vdr1, *queryRequestID)
 
 	if !*repolled {
 		t.Fatalf("Should have finished blocking issue and repolled the network")
@@ -958,13 +957,13 @@ func TestEngineAbandonQuery(t *testing.T) {
 		*reqID = requestID
 	}
 
-	te.PullQuery(vdr.ID(), 0, blkID)
+	te.PullQuery(vdr, 0, blkID)
 
 	if len(te.blocked) != 1 {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr.ID(), *reqID)
+	te.GetFailed(vdr, *reqID)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -1008,13 +1007,13 @@ func TestEngineAbandonChit(t *testing.T) {
 
 	fakeBlkIDSet := ids.Set{}
 	fakeBlkIDSet.Add(fakeBlkID)
-	te.Chits(vdr.ID(), 0, fakeBlkIDSet)
+	te.Chits(vdr, 0, fakeBlkIDSet)
 
 	if len(te.blocked) != 1 {
 		t.Fatalf("Should have blocked on request")
 	}
 
-	te.GetFailed(vdr.ID(), *reqID)
+	te.GetFailed(vdr, *reqID)
 
 	if len(te.blocked) != 0 {
 		t.Fatalf("Should have removed request")
@@ -1075,7 +1074,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr.ID(), 0, blockingBlk.ID(), blockingBlk.Bytes())
+	te.PushQuery(vdr, 0, blockingBlk.ID(), blockingBlk.Bytes())
 
 	if len(te.blocked) != 3 {
 		t.Fatalf("Both inserts should be blocking in addition to the chit request")
@@ -1131,7 +1130,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.PushQueryF = func(inVdrs ids.ShortSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr.ID())
+		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -1153,7 +1152,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	}
 	blockingBlkIDSet := ids.Set{}
 	blockingBlkIDSet.Add(blockingBlk.ID())
-	te.Chits(vdr.ID(), *queryRequestID, blockingBlkIDSet)
+	te.Chits(vdr, *queryRequestID, blockingBlkIDSet)
 
 	if len(te.blocked) != 2 {
 		t.Fatalf("The insert and the chit should be blocking")
@@ -1188,12 +1187,12 @@ func TestEngineRetryFetch(t *testing.T) {
 		*reqID = requestID
 	}
 
-	te.PullQuery(vdr.ID(), 0, missingBlk.ID())
+	te.PullQuery(vdr, 0, missingBlk.ID())
 
 	vm.CantGetBlock = true
 	sender.GetF = nil
 
-	te.GetFailed(vdr.ID(), *reqID)
+	te.GetFailed(vdr, *reqID)
 
 	vm.CantGetBlock = false
 
@@ -1202,7 +1201,7 @@ func TestEngineRetryFetch(t *testing.T) {
 		*called = true
 	}
 
-	te.PullQuery(vdr.ID(), 0, missingBlk.ID())
+	te.PullQuery(vdr, 0, missingBlk.ID())
 
 	vm.CantGetBlock = true
 	sender.GetF = nil
@@ -1263,7 +1262,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	votes := ids.Set{}
 	votes.Add(invalidBlkID)
-	te.Chits(vdr.ID(), *reqID, votes)
+	te.Chits(vdr, *reqID, votes)
 
 	vm.GetBlockF = nil
 
@@ -1308,8 +1307,8 @@ func TestEngineGossip(t *testing.T) {
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	vdr, vdrs, sender, vm, te, gBlk := setup(t)
 
-	secondVdr := validators.GenerateRandomValidator(1)
-	vdrs.Add(secondVdr)
+	secondVdr := ids.GenerateTestShortID()
+	vdrs.AddWeight(secondVdr, 1)
 
 	sender.Default(true)
 
@@ -1357,7 +1356,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr.ID()) {
+		if !reqVdr.Equals(vdr) {
 			t.Fatalf("Wrong validator requested")
 		}
 		if !blkID.Equals(missingBlk.ID()) {
@@ -1365,9 +1364,9 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr.ID(), 0, pendingBlk.ID(), pendingBlk.Bytes())
+	te.PushQuery(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes())
 
-	te.Put(secondVdr.ID(), *reqID, missingBlk.ID(), []byte{3})
+	te.Put(secondVdr, *reqID, missingBlk.ID(), []byte{3})
 
 	*parsed = false
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -1394,7 +1393,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	missingBlk.StatusV = choices.Processing
 
-	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
+	te.Put(vdr, *reqID, missingBlk.ID(), missingBlk.Bytes())
 
 	pref := te.Consensus.Preference()
 	if !pref.Equals(pendingBlk.ID()) {
@@ -1453,7 +1452,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	reqID := new(uint32)
 	sender.GetF = func(reqVdr ids.ShortID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if !reqVdr.Equals(vdr.ID()) {
+		if !reqVdr.Equals(vdr) {
 			t.Fatalf("Wrong validator requested")
 		}
 		if !blkID.Equals(missingBlk.ID()) {
@@ -1461,12 +1460,12 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 
-	te.PushQuery(vdr.ID(), 0, pendingBlk.ID(), pendingBlk.Bytes())
+	te.PushQuery(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes())
 
 	sender.GetF = nil
 	sender.CantGet = false
 
-	te.PushQuery(vdr.ID(), *reqID, randomBlkID, []byte{3})
+	te.PushQuery(vdr, *reqID, randomBlkID, []byte{3})
 
 	*parsed = false
 	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -1491,7 +1490,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	sender.CantPushQuery = false
 	sender.CantChits = false
 
-	te.Put(vdr.ID(), *reqID, missingBlk.ID(), missingBlk.Bytes())
+	te.Put(vdr, *reqID, missingBlk.ID(), missingBlk.Bytes())
 
 	pref := te.Consensus.Preference()
 	if !pref.Equals(pendingBlk.ID()) {
@@ -1504,12 +1503,11 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	config.Params.ConcurrentRepolls = 2
 
-	vdr := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr)
+	vdr := ids.GenerateTestShortID()
+	vals.AddWeight(vdr, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1590,7 +1588,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	numPulled := new(int)
 	sender.PullQueryF = func(_ ids.ShortSet, _ uint32, _ ids.ID) { *numPulled++ }
 
-	te.Put(vdr.ID(), 0, pendingBlk.ID(), pendingBlk.Bytes())
+	te.Put(vdr, 0, pendingBlk.ID(), pendingBlk.Bytes())
 
 	if *numPushed != 1 {
 		t.Fatalf("Should have initially sent a push query")
@@ -1612,14 +1610,14 @@ func TestEngineDoubleChit(t *testing.T) {
 		BetaRogue:    2,
 	}
 
-	vdr0 := validators.GenerateRandomValidator(1)
-	vdr1 := validators.GenerateRandomValidator(1)
-
 	vals := validators.NewSet()
 	config.Validators = vals
 
-	vals.Add(vdr0)
-	vals.Add(vdr1)
+	vdr0 := ids.GenerateTestShortID()
+	vdr1 := ids.GenerateTestShortID()
+
+	vals.AddWeight(vdr0, 1)
+	vals.AddWeight(vdr1, 1)
 
 	sender := &common.SenderTest{}
 	sender.T = t
@@ -1678,7 +1676,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdr0.ID(), vdr1.ID())
+		vdrSet.Add(vdr0, vdr1)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
 		}
@@ -1707,19 +1705,19 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	te.Chits(vdr0.ID(), *queryRequestID, blkSet)
+	te.Chits(vdr0, *queryRequestID, blkSet)
 
 	if status := blk.Status(); status != choices.Processing {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	te.Chits(vdr0.ID(), *queryRequestID, blkSet)
+	te.Chits(vdr0, *queryRequestID, blkSet)
 
 	if status := blk.Status(); status != choices.Processing {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	te.Chits(vdr1.ID(), *queryRequestID, blkSet)
+	te.Chits(vdr1, *queryRequestID, blkSet)
 
 	if status := blk.Status(); status != choices.Accepted {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Accepted)

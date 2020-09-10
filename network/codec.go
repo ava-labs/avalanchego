@@ -8,11 +8,10 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 )
 
 var (
-	errBadLength    = errors.New("stream has unexpected length")
 	errMissingField = errors.New("message missing field")
 	errBadOp        = errors.New("input field has invalid operation")
 )

@@ -6,7 +6,7 @@ package sampler
 import (
 	"sort"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 type weightedLinearElement struct {

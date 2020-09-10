@@ -4,10 +4,10 @@
 package platformvm
 
 import (
-	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/avalanche-go/chains"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/validators"
 )
 
 // ID of the platform VM
@@ -17,20 +17,22 @@ var (
 
 // Factory can create new instances of the Platform Chain
 type Factory struct {
-	ChainManager   chains.Manager
-	Validators     validators.Manager
-	StakingEnabled bool
-	Fee            uint64
-	MinStake       uint64
+	ChainManager     chains.Manager
+	Validators       validators.Manager
+	StakingEnabled   bool
+	Fee              uint64
+	MinStake         uint64
+	UptimePercentage float64
 }
 
 // New returns a new instance of the Platform Chain
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
-		chainManager:   f.ChainManager,
-		validators:     f.Validators,
-		stakingEnabled: f.StakingEnabled,
-		txFee:          f.Fee,
-		minStake:       f.MinStake,
+		chainManager:     f.ChainManager,
+		vdrMgr:           f.Validators,
+		stakingEnabled:   f.StakingEnabled,
+		txFee:            f.Fee,
+		minStake:         f.MinStake,
+		uptimePercentage: f.UptimePercentage,
 	}, nil
 }

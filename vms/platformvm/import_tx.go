@@ -7,24 +7,21 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/math"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/math"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 var (
-	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
-	errWrongNumberOfCredentials   = errors.New("should have the same number of credentials as inputs")
-	errNoInputs                   = errors.New("tx has no inputs")
-	errNoImportInputs             = errors.New("tx has no imported inputs")
-	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
-	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errUnknownAsset               = errors.New("unknown asset ID")
+	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
+	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
+	errNoImportInputs           = errors.New("tx has no imported inputs")
+	errInputsNotSortedUnique    = errors.New("inputs not sorted and unique")
 
 	_ UnsignedAtomicTx = &UnsignedImportTx{}
 )

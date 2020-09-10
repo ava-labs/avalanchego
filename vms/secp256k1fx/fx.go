@@ -6,10 +6,10 @@ package secp256k1fx
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
 )
 
 var (
@@ -17,7 +17,6 @@ var (
 	errWrongTxType         = errors.New("wrong tx type")
 	errWrongOpType         = errors.New("wrong operation type")
 	errWrongUTXOType       = errors.New("wrong utxo type")
-	errWrongOutputType     = errors.New("wrong output type")
 	errWrongInputType      = errors.New("wrong input type")
 	errWrongCredentialType = errors.New("wrong credential type")
 	errWrongOwnerType      = errors.New("wrong owner type")

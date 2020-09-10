@@ -10,19 +10,21 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/constants"
 )
 
 func TestAdaptiveTimeoutManager(t *testing.T) {
 	tm := AdaptiveTimeoutManager{}
-	tm.Initialize(
-		time.Millisecond,         // initialDuration
-		time.Millisecond,         // minimumDuration
-		2,                        // increaseRatio
-		time.Microsecond,         // decreaseValue
-		"gecko",                  // namespace
-		prometheus.NewRegistry(), // registerer
-	)
+	tm.Initialize(&AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    time.Hour,
+		TimeoutMultiplier: 2,
+		TimeoutReduction:  time.Microsecond,
+		Namespace:         constants.PlatformName,
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	var lock sync.Mutex

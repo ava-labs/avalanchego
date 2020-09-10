@@ -7,12 +7,12 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 	illegalNameCharacter = "h8*32"
 	invalidASCIIStr      = "ÉÎ"
 	invalidWhitespaceStr = " HAT"
-	denominationTooLarge = maxDenomination + 1
+	denominationTooLarge = byte(maxDenomination + 1)
 )
 
 func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Context) {
@@ -461,7 +461,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 		}},
 		Name:         "BRADY",
 		Symbol:       "TOM",
-		Denomination: 33,
+		Denomination: denominationTooLarge,
 		States: []*InitialState{{
 			FxID: 0,
 		}},
@@ -506,6 +506,29 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY!",
+		Symbol:       "TOM",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 0,
+		}},
+	}
+	tx.Initialize(nil, nil)
+
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 1); err == nil {
+		t.Fatalf("Name with an invalid character should have errored")
+	}
+}
+
+func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
+	ctx := NewContext(t)
+	c := setupCodec()
+
+	tx := &CreateAssetTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		Name:         illegalNameCharacter,
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{

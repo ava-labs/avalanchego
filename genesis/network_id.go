@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/constants"
 )
 
 // NetworkName returns a human readable name for the network with
@@ -30,18 +30,18 @@ func NetworkID(networkName string) (uint32, error) {
 
 	if id, err := strconv.ParseUint(networkName, 10, 0); err == nil {
 		if id > math.MaxUint32 {
-			return 0, fmt.Errorf("NetworkID %s not in [0, 2^32)", networkName)
+			return 0, fmt.Errorf("networkID %s not in [0, 2^32)", networkName)
 		}
 		return uint32(id), nil
 	}
 	if constants.ValidNetworkName.MatchString(networkName) {
 		if id, err := strconv.Atoi(networkName[8:]); err == nil {
 			if id > math.MaxUint32 {
-				return 0, fmt.Errorf("NetworkID %s not in [0, 2^32)", networkName)
+				return 0, fmt.Errorf("networkID %s not in [0, 2^32)", networkName)
 			}
 			return uint32(id), nil
 		}
 	}
 
-	return 0, fmt.Errorf("Failed to parse %s as a network name", networkName)
+	return 0, fmt.Errorf("failed to parse %s as a network name", networkName)
 }

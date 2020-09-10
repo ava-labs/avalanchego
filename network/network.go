@@ -13,19 +13,19 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/api/health"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/sender"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/sampler"
-	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/version"
+	"github.com/ava-labs/avalanche-go/api/health"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/networking/router"
+	"github.com/ava-labs/avalanche-go/snow/networking/sender"
+	"github.com/ava-labs/avalanche-go/snow/triggers"
+	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/sampler"
+	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanche-go/version"
 )
 
 // reasonable default values
@@ -46,6 +46,8 @@ const (
 	defaultPingPongTimeout                           = time.Minute
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 )
+
+func init() { rand.Seed(time.Now().UnixNano()) }
 
 // Network defines the functionality of the networking library.
 type Network interface {
@@ -70,11 +72,11 @@ type Network interface {
 	// IP.
 	Track(ip utils.IPDesc)
 
-	// Register a new handler that is called whenever a peer is connected to or
-	// disconnected to. If the handler returns true, then it will never be
-	// called again. Thread safety must be managed internally in the network.
+	// Register a new connector that is called whenever a peer is connected to
+	// or disconnected from. If the connector returns true, then it will never
+	// be called again. Thread safety must be managed internally in the network.
 	// The handler will initially be called with this local node's ID.
-	RegisterHandler(h Handler)
+	RegisterConnector(h validators.Connector)
 
 	// Returns the description of the nodes this network is currently connected
 	// to externally. Thread safety must be managed internally to the network.
@@ -138,7 +140,7 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs    map[string]struct{} // set of IPs that resulted in my ID.
 	peers    map[[20]byte]*peer
-	handlers []Handler
+	handlers []validators.Connector
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -225,19 +227,22 @@ func NewNetwork(
 	pingFrequency time.Duration,
 ) Network {
 	netw := &network{
-		log:                                log,
-		id:                                 id,
-		ip:                                 ip,
-		networkID:                          networkID,
-		version:                            version,
-		parser:                             parser,
-		listener:                           listener,
-		dialer:                             dialer,
-		serverUpgrader:                     serverUpgrader,
-		clientUpgrader:                     clientUpgrader,
-		vdrs:                               vdrs,
-		beacons:                            beacons,
-		router:                             router,
+		log:            log,
+		id:             id,
+		ip:             ip,
+		networkID:      networkID,
+		version:        version,
+		parser:         parser,
+		listener:       listener,
+		dialer:         dialer,
+		serverUpgrader: serverUpgrader,
+		clientUpgrader: clientUpgrader,
+		vdrs:           vdrs,
+		beacons:        beacons,
+		router:         router,
+		// This field just makes sure we don't connect to ourselves when TLS is
+		// disabled. So, cryptographically secure random number generation isn't
+		// used here.
 		nodeID:                             rand.Uint32(),
 		initialReconnectDelay:              initialReconnectDelay,
 		maxReconnectDelay:                  maxReconnectDelay,
@@ -650,8 +655,8 @@ func (n *network) Dispatch() error {
 	}
 }
 
-// RegisterHandler implements the Network interface
-func (n *network) RegisterHandler(h Handler) {
+// RegisterConnector implements the Network interface
+func (n *network) RegisterConnector(h validators.Connector) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
@@ -883,8 +888,9 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = n.initialReconnectDelay
 		}
 
-		// Ignore weak randomness warnings in calculating timeouts because true
-		// randomness is unnecessary here
+		// Randomization is only performed here to distribute reconnection
+		// attempts to a node that previously shut down. This doesn't require
+		// cryptographically secure random number generation.
 		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay

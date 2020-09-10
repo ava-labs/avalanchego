@@ -8,15 +8,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
 )
 
 var (
-	errLockedFunds = errors.New("funds currently locked")
-	errCantSpend   = errors.New("unable to spend this UTXO")
+	errCantSpend = errors.New("unable to spend this UTXO")
 )
 
 // Keychain is a collection of keys that can be used to spend outputs

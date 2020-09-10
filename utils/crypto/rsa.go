@@ -10,8 +10,8 @@ import (
 	"crypto/x509"
 	"errors"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // TestJob is a test Job
@@ -62,7 +62,7 @@ func (j *TestJob) Execute() error {
 	} else if j.CantExecute && j.T != nil {
 		j.T.Fatalf("Unexpectedly called Execute")
 	}
-	return errors.New("Unexpectedly called Execute")
+	return errors.New("unexpectedly called Execute")
 }
 
 // Bytes ...

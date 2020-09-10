@@ -7,9 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"unicode"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 )
 
 const (
@@ -18,7 +19,7 @@ const (
 	// initial capacity of byte slice that values are marshaled into.
 	// Larger value --> need less memory allocations but possibly have allocated but unused memory
 	// Smaller value --> need more memory allocations but more efficient use of allocated memory
-	initialSliceCap = 256
+	initialSliceCap = 128
 	// The current version of the codec. Right now there is only one codec version, but in the future the
 	// codec may change. All serialized blobs begin with the codec version.
 	version = uint16(0)
@@ -34,6 +35,7 @@ var (
 
 // Codec handles marshaling and unmarshaling of structs
 type codec struct {
+	lock        sync.Mutex
 	version     uint16
 	maxSize     int
 	maxSliceLen int
@@ -59,7 +61,7 @@ type Codec interface {
 	Unmarshal([]byte, interface{}) error
 }
 
-// New returns a new codec
+// New returns a new, concurrency-safe codec
 func New(maxSize, maxSliceLen int) Codec {
 	return &codec{
 		maxSize:                maxSize,
@@ -76,11 +78,17 @@ func New(maxSize, maxSliceLen int) Codec {
 func NewDefault() Codec { return New(defaultMaxSize, defaultMaxSliceLength) }
 
 // Skip some number of type IDs
-func (c *codec) Skip(num int) { c.nextTypeID += uint32(num) }
+func (c *codec) Skip(num int) {
+	c.lock.Lock()
+	c.nextTypeID += uint32(num)
+	c.lock.Unlock()
+}
 
 // RegisterType is used to register types that may be unmarshaled into an interface
 // [val] is a value of the type being registered
 func (c *codec) RegisterType(val interface{}) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	valType := reflect.TypeOf(val)
 	if _, exists := c.typeToTypeID[valType]; exists {
 		return fmt.Errorf("type %v has already been registered", valType)
@@ -106,6 +114,8 @@ func (c *codec) RegisterType(val interface{}) error {
 
 // To marshal an interface, [value] must be a pointer to the interface
 func (c *codec) Marshal(value interface{}) ([]byte, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if value == nil {
 		return nil, errMarshalNil // can't marshal nil
 	}
@@ -120,6 +130,7 @@ func (c *codec) Marshal(value interface{}) ([]byte, error) {
 
 // marshal writes the byte representation of [value] to [p]
 // [value]'s underlying value must not be a nil pointer or interface
+// c.lock should be held for the duration of this function
 func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 	valueKind := value.Kind()
 	switch valueKind {
@@ -185,6 +196,12 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		if p.Err != nil {
 			return p.Err
 		}
+		// If this is a slice of bytes, manually pack the bytes rather
+		// than calling marshal on each byte. This improves performance.
+		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
+			p.PackFixedBytes(value.Bytes())
+			return p.Err
+		}
 		for i := 0; i < numElts; i++ { // Process each element in the slice
 			if err := c.marshal(value.Index(i), p); err != nil {
 				return err
@@ -193,6 +210,11 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 		return nil
 	case reflect.Array:
 		numElts := value.Len()
+		if elemKind := value.Type().Kind(); elemKind == reflect.Uint8 {
+			sliceVal := value.Convert(reflect.TypeOf([]byte{}))
+			p.PackFixedBytes(sliceVal.Bytes())
+			return p.Err
+		}
 		if numElts > c.maxSliceLen {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
 		}
@@ -221,6 +243,9 @@ func (c *codec) marshal(value reflect.Value, p *wrappers.Packer) error {
 // Unmarshal unmarshals [bytes] into [dest], where
 // [dest] must be a pointer or interface
 func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	switch {
 	case len(bytes) > c.maxSize:
 		return fmt.Errorf("byte array exceeds maximum length, %d", c.maxSize)
@@ -241,6 +266,7 @@ func (c *codec) Unmarshal(bytes []byte, dest interface{}) error {
 }
 
 // Unmarshal from p.Bytes into [value]. [value] must be addressable.
+// c.lock should be held for the duration of this function
 func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Uint8:
@@ -306,6 +332,12 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
 				numElts, c.maxSliceLen)
 		}
+		// If this is a slice of bytes, manually unpack the bytes rather
+		// than calling unmarshal on each byte. This improves performance.
+		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
+			value.SetBytes(p.UnpackFixedBytes(numElts))
+			return p.Err
+		}
 		// set [value] to be a slice of the appropriate type/capacity (right now it is nil)
 		value.Set(reflect.MakeSlice(value.Type(), numElts, numElts))
 		// Unmarshal each element into the appropriate index of the slice
@@ -316,7 +348,18 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 		}
 		return nil
 	case reflect.Array:
-		for i := 0; i < value.Len(); i++ {
+		numElts := value.Len()
+		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {
+			unpackedBytes := p.UnpackFixedBytes(numElts)
+			if p.Errored() {
+				return p.Err
+			}
+			// Get a slice to the underlying array value
+			underlyingSlice := value.Slice(0, numElts).Interface().([]byte)
+			copy(underlyingSlice, unpackedBytes)
+			return nil
+		}
+		for i := 0; i < numElts; i++ {
 			if err := c.unmarshal(p, value.Index(i)); err != nil {
 				return fmt.Errorf("couldn't unmarshal array element: %s", err)
 			}
@@ -386,6 +429,7 @@ func (c *codec) unmarshal(p *wrappers.Packer, value reflect.Value) error {
 // Returns an error if a field has tag "serialize: true" but the field is unexported
 // e.g. getSerializedFieldIndices(Foo) --> [1,5,8] means Foo.Field(1), Foo.Field(5), Foo.Field(8)
 // are to be serialized/deserialized
+// c.lock should be held for the duration of this method
 func (c *codec) getSerializedFieldIndices(t reflect.Type) ([]int, error) {
 	if c.serializedFieldIndices == nil {
 		c.serializedFieldIndices = make(map[reflect.Type][]int)

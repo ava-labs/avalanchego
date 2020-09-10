@@ -9,9 +9,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 )
 
 type metrics struct {
@@ -26,35 +26,32 @@ type metrics struct {
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) error {
 	m.processing = make(map[[32]byte]time.Time)
 
-	m.numProcessing = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "processing",
-			Help:      "Number of currently processing blocks",
-		})
-	m.latAccepted = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "accepted",
-			Help:      "Latency of accepting from the time the block was issued in milliseconds",
-			Buckets:   timer.MillisecondsBuckets,
-		})
-	m.latRejected = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "rejected",
-			Help:      "Latency of rejecting from the time the block was issued in milliseconds",
-			Buckets:   timer.MillisecondsBuckets,
-		})
+	m.numProcessing = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "processing",
+		Help:      "Number of currently processing blocks",
+	})
+	m.latAccepted = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "accepted",
+		Help:      "Latency of accepting from the time the block was issued in milliseconds",
+		Buckets:   timer.MillisecondsBuckets,
+	})
+	m.latRejected = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "rejected",
+		Help:      "Latency of rejecting from the time the block was issued in milliseconds",
+		Buckets:   timer.MillisecondsBuckets,
+	})
 
 	if err := registerer.Register(m.numProcessing); err != nil {
-		return fmt.Errorf("Failed to register processing statistics due to %w", err)
+		return fmt.Errorf("failed to register processing statistics due to %w", err)
 	}
 	if err := registerer.Register(m.latAccepted); err != nil {
-		return fmt.Errorf("Failed to register accepted statistics due to %w", err)
+		return fmt.Errorf("failed to register accepted statistics due to %w", err)
 	}
 	if err := registerer.Register(m.latRejected); err != nil {
-		return fmt.Errorf("Failed to register rejected statistics due to %w", err)
+		return fmt.Errorf("failed to register rejected statistics due to %w", err)
 	}
 	return nil
 }

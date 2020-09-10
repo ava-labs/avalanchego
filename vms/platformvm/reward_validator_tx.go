@@ -6,20 +6,20 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/versiondb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 var (
-	errShouldBeDSValidator = errors.New("expected validator to be in the default subnet")
-	errOverflowReward      = errors.New("overflow while calculating validator reward")
+	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
 	errWrongTxType         = errors.New("wrong transaction type")
 
 	_ UnsignedProposalTx = &UnsignedRewardValidatorTx{}
@@ -40,6 +40,9 @@ type UnsignedRewardValidatorTx struct {
 
 	// ID of the tx that created the delegator/validator being removed/rewarded
 	TxID ids.ID `serialize:"true" json:"txID"`
+
+	// Marks if this validator should be rewarded according to this node.
+	shouldPreferCommit bool
 }
 
 // SemanticVerify this transaction performs a valid state transition.
@@ -68,19 +71,14 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
-	defaultSubnetVdrHeap, err := vm.getCurrentValidators(db, constants.DefaultSubnetID)
+	stakerTx, err := vm.nextStakerStop(db, constants.PrimaryNetworkID)
 	if err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	} else if defaultSubnetVdrHeap.Len() == 0 { // there is no validator to remove
-		return nil, nil, nil, nil, permError{errEmptyValidatingSet}
+		return nil, nil, nil, nil, permError{err}
 	}
-
-	vdrTx := defaultSubnetVdrHeap.Remove()
-	txID := vdrTx.ID()
-	if !txID.Equals(tx.TxID) {
+	if stakerID := stakerTx.Tx.ID(); !stakerID.Equals(tx.TxID) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s. Should be removing %s",
 			tx.TxID,
-			txID)}
+			stakerID)}
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
@@ -89,11 +87,11 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	unsignedVdrTx, ok := vdrTx.UnsignedTx.(TimedTx)
+	staker, ok := stakerTx.Tx.UnsignedTx.(TimedTx)
 	if !ok {
 		return nil, nil, nil, nil, permError{errWrongTxType}
 	}
-	if endTime := unsignedVdrTx.EndTime(); !endTime.Equal(currentTime) {
+	if endTime := staker.EndTime(); !endTime.Equal(currentTime) {
 		return nil, nil, nil, nil, permError{fmt.Errorf("attempting to remove TxID: %s before their end time %s",
 			tx.TxID,
 			endTime)}
@@ -101,24 +99,26 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	// If this tx's proposal is committed, remove the validator from the validator set
 	onCommitDB := versiondb.New(db)
-	if err := vm.putCurrentValidators(onCommitDB, defaultSubnetVdrHeap, constants.DefaultSubnetID); err != nil {
+	if err := vm.removeStaker(onCommitDB, constants.PrimaryNetworkID, stakerTx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
 	// If this tx's proposal is aborted, remove the validator from the validator set
 	onAbortDB := versiondb.New(db)
-	if err := vm.putCurrentValidators(onAbortDB, defaultSubnetVdrHeap, constants.DefaultSubnetID); err != nil {
+	if err := vm.removeStaker(onAbortDB, constants.PrimaryNetworkID, stakerTx); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
 
-	switch uVdrTx := vdrTx.UnsignedTx.(type) {
-	case *UnsignedAddDefaultSubnetValidatorTx:
+	nodeID := ids.ShortID{}
+	startTime := time.Time{}
+	switch uStakerTx := stakerTx.Tx.UnsignedTx.(type) {
+	case *UnsignedAddValidatorTx:
 		// Refund the stake here
-		for i, out := range uVdrTx.Stake {
+		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + i),
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out.Output(),
@@ -133,8 +133,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		}
 
 		// Provide the reward here
-		if reward := reward(uVdrTx.Validator.Duration(), uVdrTx.Validator.Wght, InflationRate); reward > 0 {
-			outIntf, err := vm.fx.CreateOutput(reward, uVdrTx.RewardsOwner)
+		if stakerTx.Reward > 0 {
+			outIntf, err := vm.fx.CreateOutput(stakerTx.Reward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
@@ -144,29 +144,59 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 			if err := vm.putUTXO(onCommitDB, &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake)),
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
 			}); err != nil {
 				return nil, nil, nil, nil, tempError{err}
 			}
+
+			currentSupply, err := vm.getCurrentSupply(onAbortDB)
+			if err != nil {
+				return nil, nil, nil, nil, tempError{err}
+			}
+			newSupply, err := safemath.Sub64(currentSupply, stakerTx.Reward)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+			if err := vm.putCurrentSupply(onAbortDB, newSupply); err != nil {
+				return nil, nil, nil, nil, tempError{err}
+			}
 		}
-	case *UnsignedAddDefaultSubnetDelegatorTx:
+
+		// Handle reward preferences
+		nodeID = uStakerTx.Validator.ID()
+		startTime = uStakerTx.StartTime()
+		if err := vm.deleteUptime(onCommitDB, nodeID); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+		if err := vm.deleteUptime(onAbortDB, nodeID); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+	case *UnsignedAddDelegatorTx:
 		// We're removing a delegator
-		parentTx, err := defaultSubnetVdrHeap.getDefaultSubnetStaker(uVdrTx.Validator.NodeID)
+		vdrTx, ok, err := vm.isValidator(db, constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
 		if err != nil {
-			return nil, nil, nil, nil, permError{err}
+			return nil, nil, nil, nil, tempError{err}
 		}
-		unsignedParentTx := parentTx.UnsignedTx.(*UnsignedAddDefaultSubnetValidatorTx)
+		if !ok {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("couldn't find validator %s: %w", uStakerTx.Validator.NodeID, err)}
+		}
+		vdr, ok := vdrTx.(*UnsignedAddValidatorTx)
+		if !ok {
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("expected vdr to be *UnsignedAddValidatorTx but is %T", vdrTx)}
+		}
 
 		// Refund the stake here
-		for i, out := range uVdrTx.Stake {
+		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + i),
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(uStakerTx.Outs) + i),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out.Output(),
@@ -180,23 +210,33 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 		}
 
-		// If reward given, it will be this amount
-		reward := reward(uVdrTx.Validator.Duration(), uVdrTx.Validator.Wght, InflationRate)
+		currentSupply, err := vm.getCurrentSupply(onAbortDB)
+		if err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+		newSupply, err := safemath.Sub64(currentSupply, stakerTx.Reward)
+		if err != nil {
+			return nil, nil, nil, nil, permError{err}
+		}
+		if err := vm.putCurrentSupply(onAbortDB, newSupply); err != nil {
+			return nil, nil, nil, nil, tempError{err}
+		}
+
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
-		delegatorShares := NumberOfShares - uint64(unsignedParentTx.Shares) // parentTx.Shares <= NumberOfShares so no underflow
-		delegatorReward := delegatorShares * (reward / NumberOfShares)      // delegatorShares <= NumberOfShares so no overflow
+		delegatorShares := PercentDenominator - uint64(vdr.Shares)                  // parentTx.Shares <= NumberOfShares so no underflow
+		delegatorReward := delegatorShares * (stakerTx.Reward / PercentDenominator) // delegatorShares <= NumberOfShares so no overflow
 		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := safemath.Mul64(delegatorShares, reward); err == nil {
-			delegatorReward = optimisticReward / NumberOfShares
+		if optimisticReward, err := safemath.Mul64(delegatorShares, stakerTx.Reward); err == nil {
+			delegatorReward = optimisticReward / PercentDenominator
 		}
-		delegateeReward := reward - delegatorReward // delegatorReward <= reward so no underflow
+		delegateeReward := stakerTx.Reward - delegatorReward // delegatorReward <= reward so no underflow
 
 		offset := 0
 
 		// Reward the delegator here
 		if delegatorReward > 0 {
-			outIntf, err := vm.fx.CreateOutput(delegatorReward, uVdrTx.RewardsOwner)
+			outIntf, err := vm.fx.CreateOutput(delegatorReward, uStakerTx.RewardsOwner)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
@@ -206,8 +246,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 			if err := vm.putUTXO(onCommitDB, &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake)),
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
@@ -220,7 +260,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 		// Reward the delegatee here
 		if delegateeReward > 0 {
-			outIntf, err := vm.fx.CreateOutput(delegateeReward, unsignedParentTx.RewardsOwner)
+			outIntf, err := vm.fx.CreateOutput(delegateeReward, vdr.RewardsOwner)
 			if err != nil {
 				return nil, nil, nil, nil, permError{err}
 			}
@@ -230,8 +270,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			}
 			if err := vm.putUTXO(onCommitDB, &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(uVdrTx.Outs) + len(uVdrTx.Stake) + offset),
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake) + offset),
 				},
 				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 				Out:   out,
@@ -239,6 +279,8 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 				return nil, nil, nil, nil, tempError{err}
 			}
 		}
+		nodeID = uStakerTx.Validator.ID()
+		startTime = vdrTx.StartTime()
 	default:
 		return nil, nil, nil, nil, permError{errShouldBeDSValidator}
 	}
@@ -246,10 +288,14 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	// Regardless of whether this tx is committed or aborted, update the
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
 	// (flush to vm.DB) before this is called
-	updateValidators := func() error {
-		return vm.updateValidators(constants.DefaultSubnetID)
+	updateValidators := func() error { return vm.updateVdrMgr(false) }
+
+	uptime, err := vm.calculateUptime(vm.DB, nodeID, startTime)
+	if err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 
+	tx.shouldPreferCommit = uptime >= vm.uptimePercentage
 	return onCommitDB, onAbortDB, updateValidators, updateValidators, nil
 }
 
@@ -260,7 +306,9 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 //
 // TODO: A validator should receive a reward only if they are sufficiently
 // responsive and correct during the time they are validating.
-func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool { return true }
+func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
+	return tx.shouldPreferCommit
+}
 
 // RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.

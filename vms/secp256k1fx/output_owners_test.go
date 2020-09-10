@@ -6,7 +6,7 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 func TestMintOutputOwnersVerifyNil(t *testing.T) {

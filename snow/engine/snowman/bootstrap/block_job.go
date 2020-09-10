@@ -9,12 +9,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanche-go/utils/logging"
 )
 
 type parser struct {
@@ -66,7 +66,7 @@ func (b *blockJob) Execute() error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		if err := b.blk.Verify(); err != nil {
-			b.log.Debug("block %s failed verification during bootstrapping due to %s",
+			return fmt.Errorf("block %s failed verification during bootstrapping due to: %w",
 				b.blk.ID(), err)
 		}
 

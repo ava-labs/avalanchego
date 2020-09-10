@@ -11,13 +11,13 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/greaderproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gconn"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greader"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greader/greaderproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gwriter"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.
@@ -115,13 +115,20 @@ func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, err
 	}
 
-	conn := gconn.NewClient(gconnproto.NewConnClient(connConn), &addr{
-		network: resp.LocalNetwork,
-		str:     resp.LocalString,
-	}, &addr{
-		network: resp.RemoteNetwork,
-		str:     resp.RemoteString,
-	}, connConn, readerConn, writerConn)
+	conn := gconn.NewClient(
+		gconnproto.NewConnClient(connConn),
+		&addr{
+			network: resp.LocalNetwork,
+			str:     resp.LocalString,
+		},
+		&addr{
+			network: resp.RemoteNetwork,
+			str:     resp.RemoteString,
+		},
+		connConn,
+		readerConn,
+		writerConn,
+	)
 
 	reader := greader.NewClient(greaderproto.NewReaderClient(readerConn))
 	writer := gwriter.NewClient(gwriterproto.NewWriterClient(writerConn))

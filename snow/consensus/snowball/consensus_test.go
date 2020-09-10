@@ -8,14 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
-
-// ByzantineFactory implements Factory by returning a byzantine struct
-type ByzantineFactory struct{}
-
-// New implements Factory
-func (ByzantineFactory) New() Consensus { return &Byzantine{} }
 
 // Byzantine is a naive implementation of a multi-choice snowball instance
 type Byzantine struct {

@@ -4,10 +4,9 @@
 package chains
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/math"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanche-go/utils/math"
 )
 
 type awaitConnected struct {
@@ -19,7 +18,7 @@ type awaitConnected struct {
 
 // NewAwaiter returns a new handler that will await for a sufficient number of
 // validators to be connected.
-func NewAwaiter(vdrs validators.Set, reqWeight uint64, connected func()) network.Handler {
+func NewAwaiter(vdrs validators.Set, reqWeight uint64, connected func()) validators.Connector {
 	return &awaitConnected{
 		vdrs:      vdrs,
 		reqWeight: reqWeight,
@@ -28,11 +27,11 @@ func NewAwaiter(vdrs validators.Set, reqWeight uint64, connected func()) network
 }
 
 func (a *awaitConnected) Connected(vdrID ids.ShortID) bool {
-	vdr, ok := a.vdrs.Get(vdrID)
+	weight, ok := a.vdrs.GetWeight(vdrID)
 	if !ok {
 		return false
 	}
-	weight, err := math.Add64(vdr.Weight(), a.weight)
+	weight, err := math.Add64(weight, a.weight)
 	a.weight = weight
 	// If the error is non-nil, then an overflow error has occurred such that
 	// the required weight was surpassed. As per network.Handler interface,
@@ -46,14 +45,14 @@ func (a *awaitConnected) Connected(vdrID ids.ShortID) bool {
 }
 
 func (a *awaitConnected) Disconnected(vdrID ids.ShortID) bool {
-	if vdr, ok := a.vdrs.Get(vdrID); ok {
+	if weight, ok := a.vdrs.GetWeight(vdrID); ok {
 		// TODO: Account for weight changes in a more robust manner.
 
 		// Sub64 should rarely error since only validators that have added their
 		// weight can become disconnected. Because it is possible that there are
 		// changes to the validators set, we utilize that Sub64 returns 0 on
 		// error.
-		a.weight, _ = math.Sub64(a.weight, vdr.Weight())
+		a.weight, _ = math.Sub64(a.weight, weight)
 	}
 	return false
 }

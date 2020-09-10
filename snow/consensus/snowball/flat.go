@@ -4,7 +4,7 @@
 package snowball
 
 import (
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // FlatFactory implements Factory by returning a flat struct

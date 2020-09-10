@@ -6,9 +6,10 @@ package snowstorm
 import (
 	"fmt"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+
+	sbcon "github.com/ava-labs/avalanche-go/snow/consensus/snowball"
 )
 
 // Consensus is a snowball instance deciding between an unbounded number of
@@ -18,10 +19,10 @@ type Consensus interface {
 	fmt.Stringer
 
 	// Takes in the context, alpha, betaVirtuous, and betaRogue
-	Initialize(*snow.Context, snowball.Parameters)
+	Initialize(*snow.Context, sbcon.Parameters) error
 
 	// Returns the parameters that describe this snowstorm instance
-	Parameters() snowball.Parameters
+	Parameters() sbcon.Parameters
 
 	// Returns true if transaction <Tx> is virtuous.
 	// That is, no transaction has been added that conflicts with <Tx>
@@ -58,4 +59,10 @@ type Consensus interface {
 	// possible that after returning finalized, a new decision may be added such
 	// that this instance is no longer finalized.
 	Finalized() bool
+
+	// Accept the provided tx remove it from the graph
+	accept(txID ids.ID) error
+
+	// Reject all the provided txs and remove them from the graph
+	reject(txIDs ...ids.ID) error
 }

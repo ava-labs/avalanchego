@@ -3,9 +3,9 @@ package propertyfx
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 var (
@@ -13,14 +13,9 @@ var (
 	errWrongUTXOType       = errors.New("wrong utxo type")
 	errWrongOperationType  = errors.New("wrong operation type")
 	errWrongCredentialType = errors.New("wrong credential type")
-
-	errNoUTXOs            = errors.New("an operation must consume at least one UTXO")
-	errWrongNumberOfUTXOs = errors.New("wrong number of UTXOs for the operation")
-	errWrongNumberOfCreds = errors.New("wrong number of credentials for the operation")
-
-	errWrongMintOutput = errors.New("wrong mint output provided")
-
-	errCantTransfer = errors.New("cant transfer with this fx")
+	errWrongNumberOfUTXOs  = errors.New("wrong number of UTXOs for the operation")
+	errWrongMintOutput     = errors.New("wrong mint output provided")
+	errCantTransfer        = errors.New("cant transfer with this fx")
 )
 
 // Fx ...

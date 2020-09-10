@@ -6,9 +6,9 @@ package state
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowstorm"
 )
 
 func TestVertexVerify(t *testing.T) {
@@ -31,7 +31,7 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	if err := validVertex.Verify(); err != nil {
-		t.Fatalf("Valid vertex failed verification due to: %w", err)
+		t.Fatalf("Valid vertex failed verification due to: %s", err)
 	}
 
 	nonUniqueParentsVtx := &innerVertex{

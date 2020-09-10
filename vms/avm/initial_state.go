@@ -8,9 +8,9 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
 )
 
 var (
@@ -51,35 +51,6 @@ func (is *InitialState) Verify(c codec.Codec, numFxs int) error {
 
 // Sort ...
 func (is *InitialState) Sort(c codec.Codec) { sortState(is.Outs, c) }
-
-type innerSortVerifiables struct {
-	vers  []verify.Verifiable
-	codec codec.Codec
-}
-
-func (vers *innerSortVerifiables) Less(i, j int) bool {
-	iVer := vers.vers[i]
-	jVer := vers.vers[j]
-
-	iBytes, err := vers.codec.Marshal(&iVer)
-	if err != nil {
-		return false
-	}
-	jBytes, err := vers.codec.Marshal(&jVer)
-	if err != nil {
-		return false
-	}
-	return bytes.Compare(iBytes, jBytes) == -1
-}
-func (vers *innerSortVerifiables) Len() int      { return len(vers.vers) }
-func (vers *innerSortVerifiables) Swap(i, j int) { v := vers.vers; v[j], v[i] = v[i], v[j] }
-
-func sortVerifiables(vers []verify.Verifiable, c codec.Codec) {
-	sort.Sort(&innerSortVerifiables{vers: vers, codec: c})
-}
-func isSortedVerifiables(vers []verify.Verifiable, c codec.Codec) bool {
-	return sort.IsSorted(&innerSortVerifiables{vers: vers, codec: c})
-}
 
 type innerSortState struct {
 	vers  []verify.State

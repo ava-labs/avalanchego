@@ -9,12 +9,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
+	sbcon "github.com/ava-labs/avalanche-go/snow/consensus/snowball"
 )
 
 func Simulate(
 	numColors, colorsPerConsumer, maxInputConflicts, numNodes int,
-	params snowball.Parameters,
+	params sbcon.Parameters,
 	seed int64,
 	fact Factory,
 ) {
@@ -53,7 +53,7 @@ func BenchmarkVirtuousDirected(b *testing.B) {
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,
@@ -73,7 +73,7 @@ func BenchmarkVirtuousInput(b *testing.B) {
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,
@@ -99,7 +99,7 @@ func BenchmarkRogueDirected(b *testing.B) {
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,
@@ -119,7 +119,7 @@ func BenchmarkRogueInput(b *testing.B) {
 			/*colorsPerConsumer=*/ 1,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,
@@ -145,7 +145,7 @@ func BenchmarkMultiDirected(b *testing.B) {
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,
@@ -165,7 +165,7 @@ func BenchmarkMultiInput(b *testing.B) {
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 1,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,
@@ -191,7 +191,7 @@ func BenchmarkMultiRogueDirected(b *testing.B) {
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,
@@ -211,7 +211,7 @@ func BenchmarkMultiRogueInput(b *testing.B) {
 			/*colorsPerConsumer=*/ 10,
 			/*maxInputConflicts=*/ 3,
 			/*numNodes=*/ 50,
-			/*params=*/ snowball.Parameters{
+			/*params=*/ sbcon.Parameters{
 				Metrics:      prometheus.NewRegistry(),
 				K:            20,
 				Alpha:        11,

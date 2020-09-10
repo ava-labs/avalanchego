@@ -6,7 +6,17 @@ package throttler
 import (
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
+)
+
+const (
+	// DefaultMaxNonStakerPendingMsgs rate limits the number of queued messages
+	// from non-stakers.
+	DefaultMaxNonStakerPendingMsgs uint32 = 3
+
+	// DefaultStakerPortion describes the percentage of resources that are
+	// reserved for stakers.
+	DefaultStakerPortion float64 = 0.2
 )
 
 // Throttler provides an interface to register consumption
@@ -18,4 +28,20 @@ type Throttler interface {
 	UtilizeCPU(ids.ShortID, time.Duration)
 	GetUtilization(ids.ShortID) (float64, bool) // Returns the CPU based priority and whether or not the peer has too many pending messages
 	EndInterval()                               // Notify throttler that the current period has ended
+}
+
+// CPUTracker tracks the consumption of CPU time
+type CPUTracker interface {
+	UtilizeCPU(ids.ShortID, time.Duration)
+	GetUtilization(ids.ShortID) float64
+	EndInterval()
+}
+
+// CountingThrottler tracks the usage of a discrete resource (ex. pending messages) by a peer
+// and determines whether or not a peer should be throttled.
+type CountingThrottler interface {
+	Add(ids.ShortID)
+	Remove(ids.ShortID)
+	Throttle(ids.ShortID) bool
+	EndInterval()
 }

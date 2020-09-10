@@ -4,9 +4,9 @@
 package avalanche
 
 import (
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowstorm"
 )
 
 // TODO: Implement pruning of accepted decisions.
@@ -23,7 +23,7 @@ type Consensus interface {
 	// called, the status maps should be immediately updated accordingly.
 	// Assumes each element in the accepted frontier will return accepted from
 	// the join status map.
-	Initialize(*snow.Context, Parameters, []Vertex)
+	Initialize(*snow.Context, Parameters, []Vertex) error
 
 	// Returns the parameters that describe this avalanche instance
 	Parameters() Parameters

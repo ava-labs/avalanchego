@@ -3,7 +3,7 @@ package propertyfx
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
 )
 
 func TestMintOutputState(t *testing.T) {

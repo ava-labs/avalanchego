@@ -6,15 +6,15 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 var (
@@ -93,11 +93,9 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
 		return nil, tempError{err}
 	}
-
 	// Register new subnet in validator manager
 	onAccept := func() error {
-		vm.validators.PutValidatorSet(tx.ID(), validators.NewSet())
-		return nil
+		return vm.vdrMgr.Set(tx.ID(), validators.NewSet())
 	}
 	return onAccept, nil
 }

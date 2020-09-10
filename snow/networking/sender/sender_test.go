@@ -12,13 +12,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/networking/router"
+	"github.com/ava-labs/avalanche-go/snow/networking/throttler"
+	"github.com/ava-labs/avalanche-go/snow/networking/timeout"
+	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 )
 
 func TestSenderContext(t *testing.T) {
@@ -37,7 +39,15 @@ func TestSenderContext(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -67,8 +77,9 @@ func TestTimeout(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -91,7 +102,15 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -123,8 +142,9 @@ func TestReliableMessages(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -150,13 +170,21 @@ func TestReliableMessages(t *testing.T) {
 	}()
 
 	for _, await := range awaiting {
-		_, _ = <-await
+		<-await
 	}
 }
 
 func TestReliableMessagesToMyself(t *testing.T) {
 	tm := timeout.Manager{}
-	tm.Initialize("", prometheus.NewRegistry())
+	tm.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -189,8 +217,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		validators.NewSet(),
 		nil,
 		1,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
+		throttler.DefaultMaxNonStakerPendingMsgs,
+		throttler.DefaultStakerPortion,
+		throttler.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -216,6 +245,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}()
 
 	for _, await := range awaiting {
-		_, _ = <-await
+		<-await
 	}
 }

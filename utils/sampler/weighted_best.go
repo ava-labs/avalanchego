@@ -9,13 +9,13 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 var (
-	errNoValidSamplers = errors.New("no valid samplers found")
+	errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -48,13 +48,22 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 		return errWeightsTooLarge
 	}
 
-	samples := make([]uint64, s.benchmarkIterations)
-	for i := range samples {
-		samples[i] = uint64(rand.Int63n(int64(totalWeight)))
+	samples := []uint64(nil)
+	if totalWeight > 0 {
+		samples = make([]uint64, s.benchmarkIterations)
+		for i := range samples {
+			// We don't need cryptographically secure random number generation
+			// here, as the generated numbers are only used to perform an
+			// optimistic benchmark. Which means the results could be arbitrary
+			// and the correctness of the implementation wouldn't be effected.
+			samples[i] = uint64(rand.Int63n(int64(totalWeight)))
+		}
 	}
 
 	s.Weighted = nil
 	bestDuration := time.Duration(math.MaxInt64)
+
+samplerLoop:
 	for _, sampler := range s.samplers {
 		if err := sampler.Initialize(weights); err != nil {
 			continue
@@ -63,7 +72,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 		start := s.clock.Time()
 		for _, sample := range samples {
 			if _, err := sampler.Sample(sample); err != nil {
-				continue
+				continue samplerLoop
 			}
 		}
 		end := s.clock.Time()
@@ -75,7 +84,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 	}
 
 	if s.Weighted == nil {
-		return errNoValidSamplers
+		return errNoValidWeightedSamplers
 	}
 	return nil
 }

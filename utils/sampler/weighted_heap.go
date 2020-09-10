@@ -6,7 +6,7 @@ package sampler
 import (
 	"sort"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 type weightedHeapElement struct {
@@ -47,7 +47,9 @@ func (s *weightedHeap) Initialize(weights []uint64) error {
 
 	// Initialize the heap
 	for i := len(s.heap) - 1; i > 0; i-- {
-		parentIndex := (i - 1) / 2
+		// Explicitly performing a shift here allows the compiler to avoid
+		// checking for negative numbers, which saves a couple cycles
+		parentIndex := (i - 1) >> 1
 		newWeight, err := safemath.Add64(
 			s.heap[parentIndex].cumulativeWeight,
 			s.heap[i].cumulativeWeight,

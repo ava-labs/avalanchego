@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // BootstrapableTest is a test engine that supports bootstrapping
@@ -60,7 +60,7 @@ func (b *BootstrapableTest) ForceAccepted(containerIDs ids.Set) error {
 		if b.T != nil {
 			b.T.Fatalf("Unexpectedly called ForceAccepted")
 		}
-		return errors.New("Unexpectedly called ForceAccepted")
+		return errors.New("unexpectedly called ForceAccepted")
 	}
 	return nil
 }

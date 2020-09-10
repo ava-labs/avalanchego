@@ -6,16 +6,17 @@ package avm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 
-	cjson "github.com/ava-labs/gecko/utils/json"
+	cjson "github.com/ava-labs/avalanche-go/utils/json"
 )
 
 var (
@@ -88,19 +89,19 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					for _, state := range initialStates {
 						b, err := json.Marshal(state)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem marshaling state: %w", err)
 						}
 						holder := Holder{}
 						if err := json.Unmarshal(b, &holder); err != nil {
-							return err
+							return fmt.Errorf("problem unmarshaling holder: %w", err)
 						}
 						_, addrbuff, err := formatting.ParseBech32(holder.Address)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem parsing holder address: %w", err)
 						}
 						addr, err := ids.ToShortID(addrbuff)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem parsing holder address: %w", err)
 						}
 						initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
 							Amt: uint64(holder.Amount),
@@ -114,11 +115,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					for _, state := range initialStates {
 						b, err := json.Marshal(state)
 						if err != nil {
-							return err
+							return fmt.Errorf("problem marshaling state: %w", err)
 						}
 						owners := Owners{}
 						if err := json.Unmarshal(b, &owners); err != nil {
-							return err
+							return fmt.Errorf("problem unmarshaling Owners: %w", err)
 						}
 
 						out := &secp256k1fx.MintOutput{
@@ -129,11 +130,11 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 						for _, address := range owners.Minters {
 							_, addrbuff, err := formatting.ParseBech32(address)
 							if err != nil {
-								return err
+								return fmt.Errorf("problem parsing minters address: %w", err)
 							}
 							addr, err := ids.ToShortID(addrbuff)
 							if err != nil {
-								return err
+								return fmt.Errorf("problem parsing minters address: %w", err)
 							}
 							out.Addrs = append(out.Addrs, addr)
 						}
@@ -155,7 +156,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 
 	b, err := c.Marshal(&g)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
 	reply.Bytes.Bytes = b

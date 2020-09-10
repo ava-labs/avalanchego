@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
 )
 
 // EngineTest is a test engine
@@ -113,7 +113,7 @@ func (e *EngineTest) Startup() error {
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Startup")
 	}
-	return errors.New("Unexpectedly called Startup")
+	return errors.New("unexpectedly called Startup")
 }
 
 // Gossip ...
@@ -127,7 +127,7 @@ func (e *EngineTest) Gossip() error {
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Gossip")
 	}
-	return errors.New("Unexpectedly called Gossip")
+	return errors.New("unexpectedly called Gossip")
 }
 
 // Shutdown ...
@@ -141,7 +141,7 @@ func (e *EngineTest) Shutdown() error {
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Shutdown")
 	}
-	return errors.New("Unexpectedly called Shutdown")
+	return errors.New("unexpectedly called Shutdown")
 }
 
 // Notify ...
@@ -155,7 +155,7 @@ func (e *EngineTest) Notify(msg Message) error {
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Notify")
 	}
-	return errors.New("Unexpectedly called Notify")
+	return errors.New("unexpectedly called Notify")
 }
 
 // GetAcceptedFrontier ...
@@ -169,7 +169,7 @@ func (e *EngineTest) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAcceptedFrontier")
 	}
-	return errors.New("Unexpectedly called GetAcceptedFrontier")
+	return errors.New("unexpectedly called GetAcceptedFrontier")
 }
 
 // GetAcceptedFrontierFailed ...
@@ -183,7 +183,7 @@ func (e *EngineTest) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestI
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAcceptedFrontierFailed")
 	}
-	return errors.New("Unexpectedly called GetAcceptedFrontierFailed")
+	return errors.New("unexpectedly called GetAcceptedFrontierFailed")
 }
 
 // AcceptedFrontier ...
@@ -197,7 +197,7 @@ func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32,
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called AcceptedFrontierF")
 	}
-	return errors.New("Unexpectedly called AcceptedFrontierF")
+	return errors.New("unexpectedly called AcceptedFrontierF")
 }
 
 // GetAccepted ...
@@ -211,7 +211,7 @@ func (e *EngineTest) GetAccepted(validatorID ids.ShortID, requestID uint32, cont
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAccepted")
 	}
-	return errors.New("Unexpectedly called GetAccepted")
+	return errors.New("unexpectedly called GetAccepted")
 }
 
 // GetAcceptedFailed ...
@@ -225,7 +225,7 @@ func (e *EngineTest) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAcceptedFailed")
 	}
-	return errors.New("Unexpectedly called GetAcceptedFailed")
+	return errors.New("unexpectedly called GetAcceptedFailed")
 }
 
 // Accepted ...
@@ -239,7 +239,7 @@ func (e *EngineTest) Accepted(validatorID ids.ShortID, requestID uint32, contain
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Accepted")
 	}
-	return errors.New("Unexpectedly called Accepted")
+	return errors.New("unexpectedly called Accepted")
 }
 
 // Get ...
@@ -253,7 +253,7 @@ func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID 
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Get")
 	}
-	return errors.New("Unexpectedly called Get")
+	return errors.New("unexpectedly called Get")
 }
 
 // GetAncestors ...
@@ -267,7 +267,7 @@ func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, con
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAncestors")
 	}
-	return errors.New("Unexpectedly called GetAncestors")
+	return errors.New("unexpectedly called GetAncestors")
 
 }
 
@@ -282,7 +282,7 @@ func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error 
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetFailed")
 	}
-	return errors.New("Unexpectedly called GetFailed")
+	return errors.New("unexpectedly called GetFailed")
 }
 
 // GetAncestorsFailed ...
@@ -296,7 +296,7 @@ func (e *EngineTest) GetAncestorsFailed(validatorID ids.ShortID, requestID uint3
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAncestorsFailed")
 	}
-	return errors.New("Unexpectedly called GetAncestorsFailed")
+	return errors.New("unexpectedly called GetAncestorsFailed")
 }
 
 // Put ...
@@ -310,7 +310,7 @@ func (e *EngineTest) Put(validatorID ids.ShortID, requestID uint32, containerID 
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Put")
 	}
-	return errors.New("Unexpectedly called Put")
+	return errors.New("unexpectedly called Put")
 }
 
 // MultiPut ...
@@ -324,7 +324,7 @@ func (e *EngineTest) MultiPut(validatorID ids.ShortID, requestID uint32, contain
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called MultiPut")
 	}
-	return errors.New("Unexpectedly called MultiPut")
+	return errors.New("unexpectedly called MultiPut")
 }
 
 // PushQuery ...
@@ -338,7 +338,7 @@ func (e *EngineTest) PushQuery(validatorID ids.ShortID, requestID uint32, contai
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called PushQuery")
 	}
-	return errors.New("Unexpectedly called PushQuery")
+	return errors.New("unexpectedly called PushQuery")
 }
 
 // PullQuery ...
@@ -352,7 +352,7 @@ func (e *EngineTest) PullQuery(validatorID ids.ShortID, requestID uint32, contai
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called PullQuery")
 	}
-	return errors.New("Unexpectedly called PullQuery")
+	return errors.New("unexpectedly called PullQuery")
 }
 
 // QueryFailed ...
@@ -366,7 +366,7 @@ func (e *EngineTest) QueryFailed(validatorID ids.ShortID, requestID uint32) erro
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called QueryFailed")
 	}
-	return errors.New("Unexpectedly called QueryFailed")
+	return errors.New("unexpectedly called QueryFailed")
 }
 
 // Chits ...
@@ -380,7 +380,7 @@ func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerI
 	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Chits")
 	}
-	return errors.New("Unexpectedly called Chits")
+	return errors.New("unexpectedly called Chits")
 }
 
 // IsBootstrapped ...

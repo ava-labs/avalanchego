@@ -9,7 +9,7 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanche-go/snow"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
@@ -29,7 +29,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command("sh", "-c", f.Path),
+		Cmd:             exec.Command(f.Path),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,

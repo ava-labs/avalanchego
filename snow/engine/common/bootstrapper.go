@@ -4,11 +4,12 @@
 package common
 
 import (
-	stdmath "math"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/math"
+	stdmath "math"
+
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/math"
 )
 
 const (
@@ -134,8 +135,8 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	b.pendingAccepted.Remove(validatorID)
 
 	weight := uint64(0)
-	if vdr, ok := b.Beacons.Get(validatorID); ok {
-		weight = vdr.Weight()
+	if w, ok := b.Beacons.GetWeight(validatorID); ok {
+		weight = w
 	}
 
 	for _, containerID := range containerIDs.List() {

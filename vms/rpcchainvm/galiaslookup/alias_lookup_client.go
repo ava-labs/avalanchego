@@ -6,9 +6,9 @@ package galiaslookup
 import (
 	"context"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup/galiaslookupproto"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 )
 
 var (

@@ -5,11 +5,11 @@ package ipcs
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/triggers"
+	"github.com/ava-labs/avalanche-go/utils/logging"
 )
 
 const (
@@ -87,5 +87,5 @@ func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
 }
 
 func ipcURL(ctx context, chainID ids.ID, eventType string) string {
-	return path.Join(ctx.path, fmt.Sprintf("%d-%s-%s", ctx.networkID, chainID.String(), eventType))
+	return filepath.Join(ctx.path, fmt.Sprintf("%d-%s-%s", ctx.networkID, chainID.String(), eventType))
 }

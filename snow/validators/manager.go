@@ -6,57 +6,84 @@ package validators
 import (
 	"sync"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // Manager holds the validator set of each subnet
 type Manager interface {
-	// PutValidatorSet puts associaties the given subnet ID with the given validator set
-	PutValidatorSet(ids.ID, Set)
+	// Set a subnet's validator set
+	Set(ids.ID, Set) error
 
-	// RemoveValidatorSet removes the specified validator set
-	RemoveValidatorSet(ids.ID)
+	// AddWeight adds weight to a given validator on the given subnet
+	AddWeight(ids.ID, ids.ShortID, uint64) error
 
-	// GetGroup returns:
-	// 1) the validator set of the subnet with the specified ID
-	// 2) false if there is no subnet with the specified ID
-	GetValidatorSet(ids.ID) (Set, bool)
+	// RemoveWeight removes weight from a given validator on a given subnet
+	RemoveWeight(ids.ID, ids.ShortID, uint64) error
+
+	// GetValidators returns the validator set for the given subnet
+	// Returns false if the subnet doesn't exist
+	GetValidators(ids.ID) (Set, bool)
 }
 
 // NewManager returns a new, empty manager
 func NewManager() Manager {
 	return &manager{
-		validatorSets: make(map[[32]byte]Set),
+		subnetToVdrs: make(map[[32]byte]Set),
 	}
 }
 
 // manager implements Manager
 type manager struct {
-	lock          sync.Mutex
-	validatorSets map[[32]byte]Set
+	lock sync.Mutex
+	// Key: Subnet ID
+	// Value: The validators that validate the subnet
+	subnetToVdrs map[[32]byte]Set
 }
 
-// PutValidatorSet implements the Manager interface.
-func (m *manager) PutValidatorSet(subnetID ids.ID, set Set) {
+func (m *manager) Set(subnetID ids.ID, newSet Set) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.validatorSets[subnetID.Key()] = set
+	subnetKey := subnetID.Key()
+
+	oldSet, exists := m.subnetToVdrs[subnetKey]
+	if !exists {
+		m.subnetToVdrs[subnetKey] = newSet
+		return nil
+	}
+	return oldSet.Set(newSet.List())
+}
+
+// AddWeight implements the Manager interface.
+func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	subnetIDKey := subnetID.Key()
+
+	vdrs, ok := m.subnetToVdrs[subnetIDKey]
+	if !ok {
+		vdrs = NewSet()
+		m.subnetToVdrs[subnetIDKey] = vdrs
+	}
+	return vdrs.AddWeight(vdrID, weight)
 }
 
 // RemoveValidatorSet implements the Manager interface.
-func (m *manager) RemoveValidatorSet(subnetID ids.ID) {
+func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.ShortID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	delete(m.validatorSets, subnetID.Key())
+	if vdrs, ok := m.subnetToVdrs[subnetID.Key()]; ok {
+		return vdrs.RemoveWeight(vdrID, weight)
+	}
+	return nil
 }
 
 // GetValidatorSet implements the Manager interface.
-func (m *manager) GetValidatorSet(subnetID ids.ID) (Set, bool) {
+func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	set, exists := m.validatorSets[subnetID.Key()]
-	return set, exists
+	vdrs, ok := m.subnetToVdrs[subnetID.Key()]
+	return vdrs, ok
 }

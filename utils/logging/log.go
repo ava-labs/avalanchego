@@ -7,11 +7,17 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ava-labs/avalanche-go/utils/constants"
+)
+
+var (
+	filePrefix = fmt.Sprintf("%s/", constants.AppName)
 )
 
 // Log ...
@@ -162,8 +168,8 @@ func (l *Log) format(level Level, format string, args ...interface{}) string {
 	if _, file, no, ok := runtime.Caller(3); ok {
 		loc = fmt.Sprintf("%s#%d", file, no)
 	}
-	if i := strings.Index(loc, "gecko/"); i != -1 {
-		loc = loc[i+5:]
+	if i := strings.Index(loc, filePrefix); i != -1 {
+		loc = loc[i+len(filePrefix):]
 	}
 	text := fmt.Sprintf("%s: %s", loc, fmt.Sprintf(format, args...))
 
@@ -351,7 +357,7 @@ func (fw *fileWriter) Rotate() error {
 }
 
 func (fw *fileWriter) create(fileIndex int) (*bufio.Writer, *os.File, error) {
-	filename := path.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
+	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
 	file, err := os.Create(filename)
 	if err != nil {
 		return nil, nil, err

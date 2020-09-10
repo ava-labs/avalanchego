@@ -12,13 +12,14 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greader/greaderproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gconn"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greader"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greader/greaderproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gwriter"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/grpcutils"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -91,21 +92,25 @@ func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackReq
 	connID := s.broker.NextId()
 	readerID := s.broker.NextId()
 	writerID := s.broker.NextId()
+	closer := grpcutils.ServerCloser{}
 
 	go s.broker.AcceptAndServe(connID, func(opts []grpc.ServerOption) *grpc.Server {
-		connServer := grpc.NewServer(opts...)
-		gconnproto.RegisterConnServer(connServer, gconn.NewServer(conn))
-		return connServer
+		server := grpc.NewServer(opts...)
+		closer.Add(server)
+		gconnproto.RegisterConnServer(server, gconn.NewServer(conn, &closer))
+		return server
 	})
 	go s.broker.AcceptAndServe(readerID, func(opts []grpc.ServerOption) *grpc.Server {
-		readerServer := grpc.NewServer(opts...)
-		greaderproto.RegisterReaderServer(readerServer, greader.NewServer(readWriter))
-		return readerServer
+		server := grpc.NewServer(opts...)
+		closer.Add(server)
+		greaderproto.RegisterReaderServer(server, greader.NewServer(readWriter))
+		return server
 	})
 	go s.broker.AcceptAndServe(writerID, func(opts []grpc.ServerOption) *grpc.Server {
-		writerServer := grpc.NewServer(opts...)
-		gwriterproto.RegisterWriterServer(writerServer, gwriter.NewServer(readWriter))
-		return writerServer
+		server := grpc.NewServer(opts...)
+		closer.Add(server)
+		gwriterproto.RegisterWriterServer(server, gwriter.NewServer(readWriter))
+		return server
 	})
 
 	local := conn.LocalAddr()

@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 )
 
 var (
@@ -57,10 +57,6 @@ func (vm *testVM) Codec() codec.Codec { return codec.NewDefault() }
 func (vm *testVM) Clock() *timer.Clock { return &vm.clock }
 
 func (vm *testVM) Logger() logging.Logger { return logging.NoLog{} }
-
-type testCodec struct{}
-
-func (c *testCodec) RegisterStruct(interface{}) {}
 
 type testTx struct{ bytes []byte }
 
@@ -399,7 +395,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 	cred := &Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
 			sigBytes,
-			[crypto.SECP256K1RSigLen]byte{},
+			{},
 		},
 	}
 
@@ -474,7 +470,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 	cred := &Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
 			sigBytes,
-			[crypto.SECP256K1RSigLen]byte{},
+			{},
 		},
 	}
 
@@ -515,7 +511,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 	}
 	cred := &Credential{
 		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			[crypto.SECP256K1RSigLen]byte{},
+			{},
 		},
 	}
 
