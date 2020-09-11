@@ -67,7 +67,7 @@ const (
 	maxBlockTime    = 1000 * time.Millisecond
 	batchSize       = 250
 	maxUTXOsToFetch = 1024
-	blockCacheSize  = 1 << 17 // 131072
+	blockCacheSize  = 1 << 10 // 1024
 )
 
 const (
