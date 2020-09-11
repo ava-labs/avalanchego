@@ -7,12 +7,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/utils/codec"
-	"github.com/ava-labs/avalanche-go/utils/units"
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
-	"github.com/ava-labs/avalanche-go/vms/components/verify"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestTxNil(t *testing.T) {

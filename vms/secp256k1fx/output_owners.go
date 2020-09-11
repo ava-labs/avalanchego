@@ -6,7 +6,7 @@ package secp256k1fx
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (

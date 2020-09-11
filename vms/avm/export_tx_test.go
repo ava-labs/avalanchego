@@ -8,17 +8,17 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/api/keystore"
-	"github.com/ava-labs/avalanche-go/chains/atomic"
-	"github.com/ava-labs/avalanche-go/database/memdb"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/utils/crypto"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
-	"github.com/ava-labs/avalanche-go/vms/components/verify"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestExportTxSyntacticVerify(t *testing.T) {

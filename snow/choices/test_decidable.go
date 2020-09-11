@@ -6,7 +6,7 @@ package choices
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // TestDecidable is a test Decidable

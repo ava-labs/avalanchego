@@ -6,8 +6,8 @@ package avax
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
 )
 
 func TestUTXOIDVerifyNil(t *testing.T) {

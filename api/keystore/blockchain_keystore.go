@@ -4,8 +4,8 @@
 package keystore
 
 import (
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // BlockchainKeystore ...

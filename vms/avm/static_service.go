@@ -9,14 +9,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/utils/codec"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-	"github.com/ava-labs/avalanche-go/utils/wrappers"
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cjson "github.com/ava-labs/avalanche-go/utils/json"
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var (

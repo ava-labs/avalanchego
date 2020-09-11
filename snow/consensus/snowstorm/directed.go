@@ -4,11 +4,11 @@
 package snowstorm
 
 import (
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 
-	sbcon "github.com/ava-labs/avalanche-go/snow/consensus/snowball"
+	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 // DirectedFactory implements Factory by returning a directed struct

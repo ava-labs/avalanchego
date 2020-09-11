@@ -4,10 +4,10 @@
 package platformvm
 
 import (
-	"github.com/ava-labs/avalanche-go/chains"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // ID of the platform VM

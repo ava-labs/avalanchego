@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // TreeFactory implements Factory by returning a tree struct

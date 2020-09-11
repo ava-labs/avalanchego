@@ -4,7 +4,7 @@
 package snowman
 
 import (
-	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.

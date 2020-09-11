@@ -8,15 +8,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/cache"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanche-go/snow/engine/common"
-	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
-	"github.com/ava-labs/avalanche-go/snow/triggers"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 const (

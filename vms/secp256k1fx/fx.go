@@ -6,10 +6,10 @@ package secp256k1fx
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanche-go/utils/crypto"
-	"github.com/ava-labs/avalanche-go/utils/hashing"
-	"github.com/ava-labs/avalanche-go/utils/wrappers"
-	"github.com/ava-labs/avalanche-go/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (

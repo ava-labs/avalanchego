@@ -7,12 +7,12 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/ava-labs/avalanche-go/cache"
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/codec"
 )
 
 // Addressable is the interface a feature extension must provide to be able to

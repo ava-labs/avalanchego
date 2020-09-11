@@ -13,19 +13,19 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanche-go/api/health"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/networking/router"
-	"github.com/ava-labs/avalanche-go/snow/networking/sender"
-	"github.com/ava-labs/avalanche-go/snow/triggers"
-	"github.com/ava-labs/avalanche-go/snow/validators"
-	"github.com/ava-labs/avalanche-go/utils"
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/utils/sampler"
-	"github.com/ava-labs/avalanche-go/utils/timer"
-	"github.com/ava-labs/avalanche-go/version"
+	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // reasonable default values

@@ -1,2 +1,2 @@
 log_level: info
-avalanche_binary: ~/go/src/github.com/ava-labs/avalanche-go/build/avalanche
+avalanche_binary: ~/go/src/github.com/ava-labs/avalanchego/build/avalanche

@@ -9,9 +9,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer"
 
-	safemath "github.com/ava-labs/avalanche-go/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (

@@ -1,4 +1,4 @@
-module github.com/ava-labs/avalanche-go
+module github.com/ava-labs/avalanchego
 
 go 1.14
 

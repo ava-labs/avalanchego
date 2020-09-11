@@ -14,13 +14,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/networking/router"
-	"github.com/ava-labs/avalanche-go/snow/validators"
-	"github.com/ava-labs/avalanche-go/utils"
-	"github.com/ava-labs/avalanche-go/utils/hashing"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/version"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (

@@ -6,9 +6,9 @@ package gsubnetlookup
 import (
 	"context"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 )
 
 // Server is a messenger that is managed over RPC.

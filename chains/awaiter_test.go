@@ -6,8 +6,8 @@ package chains
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 func TestAwaiter(t *testing.T) {

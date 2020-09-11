@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 )
 
 // Client is an implementation of a messenger channel that talks over RPC.

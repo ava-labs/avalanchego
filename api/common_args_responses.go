@@ -1,6 +1,6 @@
 package api
 
-import "github.com/ava-labs/avalanche-go/ids"
+import "github.com/ava-labs/avalanchego/ids"
 
 // This file contains structs used in arguments and responses in services
 

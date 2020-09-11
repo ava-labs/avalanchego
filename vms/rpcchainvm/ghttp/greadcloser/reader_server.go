@@ -7,7 +7,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 )
 
 // Server is a http.Handler that is managed over RPC.

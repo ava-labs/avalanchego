@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/utils/units"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 func TestRewardLongerDurationBonus(t *testing.T) {

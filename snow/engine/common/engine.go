@@ -4,8 +4,8 @@
 package common
 
 import (
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // Engine describes the standard interface of a consensus engine

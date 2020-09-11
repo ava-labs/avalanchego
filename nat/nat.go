@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (

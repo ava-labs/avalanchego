@@ -6,7 +6,7 @@ package constants
 import (
 	"regexp"
 
-	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Const variables to be exported

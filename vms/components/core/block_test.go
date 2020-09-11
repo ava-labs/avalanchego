@@ -3,11 +3,11 @@ package core
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanche-go/database/memdb"
-	"github.com/ava-labs/avalanche-go/database/versiondb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 func TestBlock(t *testing.T) {
