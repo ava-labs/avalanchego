@@ -4,12 +4,12 @@
 package platformvm
 
 import (
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/versiondb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/vms/components/core"
 )
 
 // ProposalBlock is a proposal to change the chain's state.

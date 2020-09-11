@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanche-go/snow"
 )
 
 const (

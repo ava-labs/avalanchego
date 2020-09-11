@@ -4,13 +4,18 @@
 package logging
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
+
+	"github.com/ava-labs/avalanche-go/utils/constants"
 )
 
-// DefaultLogDirectory ...
-const DefaultLogDirectory = "~/.gecko/logs"
+var (
+	// DefaultLogDirectory ...
+	DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
+)
 
 // Config ...
 type Config struct {

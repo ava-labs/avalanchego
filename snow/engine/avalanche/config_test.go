@@ -6,13 +6,13 @@ package avalanche
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/snow/consensus/avalanche"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/bootstrap"
-	"github.com/ava-labs/gecko/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
+	"github.com/ava-labs/avalanche-go/database/memdb"
+	"github.com/ava-labs/avalanche-go/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
+	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/bootstrap"
+	"github.com/ava-labs/avalanche-go/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
 )
 
 func DefaultConfig() Config {

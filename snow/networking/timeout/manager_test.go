@@ -6,14 +6,25 @@ package timeout
 import (
 	"sync"
 	"testing"
+	"time"
 
-	"github.com/ava-labs/gecko/ids"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 )
 
 func TestManagerFire(t *testing.T) {
 	manager := Manager{}
-	manager.Initialize("", prometheus.NewRegistry())
+	manager.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}
@@ -26,7 +37,15 @@ func TestManagerFire(t *testing.T) {
 
 func TestManagerCancel(t *testing.T) {
 	manager := Manager{}
-	manager.Initialize("", prometheus.NewRegistry())
+	manager.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}

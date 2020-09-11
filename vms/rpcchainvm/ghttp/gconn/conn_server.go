@@ -8,15 +8,22 @@ import (
 	"net"
 	"time"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gconn/gconnproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/grpcutils"
 )
 
 // Server is a http.Handler that is managed over RPC.
-type Server struct{ conn net.Conn }
+type Server struct {
+	conn   net.Conn
+	closer *grpcutils.ServerCloser
+}
 
 // NewServer returns a http.Handler instance manage remotely
-func NewServer(conn net.Conn) *Server {
-	return &Server{conn: conn}
+func NewServer(conn net.Conn, closer *grpcutils.ServerCloser) *Server {
+	return &Server{
+		conn:   conn,
+		closer: closer,
+	}
 }
 
 // Read ...
@@ -46,7 +53,9 @@ func (s *Server) Write(ctx context.Context, req *gconnproto.WriteRequest) (*gcon
 
 // Close ...
 func (s *Server) Close(ctx context.Context, req *gconnproto.CloseRequest) (*gconnproto.CloseResponse, error) {
-	return &gconnproto.CloseResponse{}, s.conn.Close()
+	err := s.conn.Close()
+	s.closer.Stop()
+	return &gconnproto.CloseResponse{}, err
 }
 
 // SetDeadline ...

@@ -8,15 +8,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/vms/components/missing"
+	"github.com/ava-labs/avalanche-go/cache"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/vms/components/missing"
 )
 
 const (
@@ -269,7 +269,8 @@ func (b *Bootstrapper) finish() error {
 	if b.IsBootstrapped() {
 		return nil
 	}
-	b.Ctx.Log.Info("bootstrapping finished fetching %d blocks", b.NumFetched)
+	b.Ctx.Log.Info("bootstrapping fetched %d blocks. executing state transitions...",
+		b.NumFetched)
 
 	if err := b.executeAll(b.Blocked); err != nil {
 		return err

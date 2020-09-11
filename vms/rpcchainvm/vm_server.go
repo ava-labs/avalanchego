@@ -6,33 +6,33 @@ package rpcchainvm
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/gecko/database/rpcdb"
-	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/galiaslookup/galiaslookupproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/messenger/messengerproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/vmproto"
+	"github.com/ava-labs/avalanche-go/database/rpcdb"
+	"github.com/ava-labs/avalanche-go/database/rpcdb/rpcdbproto"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/galiaslookup"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/galiaslookup/galiaslookupproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/ghttpproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gkeystore"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/grpcutils"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gsharedmemory"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gsubnetlookup"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/messenger"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/messenger/messengerproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/vmproto"
 )
 
 // VMServer is a VM that is managed over RPC.
@@ -40,10 +40,8 @@ type VMServer struct {
 	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 
-	lock    sync.Mutex
-	closed  bool
-	servers []*grpc.Server
-	conns   []*grpc.ClientConn
+	serverCloser grpcutils.ServerCloser
+	conns        []*grpc.ClientConn
 
 	ctx      *snow.Context
 	toEngine chan common.Message
@@ -189,19 +187,15 @@ func (vm *VMServer) Bootstrapped(context.Context, *vmproto.BootstrappedRequest) 
 
 // Shutdown ...
 func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmproto.ShutdownResponse, error) {
-	vm.lock.Lock()
-	defer vm.lock.Unlock()
-
-	if vm.closed || vm.toEngine == nil {
+	if vm.toEngine == nil {
 		return &vmproto.ShutdownResponse{}, nil
 	}
-
-	vm.closed = true
 
 	errs := wrappers.Errs{}
 	errs.Add(vm.vm.Shutdown())
 	close(vm.toEngine)
 
+	vm.serverCloser.Stop()
 	for _, conn := range vm.conns {
 		errs.Add(conn.Close())
 	}
@@ -218,17 +212,8 @@ func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandler
 		// start the messenger server
 		serverID := vm.broker.NextId()
 		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
-			vm.lock.Lock()
-			defer vm.lock.Unlock()
-
 			server := grpc.NewServer(opts...)
-
-			if vm.closed {
-				server.Stop()
-			} else {
-				vm.servers = append(vm.servers, server)
-			}
-
+			vm.serverCloser.Add(server)
 			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
 			return server
 		})

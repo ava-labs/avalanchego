@@ -6,9 +6,9 @@ package atomic
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/database/memdb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/logging"
 )
 
 var (

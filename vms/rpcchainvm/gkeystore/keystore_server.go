@@ -10,10 +10,12 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/gecko/database/rpcdb"
-	"github.com/ava-labs/gecko/database/rpcdb/rpcdbproto"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/rpcdb"
+	"github.com/ava-labs/avalanche-go/database/rpcdb/rpcdbproto"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/grpcutils"
 )
 
 // Server is a messenger that is managed over RPC.
@@ -30,6 +32,17 @@ func NewServer(ks snow.Keystore, broker *plugin.GRPCBroker) *Server {
 	}
 }
 
+type dbCloser struct {
+	database.Database
+	closer grpcutils.ServerCloser
+}
+
+func (db *dbCloser) Close() error {
+	err := db.Database.Close()
+	db.closer.Stop()
+	return err
+}
+
 // GetDatabase ...
 func (s *Server) GetDatabase(
 	_ context.Context,
@@ -40,16 +53,16 @@ func (s *Server) GetDatabase(
 		return nil, err
 	}
 
+	closer := dbCloser{Database: db}
+
 	// start the db server
 	dbBrokerID := s.broker.NextId()
 	go s.broker.AcceptAndServe(dbBrokerID, func(opts []grpc.ServerOption) *grpc.Server {
-		db := rpcdb.NewServer(db)
 		server := grpc.NewServer(opts...)
+		closer.closer.Add(server)
+		db := rpcdb.NewServer(&closer)
 		rpcdbproto.RegisterDatabaseServer(server, db)
 		return server
 	})
-
-	return &gkeystoreproto.GetDatabaseResponse{
-		DbServer: dbBrokerID,
-	}, nil
+	return &gkeystoreproto.GetDatabaseResponse{DbServer: dbBrokerID}, nil
 }

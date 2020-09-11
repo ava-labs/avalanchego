@@ -6,7 +6,7 @@ package common
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 // SenderTest is a test sender

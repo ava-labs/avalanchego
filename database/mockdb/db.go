@@ -6,7 +6,7 @@ package mockdb
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/database"
+	"github.com/ava-labs/avalanche-go/database"
 )
 
 var errNoFunction = errors.New("user didn't specify what value(s) return")

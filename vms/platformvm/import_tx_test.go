@@ -4,14 +4,14 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/chains/atomic"
+	"github.com/ava-labs/avalanche-go/database/prefixdb"
+	"github.com/ava-labs/avalanche-go/database/versiondb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 func TestNewImportTx(t *testing.T) {

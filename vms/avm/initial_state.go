@@ -8,9 +8,9 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
 )
 
 var (

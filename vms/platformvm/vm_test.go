@@ -14,36 +14,37 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/bootstrap"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/sender"
-	"github.com/ava-labs/gecko/snow/networking/throttler"
-	"github.com/ava-labs/gecko/snow/networking/timeout"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/core"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/ava-labs/gecko/vms/timestampvm"
+	"github.com/ava-labs/avalanche-go/chains"
+	"github.com/ava-labs/avalanche-go/chains/atomic"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/memdb"
+	"github.com/ava-labs/avalanche-go/database/prefixdb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowball"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/common/queue"
+	"github.com/ava-labs/avalanche-go/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/avalanche-go/snow/networking/router"
+	"github.com/ava-labs/avalanche-go/snow/networking/sender"
+	"github.com/ava-labs/avalanche-go/snow/networking/throttler"
+	"github.com/ava-labs/avalanche-go/snow/networking/timeout"
+	"github.com/ava-labs/avalanche-go/snow/validators"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/json"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanche-go/utils/units"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/components/core"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/vms/timestampvm"
 
-	smcon "github.com/ava-labs/gecko/snow/consensus/snowman"
-	smeng "github.com/ava-labs/gecko/snow/engine/snowman"
+	smcon "github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	smeng "github.com/ava-labs/avalanche-go/snow/engine/snowman"
 )
 
 var (
@@ -66,8 +67,8 @@ var (
 
 	minStake = 5 * units.MilliAvax
 
-	// amount all genesis validators stake in defaultVM
-	defaultStakeAmount uint64 = 100 * minStake
+	// amount all genesis validators have in defaultVM
+	defaultBalance uint64 = 100 * minStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -134,12 +135,12 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 			panic(err)
 		}
 		genesisUTXOs[i] = APIUTXO{
-			Amount:  json.Uint64(defaultStakeAmount),
+			Amount:  json.Uint64(defaultBalance),
 			Address: addr,
 		}
 	}
 
-	genesisValidators := make([]FormattedAPIPrimaryValidator, len(keys))
+	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
 		weight := json.Uint64(defaultWeight)
 		id := key.PublicKey().Address()
@@ -147,26 +148,32 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = FormattedAPIPrimaryValidator{
-			FormattedAPIValidator: FormattedAPIValidator{
+		genesisValidators[i] = APIPrimaryValidator{
+			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
 				Weight:    &weight,
-				ID:        id.PrefixedString(constants.NodeIDPrefix),
+				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
 			},
-			RewardAddress:     addr,
-			DelegationFeeRate: NumberOfShares,
+			RewardOwner: &APIOwner{
+				Threshold: 1,
+				Addresses: []string{addr},
+			},
+			DelegationFee: PercentDenominator,
 		}
 	}
 
 	buildGenesisArgs := BuildGenesisArgs{
-		NetworkID:   json.Uint32(testNetworkID),
-		AvaxAssetID: avaxAssetID,
-		UTXOs:       genesisUTXOs,
-		Validators:  genesisValidators,
-		Chains:      nil,
-		Time:        json.Uint64(defaultGenesisTime.Unix()),
+		NetworkID:     json.Uint32(testNetworkID),
+		AvaxAssetID:   avaxAssetID,
+		UTXOs:         genesisUTXOs,
+		Validators:    genesisValidators,
+		Chains:        nil,
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
+	// TODO: Remove
+	InitialSupply = 360 * units.MegaAvax
 
 	buildGenesisResponse := BuildGenesisReply{}
 	platformvmSS := StaticService{}
@@ -340,7 +347,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		ID,
 		ID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -356,6 +363,10 @@ func TestAddValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
@@ -368,9 +379,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}
 	_, ok = options[1].(*Abort)
 	if !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -418,7 +427,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		ID,
 		ID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	); err != nil {
 		t.Fatal(err)
@@ -464,7 +473,7 @@ func TestAddValidatorReject(t *testing.T) {
 		uint64(endTime.Unix()),
 		ID,
 		ID,
-		NumberOfShares,
+		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 	)
 	if err != nil {
@@ -480,6 +489,10 @@ func TestAddValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
@@ -488,9 +501,7 @@ func TestAddValidatorReject(t *testing.T) {
 	} else if commit, ok := options[0].(*Commit); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -559,6 +570,10 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
@@ -569,9 +584,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -641,6 +654,10 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
@@ -651,9 +668,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -703,6 +718,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	options, err := block.Options()
@@ -713,9 +732,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -748,7 +765,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
 	if err != nil {
 		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
 	}
+
 	// Assert preferences are correct
 	block = blk.(*ProposalBlock)
 	options, err = block.Options()
@@ -759,9 +779,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -807,6 +825,10 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Assert preferences are correct
 	block := blk.(*ProposalBlock)
 	if options, err := block.Options(); err != nil {
@@ -814,9 +836,91 @@ func TestRewardValidatorReject(t *testing.T) {
 	} else if commit, ok := options[0].(*Commit); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(abort.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if err := commit.Accept(); err != nil { // advance the timestamp
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if timestamp, err := vm.getTimestamp(vm.DB); err != nil { // Verify that chain's timestamp has advanced
+		t.Fatal(err)
+	} else if !timestamp.Equal(defaultValidateEndTime) {
+		t.Fatal("expected timestamp to have advanced")
+	}
+	if blk, err = vm.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	block = blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil { // Assert preferences are correct
+		t.Fatal(err)
+	} else if commit, ok := options[0].(*Commit); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	} else if err := commit.Verify(); err != nil {
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(commit.onAccept(), block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Committed {
+		t.Fatalf("status should be Committed but is %s", status)
+	} else if err := abort.Verify(); err != nil {
+		t.Fatal(err)
+	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
+		t.Fatal(err)
+	} else if status, err := vm.getStatus(vm.DB, block.Tx.ID()); err != nil {
+		t.Fatal(err)
+	} else if status != Aborted {
+		t.Fatalf("status should be Aborted but is %s", status)
+	} else if _, isValidator, err := vm.isValidator(vm.DB, constants.PrimaryNetworkID, keys[1].PublicKey().Address()); err != nil {
+		// Verify that genesis validator was removed from current validator set
+		t.Fatal(err)
+	} else if isValidator {
+		t.Fatal("should have removed a genesis validator")
+	}
+}
+
+// Test case where primary network validator is preferred to be rewarded
+func TestRewardValidatorPreferred(t *testing.T) {
+	vm, _ := defaultVM(t)
+	vm.Ctx.Lock.Lock()
+	defer func() {
+		vm.Shutdown()
+		vm.Ctx.Lock.Unlock()
+	}()
+
+	// Fast forward clock to time for genesis validators to leave
+	vm.clock.Set(defaultValidateEndTime)
+
+	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	if err != nil {
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert preferences are correct
+	block := blk.(*ProposalBlock)
+	if options, err := block.Options(); err != nil {
+		t.Fatal(err)
+	} else if commit, ok := options[0].(*Commit); !ok {
+		t.Fatal(errShouldPrefCommit)
+	} else if abort, ok := options[1].(*Abort); !ok {
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -842,7 +946,10 @@ func TestRewardValidatorReject(t *testing.T) {
 	} else if !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
+
 	if blk, err = vm.BuildBlock(); err != nil { // should contain proposal to reward genesis validator
+		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	}
 	block = blk.(*ProposalBlock)
@@ -851,10 +958,8 @@ func TestRewardValidatorReject(t *testing.T) {
 	} else if commit, ok := options[0].(*Commit); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := blk.(*ProposalBlock).Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := blk.(*ProposalBlock).Accept(); err != nil {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(blk); err != nil { // Normally done by the engine
 		t.Fatalf("couldn't save block: %s", err)
@@ -1009,6 +1114,8 @@ func TestCreateSubnet(t *testing.T) {
 	blk, err := vm.BuildBlock() // should add validator to the new subnet
 	if err != nil {
 		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert preferences are correct
@@ -1022,10 +1129,8 @@ func TestCreateSubnet(t *testing.T) {
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil { // Accept the block
-		t.Fatal(err)
-	} else if err := block.Accept(); err != nil {
+		t.Fatal(errShouldPrefCommit)
+	} else if err := block.Accept(); err != nil { // Accept the block
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
 		t.Fatalf("couldn't save block: %s", err)
@@ -1059,6 +1164,8 @@ func TestCreateSubnet(t *testing.T) {
 	blk, err = vm.BuildBlock() // should be advance time tx
 	if err != nil {
 		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert preferences are correct
@@ -1072,9 +1179,7 @@ func TestCreateSubnet(t *testing.T) {
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -1112,6 +1217,8 @@ func TestCreateSubnet(t *testing.T) {
 	blk, err = vm.BuildBlock() // should be advance time tx
 	if err != nil {
 		t.Fatal(err)
+	} else if err := blk.Verify(); err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert preferences are correct
@@ -1125,9 +1232,7 @@ func TestCreateSubnet(t *testing.T) {
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*Abort); !ok {
-		t.Fatal(errShouldPrefAbort)
-	} else if err := block.Verify(); err != nil {
-		t.Fatal(err)
+		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
 	} else if err := vm.SaveBlock(block); err != nil { // Normally done by the engine
@@ -1597,7 +1702,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	beacons := vdrs
 
 	timeoutManager := timeout.Manager{}
-	timeoutManager.Initialize("", prometheus.NewRegistry())
+	timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
+		InitialTimeout:    time.Millisecond,
+		MinimumTimeout:    time.Millisecond,
+		MaximumTimeout:    10 * time.Second,
+		TimeoutMultiplier: 1.1,
+		TimeoutReduction:  time.Millisecond,
+		Namespace:         "",
+		Registerer:        prometheus.NewRegistry(),
+	})
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
@@ -1848,7 +1961,7 @@ func TestNextValidatorStartTime(t *testing.T) {
 		uint64(endTime.Unix()),                  // end time
 		vm.Ctx.NodeID,                           // node ID
 		ids.GenerateTestShortID(),               // reward address
-		NumberOfShares,                          // shares
+		PercentDenominator,                      // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	assert.NoError(t, err)

@@ -8,11 +8,11 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanche-go/utils"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/components/verify"
 )
 
 var (
@@ -26,7 +26,7 @@ type Operation struct {
 	avax.Asset `serialize:"true"`
 
 	UTXOIDs []*avax.UTXOID `serialize:"true" json:"inputIDs"`
-	Op      FxOperation   `serialize:"true" json:"operation"`
+	Op      FxOperation    `serialize:"true" json:"operation"`
 }
 
 // Verify implements the verify.Verifiable interface

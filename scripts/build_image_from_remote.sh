@@ -1,15 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-# Note: this script will build a docker image by cloning a remote version of gecko into a temporary
-# location and using that version's Dockerfile to build the image.
+# Note: this script will build a docker image by cloning a remote version of
+# avalanche-go into a temporary location and using that version's Dockerfile to
+# build the image.
 
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
-REMOTE="https://github.com/ava-labs/gecko.git"
+REMOTE="https://github.com/ava-labs/avalanche-go.git"
 BRANCH="master"
 
 if [[ $# -eq 2 ]]; then
@@ -36,16 +37,16 @@ if [[ "$keep_existing" != 1 ]]; then
     rm -rf "$WORKPREFIX"
 fi
 
-# Clone the remote and checkout the specified branch to build the Docker image from
-GECKO_CLONE="$WORKPREFIX/gecko"
+# Clone the remote and checkout the specified branch to build the Docker image
+AVALANCHE_CLONE="$WORKPREFIX/avalanche-go"
 
 if [[ ! -d "$WORKPREFIX" ]]; then
     mkdir -p "$WORKPREFIX"
     git config --global credential.helper cache
-    git clone "$REMOTE" "$GECKO_CLONE"
-    git --git-dir="$GECKO_CLONE/.git" checkout "$BRANCH"
+    git clone "$REMOTE" "$AVALANCHE_CLONE"
+    git --git-dir="$AVALANCHE_CLONE/.git" checkout "$BRANCH"
 fi
 
-GECKO_COMMIT="$(git --git-dir="$GECKO_CLONE/.git" rev-parse --short HEAD)"
+AVALANCHE_COMMIT="$(git --git-dir="$AVALANCHE_CLONE/.git" rev-parse --short HEAD)"
 
-"${DOCKER}" build -t "gecko-$GECKO_COMMIT" "$GECKO_CLONE" -f "$GECKO_CLONE/Dockerfile"
+"${DOCKER}" build -t "avalanche-go-$AVALANCHE_COMMIT" "$AVALANCHE_CLONE" -f "$AVALANCHE_CLONE/Dockerfile"

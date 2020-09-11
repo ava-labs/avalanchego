@@ -12,11 +12,11 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/ghttpproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/ghttpproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greadcloser"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gresponsewriter"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 )
 
 // Server is a http.Handler that is managed over RPC.
@@ -112,12 +112,12 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 			NegotiatedProtocol:          req.Request.Tls.NegotiatedProtocol,
 			NegotiatedProtocolIsMutual:  req.Request.Tls.NegotiatedProtocolIsMutual,
 			ServerName:                  req.Request.Tls.ServerName,
+			PeerCertificates:            make([]*x509.Certificate, len(req.Request.Tls.PeerCertificates.Cert)),
+			VerifiedChains:              make([][]*x509.Certificate, len(req.Request.Tls.VerifiedChains)),
 			SignedCertificateTimestamps: req.Request.Tls.SignedCertificateTimestamps,
 			OCSPResponse:                req.Request.Tls.OcspResponse,
 			TLSUnique:                   req.Request.Tls.TlsUnique,
 		}
-
-		request.TLS.PeerCertificates = make([]*x509.Certificate, len(req.Request.Tls.PeerCertificates.Cert))
 		for i, certBytes := range req.Request.Tls.PeerCertificates.Cert {
 			cert, err := x509.ParseCertificate(certBytes)
 			if err != nil {
@@ -125,8 +125,6 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 			}
 			request.TLS.PeerCertificates[i] = cert
 		}
-
-		request.TLS.VerifiedChains = make([][]*x509.Certificate, len(req.Request.Tls.VerifiedChains))
 		for i, chain := range req.Request.Tls.VerifiedChains {
 			request.TLS.VerifiedChains[i] = make([]*x509.Certificate, len(chain.Cert))
 			for j, certBytes := range chain.Cert {

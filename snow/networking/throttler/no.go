@@ -6,7 +6,7 @@ package throttler
 import (
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/ids"
 )
 
 type noCountThrottler struct{}

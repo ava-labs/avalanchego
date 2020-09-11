@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/wrappers"
-
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanche-go/cache"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
 )
 
 const cacheSize = 1000

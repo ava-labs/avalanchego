@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
 )
 
 // NewService returns a new prometheus service

@@ -9,7 +9,7 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanche-go/snow"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )

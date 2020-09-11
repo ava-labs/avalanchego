@@ -16,12 +16,15 @@ import (
 
 	"github.com/rs/cors"
 
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/api/auth"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/utils/logging"
 )
 
-const baseURL = "/ext"
+const (
+	baseURL = "/ext"
+)
 
 var (
 	errUnknownLockOption = errors.New("invalid lock options")
@@ -29,39 +32,68 @@ var (
 
 // Server maintains the HTTP router
 type Server struct {
-	log           logging.Logger
-	factory       logging.Factory
-	router        *router
+	// log this server writes to
+	log logging.Logger
+	// generates new logs for chains to write to
+	factory logging.Factory
+	// Maps endpoints to handlers
+	router *router
+	// Listens for HTTP traffic on this address
 	listenAddress string
+	// Handles authorization. Must be non-nil after initialization, even if
+	// token authorization is off.
+	auth *auth.Auth
 }
 
 // Initialize creates the API server at the provided host and port
-func (s *Server) Initialize(log logging.Logger, factory logging.Factory, host string, port uint16) {
+func (s *Server) Initialize(
+	log logging.Logger,
+	factory logging.Factory,
+	host string,
+	port uint16,
+	authEnabled bool,
+	authPassword string,
+) error {
 	s.log = log
 	s.factory = factory
 	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
 	s.router = newRouter()
+	s.auth = &auth.Auth{Enabled: authEnabled}
+	if err := s.auth.Password.Set(authPassword); err != nil {
+		return err
+	}
+	if !authEnabled {
+		return nil
+	}
+
+	// only create auth service if token authorization is required
+	s.log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
+	authService := auth.NewService(s.log, s.auth)
+	return s.AddRoute(authService, &sync.RWMutex{}, auth.Endpoint, "", s.log)
+
 }
 
 // Dispatch starts the API server
 func (s *Server) Dispatch() error {
-	handler := cors.Default().Handler(s.router)
 	listener, err := net.Listen("tcp", s.listenAddress)
 	if err != nil {
 		return err
 	}
-	s.log.Info("API server listening on %q", s.listenAddress)
+	s.log.Info("HTTP API server listening on %q", s.listenAddress)
+	handler := cors.Default().Handler(s.router)
+	handler = s.auth.WrapHandler(handler)
 	return http.Serve(listener, handler)
 }
 
 // DispatchTLS starts the API server with the provided TLS certificate
 func (s *Server) DispatchTLS(certFile, keyFile string) error {
-	handler := cors.Default().Handler(s.router)
 	listener, err := net.Listen("tcp", s.listenAddress)
 	if err != nil {
 		return err
 	}
-	s.log.Info("API server listening on %q", s.listenAddress)
+	s.log.Info("HTTPS API server listening on %q", s.listenAddress)
+	handler := cors.Default().Handler(s.router)
+	handler = s.auth.WrapHandler(handler)
 	return http.ServeTLS(listener, handler, certFile, keyFile)
 }
 

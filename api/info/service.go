@@ -9,15 +9,15 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/genesis"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/version"
+	"github.com/ava-labs/avalanche-go/chains"
+	"github.com/ava-labs/avalanche-go/genesis"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/network"
+	"github.com/ava-labs/avalanche-go/snow/engine/common"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/json"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/version"
 )
 
 // Info is the API service for unprivileged info on a node
@@ -164,8 +164,6 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 }
 
 // GetTxFee returns the transaction fee in nAVAX.
-// Note that the transaction fee is a command line argument and this node's view
-// of the transaction fee may be different than another node's.
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *struct {
 	Fee json.Uint64 `json:"txFee"`
 }) error {

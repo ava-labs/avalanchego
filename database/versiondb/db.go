@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/database/nodb"
-	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/memdb"
+	"github.com/ava-labs/avalanche-go/database/nodb"
+	"github.com/ava-labs/avalanche-go/utils"
 )
 
 // Database implements the Database interface by living on top of another
@@ -97,7 +97,9 @@ func (db *Database) Delete(key []byte) error {
 func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
 
 // NewIterator implements the database.Database interface
-func (db *Database) NewIterator() database.Iterator { return db.NewIteratorWithStartAndPrefix(nil, nil) }
+func (db *Database) NewIterator() database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
+}
 
 // NewIteratorWithStart implements the database.Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {

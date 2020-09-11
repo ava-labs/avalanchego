@@ -4,10 +4,10 @@
 package avm
 
 import (
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/cache"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
 )
 
 const (

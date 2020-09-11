@@ -4,10 +4,10 @@
 package meterdb
 
 import (
-	"github.com/ava-labs/gecko/utils/timer"
-
-	"github.com/ava-labs/gecko/database"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/utils/timer"
 )
 
 // Database tracks the amount of time each operation takes

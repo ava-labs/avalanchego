@@ -7,16 +7,16 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/units"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 func TestPrefixedSetsAndGets(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -94,7 +94,7 @@ func TestPrefixedSetsAndGets(t *testing.T) {
 }
 
 func TestPrefixedFundingNoAddresses(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()
@@ -123,7 +123,7 @@ func TestPrefixedFundingNoAddresses(t *testing.T) {
 }
 
 func TestPrefixedFundingAddresses(t *testing.T) {
-	_, _, vm , _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
 		vm.Shutdown()

@@ -6,9 +6,9 @@ package gsubnetlookup
 import (
 	"context"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 )
 
 var (

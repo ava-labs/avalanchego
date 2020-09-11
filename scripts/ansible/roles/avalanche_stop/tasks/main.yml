@@ -2,11 +2,6 @@
   command: killall -SIGTERM avalanche
   ignore_errors: true
 
-# TODO remove when there is no longer a need to ensure old binaries are handled
-- name: Kill Old Node
-  command: killall -SIGTERM ava
-  ignore_errors: true
-
 - name: Kill EVM
   command: killall -SIGTERM evm
   ignore_errors: true

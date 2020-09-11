@@ -9,7 +9,7 @@ import (
 
 	"github.com/mr-tron/base58/base58"
 
-	"github.com/ava-labs/gecko/utils/hashing"
+	"github.com/ava-labs/avalanche-go/utils/hashing"
 )
 
 var (

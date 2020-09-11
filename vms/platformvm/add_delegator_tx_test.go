@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/crypto"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/versiondb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
@@ -172,11 +172,14 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
 			rewardAddress,                           // Reward Address
-			NumberOfShares,                          // subnet
+			PercentDenominator,                      // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		); err != nil {
 			t.Fatal(err)
-		} else if err := vm.addStaker(db, constants.PrimaryNetworkID, tx); err != nil {
+		} else if err := vm.addStaker(db, constants.PrimaryNetworkID, &rewardTx{
+			Reward: 0,
+			Tx:     *tx,
+		}); err != nil {
 			t.Fatal(err)
 		}
 	}

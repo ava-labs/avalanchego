@@ -6,12 +6,12 @@ package snowstorm
 import (
 	"math/rand"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/sampler"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/utils/sampler"
 
-	sbcon "github.com/ava-labs/gecko/snow/consensus/snowball"
+	sbcon "github.com/ava-labs/avalanche-go/snow/consensus/snowball"
 )
 
 type Network struct {

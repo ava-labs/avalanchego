@@ -10,7 +10,7 @@ import (
 	"math/rand"
 	"testing"
 
-	safemath "github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 // BenchmarkAllWeightedSampling

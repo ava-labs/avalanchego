@@ -6,12 +6,12 @@ package platformvm
 import (
 	"errors"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/versiondb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/vms/components/core"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/versiondb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/vms/components/core"
 )
 
 // When one stakes, one must specify the time one will start to validate and
@@ -73,8 +73,7 @@ import (
 //	  proposal is being rejected
 
 var (
-	errInvalidBlockType   = errors.New("invalid block type")
-	errEmptyValidatingSet = errors.New("empty validating set")
+	errInvalidBlockType = errors.New("invalid block type")
 )
 
 // Block is the common interface that all staking blocks must have

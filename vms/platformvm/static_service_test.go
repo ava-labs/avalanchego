@@ -6,10 +6,10 @@ package platformvm
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/json"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/json"
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
@@ -25,20 +25,23 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		Amount:  0,
 	}
 	weight := json.Uint64(987654321)
-	validator := FormattedAPIPrimaryValidator{
-		FormattedAPIValidator: FormattedAPIValidator{
+	validator := APIPrimaryValidator{
+		APIStaker: APIStaker{
 			EndTime: 15,
 			Weight:  &weight,
-			ID:      nodeID,
+			NodeID:  nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIPrimaryValidator{
+		Validators: []APIPrimaryValidator{
 			validator,
 		},
 		Time: 5,
@@ -64,21 +67,24 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		Amount:  123456789,
 	}
 	weight := json.Uint64(0)
-	validator := FormattedAPIPrimaryValidator{
-		FormattedAPIValidator: FormattedAPIValidator{
+	validator := APIPrimaryValidator{
+		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   15,
 			Weight:    &weight,
-			ID:        nodeID,
+			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIPrimaryValidator{
+		Validators: []APIPrimaryValidator{
 			validator,
 		},
 		Time: 5,
@@ -105,21 +111,24 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 
 	weight := json.Uint64(987654321)
-	validator := FormattedAPIPrimaryValidator{
-		FormattedAPIValidator: FormattedAPIValidator{
+	validator := APIPrimaryValidator{
+		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   5,
 			Weight:    &weight,
-			ID:        nodeID,
+			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIPrimaryValidator{
+		Validators: []APIPrimaryValidator{
 			validator,
 		},
 		Time: 5,
@@ -146,34 +155,43 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	weight := json.Uint64(987654321)
-	validator1 := FormattedAPIPrimaryValidator{
-		FormattedAPIValidator: FormattedAPIValidator{
+	validator1 := APIPrimaryValidator{
+		APIStaker: APIStaker{
 			StartTime: 0,
 			EndTime:   20,
 			Weight:    &weight,
-			ID:        nodeID,
+			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
-	validator2 := FormattedAPIPrimaryValidator{
-		FormattedAPIValidator: FormattedAPIValidator{
+	validator2 := APIPrimaryValidator{
+		APIStaker: APIStaker{
 			StartTime: 3,
 			EndTime:   15,
 			Weight:    &weight,
-			ID:        nodeID,
+			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
-	validator3 := FormattedAPIPrimaryValidator{
-		FormattedAPIValidator: FormattedAPIValidator{
+	validator3 := APIPrimaryValidator{
+		APIStaker: APIStaker{
 			StartTime: 1,
 			EndTime:   10,
 			Weight:    &weight,
-			ID:        nodeID,
+			NodeID:    nodeID,
 		},
-		RewardAddress: addr,
+		RewardOwner: &APIOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
 	}
 
 	args := BuildGenesisArgs{
@@ -181,7 +199,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		UTXOs: []APIUTXO{
 			utxo,
 		},
-		Validators: []FormattedAPIPrimaryValidator{
+		Validators: []APIPrimaryValidator{
 			validator1,
 			validator2,
 			validator3,

@@ -5,12 +5,27 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 
-	"github.com/ava-labs/gecko/nat"
-	"github.com/ava-labs/gecko/node"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanche-go/nat"
+	"github.com/ava-labs/avalanche-go/node"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+)
+
+const (
+	header = "" +
+		`     _____               .__                       .__` + "\n" +
+		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
+		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
+		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
+		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
+		`          \/           \/          \/     \/     \/     \/     \/`
+)
+
+var (
+	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
+	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
 )
 
 // main is the primary entry point to Avalanche.
@@ -21,9 +36,7 @@ func main() {
 		return
 	}
 
-	config := Config.LoggingConfig
-	config.Directory = filepath.Join(config.Directory, "node")
-	factory := logging.NewFactory(config)
+	factory := logging.NewFactory(Config.LoggingConfig)
 	defer factory.Close()
 
 	log, err := factory.Make()
@@ -31,7 +44,7 @@ func main() {
 		fmt.Printf("starting logger failed with: %s\n", err)
 		return
 	}
-	fmt.Println(gecko)
+	fmt.Println(header)
 
 	defer func() { recover() }()
 
@@ -67,7 +80,7 @@ func main() {
 	defer mapper.UnmapAllPorts()
 
 	// Open staking port
-	port, err := mapper.Map("TCP", Config.StakingLocalPort, "gecko-staking")
+	port, err := mapper.Map("TCP", Config.StakingLocalPort, stakingPortName)
 	if !Config.StakingIP.IsPrivate() {
 		if err == nil {
 			// The port was mapped and the ip is on a public network, the node
@@ -85,12 +98,11 @@ func main() {
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
 	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
-		_, _ = mapper.Map("TCP", Config.HTTPPort, "gecko-http")
+		_, _ = mapper.Map("TCP", Config.HTTPPort, httpPortName)
 	}
 
-	node := node.Node{}
-
 	log.Debug("initializing node state")
+	node := node.Node{}
 	if err := node.Initialize(&Config, log, factory); err != nil {
 		log.Fatal("error initializing node state: %s", err)
 		return

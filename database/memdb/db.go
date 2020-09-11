@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/nodb"
-	"github.com/ava-labs/gecko/utils"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/nodb"
+	"github.com/ava-labs/avalanche-go/utils"
 )
 
 const (
@@ -98,7 +98,9 @@ func (db *Database) Delete(key []byte) error {
 func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
 
 // NewIterator implements the Database interface
-func (db *Database) NewIterator() database.Iterator { return db.NewIteratorWithStartAndPrefix(nil, nil) }
+func (db *Database) NewIterator() database.Iterator {
+	return db.NewIteratorWithStartAndPrefix(nil, nil)
+}
 
 // NewIteratorWithStart implements the Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {

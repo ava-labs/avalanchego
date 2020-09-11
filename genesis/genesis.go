@@ -8,18 +8,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/nftfx"
-	"github.com/ava-labs/gecko/vms/platformvm"
-	"github.com/ava-labs/gecko/vms/propertyfx"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/json"
+	"github.com/ava-labs/avalanche-go/utils/units"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/vms/avm"
+	"github.com/ava-labs/avalanche-go/vms/nftfx"
+	"github.com/ava-labs/avalanche-go/vms/platformvm"
+	"github.com/ava-labs/avalanche-go/vms/propertyfx"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 )
 
 // ID of the EVM VM
@@ -45,6 +45,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, err
 	}
 
+	initialSupply := uint64(0)
+
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{}
 	{
@@ -66,6 +68,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				Amount:  json.Uint64(5 * units.MegaAvax),
 				Address: addr,
 			})
+			initialSupply += 5 * units.MegaAvax
 		}
 
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
@@ -110,6 +113,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				Amount:  json.Uint64(5 * units.MegaAvax),
 			},
 		)
+		initialSupply += 5 * units.MegaAvax
 	}
 
 	stakingDuration := 365 * 24 * time.Hour // ~ 1 year
@@ -119,16 +123,20 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		weight := json.Uint64(20 * units.KiloAvax)
 		destAddr := config.FundedAddresses[i%len(config.FundedAddresses)]
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			platformvm.FormattedAPIPrimaryValidator{
-				FormattedAPIValidator: platformvm.FormattedAPIValidator{
+			platformvm.APIPrimaryValidator{
+				APIStaker: platformvm.APIStaker{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					Weight:    &weight,
-					ID:        validatorID.PrefixedString(constants.NodeIDPrefix),
+					NodeID:    validatorID.PrefixedString(constants.NodeIDPrefix),
 				},
-				RewardAddress: destAddr,
+				RewardOwner: &platformvm.APIOwner{
+					Threshold: 1,
+					Addresses: []string{destAddr},
+				},
 			},
 		)
+		initialSupply += 20 * units.KiloAvax
 	}
 
 	// Specify the chains that exist upon this network's creation
@@ -151,6 +159,9 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name:        "C-Chain",
 		},
 	}
+
+	platformvmArgs.InitialSupply = json.Uint64(initialSupply)
+	platformvm.InitialSupply = initialSupply
 
 	platformvmReply := platformvm.BuildGenesisReply{}
 	platformvmSS := platformvm.StaticService{}
