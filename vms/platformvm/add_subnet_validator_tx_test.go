@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
@@ -240,7 +240,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
 		nodeID,                                  // reward address
-		NumberOfShares,                          // shares
+		PercentDenominator,                      // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 	)
 	if err != nil {
@@ -261,7 +261,10 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
 	}
 
-	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, addDSTx); err != nil {
+	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, &rewardTx{
+		Reward: 0,
+		Tx:     *addDSTx,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	// Node with ID key.PublicKey().Address() now a pending validator for primary network
@@ -321,8 +324,8 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	}
 
 	if tx, err := vm.newAddSubnetValidatorTx(
-		defaultWeight,                                           // weight
-		uint64(newTimestamp.Unix()),                             // start time
+		defaultWeight,               // weight
+		uint64(newTimestamp.Unix()), // start time
 		uint64(newTimestamp.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -344,12 +347,15 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		nodeID,           // node ID
-		testSubnet1.ID(), // subnet ID
+		nodeID,                                  // node ID
+		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
-	} else if err := vm.addStaker(vm.DB, testSubnet1.ID(), tx); err != nil {
+	} else if err := vm.addStaker(vm.DB, testSubnet1.ID(), &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
@@ -358,21 +364,24 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
-		nodeID,           // node ID
-		testSubnet1.ID(), // subnet ID
+		nodeID,                                  // node ID
+		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should have failed verification because validator already validating the specified subnet")
-	} else if err := vm.removeStaker(vm.DB, testSubnet1.ID(), tx); err != nil {
+	} else if err := vm.removeStaker(vm.DB, testSubnet1.ID(), &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Case: Too many signatures
 	if tx, err := vm.newAddSubnetValidatorTx(
-		defaultWeight,                                                   // weight
-		uint64(defaultGenesisTime.Unix()),                               // start time
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -385,8 +394,8 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Too few signatures
 	tx, err := vm.newAddSubnetValidatorTx(
-		defaultWeight,                                                 // weight
-		uint64(defaultGenesisTime.Unix()),                             // start time
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -406,8 +415,8 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 	// Case: Control Signature from invalid key (keys[3] is not a control key)
 	tx, err = vm.newAddSubnetValidatorTx(
-		defaultWeight,                                                 // weight
-		uint64(defaultGenesisTime.Unix()),                             // start time
+		defaultWeight,                     // weight
+		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
@@ -429,15 +438,18 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	// Case: Proposed validator in pending validator set for subnet
 	// First, add validator to pending validator set of subnet
 	if tx, err := vm.newAddSubnetValidatorTx(
-		defaultWeight,                                                   // weight
-		uint64(defaultGenesisTime.Unix())+1,                             // start time
+		defaultWeight,                       // weight
+		uint64(defaultGenesisTime.Unix())+1, // start time
 		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix())+1, // end time
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 	); err != nil {
 		t.Fatal(err)
-	} else if err = vm.addStaker(vm.DB, testSubnet1.ID(), tx); err != nil {
+	} else if err = vm.addStaker(vm.DB, testSubnet1.ID(), &rewardTx{
+		Reward: 0,
+		Tx:     *tx,
+	}); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
 		t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")

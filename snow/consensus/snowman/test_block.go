@@ -6,7 +6,7 @@ package snowman
 import (
 	"sort"
 
-	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
 // TestBlock is a useful test block

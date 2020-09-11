@@ -6,8 +6,8 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOperationVerifyNil(t *testing.T) {

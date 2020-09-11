@@ -1,9 +1,9 @@
 package platformvm
 
 import (
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/vms/components/avax"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 // BaseTx contains fields common to many transaction types. It should be

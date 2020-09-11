@@ -1,4 +1,4 @@
-# Gecko
+# AvalancheGo
 
 ## Installation
 
@@ -11,42 +11,42 @@ Avalanche is an incredibly lightweight protocol, so the minimum computer require
 
 ### Native Install
 
-Clone the Gecko repository:
+Clone the AvalancheGo repository:
 
 ```sh
-go get -v -d github.com/ava-labs/gecko/...
-cd $GOPATH/src/github.com/ava-labs/gecko
+go get -v -d github.com/ava-labs/avalanchego/...
+cd $GOPATH/src/github.com/ava-labs/avalanchego
 ```
 
-#### Building the Gecko Executable
+#### Building the Avalanche Executable
 
-Build Gecko using the build script:
+Build Avalanche using the build script:
 
 ```sh
 ./scripts/build.sh
 ```
 
-The Gecko binary, named `avalanche`, is in the `build` directory.
+The Avalanche binary, named `avalanchego`, is in the `build` directory.
 
 ### Docker Install
 
 - Make sure you have docker installed on your machine (so commands like `docker run` etc. are available).
-- Build the docker image of latest gecko branch by `scripts/build_image.sh`.
+- Build the docker image of latest avalanchego branch by `scripts/build_image.sh`.
 - Check the built image by `docker image ls`, you should see some image tagged
-  `gecko-xxxxxxxx`, where `xxxxxxxx` is the commit id of the Gecko source it was built from.
-- Test Gecko by `docker run -ti -p 9650:9650 -p 9651:9651 gecko-xxxxxxxx /gecko/build/avalanche
+  `avalanchego-xxxxxxxx`, where `xxxxxxxx` is the commit id of the Avalanche source it was built from.
+- Test Avalanche by `docker run -ti -p 9650:9650 -p 9651:9651 avalanchego-xxxxxxxx /avalanchego/build/avalanchego
    --network-id=local --staking-enabled=false --snow-sample-size=1 --snow-quorum-size=1`. (For a production deployment,
   you may want to extend the docker image with required credentials for
   staking and TLS.)
 
-## Running Gecko
+## Running Avalanche
 
 ### Connecting to Everest
 
 To connect to the Everest Testnet, run:
 
 ```sh
-./build/avalanche
+./build/avalanchego
 ```
 
 You should see some pretty ASCII art and log messages.
@@ -58,7 +58,7 @@ You can use `Ctrl + C` to kill the node.
 To create a single node testnet, run:
 
 ```sh
-./build/avalanche --network-id=local --staking-enabled=false --snow-sample-size=1 --snow-quorum-size=1
+./build/avalanchego --network-id=local --staking-enabled=false --snow-sample-size=1 --snow-quorum-size=1
 ```
 
 This launches an Avalanche network with one node.

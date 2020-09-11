@@ -11,15 +11,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/database/memdb"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/snow/engine/common/queue"
-	"github.com/ava-labs/gecko/snow/engine/snowman/block"
-	"github.com/ava-labs/gecko/snow/validators"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -94,7 +95,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -185,7 +186,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -334,7 +335,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -489,7 +490,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -588,7 +589,7 @@ func TestBootstrapperAcceptedFrontier(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -627,7 +628,7 @@ func TestBootstrapperFilterAccepted(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		nil,
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -714,7 +715,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	err := bs.Initialize(
 		config,
 		func() error { *finished = true; return nil },
-		fmt.Sprintf("gecko_%s", config.Ctx.ChainID),
+		fmt.Sprintf("%s_%s", constants.PlatformName, config.Ctx.ChainID),
 		prometheus.NewRegistry(),
 	)
 	if err != nil {

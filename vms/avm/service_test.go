@@ -11,17 +11,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/api/keystore"
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
@@ -423,8 +423,30 @@ func TestServiceGetUTXOs(t *testing.T) {
 			count: numUTXOs,
 			args: &GetUTXOsArgs{
 				Addresses: []string{
-					pAddr,
+					xAddr,
 				},
+				SourceChain: "P",
+			},
+		},
+		{
+			label:     "invalid source chain ID",
+			shouldErr: true,
+			count:     numUTXOs,
+			args: &GetUTXOsArgs{
+				Addresses: []string{
+					xAddr,
+				},
+				SourceChain: "HomeRunDerby",
+			},
+		},
+		{
+			label: "get all P-chain UTXOs",
+			count: numUTXOs,
+			args: &GetUTXOsArgs{
+				Addresses: []string{
+					xAddr,
+				},
+				SourceChain: "P",
 			},
 		},
 		{
@@ -433,6 +455,15 @@ func TestServiceGetUTXOs(t *testing.T) {
 			args: &GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
+					pAddr,
+				},
+			},
+		},
+		{
+			label:     "get UTXOs for an address on a different chain",
+			shouldErr: true,
+			args: &GetUTXOsArgs{
+				Addresses: []string{
 					pAddr,
 				},
 			},
@@ -658,7 +689,7 @@ func TestNFTWorkflow(t *testing.T) {
 		Name:   "BIG COIN",
 		Symbol: "COIN",
 		MinterSets: []Owners{
-			Owners{
+			{
 				Threshold: 1,
 				Minters: []string{
 					addrStr,
