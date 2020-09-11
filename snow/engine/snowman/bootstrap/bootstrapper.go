@@ -201,6 +201,9 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		}
 		wantedBlkID = blk.Parent()
 		b.blockCache.Put(blkID, blk) // Put block in cache
+		if err := b.VM.SaveBlock(blk); err != nil {
+			return fmt.Errorf("couldn't save block %s: %w", blk.ID(), err)
+		}
 	}
 
 	return b.process(tail)
