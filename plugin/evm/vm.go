@@ -643,7 +643,7 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 		for tempBlock.ethBlock != nil {
 			parentID := ids.NewID(tempBlock.ethBlock.ParentHash())
 			tempBlock = vm.getBlock(parentID)
-			if tempBlock.ethBlock == nil {
+			if tempBlock == nil || tempBlock.ethBlock == nil {
 				break
 			}
 
