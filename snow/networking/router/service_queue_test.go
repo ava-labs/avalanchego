@@ -10,9 +10,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/snow/networking/throttler"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanchego/snow/networking/throttler"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func setupMultiLevelQueue(t *testing.T, bufferSize int) (messageQueue, chan struct{}, validators.Set) {
@@ -184,15 +184,15 @@ func TestMultiLevelQueuePrioritizes(t *testing.T) {
 	// Push two messages from from high priority validator and one from
 	// low priority validator
 	messages := []message{
-		message{
+		{
 			validatorID: validator1.ID(),
 			requestID:   1,
 		},
-		message{
+		{
 			validatorID: validator1.ID(),
 			requestID:   2,
 		},
-		message{
+		{
 			validatorID: validator2.ID(),
 			requestID:   3,
 		},

@@ -7,16 +7,14 @@ import (
 	"fmt"
 	"net/http"
 
-	_ "go.nanomsg.org/mangos/v3/transport/ipc" // registers the IPC transport
-
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/ipcs"
-	"github.com/ava-labs/gecko/snow/engine/common"
-	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/logging"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ipcs"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // IPCServer maintains the IPCs

@@ -6,8 +6,9 @@ package avm
 import (
 	"fmt"
 
-	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func newCallsMetric(namespace, name string) prometheus.Counter {

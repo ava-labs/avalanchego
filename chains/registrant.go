@@ -4,7 +4,7 @@
 package chains
 
 import (
-	"github.com/ava-labs/gecko/snow"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // Registrant can register the existence of a chain

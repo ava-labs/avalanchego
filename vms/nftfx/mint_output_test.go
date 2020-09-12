@@ -3,7 +3,7 @@ package nftfx
 import (
 	"testing"
 
-	"github.com/ava-labs/gecko/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOutputState(t *testing.T) {

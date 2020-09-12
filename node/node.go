@@ -16,42 +16,41 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/gecko/api"
-	"github.com/ava-labs/gecko/api/admin"
-	"github.com/ava-labs/gecko/api/health"
-	"github.com/ava-labs/gecko/api/info"
-	"github.com/ava-labs/gecko/api/keystore"
-	"github.com/ava-labs/gecko/api/metrics"
-	"github.com/ava-labs/gecko/chains"
-	"github.com/ava-labs/gecko/chains/atomic"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/database/meterdb"
-	"github.com/ava-labs/gecko/database/prefixdb"
-	"github.com/ava-labs/gecko/genesis"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/ipcs"
-	"github.com/ava-labs/gecko/network"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/hashing"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/version"
-	"github.com/ava-labs/gecko/vms"
-	"github.com/ava-labs/gecko/vms/avm"
-	"github.com/ava-labs/gecko/vms/nftfx"
-	"github.com/ava-labs/gecko/vms/platformvm"
-	"github.com/ava-labs/gecko/vms/propertyfx"
-	"github.com/ava-labs/gecko/vms/rpcchainvm"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
-	"github.com/ava-labs/gecko/vms/spchainvm"
-	"github.com/ava-labs/gecko/vms/spdagvm"
-	"github.com/ava-labs/gecko/vms/timestampvm"
+	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/admin"
+	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/meterdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ipcs"
+	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/timestampvm"
 
-	ipcsapi "github.com/ava-labs/gecko/api/ipcs"
+	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
 
 // Networking constants
@@ -63,7 +62,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion("avalanche", 0, 7, 0)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 8, 1)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -180,7 +179,7 @@ func (n *Node) initNetworking() error {
 	)
 
 	if !n.Config.EnableStaking {
-		n.Net.RegisterHandler(&insecureValidatorManager{
+		n.Net.RegisterConnector(&insecureValidatorManager{
 			vdrs:   primaryNetworkValidators,
 			weight: n.Config.DisabledStakingWeight,
 		})
@@ -216,7 +215,7 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
 func (n *Node) Dispatch() error {
 	// Start the HTTP endpoint
 	go n.Log.RecoverAndPanic(func() {
-		if n.Config.EnableHTTPS {
+		if n.Config.HTTPSEnabled {
 			n.Log.Debug("Initializing API server with TLS Enabled")
 			err := n.APIServer.DispatchTLS(n.Config.HTTPSCertFile, n.Config.HTTPSKeyFile)
 			n.Log.Warn("Secure API server initialization failed with %s, attempting to create insecure API server", err)
@@ -385,15 +384,22 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 	go connectToBootstrapsTimeout.Dispatch()
 	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
 
-	n.Net.RegisterHandler(awaiter)
+	n.Net.RegisterConnector(awaiter)
 	return nil
 }
 
 // initAPIServer initializes the server that handles HTTP calls
-func (n *Node) initAPIServer() {
+func (n *Node) initAPIServer() error {
 	n.Log.Info("Initializing API server")
 
-	n.APIServer.Initialize(n.Log, n.LogFactory, n.Config.HTTPHost, n.Config.HTTPPort)
+	return n.APIServer.Initialize(
+		n.Log,
+		n.LogFactory,
+		n.Config.HTTPHost,
+		n.Config.HTTPPort,
+		n.Config.APIRequireAuthToken,
+		n.Config.APIAuthPassword,
+	)
 }
 
 // Create the vmManager, chainManager and register the following vms:
@@ -412,33 +418,46 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	criticalChains := ids.Set{}
 	criticalChains.Add(constants.PlatformChainID, createAVMTx.ID())
 
-	n.chainManager, err = chains.New(
-		n.Config.EnableStaking,
-		n.Config.MaxNonStakerPendingMsgs,
-		n.Config.StakerMsgPortion,
-		n.Config.StakerCPUPortion,
-		n.Log,
-		n.LogFactory,
-		n.vmManager,
-		n.DecisionDispatcher,
-		n.ConsensusDispatcher,
-		n.DB,
-		n.Config.ConsensusRouter,
-		n.Net,
-		n.Config.ConsensusParams,
-		n.vdrs,
-		n.ID,
-		n.Config.NetworkID,
-		&n.APIServer,
-		&n.keystoreServer,
-		&n.sharedMemory,
-		avaxAssetID,
-		xChainID,
-		criticalChains,
-	)
-	if err != nil {
+	timeoutManager := timeout.Manager{}
+	n.Config.NetworkConfig.Namespace = constants.PlatformName
+	n.Config.NetworkConfig.Registerer = n.Config.ConsensusParams.Metrics
+	if err := timeoutManager.Initialize(&n.Config.NetworkConfig); err != nil {
 		return err
 	}
+	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+
+	n.Config.ConsensusRouter.Initialize(
+		n.Log,
+		&timeoutManager,
+		n.Config.ConsensusGossipFrequency,
+		n.Config.ConsensusShutdownTimeout,
+	)
+
+	n.chainManager = chains.New(&chains.ManagerConfig{
+		StakingEnabled:          n.Config.EnableStaking,
+		MaxNonStakerPendingMsgs: uint32(n.Config.MaxNonStakerPendingMsgs),
+		StakerMSGPortion:        n.Config.StakerMSGPortion,
+		StakerCPUPortion:        n.Config.StakerCPUPortion,
+		Log:                     n.Log,
+		LogFactory:              n.LogFactory,
+		VMManager:               n.vmManager,
+		DecisionEvents:          n.DecisionDispatcher,
+		ConsensusEvents:         n.ConsensusDispatcher,
+		DB:                      n.DB,
+		Router:                  n.Config.ConsensusRouter,
+		Net:                     n.Net,
+		ConsensusParams:         n.Config.ConsensusParams,
+		Validators:              n.vdrs,
+		NodeID:                  n.ID,
+		NetworkID:               n.Config.NetworkID,
+		Server:                  &n.APIServer,
+		Keystore:                &n.keystoreServer,
+		AtomicMemory:            &n.sharedMemory,
+		AVAXAssetID:             avaxAssetID,
+		XChainID:                xChainID,
+		CriticalChains:          criticalChains,
+		TimeoutManager:          &timeoutManager,
+	})
 
 	vdrs := n.vdrs
 
@@ -452,11 +471,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
-			ChainManager:   n.chainManager,
-			Validators:     vdrs,
-			StakingEnabled: n.Config.EnableStaking,
-			Fee:            n.Config.TxFee,
-			MinStake:       n.Config.MinStake,
+			ChainManager:     n.chainManager,
+			Validators:       vdrs,
+			StakingEnabled:   n.Config.EnableStaking,
+			Fee:              n.Config.TxFee,
+			MinStake:         n.Config.MinStake,
+			UptimePercentage: n.Config.UptimeRequirement,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
 			Fee: n.Config.TxFee,
@@ -464,10 +484,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
-		n.vmManager.RegisterVMFactory(spdagvm.ID, &spdagvm.Factory{
-			TxFee: n.Config.TxFee,
-		}),
-		n.vmManager.RegisterVMFactory(spchainvm.ID, &spchainvm.Factory{}),
 		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
@@ -520,7 +536,8 @@ func (n *Node) initMetricsAPI() error {
 
 	n.Log.Info("initializing metrics API")
 
-	db, err := meterdb.New("gecko_db", registry, n.DB)
+	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
+	db, err := meterdb.New(dbNamespace, registry, n.DB)
 	if err != nil {
 		return err
 	}
@@ -650,7 +667,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = Config
-	n.Log.Info("Gecko version is: %s", Version)
+	n.Log.Info("Node version is: %s", Version)
 
 	httpLog, err := logFactory.MakeSubdir("http")
 	if err != nil {
@@ -671,7 +688,9 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	}
 
 	// Start HTTP APIs
-	n.initAPIServer()                           // Start the API Server
+	if err := n.initAPIServer(); err != nil { // Start the API Server
+		return fmt.Errorf("couldn't initialize API server: %w", err)
+	}
 	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
 		return fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}

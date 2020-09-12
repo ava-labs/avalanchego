@@ -4,9 +4,9 @@
 package state
 
 import (
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/choices"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
 const (

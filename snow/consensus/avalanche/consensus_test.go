@@ -11,11 +11,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowball"
-	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -57,7 +58,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:    fmt.Sprintf("gecko_%s", ctx.ChainID.String()),
+				Namespace:    fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
 				Metrics:      prometheus.NewRegistry(),
 				K:            2,
 				Alpha:        2,
@@ -77,7 +78,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:    fmt.Sprintf("gecko_%s", ctx.ChainID.String()),
+				Namespace:    fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
 				Metrics:      prometheus.NewRegistry(),
 				K:            2,
 				Alpha:        2,
@@ -97,7 +98,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 		avl := factory.New()
 		params := Parameters{
 			Parameters: snowball.Parameters{
-				Namespace:    fmt.Sprintf("gecko_%s", ctx.ChainID.String()),
+				Namespace:    fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
 				Metrics:      prometheus.NewRegistry(),
 				K:            2,
 				Alpha:        2,
@@ -121,7 +122,7 @@ func ParamsTest(t *testing.T, factory Factory) {
 	ctx := snow.DefaultContextTest()
 	params := Parameters{
 		Parameters: snowball.Parameters{
-			Namespace:         fmt.Sprintf("gecko_%s", ctx.ChainID.String()),
+			Namespace:         fmt.Sprintf("%s_%s", constants.PlatformName, ctx.ChainID),
 			Metrics:           prometheus.NewRegistry(),
 			K:                 2,
 			Alpha:             2,

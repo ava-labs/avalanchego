@@ -4,7 +4,7 @@
 package common
 
 import (
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 const (

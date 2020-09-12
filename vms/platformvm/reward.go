@@ -4,22 +4,61 @@
 package platformvm
 
 import (
-	"math"
+	"math/big"
 	"time"
 )
 
-// reward returns the amount of tokens to reward the staker with
-func reward(duration time.Duration, amount uint64, inflationRate float64) uint64 {
-	// TODO: Can't use floats here. Need to figure out how to do some integer
-	// approximations
+var (
+	// maxSubMinConsumptionRate is the difference between the maximum
+	// consumption rate of the remaining tokens and the minimum.
+	maxSubMinConsumptionRate = new(big.Int).SetUint64(MaxSubMinConsumptionRate)
 
-	years := duration.Hours() / (365. * 24.)
+	// minConsumptionRate is the consumption rate to use when calculating a
+	// validator period with duration 0.
+	minConsumptionRate = new(big.Int).SetUint64(MinConsumptionRate)
 
-	// Total value of this transaction
-	value := float64(amount) * math.Pow(inflationRate, years)
+	// consumptionRateDenominator is the magnitude offset used to emulate
+	// floating point fractions.
+	consumptionRateDenominator = new(big.Int).SetUint64(PercentDenominator)
 
-	// Amount of the reward
-	reward := value - float64(amount)
+	// consumptionInterval is the period that should be used to calculate the
+	// consumption rate given a duration.
+	consumptionInterval = new(big.Int).SetUint64(uint64(MaximumStakingDuration))
+)
 
-	return uint64(reward)
+type rewardTx struct {
+	Reward uint64 `serialize:"true"`
+	Tx     Tx     `serialize:"true"`
+}
+
+// Reward returns the amount of tokens to reward the staker with.
+//
+// RemainingSupply = SupplyCap - ExistingSupply
+// PortionOfExistingSupply = StakedAmount / ExistingSupply
+// PortionOfStakingDuration = StakingDuration / MaximumStakingDuration
+// MintingRate = MinMintingRate + MaxSubMinMintingRate * PortionOfStakingDuration
+// Reward = RemainingSupply * PortionOfExistingSupply * MintingRate * PortionOfStakingDuration
+func Reward(
+	rawDuration time.Duration,
+	rawStakedAmount,
+	rawMaxExistingAmount uint64,
+) uint64 {
+	duration := new(big.Int).SetUint64(uint64(rawDuration))
+	stakedAmount := new(big.Int).SetUint64(rawStakedAmount)
+	maxExistingAmount := new(big.Int).SetUint64(rawMaxExistingAmount)
+
+	adjustedConsumptionRateNumerator := new(big.Int).Mul(maxSubMinConsumptionRate, duration)
+	adjustedMinConsumptionRateNumerator := new(big.Int).Mul(minConsumptionRate, consumptionInterval)
+	adjustedConsumptionRateNumerator.Add(adjustedConsumptionRateNumerator, adjustedMinConsumptionRateNumerator)
+	adjustedConsumptionRateDenominator := new(big.Int).Mul(consumptionInterval, consumptionRateDenominator)
+
+	reward := new(big.Int).SetUint64(SupplyCap - rawMaxExistingAmount)
+	reward.Mul(reward, adjustedConsumptionRateNumerator)
+	reward.Mul(reward, stakedAmount)
+	reward.Mul(reward, duration)
+	reward.Div(reward, adjustedConsumptionRateDenominator)
+	reward.Div(reward, maxExistingAmount)
+	reward.Div(reward, consumptionInterval)
+
+	return reward.Uint64()
 }

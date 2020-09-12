@@ -3,7 +3,7 @@
 
 package triggers
 
-import "github.com/ava-labs/gecko/ids"
+import "github.com/ava-labs/avalanchego/ids"
 
 // Acceptor is implemented when a struct is monitoring if a message is accepted
 type Acceptor interface {

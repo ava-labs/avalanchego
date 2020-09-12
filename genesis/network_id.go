@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ava-labs/gecko/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 // NetworkName returns a human readable name for the network with

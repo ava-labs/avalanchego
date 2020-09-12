@@ -6,7 +6,7 @@ package platformvm
 import (
 	"time"
 
-	"github.com/ava-labs/gecko/ids"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Validator is a validator.

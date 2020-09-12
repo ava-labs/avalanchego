@@ -13,19 +13,19 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/gecko/api/health"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow/networking/router"
-	"github.com/ava-labs/gecko/snow/networking/sender"
-	"github.com/ava-labs/gecko/snow/triggers"
-	"github.com/ava-labs/gecko/snow/validators"
-	"github.com/ava-labs/gecko/utils"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/formatting"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/sampler"
-	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/version"
+	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // reasonable default values
@@ -72,11 +72,11 @@ type Network interface {
 	// IP.
 	Track(ip utils.IPDesc)
 
-	// Register a new handler that is called whenever a peer is connected to or
-	// disconnected to. If the handler returns true, then it will never be
-	// called again. Thread safety must be managed internally in the network.
+	// Register a new connector that is called whenever a peer is connected to
+	// or disconnected from. If the connector returns true, then it will never
+	// be called again. Thread safety must be managed internally in the network.
 	// The handler will initially be called with this local node's ID.
-	RegisterHandler(h Handler)
+	RegisterConnector(h validators.Connector)
 
 	// Returns the description of the nodes this network is currently connected
 	// to externally. Thread safety must be managed internally to the network.
@@ -140,7 +140,7 @@ type network struct {
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
 	myIPs    map[string]struct{} // set of IPs that resulted in my ID.
 	peers    map[[20]byte]*peer
-	handlers []Handler
+	handlers []validators.Connector
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -655,8 +655,8 @@ func (n *network) Dispatch() error {
 	}
 }
 
-// RegisterHandler implements the Network interface
-func (n *network) RegisterHandler(h Handler) {
+// RegisterConnector implements the Network interface
+func (n *network) RegisterConnector(h validators.Connector) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
