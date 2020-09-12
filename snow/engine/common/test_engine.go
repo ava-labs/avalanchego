@@ -44,6 +44,9 @@ type EngineTest struct {
 	CantQueryFailed,
 	CantChits bool
 
+	CantConnected,
+	CantDisconnected bool
+
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
 	StartupF, GossipF, ShutdownF                       func() error
@@ -54,6 +57,7 @@ type EngineTest struct {
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
+	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
 }
 
 var _ Engine = &EngineTest{}
@@ -89,6 +93,9 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantPullQuery = cant
 	e.CantQueryFailed = cant
 	e.CantChits = cant
+
+	e.CantConnected = cant
+	e.CantDisconnected = cant
 }
 
 // Context ...
@@ -381,6 +388,34 @@ func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerI
 		e.T.Fatalf("Unexpectedly called Chits")
 	}
 	return errors.New("unexpectedly called Chits")
+}
+
+// Connected ...
+func (e *EngineTest) Connected(validatorID ids.ShortID) error {
+	if e.ConnectedF != nil {
+		return e.ConnectedF(validatorID)
+	}
+	if !e.CantConnected {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called Connected")
+	}
+	return errors.New("unexpectedly called Connected")
+}
+
+// Disconnected ...
+func (e *EngineTest) Disconnected(validatorID ids.ShortID) error {
+	if e.DisconnectedF != nil {
+		return e.DisconnectedF(validatorID)
+	}
+	if !e.CantDisconnected {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called Disconnected")
+	}
+	return errors.New("unexpectedly called Disconnected")
 }
 
 // IsBootstrapped ...

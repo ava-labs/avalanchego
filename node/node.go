@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -38,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
@@ -161,6 +161,15 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
+	consensusRouter := n.Config.ConsensusRouter
+	if !n.Config.EnableStaking {
+		consensusRouter = &insecureValidatorManager{
+			Router: consensusRouter,
+			vdrs:   primaryNetworkValidators,
+			weight: n.Config.DisabledStakingWeight,
+		}
+	}
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
@@ -175,15 +184,8 @@ func (n *Node) initNetworking() error {
 		clientUpgrader,
 		primaryNetworkValidators,
 		n.beacons,
-		n.Config.ConsensusRouter,
+		consensusRouter,
 	)
-
-	if !n.Config.EnableStaking {
-		n.Net.RegisterConnector(&insecureValidatorManager{
-			vdrs:   primaryNetworkValidators,
-			weight: n.Config.DisabledStakingWeight,
-		})
-	}
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
 		// errors are already logged internally if they are meaningful
@@ -194,20 +196,21 @@ func (n *Node) initNetworking() error {
 }
 
 type insecureValidatorManager struct {
+	router.Router
 	vdrs   validators.Set
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) bool {
+func (i *insecureValidatorManager) Connected(vdrID ids.ShortID) {
 	_ = i.vdrs.AddWeight(vdrID, i.weight)
-	return false
+	i.Router.Connected(vdrID)
 }
 
-func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) bool {
+func (i *insecureValidatorManager) Disconnected(vdrID ids.ShortID) {
 	// Shouldn't error unless the set previously had an error, which should
 	// never happen as described above
 	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
-	return false
+	i.Router.Disconnected(vdrID)
 }
 
 // Dispatch starts the node's servers.
@@ -363,28 +366,30 @@ func (n *Node) initChains(genesisBytes []byte, avaxAssetID ids.ID) error {
 		CustomBeacons: n.beacons,
 	})
 
-	bootstrapWeight := n.beacons.Weight()
+	// TODO: Introduce this back in
 
-	reqWeight := (3*bootstrapWeight + 3) / 4
+	// bootstrapWeight := n.beacons.Weight()
 
-	if reqWeight == 0 {
-		return nil
-	}
+	// reqWeight := (3*bootstrapWeight + 3) / 4
 
-	connectToBootstrapsTimeout := timer.NewTimer(func() {
-		n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
-		go n.Net.Close()
-	})
+	// if reqWeight == 0 {
+	// 	return nil
+	// }
 
-	awaiter := chains.NewAwaiter(n.beacons, reqWeight, func() {
-		n.Log.Info("Connected to required bootstrap nodes. Starting Platform Chain...")
-		connectToBootstrapsTimeout.Cancel()
-	})
+	// connectToBootstrapsTimeout := timer.NewTimer(func() {
+	// 	n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
+	// 	go n.Net.Close()
+	// })
 
-	go connectToBootstrapsTimeout.Dispatch()
-	connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
+	// awaiter := chains.NewAwaiter(n.beacons, reqWeight, func() {
+	// 	n.Log.Info("Connected to required bootstrap nodes. Starting Platform Chain...")
+	// 	connectToBootstrapsTimeout.Cancel()
+	// })
 
-	n.Net.RegisterConnector(awaiter)
+	// go connectToBootstrapsTimeout.Dispatch()
+	// connectToBootstrapsTimeout.SetTimeoutIn(15 * time.Second)
+
+	// n.Net.RegisterConnector(awaiter)
 	return nil
 }
 
