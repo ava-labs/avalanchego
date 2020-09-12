@@ -55,8 +55,8 @@ func (sr *ChainRouter) Initialize(
 	sr.log = log
 	sr.chains = make(map[[32]byte]*Handler)
 	sr.timeouts = timeouts
-	sr.gossiper = timer.NewRepeater(sr.gossip, gossipFrequency)
-	sr.intervalNotifier = timer.NewRepeater(sr.endInterval, defaultCPUInterval)
+	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
+	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
 	sr.closeTimeout = closeTimeout
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
@@ -396,7 +396,7 @@ func (sr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 }
 
 // Gossip accepted containers
-func (sr *ChainRouter) gossip() {
+func (sr *ChainRouter) Gossip() {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
@@ -406,7 +406,7 @@ func (sr *ChainRouter) gossip() {
 }
 
 // EndInterval notifies the chains that the current CPU interval has ended
-func (sr *ChainRouter) endInterval() {
+func (sr *ChainRouter) EndInterval() {
 	sr.lock.RLock()
 	defer sr.lock.RUnlock()
 
