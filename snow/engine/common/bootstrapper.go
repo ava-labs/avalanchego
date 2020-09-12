@@ -34,6 +34,8 @@ const (
 type Bootstrapper struct {
 	Config
 
+	RequestID uint32
+
 	// IDs of validators we have requested the accepted frontier from but haven't
 	// received a reply from
 	pendingAcceptedFrontier ids.ShortSet
@@ -42,7 +44,8 @@ type Bootstrapper struct {
 	pendingAccepted ids.ShortSet
 	acceptedVotes   map[[32]byte]uint64
 
-	RequestID uint32
+	// current weight
+	weight uint64
 }
 
 // Initialize implements the Engine interface.
@@ -169,4 +172,35 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 	}
 
 	return b.Bootstrapable.ForceAccepted(accepted)
+}
+
+// Connected implements the Engine interface.
+func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
+	weight, ok := b.Validators.GetWeight(validatorID)
+	if !ok {
+		return nil
+	}
+	weight, err := math.Add64(weight, b.weight)
+	if err != nil {
+		return err
+	}
+	b.weight = weight
+	if b.weight < b.StartupAlpha {
+		return nil
+	}
+	return b.Startup()
+}
+
+// Disconnected implements the Engine interface.
+func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
+	if weight, ok := b.Validators.GetWeight(validatorID); ok {
+		// TODO: Account for weight changes in a more robust manner.
+
+		// Sub64 should rarely error since only validators that have added their
+		// weight can become disconnected. Because it is possible that there are
+		// changes to the validators set, we utilize that Sub64 returns 0 on
+		// error.
+		b.weight, _ = math.Sub64(b.weight, weight)
+	}
+	return nil
 }

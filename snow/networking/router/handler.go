@@ -438,6 +438,20 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 	})
 }
 
+// Connected passes a new connection notification to the consensus engine
+func (h *Handler) Connected(validatorID ids.ShortID) {
+	h.sendReliableMsg(message{
+		messageType: gossipMsg,
+	})
+}
+
+// Disconnected passes a new connection notification to the consensus engine
+func (h *Handler) Disconnected(validatorID ids.ShortID) {
+	h.sendReliableMsg(message{
+		messageType: gossipMsg,
+	})
+}
+
 // Gossip passes a gossip request to the consensus engine
 func (h *Handler) Gossip() {
 	h.sendReliableMsg(message{
@@ -547,6 +561,14 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
 		timeConsumed = h.clock.Time().Sub(startTime)
 		h.chits.Observe(float64(timeConsumed.Nanoseconds()))
+	case connectedMsg:
+		err = h.engine.Connected(msg.validatorID)
+		timeConsumed = h.clock.Time().Sub(startTime)
+		h.connected.Observe(float64(timeConsumed.Nanoseconds()))
+	case disconnectedMsg:
+		err = h.engine.Disconnected(msg.validatorID)
+		timeConsumed = h.clock.Time().Sub(startTime)
+		h.disconnected.Observe(float64(timeConsumed.Nanoseconds()))
 	}
 
 	h.serviceQueue.UtilizeCPU(msg.validatorID, timeConsumed)
