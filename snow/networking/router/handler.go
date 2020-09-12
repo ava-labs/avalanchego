@@ -441,14 +441,16 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 // Connected passes a new connection notification to the consensus engine
 func (h *Handler) Connected(validatorID ids.ShortID) {
 	h.sendReliableMsg(message{
-		messageType: gossipMsg,
+		messageType: connectedMsg,
+		validatorID: validatorID,
 	})
 }
 
 // Disconnected passes a new connection notification to the consensus engine
 func (h *Handler) Disconnected(validatorID ids.ShortID) {
 	h.sendReliableMsg(message{
-		messageType: gossipMsg,
+		messageType: disconnectedMsg,
+		validatorID: validatorID,
 	})
 }
 
