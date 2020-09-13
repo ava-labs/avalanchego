@@ -27,6 +27,10 @@ github.com/ava-labs/avalanchego v0.8.0-beta/go.mod h1:quYojL1hu0ue2glUT1ng28kADs
 github.com/ava-labs/coreth v0.2.14-rc.1/go.mod h1:Zhb60GFIB7G5AnUCks0Jo4Rezx/EovL8o+z51aBF1A8=
 github.com/ava-labs/coreth v0.2.15-rc.2 h1:4aMeRsluvcxngtubJiLfRIj+TkAQJoIO5cuh9uFKVxI=
 github.com/ava-labs/coreth v0.2.15-rc.2/go.mod h1:+sK2XGKCNA48uzeHWe4iBzmiOBYmYvnnzLtOkQeQfkk=
+github.com/ava-labs/coreth v0.2.15-rc.3 h1:sGmqa3C0eiLlkMFSV8X1AZzSP5t+0+smIA/FeYi1wV0=
+github.com/ava-labs/coreth v0.2.15-rc.3/go.mod h1:+sK2XGKCNA48uzeHWe4iBzmiOBYmYvnnzLtOkQeQfkk=
+github.com/ava-labs/coreth v0.2.15-rc.4 h1:Fx/QTRC3fgO7lquQSOW1N/Wwd8zbQAh7n3Zcy6qQ3bk=
+github.com/ava-labs/coreth v0.2.15-rc.4/go.mod h1:+sK2XGKCNA48uzeHWe4iBzmiOBYmYvnnzLtOkQeQfkk=
 github.com/ava-labs/gecko v0.6.1-rc.1 h1:BhWmoDGA0Obs5ZbEdpNqw/3rx9ZMPmjcZu1oD+yySLY=
 github.com/ava-labs/gecko v0.6.1-rc.1/go.mod h1:TT6uA1BETZpVMR0xiFtE8I5Mv4DULlS+lAL3xuYKnpA=
 github.com/ava-labs/go-ethereum v1.9.3 h1:GmnMZ/dlvVAPFmWBzEpRJX49pUAymPfoASLNRJqR0AY=

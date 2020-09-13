@@ -351,28 +351,6 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 			ctx.Log.Error("Chain with ID: %s was shutdown due to a panic", chainParams.ID)
 		})
 	}
-
-	reqWeight := (3*bootstrapWeight + 3) / 4
-	if reqWeight == 0 {
-		if err := chain.Engine.Startup(); err != nil {
-			chain.Handler.Shutdown()
-			return nil, fmt.Errorf("failed to start consensus engine: %w", err)
-		}
-	} else {
-		awaiter := NewAwaiter(beacons, reqWeight, func() {
-			ctx.Lock.Lock()
-			defer ctx.Lock.Unlock()
-			if err := chain.Engine.Startup(); err != nil {
-				chain.Ctx.Log.Error("failed to start consensus engine: %s", err)
-				chain.Handler.Shutdown()
-			}
-		})
-		go m.Net.RegisterConnector(awaiter)
-	}
-
-	if connector, ok := vm.(validators.Connector); ok {
-		go m.Net.RegisterConnector(connector)
-	}
 	return chain, nil
 }
 
@@ -439,11 +417,12 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: validators,
-				Beacons:    beacons,
-				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
-				Sender:     &sender,
+				Ctx:          ctx,
+				Validators:   validators,
+				Beacons:      beacons,
+				StartupAlpha: (3*bootstrapWeight + 3) / 4,
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:       &sender,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -519,11 +498,12 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: validators,
-				Beacons:    beacons,
-				Alpha:      bootstrapWeight/2 + 1, // must be > 50%
-				Sender:     &sender,
+				Ctx:          ctx,
+				Validators:   validators,
+				Beacons:      beacons,
+				StartupAlpha: (3*bootstrapWeight + 3) / 4,
+				Alpha:        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:       &sender,
 			},
 			Blocked:      blocked,
 			VM:           vm,

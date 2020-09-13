@@ -17,10 +17,11 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanche-go/utils/constants"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/units"
+
+	safemath "github.com/ava-labs/avalanche-go/utils/math"
 )
 
 // LockedAmount ...
@@ -47,10 +48,30 @@ type Config struct {
 	InitialStakeAmount    uint64        `json:"initialStakeAmount"`
 	InitialStakeDuration  uint64        `json:"initialStakeDuration"`
 	InitialStakeAddresses []ids.ShortID `json:"initialStakeAddresses"`
+	InitialStakeNodeIDs   []ids.ShortID `json:"initialStakeNodeIDs"`
 
 	CChainGenesis []byte `json:"cChainGenesis"`
 
 	Message string `json:"message"`
+}
+
+// InitialSupply ...
+func (c *Config) InitialSupply() (uint64, error) {
+	initialSupply := uint64(0)
+	for _, allocation := range c.Allocations {
+		newInitialSupply, err := safemath.Add64(initialSupply, allocation.InitialAmount)
+		if err != nil {
+			return 0, err
+		}
+		for _, unlock := range allocation.UnlockSchedule {
+			newInitialSupply, err = safemath.Add64(newInitialSupply, unlock.Amount)
+			if err != nil {
+				return 0, err
+			}
+		}
+		initialSupply = newInitialSupply
+	}
+	return initialSupply, nil
 }
 
 func main() {
@@ -61,9 +82,11 @@ func main() {
 	defer file.Close()
 
 	c := &Config{
-		NetworkID: constants.MainnetID,
-		StartTime: math.MaxUint64,
-		Message:   "Behind the Vast Market Rally: A Tumbling Dollar.",
+		NetworkID:            constants.MainnetID,
+		StartTime:            math.MaxUint64,
+		InitialStakeAmount:   100 * units.MegaAvax, // TODO: Needs to be set correctly
+		InitialStakeDuration: math.MaxUint64,
+		Message:              "Behind the Vast Market Rally: A Tumbling Dollar.",
 	}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -81,7 +104,11 @@ func main() {
 		if c.StartTime > initialUnlock.Locktime {
 			c.StartTime = initialUnlock.Locktime
 		}
+		if len(unlockSchedule) > 0 && unlockSchedule[0].Locktime < c.InitialStakeDuration {
+			c.InitialStakeDuration = unlockSchedule[0].Locktime
+		}
 	}
+	c.InitialStakeDuration -= c.StartTime
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
@@ -94,6 +121,12 @@ func main() {
 	if err := ioutil.WriteFile("./final_gv.json", configString, 0644); err != nil {
 		log.Fatal(err)
 	}
+
+	initialSupply, err := c.InitialSupply()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(360*units.MegaAvax - initialSupply)
 }
 
 func parseLine(line string) (ids.ShortID, ids.ShortID, LockedAmount, []LockedAmount, error) {

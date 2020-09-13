@@ -31,8 +31,9 @@ type StaticService struct{}
 
 // APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type APIUTXO struct {
-	Amount  json.Uint64 `json:"amount"`
-	Address string      `json:"address"`
+	Locktime json.Uint64 `json:"locktime"`
+	Amount   json.Uint64 `json:"amount"`
+	Address  string      `json:"address"`
 }
 
 // APIStaker is the representation of a staker sent via APIs.
@@ -166,29 +167,37 @@ func bech32ToID(address string) (ids.ShortID, error) {
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
 	utxos := make([]*avax.UTXO, 0, len(args.UTXOs))
-	for i, utxo := range args.UTXOs {
-		if utxo.Amount == 0 {
+	for i, apiUTXO := range args.UTXOs {
+		if apiUTXO.Amount == 0 {
 			return errUTXOHasNoValue
 		}
-		addrID, err := bech32ToID(utxo.Address)
+		addrID, err := bech32ToID(apiUTXO.Address)
 		if err != nil {
 			return err
 		}
-		utxos = append(utxos, &avax.UTXO{
+
+		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty,
 				OutputIndex: uint32(i),
 			},
 			Asset: avax.Asset{ID: args.AvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: uint64(utxo.Amount),
+				Amt: uint64(apiUTXO.Amount),
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
 					Addrs:     []ids.ShortID{addrID},
 				},
 			},
-		})
+		}
+		if apiUTXO.Locktime > args.Time {
+			utxo.Out = &StakeableLockOut{
+				Locktime:        uint64(apiUTXO.Locktime),
+				TransferableOut: utxo.Out.(avax.TransferableOut),
+			}
+		}
+		utxos = append(utxos, utxo)
 	}
 
 	// Specify the validators that are validating the primary network at genesis.
