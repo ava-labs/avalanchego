@@ -133,7 +133,7 @@ type network struct {
 	b Builder
 
 	stateLock       sync.Mutex
-	pendingBytes    *int64
+	pendingBytes    int64
 	closed          bool
 	disconnectedIPs map[string]struct{}
 	connectedIPs    map[string]struct{}
@@ -264,7 +264,6 @@ func NewNetwork(
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.String(): {}},
 		peers:                              make(map[[20]byte]*peer),
-		pendingBytes:                       new(int64),
 	}
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
@@ -622,7 +621,6 @@ func (n *network) Dispatch() error {
 		go n.upgrade(&peer{
 			net:          n,
 			conn:         conn,
-			pendingBytes: new(int64),
 		}, n.serverUpgrader)
 	}
 }
@@ -885,7 +883,6 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 		net:          n,
 		ip:           ip,
 		conn:         conn,
-		pendingBytes: new(int64),
 	}, n.clientUpgrader)
 }
 

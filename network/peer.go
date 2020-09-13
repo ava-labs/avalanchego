@@ -32,7 +32,7 @@ type peer struct {
 
 	// number of bytes currently in the send queue, is only modifed when the
 	// network state lock held.
-	pendingBytes *int64
+	pendingBytes int64
 
 	// queue of messages this connection is attempting to send the peer. Is
 	// closed when the connection is closed.
@@ -184,8 +184,8 @@ func (p *peer) WriteMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msg})
 
-		atomic.AddInt64(p.pendingBytes, -int64(len(msg)))
-		atomic.AddInt64(p.net.pendingBytes, -int64(len(msg)))
+		atomic.AddInt64(&p.pendingBytes, -int64(len(msg)))
+		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
 
 		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
 		packer.PackBytes(msg)
@@ -218,8 +218,8 @@ func (p *peer) send(msg Msg) bool {
 
 	msgBytes := msg.Bytes()
 	msgBytesLen := int64(len(msgBytes))
-	newPendingBytes := *p.net.pendingBytes + msgBytesLen
-	newConnPendingBytes := *p.pendingBytes + msgBytesLen
+	newPendingBytes := p.net.pendingBytes + msgBytesLen
+	newConnPendingBytes := p.pendingBytes + msgBytesLen
 	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
@@ -227,8 +227,8 @@ func (p *peer) send(msg Msg) bool {
 
 	select {
 	case p.sender <- msgBytes:
-		atomic.AddInt64(p.net.pendingBytes, msgBytesLen)
-		atomic.AddInt64(p.pendingBytes, newConnPendingBytes)
+		atomic.AddInt64(&p.net.pendingBytes, msgBytesLen)
+		atomic.AddInt64(&p.pendingBytes, newConnPendingBytes)
 		return true
 	default:
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
@@ -312,7 +312,7 @@ func (p *peer) handle(msg Msg) {
 
 func (p *peer) dropMessage(msgLen int, connPendingLen, networkPendingLen int64) bool {
 	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		*p.pendingBytes > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		p.pendingBytes > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
 		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
 			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
 }
