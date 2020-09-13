@@ -17,15 +17,15 @@ type Router interface {
 	ExternalRouter
 	InternalRouter
 
-	AddChain(chain *Handler)
-	RemoveChain(chainID ids.ID)
-	Shutdown()
 	Initialize(
 		log logging.Logger,
 		timeouts *timeout.Manager,
 		gossipFrequency,
 		shutdownTimeout time.Duration,
 	)
+	Shutdown()
+	AddChain(chain *Handler)
+	RemoveChain(chainID ids.ID)
 }
 
 // ExternalRouter routes messages from the network to the
@@ -51,4 +51,7 @@ type InternalRouter interface {
 	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
+
+	Connected(validatorID ids.ShortID)
+	Disconnected(validatorID ids.ShortID)
 }
