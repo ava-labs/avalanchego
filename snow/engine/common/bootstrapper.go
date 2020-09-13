@@ -49,7 +49,7 @@ type Bootstrapper struct {
 }
 
 // Initialize implements the Engine interface.
-func (b *Bootstrapper) Initialize(config Config) {
+func (b *Bootstrapper) Initialize(config Config) error {
 	b.Config = config
 
 	for _, vdr := range b.Beacons.List() {
@@ -59,6 +59,10 @@ func (b *Bootstrapper) Initialize(config Config) {
 	}
 
 	b.acceptedVotes = make(map[[32]byte]uint64)
+	if b.Config.StartupAlpha > 0 {
+		return nil
+	}
+	return b.Startup()
 }
 
 // Startup implements the Engine interface.

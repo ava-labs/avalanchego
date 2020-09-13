@@ -95,8 +95,7 @@ func (b *Bootstrapper) Initialize(
 	})
 
 	config.Bootstrapable = b
-	b.Bootstrapper.Initialize(config.Config)
-	return nil
+	return b.Bootstrapper.Initialize(config.Config)
 }
 
 // CurrentAcceptedFrontier returns the set of vertices that this node has accepted
