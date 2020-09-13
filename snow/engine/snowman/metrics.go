@@ -47,6 +47,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	errs.Add(
 		registerer.Register(m.numRequests),
 		registerer.Register(m.numBlocked),
+		registerer.Register(m.getAncestorsBlks),
 	)
 	return errs.Err
 }
