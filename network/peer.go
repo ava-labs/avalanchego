@@ -32,7 +32,7 @@ type peer struct {
 
 	// number of bytes currently in the send queue, is only modifed when the
 	// network state lock held.
-	pendingBytes int
+	pendingBytes *int64
 
 	// queue of messages this connection is attempting to send the peer. Is
 	// closed when the connection is closed.
@@ -53,6 +53,8 @@ type peer struct {
 
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
+
+	lock sync.Mutex
 }
 
 // assume the stateLock is held
@@ -129,7 +131,7 @@ func (p *peer) ReadMessages() {
 			pendingBuffer.Offset = 0
 			pendingBuffer.Err = nil
 
-			if uint32(len(pendingBuffer.Bytes)) > p.net.maxMessageSize+wrappers.IntLen {
+			if int64(len(pendingBuffer.Bytes)) > p.net.maxMessageSize+wrappers.IntLen {
 				// we have read more bytes than the max message size allows for,
 				// so we should terminate this connection
 
@@ -148,7 +150,7 @@ func (p *peer) ReadMessages() {
 		// set the offset back to the start of the next message
 		pendingBuffer.Offset = 0
 
-		if uint32(len(msgBytes)) > p.net.maxMessageSize {
+		if int64(len(msgBytes)) > p.net.maxMessageSize {
 			// if this message is longer than the max message length, then we
 			// should terminate this connection
 
@@ -182,10 +184,8 @@ func (p *peer) WriteMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msg})
 
-		p.net.stateLock.Lock()
-		p.pendingBytes -= len(msg)
-		p.net.pendingBytes -= len(msg)
-		p.net.stateLock.Unlock()
+		atomic.AddInt64(p.pendingBytes, -int64(len(msg)))
+		atomic.AddInt64(p.net.pendingBytes, -int64(len(msg)))
 
 		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
 		packer.PackBytes(msg)
@@ -204,9 +204,6 @@ func (p *peer) WriteMessages() {
 
 // send assumes that the stateLock is not held.
 func (p *peer) Send(msg Msg) bool {
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
-
 	return p.send(msg)
 }
 
@@ -218,8 +215,9 @@ func (p *peer) send(msg Msg) bool {
 	}
 
 	msgBytes := msg.Bytes()
-	newPendingBytes := p.net.pendingBytes + len(msgBytes)
-	newConnPendingBytes := p.pendingBytes + len(msgBytes)
+	msgBytesLen :=  int64(len(msgBytes))
+	newPendingBytes := *p.net.pendingBytes + msgBytesLen
+	newConnPendingBytes := *p.pendingBytes + msgBytesLen
 	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
@@ -227,8 +225,8 @@ func (p *peer) send(msg Msg) bool {
 
 	select {
 	case p.sender <- msgBytes:
-		p.net.pendingBytes = newPendingBytes
-		p.pendingBytes = newConnPendingBytes
+		atomic.AddInt64(p.net.pendingBytes, msgBytesLen)
+		atomic.AddInt64(p.pendingBytes, newConnPendingBytes)
 		return true
 	default:
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
@@ -310,9 +308,9 @@ func (p *peer) handle(msg Msg) {
 	}
 }
 
-func (p *peer) dropMessage(msgLen, connPendingLen, networkPendingLen int) bool {
+func (p *peer) dropMessage(msgLen int, connPendingLen, networkPendingLen int64) bool {
 	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		uint32(p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		*p.pendingBytes > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
 		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
 			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
 }
@@ -326,8 +324,8 @@ func (p *peer) close() {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
 
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	p.closed = true
 	close(p.sender)
@@ -489,17 +487,17 @@ func (p *peer) version(msg Msg) {
 			// verification
 			if peerIP.IP.Equal(localPeerIP.IP) {
 				// if the IPs match, add this ip:port pair to be tracked
-				p.net.stateLock.Lock()
+				p.lock.Lock()
 				p.ip = peerIP
-				p.net.stateLock.Unlock()
+				p.lock.Unlock()
 			}
 		}
 	}
 
 	p.SendPeerList()
 
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	// the network connected function can only be called if disconnected wasn't
 	// already called
@@ -510,6 +508,9 @@ func (p *peer) version(msg Msg) {
 	p.versionStr = peerVersion.String()
 
 	p.connected = true
+
+	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
 	p.net.connected(p)
 }
 
@@ -701,7 +702,9 @@ func (p *peer) discardIP() {
 	if !p.ip.IsZero() {
 		p.net.stateLock.Lock()
 		delete(p.net.disconnectedIPs, p.ip.String())
+		p.lock.Lock()
 		p.ip = utils.IPDesc{}
+		p.lock.Unlock()
 		p.net.stateLock.Unlock()
 	}
 	p.Close()
