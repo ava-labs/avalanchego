@@ -6,7 +6,6 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -202,7 +201,6 @@ type VM struct {
 
 	bootstrappedTime time.Time
 
-	uptimeLock  sync.Mutex
 	connections map[[20]byte]time.Time
 }
 
@@ -536,9 +534,6 @@ func (vm *VM) Shutdown() error {
 	stopIter := stopDB.NewIterator()
 	defer stopIter.Release()
 
-	vm.uptimeLock.Lock()
-	defer vm.uptimeLock.Unlock()
-
 	for stopIter.Next() { // Iterates in order of increasing start time
 		txBytes := stopIter.Value()
 
@@ -818,40 +813,30 @@ func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
 }
 
 // Connected implements validators.Connector
-func (vm *VM) Connected(vdrID ids.ShortID) bool {
-	// Locking is required here because this is called directly from the
-	// networking library.
-
-	vm.uptimeLock.Lock()
-	defer vm.uptimeLock.Unlock()
-
+func (vm *VM) Connected(vdrID ids.ShortID) {
 	vm.connections[vdrID.Key()] = time.Unix(vm.clock.Time().Unix(), 0)
-	return false
 }
 
 // Disconnected implements validators.Connector
-func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
-	// Locking is required here because this is called directly from the
-	// networking library.
-
-	vm.uptimeLock.Lock()
-	defer vm.uptimeLock.Unlock()
-
+func (vm *VM) Disconnected(vdrID ids.ShortID) {
 	vdrKey := vdrID.Key()
-	timeConnected := vm.connections[vdrKey]
+	timeConnected, ok := vm.connections[vdrKey]
+	if !ok {
+		return
+	}
 	delete(vm.connections, vdrKey)
 
 	if !vm.bootstrapped {
-		return false
+		return
 	}
 
 	txIntf, isValidator, err := vm.isValidator(vm.DB, constants.PrimaryNetworkID, vdrID)
 	if err != nil || !isValidator {
-		return false
+		return
 	}
 	tx, ok := txIntf.(*UnsignedAddValidatorTx)
 	if !ok {
-		return false
+		return
 	}
 
 	uptime, err := vm.uptime(vm.DB, vdrID)
@@ -861,7 +846,7 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
 			LastUpdated: uint64(tx.StartTime().Unix()),
 		}
 	case err != nil:
-		return false
+		return
 	}
 
 	if timeConnected.Before(vm.bootstrappedTime) {
@@ -875,7 +860,7 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
 
 	currentLocalTime := vm.clock.Time()
 	if !currentLocalTime.After(lastUpdated) {
-		return false
+		return
 	}
 
 	uptime.UpDuration += uint64(currentLocalTime.Sub(timeConnected) / time.Second)
@@ -887,7 +872,7 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) bool {
 	if err := vm.DB.Commit(); err != nil {
 		vm.Ctx.Log.Error("failed to commit database changes")
 	}
-	return false
+	return
 }
 
 // Check if there is a block ready to be added to consensus
@@ -1376,9 +1361,6 @@ func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 }
 
 func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTime time.Time) (float64, error) {
-	vm.uptimeLock.Lock()
-	defer vm.uptimeLock.Unlock()
-
 	uptime, err := vm.uptime(db, nodeID)
 	switch {
 	case err == database.ErrNotFound:

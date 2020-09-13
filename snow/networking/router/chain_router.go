@@ -19,6 +19,10 @@ const (
 	defaultCPUInterval = 5 * time.Second
 )
 
+var (
+	_ Router = &ChainRouter{}
+)
+
 // ChainRouter routes incoming messages from the validator network
 // to the consensus engines that the messages are intended for.
 // Note that consensus engines are uniquely identified by the ID of the chain
@@ -31,6 +35,7 @@ type ChainRouter struct {
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
+	peers            ids.ShortSet
 }
 
 // Initialize the router.
@@ -58,6 +63,35 @@ func (sr *ChainRouter) Initialize(
 	go log.RecoverAndPanic(sr.intervalNotifier.Dispatch)
 }
 
+// Shutdown shuts down this router
+func (sr *ChainRouter) Shutdown() {
+	sr.lock.Lock()
+	prevChains := sr.chains
+	sr.chains = map[[32]byte]*Handler{}
+	sr.lock.Unlock()
+
+	sr.gossiper.Stop()
+	sr.intervalNotifier.Stop()
+
+	for _, chain := range prevChains {
+		chain.Shutdown()
+	}
+
+	ticker := time.NewTicker(sr.closeTimeout)
+	timedout := false
+	for _, chain := range prevChains {
+		select {
+		case <-chain.closed:
+		case <-ticker.C:
+			timedout = true
+		}
+	}
+	if timedout {
+		sr.log.Warn("timed out while shutting down the chains")
+	}
+	ticker.Stop()
+}
+
 // AddChain registers the specified chain so that incoming
 // messages can be routed to it
 func (sr *ChainRouter) AddChain(chain *Handler) {
@@ -68,6 +102,10 @@ func (sr *ChainRouter) AddChain(chain *Handler) {
 	sr.log.Debug("registering chain %s with chain router", chainID)
 	chain.toClose = func() { sr.RemoveChain(chainID) }
 	sr.chains[chainID.Key()] = chain
+
+	for _, validatorID := range sr.peers.List() {
+		chain.Connected(validatorID)
+	}
 }
 
 // RemoveChain removes the specified chain so that incoming
@@ -335,39 +373,32 @@ func (sr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 }
 
-// Shutdown shuts down this router
-func (sr *ChainRouter) Shutdown() {
+// Connected routes an incoming notification that a validator was just connected
+func (sr *ChainRouter) Connected(validatorID ids.ShortID) {
 	sr.lock.Lock()
-	prevChains := sr.chains
-	sr.chains = map[[32]byte]*Handler{}
-	sr.lock.Unlock()
+	defer sr.lock.Unlock()
 
-	sr.gossiper.Stop()
-	sr.intervalNotifier.Stop()
+	sr.peers.Add(validatorID)
+	for _, chain := range sr.chains {
+		chain.Connected(validatorID)
+	}
+}
 
-	for _, chain := range prevChains {
-		chain.Shutdown()
-	}
+// Disconnected routes an incoming notification that a validator was connected
+func (sr *ChainRouter) Disconnected(validatorID ids.ShortID) {
+	sr.lock.Lock()
+	defer sr.lock.Unlock()
 
-	ticker := time.NewTicker(sr.closeTimeout)
-	timedout := false
-	for _, chain := range prevChains {
-		select {
-		case <-chain.closed:
-		case <-ticker.C:
-			timedout = true
-		}
+	sr.peers.Remove(validatorID)
+	for _, chain := range sr.chains {
+		chain.Disconnected(validatorID)
 	}
-	if timedout {
-		sr.log.Warn("timed out while shutting down the chains")
-	}
-	ticker.Stop()
 }
 
 // Gossip accepted containers
 func (sr *ChainRouter) Gossip() {
-	sr.lock.Lock()
-	defer sr.lock.Unlock()
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
 
 	for _, chain := range sr.chains {
 		chain.Gossip()
@@ -376,8 +407,8 @@ func (sr *ChainRouter) Gossip() {
 
 // EndInterval notifies the chains that the current CPU interval has ended
 func (sr *ChainRouter) EndInterval() {
-	sr.lock.Lock()
-	defer sr.lock.Unlock()
+	sr.lock.RLock()
+	defer sr.lock.RUnlock()
 
 	for _, chain := range sr.chains {
 		chain.endInterval()

@@ -3,12 +3,13 @@
 
 package validators
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 // Connector represents a handler that is called when a connection is marked as
 // connected or disconnected
 type Connector interface {
-	// returns true if the handler should be removed
-	Connected(id ids.ShortID) bool
-	Disconnected(id ids.ShortID) bool
+	Connected(id ids.ShortID)
+	Disconnected(id ids.ShortID)
 }
