@@ -281,6 +281,10 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 			sent = peer.send(msg)
 		}
 		if !sent {
+			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
+				vID,
+				chainID,
+				requestID)
 			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(vID, chainID, requestID) })
 			n.getAcceptedFrontier.numFailed.Inc()
 		} else {
