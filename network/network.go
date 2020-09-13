@@ -275,7 +275,7 @@ func NewNetwork(
 }
 
 type PeerElement struct {
-	peer *peer
+	peer        *peer
 	validatorId ids.ShortID
 }
 
@@ -337,7 +337,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
 	n.log.AssertNoError(err)
 
-	for _ , peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		sent := peerelement.peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
@@ -399,7 +399,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		return
 	}
 
-	for _ , peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		sent := peerelement.peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
@@ -573,7 +573,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		return // Packing message failed
 	}
 
-	for _ , peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		sent := peerelement.peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
@@ -595,7 +595,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
 
-	for _ , peerelement := range n.getPeers(validatorIDs) {
+	for _, peerelement := range n.getPeers(validatorIDs) {
 		sent := peerelement.peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
@@ -678,8 +678,8 @@ func (n *network) Dispatch() error {
 			return err
 		}
 		go n.upgrade(&peer{
-			net:  n,
-			conn: conn,
+			net:          n,
+			conn:         conn,
 			pendingBytes: new(int64),
 		}, n.serverUpgrader)
 	}
@@ -688,7 +688,7 @@ func (n *network) Dispatch() error {
 // IPs implements the Network interface
 func (n *network) Peers() []PeerID {
 	peers := []PeerID{}
-	for _,peerelement := range n.getAllPeers() {
+	for _, peerelement := range n.getAllPeers() {
 		peer := peerelement.peer
 		if peer.connected {
 			peers = append(peers, PeerID{
@@ -747,7 +747,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 	}
 
 	allPeers := make([]*peer, 0, len(n.peers))
-	for _,peerelement := range n.getAllPeers() {
+	for _, peerelement := range n.getAllPeers() {
 		allPeers = append(allPeers, peerelement.peer)
 	}
 
@@ -940,9 +940,9 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 		return err
 	}
 	return n.upgrade(&peer{
-		net:  n,
-		ip:   ip,
-		conn: conn,
+		net:          n,
+		ip:           ip,
+		conn:         conn,
 		pendingBytes: new(int64),
 	}, n.clientUpgrader)
 }

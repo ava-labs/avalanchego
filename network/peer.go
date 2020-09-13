@@ -215,7 +215,7 @@ func (p *peer) send(msg Msg) bool {
 	}
 
 	msgBytes := msg.Bytes()
-	msgBytesLen :=  int64(len(msgBytes))
+	msgBytesLen := int64(len(msgBytes))
 	newPendingBytes := *p.net.pendingBytes + msgBytesLen
 	newConnPendingBytes := *p.pendingBytes + msgBytesLen
 	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
