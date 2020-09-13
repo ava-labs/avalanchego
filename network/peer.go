@@ -218,8 +218,8 @@ func (p *peer) send(msg Msg) bool {
 
 	msgBytes := msg.Bytes()
 	msgBytesLen := int64(len(msgBytes))
-	newPendingBytes := p.net.pendingBytes + msgBytesLen
-	newConnPendingBytes := p.pendingBytes + msgBytesLen
+	newPendingBytes := atomic.LoadInt64(&p.net.pendingBytes) + msgBytesLen
+	newConnPendingBytes := atomic.LoadInt64(&p.pendingBytes) + msgBytesLen
 	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
@@ -312,7 +312,7 @@ func (p *peer) handle(msg Msg) {
 
 func (p *peer) dropMessage(msgLen int, connPendingLen, networkPendingLen int64) bool {
 	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		p.pendingBytes > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		atomic.LoadInt64(&p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
 		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
 			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
 }
