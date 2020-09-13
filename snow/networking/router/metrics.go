@@ -41,6 +41,7 @@ type metrics struct {
 	getAncestors, multiPut, getAncestorsFailed,
 	get, put, getFailed,
 	pushQuery, pullQuery, chits, queryFailed,
+	connected, disconnected,
 	notify,
 	gossip,
 	cpu,
@@ -106,6 +107,8 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	m.pullQuery = initHistogram(namespace, "pull_query", registerer, &errs)
 	m.chits = initHistogram(namespace, "chits", registerer, &errs)
 	m.queryFailed = initHistogram(namespace, "query_failed", registerer, &errs)
+	m.connected = initHistogram(namespace, "connected", registerer, &errs)
+	m.disconnected = initHistogram(namespace, "disconnected", registerer, &errs)
 	m.notify = initHistogram(namespace, "notify", registerer, &errs)
 	m.gossip = initHistogram(namespace, "gossip", registerer, &errs)
 

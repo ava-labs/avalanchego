@@ -72,12 +72,6 @@ type Network interface {
 	// IP.
 	Track(ip utils.IPDesc)
 
-	// Register a new connector that is called whenever a peer is connected to
-	// or disconnected from. If the connector returns true, then it will never
-	// be called again. Thread safety must be managed internally in the network.
-	// The handler will initially be called with this local node's ID.
-	RegisterConnector(h validators.Connector)
-
 	// Returns the description of the nodes this network is currently connected
 	// to externally. Thread safety must be managed internally to the network.
 	Peers() []PeerID
@@ -138,9 +132,8 @@ type network struct {
 	connectedIPs    map[string]struct{}
 	retryDelay      map[string]time.Duration
 	// TODO: bound the size of [myIPs] to avoid DoS. LRU caching would be ideal
-	myIPs    map[string]struct{} // set of IPs that resulted in my ID.
-	peers    map[[20]byte]*peer
-	handlers []validators.Connector
+	myIPs map[string]struct{} // set of IPs that resulted in my ID.
+	peers map[[20]byte]*peer
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -288,6 +281,10 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 			sent = peer.send(msg)
 		}
 		if !sent {
+			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
+				vID,
+				chainID,
+				requestID)
 			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(vID, chainID, requestID) })
 			n.getAcceptedFrontier.numFailed.Inc()
 		} else {
@@ -653,24 +650,6 @@ func (n *network) Dispatch() error {
 			conn: conn,
 		}, n.serverUpgrader)
 	}
-}
-
-// RegisterConnector implements the Network interface
-func (n *network) RegisterConnector(h validators.Connector) {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
-	if h.Connected(n.id) {
-		return
-	}
-	for _, peer := range n.peers {
-		if peer.connected {
-			if h.Connected(peer.id) {
-				return
-			}
-		}
-	}
-	n.handlers = append(n.handlers, h)
 }
 
 // IPs implements the Network interface
@@ -1039,15 +1018,7 @@ func (n *network) connected(p *peer) {
 		n.connectedIPs[str] = struct{}{}
 	}
 
-	for i := 0; i < len(n.handlers); {
-		if n.handlers[i].Connected(p.id) {
-			newLen := len(n.handlers) - 1
-			n.handlers[i] = n.handlers[newLen] // remove the current handler
-			n.handlers = n.handlers[:newLen]
-		} else {
-			i++
-		}
-	}
+	n.router.Connected(p.id)
 }
 
 // assumes the stateLock is held when called
@@ -1068,14 +1039,6 @@ func (n *network) disconnected(p *peer) {
 	}
 
 	if p.connected {
-		for i := 0; i < len(n.handlers); {
-			if n.handlers[i].Disconnected(p.id) {
-				newLen := len(n.handlers) - 1
-				n.handlers[i] = n.handlers[newLen] // remove the current handler
-				n.handlers = n.handlers[:newLen]
-			} else {
-				i++
-			}
-		}
+		n.router.Disconnected(p.id)
 	}
 }

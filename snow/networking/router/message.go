@@ -30,6 +30,8 @@ const (
 	pullQueryMsg
 	chitsMsg
 	queryFailedMsg
+	connectedMsg
+	disconnectedMsg
 	notifyMsg
 	gossipMsg
 	getAncestorsMsg
@@ -60,9 +62,14 @@ func (m message) String() string {
 	sb.WriteString(fmt.Sprintf("\n    messageType: %s", m.messageType))
 	sb.WriteString(fmt.Sprintf("\n    validatorID: %s", m.validatorID))
 	sb.WriteString(fmt.Sprintf("\n    requestID: %d", m.requestID))
-	sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
-	sb.WriteString(fmt.Sprintf("\n    containerIDs: %s", m.containerIDs))
-	if m.messageType == notifyMsg {
+	switch m.messageType {
+	case getAcceptedMsg, acceptedMsg, chitsMsg:
+		sb.WriteString(fmt.Sprintf("\n    containerIDs: %s", m.containerIDs))
+	case getMsg, getAncestorsMsg, putMsg, pushQueryMsg, pullQueryMsg:
+		sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
+	case multiPutMsg:
+		sb.WriteString(fmt.Sprintf("\n    numContainers: %d", len(m.containers)))
+	case notifyMsg:
 		sb.WriteString(fmt.Sprintf("\n    notification: %s", m.notification))
 	}
 	if !m.deadline.IsZero() {
@@ -107,6 +114,10 @@ func (t msgType) String() string {
 		return "Chits Message"
 	case queryFailedMsg:
 		return "Query Failed Message"
+	case connectedMsg:
+		return "Connected Message"
+	case disconnectedMsg:
+		return "Disconnected Message"
 	case notifyMsg:
 		return "Notify Message"
 	case gossipMsg:
