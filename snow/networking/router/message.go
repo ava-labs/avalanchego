@@ -30,6 +30,8 @@ const (
 	pullQueryMsg
 	chitsMsg
 	queryFailedMsg
+	connectedMsg
+	disconnectedMsg
 	notifyMsg
 	gossipMsg
 	getAncestorsMsg
@@ -112,6 +114,10 @@ func (t msgType) String() string {
 		return "Chits Message"
 	case queryFailedMsg:
 		return "Query Failed Message"
+	case connectedMsg:
+		return "Connected Message"
+	case disconnectedMsg:
+		return "Disconnected Message"
 	case notifyMsg:
 		return "Notify Message"
 	case gossipMsg:
