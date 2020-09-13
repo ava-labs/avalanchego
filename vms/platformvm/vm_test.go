@@ -1666,6 +1666,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	sender.Initialize(ctx, externalSender, chainRouter, &timeoutManager)
 
+	reqID := new(uint32)
+	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
+		*reqID = requestID
+	}
+
 	// The engine handles consensus
 	engine := smeng.Transitive{}
 	engine.Initialize(smeng.Config{
@@ -1708,13 +1713,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
-
-	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time) {
-		*reqID = requestID
-	}
-
-	engine.Startup()
 
 	externalSender.GetAcceptedFrontierF = nil
 	externalSender.GetAcceptedF = func(_ ids.ShortSet, _ ids.ID, requestID uint32, _ time.Time, _ ids.Set) {

@@ -141,15 +141,20 @@ func (c *testConn) SetReadDeadline(time.Time) error  { return nil }
 func (c *testConn) SetWriteDeadline(time.Time) error { return nil }
 
 type testHandler struct {
-	connected    func(ids.ShortID) bool
-	disconnected func(ids.ShortID) bool
+	router.Router
+	connected    func(ids.ShortID)
+	disconnected func(ids.ShortID)
 }
 
-func (h *testHandler) Connected(id ids.ShortID) bool {
-	return h.connected != nil && h.connected(id)
+func (h *testHandler) Connected(id ids.ShortID) {
+	if h.connected != nil {
+		h.connected(id)
+	}
 }
-func (h *testHandler) Disconnected(id ids.ShortID) bool {
-	return h.disconnected != nil && h.disconnected(id)
+func (h *testHandler) Disconnected(id ids.ShortID) {
+	if h.disconnected != nil {
+		h.disconnected(id)
+	}
 }
 
 func TestNewDefaultNetwork(t *testing.T) {
@@ -266,7 +271,29 @@ func TestEstablishConnection(t *testing.T) {
 	clientUpgrader := NewIPUpgrader()
 
 	vdrs := validators.NewSet()
-	handler := router.Router(nil)
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+	)
+	wg0.Add(1)
+	wg1.Add(1)
+
+	handler0 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id0) {
+				wg0.Done()
+			}
+		},
+	}
+
+	handler1 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id1) {
+				wg1.Done()
+			}
+		},
+	}
 
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
@@ -282,7 +309,7 @@ func TestEstablishConnection(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler0,
 	)
 	assert.NotNil(t, net0)
 
@@ -300,36 +327,9 @@ func TestEstablishConnection(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler1,
 	)
 	assert.NotNil(t, net1)
-
-	var (
-		wg0 sync.WaitGroup
-		wg1 sync.WaitGroup
-	)
-	wg0.Add(1)
-	wg1.Add(1)
-
-	h0 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id0) {
-				wg0.Done()
-			}
-			return false
-		},
-	}
-	h1 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id1) {
-				wg1.Done()
-			}
-			return false
-		},
-	}
-
-	net0.RegisterConnector(h0)
-	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -407,7 +407,29 @@ func TestDoubleTrack(t *testing.T) {
 	clientUpgrader := NewIPUpgrader()
 
 	vdrs := validators.NewSet()
-	handler := router.Router(nil)
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+	)
+	wg0.Add(1)
+	wg1.Add(1)
+
+	handler0 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id0) {
+				wg0.Done()
+			}
+		},
+	}
+
+	handler1 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id1) {
+				wg1.Done()
+			}
+		},
+	}
 
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
@@ -423,7 +445,7 @@ func TestDoubleTrack(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler0,
 	)
 	assert.NotNil(t, net0)
 
@@ -441,36 +463,9 @@ func TestDoubleTrack(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler1,
 	)
 	assert.NotNil(t, net1)
-
-	var (
-		wg0 sync.WaitGroup
-		wg1 sync.WaitGroup
-	)
-	wg0.Add(1)
-	wg1.Add(1)
-
-	h0 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id0) {
-				wg0.Done()
-			}
-			return false
-		},
-	}
-	h1 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id1) {
-				wg1.Done()
-			}
-			return false
-		},
-	}
-
-	net0.RegisterConnector(h0)
-	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 	net0.Track(ip1)
@@ -549,7 +544,29 @@ func TestDoubleClose(t *testing.T) {
 	clientUpgrader := NewIPUpgrader()
 
 	vdrs := validators.NewSet()
-	handler := router.Router(nil)
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+	)
+	wg0.Add(1)
+	wg1.Add(1)
+
+	handler0 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id0) {
+				wg0.Done()
+			}
+		},
+	}
+
+	handler1 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id1) {
+				wg1.Done()
+			}
+		},
+	}
 
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
@@ -565,7 +582,7 @@ func TestDoubleClose(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler0,
 	)
 	assert.NotNil(t, net0)
 
@@ -583,36 +600,9 @@ func TestDoubleClose(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler1,
 	)
 	assert.NotNil(t, net1)
-
-	var (
-		wg0 sync.WaitGroup
-		wg1 sync.WaitGroup
-	)
-	wg0.Add(1)
-	wg1.Add(1)
-
-	h0 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id0) {
-				wg0.Done()
-			}
-			return false
-		},
-	}
-	h1 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id1) {
-				wg1.Done()
-			}
-			return false
-		},
-	}
-
-	net0.RegisterConnector(h0)
-	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
@@ -635,162 +625,6 @@ func TestDoubleClose(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = net0.Close()
-	assert.NoError(t, err)
-
-	err = net1.Close()
-	assert.NoError(t, err)
-}
-
-func TestRemoveHandlers(t *testing.T) {
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
-
-	ip0 := utils.IPDesc{
-		IP:   net.IPv6loopback,
-		Port: 0,
-	}
-	id0 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip0.String())))
-	ip1 := utils.IPDesc{
-		IP:   net.IPv6loopback,
-		Port: 1,
-	}
-	id1 := ids.NewShortID(hashing.ComputeHash160Array([]byte(ip1.String())))
-
-	listener0 := &testListener{
-		addr: &net.TCPAddr{
-			IP:   net.IPv6loopback,
-			Port: 0,
-		},
-		inbound: make(chan net.Conn, 1<<10),
-		closed:  make(chan struct{}),
-	}
-	caller0 := &testDialer{
-		addr: &net.TCPAddr{
-			IP:   net.IPv6loopback,
-			Port: 0,
-		},
-		outbounds: make(map[string]*testListener),
-	}
-	listener1 := &testListener{
-		addr: &net.TCPAddr{
-			IP:   net.IPv6loopback,
-			Port: 1,
-		},
-		inbound: make(chan net.Conn, 1<<10),
-		closed:  make(chan struct{}),
-	}
-	caller1 := &testDialer{
-		addr: &net.TCPAddr{
-			IP:   net.IPv6loopback,
-			Port: 1,
-		},
-		outbounds: make(map[string]*testListener),
-	}
-
-	caller0.outbounds[ip1.String()] = listener1
-	caller1.outbounds[ip0.String()] = listener0
-
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
-
-	vdrs := validators.NewSet()
-	handler := router.Router(nil)
-
-	net0 := NewDefaultNetwork(
-		prometheus.NewRegistry(),
-		log,
-		id0,
-		ip0,
-		networkID,
-		appVersion,
-		versionParser,
-		listener0,
-		caller0,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
-		handler,
-	)
-	assert.NotNil(t, net0)
-
-	net1 := NewDefaultNetwork(
-		prometheus.NewRegistry(),
-		log,
-		id1,
-		ip1,
-		networkID,
-		appVersion,
-		versionParser,
-		listener1,
-		caller1,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
-		handler,
-	)
-	assert.NotNil(t, net1)
-
-	var (
-		wg0 sync.WaitGroup
-		wg1 sync.WaitGroup
-	)
-	wg0.Add(1)
-	wg1.Add(1)
-
-	h0 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id0) {
-				wg0.Done()
-			}
-			return false
-		},
-	}
-	h1 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id1) {
-				wg1.Done()
-			}
-			return false
-		},
-	}
-
-	net0.RegisterConnector(h0)
-	net1.RegisterConnector(h1)
-
-	net0.Track(ip1)
-
-	go func() {
-		err := net0.Dispatch()
-		assert.Error(t, err)
-	}()
-	go func() {
-		err := net1.Dispatch()
-		assert.Error(t, err)
-	}()
-
-	wg0.Wait()
-	wg1.Wait()
-
-	h3 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			assert.Equal(t, id0, id)
-			return true
-		},
-	}
-	h4 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			return id.Equals(id0)
-		},
-	}
-
-	net0.RegisterConnector(h3)
-	net1.RegisterConnector(h4)
-
-	err := net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -852,7 +686,29 @@ func TestTrackConnected(t *testing.T) {
 	clientUpgrader := NewIPUpgrader()
 
 	vdrs := validators.NewSet()
-	handler := router.Router(nil)
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+	)
+	wg0.Add(1)
+	wg1.Add(1)
+
+	handler0 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id0) {
+				wg0.Done()
+			}
+		},
+	}
+
+	handler1 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if !id.Equals(id1) {
+				wg1.Done()
+			}
+		},
+	}
 
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
@@ -868,7 +724,7 @@ func TestTrackConnected(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler0,
 	)
 	assert.NotNil(t, net0)
 
@@ -886,36 +742,9 @@ func TestTrackConnected(t *testing.T) {
 		clientUpgrader,
 		vdrs,
 		vdrs,
-		handler,
+		handler1,
 	)
 	assert.NotNil(t, net1)
-
-	var (
-		wg0 sync.WaitGroup
-		wg1 sync.WaitGroup
-	)
-	wg0.Add(1)
-	wg1.Add(1)
-
-	h0 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id0) {
-				wg0.Done()
-			}
-			return false
-		},
-	}
-	h1 := &testHandler{
-		connected: func(id ids.ShortID) bool {
-			if !id.Equals(id1) {
-				wg1.Done()
-			}
-			return false
-		},
-	}
-
-	net0.RegisterConnector(h0)
-	net1.RegisterConnector(h1)
 
 	net0.Track(ip1)
 
