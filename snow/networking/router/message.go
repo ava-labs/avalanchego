@@ -61,24 +61,12 @@ func (m message) String() string {
 	sb.WriteString(fmt.Sprintf("\n    validatorID: %s", m.validatorID))
 	sb.WriteString(fmt.Sprintf("\n    requestID: %d", m.requestID))
 	switch m.messageType {
-	case getAcceptedMsg:
+	case getAcceptedMsg, acceptedMsg, chitsMsg:
 		sb.WriteString(fmt.Sprintf("\n    containerIDs: %s", m.containerIDs))
-	case acceptedMsg:
-		sb.WriteString(fmt.Sprintf("\n    containerIDs: %s", m.containerIDs))
-	case getMsg:
-		sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
-	case getAncestorsMsg:
-		sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
-	case putMsg:
+	case getMsg, getAncestorsMsg, putMsg, pushQueryMsg, pullQueryMsg:
 		sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
 	case multiPutMsg:
 		sb.WriteString(fmt.Sprintf("\n    numContainers: %d", len(m.containers)))
-	case pushQueryMsg:
-		sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
-	case pullQueryMsg:
-		sb.WriteString(fmt.Sprintf("\n    containerID: %s", m.containerID))
-	case chitsMsg:
-		sb.WriteString(fmt.Sprintf("\n    containerIDs: %s", m.containerIDs))
 	case notifyMsg:
 		sb.WriteString(fmt.Sprintf("\n    notification: %s", m.notification))
 	}
