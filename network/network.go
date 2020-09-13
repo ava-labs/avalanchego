@@ -269,6 +269,7 @@ func NewNetwork(
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
 	netw.executor.Initialize()
+	go netw.executor.Dispatch()
 	netw.heartbeat()
 	return netw
 }
