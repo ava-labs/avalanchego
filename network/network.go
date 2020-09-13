@@ -619,8 +619,8 @@ func (n *network) Dispatch() error {
 			return err
 		}
 		go n.upgrade(&peer{
-			net:          n,
-			conn:         conn,
+			net:  n,
+			conn: conn,
 		}, n.serverUpgrader)
 	}
 }
@@ -880,9 +880,9 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 		return err
 	}
 	return n.upgrade(&peer{
-		net:          n,
-		ip:           ip,
-		conn:         conn,
+		net:  n,
+		ip:   ip,
+		conn: conn,
 	}, n.clientUpgrader)
 }
 
