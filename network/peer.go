@@ -207,8 +207,10 @@ func (p *peer) Send(msg Msg) bool {
 	return p.send(msg)
 }
 
-// send assumes that the stateLock is held.
 func (p *peer) send(msg Msg) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	if p.closed {
 		p.net.log.Debug("dropping message to %s due to a closed connection", p.id)
 		return false
@@ -329,6 +331,9 @@ func (p *peer) close() {
 
 	p.closed = true
 	close(p.sender)
+
+	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
 	p.net.disconnected(p)
 }
 
