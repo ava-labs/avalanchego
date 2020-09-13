@@ -6,44 +6,51 @@ package main
 import (
 	"bufio"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"math"
 	"math/big"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/ava-labs/avalanche-go/utils/constants"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-type lockedAmount struct {
-	amount   uint64
-	locktime uint64
+// LockedAmount ...
+type LockedAmount struct {
+	Amount   uint64 `json:"amount"`
+	Locktime uint64 `json:"locktime"`
 }
 
-type allocation struct {
-	ethAddr        ids.ShortID
-	avaxAddr       ids.ShortID
-	initialAmount  uint64
-	unlockSchedule []lockedAmount
+// Allocation ...
+type Allocation struct {
+	ETHAddr        ids.ShortID    `json:"ethAddr"`
+	AVAXAddr       ids.ShortID    `json:"avaxAddr"`
+	InitialAmount  uint64         `json:"initialAmount"`
+	UnlockSchedule []LockedAmount `json:"unlockSchedule"`
 }
 
 // Config contains the genesis addresses used to construct a genesis
 type Config struct {
-	NetworkID uint32
+	NetworkID uint32 `json:"networkID"`
 
-	Allocations []allocation
+	Allocations []Allocation `json:"allocations"`
 
-	StartTime             uint64
-	InitialStakeAmount    uint64
-	InitialStakeDuration  uint64
-	InitialStakeAddresses []ids.ShortID
+	StartTime             uint64        `json:"startTime"`
+	InitialStakeAmount    uint64        `json:"initialStakeAmount"`
+	InitialStakeDuration  uint64        `json:"initialStakeDuration"`
+	InitialStakeAddresses []ids.ShortID `json:"initialStakeAddresses"`
 
-	CChainGenesis []byte
+	CChainGenesis []byte `json:"cChainGenesis"`
 
-	Message string
+	Message string `json:"message"`
 }
 
 func main() {
@@ -53,68 +60,85 @@ func main() {
 	}
 	defer file.Close()
 
+	c := &Config{
+		NetworkID: constants.MainnetID,
+		StartTime: math.MaxUint64,
+		Message:   "Behind the Vast Market Rally: A Tumbling Dollar.",
+	}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		ethAddr, avaxAddr, initialUnlock, unlockSchedule, err := parseLine(line)
 		if err != nil {
-			fmt.Println()
-			fmt.Println(line)
-			fmt.Println(err)
-			fmt.Println()
+			log.Fatal(line, err)
 		}
-		// fmt.Println(ethAddr, avaxAddr, initialUnlock, unlockSchedule)
-		_, _, _, _ = ethAddr, avaxAddr, initialUnlock, unlockSchedule
+		c.Allocations = append(c.Allocations, Allocation{
+			ETHAddr:        ethAddr,
+			AVAXAddr:       avaxAddr,
+			InitialAmount:  initialUnlock.Amount,
+			UnlockSchedule: unlockSchedule,
+		})
+		if c.StartTime > initialUnlock.Locktime {
+			c.StartTime = initialUnlock.Locktime
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
 	}
 
-	if err := scanner.Err(); err != nil {
+	configString, err := json.MarshalIndent(c, "", "    ")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := ioutil.WriteFile("./final_gv.json", configString, 0644); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func parseLine(line string) (ids.ShortID, ids.ShortID, lockedAmount, []lockedAmount, error) {
+func parseLine(line string) (ids.ShortID, ids.ShortID, LockedAmount, []LockedAmount, error) {
 	triple := strings.SplitN(line, "', ", 3)
 	ethAddrString := triple[0][4:]
 	ethAddrBytes, err := hex.DecodeString(ethAddrString)
 	if err != nil {
-		return ids.ShortID{}, ids.ShortID{}, lockedAmount{}, nil, err
+		return ids.ShortID{}, ids.ShortID{}, LockedAmount{}, nil, err
 	}
 	ethAddr, err := ids.ToShortID(ethAddrBytes)
 	if err != nil {
-		return ids.ShortID{}, ids.ShortID{}, lockedAmount{}, nil, err
+		return ids.ShortID{}, ids.ShortID{}, LockedAmount{}, nil, err
 	}
 
 	avaxAddrString := triple[1][1:]
 	_, _, avaxAddrBytes, err := formatting.ParseAddress(avaxAddrString)
 	if err != nil {
-		return ids.ShortID{}, ids.ShortID{}, lockedAmount{}, nil, err
+		return ids.ShortID{}, ids.ShortID{}, LockedAmount{}, nil, err
 	}
 	avaxAddr, err := ids.ToShortID(avaxAddrBytes)
 	if err != nil {
-		return ids.ShortID{}, ids.ShortID{}, lockedAmount{}, nil, err
+		return ids.ShortID{}, ids.ShortID{}, LockedAmount{}, nil, err
 	}
 
 	unlockScheduleString := triple[2][2 : len(triple[2])-3]
 	unlockScheduleStringArray := strings.Split(unlockScheduleString, "), (")
-	unlockSchedule := make([]lockedAmount, len(unlockScheduleStringArray))
+	unlockSchedule := make([]LockedAmount, len(unlockScheduleStringArray))
 	for i, periodString := range unlockScheduleStringArray {
 		periodStringArray := strings.Split(periodString, ", ")
 		amount, ok := new(big.Float).SetString(periodStringArray[0])
 		if !ok {
-			return ids.ShortID{}, ids.ShortID{}, lockedAmount{}, nil, fmt.Errorf("invalid float: %s", periodStringArray[0])
+			return ids.ShortID{}, ids.ShortID{}, LockedAmount{}, nil, fmt.Errorf("invalid float: %s", periodStringArray[0])
 		}
 		locktime, err := strconv.ParseUint(periodStringArray[1], 10, 64)
 		if err != nil {
-			return ids.ShortID{}, ids.ShortID{}, lockedAmount{}, nil, err
+			return ids.ShortID{}, ids.ShortID{}, LockedAmount{}, nil, err
 		}
 
 		rawAmount, precision := new(big.Float).Mul(amount, new(big.Float).SetUint64(units.Avax)).Uint64()
 		if precision != big.Exact {
-			return ids.ShortID{}, ids.ShortID{}, lockedAmount{}, nil, fmt.Errorf("non-specific amount provided: %s", periodStringArray[0])
+			return ids.ShortID{}, ids.ShortID{}, LockedAmount{}, nil, fmt.Errorf("non-specific amount provided: %s", periodStringArray[0])
 		}
-		unlockSchedule[i] = lockedAmount{
-			amount:   rawAmount,
-			locktime: locktime,
+		unlockSchedule[i] = LockedAmount{
+			Amount:   rawAmount,
+			Locktime: locktime,
 		}
 	}
 	return ethAddr, avaxAddr, unlockSchedule[0], unlockSchedule[1:], nil

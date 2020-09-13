@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
 	github.com/Microsoft/go-winio v0.4.14
+	github.com/ava-labs/avalanche-go v0.8.0-beta
 	github.com/ava-labs/coreth v0.2.15-rc.2 // indirect
 	github.com/ava-labs/go-ethereum v1.9.3
 	github.com/btcsuite/btcutil v1.0.2
