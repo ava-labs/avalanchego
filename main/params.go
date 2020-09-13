@@ -194,7 +194,7 @@ func init() {
 	fs.BoolVar(&Config.HTTPSEnabled, "http-tls-enabled", false, "Upgrade the HTTP server to HTTPs")
 	fs.StringVar(&Config.HTTPSKeyFile, "http-tls-key-file", "", "TLS private key file for the HTTPs server")
 	fs.StringVar(&Config.HTTPSCertFile, "http-tls-cert-file", "", "TLS certificate file for the HTTPs server")
-	fs.BoolVar(&Config.APIRequireAuthToken, "api-require-auth", false, "Require authorization token to call HTTP APIs")
+	fs.BoolVar(&Config.APIRequireAuthToken, "api-auth-required", false, "Require authorization token to call HTTP APIs")
 	fs.StringVar(&Config.APIAuthPassword, "api-auth-password", "", "Password used to create/validate API authorization tokens. Can be changed via API call.")
 
 	// Bootstrapping:
@@ -427,7 +427,7 @@ func init() {
 	Config.HTTPPort = uint16(*httpPort)
 	if Config.APIRequireAuthToken {
 		if Config.APIAuthPassword == "" {
-			errs.Add(errors.New("api-auth-password must be provided if api-require-auth is true"))
+			errs.Add(errors.New("api-auth-password must be provided if api-auth-required is true"))
 			return
 		}
 		if !password.SufficientlyStrong(Config.APIAuthPassword, password.OK) {
