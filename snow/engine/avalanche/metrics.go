@@ -53,6 +53,7 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		registerer.Register(m.numVtxRequests),
 		registerer.Register(m.numPendingVts),
 		registerer.Register(m.numMissingTxs),
+		registerer.Register(m.getAncestorsVtxs),
 	)
 	return errs.Err
 }
