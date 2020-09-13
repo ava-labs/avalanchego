@@ -394,26 +394,26 @@ func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
 }
 
 // PushQuery passes a PushQuery message received from the network to the consensus engine.
-func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID, block []byte) bool {
+func (h *Handler) PushQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType: pushQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		deadline:    deadline,
-		containerID: blockID,
-		container:   block,
+		containerID: containerID,
+		container:   container,
 		received:    h.clock.Time(),
 	})
 }
 
 // PullQuery passes a PullQuery message received from the network to the consensus engine.
-func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, blockID ids.ID) bool {
+func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerID ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType: pullQueryMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
 		deadline:    deadline,
-		containerID: blockID,
+		containerID: containerID,
 		received:    h.clock.Time(),
 	})
 }
