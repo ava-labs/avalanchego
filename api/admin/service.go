@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -19,6 +20,9 @@ import (
 
 const (
 	maxAliasLength = 512
+
+	// Name of file that stacktraces are written to
+	stacktraceFile = "stacktrace.txt"
 )
 
 var (
@@ -124,15 +128,11 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
 }
 
-// StacktraceReply are the results from calling Stacktrace
-type StacktraceReply struct {
-	Stacktrace string `json:"stacktrace"`
-}
-
 // Stacktrace returns the current global stacktrace
-func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *StacktraceReply) error {
+func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: Stacktrace called")
 
-	reply.Stacktrace = logging.Stacktrace{Global: true}.String()
-	return nil
+	reply.Success = true
+	stacktrace := []byte(logging.Stacktrace{Global: true}.String())
+	return ioutil.WriteFile(stacktraceFile, stacktrace, 0644)
 }
