@@ -322,12 +322,12 @@ func (p *peer) Close() { p.once.Do(p.close) }
 
 // assumes only `peer.Close` calls this
 func (p *peer) close() {
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
-
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
 	}
+
+	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
 
 	p.closed = true
 	close(p.sender)
