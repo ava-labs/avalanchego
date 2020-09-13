@@ -12,7 +12,11 @@ func TestExecutor(t *testing.T) {
 		called <- struct{}{}
 	}
 	executor.Add(f)
+	// The second call to f will block until the channel has
+	// been read from, but that should not cause Add to block
+	executor.Add(f)
 
+	<-called
 	<-called
 	executor.Stop()
 }

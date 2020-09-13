@@ -9,11 +9,12 @@ import (
 
 // Executor ...
 type Executor struct {
-	lock     sync.Mutex
-	cond     *sync.Cond
-	wg       sync.WaitGroup
-	finished bool
-	events   []func()
+	lock       sync.Mutex
+	cond       *sync.Cond
+	wg         sync.WaitGroup
+	finished   bool
+	eventsLock sync.RWMutex
+	events     []func()
 }
 
 // Initialize ...
@@ -24,10 +25,9 @@ func (e *Executor) Initialize() {
 
 // Add new function to call
 func (e *Executor) Add(event func()) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
+	e.eventsLock.Lock()
 	e.events = append(e.events, event)
+	e.eventsLock.Unlock()
 	e.cond.Signal()
 }
 
@@ -50,11 +50,14 @@ func (e *Executor) Dispatch() {
 	defer e.wg.Done()
 
 	for !e.finished {
+		e.eventsLock.Lock()
 		if len(e.events) == 0 {
+			e.eventsLock.Unlock()
 			e.cond.Wait()
 		} else {
 			event := e.events[0]
 			e.events = e.events[1:]
+			e.eventsLock.Unlock()
 
 			e.lock.Unlock()
 			event()
