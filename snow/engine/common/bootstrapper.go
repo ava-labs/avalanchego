@@ -45,7 +45,8 @@ type Bootstrapper struct {
 	acceptedVotes   map[[32]byte]uint64
 
 	// current weight
-	weight uint64
+	started bool
+	weight  uint64
 }
 
 // Initialize implements the Engine interface.
@@ -67,6 +68,7 @@ func (b *Bootstrapper) Initialize(config Config) error {
 
 // Startup implements the Engine interface.
 func (b *Bootstrapper) Startup() error {
+	b.started = true
 	if b.pendingAcceptedFrontier.Len() == 0 {
 		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
 		return b.Bootstrapable.ForceAccepted(ids.Set{})
@@ -180,6 +182,9 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
+	if b.started {
+		return nil
+	}
 	weight, ok := b.Beacons.GetWeight(validatorID)
 	if !ok {
 		return nil
