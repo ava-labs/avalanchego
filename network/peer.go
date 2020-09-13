@@ -73,9 +73,9 @@ func (p *peer) sendPings() {
 	defer t.Stop()
 
 	for range t.C {
-		p.net.stateLock.Lock()
+		p.lock.Lock()
 		closed := p.closed
-		p.net.stateLock.Unlock()
+		p.lock.Unlock()
 
 		if closed {
 			return
@@ -91,10 +91,10 @@ func (p *peer) requestVersion() {
 	defer t.Stop()
 
 	for range t.C {
-		p.net.stateLock.Lock()
+		p.lock.Lock()
 		connected := p.connected
 		closed := p.closed
-		p.net.stateLock.Unlock()
+		p.lock.Unlock()
 
 		if connected || closed {
 			return

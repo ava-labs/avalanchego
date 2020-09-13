@@ -274,64 +274,6 @@ func NewNetwork(
 	return netw
 }
 
-type PeerElement struct {
-	peer        *peer
-	validatorId ids.ShortID
-}
-
-func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
-	peers := make([]PeerElement, 0, 2)
-
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
-	if n.closed {
-		return peers
-	}
-
-	for _, validatorID := range validatorIDs.List() {
-		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			peers = append(peers, PeerElement{peer, vID})
-		}
-	}
-
-	return peers
-}
-
-func (n *network) getAllPeers() []PeerElement {
-	peers := make([]PeerElement, 0, 2)
-
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
-	if n.closed {
-		return peers
-	}
-
-	for _, peer := range n.peers {
-		peers = append(peers, PeerElement{peer, ids.ShortID{}})
-	}
-
-	return peers
-}
-
-func (n *network) getPeer(validatorID ids.ShortID) PeerElement {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
-	if n.closed {
-		return PeerElement{nil, validatorID}
-	}
-
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		return PeerElement{peer, validatorID}
-	}
-	return PeerElement{nil, validatorID}
-}
-
 // GetAcceptedFrontier implements the Sender interface.
 func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Time) {
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
@@ -1066,4 +1008,62 @@ func (n *network) disconnected(p *peer) {
 	if p.connected {
 		n.router.Disconnected(p.id)
 	}
+}
+
+type PeerElement struct {
+	peer        *peer
+	validatorId ids.ShortID
+}
+
+func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
+	peers := make([]PeerElement, 0, 2)
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	if n.closed {
+		return peers
+	}
+
+	for _, validatorID := range validatorIDs.List() {
+		vID := validatorID
+		peer, sent := n.peers[vID.Key()]
+		if sent {
+			peers = append(peers, PeerElement{peer, vID})
+		}
+	}
+
+	return peers
+}
+
+func (n *network) getAllPeers() []PeerElement {
+	peers := make([]PeerElement, 0, 2)
+
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	if n.closed {
+		return peers
+	}
+
+	for _, peer := range n.peers {
+		peers = append(peers, PeerElement{peer, ids.ShortID{}})
+	}
+
+	return peers
+}
+
+func (n *network) getPeer(validatorID ids.ShortID) PeerElement {
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
+
+	if n.closed {
+		return PeerElement{nil, validatorID}
+	}
+
+	peer, sent := n.peers[validatorID.Key()]
+	if sent {
+		return PeerElement{peer, validatorID}
+	}
+	return PeerElement{nil, validatorID}
 }
