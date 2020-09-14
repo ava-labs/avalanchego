@@ -1077,6 +1077,7 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
 			peer, sent := n.peers[vID.Key()]
 			peers = append(peers, PeerElement{peer, sent})
 		}
+		return peers
 	}
 
 	return []PeerElement{}
