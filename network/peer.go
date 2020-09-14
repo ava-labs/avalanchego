@@ -332,8 +332,6 @@ func (p *peer) close() {
 	p.closed = true
 	close(p.sender)
 
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
 	p.net.disconnected(p)
 }
 
@@ -514,8 +512,6 @@ func (p *peer) version(msg Msg) {
 
 	p.connected = true
 
-	p.net.stateLock.Lock()
-	defer p.net.stateLock.Unlock()
 	p.net.connected(p)
 }
 
