@@ -132,7 +132,7 @@ type network struct {
 
 	b Builder
 
-	stateLock       sync.Mutex
+	stateLock       sync.RWMutex
 	pendingBytes    int64
 	closed          bool
 	disconnectedIPs map[string]struct{}
@@ -1015,8 +1015,8 @@ type PeerElement struct {
 func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
 	peers := make([]PeerElement, 0, 2)
 
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
 
 	if n.closed {
 		return peers
@@ -1036,8 +1036,8 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
 func (n *network) getAllPeers() []PeerElement {
 	peers := make([]PeerElement, 0, 2)
 
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
 
 	if n.closed {
 		return peers
@@ -1051,8 +1051,8 @@ func (n *network) getAllPeers() []PeerElement {
 }
 
 func (n *network) getPeer(validatorID ids.ShortID) PeerElement {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
 
 	if n.closed {
 		return PeerElement{nil, validatorID}
