@@ -74,7 +74,7 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 
 	s.log.Verbo("creating poll with requestID %d and validators %s",
 		requestID,
-		vdrs)
+		&vdrs)
 
 	s.polls[requestID] = poll{
 		Poll:  s.factory.New(vdrs), // create the new poll
