@@ -278,14 +278,14 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
 	n.log.AssertNoError(err)
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
-		sent := peerelement.peer.send(msg)
+	for _, peer := range n.getPeers(validatorIDs) {
+		sent := peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
-				peerelement.validatorId,
+				peer.id,
 				chainID,
 				requestID)
-			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(peerelement.validatorId, chainID, requestID) })
+			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(peer.id, chainID, requestID) })
 			n.getAcceptedFrontier.numFailed.Inc()
 		} else {
 			n.getAcceptedFrontier.numSent.Inc()
@@ -306,12 +306,11 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer.peer == nil {
+	if peer == nil {
 		return
 	}
 
-	sent := peer.peer.send(msg)
-
+	sent := peer.send(msg)
 	if !sent {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
@@ -340,15 +339,15 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		return
 	}
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
-		sent := peerelement.peer.send(msg)
+	for _, peer := range n.getPeers(validatorIDs) {
+		sent := peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
-				peerelement.validatorId,
+				peer.id,
 				chainID,
 				requestID,
 				containerIDs)
-			n.executor.Add(func() { n.router.GetAcceptedFailed(peerelement.validatorId, chainID, requestID) })
+			n.executor.Add(func() { n.router.GetAcceptedFailed(peer.id, chainID, requestID) })
 			n.getAccepted.numFailed.Inc()
 		} else {
 			n.getAccepted.numSent.Inc()
@@ -369,11 +368,11 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer.peer == nil {
+	if peer == nil {
 		return
 	}
 
-	sent := peer.peer.send(msg)
+	sent := peer.send(msg)
 	if !sent {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
@@ -395,11 +394,11 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer.peer == nil {
+	if peer == nil {
 		return
 	}
 
-	sent := peer.peer.send(msg)
+	sent := peer.send(msg)
 	if !sent {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
@@ -422,11 +421,11 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer.peer == nil {
+	if peer == nil {
 		return
 	}
 
-	sent := peer.peer.send(msg)
+	sent := peer.send(msg)
 	if !sent {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
@@ -445,11 +444,11 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.log.AssertNoError(err)
 
 	peer := n.getPeer(validatorID)
-	if peer.peer == nil {
+	if peer == nil {
 		return
 	}
 
-	sent := peer.peer.send(msg)
+	sent := peer.send(msg)
 	if !sent {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
@@ -477,11 +476,11 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer.peer == nil {
+	if peer == nil {
 		return
 	}
 
-	sent := peer.peer.send(msg)
+	sent := peer.send(msg)
 	if !sent {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
@@ -514,16 +513,16 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		return // Packing message failed
 	}
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
-		sent := peerelement.peer.send(msg)
+	for _, peer := range n.getPeers(validatorIDs) {
+		sent := peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
-				peerelement.validatorId,
+				peer.id,
 				chainID,
 				requestID,
 				containerID)
 			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-			n.executor.Add(func() { n.router.QueryFailed(peerelement.validatorId, chainID, requestID) })
+			n.executor.Add(func() { n.router.QueryFailed(peer.id, chainID, requestID) })
 			n.pushQuery.numFailed.Inc()
 		} else {
 			n.pushQuery.numSent.Inc()
@@ -536,15 +535,15 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
 
-	for _, peerelement := range n.getPeers(validatorIDs) {
-		sent := peerelement.peer.send(msg)
+	for _, peer := range n.getPeers(validatorIDs) {
+		sent := peer.send(msg)
 		if !sent {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
-				peerelement.validatorId,
+				peer.id,
 				chainID,
 				requestID,
 				containerID)
-			n.executor.Add(func() { n.router.QueryFailed(peerelement.validatorId, chainID, requestID) })
+			n.executor.Add(func() { n.router.QueryFailed(peer.id, chainID, requestID) })
 			n.pullQuery.numFailed.Inc()
 		} else {
 			n.pullQuery.numSent.Inc()
@@ -565,11 +564,11 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer.peer == nil {
+	if peer == nil {
 		return
 	}
 
-	sent := peer.peer.send(msg)
+	sent := peer.send(msg)
 	if !sent {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
@@ -628,8 +627,7 @@ func (n *network) Dispatch() error {
 // IPs implements the Network interface
 func (n *network) Peers() []PeerID {
 	peers := []PeerID{}
-	for _, peerelement := range n.getAllPeers() {
-		peer := peerelement.peer
+	for _, peer := range n.getAllPeers() {
 		if peer.connected {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
@@ -687,8 +685,8 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 	}
 
 	allPeers := make([]*peer, 0, len(n.peers))
-	for _, peerelement := range n.getAllPeers() {
-		allPeers = append(allPeers, peerelement.peer)
+	for _, peer := range n.getAllPeers() {
+		allPeers = append(allPeers, peer)
 	}
 
 	numToGossip := n.gossipSize
@@ -754,14 +752,14 @@ func (n *network) gossip() {
 			continue
 		}
 
-		allpeers := n.getAllPeers()
-		if len(allpeers) == 0 {
+		allPeers := n.getAllPeers()
+		if len(allPeers) == 0 {
 			return
 		}
 		stakers := []*peer(nil)
 		nonStakers := []*peer(nil)
-		for _, peerelement := range allpeers {
-			peer := peerelement.peer
+		for _, peer := range allPeers {
+			peer := peer
 			if n.vdrs.Contains(peer.id) {
 				stakers = append(stakers, peer)
 			} else {
@@ -958,8 +956,7 @@ func (n *network) tryAddPeer(p *peer) error {
 // valid IPs that are marked as validators.
 func (n *network) validatorIPs() []utils.IPDesc {
 	ips := []utils.IPDesc(nil)
-	for _, peerelement := range n.getAllPeers() {
-		peer := peerelement.peer
+	for _, peer := range n.getAllPeers() {
 		if peer.connected &&
 			!peer.ip.IsZero() &&
 			n.vdrs.Contains(peer.id) {
@@ -1007,60 +1004,58 @@ func (n *network) disconnected(p *peer) {
 	}
 }
 
-type PeerElement struct {
-	peer        *peer
-	validatorId ids.ShortID
-}
-
-func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
-	peers := make([]PeerElement, 0, 2)
+func (n *network) getPeers(validatorIDs ids.ShortSet) []*peer {
 
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	if n.closed {
+		peers := make([]*peer, 0, 1)
 		return peers
 	}
 
-	for _, validatorID := range validatorIDs.List() {
+	vIDS := validatorIDs.List()
+	peers := make([]*peer, 0, len(vIDS))
+	for _, validatorID := range vIDS {
 		vID := validatorID
 		peer, sent := n.peers[vID.Key()]
 		if sent {
-			peers = append(peers, PeerElement{peer, vID})
+			peers = append(peers, peer)
 		}
 	}
 
 	return peers
 }
 
-func (n *network) getAllPeers() []PeerElement {
-	peers := make([]PeerElement, 0, 2)
+func (n *network) getAllPeers() []*peer {
 
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	if n.closed {
+		peers := make([]*peer, 0, 1)
 		return peers
 	}
 
+	peers := make([]*peer, 0, len(n.peers))
 	for _, peer := range n.peers {
-		peers = append(peers, PeerElement{peer, ids.ShortID{}})
+		peers = append(peers, peer)
 	}
 
 	return peers
 }
 
-func (n *network) getPeer(validatorID ids.ShortID) PeerElement {
+func (n *network) getPeer(validatorID ids.ShortID) *peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	if n.closed {
-		return PeerElement{nil, validatorID}
+		return nil
 	}
 
 	peer, sent := n.peers[validatorID.Key()]
 	if sent {
-		return PeerElement{peer, validatorID}
+		return peer
 	}
-	return PeerElement{nil, validatorID}
+	return nil
 }
