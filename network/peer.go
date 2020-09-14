@@ -184,13 +184,14 @@ func (p *peer) WriteMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msg})
 
-		atomic.AddInt64(&p.pendingBytes, -int64(len(msg)))
-		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
+		msgLen := len(msg)
+		atomic.AddInt64(&p.pendingBytes, -int64(msgLen))
+		atomic.AddInt64(&p.net.pendingBytes, -int64(msgLen))
 
-		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
+		packer := wrappers.Packer{Bytes: make([]byte, msgLen+wrappers.IntLen)}
 		packer.PackBytes(msg)
 		msg = packer.Bytes
-		for len(msg) > 0 {
+		for msgLen > 0 {
 			written, err := p.conn.Write(msg)
 			if err != nil {
 				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
@@ -216,21 +217,34 @@ func (p *peer) send(msg Msg) bool {
 		return false
 	}
 
+	// is it possible to send?
+	if dropMsg := p.dropMessagePeer(); dropMsg {
+		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
+		return false
+	}
+
 	msgBytes := msg.Bytes()
 	msgBytesLen := int64(len(msgBytes))
-	newPendingBytes := atomic.LoadInt64(&p.net.pendingBytes) + msgBytesLen
+
+	// lets assume send will be successful, we add to the network pending bytes
+	// if we determine that we are being a bit restrictive, we could increase the global bandwidth?
+	newPendingBytes := atomic.AddInt64(&p.net.pendingBytes, msgBytesLen)
+
 	newConnPendingBytes := atomic.LoadInt64(&p.pendingBytes) + msgBytesLen
-	if dropMsg := p.dropMessage(len(msgBytes), newConnPendingBytes, newPendingBytes); dropMsg {
+	if dropMsg := p.dropMessage(newConnPendingBytes, newPendingBytes); dropMsg {
+		// we never sent the message, remove from pending totals
+		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
 		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
 		return false
 	}
 
 	select {
 	case p.sender <- msgBytes:
-		atomic.AddInt64(&p.net.pendingBytes, msgBytesLen)
-		atomic.AddInt64(&p.pendingBytes, newConnPendingBytes)
+		atomic.AddInt64(&p.pendingBytes, msgBytesLen)
 		return true
 	default:
+		// we never sent the message, remove from pending totals
+		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
 		return false
 	}
@@ -310,9 +324,13 @@ func (p *peer) handle(msg Msg) {
 	}
 }
 
-func (p *peer) dropMessage(msgLen int, connPendingLen, networkPendingLen int64) bool {
+func (p *peer) dropMessagePeer() bool {
+	return atomic.LoadInt64(&p.pendingBytes) > p.net.maxMessageSize
+}
+
+func (p *peer) dropMessage(connPendingLen, networkPendingLen int64) bool {
 	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		atomic.LoadInt64(&p.pendingBytes) > p.net.maxMessageSize && // this connection should have a minimum allowed bandwidth
+		p.dropMessagePeer() && // this connection should have a minimum allowed bandwidth
 		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
 			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
 }
@@ -344,7 +362,7 @@ func (p *peer) GetVersion() {
 
 // assumes the stateLock is not held
 func (p *peer) Version() {
-	p.net.stateLock.Lock()
+	p.net.stateLock.RLock()
 	msg, err := p.net.b.Version(
 		p.net.networkID,
 		p.net.nodeID,
@@ -352,7 +370,7 @@ func (p *peer) Version() {
 		p.net.ip,
 		p.net.version.String(),
 	)
-	p.net.stateLock.Unlock()
+	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
 	p.Send(msg)
 }
@@ -522,16 +540,16 @@ func (p *peer) getPeerList(_ Msg) { p.SendPeerList() }
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
-	p.net.stateLock.Lock()
 	for _, ip := range ips {
+		p.net.stateLock.Lock()
 		if !ip.Equal(p.net.ip) &&
 			!ip.IsZero() &&
 			(p.net.allowPrivateIPs || !ip.IsPrivate()) {
 			// TODO: only try to connect once
 			p.net.track(ip)
 		}
+		p.net.stateLock.Unlock()
 	}
-	p.net.stateLock.Unlock()
 }
 
 // assumes the stateLock is not held
