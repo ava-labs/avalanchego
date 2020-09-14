@@ -796,10 +796,18 @@ func (n *network) gossip() {
 			continue
 		}
 
-		allPeers := n.getAllPeers()
-		if len(allPeers) == 0 {
+		n.stateLock.RLock()
+		if n.closed {
+			n.stateLock.RUnlock()
 			return
 		}
+		n.stateLock.RUnlock()
+
+		allPeers := n.getAllPeers()
+		if len(allPeers) == 0 {
+			continue
+		}
+
 		stakers := []*peer(nil)
 		nonStakers := []*peer(nil)
 		for _, peer := range allPeers {
