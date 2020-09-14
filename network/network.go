@@ -132,6 +132,7 @@ type network struct {
 
 	b Builder
 
+	// stateLock should never be held when grabbing a peer lock
 	stateLock       sync.RWMutex
 	pendingBytes    int64
 	closed          bool
