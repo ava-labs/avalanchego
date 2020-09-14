@@ -1058,42 +1058,34 @@ type PeerElement struct {
 }
 
 func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
-
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	if n.closed {
-		peers := make([]PeerElement, 0, 1)
-		return peers
+	if !n.closed {
+		vIDS := validatorIDs.List()
+		peers := make([]PeerElement, 0, len(vIDS))
+		for _, validatorID := range vIDS {
+			vID := validatorID
+			peer, sent := n.peers[vID.Key()]
+			peers = append(peers, PeerElement{peer, sent})
+		}
 	}
 
-	vIDS := validatorIDs.List()
-	peers := make([]PeerElement, 0, len(vIDS))
-	for _, validatorID := range vIDS {
-		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		peers = append(peers, PeerElement{peer, sent})
-	}
-
-	return peers
+	return []PeerElement{}
 }
 
 func (n *network) getAllPeers() []*peer {
-
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	if n.closed {
-		peers := make([]*peer, 0, 1)
-		return peers
+	if !n.closed {
+		peers := make([]*peer, 0, len(n.peers))
+		for _, peer := range n.peers {
+			peers = append(peers, peer)
+		}
 	}
 
-	peers := make([]*peer, 0, len(n.peers))
-	for _, peer := range n.peers {
-		peers = append(peers, peer)
-	}
-
-	return peers
+	return []*peer{}
 }
 
 func (n *network) getPeer(validatorID ids.ShortID) PeerElement {
