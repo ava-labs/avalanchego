@@ -54,6 +54,7 @@ type peer struct {
 	// unix time of the last message sent and received respectively
 	lastSent, lastReceived int64
 
+	// only one peer lock should only be held at a time by a thread of execution
 	lock sync.Mutex
 }
 
