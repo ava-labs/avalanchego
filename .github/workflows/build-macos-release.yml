@@ -1,4 +1,4 @@
-# Build a macos release from the avalanche repo 
+# Build a macos release from the avalanchego repo 
 
 name: build-macos-release
 
@@ -21,7 +21,7 @@ jobs:
     - uses: actions/checkout@v2
 
     # Runs a single command using the runners shell
-    - name: Build the avalanche binaries 
+    - name: Build the avalanchego binaries 
       run: ./scripts/build.sh 
 
     - name: Get the version
@@ -35,10 +35,10 @@ jobs:
         sudo installer -pkg AWSCLIV2.pkg -target /
 
     - name: Create zip file
-      run: 7z a avalanche-macos-${{ steps.get_version.outputs.VERSION }}.zip build/avalanche build/plugins
+      run: 7z a avalanchego-macos-${{ steps.get_version.outputs.VERSION }}.zip build/avalanchego build/plugins
 
     - name: Upload file to S3 
-      run: aws s3 cp avalanche-macos-${{ steps.get_version.outputs.VERSION }}.zip s3://{{ secrets.BUCKET }}/macos/ 
+      run: aws s3 cp avalanchego-macos-${{ steps.get_version.outputs.VERSION }}.zip s3://{{ secrets.BUCKET }}/macos/ 
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}

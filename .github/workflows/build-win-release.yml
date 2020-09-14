@@ -1,4 +1,4 @@
-# Build a windows release from the avalanche repo 
+# Build a windows release from the avalanchego repo 
 
 name: build-win-release 
 
@@ -26,15 +26,15 @@ jobs:
       shell: bash
 
     # Runs a single command using the runners shell
-    - name: Build the avalanche binaries 
+    - name: Build the avalanchego binaries 
       run: ./scripts/build.sh 
       shell: bash
 
     - name: Create zip
       run: |
-        mv .\build\avalanche .\build\avalanche.exe
+        mv .\build\avalanchego .\build\avalanchego.exe
         mv .\build\plugins\evm .\build\plugins\evm.exe
-        Compress-Archive -Path .\build\avalanche.exe,.\build\plugins -DestinationPath .\build\avalanche-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+        Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
     - name: Install aws cli
       env:
@@ -43,5 +43,5 @@ jobs:
       run: |
         Install-Module -Name AWS.Tools.Installer -Force
         Install-AWSToolsModule AWS.Tools.EC2,AWS.Tools.S3 -CleanUp -Force
-        Write-S3Object -BucketName ${{ secrets.BUCKET }} -File .\build\avalanche-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip -Key windows/avalanche-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+        Write-S3Object -BucketName ${{ secrets.BUCKET }} -File .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip -Key windows/avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
