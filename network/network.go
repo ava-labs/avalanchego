@@ -1091,6 +1091,7 @@ func (n *network) getAllPeers() []*peer {
 		for _, peer := range n.peers {
 			peers = append(peers, peer)
 		}
+		return peers
 	}
 
 	return []*peer{}
