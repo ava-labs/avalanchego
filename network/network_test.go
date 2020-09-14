@@ -187,7 +187,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 	clientUpgrader := NewIPUpgrader()
 
 	vdrs := validators.NewSet()
-	handler := router.Router(nil)
+	handler := &testHandler{}
 
 	net := NewDefaultNetwork(
 		prometheus.NewRegistry(),
@@ -824,7 +824,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	clientUpgrader := NewIPUpgrader()
 
 	vdrs := validators.NewSet()
-	handler := router.Router(nil)
+	handler := &testHandler{}
 
 	net0 := NewDefaultNetwork(
 		prometheus.NewRegistry(),
