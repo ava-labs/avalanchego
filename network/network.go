@@ -949,6 +949,8 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	return nil
 }
 
+// assumes the stateLock is not held. Returns an error if the peer couldn't be
+// added.
 func (n *network) tryAddPeer(p *peer) error {
 	key := p.id.Key()
 
