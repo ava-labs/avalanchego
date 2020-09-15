@@ -181,7 +181,7 @@ func init() {
 	fs.Float64Var(&Config.UptimeRequirement, "uptime-requirement", 0, "Percent of time a validator must be online to receive rewards")
 
 	// Minimum stake, in nAVAX, required to validate the primary network
-	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+	fs.Uint64Var(&Config.MinStake, "min-stake", 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
@@ -238,8 +238,8 @@ func init() {
 	logDisplayLevel := fs.String("log-display-level", "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	logDisplayHighlight := fs.String("log-display-highlight", "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
 
-	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 5, "Number of nodes to query for each network poll")
-	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 4, "Alpha value to use for required number positive results")
+	fs.IntVar(&Config.ConsensusParams.K, "snow-sample-size", 20, "Number of nodes to query for each network poll")
+	fs.IntVar(&Config.ConsensusParams.Alpha, "snow-quorum-size", 16, "Alpha value to use for required number positive results")
 	fs.IntVar(&Config.ConsensusParams.BetaVirtuous, "snow-virtuous-commit-threshold", 20, "Beta value to use for virtuous transactions")
 	fs.IntVar(&Config.ConsensusParams.BetaRogue, "snow-rogue-commit-threshold", 30, "Beta value to use for rogue transactions")
 	fs.IntVar(&Config.ConsensusParams.Parents, "snow-avalanche-num-parents", 5, "Number of vertexes for reference from each new vertex")
