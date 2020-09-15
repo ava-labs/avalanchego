@@ -283,16 +283,16 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		sent := peerelement.sent
-		vId := peerelement.id
+		vID := peerelement.id
 		if sent {
 			sent = peer.send(msg)
 		}
 		if !sent {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
-				vId,
+				vID,
 				chainID,
 				requestID)
-			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(vId, chainID, requestID) })
+			n.executor.Add(func() { n.router.GetAcceptedFrontierFailed(vID, chainID, requestID) })
 			n.getAcceptedFrontier.numFailed.Inc()
 		} else {
 			n.getAcceptedFrontier.numSent.Inc()
@@ -352,17 +352,17 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		sent := peerelement.sent
-		vId := peerelement.id
+		vID := peerelement.id
 		if sent {
 			sent = peer.send(msg)
 		}
 		if !sent {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
-				vId,
+				vID,
 				chainID,
 				requestID,
 				containerIDs)
-			n.executor.Add(func() { n.router.GetAcceptedFailed(vId, chainID, requestID) })
+			n.executor.Add(func() { n.router.GetAcceptedFailed(vID, chainID, requestID) })
 			n.getAccepted.numFailed.Inc()
 		} else {
 			n.getAccepted.numSent.Inc()
@@ -551,18 +551,18 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		sent := peerelement.sent
-		vId := peerelement.id
+		vID := peerelement.id
 		if sent {
 			sent = peer.send(msg)
 		}
 		if !sent {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
-				vId,
+				vID,
 				chainID,
 				requestID,
 				containerID)
 			n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-			n.executor.Add(func() { n.router.QueryFailed(vId, chainID, requestID) })
+			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 			n.pushQuery.numFailed.Inc()
 		} else {
 			n.pushQuery.numSent.Inc()
@@ -578,17 +578,17 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerelement := range n.getPeers(validatorIDs) {
 		peer := peerelement.peer
 		sent := peerelement.sent
-		vId := peerelement.id
+		vID := peerelement.id
 		if sent {
 			sent = peer.send(msg)
 		}
 		if !sent {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
-				vId,
+				vID,
 				chainID,
 				requestID,
 				containerID)
-			n.executor.Add(func() { n.router.QueryFailed(vId, chainID, requestID) })
+			n.executor.Add(func() { n.router.QueryFailed(vID, chainID, requestID) })
 			n.pullQuery.numFailed.Inc()
 		} else {
 			n.pullQuery.numSent.Inc()

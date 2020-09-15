@@ -185,14 +185,13 @@ func (p *peer) WriteMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msg})
 
-		msgLen := len(msg)
-		atomic.AddInt64(&p.pendingBytes, -int64(msgLen))
-		atomic.AddInt64(&p.net.pendingBytes, -int64(msgLen))
+		atomic.AddInt64(&p.pendingBytes, -int64(len(msg)))
+		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
 
-		packer := wrappers.Packer{Bytes: make([]byte, msgLen+wrappers.IntLen)}
+		packer := wrappers.Packer{Bytes: make([]byte, len(msg)+wrappers.IntLen)}
 		packer.PackBytes(msg)
 		msg = packer.Bytes
-		for msgLen > 0 {
+		for len(msg) > 0 {
 			written, err := p.conn.Write(msg)
 			if err != nil {
 				p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.ip, err)
