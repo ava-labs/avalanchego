@@ -51,13 +51,14 @@ func TestTimeout(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second)
 
 	sender := Sender{}
 	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
+	engine.CantConnected = false
 
 	engine.ContextF = snow.DefaultContextTest
 
@@ -114,13 +115,14 @@ func TestReliableMessages(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second)
 
 	sender := Sender{}
 	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
 
 	engine := common.EngineTest{T: t}
 	engine.Default(true)
+	engine.CantConnected = false
 
 	engine.ContextF = snow.DefaultContextTest
 	engine.GossipF = func() error { return nil }
@@ -188,7 +190,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &tm, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &tm, time.Hour, time.Second)
 
 	sender := Sender{}
 	sender.Initialize(snow.DefaultContextTest(), &ExternalSenderTest{}, &chainRouter, &tm)
