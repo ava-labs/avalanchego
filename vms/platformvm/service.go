@@ -825,7 +825,7 @@ type AddValidatorArgs struct {
 
 // AddValidator creates and signs and issues a transaction to add a
 // validator to the primary network
-func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JsonTxID) error {
+func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddValidator called")
 	switch {
 	case args.RewardAddress == "":
@@ -896,9 +896,11 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	}
 
 	reply.TxID = tx.ID()
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.issueTx(tx),
 		db.Close(),
 	)
@@ -918,7 +920,7 @@ type AddDelegatorArgs struct {
 
 // AddDelegator creates and signs and issues a transaction to add a
 // delegator to the primary network
-func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JsonTxID) error {
+func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddDelegator called")
 	switch {
 	case int64(args.StartTime) < time.Now().Unix():
@@ -986,9 +988,11 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	}
 
 	reply.TxID = tx.ID()
+	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.issueTx(tx),
 		db.Close(),
 	)
@@ -1009,7 +1013,7 @@ type AddSubnetValidatorArgs struct {
 
 // AddSubnetValidator creates and signs and issues a transaction to
 // add a validator to a subnet other than the primary network
-func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JsonTxID) error {
+func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JsonTxIDChangeAddr) error {
 	service.vm.SnowmanVM.Ctx.Log.Info("Platform: AddSubnetValidator called")
 	switch {
 	case args.SubnetID == "":
@@ -1072,9 +1076,11 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	}
 
 	response.TxID = tx.ID()
+	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.issueTx(tx),
 		db.Close(),
 	)
@@ -1095,7 +1101,7 @@ type CreateSubnetArgs struct {
 
 // CreateSubnet creates and signs and issues a transaction to create a new
 // subnet
-func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxID) error {
+func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
 	controlKeys := []ids.ShortID{}
@@ -1147,9 +1153,11 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	}
 
 	response.TxID = tx.ID()
+	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.issueTx(tx),
 		db.Close(),
 	)
@@ -1174,7 +1182,7 @@ type ExportAVAXArgs struct {
 
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
-func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
+func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: ExportAVAX called")
 
 	if args.Amount == 0 {
@@ -1227,9 +1235,11 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	}
 
 	response.TxID = tx.ID()
+	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.issueTx(tx),
 		db.Close(),
 	)
@@ -1253,7 +1263,7 @@ type ImportAVAXArgs struct {
 
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
-func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
+func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
 
 	chainID, err := service.vm.Ctx.BCLookup.Lookup(args.SourceChain)
@@ -1300,11 +1310,13 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	}
 
 	response.TxID = tx.ID()
+	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		service.vm.issueTx(tx),
 		db.Close(),
+		err,
 	)
 	return errs.Err
 }
@@ -1335,7 +1347,7 @@ type CreateBlockchainArgs struct {
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain
-func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JsonTxID) error {
+func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: CreateBlockchain called")
 	switch {
 	case args.Name == "":
@@ -1412,9 +1424,11 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	response.TxID = tx.ID()
+	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		service.vm.issueTx(tx),
 		db.Close(),
 	)
