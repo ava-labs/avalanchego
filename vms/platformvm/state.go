@@ -612,17 +612,17 @@ func (vm *VM) registerDBTypes() {
 
 	marshalChainsFunc := func(chainsIntf interface{}) ([]byte, error) {
 		if chains, ok := chainsIntf.([]*Tx); ok {
-			return Codec.Marshal(chains)
+			return GenesisCodec.Marshal(chains)
 		}
 		return nil, fmt.Errorf("expected []*CreateChainTx but got type %T", chainsIntf)
 	}
 	unmarshalChainsFunc := func(bytes []byte) (interface{}, error) {
 		var chains []*Tx
-		if err := Codec.Unmarshal(bytes, &chains); err != nil {
+		if err := GenesisCodec.Unmarshal(bytes, &chains); err != nil {
 			return nil, err
 		}
 		for _, tx := range chains {
-			if err := tx.Sign(vm.codec, nil); err != nil {
+			if err := tx.Sign(GenesisCodec, nil); err != nil {
 				return nil, err
 			}
 		}

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
@@ -125,7 +126,7 @@ func (vm *VM) Initialize(
 	vm.Aliaser.Initialize()
 
 	vm.pubsub = cjson.NewPubSubServer(ctx)
-	c := codec.NewDefault()
+	c := codec.New(math.MaxUint32, 1<<20)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -193,6 +194,9 @@ func (vm *VM) Initialize(
 			return err
 		}
 	}
+
+	c.SetMaxSize(1 << 18)
+	c.SetMaxSliceLen(1 << 18)
 
 	vm.timer = timer.NewTimer(func() {
 		ctx.Lock.Lock()

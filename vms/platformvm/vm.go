@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -100,48 +101,54 @@ var (
 )
 
 // Codec does serialization and deserialization
-var Codec codec.Codec
+var (
+	Codec        codec.Codec
+	GenesisCodec codec.Codec
+)
 
 func init() {
 	Codec = codec.NewDefault()
+	GenesisCodec = codec.New(math.MaxUint32, math.MaxUint32)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		Codec.RegisterType(&ProposalBlock{}),
-		Codec.RegisterType(&Abort{}),
-		Codec.RegisterType(&Commit{}),
-		Codec.RegisterType(&StandardBlock{}),
-		Codec.RegisterType(&AtomicBlock{}),
+	for _, c := range []codec.Codec{Codec, GenesisCodec} {
+		errs := wrappers.Errs{}
+		errs.Add(
+			c.RegisterType(&ProposalBlock{}),
+			c.RegisterType(&Abort{}),
+			c.RegisterType(&Commit{}),
+			c.RegisterType(&StandardBlock{}),
+			c.RegisterType(&AtomicBlock{}),
 
-		// The Fx is registered here because this is the same place it is
-		// registered in the AVM. This ensures that the typeIDs match up for
-		// utxos in shared memory.
-		Codec.RegisterType(&secp256k1fx.TransferInput{}),
-		Codec.RegisterType(&secp256k1fx.MintOutput{}),
-		Codec.RegisterType(&secp256k1fx.TransferOutput{}),
-		Codec.RegisterType(&secp256k1fx.MintOperation{}),
-		Codec.RegisterType(&secp256k1fx.Credential{}),
-		Codec.RegisterType(&secp256k1fx.Input{}),
-		Codec.RegisterType(&secp256k1fx.OutputOwners{}),
+			// The Fx is registered here because this is the same place it is
+			// registered in the AVM. This ensures that the typeIDs match up for
+			// utxos in shared memory.
+			c.RegisterType(&secp256k1fx.TransferInput{}),
+			c.RegisterType(&secp256k1fx.MintOutput{}),
+			c.RegisterType(&secp256k1fx.TransferOutput{}),
+			c.RegisterType(&secp256k1fx.MintOperation{}),
+			c.RegisterType(&secp256k1fx.Credential{}),
+			c.RegisterType(&secp256k1fx.Input{}),
+			c.RegisterType(&secp256k1fx.OutputOwners{}),
 
-		Codec.RegisterType(&UnsignedAddValidatorTx{}),
-		Codec.RegisterType(&UnsignedAddSubnetValidatorTx{}),
-		Codec.RegisterType(&UnsignedAddDelegatorTx{}),
+			c.RegisterType(&UnsignedAddValidatorTx{}),
+			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
+			c.RegisterType(&UnsignedAddDelegatorTx{}),
 
-		Codec.RegisterType(&UnsignedCreateChainTx{}),
-		Codec.RegisterType(&UnsignedCreateSubnetTx{}),
+			c.RegisterType(&UnsignedCreateChainTx{}),
+			c.RegisterType(&UnsignedCreateSubnetTx{}),
 
-		Codec.RegisterType(&UnsignedImportTx{}),
-		Codec.RegisterType(&UnsignedExportTx{}),
+			c.RegisterType(&UnsignedImportTx{}),
+			c.RegisterType(&UnsignedExportTx{}),
 
-		Codec.RegisterType(&UnsignedAdvanceTimeTx{}),
-		Codec.RegisterType(&UnsignedRewardValidatorTx{}),
+			c.RegisterType(&UnsignedAdvanceTimeTx{}),
+			c.RegisterType(&UnsignedRewardValidatorTx{}),
 
-		Codec.RegisterType(&StakeableLockIn{}),
-		Codec.RegisterType(&StakeableLockOut{}),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
+			c.RegisterType(&StakeableLockIn{}),
+			c.RegisterType(&StakeableLockOut{}),
+		)
+		if errs.Errored() {
+			panic(errs.Err)
+		}
 	}
 }
 
@@ -237,7 +244,7 @@ func (vm *VM) Initialize(
 	// the provided genesis state
 	if !vm.DBInitialized() {
 		genesis := &Genesis{}
-		if err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
+		if err := GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
 			return err
 		}
 		if err := genesis.Initialize(); err != nil {
@@ -246,26 +253,40 @@ func (vm *VM) Initialize(
 
 		// Persist UTXOs that exist at genesis
 		for _, utxo := range genesis.UTXOs {
-			if err := vm.putUTXO(vm.DB, utxo); err != nil {
+			if err := vm.putUTXO(vm.DB, &utxo.UTXO); err != nil {
 				return err
 			}
 		}
 
 		// Persist the platform chain's timestamp at genesis
-		time := time.Unix(int64(genesis.Timestamp), 0)
-		if err := vm.State.PutTime(vm.DB, timestampKey, time); err != nil {
+		genesisTime := time.Unix(int64(genesis.Timestamp), 0)
+		if err := vm.State.PutTime(vm.DB, timestampKey, genesisTime); err != nil {
 			return err
 		}
 
-		// TODO: change InitialSupply to genesis.InitialSupply.
-		if err := vm.putCurrentSupply(vm.DB, InitialSupply); err != nil {
+		if err := vm.putCurrentSupply(vm.DB, genesis.InitialSupply); err != nil {
 			return err
 		}
 
 		// Persist primary network validator set at genesis
 		for _, vdrTx := range genesis.Validators {
+			var (
+				stakeAmount   uint64
+				stakeDuration time.Duration
+			)
+			switch tx := vdrTx.UnsignedTx.(type) {
+			case *UnsignedAddValidatorTx:
+				stakeAmount = tx.Validator.Wght
+				stakeDuration = tx.Validator.Duration()
+			default:
+				return errWrongTxType
+			}
+			reward, err := vm.calculateReward(vm.DB, stakeDuration, stakeAmount)
+			if err != nil {
+				return err
+			}
 			tx := rewardTx{
-				Reward: 0,
+				Reward: reward,
 				Tx:     *vdrTx,
 			}
 			if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, &tx); err != nil {

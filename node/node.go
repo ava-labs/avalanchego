@@ -64,7 +64,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 8, 2)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 9, 0)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -674,9 +674,9 @@ func (n *Node) initIPCAPI() error {
 }
 
 // Give chains and VMs aliases as specified by the genesis information
-func (n *Node) initAliases() error {
+func (n *Node) initAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing aliases")
-	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(n.Config.NetworkID)
+	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -773,7 +773,7 @@ func (n *Node) Initialize(Config *Config, logger logging.Logger, logFactory logg
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(); err != nil { // Set up aliases
+	if err := n.initAliases(genesisBytes); err != nil { // Set up aliases
 		return fmt.Errorf("couldn't initialize aliases: %w", err)
 	}
 	if err := n.initChains(genesisBytes, avaxAssetID); err != nil { // Start the Platform chain

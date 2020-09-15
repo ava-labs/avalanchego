@@ -142,7 +142,6 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 	genesisValidators := make([]APIPrimaryValidator, len(keys))
 	for i, key := range keys {
-		weight := json.Uint64(defaultWeight)
 		id := key.PublicKey().Address()
 		addr, err := formatting.FormatBech32(hrp, id.Bytes())
 		if err != nil {
@@ -152,13 +151,16 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 			APIStaker: APIStaker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				Weight:    &weight,
 				NodeID:    id.PrefixedString(constants.NodeIDPrefix),
 			},
 			RewardOwner: &APIOwner{
 				Threshold: 1,
 				Addresses: []string{addr},
 			},
+			Staked: []APIUTXO{{
+				Amount:  json.Uint64(defaultWeight),
+				Address: addr,
+			}},
 			DelegationFee: PercentDenominator,
 		}
 	}
@@ -172,8 +174,6 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
-	// TODO: Remove
-	InitialSupply = 360 * units.MegaAvax
 
 	buildGenesisResponse := BuildGenesisReply{}
 	platformvmSS := StaticService{}

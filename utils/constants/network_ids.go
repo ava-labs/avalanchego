@@ -11,29 +11,33 @@ import (
 
 // Const variables to be exported
 const (
-	MainnetID  uint32 = 1
-	CascadeID  uint32 = 2
-	DenaliID   uint32 = 3
-	EverestID  uint32 = 4
-	TestnetID  uint32 = EverestID
-	LocalID    uint32 = 12345
+	ManhattenID uint32 = 0
+	MainnetID   uint32 = 1
+	CascadeID   uint32 = 2
+	DenaliID    uint32 = 3
+	EverestID   uint32 = 4
+
+	TestnetID  uint32 = ManhattenID
 	UnitTestID uint32 = 10
+	LocalID    uint32 = 12345
 
-	MainnetName  = "mainnet"
-	CascadeName  = "cascade"
-	DenaliName   = "denali"
-	EverestName  = "everest"
-	TestnetName  = "testnet"
-	LocalName    = "local"
-	UnitTestName = "testing"
+	ManhattenName = "manhatten"
+	MainnetName   = "mainnet"
+	CascadeName   = "cascade"
+	DenaliName    = "denali"
+	EverestName   = "everest"
+	TestnetName   = "testnet"
+	UnitTestName  = "testing"
+	LocalName     = "local"
 
-	MainnetHRP  = "avax"
-	CascadeHRP  = "cascade"
-	DenaliHRP   = "denali"
-	EverestHRP  = "everest"
-	LocalHRP    = "local"
-	UnitTestHRP = "testing"
-	FallbackHRP = "custom"
+	ManhattenHRP = "man"
+	MainnetHRP   = "avax"
+	CascadeHRP   = "cascade"
+	DenaliHRP    = "denali"
+	EverestHRP   = "everest"
+	UnitTestHRP  = "testing"
+	LocalHRP     = "local"
+	FallbackHRP  = "custom"
 )
 
 // Variables to be exported
@@ -42,38 +46,42 @@ var (
 	PlatformChainID  = ids.Empty
 
 	NetworkIDToNetworkName = map[uint32]string{
-		MainnetID:  MainnetName,
-		CascadeID:  CascadeName,
-		DenaliID:   DenaliName,
-		EverestID:  EverestName,
-		LocalID:    LocalName,
-		UnitTestID: UnitTestName,
+		ManhattenID: ManhattenName,
+		MainnetID:   MainnetName,
+		CascadeID:   CascadeName,
+		DenaliID:    DenaliName,
+		EverestID:   EverestName,
+		UnitTestID:  UnitTestName,
+		LocalID:     LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
-		MainnetName:  MainnetID,
-		CascadeName:  CascadeID,
-		DenaliName:   DenaliID,
-		EverestName:  EverestID,
-		TestnetName:  TestnetID,
-		LocalName:    LocalID,
-		UnitTestName: UnitTestID,
+		ManhattenName: ManhattenID,
+		MainnetName:   MainnetID,
+		CascadeName:   CascadeID,
+		DenaliName:    DenaliID,
+		EverestName:   EverestID,
+		TestnetName:   TestnetID,
+		UnitTestName:  UnitTestID,
+		LocalName:     LocalID,
 	}
 
 	NetworkIDToHRP = map[uint32]string{
-		MainnetID:  MainnetHRP,
-		CascadeID:  CascadeHRP,
-		DenaliID:   DenaliHRP,
-		EverestID:  EverestHRP,
-		LocalID:    LocalHRP,
-		UnitTestID: UnitTestHRP,
+		ManhattenID: ManhattenHRP,
+		MainnetID:   MainnetHRP,
+		CascadeID:   CascadeHRP,
+		DenaliID:    DenaliHRP,
+		EverestID:   EverestHRP,
+		UnitTestID:  UnitTestHRP,
+		LocalID:     LocalHRP,
 	}
 	NetworkHRPToNetworkID = map[string]uint32{
-		MainnetHRP:  MainnetID,
-		CascadeHRP:  CascadeID,
-		DenaliHRP:   DenaliID,
-		EverestHRP:  EverestID,
-		LocalHRP:    LocalID,
-		UnitTestHRP: UnitTestID,
+		ManhattenHRP: ManhattenID,
+		MainnetHRP:   MainnetID,
+		CascadeHRP:   CascadeID,
+		DenaliHRP:    DenaliID,
+		EverestHRP:   EverestID,
+		UnitTestHRP:  UnitTestID,
+		LocalHRP:     LocalID,
 	}
 
 	ValidNetworkName = regexp.MustCompile(`network-[0-9]+`)
