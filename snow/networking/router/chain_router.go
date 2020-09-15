@@ -47,6 +47,7 @@ type ChainRouter struct {
 // This router also fires a gossip event every [gossipFrequency] to the engine,
 // notifying the engine it should gossip it's accepted set.
 func (sr *ChainRouter) Initialize(
+	nodeID ids.ShortID,
 	log logging.Logger,
 	timeouts *timeout.Manager,
 	gossipFrequency time.Duration,
@@ -58,6 +59,8 @@ func (sr *ChainRouter) Initialize(
 	sr.gossiper = timer.NewRepeater(sr.Gossip, gossipFrequency)
 	sr.intervalNotifier = timer.NewRepeater(sr.EndInterval, defaultCPUInterval)
 	sr.closeTimeout = closeTimeout
+
+	sr.peers.Add(nodeID)
 
 	go log.RecoverAndPanic(sr.gossiper.Dispatch)
 	go log.RecoverAndPanic(sr.intervalNotifier.Dispatch)
