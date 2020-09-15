@@ -3,7 +3,7 @@ module github.com/ava-labs/coreth
 go 1.14
 
 require (
-	github.com/ava-labs/avalanche-go v0.8.0-beta
+	github.com/ava-labs/avalanchego v0.8.3
 	github.com/ava-labs/go-ethereum v1.9.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
