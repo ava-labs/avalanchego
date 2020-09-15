@@ -28,29 +28,29 @@ import (
 
 	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 
-	geckorpc "github.com/gorilla/rpc/v2"
+	avalancheRPC "github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanche-go/api/admin"
-	"github.com/ava-labs/avalanche-go/cache"
-	"github.com/ava-labs/avalanche-go/database"
-	"github.com/ava-labs/avalanche-go/database/prefixdb"
-	"github.com/ava-labs/avalanche-go/ids"
-	"github.com/ava-labs/avalanche-go/snow"
-	"github.com/ava-labs/avalanche-go/snow/choices"
-	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
-	"github.com/ava-labs/avalanche-go/utils/codec"
-	"github.com/ava-labs/avalanche-go/utils/constants"
-	"github.com/ava-labs/avalanche-go/utils/crypto"
-	"github.com/ava-labs/avalanche-go/utils/formatting"
-	"github.com/ava-labs/avalanche-go/utils/logging"
-	"github.com/ava-labs/avalanche-go/utils/timer"
-	"github.com/ava-labs/avalanche-go/utils/units"
-	"github.com/ava-labs/avalanche-go/utils/wrappers"
-	"github.com/ava-labs/avalanche-go/vms/components/avax"
-	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/api/admin"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	commonEng "github.com/ava-labs/avalanche-go/snow/engine/common"
-	geckojson "github.com/ava-labs/avalanche-go/utils/json"
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var (
@@ -505,9 +505,9 @@ func (vm *VM) LastAccepted() ids.ID {
 //     By default the LockOption is WriteLock
 //     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
 func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) *commonEng.HTTPHandler {
-	server := geckorpc.NewServer()
-	server.RegisterCodec(geckojson.NewCodec(), "application/json")
-	server.RegisterCodec(geckojson.NewCodec(), "application/json;charset=UTF-8")
+	server := avalancheRPC.NewServer()
+	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json")
+	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterService(service, name)
 
 	var lock commonEng.LockOption = commonEng.WriteLock
