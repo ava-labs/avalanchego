@@ -814,15 +814,13 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 type AddValidatorArgs struct {
 	api.UserPass
 	APIStaker
-
-	// The address the staking reward, if applicable, will go to
-	RewardAddress     string       `json:"rewardAddress"`
-	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
-
 	// The address change will be sent to.
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
-	ChangeAddr string `json:"changeAddr"`
+	api.JsonChangeAddr
+	// The address the staking reward, if applicable, will go to
+	RewardAddress     string       `json:"rewardAddress"`
+	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
 // AddValidator creates and signs and issues a transaction to add a
@@ -911,12 +909,11 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 type AddDelegatorArgs struct {
 	api.UserPass
 	APIStaker
-	RewardAddress string `json:"rewardAddress"`
-
 	// The address change will be sent to.
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
-	ChangeAddr string `json:"changeAddr"`
+	api.JsonChangeAddr
+	RewardAddress string `json:"rewardAddress"`
 }
 
 // AddDelegator creates and signs and issues a transaction to add a
@@ -1002,13 +999,12 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 type AddSubnetValidatorArgs struct {
 	APIStaker
 	api.UserPass
-	// ID of subnet to validate
-	SubnetID string `json:"subnetID"`
-
 	// The address change will be sent to.
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
-	ChangeAddr string `json:"changeAddr"`
+	api.JsonChangeAddr
+	// ID of subnet to validate
+	SubnetID string `json:"subnetID"`
 }
 
 // AddSubnetValidator creates and signs and issues a transaction to
@@ -1094,7 +1090,7 @@ type CreateSubnetArgs struct {
 	// The address change will be sent to.
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
-	ChangeAddr string `json:"changeAddr"`
+	api.JsonChangeAddr
 }
 
 // CreateSubnet creates and signs and issues a transaction to create a new
@@ -1163,6 +1159,10 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
 	api.UserPass
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	api.JsonChangeAddr
 
 	// Amount of AVAX to send
 	Amount json.Uint64 `json:"amount"`
@@ -1170,11 +1170,6 @@ type ExportAVAXArgs struct {
 	// ID of the address that will receive the AVAX. This address includes the
 	// chainID, which is used to determine what the destination chain is.
 	To string `json:"to"`
-
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	ChangeAddr string `json:"changeAddr"`
 }
 
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
@@ -1244,17 +1239,16 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 // ImportAVAXArgs are the arguments to ImportAVAX
 type ImportAVAXArgs struct {
 	api.UserPass
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	api.JsonChangeAddr
 
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
 
 	// The address that will receive the imported funds
 	To string `json:"to"`
-
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	ChangeAddr string `json:"changeAddr"`
 }
 
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
@@ -1324,6 +1318,10 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
 	api.UserPass
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	api.JsonChangeAddr
 	// ID of Subnet that validates the new blockchain
 	SubnetID ids.ID `json:"subnetID"`
 	// ID of the VM the new blockchain is running
@@ -1334,10 +1332,6 @@ type CreateBlockchainArgs struct {
 	Name string `json:"name"`
 	// Genesis state of the blockchain being created
 	GenesisData formatting.CB58 `json:"genesisData"`
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	ChangeAddr string `json:"changeAddr"`
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain

@@ -24,6 +24,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var (
+	testChangeAddr = ids.GenerateTestShortID()
+)
+
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
 	keystore := keystore.CreateTestKeystore()
@@ -552,11 +556,17 @@ func TestCreateFixedCapAsset(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := FormattedAssetID{}
+	reply := AssetIDChangeAddr{}
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -569,6 +579,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			Amount:  123456789,
 			Address: addrStr,
 		}},
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -576,6 +587,8 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 	if reply.AssetID.String() != "2YD5ovZNEx7cxryCBxDZaYbrQc3v6AxTDiJwCxkZS1YMFU3Sni" {
 		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
+	} else if reply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
 	}
 }
 
@@ -586,11 +599,16 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := FormattedAssetID{}
+	reply := AssetIDChangeAddr{}
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
 	}
+	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -606,9 +624,12 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				},
 			},
 		},
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
+	} else if reply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
 	}
 
 	createdAssetID := reply.AssetID.String()
@@ -634,13 +655,16 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		Amount:  200,
-		AssetID: createdAssetID,
-		To:      addrStr,
+		Amount:         200,
+		AssetID:        createdAssetID,
+		To:             addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}
-	mintReply := &api.JsonTxID{}
+	mintReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
 		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
+	} else if mintReply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address %s but got %s", changeAddrStr, mintReply.ChangeAddr)
 	}
 
 	mintTx := UniqueTx{
@@ -654,18 +678,22 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	if err := mintTx.Accept(); err != nil {
 		t.Fatalf("Failed to accept MintTx due to: %s", err)
 	}
+
 	sendArgs := &SendArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		Amount:  200,
-		AssetID: createdAssetID,
-		To:      addrStr,
+		Amount:         200,
+		AssetID:        createdAssetID,
+		To:             addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}
-	sendReply := &api.JsonTxID{}
+	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Send(nil, sendArgs, sendReply); err != nil {
 		t.Fatalf("Failed to send newly minted variable cap asset due to: %s", err)
+	} else if sendReply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
 	}
 }
 
@@ -678,6 +706,10 @@ func TestNFTWorkflow(t *testing.T) {
 
 	// Test minting of the created variable cap asset
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -696,10 +728,13 @@ func TestNFTWorkflow(t *testing.T) {
 				},
 			},
 		},
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}
-	createReply := &FormattedAssetID{}
+	createReply := &AssetIDChangeAddr{}
 	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
 		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
+	} else if createReply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, createReply.ChangeAddr)
 	}
 
 	assetID := createReply.AssetID
@@ -721,14 +756,17 @@ func TestNFTWorkflow(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		AssetID: assetID.String(),
-		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
-		To:      addrStr,
+		AssetID:        assetID.String(),
+		Payload:        formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
+		To:             addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}
-	mintReply := &api.JsonTxID{}
+	mintReply := &api.JsonTxIDChangeAddr{}
 
 	if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
 		t.Fatalf("MintNFT returned an error: %s", err)
+	} else if createReply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, mintReply.ChangeAddr)
 	}
 
 	mintNFTTx := UniqueTx{
@@ -749,13 +787,16 @@ func TestNFTWorkflow(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		AssetID: assetID.String(),
-		GroupID: 0,
-		To:      addrStr,
+		AssetID:        assetID.String(),
+		GroupID:        0,
+		To:             addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}
-	sendReply := &api.JsonTxID{}
+	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
 		t.Fatalf("Failed to send NFT due to: %s", err)
+	} else if sendReply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
 	}
 }
 
@@ -893,19 +934,27 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	args := &SendArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		Amount:  500,
-		AssetID: assetID.String(),
-		To:      addrStr,
+		Amount:         500,
+		AssetID:        assetID.String(),
+		To:             addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}
-	reply := &api.JsonTxID{}
+	reply := &api.JsonTxIDChangeAddr{}
 	vm.timer.Cancel()
 	if err := s.Send(nil, args, reply); err != nil {
 		t.Fatalf("Failed to send transaction: %s", err)
+	} else if reply.ChangeAddr != changeAddrStr {
+		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
 	}
 
 	pendingTxs := vm.txs
