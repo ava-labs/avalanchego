@@ -4,6 +4,7 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -45,6 +46,12 @@ const (
 	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = time.Minute
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
+)
+
+var (
+	errNetworkClosed        = errors.New("network closed")
+	errPeerIsMyself         = errors.New("peer is myself")
+	errDuplicatedConnection = errors.New("duplicated connection")
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -262,6 +269,7 @@ func NewNetwork(
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
 	netw.executor.Initialize()
+	go netw.executor.Dispatch()
 	netw.heartbeat()
 	return netw
 }
@@ -635,15 +643,15 @@ func (n *network) Dispatch() error {
 	for {
 		conn, err := n.listener.Accept()
 		if err != nil {
-			n.stateLock.Lock()
-			closed := n.closed
-			n.stateLock.Unlock()
-
-			if closed {
-				return err
+			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+				// Sleep for a small amount of time to try to wait for the
+				// temporary error to go away.
+				time.Sleep(time.Millisecond)
+				continue
 			}
+
 			n.log.Debug("error during server accept: %s", err)
-			continue
+			return err
 		}
 		go n.upgrade(&peer{
 			net:  n,
@@ -675,17 +683,17 @@ func (n *network) Peers() []PeerID {
 
 // Close implements the Network interface
 func (n *network) Close() error {
+	err := n.listener.Close()
+	if err != nil {
+		n.log.Debug("closing network listener failed with: %s", err)
+	}
+
 	n.stateLock.Lock()
 	if n.closed {
 		n.stateLock.Unlock()
 		return nil
 	}
-
 	n.closed = true
-	err := n.listener.Close()
-	if err != nil {
-		n.log.Debug("closing network listener failed with: %s", err)
-	}
 
 	peersToClose := []*peer(nil)
 	for _, peer := range n.peers {
@@ -935,7 +943,17 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	p.id = id
 	p.conn = conn
 
-	key := id.Key()
+	if err := n.tryAddPeer(p); err != nil {
+		_ = p.conn.Close()
+		n.log.Debug("dropping peer connection due to: %s", err)
+	}
+	return nil
+}
+
+// assumes the stateLock is not held. Returns an error if the peer couldn't be
+// added.
+func (n *network) tryAddPeer(p *peer) error {
+	key := p.id.Key()
 
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
@@ -943,13 +961,12 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	if n.closed {
 		// the network is closing, so make sure that no further reconnect
 		// attempts are made.
-		_ = p.conn.Close()
-		return nil
+		return errNetworkClosed
 	}
 
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
-	if id.Equals(n.id) {
+	if p.id.Equals(n.id) {
 		if !p.ip.IsZero() {
 			// if n.ip is less useful than p.ip set it to this IP
 			if n.ip.IsZero() {
@@ -962,10 +979,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.retryDelay, str)
 			n.myIPs[str] = struct{}{}
 		}
-		// don't attempt to reconnect to myself, so return nil even if closing
-		// returns an error
-		_ = p.conn.Close()
-		return nil
+		return errPeerIsMyself
 	}
 
 	// If I am already connected to this peer, then I should close this new
@@ -976,10 +990,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 		}
-		// I'm already connected to this peer, so don't attempt to reconnect to
-		// this ip, even if an error occurres during closing
-		_ = p.conn.Close()
-		return nil
+		return errDuplicatedConnection
 	}
 
 	n.peers[key] = p
