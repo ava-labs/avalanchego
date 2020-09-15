@@ -87,7 +87,7 @@ const (
 var (
 	// minGasPrice is the number of nAVAX required per gas unit for a transaction
 	// to be valid, measured in wei
-	minGasPrice = big.NewInt(47 * params.GWei)
+	minGasPrice = big.NewInt(470 * params.GWei)
 
 	txFee = units.MilliAvax
 
