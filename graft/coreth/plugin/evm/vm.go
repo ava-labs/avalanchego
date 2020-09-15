@@ -23,31 +23,34 @@ import (
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/go-ethereum/common"
-	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
 	"github.com/ava-labs/go-ethereum/rlp"
 	"github.com/ava-labs/go-ethereum/rpc"
+
+	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
+
 	geckorpc "github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/gecko/api/admin"
-	"github.com/ava-labs/gecko/cache"
-	"github.com/ava-labs/gecko/database"
-	"github.com/ava-labs/gecko/ids"
-	"github.com/ava-labs/gecko/snow"
-	"github.com/ava-labs/gecko/snow/choices"
-	"github.com/ava-labs/gecko/snow/consensus/snowman"
-	"github.com/ava-labs/gecko/utils/codec"
-	"github.com/ava-labs/gecko/utils/constants"
-	"github.com/ava-labs/gecko/utils/crypto"
-	"github.com/ava-labs/gecko/utils/formatting"
-	geckojson "github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/timer"
-	"github.com/ava-labs/gecko/utils/units"
-	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/components/avax"
-	"github.com/ava-labs/gecko/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-go/api/admin"
+	"github.com/ava-labs/avalanche-go/cache"
+	"github.com/ava-labs/avalanche-go/database"
+	"github.com/ava-labs/avalanche-go/database/prefixdb"
+	"github.com/ava-labs/avalanche-go/ids"
+	"github.com/ava-labs/avalanche-go/snow"
+	"github.com/ava-labs/avalanche-go/snow/choices"
+	"github.com/ava-labs/avalanche-go/snow/consensus/snowman"
+	"github.com/ava-labs/avalanche-go/utils/codec"
+	"github.com/ava-labs/avalanche-go/utils/constants"
+	"github.com/ava-labs/avalanche-go/utils/crypto"
+	"github.com/ava-labs/avalanche-go/utils/formatting"
+	"github.com/ava-labs/avalanche-go/utils/logging"
+	"github.com/ava-labs/avalanche-go/utils/timer"
+	"github.com/ava-labs/avalanche-go/utils/units"
+	"github.com/ava-labs/avalanche-go/utils/wrappers"
+	"github.com/ava-labs/avalanche-go/vms/components/avax"
+	"github.com/ava-labs/avalanche-go/vms/secp256k1fx"
 
-	commonEng "github.com/ava-labs/gecko/snow/engine/common"
+	commonEng "github.com/ava-labs/avalanche-go/snow/engine/common"
+	geckojson "github.com/ava-labs/avalanche-go/utils/json"
 )
 
 var (
@@ -60,6 +63,7 @@ var (
 
 const (
 	lastAcceptedKey = "snowman_lastAccepted"
+	acceptedPrefix  = "snowman_accepted"
 )
 
 const (
@@ -67,7 +71,7 @@ const (
 	maxBlockTime    = 1000 * time.Millisecond
 	batchSize       = 250
 	maxUTXOsToFetch = 1024
-	blockCacheSize  = 1 << 17 // 131072
+	blockCacheSize  = 1 << 10 // 1024
 )
 
 const (
@@ -157,6 +161,8 @@ type VM struct {
 	networkChan       chan<- commonEng.Message
 	newTxPoolHeadChan chan core.NewTxPoolHeadEvent
 
+	acceptedDB database.Database
+
 	txPoolStabilizedHead common.Hash
 	txPoolStabilizedOk   chan struct{}
 	txPoolStabilizedLock sync.Mutex
@@ -228,6 +234,8 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+
+	vm.acceptedDB = prefixdb.New([]byte(acceptedPrefix), db)
 
 	vm.chainID = g.Config.ChainID
 	vm.txFee = txFee
@@ -598,45 +606,89 @@ func (vm *VM) tryBlockGen() error {
 func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 	vm.metalock.Lock()
 	defer vm.metalock.Unlock()
-	status := choices.Processing
 
 	if statusIntf, ok := vm.blockStatusCache.Get(blockID); ok {
-		status = statusIntf.(choices.Status)
-	} else {
-		wrappedBlk := vm.getBlock(blockID)
-		if wrappedBlk == nil {
-			return choices.Unknown
-		}
-		blk := wrappedBlk.ethBlock
-		acceptedBlk := vm.lastAccepted.ethBlock
+		return statusIntf.(choices.Status)
+	}
 
-		// TODO: There must be a better way of doing this.
-		// Traverse up the chain from the lower block until the indices match
-		highBlock := blk
-		lowBlock := acceptedBlk
-		if highBlock.Number().Cmp(lowBlock.Number()) < 0 {
-			highBlock, lowBlock = lowBlock, highBlock
-		}
-		for highBlock.Number().Cmp(lowBlock.Number()) > 0 {
-			parentBlock := vm.getBlock(ids.NewID(highBlock.ParentHash()))
-			if parentBlock == nil {
-				vm.blockStatusCache.Put(blockID, choices.Processing)
-				return choices.Processing
+	wrappedBlk := vm.getBlock(blockID)
+	if wrappedBlk == nil {
+		return choices.Unknown
+	}
+	blk := wrappedBlk.ethBlock
+
+	heightKey := blk.Number().Bytes()
+	acceptedIDBytes, err := vm.acceptedDB.Get(heightKey)
+	if err == nil {
+		if acceptedID, err := ids.ToID(acceptedIDBytes); err != nil {
+			vm.ctx.Log.Error("snowman-eth: acceptedID bytes didn't match expected value: %s", err)
+		} else {
+			if acceptedID.Equals(blockID) {
+				vm.blockStatusCache.Put(blockID, choices.Accepted)
+				return choices.Accepted
 			}
-			highBlock = parentBlock.ethBlock
+			vm.blockStatusCache.Put(blockID, choices.Rejected)
+			return choices.Rejected
+		}
+	}
+
+	status := vm.getUncachedStatus(blk)
+	if status == choices.Accepted {
+		err := vm.acceptedDB.Put(heightKey, blockID.Bytes())
+		if err != nil {
+			vm.ctx.Log.Error("snowman-eth: failed to write back acceptedID bytes: %s", err)
 		}
 
-		if highBlock.Hash() == lowBlock.Hash() { // on the same branch
-			if blk.Number().Cmp(acceptedBlk.Number()) <= 0 {
-				status = choices.Accepted
+		tempBlock := wrappedBlk
+		for tempBlock.ethBlock != nil {
+			parentID := ids.NewID(tempBlock.ethBlock.ParentHash())
+			tempBlock = vm.getBlock(parentID)
+			if tempBlock == nil || tempBlock.ethBlock == nil {
+				break
 			}
-		} else { // on different branches
-			status = choices.Rejected
+
+			heightKey := tempBlock.ethBlock.Number().Bytes()
+			_, err := vm.acceptedDB.Get(heightKey)
+			if err == nil {
+				break
+			}
+
+			if err := vm.acceptedDB.Put(heightKey, parentID.Bytes()); err != nil {
+				vm.ctx.Log.Error("snowman-eth: failed to write back acceptedID bytes: %s", err)
+			}
 		}
 	}
 
 	vm.blockStatusCache.Put(blockID, status)
 	return status
+}
+
+func (vm *VM) getUncachedStatus(blk *types.Block) choices.Status {
+	acceptedBlk := vm.lastAccepted.ethBlock
+
+	// TODO: There must be a better way of doing this.
+	// Traverse up the chain from the lower block until the indices match
+	highBlock := blk
+	lowBlock := acceptedBlk
+	if highBlock.Number().Cmp(lowBlock.Number()) < 0 {
+		highBlock, lowBlock = lowBlock, highBlock
+	}
+	for highBlock.Number().Cmp(lowBlock.Number()) > 0 {
+		parentBlock := vm.getBlock(ids.NewID(highBlock.ParentHash()))
+		if parentBlock == nil {
+			return choices.Processing
+		}
+		highBlock = parentBlock.ethBlock
+	}
+
+	if highBlock.Hash() != lowBlock.Hash() { // on different branches
+		return choices.Rejected
+	}
+	// on the same branch
+	if blk.Number().Cmp(acceptedBlk.Number()) <= 0 {
+		return choices.Accepted
+	}
+	return choices.Processing
 }
 
 func (vm *VM) getBlock(id ids.ID) *Block {
