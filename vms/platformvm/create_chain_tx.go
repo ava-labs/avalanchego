@@ -171,8 +171,9 @@ func (vm *VM) newCreateChainTx(
 	fxIDs []ids.ID, // fxs this chain supports
 	chainName string, // Name of the chain
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

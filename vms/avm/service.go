@@ -449,14 +449,15 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		return err
 	}
 
-	// Parse the change address
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
 	var changeAddr ids.ShortID
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 { // If the user has no keys this operation will fail
+	} else if len(kc.Keys) > 0 {
 		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 

@@ -813,11 +813,16 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 // AddValidatorArgs are the arguments to AddValidator
 type AddValidatorArgs struct {
 	api.UserPass
-
 	APIStaker
+
 	// The address the staking reward, if applicable, will go to
 	RewardAddress     string       `json:"rewardAddress"`
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
+
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	ChangeAddr string `json:"changeAddr"`
 }
 
 // AddValidator creates and signs and issues a transaction to add a
@@ -865,6 +870,18 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
+	var changeAddr ids.ShortID
+	if args.ChangeAddr != "" {
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	} else if len(privKeys) > 0 {
+		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newAddValidatorTx(
 		uint64(args.weight()),                // Stake amount
@@ -874,6 +891,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
 		privKeys,                             // Private keys
+		changeAddr,                           // Change address
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -894,6 +912,11 @@ type AddDelegatorArgs struct {
 	api.UserPass
 	APIStaker
 	RewardAddress string `json:"rewardAddress"`
+
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	ChangeAddr string `json:"changeAddr"`
 }
 
 // AddDelegator creates and signs and issues a transaction to add a
@@ -939,6 +962,18 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
+	var changeAddr ids.ShortID
+	if args.ChangeAddr != "" {
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	} else if len(privKeys) > 0 {
+		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newAddDelegatorTx(
 		uint64(args.weight()),  // Stake amount
@@ -947,6 +982,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 		nodeID,                 // Node ID
 		rewardAddress,          // Reward Address
 		privKeys,               // Private keys
+		changeAddr,             // Change address
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -968,6 +1004,11 @@ type AddSubnetValidatorArgs struct {
 	api.UserPass
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
+
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	ChangeAddr string `json:"changeAddr"`
 }
 
 // AddSubnetValidator creates and signs and issues a transaction to
@@ -1008,6 +1049,18 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
+	var changeAddr ids.ShortID
+	if args.ChangeAddr != "" {
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	} else if len(keys) > 0 {
+		changeAddr = keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newAddSubnetValidatorTx(
 		uint64(args.weight()),  // Stake amount
@@ -1016,6 +1069,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		nodeID,                 // Node ID
 		subnetID,               // Subnet ID
 		keys,                   // Keys
+		changeAddr,             // Change address
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -1036,6 +1090,11 @@ type CreateSubnetArgs struct {
 	// The ID member of APISubnet is ignored
 	APISubnet
 	api.UserPass
+
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	ChangeAddr string `json:"changeAddr"`
 }
 
 // CreateSubnet creates and signs and issues a transaction to create a new
@@ -1068,11 +1127,24 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
+	var changeAddr ids.ShortID
+	if args.ChangeAddr != "" {
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	} else if len(privKeys) > 0 {
+		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newCreateSubnetTx(
 		uint32(args.Threshold), // Threshold
 		controlKeys,            // Control Addresses
 		privKeys,               // Private keys
+		changeAddr,             // Change address
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -1098,6 +1170,11 @@ type ExportAVAXArgs struct {
 	// ID of the address that will receive the AVAX. This address includes the
 	// chainID, which is used to determine what the destination chain is.
 	To string `json:"to"`
+
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	ChangeAddr string `json:"changeAddr"`
 }
 
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
@@ -1130,12 +1207,25 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
+	var changeAddr ids.ShortID
+	if args.ChangeAddr != "" {
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	} else if len(privKeys) > 0 {
+		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
 		privKeys,            // Private keys
+		changeAddr,          // Change address
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
@@ -1160,6 +1250,11 @@ type ImportAVAXArgs struct {
 
 	// The address that will receive the imported funds
 	To string `json:"to"`
+
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	ChangeAddr string `json:"changeAddr"`
 }
 
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
@@ -1193,7 +1288,19 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
 	}
 
-	tx, err := service.vm.newImportTx(chainID, to, privKeys)
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
+	var changeAddr ids.ShortID
+	if args.ChangeAddr != "" {
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	} else if len(privKeys) > 0 {
+		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
+	}
+
+	tx, err := service.vm.newImportTx(chainID, to, privKeys, changeAddr)
 	if err != nil {
 		return err
 	}
@@ -1227,6 +1334,10 @@ type CreateBlockchainArgs struct {
 	Name string `json:"name"`
 	// Genesis state of the blockchain being created
 	GenesisData formatting.CB58 `json:"genesisData"`
+	// The address change will be sent to.
+	// If empty, change will be sent to one of the
+	// addresses controlled by the user
+	ChangeAddr string `json:"changeAddr"`
 }
 
 // CreateBlockchain issues a transaction to create a new blockchain
@@ -1280,6 +1391,18 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	// Parse the change address. Assumes that if the user has no keys,
+	// this operation will fail so the change address can be anything.
+	var changeAddr ids.ShortID
+	if args.ChangeAddr != "" {
+		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse changeAddr: %w", err)
+		}
+	} else if len(keys) > 0 {
+		changeAddr = keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newCreateChainTx(
 		args.SubnetID,
@@ -1288,6 +1411,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		fxIDs,
 		args.Name,
 		keys,
+		changeAddr, // Change address
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)

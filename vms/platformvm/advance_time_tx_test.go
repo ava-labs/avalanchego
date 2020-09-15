@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 )
@@ -46,6 +47,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -106,6 +108,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
