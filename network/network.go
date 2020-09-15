@@ -1068,7 +1068,7 @@ func (n *network) disconnected(p *peer) {
 type PeerElement struct {
 	peer *peer
 	sent bool
-	id ids.ShortID
+	id   ids.ShortID
 }
 
 func (n *network) getPeers(validatorIDs ids.ShortSet) []PeerElement {
