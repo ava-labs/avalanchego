@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanche-go/vms/rpcchainvm"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 
 	"github.com/ava-labs/coreth/plugin/evm"
 )
