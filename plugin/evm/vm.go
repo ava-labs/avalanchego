@@ -251,6 +251,7 @@ func (vm *VM) Initialize(
 	config.Miner.GasPrice = minGasPrice
 	config.GPO.Default = minGasPrice
 	config.TxPool.PriceLimit = minGasPrice.Uint64()
+	config.TxPool.NoLocals = true
 
 	if err := config.SetGCMode("archive"); err != nil {
 		panic(err)
