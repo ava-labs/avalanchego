@@ -65,7 +65,7 @@ var (
 // GetIPs returns the default IPs for each network
 func GetIPs(networkID uint32) []string {
 	switch networkID {
-	case constants.ManhattenID:
+	case constants.ManhattanID:
 		return []string{
 			"54.94.43.49:21001",
 			"52.79.47.77:21001",
@@ -100,7 +100,7 @@ func GetIPs(networkID uint32) []string {
 // GetIDs returns the default IDs for each network
 func GetIDs(networkID uint32) []string {
 	switch networkID {
-	case constants.ManhattenID:
+	case constants.ManhattanID:
 		return []string{
 			"NodeID-A6onFGyJjA37EZ7kYHANMR1PFRT8NmXrF",
 			"NodeID-6SwnPJLH8cWfrJ162JjZekbmzaFpjPcf",

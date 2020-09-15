@@ -65,9 +65,9 @@ func (c *Config) InitialSupply() (uint64, error) {
 }
 
 var (
-	// ManhattenConfig is the config that should be used to generate the
-	// manhatten genesis.
-	ManhattenConfig Config
+	// ManhattanConfig is the config that should be used to generate the
+	// manhattan genesis.
+	ManhattanConfig Config
 
 	// LocalConfig is the config that should be used to generate a local
 	// genesis.
@@ -77,7 +77,7 @@ var (
 func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
-		json.Unmarshal([]byte(manhattenGenesisConfigJSON), &ManhattenConfig),
+		json.Unmarshal([]byte(manhattanGenesisConfigJSON), &ManhattanConfig),
 		json.Unmarshal([]byte(localGenesisConfigJSON), &LocalConfig),
 	)
 	if errs.Errored() {
@@ -88,8 +88,8 @@ func init() {
 // GetConfig ...
 func GetConfig(networkID uint32) *Config {
 	switch networkID {
-	case constants.ManhattenID:
-		return &ManhattenConfig
+	case constants.ManhattanID:
+		return &ManhattanConfig
 	case constants.LocalID:
 		return &LocalConfig
 	default:

@@ -4,7 +4,7 @@
 package genesis
 
 var (
-	manhattenGenesisConfigJSON = `{
+	manhattanGenesisConfigJSON = `{
 		"networkID": 0,
 		"allocations": [
 			{

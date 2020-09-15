@@ -11,17 +11,17 @@ import (
 
 // Const variables to be exported
 const (
-	ManhattenID uint32 = 0
+	ManhattanID uint32 = 0
 	MainnetID   uint32 = 1
 	CascadeID   uint32 = 2
 	DenaliID    uint32 = 3
 	EverestID   uint32 = 4
 
-	TestnetID  uint32 = ManhattenID
+	TestnetID  uint32 = ManhattanID
 	UnitTestID uint32 = 10
 	LocalID    uint32 = 12345
 
-	ManhattenName = "manhatten"
+	ManhattanName = "manhattan"
 	MainnetName   = "mainnet"
 	CascadeName   = "cascade"
 	DenaliName    = "denali"
@@ -30,7 +30,7 @@ const (
 	UnitTestName  = "testing"
 	LocalName     = "local"
 
-	ManhattenHRP = "man"
+	ManhattanHRP = "man"
 	MainnetHRP   = "avax"
 	CascadeHRP   = "cascade"
 	DenaliHRP    = "denali"
@@ -46,7 +46,7 @@ var (
 	PlatformChainID  = ids.Empty
 
 	NetworkIDToNetworkName = map[uint32]string{
-		ManhattenID: ManhattenName,
+		ManhattanID: ManhattanName,
 		MainnetID:   MainnetName,
 		CascadeID:   CascadeName,
 		DenaliID:    DenaliName,
@@ -55,7 +55,7 @@ var (
 		LocalID:     LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
-		ManhattenName: ManhattenID,
+		ManhattanName: ManhattanID,
 		MainnetName:   MainnetID,
 		CascadeName:   CascadeID,
 		DenaliName:    DenaliID,
@@ -66,7 +66,7 @@ var (
 	}
 
 	NetworkIDToHRP = map[uint32]string{
-		ManhattenID: ManhattenHRP,
+		ManhattanID: ManhattanHRP,
 		MainnetID:   MainnetHRP,
 		CascadeID:   CascadeHRP,
 		DenaliID:    DenaliHRP,
@@ -75,7 +75,7 @@ var (
 		LocalID:     LocalHRP,
 	}
 	NetworkHRPToNetworkID = map[string]uint32{
-		ManhattenHRP: ManhattenID,
+		ManhattanHRP: ManhattanID,
 		MainnetHRP:   MainnetID,
 		CascadeHRP:   CascadeID,
 		DenaliHRP:    DenaliID,
