@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -17,10 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-)
-
-var (
-	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
 )
 
 // UnsignedTx ...
@@ -81,7 +76,10 @@ func (t *Tx) SyntacticVerify(
 	}
 
 	if numCreds := t.UnsignedTx.NumCredentials(); numCreds != len(t.Creds) {
-		return errWrongNumberOfCredentials
+		return fmt.Errorf("tx has %d credentials but %d inputs. Should be same",
+			len(t.Creds),
+			numCreds,
+		)
 	}
 	return nil
 }

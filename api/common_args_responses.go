@@ -40,3 +40,8 @@ type JsonTxIDChangeAddr struct {
 	JsonTxID
 	JsonChangeAddr
 }
+
+// JsonFromAddrs is a list of addresses to send funds from
+type JsonFromAddrs struct {
+	From []string `json:"from"`
+}

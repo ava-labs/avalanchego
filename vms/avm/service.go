@@ -42,7 +42,7 @@ var (
 	errInvalidUTXO            = errors.New("invalid utxo")
 	errNilTxID                = errors.New("nil transaction ID")
 	errNoAddresses            = errors.New("no addresses provided")
-	errNoKeys                 = errors.New("user has no keys or funds")
+	errNoKeys                 = errors.New("from addresses have no keys or funds")
 )
 
 // Service defines the base service for the asset vm
@@ -416,6 +416,9 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 // CreateFixedCapAssetArgs are arguments for passing into CreateFixedCapAsset requests
 type CreateFixedCapAssetArgs struct {
 	api.UserPass
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -450,18 +453,28 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		return errNoHolders
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
+	// Parse the change address.
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
@@ -543,6 +556,9 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 // CreateVariableCapAssetArgs are arguments for passing into CreateVariableCapAsset requests
 type CreateVariableCapAssetArgs struct {
 	api.UserPass
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -571,18 +587,28 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		return errNoMinters
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
+	// Parse the change address.
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
@@ -668,6 +694,9 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 // CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
 type CreateNFTAssetArgs struct {
 	api.UserPass
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -689,18 +718,28 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		return errNoMinters
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
+	// Parse the change address.
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
@@ -967,6 +1006,10 @@ type SendArgs struct {
 	// Username and password of user sending the funds
 	api.UserPass
 
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
+
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -1033,13 +1076,12 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
+	// Parse the change address.
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
@@ -1129,6 +1171,9 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 // MintArgs are arguments for passing into Mint requests
 type MintArgs struct {
 	api.UserPass
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -1159,18 +1204,28 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	feeUTXOs, feeKc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	if len(kc.Keys) == 0 {
+	// Parse the change address.
+	if len(feeKc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := feeKc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                        // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
@@ -1179,8 +1234,8 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
 	amountsSpent, ins, keys, err := service.vm.Spend(
-		utxos,
-		kc,
+		feeUTXOs,
+		feeKc,
 		map[[32]byte]uint64{
 			avaxKey: service.vm.txFee,
 		},
@@ -1202,6 +1257,12 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 				},
 			},
 		})
+	}
+
+	// Get all UTXOs/keys for the user
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	if err != nil {
+		return err
 	}
 
 	ops, opKeys, err := service.vm.Mint(
@@ -1243,6 +1304,9 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 // SendNFTArgs are arguments for passing into SendNFT requests
 type SendNFTArgs struct {
 	api.UserPass
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -1256,6 +1320,7 @@ type SendNFTArgs struct {
 func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("AVM: SendNFT called with username: %s", args.Username)
 
+	// Parse the asset ID
 	assetID, err := service.vm.Lookup(args.AssetID)
 	if err != nil {
 		assetID, err = ids.FromString(args.AssetID)
@@ -1264,23 +1329,34 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		}
 	}
 
+	// Parse the to address
 	to, err := service.vm.ParseLocalAddress(args.To)
 	if err != nil {
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
+	// Parse the change address.
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
@@ -1354,6 +1430,9 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
 	api.UserPass
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -1380,18 +1459,28 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		return fmt.Errorf("problem parsing to address %q: %w", args.To, err)
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	feeUTXOs, feeKc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	if len(kc.Keys) == 0 {
+	// Parse the change address.
+	if len(feeKc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := feeKc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                        // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
@@ -1400,8 +1489,8 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
 	amountsSpent, ins, secpKeys, err := service.vm.Spend(
-		utxos,
-		kc,
+		feeUTXOs,
+		feeKc,
 		map[[32]byte]uint64{
 			avaxKey: service.vm.txFee,
 		},
@@ -1423,6 +1512,12 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 				},
 			},
 		})
+	}
+
+	// Get all UTXOs/keys
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	if err != nil {
+		return err
 	}
 
 	ops, nftKeys, err := service.vm.MintNFT(
@@ -1581,6 +1676,9 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 // ExportAVAXArgs are arguments for passing into ExportAVA requests
 type ExportAVAXArgs struct {
 	api.UserPass // User providing exported AVAX
+	// The addresses from which the transaction fee is paid.
+	// If empty, pays the fee from any of the user's addresses.
+	api.JsonFromAddrs
 	// The address change will be sent to
 	// If empty, change will be sent to one of the
 	// addresses controlled by the user
@@ -1609,18 +1707,28 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 		return errInvalidAmount
 	}
 
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, nil)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Get the UTXOs/keys for the from addresses
+	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
 	if err != nil {
 		return err
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
+	// Parse the change address.
 	if len(kc.Keys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use an arbitrary key
+	if args.ChangeAddr != "" {                     // If change addr specified, use that
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)

@@ -65,7 +65,7 @@ func TestTxInvalidCredential(t *testing.T) {
 					TxID:        ids.Empty,
 					OutputIndex: 0,
 				},
-				Asset: avax.Asset{ID: asset},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt: 20 * units.KiloAvax,
 					Input: secp256k1fx.Input{
@@ -102,7 +102,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
@@ -117,7 +117,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 						TxID:        ids.Empty,
 						OutputIndex: 0,
 					},
-					Asset: avax.Asset{ID: asset},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
@@ -155,7 +155,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 			Ins: []*avax.TransferableInput{
 				{
 					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 0},
-					Asset:  avax.Asset{ID: asset},
+					Asset:  avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
@@ -167,7 +167,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 				},
 				{
 					UTXOID: avax.UTXOID{TxID: ids.Empty, OutputIndex: 1},
-					Asset:  avax.Asset{ID: asset},
+					Asset:  avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 20 * units.KiloAvax,
 						Input: secp256k1fx.Input{
