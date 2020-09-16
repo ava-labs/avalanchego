@@ -19,23 +19,30 @@ package types
 import (
 	"bytes"
 
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// DerivableList is the interface which can derive the hash.
 type DerivableList interface {
 	Len() int
 	GetRlp(i int) []byte
 }
 
-func DeriveSha(list DerivableList) common.Hash {
+// Hasher is the tool used to calculate the hash of derivable list.
+type Hasher interface {
+	Reset()
+	Update([]byte, []byte)
+	Hash() common.Hash
+}
+
+func DeriveSha(list DerivableList, hasher Hasher) common.Hash {
+	hasher.Reset()
 	keybuf := new(bytes.Buffer)
-	trie := new(trie.Trie)
 	for i := 0; i < list.Len(); i++ {
 		keybuf.Reset()
 		rlp.Encode(keybuf, uint(i))
-		trie.Update(keybuf.Bytes(), list.GetRlp(i))
+		hasher.Update(keybuf.Bytes(), list.GetRlp(i))
 	}
-	return trie.Hash()
+	return hasher.Hash()
 }

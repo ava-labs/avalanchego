@@ -35,7 +35,7 @@ import (
 	"strconv"
 
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type allocItem struct{ Addr, Balance *big.Int }
