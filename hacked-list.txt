@@ -13,7 +13,6 @@
 ./core/state_processor.go
 ./core/state/statedb.go
 ./core/state/state_object.go
-
 ./core/tx_pool.go
 ./core/types/block.go
 ./core/vm/errors.go
@@ -28,6 +27,7 @@
 ./eth/api.go
 ./eth/api_tracer.go
 ./eth/backend.go
+
 ./eth/config.go
 ./eth/gen_config.go
 ./eth/tracers/internal/tracers/assets.go

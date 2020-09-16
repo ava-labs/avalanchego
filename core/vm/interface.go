@@ -20,7 +20,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // StateDB is an EVM database for full state querying.
