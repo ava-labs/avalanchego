@@ -295,6 +295,7 @@ func (vm *VM) Initialize(
 			vm:       vm,
 		}
 		if blk.Verify() != nil {
+			vm.newBlockChan <- nil
 			return errInvalidBlock
 		}
 		vm.newBlockChan <- blk
