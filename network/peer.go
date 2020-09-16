@@ -72,7 +72,7 @@ func (p *peer) Start() {
 
 	// Initially send the version to the peer
 	go p.Version()
-	go p.requestVersion()
+	go p.requestFinishHandshake()
 	go p.sendPings()
 }
 
@@ -93,8 +93,8 @@ func (p *peer) sendPings() {
 	}
 }
 
-// request the version from the peer until we get the version from them
-func (p *peer) requestVersion() {
+// request missing handshake messages from the peer
+func (p *peer) requestFinishHandshake() {
 	t := time.NewTicker(p.net.getVersionTimeout)
 	defer t.Stop()
 
@@ -110,10 +110,11 @@ func (p *peer) requestVersion() {
 			return
 		}
 
-		if gotVersion {
-			p.GetPeerList()
-		} else if gotPeerList {
+		if !gotVersion {
 			p.GetVersion()
+		}
+		if !gotPeerList {
+			p.GetPeerList()
 		}
 	}
 }
