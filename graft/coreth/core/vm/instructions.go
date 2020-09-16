@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"errors"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
@@ -265,7 +266,12 @@ func opBalance(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([
 
 func opBalanceMultiCoin(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
 	addr, cid := callContext.stack.pop(), callContext.stack.pop()
-	callContext.stack.push(interpreter.evm.StateDB.GetBalanceMultiCoin(common.BigToAddress(addr), common.BigToHash(cid)))
+	res, err := uint256.FromBig(interpreter.evm.StateDB.GetBalanceMultiCoin(
+		common.BigToAddress(addr.ToBig()), common.BigToHash(cid.ToBig())))
+	if err {
+		return nil, errors.New("balance overflow")
+	}
+	callContext.stack.push(res)
 	return nil, nil
 }
 
@@ -725,7 +731,7 @@ func opCallExpert(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx)
 	// Pop other call parameters.
 	addr, value, cid, value2, inOffset, inSize, retOffset, retSize := stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop()
 	toAddr := common.Address(addr.Bytes20())
-	coinID := common.BigToHash(cid)
+	coinID := common.BigToHash(cid.ToBig())
 	// Get the arguments from the memory.
 	args := callContext.memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
@@ -875,8 +881,8 @@ func opSuicide(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([
 	return nil, nil
 }
 
-func opEMC(pc *uint64, interpreter *EVMInterpreter, contract *Contract, callContext *callCtx) ([]byte, error) {
-	return nil, interpreter.evm.StateDB.EnableMultiCoin(contract.Address())
+func opEMC(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
+	return nil, interpreter.evm.StateDB.EnableMultiCoin(callContext.contract.Address())
 }
 
 // following functions are used by the instruction jump  table

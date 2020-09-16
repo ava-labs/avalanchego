@@ -371,7 +371,7 @@ func (api *PublicDebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, sta
 			var block *types.Block
 			if number == rpc.LatestBlockNumber {
 				block = api.eth.blockchain.CurrentBlock()
-			} else if blockNr == rpc.AcceptedBlockNumber {
+			} else if number == rpc.AcceptedBlockNumber {
 				block = api.eth.AcceptedBlock()
 			} else {
 				block = api.eth.blockchain.GetBlockByNumber(uint64(number))

@@ -22,6 +22,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/forkid"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
