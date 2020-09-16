@@ -27,7 +27,6 @@
 ./eth/api.go
 ./eth/api_tracer.go
 ./eth/backend.go
-
 ./eth/config.go
 ./eth/gen_config.go
 ./eth/tracers/internal/tracers/assets.go
