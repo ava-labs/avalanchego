@@ -165,6 +165,9 @@ func (n *Node) initNetworking() error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
+		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
+			return err
+		}
 		consensusRouter = &insecureValidatorManager{
 			Router: consensusRouter,
 			vdrs:   primaryNetworkValidators,
