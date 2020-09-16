@@ -18,14 +18,13 @@ package node
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/internal/debug"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
@@ -48,7 +47,6 @@ type Node struct {
 	state         int               // Tracks state of node lifecycle
 
 	lock          sync.Mutex
-	lifecycles    []Lifecycle // All registered backends, services, and auxiliary services that have a lifecycle
 	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
 	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
 
@@ -60,6 +58,25 @@ const (
 	runningState
 	closedState
 )
+
+func (n *Node) openDataDir() error {
+	if n.config.DataDir == "" {
+		return nil // ephemeral
+	}
+
+	instdir := filepath.Join(n.config.DataDir, n.config.name())
+	if err := os.MkdirAll(instdir, 0700); err != nil {
+		return err
+	}
+	// Lock the instance directory to prevent concurrent use by another instance as well as
+	// accidental use of the instance directory as a database.
+	release, _, err := fileutil.Flock(filepath.Join(instdir, "LOCK"))
+	if err != nil {
+		return convertFileLockError(err)
+	}
+	n.dirLock = release
+	return nil
+}
 
 // New creates a new P2P node, ready for protocol registration.
 func New(conf *Config) (*Node, error) {
@@ -265,4 +282,15 @@ func (n *Node) closeDatabases() (errors []error) {
 		}
 	}
 	return errors
+}
+
+// RegisterAPIs registers the APIs a service provides on the node.
+func (n *Node) RegisterAPIs(apis []rpc.API) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if n.state != initializingState {
+		panic("can't register APIs on running/stopped node")
+	}
+	n.rpcAPIs = append(n.rpcAPIs, apis...)
 }

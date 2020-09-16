@@ -22,6 +22,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/accounts"
+	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"

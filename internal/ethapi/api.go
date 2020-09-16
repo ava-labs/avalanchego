@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/coreth/accounts/scwallet"
 	"github.com/ava-labs/coreth/consensus/ethash"
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"

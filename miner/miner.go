@@ -30,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // Backend wraps all methods required for mining.
@@ -60,7 +59,7 @@ type Miner struct {
 
 func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, mcb *MinerCallbacks) *Miner {
 	return &Miner{
-		worker: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, mcb),
+		worker: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true, mcb),
 	}
 }
 

@@ -2498,6 +2498,6 @@ func (bc *BlockChain) ManualHead(hash common.Hash) error {
 	}
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
-	bc.insert(block)
+	bc.writeHeadBlock(block)
 	return nil
 }
