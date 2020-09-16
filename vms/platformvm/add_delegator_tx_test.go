@@ -28,13 +28,13 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : tx is nil
 	var unsignedTx *UnsignedAddDelegatorTx
-	if err := unsignedTx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+	if err := unsignedTx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
 	// Case: Wrong network ID
 	tx, err := vm.newAddDelegatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -48,13 +48,13 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
 	// Case: Missing Node ID
 	tx, err = vm.newAddDelegatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -68,13 +68,13 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.NodeID = ids.ShortID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err == nil {
 		t.Fatal("should have errored because NodeID is nil")
 	}
 
 	// Case: Not enough weight
 	tx, err = vm.newAddDelegatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -85,16 +85,16 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.Wght = vm.minStake - 1
+	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.Wght = vm.minValidatorStake - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err == nil {
 		t.Fatal("should have errored because of not enough weight")
 	}
 
 	// Case: Validation length is too short
 	tx, err = vm.newAddDelegatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
 		nodeID,
@@ -108,13 +108,13 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End-- // 1 shorter than minimum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
 	// Case: Validation length is too long
 	if tx, err = vm.newAddDelegatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix()),
 		nodeID,
@@ -127,13 +127,13 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End++ // 1 longer than maximum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
 	// Case: Valid
 	if tx, err = vm.newAddDelegatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(defaultValidateStartTime.Unix()),
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
@@ -142,7 +142,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
+	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -173,7 +173,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 	// [addValidator] adds a new validator to the primary network's pending validator set
 	addValidator := func(db database.Database) {
 		if tx, err := vm.newAddValidatorTx(
-			vm.minStake,                             // stake amount
+			vm.minValidatorStake,                             // stake amount
 			newValidatorStartTime,                   // start time
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
@@ -205,7 +205,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			vm.minStake,
+			vm.minValidatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
@@ -216,7 +216,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator stops validating primary network earlier than subnet",
 		},
 		{
-			vm.minStake,
+			vm.minValidatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID,
@@ -227,7 +227,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"end time is after the primary network end time",
 		},
 		{
-			vm.minStake,
+			vm.minValidatorStake,
 			uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
 			uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			newValidatorID,
@@ -238,7 +238,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator not in the current or pending validator sets of the subnet",
 		},
 		{
-			vm.minStake,
+			vm.minValidatorStake,
 			newValidatorStartTime - 1, // start validating subnet before primary network
 			newValidatorEndTime,
 			newValidatorID,
@@ -249,7 +249,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator starts validating subnet before primary network",
 		},
 		{
-			vm.minStake,
+			vm.minValidatorStake,
 			newValidatorStartTime,
 			newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
 			newValidatorID,
@@ -260,7 +260,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"validator stops validating primary network before subnet",
 		},
 		{
-			vm.minStake,
+			vm.minValidatorStake,
 			newValidatorStartTime, // same start time as for primary network
 			newValidatorEndTime,   // same end time as for primary network
 			newValidatorID,
@@ -271,7 +271,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"valid",
 		},
 		{
-			vm.minStake, // weight
+			vm.minValidatorStake, // weight
 			uint64(currentTimestamp.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
 			nodeID,                                  // node ID
@@ -282,7 +282,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			"starts validating at current timestamp",
 		},
 		{
-			vm.minStake,                             // weight
+			vm.minValidatorStake,                             // weight
 			uint64(defaultValidateStartTime.Unix()), // start time
 			uint64(defaultValidateEndTime.Unix()),   // end time
 			nodeID,                                  // node ID

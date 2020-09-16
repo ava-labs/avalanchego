@@ -28,11 +28,11 @@ type Factory struct {
 // New returns a new instance of the Platform Chain
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{
-		chainManager:     f.ChainManager,
-		vdrMgr:           f.Validators,
-		stakingEnabled:   f.StakingEnabled,
-		txFee:            f.Fee,
-		minStake:         f.MinStake,
-		uptimePercentage: f.UptimePercentage,
+		chainManager:      f.ChainManager,
+		vdrMgr:            f.Validators,
+		stakingEnabled:    f.StakingEnabled,
+		txFee:             f.Fee,
+		minValidatorStake: f.MinStake,
+		uptimePercentage:  f.UptimePercentage,
 	}, nil
 }

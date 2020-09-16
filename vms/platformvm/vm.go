@@ -180,8 +180,8 @@ type VM struct {
 	// Tx fee burned by a transaction
 	txFee uint64
 
-	// The minimum amount of tokens one must bond to be a staker
-	minStake uint64
+	// The minimum amount of tokens one must bond to be a validator
+	minValidatorStake uint64
 
 	// UptimePercentage is the minimum uptime required to be rewarded for
 	// staking.

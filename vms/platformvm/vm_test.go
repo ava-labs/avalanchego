@@ -185,10 +185,10 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 func defaultVM() (*VM, database.Database) {
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
-		txFee:        defaultTxFee,
-		minStake:     minStake,
+		SnowmanVM:         &core.SnowmanVM{},
+		chainManager:      chains.MockManager{},
+		txFee:             defaultTxFee,
+		minValidatorStake: minStake,
 	}
 
 	baseDB := memdb.New()
@@ -341,7 +341,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -418,7 +418,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	// create invalid tx
 	if tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -465,7 +465,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -1908,7 +1908,7 @@ func TestNextValidatorStartTime(t *testing.T) {
 	endTime := startTime.Add(MinimumStakingDuration)
 
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,               // stake amount
+		vm.minValidatorStake,      // stake amount
 		uint64(startTime.Unix()),  // start time
 		uint64(endTime.Unix()),    // end time
 		vm.Ctx.NodeID,             // node ID

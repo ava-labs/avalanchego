@@ -243,7 +243,7 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
-					service.vm.minStake,
+					service.vm.minValidatorStake,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
 					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),
 					ids.GenerateTestShortID(),

@@ -117,7 +117,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestShortID()
 	vdrTx, err := vm.newAddValidatorTx(
-		vm.minStake, // stakeAmt
+		vm.minValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -133,7 +133,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 	delTx, err := vm.newAddDelegatorTx(
-		vm.minStake, // stakeAmt
+		vm.minValidatorStake, // stakeAmt
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID
