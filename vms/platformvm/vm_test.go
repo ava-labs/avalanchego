@@ -65,10 +65,11 @@ var (
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys []*crypto.PrivateKeySECP256K1R
 
-	minStake = 5 * units.MilliAvax
+	minValidatorStake = 5 * units.MilliAvax
+	minDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	defaultBalance uint64 = 100 * minStake
+	defaultBalance uint64 = 100 * minValidatorStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -188,7 +189,8 @@ func defaultVM() (*VM, database.Database) {
 		SnowmanVM:         &core.SnowmanVM{},
 		chainManager:      chains.MockManager{},
 		txFee:             defaultTxFee,
-		minValidatorStake: minStake,
+		minValidatorStake: minValidatorStake,
+		minDelegatorStake: minDelegatorStake,
 	}
 
 	baseDB := memdb.New()

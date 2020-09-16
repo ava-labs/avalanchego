@@ -1827,11 +1827,15 @@ func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, respo
 
 // GetMinStakeReply is the response from calling GetMinStake.
 type GetMinStakeReply struct {
-	MinStake json.Uint64 `json:"minStake"`
+	//  The minimum amount of tokens one must bond to be a validator
+	MinValidatorStake json.Uint64 `json:"minValidatorStake"`
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	MinDelegatorStake json.Uint64 `json:"minDelegatorStake"`
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX.
 func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinStakeReply) error {
-	reply.MinStake = json.Uint64(service.vm.minValidatorStake)
+	reply.MinValidatorStake = json.Uint64(service.vm.minValidatorStake)
+	reply.MinDelegatorStake = json.Uint64(service.vm.minDelegatorStake)
 	return nil
 }

@@ -59,7 +59,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	c codec.Codec,
 	feeAmount uint64,
 	feeAssetID ids.ID,
-	minStake uint64,
+	minDelegatorStake uint64,
 ) error {
 	switch {
 	case tx == nil:
@@ -92,7 +92,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
-	case tx.Validator.Wght < minStake:
+	case tx.Validator.Wght < minDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
@@ -115,7 +115,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -235,5 +235,5 @@ func (vm *VM) newAddDelegatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake)
 }

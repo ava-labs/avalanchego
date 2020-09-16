@@ -20,9 +20,10 @@ type Factory struct {
 	ChainManager      chains.Manager
 	Validators        validators.Manager
 	StakingEnabled    bool
-	Fee               uint64
-	MinValidatorStake uint64
-	UptimePercentage  float64
+	Fee               uint64  // Transaction fee
+	MinValidatorStake uint64  // Min amt required to validate primary network
+	MinDelegatorStake uint64  // Min amt that can be delegated
+	UptimePercentage  float64 // Required uptime to get a reward in [0,1]
 }
 
 // New returns a new instance of the Platform Chain
@@ -33,6 +34,7 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		stakingEnabled:    f.StakingEnabled,
 		txFee:             f.Fee,
 		minValidatorStake: f.MinValidatorStake,
+		minDelegatorStake: f.MinDelegatorStake,
 		uptimePercentage:  f.UptimePercentage,
 	}, nil
 }

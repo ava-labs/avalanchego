@@ -133,7 +133,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 	delTx, err := vm.newAddDelegatorTx(
-		vm.minValidatorStake, // stakeAmt
+		vm.minDelegatorStake, // stakeAmt
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID

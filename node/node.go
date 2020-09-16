@@ -523,6 +523,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			StakingEnabled:    n.Config.EnableStaking,
 			Fee:               n.Config.TxFee,
 			MinValidatorStake: n.Config.MinValidatorStake,
+			MinDelegatorStake: n.Config.MinDelegatorStake,
 			UptimePercentage:  n.Config.UptimeRequirement,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
