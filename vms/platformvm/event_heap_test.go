@@ -28,6 +28,7 @@ func TestTxHeapStart(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -42,6 +43,7 @@ func TestTxHeapStart(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -56,6 +58,7 @@ func TestTxHeapStart(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +101,7 @@ func TestTxHeapStop(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +116,7 @@ func TestTxHeapStop(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +131,7 @@ func TestTxHeapStop(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -168,6 +174,7 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -180,6 +187,7 @@ func TestTxHeapStartValidatorVsDelegatorOrdering(t *testing.T) {
 		ids.NewShortID([20]byte{}),                                      // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},                         // key
+		ids.ShortEmpty,                                                  // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -211,6 +219,7 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		0,                                       // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -223,6 +232,8 @@ func TestTxHeapStopValidatorVsDelegatorOrdering(t *testing.T) {
 		ids.NewShortID([20]byte{}),                                      // node ID
 		ids.NewShortID([20]byte{1, 2, 3, 4, 5, 6, 7}),                   // reward address
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},                         // key
+		ids.ShortEmpty,                                                  // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)

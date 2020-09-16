@@ -40,6 +40,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -59,6 +60,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +80,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -97,6 +100,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -116,6 +120,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +139,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
@@ -174,6 +180,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			rewardAddress,                           // Reward Address
 			PercentDenominator,                      // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+			ids.ShortEmpty,                          // change addr
 		); err != nil {
 			t.Fatal(err)
 		} else if err := vm.addStaker(db, constants.PrimaryNetworkID, &rewardTx{
@@ -307,6 +314,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 				tt.nodeID,
 				tt.rewardAddress,
 				tt.feeKeys,
+				ids.ShortEmpty, // change addr
 			)
 			if err != nil {
 				t.Fatalf("couldn't build tx: %s", err)

@@ -101,7 +101,7 @@ func TestNewImportTx(t *testing.T) {
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		vm.Ctx.SharedMemory = tt.sharedMemory
-		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys)
+		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys, ids.ShortEmpty)
 		if err != nil {
 			if !tt.shouldErr {
 				t.Fatalf("test '%s' unexpectedly errored with: %s", tt.description, err)

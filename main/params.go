@@ -178,7 +178,7 @@ func init() {
 	fs.Uint64Var(&Config.TxFee, "tx-fee", units.MilliAvax, "Transaction fee, in nAVAX")
 
 	// Uptime requirement:
-	fs.Float64Var(&Config.UptimeRequirement, "uptime-requirement", 0, "Percent of time a validator must be online to receive rewards")
+	fs.Float64Var(&Config.UptimeRequirement, "uptime-requirement", .6, "Fraction of time a validator must be online to receive rewards")
 
 	// Minimum stake, in nAVAX, required to validate the primary network
 	fs.Uint64Var(&Config.MinStake, "min-stake", 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")

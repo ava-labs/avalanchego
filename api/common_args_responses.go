@@ -29,3 +29,14 @@ type JsonAddress struct {
 type JsonAddresses struct {
 	Addresses []string `json:"addresses"`
 }
+
+// ChangeAddr is the address change is sent to, if any
+type JsonChangeAddr struct {
+	ChangeAddr string `json:"changeAddr"`
+}
+
+// JsonTxIDChangeAddr is a tx ID and change address
+type JsonTxIDChangeAddr struct {
+	JsonTxID
+	JsonChangeAddr
+}

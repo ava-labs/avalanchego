@@ -18,6 +18,7 @@ type Router interface {
 	InternalRouter
 
 	Initialize(
+		nodeID ids.ShortID,
 		log logging.Logger,
 		timeouts *timeout.Manager,
 		gossipFrequency,

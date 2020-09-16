@@ -39,6 +39,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -58,6 +59,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +79,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -96,6 +99,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +119,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -135,6 +140,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -154,6 +160,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -173,6 +180,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
@@ -200,6 +208,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
@@ -217,6 +226,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err != nil {
@@ -242,6 +252,8 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,                                  // reward address
 		PercentDenominator,                      // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		ids.ShortEmpty,                          // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -255,6 +267,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		pendingDSValidatorID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
@@ -278,6 +291,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		pendingDSValidatorID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
@@ -294,6 +308,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		pendingDSValidatorID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
@@ -310,6 +325,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		pendingDSValidatorID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err != nil {
@@ -330,6 +346,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
@@ -350,6 +367,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,                                  // node ID
 		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err := vm.addStaker(vm.DB, testSubnet1.ID(), &rewardTx{
@@ -367,6 +385,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,                                  // node ID
 		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
@@ -386,6 +405,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
@@ -400,6 +420,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -421,6 +442,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], keys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -444,6 +466,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,           // node ID
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err = vm.addStaker(vm.DB, testSubnet1.ID(), &rewardTx{
@@ -475,6 +498,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
