@@ -323,8 +323,8 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	startTime := defaultGenesisTime.Add(1 * time.Second)
 	tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,              // stake amount
-		uint64(startTime.Unix()), // start time
+		vm.minValidatorStake,                                 // stake amount
+		uint64(startTime.Unix()),                             // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
 		nodeID,                     // node ID
 		key2.PublicKey().Address(), // reward address
