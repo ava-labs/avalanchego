@@ -42,9 +42,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/accounts"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/event"
-	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	pcsc "github.com/gballet/go-libpcsclite"
 )
 

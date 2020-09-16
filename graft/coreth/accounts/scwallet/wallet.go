@@ -35,10 +35,10 @@ import (
 
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/core/types"
-	ethereum "github.com/ava-labs/go-ethereum"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/crypto"
-	"github.com/ava-labs/go-ethereum/log"
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	pcsc "github.com/gballet/go-libpcsclite"
 	"github.com/status-im/keycard-go/derivationpath"
 )

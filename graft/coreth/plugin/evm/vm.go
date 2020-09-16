@@ -22,11 +22,11 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/rlp"
-	"github.com/ava-labs/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rpc"
 
-	ethcrypto "github.com/ava-labs/go-ethereum/crypto"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
