@@ -209,8 +209,9 @@ func (vm *VM) newAddValidatorTx(
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

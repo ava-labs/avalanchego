@@ -222,6 +222,7 @@ func defaultVM() (*VM, database.Database) {
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
+		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
 	} else if err := vm.issueTx(tx); err != nil {
@@ -347,6 +348,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -423,6 +425,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if preferredHeight, err := vm.preferredHeight(); err != nil {
@@ -469,6 +472,7 @@ func TestAddValidatorReject(t *testing.T) {
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -546,6 +550,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -626,6 +631,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -982,6 +988,7 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1036,7 +1043,8 @@ func TestCreateSubnet(t *testing.T) {
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr // payer
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1067,6 +1075,7 @@ func TestCreateSubnet(t *testing.T) {
 		nodeID,
 		createSubnetTx.ID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err := vm.issueTx(addValidatorTx); err != nil {
@@ -1241,6 +1250,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err == nil {
 		t.Fatalf("should have errored due to missing utxos")
 	}
@@ -1277,6 +1287,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1656,7 +1667,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -1897,13 +1908,14 @@ func TestNextValidatorStartTime(t *testing.T) {
 	endTime := startTime.Add(MinimumStakingDuration)
 
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,                             // stake amount
-		uint64(startTime.Unix()),                // start time
-		uint64(endTime.Unix()),                  // end time
-		vm.Ctx.NodeID,                           // node ID
-		ids.GenerateTestShortID(),               // reward address
-		PercentDenominator,                      // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		vm.minStake,               // stake amount
+		uint64(startTime.Unix()),  // start time
+		uint64(endTime.Unix()),    // end time
+		vm.Ctx.NodeID,             // node ID
+		ids.GenerateTestShortID(), // reward address
+		PercentDenominator,        // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr // key
 	)
 	assert.NoError(t, err)
 

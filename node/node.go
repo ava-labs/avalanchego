@@ -470,6 +470,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	n.Config.ConsensusRouter.Initialize(
+		n.ID,
 		n.Log,
 		&timeoutManager,
 		n.Config.ConsensusGossipFrequency,

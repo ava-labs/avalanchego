@@ -78,7 +78,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddValidator(t *testing.T) {
-	expectedJSONString := `{"username":"","password":"","startTime":"0","endTime":"0","nodeID":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
+	expectedJSONString := `{"username":"","password":"","startTime":"0","endTime":"0","nodeID":"","changeAddr":"","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := json.Marshal(&args)
 	if err != nil {
@@ -170,6 +170,7 @@ func TestGetTxStatus(t *testing.T) {
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -234,6 +235,7 @@ func TestGetTx(t *testing.T) {
 					nil,
 					"chain name",
 					[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -248,6 +250,7 @@ func TestGetTx(t *testing.T) {
 					ids.GenerateTestShortID(),
 					0,
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -259,6 +262,7 @@ func TestGetTx(t *testing.T) {
 					service.vm.Ctx.XChainID,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					keys[0].PublicKey().Address(), // change addr
 				)
 			},
 		},
@@ -354,6 +358,7 @@ func TestGetStake(t *testing.T) {
 		ids.GenerateTestShortID(),
 		ids.GenerateTestShortID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -385,6 +390,7 @@ func TestGetStake(t *testing.T) {
 		ids.GenerateTestShortID(),
 		0,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -412,6 +418,7 @@ func TestGetStake(t *testing.T) {
 		ids.GenerateTestShortID(),
 		0,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr
 	)
 	if err != nil {
 		t.Fatal(err)

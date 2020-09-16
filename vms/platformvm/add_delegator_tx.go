@@ -202,10 +202,11 @@ func (vm *VM) newAddDelegatorTx(
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
 	nodeID ids.ShortID, // ID of the node we are delegating to
-	rewardAddress ids.ShortID, // Address to returned staked tokens (and maybe reward) to
+	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

@@ -45,6 +45,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -65,6 +67,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +89,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +121,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -139,6 +147,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -159,6 +169,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -179,6 +191,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -199,6 +213,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -219,6 +235,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -239,6 +257,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+
 	); err != nil {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
@@ -271,6 +291,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
@@ -287,6 +308,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		nodeID, // reward address
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
@@ -304,10 +326,11 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		vm.minStake,              // stake amount
 		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(MinimumStakingDuration).Unix()), // end time
-		nodeID,                                  // node ID
-		key2.PublicKey().Address(),              // reward address
-		PercentDenominator,                      // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		nodeID,                     // node ID
+		key2.PublicKey().Address(), // reward address
+		PercentDenominator,         // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr // key
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -330,6 +353,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		nodeID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	}

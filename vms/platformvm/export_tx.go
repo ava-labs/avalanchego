@@ -156,6 +156,7 @@ func (vm *VM) newExportTx(
 	chainID ids.ID, // Chain to send the UTXOs to
 	to ids.ShortID, // Address of chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
 	if !vm.Ctx.XChainID.Equals(chainID) {
 		return nil, errWrongChainID
@@ -165,7 +166,7 @@ func (vm *VM) newExportTx(
 	if err != nil {
 		return nil, errOverflowExport
 	}
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, toBurn)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, toBurn, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
