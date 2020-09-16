@@ -65,10 +65,11 @@ var (
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys []*crypto.PrivateKeySECP256K1R
 
-	minStake = 5 * units.MilliAvax
+	minValidatorStake = 5 * units.MilliAvax
+	minDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	defaultBalance uint64 = 100 * minStake
+	defaultBalance uint64 = 100 * minValidatorStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -185,10 +186,11 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 func defaultVM() (*VM, database.Database) {
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
-		txFee:        defaultTxFee,
-		minStake:     minStake,
+		SnowmanVM:         &core.SnowmanVM{},
+		chainManager:      chains.MockManager{},
+		txFee:             defaultTxFee,
+		minValidatorStake: minValidatorStake,
+		minDelegatorStake: minDelegatorStake,
 	}
 
 	baseDB := memdb.New()
@@ -341,7 +343,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -418,7 +420,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	// create invalid tx
 	if tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -465,7 +467,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
@@ -1908,7 +1910,7 @@ func TestNextValidatorStartTime(t *testing.T) {
 	endTime := startTime.Add(MinimumStakingDuration)
 
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,               // stake amount
+		vm.minValidatorStake,      // stake amount
 		uint64(startTime.Unix()),  // start time
 		uint64(endTime.Unix()),    // end time
 		vm.Ctx.NodeID,             // node ID

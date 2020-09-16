@@ -30,7 +30,10 @@ type Config struct {
 	UptimeRequirement float64
 
 	// Minimum stake, in nAVAX, required to validate the primary network
-	MinStake uint64
+	MinValidatorStake uint64
+
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	MinDelegatorStake uint64
 
 	// Assertions configuration
 	EnableAssertions bool

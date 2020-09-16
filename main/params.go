@@ -173,7 +173,10 @@ func init() {
 	fs.Float64Var(&Config.UptimeRequirement, "uptime-requirement", .6, "Fraction of time a validator must be online to receive rewards")
 
 	// Minimum stake, in nAVAX, required to validate the primary network
-	fs.Uint64Var(&Config.MinStake, "min-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+	fs.Uint64Var(&Config.MinValidatorStake, "min-validator-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	fs.Uint64Var(&Config.MinDelegatorStake, "min-delegator-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
 
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
