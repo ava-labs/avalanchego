@@ -298,10 +298,11 @@ func (p *peer) handle(msg Msg) {
 		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
 
 		// attempt to finish the handshake
-		if p.gotVersion {
-			p.GetPeerList()
-		} else {
+		if !p.gotVersion {
 			p.GetVersion()
+		}
+		if !p.gotPeerList {
+			p.GetPeerList()
 		}
 		return
 	}
