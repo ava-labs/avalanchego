@@ -22,10 +22,10 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
-	ethereum "github.com/ava-labs/go-ethereum"
-	gethaccounts "github.com/ava-labs/go-ethereum/accounts"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/event"
+	ethereum "github.com/ethereum/go-ethereum"
+	gethaccounts "github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"golang.org/x/crypto/sha3"
 )
 

@@ -21,8 +21,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 // Config contains the settings of the global account manager.
