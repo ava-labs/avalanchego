@@ -31,7 +31,9 @@ var (
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
 	keystore := keystore.CreateTestKeystore()
-	keystore.AddUser(username, password)
+	if err := keystore.AddUser(username, password); err != nil {
+		t.Fatalf("couldn't add user: %w", err)
+	}
 	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
 	s := &Service{vm: vm}
 	return genesisBytes, vm, s, m
@@ -550,7 +552,7 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestCreateFixedCapAsset(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _ := setupWithKeys(t)
 	defer func() {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()

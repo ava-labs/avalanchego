@@ -39,6 +39,7 @@ var (
 	errNoRewardAddress       = errors.New("argument 'rewardAddress' not provided")
 	errInvalidDelegationRate = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
 	errNoAddresses           = errors.New("no addresses provided")
+	errNoKeys                = errors.New("user has no keys or funds")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -868,16 +869,16 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	// Parse the change address.
+	if len(privKeys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(privKeys) > 0 {
-		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	// Create the transaction
@@ -963,14 +964,15 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(privKeys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(privKeys) > 0 {
-		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	// Create the transaction
@@ -1049,16 +1051,16 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	// Parse the change address.
+	if len(keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(keys) > 0 {
-		changeAddr = keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	// Create the transaction
@@ -1131,14 +1133,15 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(privKeys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(privKeys) > 0 {
-		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	// Create the transaction
@@ -1212,14 +1215,15 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(privKeys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(privKeys) > 0 {
-		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	// Create the transaction
@@ -1294,14 +1298,15 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(privKeys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(privKeys) > 0 {
-		changeAddr = privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	tx, err := service.vm.newImportTx(chainID, to, privKeys, changeAddr)
@@ -1399,14 +1404,15 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(keys) > 0 {
-		changeAddr = keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	// Create the transaction

@@ -42,6 +42,7 @@ var (
 	errInvalidUTXO            = errors.New("invalid utxo")
 	errNilTxID                = errors.New("nil transaction ID")
 	errNoAddresses            = errors.New("no addresses provided")
+	errNoKeys                 = errors.New("user has no keys or funds")
 )
 
 // Service defines the base service for the asset vm
@@ -456,14 +457,15 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -576,14 +578,15 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -693,14 +696,15 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -1031,14 +1035,15 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	amounts := map[[32]byte]uint64{
@@ -1161,14 +1166,15 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -1270,14 +1276,15 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -1380,14 +1387,15 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	avaxKey := service.vm.ctx.AVAXAssetID.Key()
@@ -1608,14 +1616,15 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 
 	// Parse the change address. Assumes that if the user has no keys,
 	// this operation will fail so the change address can be anything.
-	var changeAddr ids.ShortID
+	if len(kc.Keys) == 0 {
+		return errNoKeys
+	}
+	changeAddr := kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
-	} else if len(kc.Keys) > 0 {
-		changeAddr = kc.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	}
 
 	amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
