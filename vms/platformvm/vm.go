@@ -150,7 +150,7 @@ type VM struct {
 	*core.SnowmanVM
 
 	// Node's validator manager
-	// Maps Subnets --> nodes in the Subnet
+	// Maps Subnets --> validators of the Subnet
 	vdrMgr validators.Manager
 
 	// true if the node is being run with staking enabled
@@ -180,11 +180,13 @@ type VM struct {
 	// Tx fee burned by a transaction
 	txFee uint64
 
-	// The minimum amount of tokens one must bond to be a staker
-	minStake uint64
+	// The minimum amount of tokens one must bond to be a validator
+	minValidatorStake uint64
 
-	// UptimePercentage is the minimum uptime required to be rewarded for
-	// staking.
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	minDelegatorStake uint64
+
+	// UptimePercentage is the minimum uptime required to be rewarded for staking.
 	uptimePercentage float64
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set

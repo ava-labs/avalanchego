@@ -40,7 +40,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
 	addPendingValidatorTx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
@@ -101,7 +101,7 @@ func TestAdvanceTimeTxUpdateValidators(t *testing.T) {
 	nodeIDKey, _ := vm.factory.NewPrivateKey()
 	nodeID := nodeIDKey.PublicKey().Address()
 	addPendingValidatorTx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(pendingValidatorStartTime.Unix()),
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,

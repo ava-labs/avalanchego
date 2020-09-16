@@ -243,7 +243,7 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
-					service.vm.minStake,
+					service.vm.minValidatorStake,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
 					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
@@ -350,7 +350,7 @@ func TestGetStake(t *testing.T) {
 	oldStake := response.Staked
 
 	// Add a delegator
-	stakeAmt := minStake + 12345
+	stakeAmt := service.vm.minDelegatorStake + 12345
 	tx, err := service.vm.newAddDelegatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
@@ -381,7 +381,7 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = minStake + 54321
+	stakeAmt = service.vm.minValidatorStake + 54321
 	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
@@ -409,7 +409,7 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = minStake + 54321
+	stakeAmt = service.vm.minValidatorStake + 54321
 	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),

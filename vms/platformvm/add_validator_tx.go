@@ -121,7 +121,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -241,5 +241,5 @@ func (vm *VM) newAddValidatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minValidatorStake)
 }
