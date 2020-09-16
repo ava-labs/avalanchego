@@ -142,7 +142,7 @@ func (vm *VM) stake(
 			Out: &StakeableLockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
-					Amt:          remainingValue,
+					Amt:          amountToStake,
 					OutputOwners: inner.OutputOwners,
 				},
 			},

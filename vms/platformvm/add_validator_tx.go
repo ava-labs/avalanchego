@@ -129,9 +129,9 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	if currentTime, err := vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
-			currentTime,
-			startTime)}
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
+			startTime,
+			currentTime)}
 	}
 
 	_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)

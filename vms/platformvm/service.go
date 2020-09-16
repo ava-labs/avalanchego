@@ -192,7 +192,7 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, respon
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			service.vm.Ctx.Log.Warn("expected UTXO output to be type *secp256k1fx.TransferOutput but is type %T", utxo.Out)
+			// TODO: support looking up tokens that are locked.
 			continue
 		}
 		balance, err = math.Add64(balance, out.Amount())

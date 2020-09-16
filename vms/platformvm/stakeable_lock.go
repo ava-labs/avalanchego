@@ -16,6 +16,14 @@ type StakeableLockOut struct {
 	avax.TransferableOut `serialize:"true"`
 }
 
+// Addresses ...
+func (s *StakeableLockOut) Addresses() [][]byte {
+	if addressable, ok := s.TransferableOut.(avax.Addressable); ok {
+		return addressable.Addresses()
+	}
+	return nil
+}
+
 // Verify ...
 func (s *StakeableLockOut) Verify() error {
 	if s.Locktime == 0 {
