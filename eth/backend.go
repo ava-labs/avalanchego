@@ -26,7 +26,6 @@ import (
 	//"sync/atomic"
 
 	"github.com/ava-labs/coreth/accounts"
-	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/clique"
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/go-ethereum/accounts/abi/bind"
 	"github.com/ava-labs/go-ethereum/common"
 	"github.com/ava-labs/go-ethereum/common/hexutil"
 	"github.com/ava-labs/go-ethereum/core/bloombits"

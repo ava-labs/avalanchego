@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // chainRetriever is used by the unconfirmed block set to verify whether a previously
