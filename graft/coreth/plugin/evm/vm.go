@@ -24,6 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -356,13 +357,15 @@ func (vm *VM) Initialize(
 		for {
 			select {
 			case e := <-vm.newTxPoolHeadChan.Chan():
-				switch h := e.Data.(core.NewTxPoolHeadEvent) {
+				switch h := e.Data.(type) {
+				case core.NewMinedBlockEvent:
 					vm.txPoolStabilizedLock.Lock()
 					if vm.txPoolStabilizedHead == h.Block.Hash() {
 						vm.txPoolStabilizedOk <- struct{}{}
 						vm.txPoolStabilizedHead = common.Hash{}
 					}
 					vm.txPoolStabilizedLock.Unlock()
+				default:
 				}
 			}
 		}
