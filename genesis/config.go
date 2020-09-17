@@ -4,7 +4,10 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"encoding/json"
+
+	"github.com/ava-labs/avalanche-go/utils/formatting"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -27,6 +30,22 @@ type Allocation struct {
 	UnlockSchedule []LockedAmount `json:"unlockSchedule"`
 }
 
+// Unparse ...
+func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
+	ua := UnparsedAllocation{
+		InitialAmount:  a.InitialAmount,
+		UnlockSchedule: a.UnlockSchedule,
+		ETHAddr:        "0x" + hex.EncodeToString(a.ETHAddr.Bytes()),
+	}
+	avaxAddr, err := formatting.FormatAddress(
+		"X",
+		constants.GetHRP(networkID),
+		a.AVAXAddr.Bytes(),
+	)
+	ua.AVAXAddr = avaxAddr
+	return ua, err
+}
+
 // Config contains the genesis addresses used to construct a genesis
 type Config struct {
 	NetworkID uint32 `json:"networkID"`
@@ -43,6 +62,56 @@ type Config struct {
 	CChainGenesis string `json:"cChainGenesis"`
 
 	Message string `json:"message"`
+}
+
+// Unparse ...
+func (c Config) Unparse() (UnparsedConfig, error) {
+	uc := UnparsedConfig{
+		NetworkID:                   c.NetworkID,
+		Allocations:                 make([]UnparsedAllocation, len(c.Allocations)),
+		StartTime:                   c.StartTime,
+		InitialStakeDuration:        c.InitialStakeDuration,
+		InitialStakeDurationOffset:  c.InitialStakeDurationOffset,
+		InitialStakeAddresses:       make([]string, len(c.InitialStakeAddresses)),
+		InitialStakeNodeIDs:         make([]string, len(c.InitialStakeNodeIDs)),
+		InitialStakeRewardAddresses: make([]string, len(c.InitialStakeRewardAddresses)),
+		CChainGenesis:               c.CChainGenesis,
+		Message:                     c.Message,
+	}
+	for i, a := range c.Allocations {
+		ua, err := a.Unparse(uc.NetworkID)
+		if err != nil {
+			return uc, err
+		}
+		uc.Allocations[i] = ua
+	}
+	for i, isa := range c.InitialStakeAddresses {
+		avaxAddr, err := formatting.FormatAddress(
+			"X",
+			constants.GetHRP(uc.NetworkID),
+			isa.Bytes(),
+		)
+		if err != nil {
+			return uc, err
+		}
+		uc.InitialStakeAddresses[i] = avaxAddr
+	}
+	for i, isnID := range c.InitialStakeNodeIDs {
+		uc.InitialStakeNodeIDs[i] = isnID.PrefixedString(constants.NodeIDPrefix)
+	}
+	for i, isa := range c.InitialStakeRewardAddresses {
+		avaxAddr, err := formatting.FormatAddress(
+			"X",
+			constants.GetHRP(uc.NetworkID),
+			isa.Bytes(),
+		)
+		if err != nil {
+			return uc, err
+		}
+		uc.InitialStakeRewardAddresses[i] = avaxAddr
+	}
+
+	return uc, nil
 }
 
 // InitialSupply ...
@@ -75,14 +144,25 @@ var (
 )
 
 func init() {
+	unparsedManhattanConfig := UnparsedConfig{}
+	unparsedLocalConfig := UnparsedConfig{}
+
 	errs := wrappers.Errs{}
 	errs.Add(
-		json.Unmarshal([]byte(manhattanGenesisConfigJSON), &ManhattanConfig),
-		json.Unmarshal([]byte(localGenesisConfigJSON), &LocalConfig),
+		json.Unmarshal([]byte(manhattanGenesisConfigJSON), &unparsedManhattanConfig),
+		json.Unmarshal([]byte(localGenesisConfigJSON), &unparsedLocalConfig),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
+
+	manhattanConfig, err := unparsedManhattanConfig.Parse()
+	errs.Add(err)
+	ManhattanConfig = manhattanConfig
+
+	localConfig, err := unparsedLocalConfig.Parse()
+	errs.Add(err)
+	LocalConfig = localConfig
 }
 
 // GetConfig ...

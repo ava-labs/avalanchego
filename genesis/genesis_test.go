@@ -158,7 +158,7 @@ func TestVMGenesis(t *testing.T) {
 		{
 			networkID:  constants.LocalID,
 			vmID:       avm.ID,
-			expectedID: "2JYEvdbWV8q6S6X7G8AuH9ZXn1scubxdGjPy8EHVHxX8BzKsuX",
+			expectedID: "EnRhNWM7RLvZEbmWhayMmS58ZigwVhH35hNByWkTGQoEKB3nD",
 		},
 		{
 			networkID:  constants.ManhattanID,
@@ -204,7 +204,7 @@ func TestAVAXAssetID(t *testing.T) {
 		},
 		{
 			networkID:  constants.LocalID,
-			expectedID: "bhFWBnko8fouJQ4hmV4HmbPokehBDHss8rXdhzKUXiQpGpCCn",
+			expectedID: "m45n63XXAtUnmn3cwKAJpVJ8BqF3JRCYfPd6qGWo3EuYmtHGa",
 		},
 	}
 
