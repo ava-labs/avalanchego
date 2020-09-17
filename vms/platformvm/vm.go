@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -1434,4 +1435,92 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 	}
 	bestPossibleUpDuration := uint64(currentLocalTime.Sub(startTime) / time.Second)
 	return float64(upDuration) / float64(bestPossibleUpDuration), nil
+}
+
+// Returns the current staker set of the Primary Network.
+// Each element corresponds to a staking transaction.
+// There may be multiple elements with the same node ID.
+func (vm *VM) getStakers() ([]validators.Validator, error) {
+	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
+	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
+	defer stopDB.Close()
+	iter := stopDB.NewIterator()
+	defer iter.Release()
+
+	stakers := []validators.Validator{}
+
+	for iter.Next() { // Iterates in order of increasing start time
+		txBytes := iter.Value()
+		tx := rewardTx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		} else if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+			return nil, err
+		}
+
+		switch staker := tx.Tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			stakers = append(stakers, &staker.Validator)
+		case *UnsignedAddValidatorTx:
+			stakers = append(stakers, &staker.Validator)
+		}
+	}
+	if err := iter.Error(); err != nil {
+		return nil, err
+	}
+
+	return stakers, nil
+}
+
+// Returns the pending staker set of the Primary Network.
+// Each element corresponds to a staking transaction.
+// There may be multiple elements with the same node ID.
+func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
+	startDBPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
+	startDB := prefixdb.NewNested(startDBPrefix, vm.DB)
+	defer startDB.Close()
+	iter := startDB.NewIterator()
+	defer iter.Release()
+
+	stakers := []validators.Validator{}
+
+	for iter.Next() { // Iterates in order of increasing start time
+		txBytes := iter.Value()
+		tx := rewardTx{}
+		if err := vm.codec.Unmarshal(txBytes, &tx); err != nil {
+			return nil, fmt.Errorf("couldn't unmarshal validator tx: %w", err)
+		} else if err := tx.Tx.Sign(vm.codec, nil); err != nil {
+			return nil, err
+		}
+
+		switch staker := tx.Tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			stakers = append(stakers, &staker.Validator)
+		case *UnsignedAddValidatorTx:
+			stakers = append(stakers, &staker.Validator)
+		}
+	}
+	if err := iter.Error(); err != nil {
+		return nil, err
+	}
+
+	return stakers, nil
+}
+
+// Returns the total amount being staked on the Primary Network, in nAVAX.
+// Does not include stake of pending stakers.
+func (vm *VM) getTotalStake() (uint64, error) {
+	stakers, err := vm.getStakers()
+	if err != nil {
+		return 0, fmt.Errorf("couldn't get stakers: %w", err)
+	}
+
+	totalStake := uint64(0)
+	for _, staker := range stakers {
+		totalStake, err = math.Add64(totalStake, staker.Weight())
+		if err != nil {
+			return 0, err
+		}
+	}
+	return totalStake, nil
 }

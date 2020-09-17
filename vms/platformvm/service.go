@@ -2044,3 +2044,12 @@ func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinS
 	reply.MinDelegatorStake = json.Uint64(service.vm.minDelegatorStake)
 	return nil
 }
+
+// GetTotalStake returns the total amount staked on the Primary Network
+func (service *Service) GetTotalStake(_ *http.Request, _ *struct{}, reply *struct {
+	Stake json.Uint64 `json:"stake"`
+}) error {
+	stake, err := service.vm.getTotalStake()
+	reply.Stake = json.Uint64(stake)
+	return err
+}
