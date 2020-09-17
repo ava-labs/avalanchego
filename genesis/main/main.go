@@ -232,12 +232,17 @@ func parseLine(line string) (string, string, genesis.LockedAmount, []genesis.Loc
 		if precision != big.Exact {
 			return "", "", genesis.LockedAmount{}, nil, fmt.Errorf("non-specific amount provided: %s", periodStringArray[0])
 		}
-		if rawAmount > 0 {
-			unlockSchedule = append(unlockSchedule, genesis.LockedAmount{
-				Amount:   rawAmount,
-				Locktime: locktime,
-			})
+		unlockSchedule = append(unlockSchedule, genesis.LockedAmount{
+			Amount:   rawAmount,
+			Locktime: locktime,
+		})
+	}
+	initialAllocation := unlockSchedule[0]
+	filteredAllocations := []genesis.LockedAmount{}
+	for _, allocation := range unlockSchedule[1:] {
+		if allocation.Amount > 0 {
+			filteredAllocations = append(filteredAllocations, allocation)
 		}
 	}
-	return ethAddrString, avaxAddrString, unlockSchedule[0], unlockSchedule[1:], nil
+	return ethAddrString, avaxAddrString, initialAllocation, filteredAllocations, nil
 }

@@ -356,14 +356,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15an3ge2lvtlcaaahvhdcapsqtxmxam235nks8v",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x34v4xheyrl3dpzzm2f0vgt54h2sdnfpy0rn66",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -439,8 +449,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1z700vfnxlwhny7z2x54a09h73v4mcyjrw0g3w8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -522,14 +537,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1q2cg6fefg9rs2fnrnq7s3332trarhpk6728mgn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18k6h5lma383h5mp53lx6cep4qgt0xd7y330yz4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -605,8 +630,12 @@ var (
 			{
 				"ethAddr": "0xaf3caeca0c63d0e7b3961761735d44b1cbc68094",
 				"avaxAddr": "X-avax12s2l42wrwedzrvwclkgeymqhz5y40mmwftuz02",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -857,8 +886,12 @@ var (
 			{
 				"ethAddr": "0x384ed12c6a6f0620881608c0cbd463d7092821c3",
 				"avaxAddr": "X-avax1pquf9hqp40w4fzfre2tp9d3majad8g5u25rpuq",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -930,8 +963,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18urs8ne7af0yk42g3h2m5yzna4qaj76ywl0glc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -1081,8 +1119,12 @@ var (
 			{
 				"ethAddr": "0x94d2a61300f14897b35bb3f4821463f7192b47a7",
 				"avaxAddr": "X-avax1xksdnged0n5r5g33gwdy0tj6raep882h4a9wlz",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -1242,8 +1284,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1g2twxavmfkjg7jwk9990ungnz6dye2c9q3xsmj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -1390,8 +1437,12 @@ var (
 			{
 				"ethAddr": "0x149495c6e87296ff82b7744b013560756876aa6b",
 				"avaxAddr": "X-avax19fducpy4g2f5emrkmjqv2fzgc2yx8qmxvsu04m",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -1457,8 +1508,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ng29fhxfarmt8ackwyj4gnevncn68f8w80vt0q",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -1877,8 +1933,12 @@ var (
 			{
 				"ethAddr": "0x019d7fde7f6929b375a6ab3f58e8f99dfec21fc7",
 				"avaxAddr": "X-avax1y8vf0ch9c7mw6vye9dpe5rqdltraa2n7qu9etq",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -2148,8 +2208,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uxcd973z7m7hh075f96h77elz3z0qzt769da5n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -2268,8 +2333,12 @@ var (
 			{
 				"ethAddr": "0xbceff70712d7b4d5c6fcecfb695d832f755c90aa",
 				"avaxAddr": "X-avax1z2vhq8fg65047e9rlukcd07p7r003ttm9cxrta",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -3273,8 +3342,12 @@ var (
 			{
 				"ethAddr": "0x3772a6d966db4e949a35bdd33f173cc0dc9856fc",
 				"avaxAddr": "X-avax1fyjskkcc627xcu2jjdu95ts8e6u2auwx2psn4k",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -3346,8 +3419,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10qrykscvsr8q4a96enc4d0vs37p0t7r2knngsv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -3423,8 +3501,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jua65uscanee4377juk3ftwnmsk4duxe9q9w5r",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -3719,8 +3802,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax150w778eehzujjvsavrql02n4hwsvqmaned0j84",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -4531,8 +4618,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d2dgpu02vhsglkgsus63zqgdr7hsqf72pw4aay",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -5297,8 +5388,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rgwts74nkzxz6pjg4qxj3u9frmq5qhxwwxafrz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -5332,8 +5428,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jwwnlpcwhsy4ssudqwekdrq3qkfjcterkz9hy2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -5673,8 +5774,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ay4wup4f3nskjkhrsdkl0rchhury7zn6cshg3n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -5710,8 +5816,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16elf3jhl0lt8pmyyuu7npy4t95y435gwleekk0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -5751,8 +5862,12 @@ var (
 			{
 				"ethAddr": "0x3c04252507546a29bee43f9c044f0adea26c6a80",
 				"avaxAddr": "X-avax1lqkslv60n6h88lws7mcguqm2gvz8s6rsau2cev",
-				"initialAmount": 16875000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 16875000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 16875000000000,
 						"locktime": 1617840000
@@ -6006,8 +6121,12 @@ var (
 			{
 				"ethAddr": "0xe0af8ddd6f59e3aacee40f10ee60535fbfa72cb3",
 				"avaxAddr": "X-avax14l2rgdtl7sqa6067xva8l23av0w23c4gpgx92l",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -6104,8 +6223,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lth42emlr542vvgptllzla3jhk2llvslxlqehq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -6488,8 +6612,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1j64509ss7uynplsw0fr6s4gtusjtajafqz2qjf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -6704,8 +6833,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18cv30vdu9085f946zzuwzm6pw4l6rjn68cw9kt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -6807,8 +6941,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17ztdm60c6j4y3rcnkc4v7s9cgs40cwnrenz6q8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -6907,8 +7046,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zktlyhgkmnh7sjxjcqvq9t8zklmpq3xugn4psq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -6944,8 +7088,12 @@ var (
 			{
 				"ethAddr": "0xbf0749218bda7580ec382362a33962c6637b48ab",
 				"avaxAddr": "X-avax1deq0ss06a3d8lxcprr8ahysfw6umpa2p084502",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -7266,8 +7414,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1py6f297yctczs95ple3kf42zw7lx4ne84dlvzy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -7569,8 +7722,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mckqllmfse2yxuevrqvms0yn3t8zwhhmhnppxd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -8157,8 +8315,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax150y05hmukh670e53hac08fenm0txey5flunzr3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -8234,8 +8397,12 @@ var (
 			{
 				"ethAddr": "0x39893db0e6fc667637f2672c07e43cbcbbb7090b",
 				"avaxAddr": "X-avax1hpgjjzhy78hzzzmvs4c7wj3yxcrjuhlyp98w09",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -8583,8 +8750,12 @@ var (
 			{
 				"ethAddr": "0x1e22d051854dba3fb434e37013d855daba1e6b22",
 				"avaxAddr": "X-avax1gr5d35w08x3sgux82gl5e0f8rd5xs9vfjcn79y",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -8650,8 +8821,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nvt55vuma4jzlham455ausng9zv7edavfmvqy2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -9481,20 +9657,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16cldkap2lazzs68s72shtk0u9dyhegw9tcy2vj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15hqcngf6exffv8sw2asj9qxeq0whc8cwf8ty29",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cpkfph3squy8eg82fw5xwklt2evneuerrxv50v",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -9836,8 +10027,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pexpfywkky533z5hpc24zv3j704xrdn8tg9fm5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -10271,8 +10467,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1960xrhnr8rhupkxwtdek442492sty2cvmehj2e",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -10600,8 +10800,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1spyd9ef42qsu5rufgs4ukxd4ekeck6y0txh3t9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -10629,8 +10834,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1q8d3pg3t230czrrwrdu3d65qjfjnxfypm0lsk9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -11501,14 +11711,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1alzevutskqn85tw0t5mqyld3xtmcwl0p0rdvry",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax188zfpln2ed0saaz873r6mucmqtl87af84uey97",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -11575,8 +11795,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mpvhdvd2h6rkjcdm58wvadv274kp4wd547hj46",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -11652,8 +11877,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uy2jt77yjtcx3kg267vsc5exhr2wpta6fezjnz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -11932,8 +12162,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tpv8xuezujknhk0g3k0kvelmt6txxnv4np0tud",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -12422,8 +12657,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ek5zpvkke0pulssllglkcv7rnzrdayf83rx8gu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -12601,8 +12841,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10w93aj0jhnjet2edkqh0kzpk68dw56swveaesx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -12911,8 +13156,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qjd4ksf2mu39hsqdxcn5dpqjywmh3km48dv7ah",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -13056,8 +13306,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xq0hmrk395c9mexp0phcly4ua5xd4nveuw6vhs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -13720,8 +13975,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax155vjlseeenpaek6sm5kzug2fxqr68ykm22f4z8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -13854,8 +14114,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fgxc2kql5a2fyav4t0zrfxg96wjyljzgmfugey",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -14016,8 +14281,12 @@ var (
 			{
 				"ethAddr": "0x84b52698b16b78b5d3ac7ef02e52e163f14d5390",
 				"avaxAddr": "X-avax1qkqzumcpdrjhnju4stf5kfdwus36vpsf0kk2ct",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -14418,8 +14687,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r36s9dkzxpdm4rf62lyq5l3vg38ygzj556q0pk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -14495,8 +14769,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fsaysnmnnmtdew462lrnyk3adfelx9kllgh9r5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -14572,8 +14851,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w2kdmc3dguhrv8ucmg25cdd60ql53zd6y8wxsy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -14738,8 +15022,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ztf74qxffld8j04tfjrxw6ukxc9uxrp97q8xg4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -15031,8 +15320,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1s6fzp6lan77rdc8z4u6fqul37tgwl0h0ssmyhj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -15136,8 +15430,12 @@ var (
 			{
 				"ethAddr": "0xa422c644674a1738465c7e4a429bcb6886f00a5d",
 				"avaxAddr": "X-avax1rxauje80m84anavxal539zmlwwf8grzlfdg0as",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -15533,8 +15831,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d7yln3200756utf76vn5qfa2yentgc22d47nk4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -15639,8 +15942,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15j9pgde6hfzu2hpdnpxhkqee9mgxw6ehhc7eg7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -15824,8 +16132,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13qq9rkz7ku9f5z2drjr8y0kvsn67fk7jeure0a",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -15987,8 +16299,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zn8wvgdjt6vtra82qekvf893jj29m8x6cmgc0a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -16095,8 +16412,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16qlpf2lhnnkm6qw9jmr6xffywks68txznlhvm5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -16107,8 +16429,12 @@ var (
 			{
 				"ethAddr": "0xc8e1ad044f53b4bfc3dc3169393a8b32bf673dfc",
 				"avaxAddr": "X-avax14nnlfgv3atdj4q96halnxha7gy26namxnqyk8u",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -16879,8 +17205,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19h59uthwjn7p0s4upmlgy70ackx0zthtuqamq2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -16916,8 +17247,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jqmtc0sc8az286ppwgp8ggt0cry2s05clpfn20",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -17071,14 +17407,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10g4x7zusd73ejt5qmvsn2erv62n8f75k3rca9t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xdda04bca285a838716d9d614f310f76f674addd9",
 				"avaxAddr": "X-avax1xj9656j9dru68swluxqpefvmqqt6d5vj3u0rcl",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -18151,8 +18496,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1n7rtwxwgphuupnahvy0nmswe87zsq9ev6gyk34",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -18223,8 +18573,12 @@ var (
 			{
 				"ethAddr": "0x0f50c156d0f4302525286e3c9f05b53f5a55fd4a",
 				"avaxAddr": "X-avax1unge0y4xtu52vdruz2an3v6qxta42wx490j03q",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -18333,8 +18687,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1egrs9pezpukpjgmy28z5fn2c3k83mmz00k5e2n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -18513,14 +18872,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1555kx5r86l70knlzrkdlzzncke2j58v5gu007j",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sguft998dltavk45zrsma7h2avvqqnvpqc7k30",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -18627,8 +18996,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13df2q3s537yeuaungn832dphw47ltmn3seu0l4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -18790,14 +19164,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zqwt0sajh4vuwq59mmwe67g86kcpn27ap0jgtj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r22hxff62e0lka238yw2aa0753mdgyza0z04gx",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -19036,8 +19419,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wej8jzxcuj4yga57ul6nkcwvrl2g9t4s9slf4x",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -19096,8 +19484,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hn4z47peufshp6ax2lfn8n4fprxyr48zhmgcv3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -19241,8 +19634,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17g0styj3u99ekpn4nt7au82pqulzu6vhy2ry35",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -19481,8 +19878,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w83a8ylvjwkfq8ww3h3j62drqvp6jlee027j9w",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -19777,8 +20178,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15vpg57kyctjzcjcle7nsh2zsnjq9lv8f69l4lg",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -20054,8 +20459,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jn872x5064k0xg3dddjedqwcrd0u03kl2x3x7k",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -20083,8 +20493,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12n4enrrfn6phl6m50qud3e2uk35fwd6s3qatqx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -20189,8 +20604,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lmecf2l5xqv9f3le3s4lu750kp8ja5yezqmy6t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -20545,8 +20965,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13a287rg8qymx4ldncamwfsg4gnjp8xjvzujazg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -21217,8 +21642,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1406mdpm8c8lh4mv8w88egvh8z40zf52fp44m0w",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -21662,8 +22091,12 @@ var (
 			{
 				"ethAddr": "0xc490571ae4aeaacb635aaf46765e0c087b086dfb",
 				"avaxAddr": "X-avax1wju68ry6l9l9dj2uvqqm5zt6yrm43j8lmafqh0",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -21735,8 +22168,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax188vgxyjfjqt9eza0g4ccgepdplr2tmlcg458gj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -21937,8 +22375,12 @@ var (
 			{
 				"ethAddr": "0x0241e072b492d72285946fe47b6f5699bb75b012",
 				"avaxAddr": "X-avax1pngtkly5kzvyuk7kr8f7atyf7xd077j3lez02z",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -22075,8 +22517,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zyyyhu2yl6qdgr9e9tvkhlxd0jpeldqpa8qt8l",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -22104,14 +22551,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jpfvt6u0jrqkth2vlq24p30ggucmhwsdagc0af",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19umw7v3kl2nw2m2fskl4zhfkf2ftn29g765mkm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -22401,8 +22858,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sxxtg6hxzhu3pycfp6j3p206ytp4fhvxvh6tkf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -22413,8 +22875,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1extjkrwdhapy689fzqyegmd0fc64c4lzaulhv8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -22549,8 +23016,12 @@ var (
 			{
 				"ethAddr": "0xa48d6605a29580fe0c7ace78885aa9eafcfc4240",
 				"avaxAddr": "X-avax1zz06hsq4vv4gjunpz8mqaw842ssf3rwg4w7wkx",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -22616,8 +23087,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dh5nut57n0thxvkm6y4jpalujceydcr9rd5hkx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -22722,8 +23198,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dcav0tvexqecfg543vcmj44mmxm2h0cgkdl4lj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -22765,8 +23246,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14j4xrv6x0dmvqppwp28klxfqdvznwn5tx97suh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -23184,8 +23670,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14mhc3padjgrxnale8tefd75mjwcznw6l49ju04",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -23500,8 +23990,12 @@ var (
 			{
 				"ethAddr": "0x7be00383de7b96dee8c35b3dd90e1a5764211a1d",
 				"avaxAddr": "X-avax1r803m6agzfs6hvafder269mmu6lpvmg004pvj4",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -23604,8 +24098,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ppaahy2de8ulq5v5gykxs9zseg5742laqc2xhy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -23959,8 +24458,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dtra0lcs6cjgagjwjgh4ct6mxvwzq56jx0yaha",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -24222,8 +24726,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jyycge42z5l0fn9qwx8xkh4fudmjyya8cn7v3s",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -24361,8 +24870,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dp6rjhv03820w0hdn9fza94q0ap334nch3ee7d",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -24535,8 +25049,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19jsl9mhzuuq7pz44tqcygrg33w9txzxfugu84p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -24720,8 +25239,12 @@ var (
 			{
 				"ethAddr": "0xcab226950dbb6afe8aaf2aa894806fd5d9bb8551",
 				"avaxAddr": "X-avax1aupnm0hgv6akpg7uy5s2xqsga8yknfa7ur78aw",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -25006,8 +25529,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18lxyy9qjv8l5xxu4txt8cvx06423uwarla0we7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -25080,8 +25608,12 @@ var (
 			{
 				"ethAddr": "0x36f1baa1acef657361df4166a3af2cbd9566dbe6",
 				"avaxAddr": "X-avax174yw3vkw7l3xn34tff8396g48cu6qdnut60jkf",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -25317,8 +25849,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1epjrqq5l70s8atvt2ndu299ccacwlxq0wxlj83",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -25506,8 +26043,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jhwgkjfarvcr3k6fht4e59ywdap6cjydj593yk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -25620,8 +26162,12 @@ var (
 			{
 				"ethAddr": "0x79873beb56bd28c86b6a2332486e03e44e4f7828",
 				"avaxAddr": "X-avax17jwcqlkm7ryfks8asrundp8z6ndhag3wjrzw8s",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -25687,8 +26233,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mzlr4j3pk0nryqxqev0vj3f73cn0y6sg3c0kkr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -25824,14 +26375,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18zpy4gef6zstfwu8kkttflx3dplut8y66lnjpe",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xd4ea97cf2d07f811c190f3b50ae74ebd7e355284",
 				"avaxAddr": "X-avax1mu0azx3pl8fdu7yf98gus060q2g66mlw4ur2hm",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -25897,14 +26457,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gdw7rmln4wl74pg472yu63tek3xevdjm0cs0r2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb84d0b4381fbfc70ef462a09b93994f89849572f",
 				"avaxAddr": "X-avax13xxccnzahezcdzr3424h3da520lj05jsea9syt",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -25976,8 +26545,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gylx5dw975zg9yvqanc9m9jgrl0efl7pwhhpt4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -26213,8 +26787,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1n30504mwm5q40auu4ndqsjnjqp3gm33tvx22t8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -26256,8 +26835,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rqeuwn7tqjj4stgatsyffzmsl3v3z9lfe4qn7v",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -26450,14 +27033,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f4kf029qfg2c6vca2q0qt5mdpcr5whfutufalc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
 				"avaxAddr": "X-avax1wc80mzlc5ew22dfvld3shhexnevl7xelprh4kj",
-				"initialAmount": 16875000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 16875000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 16875000000000,
 						"locktime": 1617840000
@@ -26631,8 +27223,12 @@ var (
 			{
 				"ethAddr": "0xc1b7e0efa17c3cc4fa8a9a4f9736bfb99b92c2b0",
 				"avaxAddr": "X-avax1r3j6y79yvz3lg50zj5l08lwcmss9m4vq2h229w",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -26698,8 +27294,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1snus5hvwdzygwka5sgmutgwheuy69wxeh4ap95",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -26735,8 +27336,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jgvf5zsegj0whuztuvftecgkrasf0lrzkrtskn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -27000,8 +27606,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rmawaln8vemkyv3g7nph4mse78a64gt0f2cy82",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -27398,8 +28009,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1h5xjezwsrzsqru9wzn0tpwfrmkr0u8ewfq8u4k",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -27470,14 +28086,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax106307mjtvz82xh3wrxae6dcqyjcqaagg4dap23",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1t4p8x5204chmf8pq39y0zjesh4nqzzvwvgejh5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -27692,8 +28318,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18u6e309t488ec5cnkec8uek6j5f6suwydk3k43",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -27769,8 +28400,12 @@ var (
 			{
 				"ethAddr": "0x06c87cde133789ec6b519b3f223fbc4caa03c39f",
 				"avaxAddr": "X-avax173zu5ehr3v5jckhh3wqx7vr9ecn3gegrwyux5w",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -28157,8 +28792,12 @@ var (
 			{
 				"ethAddr": "0x81f782ab0958822f8ea519601ef7aa0e89e6670e",
 				"avaxAddr": "X-avax1g867fj6pj0pdu6jcvkp9hgufdllpahdrdck9ms",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -28270,8 +28909,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ghunp55ccqlsqe7r7n372tcsncx03g5jjdc5cp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -28552,8 +29196,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l4yc7lkugzk2xdclyuultcww6n9d5yfgl2rgfa",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -28848,8 +29497,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1m6tp2gamsjpa5anye2l2clpc3k3gc0t4u6qt25",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -28914,8 +29568,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ltgnnajsjj35u5s649lwmvymyck7pf4v5gcham",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -29499,8 +30158,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1h9zmdwtcxycmea9mqf6a6lvlkxu2c7q5hhav24",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -29511,8 +30175,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rq2dzfj6magfr9n3uhw7k6xxtqj6xl4lfktkqk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -29771,26 +30440,45 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10ee80jmdnhx2pw54eyswe8nn234rrkg044jf6w",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gw3dpzkjh075f0ehlccvt5a0rxdsq2t6jj7302",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14wpec6wxp5vpmn4dyx5aczq3vjnxv8wq9hhhkf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1anflkvlkdpkvv32e4raq0slmvjhsvgd6new65n",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -29983,14 +30671,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uvvy2s3jr83j27d78u2q7q2frx5dqvpcs26j3t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x681081212fa8b6c68708042b26830e970689355f",
 				"avaxAddr": "X-avax13hhw8dycwh39ujhrnu7lg7jl5zc9685epa9qfe",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -30218,8 +30915,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qckpqdkzy7ws4m77yv2lx02f8cp6pjzh0e7qpd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -30253,8 +30955,12 @@ var (
 			{
 				"ethAddr": "0x0c820c9208e4efa92812cd71189ef91f5511b368",
 				"avaxAddr": "X-avax1dr0tv2pym5wpd6djrta39walmvdxhxsc9f36qh",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -30320,8 +31026,12 @@ var (
 			{
 				"ethAddr": "0x820459813e1916a9b4be710d86061d2a875f6ccc",
 				"avaxAddr": "X-avax1mcnfl8489equdlffznlzln3m0cez58phj3fhvs",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -30700,14 +31410,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pw6yq45zvqw3m7kwyfqrr048c0l8y2swlnklmf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1u7varnlwcm5c54mx7efu86d0g5uls0weyun70x",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -30889,8 +31609,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17p5ud0dt8t6h6lnthc0xyjmjx2sc5sugqvndaf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -31205,8 +31930,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax198hypvwkfkyhw4uzjzlg6lu87gqsc3kklysunl",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -31612,8 +32342,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1juv0ysgg7mqmxqcpd9j5h8wnrxtqssxevqhxee",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -31795,8 +32530,12 @@ var (
 			{
 				"ethAddr": "0x1a290a0c52dcfcd043037f0eddfac5e514ea0ed5",
 				"avaxAddr": "X-avax1p65senj2se5sal4729v06h9vkt2vpacgm6zffw",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -31862,8 +32601,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14t6kxxma7809n2tzmpher2xc5dr086d783sqht",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -32199,8 +32942,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16ewcm5emjgsfyla2kes6e3j79cr53sckgjcztc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -32211,8 +32959,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1asj8mxcf8eklszchcxl84ggrdkfxnzjlstcmuy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -32314,8 +33067,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v56q4n0ztef2hev8murntmccaq8fh4rphpcjm5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -32558,38 +33316,67 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1h7qhljtr3rwwplv7sk52jr96lndkwezh5zgj87",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tq33l00unaxzppmcty0klevxsu5kzdvftqsr0a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x2a97mzn8wdsfsdcheqrjp6pwnr4dc4fmuldyt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jz8pycnk40glcc8ull88c8h7h48uaf0s27ywnr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dptf69vyurwcl3w83undefl0704m9fetl43ycu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax187fszjhzxd7a7ps7qtrklkuq5z4drdtuenxqqz",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -32788,8 +33575,12 @@ var (
 			{
 				"ethAddr": "0x9345057b4ced179b458fb5d41fcc61996dfd8ef4",
 				"avaxAddr": "X-avax1atd7vu4y7vgw70k8d2cepsuy4ykzh9crzllgwc",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -33120,8 +33911,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wrlz09ng2g9ce4k28az56mspx9fmrej4dehtvw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -33466,8 +34262,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1546c599vqs3e2v02szdyd0e5g5lv2cvrdgdch4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -33543,8 +34344,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fv4u3qa70wwj5a0ksggkm4cy3p44x66z2j5tsp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -33647,8 +34453,12 @@ var (
 			{
 				"ethAddr": "0x92029087eb8cdbd2fb8935792c311302fe2dd516",
 				"avaxAddr": "X-avax165ftdfr34dzdrp2e7pyct37ulmre6nukg3n975",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -33970,8 +34780,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1knwslhqgfdkua7jreae0wznl96rd7a55z3q8lv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -34007,14 +34822,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15lqvc94qcrp70xjppgenj8zx08dfwj5wqkaj8u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jaycq74euqtpre839h3wmmpkkam4vqfa48xz7r",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -34042,8 +34867,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fhl7xrne2wcpxja8t3g2kdwzwyujlkydwqz7t9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -34079,8 +34909,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pfnu3hd9e734h4yvsfn9t3zzlfymtkdguscgur",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -34156,8 +34991,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tullx7dy68f57vk2tvxrhx543g6gj7g7ps2lna",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -34671,8 +35511,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17wqvj862tjnta05z34zct6pme2wvu93zusu4c8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -34683,8 +35528,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hdfsh29eqxr9v8nax82maudt7mq3dncp82t7a5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -35131,8 +35981,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jgffm3uf4jj5qztah66jsj9zzrst3t9a3kyeds",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -35237,8 +36092,12 @@ var (
 			{
 				"ethAddr": "0x725c03daa7c01f667088c99a4138f81f2009c0d4",
 				"avaxAddr": "X-avax1zp2n7ug4etp4qrjv5efml2y82q9c07ufh66e3v",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -35304,20 +36163,34 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tggqc53z0hhanpewezm2yjpnndzj82aancwmv8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cp70p3hsdt63ulc48f3ruznm9nflfkt668t7qk",
-				"initialAmount": 564000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 564000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12saazgfqjqc7a7r2hm6g0l5dszen9rf5te32dp",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -35649,8 +36522,12 @@ var (
 			{
 				"ethAddr": "0xc50fc027191c3dbf84c558dc5d56b805ba01b7b4",
 				"avaxAddr": "X-avax179ztf2lr3cnmzp8c2xe3z9wa6jeutg2ullw3ew",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -36144,8 +37021,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pe7c5v8jgcjt0a27xkgcw3tm6mkr90l9adxx8f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -36477,8 +37359,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cwnvgrnvyj0c9793ucw47zxadgkpmjr2hq2y6x",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -36545,8 +37432,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ypx7m86p99z3cuf9cgymgupmwpm36j86uxvzhw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -36895,8 +37787,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1s3y004ghkym8hkcv83al35pnda2mrld7etz4ef",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -36913,14 +37810,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16hlf47kldtn04frvnmshwl6ejp2q3uy2tfmpng",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1efz8chevs4pcr3qd29dzgyuwajkva78f892066",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -36968,8 +37875,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y74crmx44xk4xhx7ssc5secpvtrg9f4re48a87",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -37045,8 +37957,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14wuffxgr20w82q849me0cktkwjg4ytwytuzdcr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -37211,8 +38128,12 @@ var (
 			{
 				"ethAddr": "0xd8b27da628723df981690cca23f14c8f83c156bc",
 				"avaxAddr": "X-avax1xzfgauq5k0l57atzvt5tkl63hl39ua9nptnvp4",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -37309,8 +38230,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19kyqfg38x4e36ku9csz9zlr6g9lys6us2qa65g",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -37386,8 +38312,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nxcje6sawq0zrl55nmtk2axpn7dmu4dvz67qaf",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -37651,8 +38581,12 @@ var (
 			{
 				"ethAddr": "0xde74fdb5ca569f303ca119e7841439b1a278f135",
 				"avaxAddr": "X-avax1x06gvz6xvdhgryhxepdray8pmm6w3vzy24unnl",
-				"initialAmount": 407250000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 407250000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 407250000000,
 						"locktime": 1617840000
@@ -37780,8 +38714,12 @@ var (
 			{
 				"ethAddr": "0x0b9d07e635d6c2e1d41895c91398589015a56aea",
 				"avaxAddr": "X-avax1rak2zasnutn95ufnuc7gejthqeujstjvwh7lvq",
-				"initialAmount": 58662750000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 58662750000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 58662750000000,
 						"locktime": 1617840000
@@ -38060,8 +38998,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1melpn52lyvfpxh238xcp5qjcp435y4klc3plxs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -38174,8 +39117,12 @@ var (
 			{
 				"ethAddr": "0xdc97d51b712e47e3119e684c6234035330936607",
 				"avaxAddr": "X-avax1362u4rkp8h8963yd4drjedymnmtumwr2x58dex",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -38264,8 +39211,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sq845kxjcgylqhpn4uwrz7ggacj2lkc3p6qduw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -38390,14 +39342,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12gpwkwusye2pwxqg0ldgxrq0sqjuprtjv8682m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tc4xq4sjefxgq0ux7gq0d8gjyukdgkp4llrta8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -38479,8 +39441,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1keqlzhypmkxztd96vl54ydkz577l7shq9ytjy9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -38791,8 +39758,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1adflcgqnze9vxv8t97xg3un72xw88uvwgqajea",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -38865,8 +39837,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vs89j49urk0rmath2wrjhp6zf5jy520xnnmxe3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -38987,14 +39964,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12nqtqkplekgv0cy44fe0fgsmscgx580k20dfqc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xj2r3g7ec5p2nszp9tjzsxr3k7cpecfwt4pdwz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -39030,8 +40017,12 @@ var (
 			{
 				"ethAddr": "0x6dd8832eaad28c8bf1b1c8bff1cd481bad835dd4",
 				"avaxAddr": "X-avax1wnly0xzu7x7uwzwm94k5mtyykx2puhjsr8au2k",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -39620,8 +40611,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1trnlrr8kqfvqrsx7l38hxh2p5jju3tjp7ddlln",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -39783,8 +40778,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zsaqlptexkmus0wkgx9mmju88xjam8xlfsk5tl",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -39895,8 +40895,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r65rnfnfjju8zqyyzt5l20kc286w067kchxmh5",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -40320,8 +41324,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x50029p8y825m7xxn4f8wagfkckv6cy4ldvugt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -40357,8 +41366,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax192n8gs3z4g3d76x4wykky5qvt9fxhktutlss6w",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -40738,8 +41752,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1aesfrpqwxkkf9aq9wl9f702td9gk4lnvlmpq46",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -40750,8 +41769,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ed3wsvv8tmas4g2q0j3xqp7u55h3xcasx4r38y",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -40941,8 +41965,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x7e5w5l0fkg0vjze7zuvnt2us8632t8gsdd704",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -41274,8 +42303,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1c5nsvxqy48z5atdztljc934tkhaqfege8xjhhx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -41417,14 +42451,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w07hqdca0telyqrajcpmykpzm98d2juymrqqdj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax159y2ksyjwrl6tpzuvakcwuzrt42z627jn646rg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -41690,20 +42734,34 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16lkyrys552myx8z960q6u6zusxge35efj8f869",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fhd9atymq8dgk6x3zv62nchunwdyv9l60pn2kl",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mc7pa747njt47z4msuve5ye6vf2v5yw2axjehp",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -41865,8 +42923,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vry0qy8yyatrjekvnvmcj2j9ztzfqwml5uh22m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -41925,8 +42988,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r0tzc899cahkhtwzah2fddz0fntr5lkzl0jgs6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -41993,8 +43061,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xvusf9jt3nu8wtxa7jk4zkggywnfzwnjjuzde5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -42093,8 +43166,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vet9p5keur6satcpvd8697atpmxvlzlta8exk6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -42312,8 +43390,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f5r9vvm5w90tjm9eayx8vt2387c6jhn2e9vu9e",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -42324,8 +43407,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1me275mn8sffz6jw3yfky3r9ypn63p6pu3wswcd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -42658,8 +43746,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vylcz7aym8vyst80zp73fhkcelq3a8evlyup0u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -42995,8 +44088,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d6pg4wp4up3hh8advu5cn7e2srxadkrthmepw0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -43007,14 +44105,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lkzu33lymecf0qd7fyj3kl09pzxna8hg0ucuh0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jtw2jssp6pk2wn6x5rsgkkua6ae3c0v0s76nja",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -43189,8 +44297,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1t3k0ej6xw8fqh036qaynukjzr5xey4asqn3v7a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -43445,8 +44558,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sapxhhycl5cxh0ccy32pvr2kgpfy3cvs77kfmr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -43482,8 +44600,12 @@ var (
 			{
 				"ethAddr": "0xb89d6741779e8fa4a44a326a110a6b1391002795",
 				"avaxAddr": "X-avax15ewe35hkrla8gk72urvwwnchu0f48km3zarwrc",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -44016,8 +45138,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tff0pwn6ajzjfuspq8afcas0kpnfqpwt3f7pte",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -44130,8 +45257,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mdx2zkjrcr5k655yksmaffgr92gkqua4ndsv4q",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -44173,8 +45305,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jcs73kah2j3c375ew5rmqt7nv897n8hc53lz0p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -44444,8 +45581,12 @@ var (
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
 				"avaxAddr": "X-avax1cjmu5xns7638swm7q37qjjxrr68anm78e0s7ke",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -44997,8 +46138,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12agdrvyrmrmk6mclxk440ww2ujktvqtjgc7k8m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -45128,8 +46274,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10gqrumleja4v3fc5v2h7hwz72ehqwfhk5hg0tn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -45245,14 +46396,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hfwtx6u3lg6tqsa2hyh3mrcndepntzdt87wuwy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nyr0catj0pazscyjtlsxwsh8ukysar2ujpsx3p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -45363,8 +46524,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hwqgwtv5mg7eduwvsgw9puamrez8cplv7jkdpc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -45463,8 +46629,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x2ugnl6ch3y9pt03zu5n0gwqqfaugydh88wup7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -45571,14 +46742,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13kcqqztkmhvq2jhk5zrqghn7yvg4284s9s8n87",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tsrsa95h5u5vmerhwfk86pcg0p63d3kph530e9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -45836,8 +47017,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1av7at50k5lvygypxx9fnu3fdw22vxp0g7ne543",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -46022,8 +47208,12 @@ var (
 			{
 				"ethAddr": "0x2dfe2727f2f61ed8c6ce755c8d36e0e72d5ff221",
 				"avaxAddr": "X-avax1hwy22s9s3sktskj328424v9vcyfpqs3vkst0un",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -46286,8 +47476,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cz5dq78l48u3mzawpg6m2j8x3rkwmsrpwy79ls",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -46437,8 +47632,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14q43wu6wp8fs745dt6y5s0a02vx57ypq4xc5s3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -46688,8 +47888,12 @@ var (
 			{
 				"ethAddr": "0xe015423010460fd57750610acfe7f8ae5e2f93c4",
 				"avaxAddr": "X-avax1pcqy7gvvdrtxy4qfqu8z0pfpqn5jlt73w4gftr",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -46932,8 +48136,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1n985s29f8m46rfk4hjs6ulqeqq726tx6sgrann",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -47015,8 +48224,12 @@ var (
 			{
 				"ethAddr": "0x9c540cd98649ab8294460c1cf1e5cf11cdea258e",
 				"avaxAddr": "X-avax1qtj2pe44yqyqj895vrtne64n7npy623pau7auy",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -47190,14 +48403,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ykwkcjje23vw35kvcqquuap48wxc9rfa9c99pk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r70alhacxvc7kjmwxqxs4exzn2cu4hqanaultp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -47287,8 +48510,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax122uqawlr6k0usqa8q0l486platnrxpmln2ynnp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -47376,8 +48604,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mpymhmgsh7rum4dmny7et7afz9hce24kaz8075",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -47413,14 +48646,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1n087nvhg6szmfqefegahhmtahzzd6t4k0twqnw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15qrmadqzx7eggxa8hmvr6pvjajrf5r225n94lx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -47456,8 +48699,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1a8wkt9aau8x4juslq042c0duaksk2xg0ku4650",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -47576,8 +48824,12 @@ var (
 			{
 				"ethAddr": "0x09727503d7d8ffcd23446d1df62364f31e7d4ae7",
 				"avaxAddr": "X-avax13p5g70jqw5yclgrgtjwrnunpxfjd6zv0tyneqe",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -47680,20 +48932,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19k3f2lmxnzp3kv7z2f0wraj2q5uz88mhj3zunj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1392h69a6pygypu8qu7nv4tjz6um4f2rlk0x65w",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fm5pqchp5fvrqxu4q5ccmalgc3u5fqwadytynx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -47729,8 +48996,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14rnwt8lmv5e80w7cphsz6yhy9q8fe74n0hcds9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -48191,8 +49463,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1kptkrxxegsapmuadtcj78rympty7a65an4z3lx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -48228,8 +49505,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rtf48fmmpqqvwpeh9rhrqpuumel4gwl33ezfl7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -48469,20 +49751,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v2t286qt4u0humf0t0duethqv8t990hl66z3uz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rm8jzlu9536tqj8g8ytxsg2mladwfdpf66uluz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vr3phjdp8fv6kusp0xwpz7cym2teweqxg5m3vh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -48578,8 +49875,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uw3xfap77ugrqf5xsctnpcd6evaptauvml9xc9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -48630,8 +49932,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fc6uzkuk7s7crf8q5cvwcappnrecs06n9lz66q",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -48872,8 +50179,12 @@ var (
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
 				"avaxAddr": "X-avax1utcsxua0es69ecupmvvagxxvj86t0c82f2nlpd",
-				"initialAmount": 15187500000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 15187500000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 15187500000000,
 						"locktime": 1617840000
@@ -49062,8 +50373,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14srdau6a0cfpnmpznr98hksudhdkpp0qwe2e3m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -49594,8 +50910,12 @@ var (
 			{
 				"ethAddr": "0x031672249c7d5e6067369e9de341588df7ed4248",
 				"avaxAddr": "X-avax1mwegzdf4e385q7vphrhue3ktwmtgh22ynvz86q",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -49667,8 +50987,12 @@ var (
 			{
 				"ethAddr": "0xcd76a5695ef61f5f4e6d6054620f849f9a3181b9",
 				"avaxAddr": "X-avax1t2jp2guwca83efke3kcmm5jy8s3cga8nzu0u4a",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -49757,8 +51081,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lcwh9hwlawc5n0py0a7kq80xxvhv8pxa3k9ajr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -49846,8 +51175,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1n7urznu4x937z7quh673z795xwtgm7js9wj4fp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -49926,8 +51260,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qkr4u74kuaknn329sp5ehj8q75xsjjzgpw4jq3",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -50160,8 +51498,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gjamfszcl5p7a555f82sghkesgsqfnv7hea683",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -50197,8 +51540,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19ea6k9hr4rfqfrzxckxpjv22ulpcmwk0w4verg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -50300,8 +51648,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17qpkc0ezxm58elshcwhmgavatftrvvedyhg09z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -50337,8 +51690,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ur2939hqhce8246k43ke3a76rq7la2yzzg8wnp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -50633,8 +51991,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax146dsu24um4d5rmh9hx4lg34xd5wcq3qlc5s925",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -50693,8 +52056,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rw35hkr6r9vgdfff4xelfcp6svvshlnutd0fha",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -50870,8 +52238,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1g8k0xn553ewk8wjta4vpxu9rfzrmwev4vg68c7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -51188,14 +52561,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sjlp8x3wmkrs4nym9acjnny2p2jafnfdl833mt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xf975b6ec705b81aa95a270af836e8b79fc59ee89",
 				"avaxAddr": "X-avax1rx8f3m82nvehxvr4kynutth0w3hnsr3csdj8c0",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -51323,8 +52705,12 @@ var (
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
 				"avaxAddr": "X-avax1d2gu9v5fx7nyq3zzqyhkn6lmxq8827nz949fse",
-				"initialAmount": 3125000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 3125000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 3125000000000,
 						"locktime": 1617840000
@@ -51421,14 +52807,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax122935zyd6z6xpw0j7dqqzvju4vvx7j7qt4gl5m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r7paktn0ystd45y3wyqtszcdawllx8w77dvt7f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -51462,8 +52858,12 @@ var (
 			{
 				"ethAddr": "0x1349a6baadb77e9f9a7ec132edb1221f68cfe492",
 				"avaxAddr": "X-avax125w84sznaxh8krmg8hp0gkuvgfh7xu62qc0r5a",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -51529,8 +52929,12 @@ var (
 			{
 				"ethAddr": "0x215ab8ff475d1dbca4f120fc4b07ed42d01dd191",
 				"avaxAddr": "X-avax16qtd9c36y4t5ez4pysax7lzytg3dglrcfe0g43",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -51906,8 +53310,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v7l73cu579lvvqfl6wendg6sxk5cs4jd2asrtf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -52195,8 +53604,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13666z88rmzvlw9rdy5f4ae8qm62sr0skdk032z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -52309,8 +53723,12 @@ var (
 			{
 				"ethAddr": "0x47d70b405209d680830c9e5e3e4cceb1f57f163d",
 				"avaxAddr": "X-avax1ctslnuh077qcetypj0gq06ezw0plpmczf2pqz4",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -52376,8 +53794,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cv2f4900dpj8tn6srqqdzn8un7g98ld59mq2hw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -52521,8 +53944,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r76pwd708s6jhtpykftfr8w5rm5n30a63ygsjh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -52958,8 +54386,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12qmrd9890xluumx9w58fh5993r6lrwwz0k2yc0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -53032,8 +54465,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19hjr726x2l4sdlg8mgmyvvxg8ke7jmvlk0gfe4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -53100,14 +54538,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1epcy660lyh4yxfjjtdj8qm24ynngllpr8tgpfr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x1d2b05be48a914dd65d5e7aedb73060d5907e57d",
 				"avaxAddr": "X-avax1dsqf8re2jg9yyqyt5z2rul8wutw0mh8j2k5x8a",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -53258,14 +54705,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13ygl9329swl9dcwkn8jtr52v2hwc8y378uvq5t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rfp6u7xtw3gyuqp24x4d03vvp55wvah48g3n4u",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -53550,8 +55006,12 @@ var (
 			{
 				"ethAddr": "0x03c5ee19f6720addb0927f25b42136fab2e0bec6",
 				"avaxAddr": "X-avax1g7xcmhj4pe0jjvmh8s5yrkcsz8jx5249qe595w",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -53654,8 +55114,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ydyar0eluas6ls6zthwd2jf5ez23aq3m8j0atx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -53731,8 +55196,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rnklurqutmqvh9e4gxudd5pa89k47z32dfp49q",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -53871,8 +55341,12 @@ var (
 			{
 				"ethAddr": "0xaa22d22ae1f65a064fa708e7178ac0dcf194c850",
 				"avaxAddr": "X-avax1fhfv8lj9wmry4fqxlznu2lchj0gctus6ecfw77",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -54290,8 +55764,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uk7dyvhrtmx4pyxvc60gwg943qgyrnhdx2nzzk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -54483,14 +55962,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1m2sgyh7cj5mnwulh54mm3c0k9lh4dskgah2xcs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xcg7vhxq9za7ws49tjh25fptpc95364a87t87k",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -54595,8 +56084,12 @@ var (
 			{
 				"ethAddr": "0x7d09ac9932f354dccd9b8b32e9f8c1808396bdaf",
 				"avaxAddr": "X-avax1m87ncyjtvcxjvt3pm5ems42jecugmun25edla3",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -54733,8 +56226,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19385zd4lmxxfksq2g9zk7nnu6pjfy4mgzgvndd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -54776,8 +56274,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xf00c5k2wcgszcmvqakjnuunvp8ezasxqs98yu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -54896,8 +56399,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yr0dx6l8hph9xkj2j4gplg5sfedp9402v27c0n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -54995,8 +56503,12 @@ var (
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
 				"avaxAddr": "X-avax1jgyu7uwhghl3h4x7pl85rgc9turw7yh8k0yghu",
-				"initialAmount": 5712250000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 5712250000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 5712250000000,
 						"locktime": 1617840000
@@ -55062,8 +56574,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nn97trmqk07jry9lqfzpmha8af38tjhusfm43l",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -55074,8 +56591,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d3n8rd893rw8d5u83qxwnyhgxf6gc4y7qsd7p2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -55223,14 +56745,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1huet3m6ga02jl43s0s23txud7z0rukr4dydz9k",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xf0f53428570c6d2cefb489fb26de0c4a137249c1",
 				"avaxAddr": "X-avax1n023uk4hx5u92xn9zv8w2rrg6ncacrt2hq4xek",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -55296,8 +56827,12 @@ var (
 			{
 				"ethAddr": "0x537567e73794e8ffd09d71877ca9c87a020a8b63",
 				"avaxAddr": "X-avax1mqzsqq5d99n8dspfcujcyzy2tn535x3xemthpa",
-				"initialAmount": 12375000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 12375000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 12375000000000,
 						"locktime": 1617840000
@@ -55500,14 +57035,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1awd0u5y7f8hmzslxegzaznqmc6ysytrqg9wxev",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vwvhlm7l0he9g43h5scajvkwa7rgh30m76mra2",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -56341,8 +57885,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12903w2hgjk9cksmk37dwz38n9m05u6kk9rs9lt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -56739,8 +58288,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1m7qmu5nqrx9j9kfqtjngws0uzxdkrsfzmnuhx0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -56893,8 +58447,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rcavzvtfaqwyqxdzkcsw54azm06qpmvl3wqavf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -56942,8 +58501,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1exvh565hajz9ph4g4y20gvm8x7qxtn0y8kdjmj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -57056,8 +58620,12 @@ var (
 			{
 				"ethAddr": "0xde5326b470ff87163d3204ef797f3b83a8c92143",
 				"avaxAddr": "X-avax14jplc52kw5y4ssv7w33gxzw8dzkvmnlmzwrran",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -57194,8 +58762,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yatl3t9dngg7x3lm00gaq7jrrqryxefy6rrc2z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -57302,8 +58875,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dlrfymx7z9x3ta43wgp99z0r3fyqpqw0se9vhw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -57339,8 +58917,12 @@ var (
 			{
 				"ethAddr": "0xdaf219727e308277295600807125d8d844b74e56",
 				"avaxAddr": "X-avax1q9nru7jz9025n57e6uqn53kfe09yf4un4cyehs",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -57574,8 +59156,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tdzqjzxeefuf0k3rl8sm0ne9eht4v7s3r8hnw0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -58408,26 +59995,45 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13347ajzgw6uqfkyyvgezx2c35tj7ljs7gxv5el",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yqu4ae05aejsuzae74epnmmyn5lxv3t4gd2rkn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax124fgmh0k2eykwtgw8spnmu5lgypcq79sx65683",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xfe4687659abbd67107831e58d8c1b7602c47c13e",
 				"avaxAddr": "X-avax1u3wezu4mns8ftr82t60zus33u2mn2d79eluxfc",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -58516,8 +60122,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gn4a2rkgzl209kftwvqqt9ywxex4ew2zxfn7ur",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -58707,8 +60318,12 @@ var (
 			{
 				"ethAddr": "0xa50ff505c1d99db1238ce633845dc06162402c03",
 				"avaxAddr": "X-avax19ackg27ggpml4e9p7hppg0plfj5h6v7gh4rw2p",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -58809,8 +60424,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sfr7pmk2stkmxmfgxfxrde3vgemyj4ds27wfdg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -59006,8 +60626,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sq4a2n0uyypr9x6whmthw0zyse480xsaprrrhd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -59035,8 +60660,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14uet3eplpx549zcp3nle6cvft5z7trfl93nt3k",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -59149,8 +60779,12 @@ var (
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
 				"avaxAddr": "X-avax1cm8xngmvestc63ftunm27ae4kka6g4up4tp9m0",
-				"initialAmount": 9475250000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 9475250000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 9475250000000,
 						"locktime": 1617840000
@@ -59310,8 +60944,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jndew70yx8ny72hg3xh660y6jjfnzaynwfl5af",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -59557,8 +61196,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jdnl6hwne3cam0a3fqeytmhguyg7pa8zfvfmhr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -59729,8 +61373,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16fp0x50ju5fgtywedfs7p5x6jn3uepxxjakaqx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -59741,8 +61390,12 @@ var (
 			{
 				"ethAddr": "0x3a663cbc80a86004aa74404be72c1e9bd40b4417",
 				"avaxAddr": "X-avax13h0k32fp0fhk62m3t45jm66efyskf25apx7kkt",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -59964,8 +61617,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rlyna2c6fsem7mmr5helv9x2qgkkfxqxh7j729",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -60038,8 +61696,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dad0t9p4v0cagzdm436yfyhm7v29jjwdsuzfqk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -60068,8 +61731,12 @@ var (
 			{
 				"ethAddr": "0xbcfb5d84360c15b52e88f60053d37919dbfaf499",
 				"avaxAddr": "X-avax18wjjxyjp8n6k2rdnfxh0tjcs627cjuj4u2yrwx",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -60135,8 +61802,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mn0gk9m62emz5423flxa8cg0z3q2ds2ucxghdy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -60300,8 +61972,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yvnqwfm2q54axfwzxn3uyzx50f8knyjky7mp3u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -60312,8 +61989,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tg62cdu2hyp84ysdad8tv5xlvahds2r2gl2x4f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -60556,8 +62238,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rg9au6gcxvfzy6fr4x9njkc5msafe3gsrmyaj3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -60750,8 +62437,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gfe0t0482v9hltz57nrs4wct8ahc255p7sx44k",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -60827,8 +62519,12 @@ var (
 			{
 				"ethAddr": "0x7c7f89ddcff8d6792d595edab31473c7de36fb71",
 				"avaxAddr": "X-avax18cywfe948me8jez3gwmfwyapfswdcpfllq78pj",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -60925,8 +62621,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ndkhjqdwdh6k0x7cn0w2lpvnxlwuq57tgsuh8t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -61337,8 +63038,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zsxexlrpf3tupsrxvpfdvq760qnupnwr6qty70",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -61457,8 +63163,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18s23atqrh36u7y0qumhtc0m0gwvwnm50zexdly",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -61685,8 +63396,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13scycxpgcrm6x2ldcuw3qkx7atfj4lcm2kn2ul",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -61911,14 +63627,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1erwjlzkt3rndsrcr0jdmefwwfdmu4rh47zm6sd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1s4ry6rzc2ftzjr53xdesxce9268kpydlscyzum",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -62119,8 +63845,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18kfldzfyq36zd9jk5f7azgjd5lnj7365gplm4n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -62208,8 +63939,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v8jpraterths5mwkf2t8zxvgq3lj9ezmkj0f3a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -62251,8 +63987,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax186ylkzzq5ut403f8duy75a8zxu3eqz9h33hy9s",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -62348,8 +64089,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mswpxf9nkvelf6qz5fnzjecxsdf8en26lrzug2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -62741,8 +64487,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d7vp22z286qwg5pjjucz4guupl9astrg3fhs78",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -62753,8 +64504,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vvyg80paj5zll304czvfcmedncglwhy8j53cly",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -62884,8 +64640,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mwvxppvc5vghwaw2ad8xaahxl7hu4vstqtqupc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -62913,26 +64674,45 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13c58pc8xvftdwau496fpzed4m8hcphyrgultqe",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1et5qjfn0sg4yed4fjvaxgtg4pwkqat9c02jduc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1q2w5etsn72mh0540wv4mugay3t3fw8m3ckzqj5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x0895f97c804b2eaa1046d2e49cfc0781580c463f",
 				"avaxAddr": "X-avax17aykwjwzzkf96krfe89yluv8rz2k4xytaqtvnv",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -63069,8 +64849,12 @@ var (
 			{
 				"ethAddr": "0x089f23695fa07a717fec32fc6164858db899ce28",
 				"avaxAddr": "X-avax1e7p8yaf3dkn54n83umrf6t8pef8c2x38r28tnf",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -63273,8 +65057,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16s29sr4gygwetk89ucs9j0a49tuxcjqmcwc3pe",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -63418,8 +65207,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dc6ac53uz82rx458tq8fp4uy7zs72d9l6th77v",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -63430,14 +65224,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1adwa2xa9st07spz0r8fgycz36lc685xfyzet6h",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x249dfe37141e7c3538301adc0906f641b6dff18d",
 				"avaxAddr": "X-avax1ah76lhelghyq9frtdfgewunutda8ecq9l7upkt",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -63574,8 +65377,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rzyqv6g4ma9uhu2drugch05xmcqyu90d0z3aaj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -63611,8 +65419,12 @@ var (
 			{
 				"ethAddr": "0x6e4c7d25c55196b64aa73a5abca726c8c94b4575",
 				"avaxAddr": "X-avax1u8w2gtmycntje0p07fgfuxdgfmlmgd4am7pjdt",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -63857,14 +65669,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tpacxzlyucgd7ffwwx3ddew382czschf0zx8vk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1k5mwqpls960v0eenqvynmu37csj2k2dut7hh2e",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64025,8 +65847,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jq2nr867y6kg7y3lj3s0l6e059n2786sf0rgm6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64077,8 +65904,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1h900kgu7rcxnkxjr6xpqnrfmplwmddlnv82sq4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64145,8 +65977,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1makd4rhr5nx27nd0u2l7fa8acre5m58wun2lp9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64182,8 +66019,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vlsjh46ny9q6aerc68q0ycj3lprxe0j22zfug5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64211,8 +66053,12 @@ var (
 			{
 				"ethAddr": "0xf8ca8fad3f0b28370e1b678663de3919841e16e5",
 				"avaxAddr": "X-avax1mvw3a6ucng2mjwfy2awrqkrzglxehsxfnt7xjl",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -64296,8 +66142,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10fwf6dznzrlwrqpw6tumd9wrtwp0hxrhfvp67r",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64370,14 +66221,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vhcj6xpy8unqay786dwr9gd26jaatdahxkz52u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dr0yzz52up8p4ayq8xly0q3wtmk3kj9vxj0t3q",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64448,8 +66309,12 @@ var (
 			{
 				"ethAddr": "0x171d6100774b4ba22accce760111803638abb5c9",
 				"avaxAddr": "X-avax16wt3xles2r8gvg554rqhx7629wgnhxgzp4p0dh",
-				"initialAmount": 12375000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 12375000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 12375000000000,
 						"locktime": 1617840000
@@ -64586,8 +66451,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18pf77cvt2ygu55lmxl4m36xv0lwlcqt2jkdkj3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -64615,8 +66485,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13c9cyn0jheyfc0gglm83rxvr0adlnp4zuaxqx9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -65054,8 +66929,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wq7w4ey0xfgf9mlrx7w0wwz5uuvsjsaq4la3kq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -65083,8 +66963,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mv90epllkyxs7l0wcs2ksfne96ghwz6nhvnh9c",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -65126,14 +67011,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1487r8kx6hdpqxfvne9gmw82u43kxypsrc6wdfr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x3685707e0acba8dd32ae1d4e988744e3e0dcaeb7",
 				"avaxAddr": "X-avax1x9k0ckrj3xmxk3j4fa099drrhk8g72gtxgzh7a",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -65619,8 +67513,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1687g7h4mjsgnjgczy8cdg88qj68sykcw04j4xa",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -66185,8 +68084,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v3zr3pkkmrc3sm4w7y8838w8trgej3rdugvvk6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -66271,8 +68175,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wln2l2lsnsq9c04s2k7xg3mzkwq0q2a58gfnmp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -66300,8 +68209,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1kyeutvwq9zvmpk443l38nhpexsp4gry75dww4g",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -66687,8 +68601,12 @@ var (
 			{
 				"ethAddr": "0x6c7076fa1d8060471a4be0b3e3f3157311f48c51",
 				"avaxAddr": "X-avax1yxwm260ty3lwy4kuhglvtyevaa6607wf9j9lav",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -66808,8 +68726,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1te72tvl5l8f0kgrvxnuy3c0945tr0ldrdj7yrm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -66916,8 +68839,12 @@ var (
 			{
 				"ethAddr": "0xfe2e4afa32f53f7823889441d223dd4db8455fa8",
 				"avaxAddr": "X-avax163fw4f5rqzffp45ndu9ghw93vl9v56dpl8xmhz",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -66983,8 +68910,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1skyk3nj3vlfvzq4jk7f6pwclyv7h6fv5sflsjw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -67251,8 +69183,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f4hw27pmfztzdg4yk2syezjmdj3w5nrlzvr3ar",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -68142,8 +70079,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v9trxl5sy6ddqzs2fqqqdj366d4zz9s6q226fn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x1fdbd3a724ce1c299eba7e38344a19401263f5a3",
@@ -68466,8 +70408,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10l63te0n8seee3clg2v7dw948upfl6aqgwt5te",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -68534,8 +70481,12 @@ var (
 			{
 				"ethAddr": "0xd8906900af43b728c754cd8437069db6a029eccf",
 				"avaxAddr": "X-avax159tesn68sn578wsuy84k8azy7cudex26th0h98",
-				"initialAmount": 33750000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33750000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33750000000000,
 						"locktime": 1617840000
@@ -68661,8 +70612,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16cczc4r224fj49uur3lm2xjh55zxpex2f3ztuv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -68852,8 +70808,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12wpge3k60tsr2w4uv5ed5juqdqv7qgrczk633p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -68966,8 +70927,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1kjd03cd64v6uwclq4fdgah9vhanmmu0esmaavg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -69319,8 +71285,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10faexn0sx3035v4ev0rch7c2adx764n9lwnt6e",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -69450,8 +71421,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d6trxgmqauvht55q9u9v3z6cs9x8j6tj5a6rt6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -69462,8 +71438,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16tamanmvtqykeqe5cy8ujca00k48ztspuaef43",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -69480,8 +71461,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10d74y65n0genvaph4l8jve60c3aqufy2578v79",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -69554,8 +71540,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1e92ew9lgwuqrmxtx5lknk8lf3yxhdxlxnxfeyk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -69720,8 +71711,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax123z2xlc8et264j6f7ew6jzs72rr9zds5jf4uha",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -70261,8 +72257,12 @@ var (
 			{
 				"ethAddr": "0x94a1bedf106999a7698ab22c3a75292a6ce6680d",
 				"avaxAddr": "X-avax1etu5efjlkp2pylxjltkcfp9ax2t2sx4kyhm9um",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -70328,8 +72328,12 @@ var (
 			{
 				"ethAddr": "0x92222ef3212c41e0feb846c8f3506303fb529b4c",
 				"avaxAddr": "X-avax19a6mcrr88y8yluvde3th32z9q0c92h98qtj45t",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -70549,8 +72553,12 @@ var (
 			{
 				"ethAddr": "0x5288bb8f06df98ef53e5e625721f258b0b2dd5a2",
 				"avaxAddr": "X-avax1kgs7lgkgg322rpqeyxpq0mdrstn5v9vpr9sqvr",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -70616,8 +72624,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1363yc78mz08ysdku5zev929l57ysaflsqqmyhw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -71043,8 +73056,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1007wx54tql5sv4qd98c3luhu4k859zffpd09l7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -71363,8 +73381,12 @@ var (
 			{
 				"ethAddr": "0x1bf3ee93e9b7452ee6fba698f28981ba8b323dc6",
 				"avaxAddr": "X-avax1s30ffs7rynseesepyd0w80qhj7w25wf32vaflg",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -71640,14 +73662,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v7lu9yn69scvm80e6sd36wn0q2j38ewtl6zdfw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x3f8abad8f8392002b97d82c99139c58e571e818b",
 				"avaxAddr": "X-avax1msyyr9hug7qyxsclsnele2muz9dptqh3dtqvcg",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -71713,8 +73744,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1n7hhymv2uqa735jem7x2xlrdzzhrrxkuc7h9f2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -72097,8 +74133,12 @@ var (
 			{
 				"ethAddr": "0xed5326d754e53090fab288d5ee31a5d3e9206cb4",
 				"avaxAddr": "X-avax17gz480y8zx3mxf8stl4caw342zsnrr5737k0ty",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -72170,8 +74210,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10rmvnggpxe8z6lpx7q79hszwr98uquc52vg5fw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -72521,8 +74566,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nalhy52ftqqe4269dg8a7hkrzzx0cmad2xujl6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -72675,8 +74725,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y7pl7t7d84htr8wchckwrmktmwr0n4dmgqed6t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -72687,8 +74742,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xve9g04aje5d6tm9savfcjm0p3zenw2u4cpfkq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -72943,8 +75003,12 @@ var (
 			{
 				"ethAddr": "0x8e5f82babd6a0fad5157fae76b336644dcb8033b",
 				"avaxAddr": "X-avax153wfvxcp2p69707g7h0cp7ukvt5utl5hndust0",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -73206,8 +75270,12 @@ var (
 			{
 				"ethAddr": "0x49315e1705cf2111707336c11b220cf805aa9984",
 				"avaxAddr": "X-avax1pmlsw5y5vwz6wuvfdp72rgge7qdxx2wma6vp0l",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -73391,8 +75459,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wr66skd07szt7jvu999p073qyst08y76me8jxu",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -73705,8 +75777,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10gnmumceu9c4fr9q3ut38qk4f2f8u83dfn7va0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -73972,20 +76049,34 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10jyvvy0djv2njnq69ff9kl8zgcy7dsk35m4m4p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13ezft8za9j7p47838d9fudcjr86ju7vglhd6gm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gu25jq6j735zf00f83xj9rpjnv7c2zqrztygdl",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -74529,8 +76620,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hvglgun79djfzkq5rwyy6acr2zqycps3c4z5up",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -74566,8 +76662,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14x56xaymred8f44f8t35hvpjc3ugrhqwtznhef",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -74595,8 +76696,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19wuw7gyug0nfwyhzmp6ttew99d3xcrgr4qpr2k",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -74860,8 +76965,12 @@ var (
 			{
 				"ethAddr": "0xcb7350ba19e642c46189adee4f870d9c9a6ac45f",
 				"avaxAddr": "X-avax1jfde2208l8p6ymmjjc3ry34qyc8fyfppjtqnn8",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -74989,14 +77098,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12lqk4qvfh6hyc4snu0zyrsztjcvh08a3mws9wg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x62bc816e9d42ffa7ec6cd40d31ee6bf6400ec0ac",
 				"avaxAddr": "X-avax1z8ny7c9g0nj8xsda35pgjddn94qjup4ltfcl34",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -75174,8 +77292,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x8jpc0tjsuzuwvxc5jh3djksfnaelmcxsgf2cs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -75389,8 +77512,12 @@ var (
 			{
 				"ethAddr": "0x0ecd8165499062de04a7199c7ae28db7c4bdc46c",
 				"avaxAddr": "X-avax1ykq5vv5zh3087r56g6043czhyugm3svc5468kz",
-				"initialAmount": 12375000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 12375000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 12375000000000,
 						"locktime": 1617840000
@@ -75462,8 +77589,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nnrdrwk8pftmv3yxlfu7payx5tfx0363gna8nw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -75499,8 +77631,12 @@ var (
 			{
 				"ethAddr": "0x54aa663e4bebf6196f6e668516b98c9fbfe980f6",
 				"avaxAddr": "X-avax1w3hhw853c6snnzqq5nt84h7wlrpkzrs6u60d4x",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -75566,8 +77702,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qaskdueju4dyh3kdmp65vn64w3gu4jqck56nks",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -75632,8 +77773,12 @@ var (
 			{
 				"ethAddr": "0xa7c19df9fe37177c75bb4cbd08768038284b97e7",
 				"avaxAddr": "X-avax12uukyk4r28d9etcq9j835pcdrzyx5nupatplyu",
-				"initialAmount": 3375000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 3375000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 3375000000000,
 						"locktime": 1617840000
@@ -76109,14 +78254,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1277xtqwext0vx0xfak904rjne2mc3la6ul4la2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xfa4017fa12d6a041fb14f225e71bdc260f473f7c",
 				"avaxAddr": "X-avax12vpljmyw2227fr4axcxhju2vjkuq7xf9qs24hd",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -76426,14 +78580,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ruswhtj79l6zu7cq842mh77a3gxyh5sef0y2fl",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x5dad307bce6b366ce52ee9011974e21af47ff413",
 				"avaxAddr": "X-avax1dnzujznjpkfm6j9n79eflkzy5hdanptt924fr5",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -76644,8 +78807,12 @@ var (
 			{
 				"ethAddr": "0x56dc9bfad5c9abae1860c7c8f277a849ecaceef8",
 				"avaxAddr": "X-avax1j0rd9agup9l0xrf0sskr6qnvnmq38ukczvz77p",
-				"initialAmount": 34218750000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 34218750000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 34218750000000,
 						"locktime": 1617840000
@@ -76711,8 +78878,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d3awd689kk3v0qa02sxzgqq2ddqentx3vxgz44",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -76950,8 +79122,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1478eruxwxa4fzpd8lkg2g93mduvp2w7jcvwvcq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -77065,8 +79242,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pdrgr7xk80gvlgj3n0phhm0263a86dhhx8da62",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -77250,8 +79432,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qq7lemp0usva663qvna60ay0yk85cqa53vtgz6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -77334,8 +79521,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xa6guxha60wr897lz4yzn4equzf7flv7ajle8m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -77363,8 +79555,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax192pgrnee90ezdcrlmytttz8qgljfh7pl642lyn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -77463,8 +79660,12 @@ var (
 			{
 				"ethAddr": "0x28d804bf2212e220bc2b7b6252993db8286df07f",
 				"avaxAddr": "X-avax1py57ysmae9rgkc28nrnwt8ex4u45lck8ht7je8",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -77619,8 +79820,12 @@ var (
 			{
 				"ethAddr": "0x00fffe5841d39a92fa37d14703db0bf9bf6726ed",
 				"avaxAddr": "X-avax1uxk9cxmycnxtcr0vyxd9caufqwtcmjqck8lk5n",
-				"initialAmount": 12375000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 12375000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 12375000000000,
 						"locktime": 1617840000
@@ -77825,8 +80030,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12nlmuv9x25yexx0tkqwqfktn9xpjt94yz7gj26",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -77893,8 +80103,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15yepq8t6q0jslttxuzlnntd5lph4cra9dyq4te",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -77976,8 +80191,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pnqx6tv5c69q307z49gt8hnulte90azfncxg54",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -78019,8 +80239,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xe6f5pvkrakwzam2eyd5v6xp66zpctqmsa7edw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -78096,8 +80321,12 @@ var (
 			{
 				"ethAddr": "0x259ae1cac6dabac2a2ff1f9a54ff5eca96d6f21c",
 				"avaxAddr": "X-avax1vz4r4yvlu06uckag7qmpwmu9tlwfp8f4n6nxtc",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -78163,8 +80392,12 @@ var (
 			{
 				"ethAddr": "0x307276fb12887b09652a684a58ecba6e17358244",
 				"avaxAddr": "X-avax1wteapzmy3kde07rzx7x7lqcglnuvpkn3u26un7",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -78483,8 +80716,12 @@ var (
 			{
 				"ethAddr": "0x1a3e275817e337ecca4cf1a888d7e7b186e98b26",
 				"avaxAddr": "X-avax19j34fdc2ngwjn2d6qedaxhjj6k4k5s0s8evm2a",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -78715,8 +80952,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1smfem7eklysfucj5g74q7xg8x7lydctj28h7uf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -79154,8 +81396,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r87gjvstr7zmlqtr34m60j2mqwuzvfndver8az",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -79374,8 +81621,12 @@ var (
 			{
 				"ethAddr": "0x841fa6a383030d51c4661880aee4ace4379ae93d",
 				"avaxAddr": "X-avax14l6q63zpxqg5j7l2guecpjhlmyqu9akhaf9skq",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -79441,8 +81692,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ue32p4ffzhzeen8w5ghnm0trssgt34dyfu24lw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -79806,8 +82062,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hs0yfz62v4lyjgskkhe59tj5a93guvnp7t9z4n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -79889,8 +82150,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cvymk8fs856yxqu2f65nptusadxgf6xfkl4zhs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -80464,14 +82730,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f4yds23ag6ksej5zty58adpwdgnpph55yte5jh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1e7c3lp03898l9he22cys0vaz9hzeav7xxjlruh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -80482,8 +82758,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tm5pq3un05vr56srjakn5qy55agde5gff35awj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -80649,8 +82930,12 @@ var (
 			{
 				"ethAddr": "0x5f7e1e175f2804cf54adaccbeec352609e2215cd",
 				"avaxAddr": "X-avax1yg9jrmh6h7wea5fhcln5m7sp25aw6qck05rp9q",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -81106,8 +83391,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dda4kwxc0n9jega5xxfpwr00gfrr0d4ha03w3s",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -81118,8 +83408,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wst6llxywr04advlzdjdrm6fz8udqvy24fc2c8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -81582,8 +83877,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pukln6rr65hu2559yrg50g2wwgl7m62ys5kyr7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -81619,14 +83919,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rulwt8r8fdmftj30p2hy2z24txc6lne4z9hm36",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r3z2td56x3nwyx6whkfpklv2edfm399ehhgy26",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -81930,8 +84240,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cgxx53re954lqq6hx8ss5qrcmvqfzs8w49m62f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -82078,8 +84393,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y2l3yh6k4wmgjplpt2034lm84r2zyrjddhv79k",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -82295,8 +84614,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1eqnneefknpq3pqk4kaatvml09h7k3dztc4ydxf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -83144,14 +85468,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l70kcrhxgje4mpp2g7t6dl9m2gmcg26dwez658",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1van4kfnszjs5x7emujrr0czdls98dc7cls5u3v",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -83227,8 +85561,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lw8qfvwsaep6qmcj5my4jtxvu2m8vmk8wmkq0n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -83751,8 +86090,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax176lchyduke5lqtj5cwtwc4q9rgkzvlw47vau5z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -84261,14 +86605,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1u5qh07xc4cp0ews45klswxz3u37q9j9wq4cxtm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tf50xte3wylg2ty45m8et4c2y0vj2tz8vsde4s",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -84375,14 +86729,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1aa26769tjgurdtvly0vupnt3kvljg3vasrmnwk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yezk2pkfslrp0cz63na3hk0y4uup608h964czz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -84459,8 +86823,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vx6eyred5pe6msh7n93lhhvrkc43d9h2rnvgqx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -84514,8 +86883,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fm0wx09nchqh9cvak5pejfudkwg98239f6gyzn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -84878,8 +87252,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1awyeg7lcpz4t8zn0nyvc4hz062veylu7ztn8yr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -85322,8 +87701,12 @@ var (
 			{
 				"ethAddr": "0x8e8070e9b364e45236b783c3ca733b40897b080a",
 				"avaxAddr": "X-avax1pu86w3d8s70hsz0y3uhgkm6lsxl8fc3g9lm3p9",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -85801,8 +88184,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax106p958u4wj0j924h3v5lvev3g2j3tvs5wh7pwg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -85861,14 +88249,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sly8rrpvndju2ucu0cudmr63zwtawkc2etrhmk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nv44qswa6esa6xkw3vd0ervchtdp290vaugx46",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -85904,8 +88302,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qdljdnc3hm6cj2knqspdfxluutdr5rkttnrggw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -86285,8 +88688,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qec0eg7yhfestz9sp9e40ksmptdaudjkpwsdx0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -86541,8 +88949,12 @@ var (
 			{
 				"ethAddr": "0xc77a47b6a9ceac92ec8f97342aa97ecd493b1107",
 				"avaxAddr": "X-avax172v2cckkxup79gcjfh50z2a8rdyhd5xlx3u7ur",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -86662,8 +89074,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19c4kvcc65dg6fpqkalawve633fuwr6wr9w8rhv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -87037,8 +89454,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wqs6a606fn25zqckdkqqt4q35v64k9a4vdv77m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -87185,8 +89607,12 @@ var (
 			{
 				"ethAddr": "0x1c6600f9b0493bdd2bbe83d44090c47731361e39",
 				"avaxAddr": "X-avax1eektch5dfkee7p489y6kekckj0c9pddfxv77zg",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -87420,8 +89846,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1p9ga42mdgj7agkhuv2chja65fr6pess2hdet79",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -87642,14 +90073,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xm0p5lr4zxyh42mzk4fnl7qms2vzg9gv7f4qfs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x68cfd731b79511216174bbaedc84b0f4776ac739",
 				"avaxAddr": "X-avax1xa2q9l0r5d4p028cwcnqqf7nkr0u83nnyhqjwc",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -87715,8 +90155,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1e3t204jkk5djhsurlkxgy7lfwpxyl8gl0zdgwf",
-				"initialAmount": 16800000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 16800000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 16800000000000,
 						"locktime": 1617840000
@@ -87949,8 +90393,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10x27ra08ypwm8xun5kae7ghlns3fr4tp32yp46",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -88267,14 +90716,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rsh6uy43v92e4ke9un6uzu6rrt63amz3vmykdm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x4f985563c4611a8d27cf16f83290ae7ec5069102",
 				"avaxAddr": "X-avax1nmawwp9qvjnh3tvq967a6wwee35la2yamhfd4n",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -88346,8 +90804,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gkyvmz95lgt8dylc346v69w8rf8twaw4l6y28s",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -88398,8 +90861,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l0eg240msam6jacfydvplzatvmgkusemqhnmsf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -88481,8 +90949,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10lg394pc5uapu2lggzy2amaqhu25jqawl6xwup",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -89170,8 +91643,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f3vxd0x7p9gc0v9uf7wxgjey35p6gp2kg3d630",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -89207,8 +91685,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xv92r53xl485nyywfjm6muyu43jreux7xyqee9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -89462,8 +91945,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1eta3n22ju6y4xswzxwd9w2pvlmhsm4454k734g",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -89491,8 +91979,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hxdhdjrctsj5vfwpt2cdnzq4fqw3cjfu55yx0g",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -89666,20 +92158,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qtnz92vglj4qlaqssyfa6yy9yezulesh67gxaq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1969npje7p5advmw725n0pwsfw3g4vgef32pd3p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v40fm5qgfhr6ptjpa3tqxersh7mr8xyvulfphf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -89738,8 +92245,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ytjp2pctgyfc0q84hvsdpwndnmwmszuennxqzn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -90387,8 +92899,12 @@ var (
 			{
 				"ethAddr": "0xe3cb1ef799fa212d4401ae245116f1b43725499c",
 				"avaxAddr": "X-avax1fa8pxw6uwg0q9kthfm2ra77v7ps6lm4kzudpzm",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -90454,8 +92970,12 @@ var (
 			{
 				"ethAddr": "0x04f0970d1af0bd62d5850933f051ae4a67147f6e",
 				"avaxAddr": "X-avax15gl9je0prx5rd8qhgqez8vz45xl50acedyn7x4",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -90544,8 +93064,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1urff3fyxpywu7qa4snel7rs433n6kq0g4ur9wm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -90618,8 +93143,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15wve78f054g3m5mj7nrzpgp5049y2h99puepl0",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -90881,8 +93410,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jtuv444tvljszmh4zjepyrs5a58xcw0rk9kf8h",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -91057,8 +93591,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cfvcrscc039l5nkcupujf9zuyxkjm2a04l6cw3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -91248,14 +93787,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xuzuh2r6e6epdggeaq07cmsxs866ws2gqn42k9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zclas0p6zsdwe6nyvy4v2qttqcgsv53psavzm6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -91385,8 +93934,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tmnpf87ph0pap4p507zfr0zesafnj5qh0sdkjc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -91428,14 +93982,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1verjz847yxnl9dykwv8qcmudumyd2s996y4mhx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb048548f9572308946e707ab12085a62cbc4c98e",
 				"avaxAddr": "X-avax1hxwkjpr4rsn8d57ccm7p0qk3qyppay9rjmlpj0",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -91507,8 +94070,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gngedn84g3g2d0cpjjcj0weyzt46e65nelltfq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -91655,8 +94223,12 @@ var (
 			{
 				"ethAddr": "0x5e1316ac104b8218238de70f8a27dbbdc8e574da",
 				"avaxAddr": "X-avax1vzcu80npjm58and0vrt9xrqzlpdm7l54spprtk",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -91722,8 +94294,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tmah08m45a0d2vasvxtx5fy4nrhgmnewk7mmmm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -92288,8 +94865,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gzhcevfdxem4hrtmrzgq04ud3p6vad8frqn6xn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -92388,8 +94970,12 @@ var (
 			{
 				"ethAddr": "0xdc267b97c331e1ff85a59ba147dda1cdb955501d",
 				"avaxAddr": "X-avax130gnqwduvnpqpulaqef5y4yytfklgfzacg9c8u",
-				"initialAmount": 12375000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 12375000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 12375000000000,
 						"locktime": 1617840000
@@ -92455,20 +95041,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zmjj04np5qp44r6xk2na7spyjcrag0wn2fdwx0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1kd7zmffmkx0tenaqqshglh44czt6vnaswsp9z4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14ffcgpclnlk8t2y9fwhsyrnwrhyvqkfc5wru3z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -92707,14 +95308,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1alu3j3vlcw2aa94p076k6zz9ljr4r0n7am90hw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zqssmn8vllhuuelrxqr8k9pkms0vajsj8p73pw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -93142,14 +95753,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1de5xnm5hyr3k5ggu3ngs2hzg6ygvtwykawcm7f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x8cca11107b46fa2e1e3b6a178b2f86ef3ddd539f",
 				"avaxAddr": "X-avax14tynajtru7um6f6s6gunhmmj6nddaw2tyqz5qr",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -93364,8 +95984,12 @@ var (
 			{
 				"ethAddr": "0x4fd747b0a46564bfb8fa6e9c07a3833d89da6e95",
 				"avaxAddr": "X-avax1c6rkyp92js730at3z0q35a4eu4cqs3arhykhy7",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -93454,8 +96078,12 @@ var (
 			{
 				"ethAddr": "0x67b14adb08a40c312529ad67554287752f5a37ff",
 				"avaxAddr": "X-avax17hs88z0lwm2082j66gja40czte4tmk67gxt4ak",
-				"initialAmount": 10781250000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 10781250000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 10781250000000,
 						"locktime": 1617840000
@@ -93623,20 +96251,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xtn8gv0r6tz6p8mh5efk2k5zpgqeh3w0mswcxq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zr03fdc8p0xa8x78f7h50ytp7n5q493t6act67",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1plwegxgvcef6txw3xh90dumwmcl2nex8h66dhj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -93772,8 +96415,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mqx9x6lws72veqa76au7vrgxx2evmm23a0nglj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -93838,8 +96486,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gsp8n8ngs7cf6fr6gx4ssuuvvvrd9420xsta92",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -93875,14 +96528,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1py962uk6xfxg6zsqecsjj39ucqqjsdm08cvlz7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17fc7kw8yq35utwl4sgmdenyld9xkyt84q6mudf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -93964,8 +96627,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14f6zqpvu4fj76eefuylgwdse2fse8ds7vtn83s",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -93976,8 +96644,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14g7s8ykcy6rjd40xfpehfgzsz09vsj88ze7qfs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -94108,8 +96781,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1kukul5gprey8pjuueypknlsrshe4rfsetq6sls",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -94324,8 +97002,12 @@ var (
 			{
 				"ethAddr": "0x849212c6553de5ec94bb0f06e1eeb17b42988bdc",
 				"avaxAddr": "X-avax1jr6ul2gl9nlaw75chwc360684xvukuwfxkunmx",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -94391,8 +97073,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tpvj48q2pssuldfj04klg7gyqq0avz9vnqw4aj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -94565,14 +97252,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rl47z8qk42qffnt8wkupzyvnv7vmjpc59gunwk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wkzqczsc53desdrkpv4sptapvmeennjjvrx2rt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -94846,8 +97543,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cgjh7sa2kwv85cf70q4tqchj7sht7xcck4afkr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -94929,8 +97631,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1msmwpkky780t067dhlqj0a9v0t2kwmpr9xu6p8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -95092,14 +97799,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12km6nr87q06gcrw2p06qhf83z4dvh7cg4hu2dx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nluanqye6f7d4r7gp9jh45eldms9ecctypuuh2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -95315,8 +98032,12 @@ var (
 			{
 				"ethAddr": "0x6ba0ca757342ab217f4a24552b9da4ccb120ed51",
 				"avaxAddr": "X-avax19laeslszngfftmq4thpqnvgarqzs5uqpumcz28",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -95394,8 +98115,12 @@ var (
 			{
 				"ethAddr": "0x05a03f88249cc80a9e3b0e7f3e1cff4cee868845",
 				"avaxAddr": "X-avax1cx0skt3w8hjnt8zjpw8sf0hftrhsyez39vd82h",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -95492,8 +98217,12 @@ var (
 			{
 				"ethAddr": "0x0191b6026e83685c6ce227e37aa629a9c356fcbb",
 				"avaxAddr": "X-avax142cfwtqev6v4c38lemmkkssaeyex45j9ugsmyt",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -95619,8 +98348,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jjlru53pd3xzy0hx4hz57cf205krpyjr9nke6t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -96356,8 +99090,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14q2veh4z72zvvdn2jmcygvskqk823a88cahspk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -96605,8 +99344,12 @@ var (
 			{
 				"ethAddr": "0x5529264f31cbe8dd55dd51ddb049df86c4a7e17c",
 				"avaxAddr": "X-avax1f035l9sq7fanp6nzkd3wsqv23z989tplr0a9x3",
-				"initialAmount": 5625000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 5625000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 5625000000000,
 						"locktime": 1617840000
@@ -97086,8 +99829,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1phjfpes330dlw8lkm6l6xavlcpxryh48xwms2e",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -97515,8 +100262,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zpfty307m5g504sj9fhzhuqx7jx986e2tfuhge",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -97592,8 +100344,12 @@ var (
 			{
 				"ethAddr": "0x464bcc63be0e32c3b281fceada2b6cecf1e0e05c",
 				"avaxAddr": "X-avax1c6nh4h34afd3ft04cra43cze8crxk0pp2u82jj",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -97659,8 +100415,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wupq5nglsp98x607ns73shavn5gfclgg97sgur",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -98233,14 +100994,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18vml4u7jwwfxrx0fmnnqjn5w0xg39c4q9n5pgq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17sypy2tyutp7nguecsluw2j3zgpte0stgzaca0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -98316,8 +101087,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16z0eh70h0khawg3g4nxugh2tdga5rfuh364tqm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -98961,8 +101737,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1e4nejeasyw579034lvnt7lep6e9rauyped455z",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -99551,8 +102331,12 @@ var (
 			{
 				"ethAddr": "0x9bb14d24ead422212b50b6c458e601eaf6f64716",
 				"avaxAddr": "X-avax1es230vynnjm6epfga6n3lf00xfps7nd3qkvg48",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -99693,8 +102477,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f7jyypw7n2zwrphleqyd309qqwgvfj6rckwkvq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -99867,8 +102656,12 @@ var (
 			{
 				"ethAddr": "0xd678a02b71495fc8425dedb4c9eb237768eadf6b",
 				"avaxAddr": "X-avax1j989xnwv5ay30tmzxwu90jvj74h0cgx8tr2lng",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -99934,8 +102727,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax196yrcnw5uj8v3agjkpgnwxvrg7mrgydrnrycnw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -100108,8 +102906,12 @@ var (
 			{
 				"ethAddr": "0x0e7fabbc7839d256d32c335f4ef5a39cf8815007",
 				"avaxAddr": "X-avax14fwjjsuda4wlaqqpu5w2zpv26fw74azyaqeq66",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -100246,8 +103048,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15ydw0h623elr3yn5svsul3cx9yjaw9pfknjh6c",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -100432,8 +103239,12 @@ var (
 			{
 				"ethAddr": "0xacb7729b96069b077881c1871463c47a95aa65a0",
 				"avaxAddr": "X-avax12z9cv0w3exkgjhlml4e3ekjh40j9yw4w27e4cy",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -100576,8 +103387,12 @@ var (
 			{
 				"ethAddr": "0xabeecca0c06f6dbbf73ed0e0db6ceda3b2e38ba2",
 				"avaxAddr": "X-avax1jwldxpwfwekg5cl2ek46yplacum9j9qgyqmmga",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -100751,8 +103566,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18m64y2x8jwfzd5q2wlvw6qge5vnesaregfppfe",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -100981,8 +103801,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qpmshqgnxcpx0qfvlafsy8k22u98lnx56n3jly",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -101129,8 +103954,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cukauh850nm9xh5lagxdmvqk2u6ha0x5uy50g2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -101206,8 +104036,12 @@ var (
 			{
 				"ethAddr": "0x7e665729947fa1474204f44c065decae32d61bb0",
 				"avaxAddr": "X-avax1t4rfa3ncxftcgmrmxlsymk97uvlh7cxug62ltz",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -101461,8 +104295,12 @@ var (
 			{
 				"ethAddr": "0x7e73e434dde46119a98015c8c29e81d32b1195e2",
 				"avaxAddr": "X-avax1xf6l7flau6tyac0kpf6nec65uj7js3umtz4x3m",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -101599,8 +104437,12 @@ var (
 			{
 				"ethAddr": "0x99dbca3fbf1ae7763233a586f512c012a0e078d7",
 				"avaxAddr": "X-avax19h466k9078xlt725rdase72ec8d5v8f5jwnkq8",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -101771,8 +104613,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r27zc6nejd5xu44k7j4yqwasxutvcq5c67xmqh",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -102050,8 +104896,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax134lw9k5sjqklh29fk9nakcjf8lmh2vrj2x6q80",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -102204,8 +105055,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yz8hv6xdm0pdx82rqvqu9afvec23fv2fl7kad9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -102293,8 +105149,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cs79m65wqzukd6lalpj5vskec04jszpzhchct7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -102481,8 +105342,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13vcnw9l4ujaanva5s0q89n709d9p6kur3c0fzv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -102657,8 +105523,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1usrqem2h4uc9tmuvcu6klqj075fgre7hxs9nh3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -102998,8 +105869,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wmw95nzxz7456dcu5cn8sfalssf9lq0rr4uude",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -103027,8 +105903,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pc7fpt6ttzhsd38k89lggghkjq6wscpgx3yx2f",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -103469,8 +106349,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y9rtqd93d8jsrwvjlhtlnm6s94alcyh2cwnug5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -103862,8 +106747,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hq4taa9ecv2ydna2y4glfvl353rf4ke3wmnx09",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -104006,8 +106896,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17mq454sp3f20k9mtf84ey5uk3sm2ukx8j25nnu",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -104308,8 +107202,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pwnyzuppkpykzvx6enjpem3hxes73k33t60dqq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -104905,14 +107804,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1amhxm7f7qm9dnva0etsv6798f2jylsqzksmehn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wlp6s9538pu5mxlhzwy7prgflaacwk6c38ua0u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -105210,8 +108119,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gzjkcym06fqu55jhun6e0725xhz0nje8jjrynr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -105413,8 +108327,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wl6x78v8s3gg8xmdug5m3z8pl7233j78kzz5w7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -105698,8 +108617,12 @@ var (
 			{
 				"ethAddr": "0x5097e84a3caccef74e7734e431fe210083243ee4",
 				"avaxAddr": "X-avax1ack4wuscae8zsqk3282eukz04cjljs6mn7e482",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -105765,14 +108688,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13ffyyck098e3ygd5yf4ju93s0mzs6y75hxj7al",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19gmvkq5xsvm6xgmg3md7rxfpdpz9fzlnuvx0r3",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -106137,8 +109069,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax128k36vkkjygnhhr8p2u9p9nqp75de5yhm5a5ut",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -106243,8 +109180,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1k5nfsufwva95yexh6kxa4x6a09ysws600z6mwn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -106407,8 +109349,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1q05t5tle9zadlnlepugzxqptlm53scefu6k3c0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -106584,8 +109531,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gnusdev4v59d6k9x64aw2jmgzq6pdplv3l4l2p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -106730,8 +109682,12 @@ var (
 			{
 				"ethAddr": "0x7f687d307e61e6dbeeecb6967d3063390d27250c",
 				"avaxAddr": "X-avax1g6mdpx3rrv768cvp34xzfhpkx0xk23r6ahrru4",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -106797,14 +109753,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dxprn0xnkrycum89ud3s5uxjpj0prj7s3056c9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17wktsvrrzm5ad676js8qw750ghtm5rlakrmfqy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -107026,20 +109992,34 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f5ex8hfgmjtcs4al4jwxnl37vu7xr9m9cu2esd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1s9ztm5ax030uza0q5aa49aswmjc54ykknly602",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x7c19e527c6419350d41b7cf39236c99ea3e3b679",
 				"avaxAddr": "X-avax12s3ajwuyep5mv5zfdc5t3u4eucv5kq5du8q2vx",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -107340,8 +110320,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y6qyy7q9990r2dqj26dn0dua2ar60prrvqvstg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -107588,14 +110573,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax190vvnnss6wg9swmelzv32mtm4jeq48gch7vj68",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x215c568b2a1b10f3eaee8d3f69a1b39f65007d14",
 				"avaxAddr": "X-avax10q9exhgsl8kfdqcnse4t9c3ar7y8wmw9guy8xe",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -107732,8 +110726,12 @@ var (
 			{
 				"ethAddr": "0x6afad3c0df9bcac201fa8ac042c61252dcb48b0f",
 				"avaxAddr": "X-avax1uwpu5ltd9tu9z8ujkl5wulram2n7dzycsfzadu",
-				"initialAmount": 16875000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 16875000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 16875000000000,
 						"locktime": 1617840000
@@ -108040,8 +111038,12 @@ var (
 			{
 				"ethAddr": "0x9ede512beb3a7c1c5ddcadf820547cf756dec5f8",
 				"avaxAddr": "X-avax13508fe57njhye8zq0x5ffnk2dyfz9kk8uthqht",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -108340,8 +111342,12 @@ var (
 			{
 				"ethAddr": "0xd88b185b5cb8dbec408e0fcf24295f51a68fdd6f",
 				"avaxAddr": "X-avax1z0htx9g84e047eq4ejy62842l7xxx2chtw0r94",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -108615,8 +111621,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rd69q597nfjqfpgzkjjjuly7wumuczxmze4v94",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -108675,8 +111686,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y8mtlk7q9au47d5puju5yxpzeu9zug45lkjvyw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -108889,8 +111905,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uk7zkh3rh9qv2y7kuy5ra7a4g6funqg57722fw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -109037,8 +112058,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d0vd50dfranjhfzdtza83cdpcya4uhwaxktn8q",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -109067,8 +112093,12 @@ var (
 			{
 				"ethAddr": "0xff02961e727160f76b7b5ecdda43807ae5c469bd",
 				"avaxAddr": "X-avax1d0q9dz84c938zay6m50n3wyy4l4v5xsj69hf9x",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -109134,8 +112164,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1kvlytn9l2vulgvsgdh2zl9ltudnmwz6h4e72gu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -109436,8 +112471,12 @@ var (
 			{
 				"ethAddr": "0xfcfc9be349799cd939e26ccb4b05c77c1b2409f0",
 				"avaxAddr": "X-avax174szu9u5wgjgqxdlfcp7gvhpq9akpkep5rdly5",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -109557,8 +112596,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1m5yyza305kuy3c4ndfklss9a0za85scnf32q7p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -109723,8 +112767,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1de4u9r8092dwftyzmy86v3str6s0g57wkhk47l",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -109963,20 +113011,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tev845f53gdyve8ezg87schu7yu5uem7zfyw7f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pc8jsjgh0ldupzhpm0y3wdct8xvttu2a3jg9r4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rdnnmssgv5c4ae0chfm7ujp5gkst6eakytfa93",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -110052,8 +113115,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1s5g2rz92etc2dtdn3fa53mk9xg9wkynecut3xn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -110161,8 +113229,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ma2jvfe2vmetkfae68gk0czetdzu6hdmuj9yd3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -110337,8 +113410,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ve254v3kankt8z5f5kfhv4p2qcdmvz6ud4hpke",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -110831,8 +113909,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y7my5gzxh3u7flhxpmjz3asramscut4n5fvphd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -111178,14 +114261,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cwfcjj6sduryw3sk4mhvgdda7ju0l9ycg0p9vz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1g6axadjyvgf9wq3xlt83mxpg3auyguj9l0fs4j",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -111523,8 +114616,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fyuatlcxep7mr7ksqsqv5tsd3w65666x6xy6rj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -111643,8 +114741,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rc57csua8l04xffuv0md96eecur8jlhwd734y2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -111782,14 +114885,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mskm0zq2r0y2vw3lyyhpjtg2tjt59haldu9hwu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17ev4vzk0ravdm825m429lgzd0ze37ctzrzumue",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -111912,8 +115025,12 @@ var (
 			{
 				"ethAddr": "0x87aa271f6986e5f73a4855c34e60b202c6cc1e3c",
 				"avaxAddr": "X-avax19wf84mm09uxld37v6sgky6l7028pr092l0g6tv",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -112187,14 +115304,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fuqds5n34p8yuujvskxy2knqxx2x8qak0j0u5f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16a7ehpt4s62sspael9p78fkyqkut4aksv98u4n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -112363,8 +115490,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14jl878kjwqjknndl0tyd4xktw6trpd6sfqftly",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -112462,8 +115594,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ng0hzj7w3fxqws8grd5k3jfasy2ez9tx7pnzn7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -112653,8 +115790,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1psslxqnq0g9df7jy6hl78ktncjqu7u7pg4aua7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -112690,8 +115832,12 @@ var (
 			{
 				"ethAddr": "0xdcd5c5e27c87c29433b7d537369e1b74de5eac0f",
 				"avaxAddr": "X-avax1e27e64ekta98mykrf2zhzgrx7hjrjycv2vcq3k",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -113266,8 +116412,12 @@ var (
 			{
 				"ethAddr": "0xddb020108cc08f2f0b3047a5c6fafa2a9e0de724",
 				"avaxAddr": "X-avax16xqmw4atz3duhqrmz5rmtlz86u07l6kjs02evm",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -113994,8 +117144,12 @@ var (
 			{
 				"ethAddr": "0x44f27773bc0bb410719a4aa9f1ed3f1dc710e651",
 				"avaxAddr": "X-avax12a5ksxhdt3rdz472lv4lxnxp06jk34hxly39jy",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -114090,8 +117244,12 @@ var (
 			{
 				"ethAddr": "0x0e5a687c2301ccdf0159fcdec08831c4d8ff3d51",
 				"avaxAddr": "X-avax19sywkmuqvvswhrw4u9nwc97nr6f073egrepdz3",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -114321,8 +117479,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wkt2ramx5u2y0zt097chswr59ql7za3hx68dqc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -114606,8 +117769,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tcqnsua4keuhmn8ffgkfvgceunsahlf3lrhqr8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -114982,8 +118150,12 @@ var (
 			{
 				"ethAddr": "0x9f5c97066e40c4e581a8e759b9aa16c9108f0f47",
 				"avaxAddr": "X-avax1xzpd0n5ppt43h0w88uazhfks8806fa062045yz",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -115484,8 +118656,12 @@ var (
 			{
 				"ethAddr": "0x0b2c600ff46e3142eb5f9ed3e84e0040cb530cc5",
 				"avaxAddr": "X-avax1p5hhukvl93vlqwe7gwp54ly2ytcp3kg3ah086l",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -115551,8 +118727,12 @@ var (
 			{
 				"ethAddr": "0xad5843d92c4fbdbb607d7ea24cc08319d2f641e1",
 				"avaxAddr": "X-avax1e6cryds89m8au5gdtsacgv7mjkag58hhl9t7me",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -116126,8 +119306,12 @@ var (
 			{
 				"ethAddr": "0x6510f12f87e063793822f718f84965c4705ad139",
 				"avaxAddr": "X-avax1ds7gfn35kxksyqad4dkamv2z5q5rs8m29mh4vf",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -116336,8 +119520,12 @@ var (
 			{
 				"ethAddr": "0x92f52a033738df018a340c736bc85bbdf95b2bab",
 				"avaxAddr": "X-avax1ytz4p2n5ugs508w75gfh88ctdw9eeyuwgjqxa7",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -116511,8 +119699,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1drq4rlxjl5cqn6fvhk5nf8shgqqvlwj8v3zt85",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -116744,8 +119937,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17sf8dvjmfgky2rkxhjuwqfh5r02rls7ztkqzvr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -116804,14 +120002,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r47qhvj77dpsk2j3fwywfdnat8f5c4zpn2yum3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1m488w7tglthwpx5wvz2zpsyrtddma0y086rzqz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -117067,8 +120275,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1q8fpsefhtuum9eff2wt0wjwejsqyppku22yqta",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -117343,8 +120556,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l3uk3y00xmaysnrhwg5awjynhfp3z6n4gq0jn4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -117703,8 +120921,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dddnu3gufk3es3n5x05nzwrfth7ddrz0gllmu2",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -118003,14 +121225,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1se0822x9wagz0zpjz0dhwccput427hveedqpk6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vdh0mq49xjmk5tefn5jajzpyf6t2v0necpmvpt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -118021,8 +121253,12 @@ var (
 			{
 				"ethAddr": "0x3cbe2c2a9bd1d8d36f6c8b344131a36ca4f9db99",
 				"avaxAddr": "X-avax165hv7cqcja4numkq3fxdh6rzh38zm5f2jg78vp",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -118213,8 +121449,12 @@ var (
 			{
 				"ethAddr": "0xb98aa36cbaf54387910ba1c8c6bc7edace3494c8",
 				"avaxAddr": "X-avax1yehgu5yxgpu2mt6rwa73ke8uhr67876kcamgln",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -118315,8 +121555,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fs4h7px5fytz8cjwdav0rdt0srnfsg4tn7wj5z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -118398,8 +121643,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mc4dx28hwmysl5kaujj86asrtufj2wazva5a2t",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -119190,14 +122439,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15dz6grwkjs4vkahutptfh70pt47wsezszzyysc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x398cd0e73b4734d93da8d934786fa6d137c06169",
 				"avaxAddr": "X-avax1u52qgtm2xd7e6ldr4k4hruwj879rtm20aaa9k3",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -119670,8 +122928,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19yafpxltu2xu4l6shn943pgug3nczjnal3mmy3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -119878,8 +123141,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1un3ll2vycqct5sa8usuxq7lzu2ruyptsnw5h6v",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -120112,8 +123379,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fpczkhu7sxtnggzy9q3z36jqp9djt03wxfa6wz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -120226,8 +123498,12 @@ var (
 			{
 				"ethAddr": "0xb96cd32d84d2ee6cd2a5115e2e96f98014d4d8ad",
 				"avaxAddr": "X-avax1n0u6lwyuugztflcafvm59rrkz63lnxzspu2m8m",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -120316,8 +123592,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12v8933vm2jf0nnh0dckg76qy2w90fvszuwvwwz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -120675,8 +123956,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18cnqlk4ve6rd0lwzagsxu5axhpu7ly462may7r",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -120781,8 +124067,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w48q7g8cwfg7mfs8eckgqeetknrxv0j8vkjq2u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -120818,8 +124109,12 @@ var (
 			{
 				"ethAddr": "0x3a9b8cdb5578b9e549fe256c30ec9363d472c886",
 				"avaxAddr": "X-avax1ulsae6rsrje9gk2sf83sx5vjq3x0mv32j0gx8d",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -120979,14 +124274,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l9n7gjrcnly2nhsufyh8jz6pc89j7rrql0sgp7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xqs86nzm6xzc62v9p4wkz2ggmm3l5vm3ve7tha",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -121554,8 +124859,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14x7h55uvh7hm2xau35j3w246580p4a3a306plh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -122102,8 +125412,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14qu5j9j0lurwjtxlzgl938nh5kclz7q8ryzp3n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -122228,8 +125543,12 @@ var (
 			{
 				"ethAddr": "0x57a436e9cc711068c4a6bd47eb9a754ea22ef1ab",
 				"avaxAddr": "X-avax13jtfqjpfhgywugm0cxyxxvy2lxx3ul8dqyxvd6",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -122437,8 +125756,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1den0fwkwu4h6zyjmvcaglhj9zrlg3wmr9gdl6e",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -122630,8 +125954,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cpvdk27p9m66rzwylg0qeee9hr62mq47cz5pyu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -122815,8 +126144,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cjpjgtq5vtvwalj9v8t704lwsjnw77v4y6tsln",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xf0cd4c273bdf4d6da9708329b1cd0af0f2011b21",
@@ -123084,8 +126418,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1k4fyxasaru6r2f7vf8qlwa947fyw83r7pmhens",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -123355,20 +126694,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cx2pn9xgmh4vs5fqmv5nacapnejarg7s3aehll",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f80df3sz5d4rsjd2djg7quhvjd7ukprdks4c5z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y9073cryxq29fjd5wrrynemnv3yygjkwag5fpd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -123637,14 +126991,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18lwlcl4tsj3u3t2jufyvnglz2tqzrxxtfzx802",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xc93443e671d33a3dfc31489d2d35c9319be7a622",
 				"avaxAddr": "X-avax123sjug2qn9pd3jsrj7s8gc2a822jkzc06p0nrm",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -123858,8 +127221,12 @@ var (
 			{
 				"ethAddr": "0x49232a191ded3250182db9d1e34c0b777f215267",
 				"avaxAddr": "X-avax1vgrz7lpn7c6pvlf233paclmuyu83224fshuh65",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -124033,8 +127400,12 @@ var (
 			{
 				"ethAddr": "0x3d195e5720e59f737b99c005bf96ab2f86b753dc",
 				"avaxAddr": "X-avax12aa3m28pm957y8te6wqnka4hxvefsk44s33zs9",
-				"initialAmount": 180000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 180000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 180000000000,
 						"locktime": 1617840000
@@ -124459,8 +127830,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cduprpq8r8ju3trwmvkz2t9yuhv4xlfxgxn895",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -124579,8 +127955,12 @@ var (
 			{
 				"ethAddr": "0x2652c73ba0d7df185a79c09e2e25f9fa3f82b722",
 				"avaxAddr": "X-avax184ftudx803806yl9x5qal3cfr7kq2hx6psnm99",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -124777,8 +128157,12 @@ var (
 			{
 				"ethAddr": "0xcebdb29f9bd3e8819cb8adeeabaae060175c67dd",
 				"avaxAddr": "X-avax14x62ym6wsgmmvhnh55kg28pxu7leus6j73a0ww",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -125010,8 +128394,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1n992ptdcqdp6r7tfza4er3zvkww4jms0n3lspz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -125087,8 +128476,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1c32fs25qd5k59zkhq2pdm0ve43zrjdjjchgr5h",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -125099,8 +128493,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1djyry36p5hj3xewlmzxrlcxmsd5skr2veve62u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -125395,14 +128794,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ujl9n5gdaqduwh8papzfa560fuvtranpakqjtv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x7f431b8bc134182b5999d8fc4faea1677d550121",
 				"avaxAddr": "X-avax1ffuvnzh6vwa4g6377947sqyrjdyky5pzu5l0qn",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -125497,8 +128905,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hvaxafcazysdjx84yz3gpj5hyah5frq5llf94u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -125747,8 +129160,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18rwpea4tjrhq5qzntqtfedsz5437hqzq58ygya",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -125907,8 +129325,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19827g8dxkay2z42aetlwqk30kun7xes5sr0vk6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -126123,8 +129546,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1af6qlp6vhphshnsmvf9lmlurhy0s9h84xtgyae",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -126511,8 +129939,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1flcytdelzsgrr0p4wcqa5txcs6vn958drjecw0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -126739,8 +130172,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nz07g0c65230vx6l26z6zecmnyqzy5hl5090yv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -126901,8 +130339,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d7zmy83gmjwsef6m9jsushn4qujpvm7muhhcku",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -127013,8 +130456,12 @@ var (
 			{
 				"ethAddr": "0x902371b55d1229aa3cf3b087b4bbada7f243b68d",
 				"avaxAddr": "X-avax1skhv6szhlmdzxu57v9xquvn4hvyq6kt8c8pgs7",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -127271,8 +130718,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1eysry5q6e8yyfn7rsthhhpxtu9gyy9e6j44jqk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -127564,8 +131016,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13q84r25r873jwccrw2qae9gsze6myapjppc3na",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -127868,14 +131325,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yat5ggmznnsj9nyfz9sau54kdq9hcm3d44lnrm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax105l6dnxjy9fctnfzfuyjte5ys0er32rswz6m6l",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -128076,8 +131543,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l4sh787f0g7j37hhx6ms3kg5wrucxr686mp5tl",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -128366,8 +131838,12 @@ var (
 			{
 				"ethAddr": "0x94f6c7a3cd9348391944882a58906053b63fed58",
 				"avaxAddr": "X-avax1qua2nd75k3efpgrv5ey5dfyhlvcnm4p503zczr",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -128539,8 +132015,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tc7w7xhs09n42llmznrslrewdapgcd8m5h4k4f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -128956,8 +132437,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1a9azjl3y6t0asnupx2v7tv2j98qus5jtnv0vyd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -128991,8 +132477,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15e76df6ykzgnu74ggsf3etytqc03pemdejgnnu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -129236,8 +132727,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1g4qyejlu2m7cnvqqfwxpk6vetnsspeq5kacgz6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -129500,8 +132996,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jjsesuz8u98fltdkvx02sk7lacy6k86xh8f6rs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -129679,14 +133180,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jg7vjkrfqf67dkg9vfmjx5zae0g6y5x4wf3yac",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1k00dh0nde6gydx50cdweqvek22gwmtageteetu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -129697,8 +133208,12 @@ var (
 			{
 				"ethAddr": "0x9585e6494ae1975bd69156d8d4f87fc1e700627e",
 				"avaxAddr": "X-avax1ztjqu66j88ccrn297nm86d44ss69qakup88pxa",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -129926,8 +133441,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19x0cme7t9f0cwdmdrmx7kd7hacl4assmqelghf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -130003,8 +133523,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cw95mvqewh8shx2ew9jp9m76mqxncsjtukusxc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -130117,8 +133642,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12fjm974kydezplyr0887f6pkjr0j9qsk5g5nj9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -130387,8 +133917,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lqrhtzju0mckvp36xw8f5syv2yyu406r4em3fk",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -130399,14 +133934,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13xmgrtr24d23zhdkluuq4taaprne2ulle7e37c",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
 				"avaxAddr": "X-avax16fjzdkhyp4yegr9sceg336emlf69fm5nq3qwlr",
-				"initialAmount": 6250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 6250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 6250000000000,
 						"locktime": 1617840000
@@ -130961,14 +134505,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hvkencry8se2d4qv9cz5tracc45r96fdtn4vxa",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l4sxvn0za2mjjxux4rwsepayxkk7nvwk0t708n",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -131050,8 +134604,12 @@ var (
 			{
 				"ethAddr": "0xdfa13db2578abf81d88a88ccae34b00c7ee4b1a3",
 				"avaxAddr": "X-avax1wjts00zvx4tp3x96n5w7vvtn3u6d6sgwd7da58",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -131223,8 +134781,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x88v9ep3dsk97ehc5er62dmyg0v8cvqhn0nvvc",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -131266,8 +134829,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hklzna057537uevdyvmxh7u24xmqdwcedhlxze",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -131486,8 +135054,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1va2ny9392l3zan73630hn8g8pp4vajy82jl7f0",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -131637,8 +135210,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w05vrts2vs63qef54qdfaatmggnm090s754uzh",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -131800,8 +135377,12 @@ var (
 			{
 				"ethAddr": "0x66dc4b41e028970a495d63a3917a0036dd74f7b9",
 				"avaxAddr": "X-avax196xukpzlvgvpuj3p8rjg2yuckc9xjkejs3k6an",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -131873,8 +135454,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d5v8lhe0r6hy6nsgn4qwwwmfx908p5kmdfq4pz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -132130,8 +135716,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1z8px669lt4e0mvsxfgkrhn7qykj3dzsanetuvp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -132546,8 +136137,12 @@ var (
 			{
 				"ethAddr": "0xc1ad0ddd5a8c1ffa86e9151169619691c17f3b64",
 				"avaxAddr": "X-avax1apfrhn955nhslgq4vntles0j3yczw3037qdtn8",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -133022,8 +136617,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ugpr6fay5n364fej7dx9n8h3f9p8n4z07aetwn",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -134138,8 +137737,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1czw4nzlhwktjcdg5jqgln99zv38vpghdtytd7d",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -134329,8 +137933,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gvgxwvnuk9nv7zmgsvnzhr66u8mmean6kena86",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -134576,8 +138185,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10npe5ujqf879pj5gx96al05y9cnl75t4hqm2p2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -134653,8 +138267,12 @@ var (
 			{
 				"ethAddr": "0xc1f6d28dabade6841235878f71d155545b889fcb",
 				"avaxAddr": "X-avax1fmrn66z3k2dep7xwmheguwquy352lyhqy9gzse",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -134813,8 +138431,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hgts6h0fhn5qhw0s3jnlsl4qyuq3k8r3eust8d",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -134842,8 +138465,12 @@ var (
 			{
 				"ethAddr": "0x85630c5908a94e0c52338f6d025ffb81cf6e970a",
 				"avaxAddr": "X-avax1qe4cprv7m93wwzyggxys7qmgzqg8kmll3lhhkh",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -134946,8 +138573,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax193cecfvuxxpz2k97sspxklhsvmm0qp7g2hhq8v",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -135109,8 +138740,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16n3us3sr4ujmtekq97k8aw76kg383v0f4876se",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -135272,8 +138907,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yphxq504sxgzzmf6c3a4hc6xu93nn2u0znaecw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -135332,8 +138972,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax120lztrd0esx3cd07lff5a432a9ppp7xfkemd9x",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -135409,8 +139054,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v6tgh70lgwn2h67a646uxmqc5rwm2zhkpvhg5e",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -135649,8 +139299,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y5gyjk5rqg0t7rjyddzm3crzvdn3jmdp986y3d",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -136042,26 +139697,45 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qq7uppncfgu00zy9g4fxkqmae4k5vd9k0yk836",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rfwzhq87zyj74e7wjc2en7uwtnsa8wxedpxg4p",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12784n0c4qy58y3hvd2pctrxtz3szdh3z8ukcsu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xf4299c646bd16b6dbb5313ad06a0b98213f001c9",
 				"avaxAddr": "X-avax1u4hdcyv7vpdatxrnncnd8pxu9j054jqe8dug3p",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -136458,8 +140132,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19ruua54xfa7d0v7pgy5e6m8ww97gzd6cya9wa2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -136872,14 +140551,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1papwxdfcxctdm3fls0em2ylap4vzqux6x4fd86",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x61225461f9831feaf29fb74fdb633327bf95a8a3",
 				"avaxAddr": "X-avax14656nad4zn5phadk5cw69wxg2cuz8zl3kcjpzp",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -137022,14 +140710,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15adgs7z5jrvzlw5f8e65mlaysevsatnn7a3yhr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fvjuj5efpjzuut3mxqyckdkeuecksaz98q547d",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -137191,8 +140888,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xlrq8l8vh3jq7x84k3u3km4j6lq45gcly0mkgf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -137251,8 +140953,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1caftrmjgw3e4feswrhrac6v4vu52v0k43cg286",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -137334,8 +141041,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cjrc3uhh58sdu0m3dsm7syzmeyjdvfhycvqrcj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -137371,8 +141083,12 @@ var (
 			{
 				"ethAddr": "0xc3fa52fb593e76cbc48b3a1ee60877f6dfdef073",
 				"avaxAddr": "X-avax17vdxjwt7ggzzqas58gw789lnwng5f624e0n297",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -137500,8 +141216,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zmy6faefjxjnzd0qyxv8wl6s4a4f487vu4p5y3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -137552,8 +141273,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17gmm8sxe87uzf0ukvsp44sa8mjh5gmrcekrnzy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -137620,8 +141346,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wp0s8np5wxpdep3qst6xxs7699gu87pyrjygsd",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -137987,8 +141717,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1nq4zkz2l72nguuw6dfrx09879ffyqdva2yd2yg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -138388,8 +142123,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1z2ncr9h6gwdez5k5uglmvsfps284sp7lne6r57",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -138471,8 +142211,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1phygrq88wtpvaw3q5safrpedyrwjx4s4v34869",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -138967,8 +142712,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w4czjyl7fa5509gw2gc7dkckkf28scwlh4hfrn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -139048,8 +142798,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17alj2qn9k5yptp3gmsd35haw32txh52tvk9d2y",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -139083,14 +142838,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax136jlwmtj6z5kft2t8p7fwf3w0n22d336jwgjye",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mjre8vzvlt82l9xxc05xtjthya879setd3k4gf",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -139281,8 +143045,12 @@ var (
 			{
 				"ethAddr": "0x72fea67318141a8e27e167ff2f4b25f36055f128",
 				"avaxAddr": "X-avax1amfvd6deqt0s024at9cs6e4cswxsgw7qpgsqqw",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -139348,8 +143116,12 @@ var (
 			{
 				"ethAddr": "0xac4c4ef77e233fa826269c605d29cae0eaed2260",
 				"avaxAddr": "X-avax1wx6mkthhwraxqz72s7l4qyttetaga44c4j250a",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -139415,8 +143187,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sunqhxzlfqqfy8y4lkvtwr3s52gg4qnzwq7zj9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -139683,8 +143460,12 @@ var (
 			{
 				"ethAddr": "0xc65f8a400c5ec102840572af06b384fb18aea2e2",
 				"avaxAddr": "X-avax1kf0wmcse74xk42z5ujfsyaxlkn6tej55kps890",
-				"initialAmount": 2250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 2250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 2250000000000,
 						"locktime": 1617840000
@@ -140170,14 +143951,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16af2f7490ry8ne87lep25zwfn08dxh9vugpfqx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19skr5wmv3d22frk4f5hxx3p7z7fm5rrk3dwja4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -140253,8 +144044,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fe9wvulda6llhugd54avfm08tzxsunzqf0ya2s",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -140828,8 +144624,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15el4p3acsxuka90azu5uqq2spqkk6y9pqggmd3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -141487,8 +145288,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gsjtkl6vrag8zyf6hvk0ewcsx3978enkthpgv7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -141551,8 +145357,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zg5tk0whpngfltnt6pt58dknw079xrq3tzll24",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -142047,8 +145858,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f68uy8dty4afrcv67kfdzw2lrqhxuf02xz46jg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -142107,14 +145923,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pyw25hdqq0fwv4rfm7kstumwc7v888jlm28a3y",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1048n5vghpzq0k027sf3a4cgprtlzuzhuysqmjr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -142125,14 +145951,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vn4swge337788zl934w7a7cx8djtqefxdsy7vs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax16d77ywfu3jy6jpfkpldm8fy72uhjjd5fn7rnsx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -142191,8 +146027,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ja0py5uwg9vqmr5msl559cdujlqjdfr7e55zs5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -142752,8 +146593,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yg5c96m2y8na6hpeqx3fvkpuq3upp58rmdsv45",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -143049,8 +146895,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1d9jyzfwcwwmfsa2nlju8tceys6hc3k3fwyktzp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -143086,8 +146937,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dpysd5wm0deejtke5p36dh85ra65n6k657a4yw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -143545,8 +147401,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uma4u62z3rsmex86slpw6emjv009ysqyw5p8fm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -143574,8 +147435,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12xzsa65dhqmp570uhft99vllu0svw20mjp74f4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -143842,8 +147708,12 @@ var (
 			{
 				"ethAddr": "0xef74474ac4c37953f00d1935d9697996100002a6",
 				"avaxAddr": "X-avax15yscqyll4p9rnsxwge94fejwd7tvmhc6mpm0u8",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -144085,8 +147955,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ga48838pcsrx28e5wqhudqxn5cnafe4a64e7yu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -144097,8 +147972,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tyr9qw35wfwuuzfjg4ceg2vehys3x98hxmf5qd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -144174,8 +148054,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18t7gshu3uynr96967d4h4wg5aly8mrw43nuscp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -144217,8 +148102,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w7d2nyeux468rzk5ruyyk53lzwzjhf83tf9l4u",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -144235,8 +148125,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1u9n07nwxkwlzxfhaslm9e2ne4trft73tljxkfp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -144606,8 +148501,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wukcuw2axz5n3a3dt30hwt8h9cplae0hpgrefx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -144979,14 +148879,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wqxg97kmvqrzxumc2fq59tu0vfchcz8s7xe57z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ft05kgeylwfamvvhmnh4wxs6xu38ge4yvn9a3e",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -145096,8 +149006,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1f076erutexy0n8avygvq0mqhwt7aqqtxly6ss8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -145210,8 +149125,12 @@ var (
 			{
 				"ethAddr": "0x3bced7c0ce88a353232897e62c38c1752a8e9059",
 				"avaxAddr": "X-avax18vaj3nt6yrcutjvxzy4n8tpteg6fvsvwjtu5ye",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -145402,8 +149321,12 @@ var (
 			{
 				"ethAddr": "0x1dfa21788261b24c6692412f993b445a0f83aa6d",
 				"avaxAddr": "X-avax1umursud79l9k02nzxlymcdh06ddhdtzj50mvt7",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -145759,8 +149682,12 @@ var (
 			{
 				"ethAddr": "0xf30b60ae8e7df24a83f48e31412fdf6770849f5e",
 				"avaxAddr": "X-avax1zpn40ehvgjfr4u259cct7xqeylcjqan6scl5vn",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -146334,8 +150261,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cxhnlgrcpax9w3p0adthvdexvy82dt7dhgpt7e",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -146425,8 +150357,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18z8k0yyu6440tqqwgpt7glncfr59fq0ghj2frz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -146462,8 +150399,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15xmy9whdp7m0qyfn6g046da7jjwlpptslfmp0a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -146526,8 +150468,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lpgdu5skql87ftfwwm38exgwgjp2nxv8ryd79x",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -146561,14 +150508,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vw2a6nuxqxv5parkzyspratkr9ftht8mctahg6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1m5u79jy062jd474hgl29drelvwm08ykcetdqsv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -146675,8 +150632,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uczqp7a6qwuy6qstx9zk9wnj5upfakkm9xjwyx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -146837,8 +150799,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rug8matzpemprlth6tw25nj80txnr7l0030xdt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -146957,8 +150924,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15swn5gjauzhhh50rrta5wptj64fw3ynqyqcw3a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -147259,8 +151231,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dwxhu7c6lvpv7fxkz0slyyljf3z5ml9e6f053c",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -147593,8 +151570,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xdd9xvcrlugwh3jmpmj8a2fnlh3xmuxdp5gcyn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -147747,8 +151729,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1yveadt5q24uqw73msuunq0w5grxphpjuv0dcen",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -147936,8 +151923,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jkdvr52uur7q6r4pnmphs28kf0w38wrvm05tz2",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -148367,8 +152358,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1e8yfxe2pk6vuaghggh9hgrjqqhzaag5tam2l4a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -148586,8 +152582,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1h0gzxxrr2jhgejjtjg72nsx5vrghpxazlxvl8t",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -148694,8 +152695,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1x8vv3f7w2v89pr4yr9r2fz5r9wh8nl3hvdj02m",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -148905,8 +152911,12 @@ var (
 			{
 				"ethAddr": "0xbb571776e450750a47ef20b3bbd52954fcc1d3af",
 				"avaxAddr": "X-avax1ufaz5kma48qtxtvp4xw98hxmtyddummln4c8ml",
-				"initialAmount": 1125000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 1125000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 1125000000000,
 						"locktime": 1617840000
@@ -149036,8 +153046,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1h4gqen4kga6xmcak8zuk0n7ahkgwcmw3wax5cr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -149715,8 +153730,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14d3ckxt0ekac3gy5ndf4kfd5tmvfvcssy4k830",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -149889,14 +153909,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vy4gu3dh3eywmx3twjvdx8hgxlkw70yxjzpdsz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1u3f7vdd9ay739vsdprhkfz6k72ytx9sapxs473",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -149932,8 +153962,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13040mhcw6tr9h084ce790gqhel0ck5xmpx0zc8",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -150009,8 +154044,12 @@ var (
 			{
 				"ethAddr": "0x39bbff6e37425ba6fbd207862d71c8f92401ec88",
 				"avaxAddr": "X-avax1mqjasqd7vgy5mpx0qae9pzml6qhcp0xrt6gdg8",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -150076,14 +154115,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax193na2zvlxn35vq6xyk928nplngmedt3s8v788f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1732g7ptusyc2q0dac4lrweck8gd7ltzj2fh6mf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -150299,8 +154348,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1cpwnykevemlvjqe3h8mcesu7xeqr8unakfrays",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -150376,8 +154430,12 @@ var (
 			{
 				"ethAddr": "0x583655f6e5dac2396b496df998d28fd6df33b904",
 				"avaxAddr": "X-avax1wx4npcc723lcw5ezp6d4w8uayp3wdheaxa6z63",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -150480,8 +154538,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15hf5x3sxl3362wlaxnmjzpjc5vyndk3gw9z43z",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -150492,8 +154555,12 @@ var (
 			{
 				"ethAddr": "0x495a5e750a24beb851677ee39b284237c0792aaf",
 				"avaxAddr": "X-avax14jcq93shtf80smz72ay9h3jmjawxljkalyfkx3",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -150630,8 +154697,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13fp8kr0ayre48kqahs7tl2szw5ck5p8w6jusq7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -150667,8 +154739,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mgc8lrj9gfchew39592xfjwlf0xz5rn3n2sxa9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -150849,8 +154926,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1p7024sqwddv22tl2zxne8yvpyquj9u80hhj7js",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -151018,8 +155099,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax105n50z3ddh8kc26knsrnwllqwhup3paq564c4h",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -151078,8 +155164,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1a45dgarmwutzng4r25l25lnfltzetsrcjyp0m2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -151115,8 +155206,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1eq0t62vrzrpvtmjdhtjlsjhcu3yv6pcm2twz87",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -151183,8 +155279,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dct7anmahjwggvw5fpvmjp77gqq577yvrgqt4v",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -151400,8 +155501,12 @@ var (
 			{
 				"ethAddr": "0x9f840bb166891ccd354c04c38c215d5697ea3f17",
 				"avaxAddr": "X-avax12j67f3yeadc202v9ttr4gt50mlnmutkps0387h",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -151467,8 +155572,12 @@ var (
 			{
 				"ethAddr": "0x2cb373cd96aca20341250a5c4a4c4520a220bd30",
 				"avaxAddr": "X-avax1elmvyguw7ccq95yk4jcs6ftyzraacadvvtfs30",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -151602,8 +155711,12 @@ var (
 			{
 				"ethAddr": "0xa4e3106a29f2084067ce3323687ea16f68301234",
 				"avaxAddr": "X-avax1skkmzyxdkllyk7vx4553p9v5zhyewnccdkw08q",
-				"initialAmount": 67500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 67500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 67500000000000,
 						"locktime": 1617840000
@@ -152064,8 +156177,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w043k4gejve9zv0yrultp7k23g6x55unpccs34",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152153,8 +156271,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1h70hyxegftkagmuc0gnyl7vhrkxkm4k3q23twg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152182,8 +156305,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1y57sej2sldfcdegywvseh38rwskrcu8khvnu32",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152219,8 +156347,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18yf0xvgg9se9kewe0y5tc39mn94qud0scq9s2r",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152485,14 +156618,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ty3j9tq0vqjcny4n6gtuqhr3uxuc0hkcgs209g",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19zqzgau3xpnsv074fyat8mlkp0hykzcp7ksxdp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152528,8 +156671,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19vrq3ls9v7c42f8fgn3738tc5q5gw3m6fejzyt",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152565,8 +156713,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19vpcvrc7ddnma74lqde9a45x859wvu5eevdfcg",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152577,8 +156730,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fmfv85mwqxrjy0h4vwheylgkzcqntp8zwwhv99",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -152697,8 +156855,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1v3x792vaxutqlav4mykmyu6hjxeh95k6j64rtv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -152734,8 +156897,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gg2ps5859d7x9uf7eeepw2agyvxl4crqkvsc88",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -153118,8 +157286,12 @@ var (
 			{
 				"ethAddr": "0x88f07b34b71152d932bae8b39925c749761cd14b",
 				"avaxAddr": "X-avax1x69nzwaacagl0f89p0njvz5ywxarm4g09ppf2x",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -153185,14 +157357,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1qwpccwqrfpsuz9pm89z73jymsxyhmw4snakjsw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xe321bd33e6aa45f3abb8248f1cca0123b194e4c1",
 				"avaxAddr": "X-avax1t749787x58v7wzrk5hkm4pnm8jkmh9r520ad0r",
-				"initialAmount": 11250000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 11250000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 11250000000000,
 						"locktime": 1617840000
@@ -153341,8 +157522,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13ec085au6dmzhwr9gg3j2fc64rq0acpl6k5vxm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -153654,14 +157840,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1wnc90wc6t927ecas7cfkcfqh9r25wqwatvc3w6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1g0d8d8m3qysls44xw3jrngwppskmr4t2yy244a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -153737,8 +157933,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1gr799wx5y9nzccxvhg454jjx8rlmwtz6wmnqvv",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -153928,8 +158129,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax137r0nghvkc5pmw7g2l9kl7rd9ax8cyjmgsaadx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -154334,14 +158540,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zt9p6xj6dnevfmaglx47jeykcpn4nusqqvvvkf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1aj8g76050g7a5xz72ghzmvmywrpcmyvyhrt8ls",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -154533,8 +158749,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax18fh544g6sjjte6t8n2w38n83m4u2hptngtfzxu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -154562,8 +158783,12 @@ var (
 			{
 				"ethAddr": "0x5fda2fa749771a684e3504d5ac781eae64f93d9f",
 				"avaxAddr": "X-avax1chyp2df73yx8gcecspalxjdfyzugdhpaptlhzt",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -154629,8 +158854,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sph3v322eydk4pes7a6n6xpf5tks2972zdgake",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -154849,14 +159079,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xlc87hpcccrwqcqfh0nplgfqy4vdn9g8fzfxhr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ea4efedfn2up5qcmn8np9fl246dvemhasss0zx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -155063,8 +159303,12 @@ var (
 			{
 				"ethAddr": "0xc82776e37eec27bc662c42c226b94488a3636fa9",
 				"avaxAddr": "X-avax18run3p0977dgeg5wkec5avz7d29u9m8rl665kt",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -155347,8 +159591,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13tswxat2a07q0jlt8hwd5t54fk5ymjzqz53wjz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -155359,8 +159608,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17jg0zcdul8fn4uw2mz3frhynrjrgrdex2kacp9",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -155436,8 +159690,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pzj3hcv780f02wlvex2cw3m2gg988l9zyyx25y",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -156171,8 +160429,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mc20dnl8ry8598q5r9967gvlzudrfquz530qt6",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -156183,8 +160446,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1egnqcdgjykc2yhtq2yqahaezq86nk5wkrgdxuj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -157129,8 +161397,12 @@ var (
 			{
 				"ethAddr": "0x06f8684b788f3bfa6c025e4dd4d4bfb4d0e0ce1b",
 				"avaxAddr": "X-avax1cgnh769zd92pu564fdrswmqtptvpy0h9jw3pvr",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -157196,8 +161468,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vmjyph9sfugq3uduessns4vdau26852dyxegux",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -157336,8 +161613,12 @@ var (
 			{
 				"ethAddr": "0x979f9da9415854ea00826ec687f6e760cb44d6f8",
 				"avaxAddr": "X-avax1j7wth9p4gjyev6czl4xcrsp0hh6zharejkavj7",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -157608,8 +161889,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1upwyr5veddz0g55yhafcdcs4e9r5nn3l6gk0lq",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -157855,8 +162141,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17dwjq8hwprurvdfrr35rcr72vk8xgafhzgwe6l",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -157892,14 +162183,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax19t63778drucgrnxhu6hd2mwhkfdwyjlp8pt2mn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uxl5eshm2dkjs9cjy8wg4elm38y0s2g4pu0l3f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -157975,8 +162276,12 @@ var (
 			{
 				"ethAddr": "0x704cc51dafae36c4446d19281a86a49a0f18240a",
 				"avaxAddr": "X-avax1gfmp7d7lhursh0s0ngpdcul8l0yelnaxhatc48",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -158227,8 +162532,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax157e5m4d9sq6qqyapfkd2zzcakcxtrmr0jmssat",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -158264,8 +162574,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1rh9kn2l4h6y5v6ms48tlngukrr6rg3l2zrn9ah",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -158307,8 +162622,12 @@ var (
 			{
 				"ethAddr": "0x6ea36f9efba0126396ae794ebe4e5bd42d0449ef",
 				"avaxAddr": "X-avax14fgx8g50ym3gnhcffhwv3kln7h7hztlqpevzxl",
-				"initialAmount": 12375000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 12375000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 12375000000000,
 						"locktime": 1617840000
@@ -158405,8 +162724,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jrgvflhk9ugn60mugugxm0cnlczx4xpts88yhh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -158644,8 +162968,12 @@ var (
 			{
 				"ethAddr": "0x7cb041e641f8b74275f233ff017d26c2df24f5c8",
 				"avaxAddr": "X-avax1y3m4fyjzc05d79jsnd5kwqechew49vuw58z4r7",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -158967,8 +163295,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1xum7za7e3gw0gn70ywrsturvzfpkswxh66fr32",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -159041,8 +163374,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fcu2c75y5msfpktdkdazp688lpeuaw83994twm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -159124,8 +163462,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r6pfmv9nzdjar33z4zdlvh8sps7vre8s8m0q05",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -159402,8 +163745,12 @@ var (
 			{
 				"ethAddr": "0x596dbd82771863009576edbab0e6546c0f8dc02c",
 				"avaxAddr": "X-avax1np6tdp87w74qeh5vr9gjneax0l22km0wggxz5e",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -159602,8 +163949,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax10v6dav8s5vr84x3568rq4krdn9rd9rra43uwsx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -159810,8 +164162,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax17e8jhv8vzpqvj35u57t3vlzwcpjxk2u45v9vje",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -160070,14 +164426,23 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax123klsa7sk9zlfskgdpug4sk008037qhwer9p0h",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0x98aaf4f8458802334c7d5b0c3bc165ad8d4155b0",
 				"avaxAddr": "X-avax1axh8urs7ev9gtw9j7esd0v3f357sawa5wn6upg",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -160749,8 +165114,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1aj0fmysx6fsepw4phe9a3neaqs26wlg7dsscr2",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -160977,8 +165347,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l53jjqsn5c3aplgel0fjtvt0sq9wnmerztmxpx",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -161014,8 +165389,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lq5z0pp7k27kg0ann6x4vgpk4pvk4wxuexludh",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -161367,8 +165747,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax186trugjxqmfmqsrz7qq26cjamc0clyl4exmdkr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -161427,14 +165812,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15zddy3v69exuhtag6v4w7t5e3wmw8yr2e4l09d",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14xz4rg7pwq08lr4t5pcxv9ec8qqyfe4pdudwgs",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -161501,8 +165896,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sc62y34fz2asstn9cl2vldt50cgpp2qje7826g",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -161805,8 +166205,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1l4uy6he0kzptemn6qpt0y9rhxlhznv7m54tahy",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -161979,8 +166384,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1madr7u74w8jjjmqea27laajr94zryc2j2ss5kl",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -162022,8 +166432,12 @@ var (
 			{
 				"ethAddr": "0x7eb2e4c70570be9c8420e14b6a232d6b0c1524f4",
 				"avaxAddr": "X-avax16ycyxgn2gj3scf58rr3ntyrqjk6l96hr3t6wa8",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -162562,8 +166976,12 @@ var (
 			{
 				"ethAddr": "0xca2df6c3c4c26560e7201c49da751b8aa074eb57",
 				"avaxAddr": "X-avax1c2u0kjy0mqjrrckf9j8a2um9rnqns6unj3unc6",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -162709,8 +167127,12 @@ var (
 			{
 				"ethAddr": "0x7ddd68095bc4643ef1c4a473d1a40056edc0a499",
 				"avaxAddr": "X-avax1h9nqa38sgusny5etjldmkezhs0zzprxmm9626r",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -163020,14 +167442,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ndzchyyd935qffj5736q5ek8dyc3f2tjnt75hf",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mszys77fryrqkfdngku8kenc4rx2jsgfu5xnf5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -163257,8 +167689,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pfjz0yjmsj22z9hejap2r0we6mq3nyfenv75zz",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -163568,14 +168005,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vm6wwwczdqn3vdfnhewjqah7cfpt43vkmpucv3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax120nckx09ravw90hgmqx5z9d0v0xewrpwrfhcqu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -163805,14 +168252,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1hwf2xerqtwalhlx8cf4cltypup2dyp0fkj232a",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1tzak4r7hsv0h6at7mgmhvm6j6skcc7k9js26dd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -163848,8 +168305,12 @@ var (
 			{
 				"ethAddr": "0x0e905b21b53adc5c86a283ce2e1ed152450ea439",
 				"avaxAddr": "X-avax1yk76p78e4egt8lmhg9ay8gdnkz5ds7ecyx3s7y",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -163915,20 +168376,35 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1sf44g8c39p9ey9pevyanepqjsan2a38hglwcz4",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax165mj2p39xryxk2xp38xa63qs45qh0ksvt39a8l",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax13a04nqqtupeq4q4a5zngk8nhpa8aqv45jzwyvu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -164097,8 +168573,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1vpu6dykxq2c7pg5hf4gwuw5439dy0hhdtd3wkr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -164305,8 +168786,12 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax12mp7g5x3ta3p5yzgmy7cpsdstglru3cpn5ruxa",
-				"initialAmount": 33000000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 33000000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 33000000000000,
 						"locktime": 1617840000
@@ -164576,8 +169061,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax106gmacruqtr3a8fzd7879p4wy30m4xc0h8sjg3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -164659,8 +169149,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1zkw0fwq500gspcu6vyq93mj42xvdtzmsgwj3px",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -164767,8 +169262,12 @@ var (
 			{
 				"ethAddr": "0x4e2577da2b6bb3c77d941991785ef861e9037386",
 				"avaxAddr": "X-avax1m8nascnyfuy3nhuqap6vv4jldc27dpmyxrcdg2",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -164911,8 +169410,12 @@ var (
 			{
 				"ethAddr": "0xf9822903eb987dc09d2c4c8e8ec17aef1531f1fa",
 				"avaxAddr": "X-avax1l877ha38a64mevwsa7ayn6g30ufh79rp002tun",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -165370,8 +169873,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax126k3vv6usegkndentccz8l3x8washse2df6nkj",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -165773,8 +170281,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1dzurfnxxlc79wyw0zazd6hneftd7t576ansaa7",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -166089,8 +170602,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ga4dkngpcn2tdzmu4a889jzdctp8jtvu8m9s2f",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -166149,8 +170667,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14nuef3x8ruamt2rvpgq67td62lgltvm8qcpvdp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -166405,8 +170928,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1pw0npqldyed87g8l3l65h930xyw72qwy6mlmr3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -166482,14 +171010,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fnm5wa3lllclsm49gghymnkt30qmajr6u5zx90",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1fg55xhqv8tycuxh8mae735rlydfvy66tvdks95",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -166506,8 +171044,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax15ms22fet0gd25mnj09tazzu8dndqcnvjklmd96",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -166618,8 +171161,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1jtdt7ym6sg30s9qussxrug3n06u33fjemnfaxu",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -166874,8 +171422,12 @@ var (
 			{
 				"ethAddr": "0x587f9b799037d2a703e26c74de9287ec28595cbf",
 				"avaxAddr": "X-avax1d3asgr3lkmeuzakrsflfrw0w2l9d0063nxxx4j",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -166970,8 +171522,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1ugpwzut878cg809nnuj6k3fhytf4px3aeq2zn5",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -167082,14 +171639,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1m92vx92ekkndj0r80dlmxgnk8yycdupzl7c3rw",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1kasah93u2l2vjyw8zl9zkj06kf4k9fqkdxt0ht",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -167125,8 +171692,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14u2kr9eamn0su054jl256k46deagt7fgr7fadm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -167202,8 +171774,12 @@ var (
 			{
 				"ethAddr": "0xdb6d7f5a8bfdb1e7342511e0e9178840069d49a4",
 				"avaxAddr": "X-avax1x207w7tmza3qh36ayjtlzl7gw7v7g0nf0te2v2",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -167340,8 +171916,12 @@ var (
 			{
 				"ethAddr": "0xcc4b1c2bfde6b1cdf52ed9382f107c5f82e142cc",
 				"avaxAddr": "X-avax1yuxkdcg50chq5wzy0hgxc40dzz2r9r43xfed8l",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -167478,14 +172058,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1mdceetryr7573t94a3sn32u9ruuvc79cmesg6h",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1030nshfj2swz5umu0e5dy2rf6tf9cghz0v2exm",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -167595,8 +172185,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1r8ulhk8mrgffs299yhg37r2v96xzjky0w6d79c",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -167755,8 +172350,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1lqkslv60n6h88lws7mcguqm2gvz8s6rsau2cev",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -167863,8 +172463,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1w7na6s6x2mqc456pjjcq4ggmgrxtu7h3z7cuy3",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -168230,8 +172835,12 @@ var (
 			{
 				"ethAddr": "0xfcb7fb47029f41503c1a6a38bdba6492c9349ea8",
 				"avaxAddr": "X-avax1qv4s702tck6durgemvyupec6j0a8eetwxmdlfe",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -168297,14 +172906,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1uc62mfmdkkpwzw889qylgn48dxr6f77cd0wh05",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1c7nyvc2cndhygu0dn58pvxk4slmgj6mpsj9lrn",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -168340,14 +172959,24 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax14ygpaj4n07dgtpcl7qwh97arxv3l3nf9927cyp",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1z30fav4xrmfx9xjpl9c9gavmf22ql077lkw9ua",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
@@ -168429,8 +173058,12 @@ var (
 			{
 				"ethAddr": "0x282c78b41993206ebbc31aaf47d8f03b3844db6f",
 				"avaxAddr": "X-avax1z7xj0krjx77m4d2hnt8qy37l5jypljave926rj",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -168613,8 +173246,12 @@ var (
 			{
 				"ethAddr": "0xca8ae0b8a80645ae0b601ea246547466e78e0323",
 				"avaxAddr": "X-avax1gqd7q6av6t7hj0d6e30uk7yy3pmf78je0h05f5",
-				"initialAmount": 22500000000000,
+				"initialAmount": 0,
 				"unlockSchedule": [
+					{
+						"amount": 22500000000000,
+						"locktime": 1610064000
+					},
 					{
 						"amount": 22500000000000,
 						"locktime": 1617840000
@@ -168763,8 +173400,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax1shudwp26f2xj68s5qfug0n7amrn8nk9j6mn0hd",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xa8d8de1f4aa943b51170924911fac2aca4d0a19b",
@@ -169354,8 +173996,13 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-avax108usu4k6p7k4s5h3qjztzu65ft0nnnd8cpuxsr",
-				"initialAmount": 2000000000000,
-				"unlockSchedule": []
+				"initialAmount": 0,
+				"unlockSchedule": [
+					{
+						"amount": 2000000000000,
+						"locktime": 1633392000
+					}
+				]
 			},
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
