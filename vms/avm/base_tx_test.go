@@ -876,7 +876,8 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}
 
 	cr := codecRegistry{
-		Codec:         vm.codec,
+		genesisCodec:  vm.genesisCodec,
+		codec:         vm.codec,
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
 	}
@@ -1289,7 +1290,8 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	}
 
 	cr := codecRegistry{
-		Codec:         vm.codec,
+		genesisCodec:  vm.genesisCodec,
+		codec:         vm.codec,
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
 	}
@@ -1431,7 +1433,8 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	}
 
 	cr := codecRegistry{
-		Codec:         vm.codec,
+		genesisCodec:  vm.genesisCodec,
+		codec:         vm.codec,
 		index:         1,
 		typeToFxIndex: vm.typeToFxIndex,
 	}
