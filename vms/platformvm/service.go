@@ -813,14 +813,8 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 
 // AddValidatorArgs are the arguments to AddValidator
 type AddValidatorArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	APIStaker
 	// The address the staking reward, if applicable, will go to
 	RewardAddress     string       `json:"rewardAddress"`
@@ -937,15 +931,9 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 // AddDelegatorArgs are the arguments to AddDelegator
 type AddDelegatorArgs struct {
-	api.UserPass
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	APIStaker
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
 	RewardAddress string `json:"rewardAddress"`
 }
 
@@ -1057,14 +1045,8 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
 type AddSubnetValidatorArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	APIStaker
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
@@ -1172,14 +1154,8 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 // CreateSubnetArgs are the arguments to CreateSubnet
 type CreateSubnetArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	// The ID member of APISubnet is ignored
 	APISubnet
 }
@@ -1275,16 +1251,8 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
-	api.UserPass
-
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 
 	// Amount of AVAX to send
 	Amount json.Uint64 `json:"amount"`
@@ -1386,16 +1354,8 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 
 // ImportAVAXArgs are the arguments to ImportAVAX
 type ImportAVAXArgs struct {
-	api.UserPass
-
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
@@ -1497,14 +1457,8 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	// ID of Subnet that validates the new blockchain
 	SubnetID ids.ID `json:"subnetID"`
 	// ID of the VM the new blockchain is running

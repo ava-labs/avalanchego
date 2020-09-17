@@ -415,18 +415,11 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JsonAddress, r
 
 // CreateFixedCapAssetArgs are arguments for passing into CreateFixedCapAsset requests
 type CreateFixedCapAssetArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
-	Name           string    `json:"name"`
-	Symbol         string    `json:"symbol"`
-	Denomination   byte      `json:"denomination"`
-	InitialHolders []*Holder `json:"initialHolders"`
+	api.JsonSpendHeader           // User, password, from addrs, change addr
+	Name                string    `json:"name"`
+	Symbol              string    `json:"symbol"`
+	Denomination        byte      `json:"denomination"`
+	InitialHolders      []*Holder `json:"initialHolders"`
 }
 
 // Holder describes how much an address owns of an asset
@@ -555,18 +548,11 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 
 // CreateVariableCapAssetArgs are arguments for passing into CreateVariableCapAsset requests
 type CreateVariableCapAssetArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
-	Name         string   `json:"name"`
-	Symbol       string   `json:"symbol"`
-	Denomination byte     `json:"denomination"`
-	MinterSets   []Owners `json:"minterSets"`
+	api.JsonSpendHeader          // User, password, from addrs, change addr
+	Name                string   `json:"name"`
+	Symbol              string   `json:"symbol"`
+	Denomination        byte     `json:"denomination"`
+	MinterSets          []Owners `json:"minterSets"`
 }
 
 // Owners describes who can perform an action
@@ -693,17 +679,10 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 
 // CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
 type CreateNFTAssetArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
-	Name       string   `json:"name"`
-	Symbol     string   `json:"symbol"`
-	MinterSets []Owners `json:"minterSets"`
+	api.JsonSpendHeader          // User, password, from addrs, change addr
+	Name                string   `json:"name"`
+	Symbol              string   `json:"symbol"`
+	MinterSets          []Owners `json:"minterSets"`
 }
 
 // CreateNFTAsset returns ID of the newly created asset
@@ -1003,17 +982,8 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 
 // SendArgs are arguments for passing into Send requests
 type SendArgs struct {
-	// Username and password of user sending the funds
-	api.UserPass
-
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 
 	// The amount of funds to send
 	Amount json.Uint64 `json:"amount"`
@@ -1170,17 +1140,10 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JsonTxI
 
 // MintArgs are arguments for passing into Mint requests
 type MintArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
-	Amount  json.Uint64 `json:"amount"`
-	AssetID string      `json:"assetID"`
-	To      string      `json:"to"`
+	api.JsonSpendHeader             // User, password, from addrs, change addr
+	Amount              json.Uint64 `json:"amount"`
+	AssetID             string      `json:"assetID"`
+	To                  string      `json:"to"`
 }
 
 // Mint issues a transaction that mints more of the asset
@@ -1303,17 +1266,10 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JsonTxI
 
 // SendNFTArgs are arguments for passing into SendNFT requests
 type SendNFTArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
-	AssetID string      `json:"assetID"`
-	GroupID json.Uint32 `json:"groupID"`
-	To      string      `json:"to"`
+	api.JsonSpendHeader             // User, password, from addrs, change addr
+	AssetID             string      `json:"assetID"`
+	GroupID             json.Uint32 `json:"groupID"`
+	To                  string      `json:"to"`
 }
 
 // SendNFT sends an NFT
@@ -1429,17 +1385,10 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 
 // MintNFTArgs are arguments for passing into MintNFT requests
 type MintNFTArgs struct {
-	api.UserPass
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
-	AssetID string          `json:"assetID"`
-	Payload formatting.CB58 `json:"payload"`
-	To      string          `json:"to"`
+	api.JsonSpendHeader                 // User, password, from addrs, change addr
+	AssetID             string          `json:"assetID"`
+	Payload             formatting.CB58 `json:"payload"`
+	To                  string          `json:"to"`
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
@@ -1675,14 +1624,8 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, reply 
 
 // ExportAVAXArgs are arguments for passing into ExportAVA requests
 type ExportAVAXArgs struct {
-	api.UserPass // User providing exported AVAX
-	// The addresses from which the transaction fee is paid.
-	// If empty, pays the fee from any of the user's addresses.
-	api.JsonFromAddrs
-	// The address change will be sent to
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 
 	// Amount of nAVAX to send
 	Amount json.Uint64 `json:"amount"`
