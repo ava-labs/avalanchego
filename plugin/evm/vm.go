@@ -160,7 +160,7 @@ type VM struct {
 	chaindb           Database
 	newBlockChan      chan *Block
 	networkChan       chan<- commonEng.Message
-	newTxPoolHeadChan chan core.NewTxPoolHeadEvent
+	newTxPoolHeadChan *event.TypeMuxSubscription
 
 	acceptedDB database.Database
 
@@ -344,23 +344,26 @@ func (vm *VM) Initialize(
 
 	vm.bdTimerState = bdTimerStateLong
 	vm.bdGenWaitFlag = true
-	vm.newTxPoolHeadChan = make(chan core.NewTxPoolHeadEvent, 1)
+	//vm.newTxPoolHeadChan = make(chan core.NewTxPoolHeadEvent, 1)
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
 	// TODO: read size from options
 	vm.pendingAtomicTxs = make(chan *Tx, 1024)
 	vm.atomicTxSubmitChan = make(chan struct{}, 1)
-	chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
+	//chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
+	vm.newTxPoolHeadChan = vm.chain.SubscribeNewMinedBlockEvent()
 	// TODO: shutdown this go routine
 	go ctx.Log.RecoverAndPanic(func() {
 		for {
 			select {
-			case h := <-vm.newTxPoolHeadChan:
-				vm.txPoolStabilizedLock.Lock()
-				if vm.txPoolStabilizedHead == h.Block.Hash() {
-					vm.txPoolStabilizedOk <- struct{}{}
-					vm.txPoolStabilizedHead = common.Hash{}
+			case e := <-vm.newTxPoolHeadChan.Chan():
+				switch h := e.Data.(core.NewTxPoolHeadEvent) {
+					vm.txPoolStabilizedLock.Lock()
+					if vm.txPoolStabilizedHead == h.Block.Hash() {
+						vm.txPoolStabilizedOk <- struct{}{}
+						vm.txPoolStabilizedHead = common.Hash{}
+					}
+					vm.txPoolStabilizedLock.Unlock()
 				}
-				vm.txPoolStabilizedLock.Unlock()
 			}
 		}
 	})

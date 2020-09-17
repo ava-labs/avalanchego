@@ -135,3 +135,7 @@ func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscript
 func (miner *Miner) GenBlock() {
 	miner.worker.genBlock()
 }
+
+func (miner *Miner) GetWorkerMux() *event.TypeMux {
+	return miner.worker.mux
+}

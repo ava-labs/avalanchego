@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/trie"
 	//"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -83,6 +84,10 @@ func (self *ETHChain) Stop() {
 
 func (self *ETHChain) GenBlock() {
 	self.backend.Miner().GenBlock()
+}
+
+func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
+	return self.backend.Miner().GetWorkerMux().Subscribe(core.NewMinedBlockEvent{})
 }
 
 func (self *ETHChain) VerifyBlock(block *types.Block) bool {
