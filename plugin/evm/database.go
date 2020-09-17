@@ -46,12 +46,19 @@ func (db Database) Sync() error { return errOpNotSupported }
 // NewBatch implements ethdb.Database
 func (db Database) NewBatch() ethdb.Batch { return Batch{db.Database.NewBatch()} }
 
-// NewIterator implements ethdb.Database
-func (db Database) NewIterator() ethdb.Iterator { return db.Database.NewIterator() }
+//// NewIterator implements ethdb.Database
+//func (db Database) NewIterator() ethdb.Iterator {
+//	return db.Database.NewIterator()
+//}
 
-// NewIteratorWithPrefix implements ethdb.Database
-func (db Database) NewIteratorWithPrefix(prefix []byte) ethdb.Iterator {
-	return db.NewIteratorWithPrefix(prefix)
+//// NewIteratorWithPrefix implements ethdb.Database
+//func (db Database) NewIteratorWithPrefix(prefix []byte) ethdb.Iterator {
+//	return db.NewIteratorWithPrefix(prefix)
+//}
+
+// NewIterator implements ethdb.Database
+func (db Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+	return db.NewIteratorWithStartAndPrefix(start, prefix)
 }
 
 // NewIteratorWithStart implements ethdb.Database
