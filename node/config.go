@@ -23,7 +23,9 @@ type Config struct {
 	// ID of the network this node should connect to
 	NetworkID uint32
 
-	// Transaction fee configuration
+	// Transaction fee for transactions that create new state
+	CreationTxFee uint64
+	// Transaction fee
 	TxFee uint64
 
 	// Staking uptime requirements

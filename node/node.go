@@ -521,6 +521,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ChainManager:       n.chainManager,
 			Validators:         vdrs,
 			StakingEnabled:     n.Config.EnableStaking,
+			CreationFee:        n.Config.CreationTxFee,
 			Fee:                n.Config.TxFee,
 			UptimePercentage:   n.Config.UptimeRequirement,
 			MinValidatorStake:  n.Config.MinValidatorStake,
@@ -530,7 +531,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			Fee: n.Config.TxFee,
+			CreationFee: n.Config.CreationTxFee,
+			Fee:         n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, "evm"),

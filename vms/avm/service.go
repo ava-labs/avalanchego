@@ -473,7 +473,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaxKey: service.vm.txFee,
+			avaxKey: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -481,11 +481,11 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -594,7 +594,7 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaxKey: service.vm.txFee,
+			avaxKey: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -602,11 +602,11 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -712,7 +712,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		utxos,
 		kc,
 		map[[32]byte]uint64{
-			avaxKey: service.vm.txFee,
+			avaxKey: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -720,11 +720,11 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,

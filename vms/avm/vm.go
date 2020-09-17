@@ -75,7 +75,9 @@ type VM struct {
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
-	// fee that must be burned by every transaction
+	// fee that must be burned by every state creating transaction
+	creationTxFee uint64
+	// fee that must be burned by every non-state creating transaction
 	txFee uint64
 
 	// Transaction issuing

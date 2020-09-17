@@ -168,6 +168,7 @@ func init() {
 
 	// AVAX fees:
 	fs.Uint64Var(&Config.TxFee, "tx-fee", units.MilliAvax, "Transaction fee, in nAVAX")
+	fs.Uint64Var(&Config.CreationTxFee, "creation-tx-fee", units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 
 	// Uptime requirement:
 	fs.Float64Var(&Config.UptimeRequirement, "uptime-requirement", .6, "Fraction of time a validator must be online to receive rewards")

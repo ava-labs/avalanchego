@@ -581,7 +581,9 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			Amount:  123456789,
 			Address: addrStr,
 		}},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -626,7 +628,9 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				},
 			},
 		},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -657,10 +661,12 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		Amount:         200,
-		AssetID:        createdAssetID,
-		To:             addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		Amount:  200,
+		AssetID: createdAssetID,
+		To:      addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}
 	mintReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -686,10 +692,12 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		Amount:         200,
-		AssetID:        createdAssetID,
-		To:             addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		Amount:  200,
+		AssetID: createdAssetID,
+		To:      addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}
 	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Send(nil, sendArgs, sendReply); err != nil {
@@ -730,7 +738,9 @@ func TestNFTWorkflow(t *testing.T) {
 				},
 			},
 		},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}
 	createReply := &AssetIDChangeAddr{}
 	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
@@ -758,10 +768,12 @@ func TestNFTWorkflow(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		AssetID:        assetID.String(),
-		Payload:        formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
-		To:             addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		AssetID: assetID.String(),
+		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
+		To:      addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}
 	mintReply := &api.JsonTxIDChangeAddr{}
 
@@ -789,10 +801,12 @@ func TestNFTWorkflow(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		AssetID:        assetID.String(),
-		GroupID:        0,
-		To:             addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		AssetID: assetID.String(),
+		GroupID: 0,
+		To:      addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}
 	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
@@ -946,10 +960,12 @@ func TestSend(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		Amount:         500,
-		AssetID:        assetID.String(),
-		To:             addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		Amount:  500,
+		AssetID: assetID.String(),
+		To:      addrStr,
+		JsonChangeAddr: api.JsonChangeAddr{
+			ChangeAddr: changeAddrStr,
+		},
 	}
 	reply := &api.JsonTxIDChangeAddr{}
 	vm.timer.Cancel()
