@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"math/rand"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -20,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -28,6 +31,11 @@ var (
 	testChangeAddr = ids.GenerateTestShortID()
 )
 
+// Returns:
+// 1) genesis bytes of vm
+// 2) the VM
+// 3) The service that wraps the VM
+// 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
 	keystore := keystore.CreateTestKeystore()
@@ -39,6 +47,11 @@ func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	return genesisBytes, vm, s, m
 }
 
+// Returns:
+// 1) genesis bytes of vm
+// 2) the VM
+// 3) The service that wraps the VM
+// 4) atomic memory to use in tests
 func setupWithKeys(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, vm, s, m := setup(t)
 
@@ -59,7 +72,82 @@ func setupWithKeys(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	if err := user.SetAddresses(db, addrs); err != nil {
 		t.Fatalf("Failed to set user addresses: %s", err)
 	}
+
 	return genesisBytes, vm, s, m
+}
+
+// Sample from a set of addresses and return them raw and formatted as strings.
+// The size of the sample is between 1 and len(addrs)
+// If len(addrs) == 0, returns nil
+func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+	sampledAddrs := []ids.ShortID{}
+	sampledAddrsStr := []string{}
+
+	sampler := sampler.NewUniform()
+	if err := sampler.Initialize(uint64(len(addrs))); err != nil {
+		t.Fatal(err)
+	}
+
+	numAddrs := 1 + rand.Intn(len(addrs))
+	for i := 0; i < numAddrs; i++ {
+		indices, err := sampler.Sample(1)
+		if err != nil {
+			t.Fatal(err)
+		} else if len(indices) != 1 {
+			t.Fatal("should have gotten only 1 index")
+		}
+		addr := addrs[indices[0]]
+		sampledAddrs = append(sampledAddrs, addr)
+		addrStr, err := vm.FormatLocalAddress(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sampledAddrsStr = append(sampledAddrsStr, addrStr)
+	}
+	return sampledAddrs, sampledAddrsStr
+}
+
+// Returns error if [numTxFees] tx fees was not deducted from the addresses in [fromAddrs]
+// relative to their starting balance
+func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numTxFees int) error {
+	totalTxFee := numTxFees * int(s.vm.txFee)
+	fromAddrsStartBalance := int(startBalance) * len(fromAddrs)
+
+	// Key: Address
+	// Value: AVAX balance
+	balances := map[[20]byte]int{}
+
+	for _, addr := range addrs { // get balances for all addresses
+		addrStr, err := s.vm.FormatLocalAddress(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reply := &GetBalanceReply{}
+		err = s.GetBalance(nil,
+			&GetBalanceArgs{
+				Address: addrStr,
+				AssetID: s.vm.ctx.AVAXAssetID.String(),
+			},
+			reply,
+		)
+		if err != nil {
+			return fmt.Errorf("couldn't get balance of %s: %s", addr, err)
+		}
+		balances[addr.Key()] = int(reply.Balance)
+	}
+
+	fromAddrsTotalBalance := 0
+	for _, addr := range fromAddrs {
+		fromAddrsTotalBalance += balances[addr.Key()]
+	}
+
+	if fromAddrsTotalBalance != fromAddrsStartBalance-totalTxFee {
+		return fmt.Errorf("expected fromAddrs to have %d balance but have %d",
+			fromAddrsStartBalance-totalTxFee,
+			fromAddrsTotalBalance,
+		)
+	}
+	return nil
 }
 
 func TestServiceIssueTx(t *testing.T) {
@@ -137,7 +225,7 @@ func TestServiceGetBalance(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
 	addrStr, err := vm.FormatLocalAddress(addr)
@@ -152,9 +240,8 @@ func TestServiceGetBalance(t *testing.T) {
 	balanceReply := &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(balanceReply.Balance), uint64(300000))
-
-	assert.Len(t, balanceReply.UTXOIDs, 4, "should have only returned four utxoIDs")
+	assert.Equal(t, uint64(balanceReply.Balance), uint64(startBalance))
+	assert.Len(t, balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
 }
 
 func TestServiceGetAllBalances(t *testing.T) {
@@ -164,7 +251,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
 	addrStr, err := vm.FormatLocalAddress(addr)
@@ -187,7 +274,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		t.Fatalf("Failed to get primary alias of genesis asset: %s", err)
 	}
 	assert.Equal(t, balance.AssetID, alias)
-	assert.Equal(t, uint64(balance.Balance), uint64(300000))
+	assert.Equal(t, uint64(balance.Balance), uint64(startBalance))
 }
 
 func TestServiceGetTx(t *testing.T) {
@@ -197,7 +284,7 @@ func TestServiceGetTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	genesisTxBytes := genesisTx.Bytes()
 	txID := genesisTx.ID()
 
@@ -502,7 +589,7 @@ func TestGetAssetDescription(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxAssetID := genesisTx.ID()
 
@@ -514,10 +601,10 @@ func TestGetAssetDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.Name != "myFixedCapAsset" {
+	if reply.Name != "AVAX" {
 		t.Fatalf("Wrong name returned from GetAssetDescription %s", reply.Name)
 	}
-	if reply.Symbol != "MFCA" {
+	if reply.Symbol != "SYMB" {
 		t.Fatalf("Wrong name returned from GetAssetDescription %s", reply.Symbol)
 	}
 }
@@ -529,7 +616,7 @@ func TestGetBalance(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxAssetID := genesisTx.ID()
 
@@ -546,7 +633,7 @@ func TestGetBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if reply.Balance != 300000 {
+	if uint64(reply.Balance) != startBalance {
 		t.Fatalf("Wrong balance returned from GetBalance %d", reply.Balance)
 	}
 }
@@ -568,11 +655,16 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Name:         "testAsset",
 		Symbol:       "TEST",
@@ -581,16 +673,9 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			Amount:  123456789,
 			Address: addrStr,
 		}},
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
-		},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if reply.AssetID.String() != "2YD5ovZNEx7cxryCBxDZaYbrQc3v6AxTDiJwCxkZS1YMFU3Sni" {
-		t.Fatalf("Wrong assetID returned from CreateFixedCapAsset %s", reply.AssetID)
 	} else if reply.ChangeAddr != changeAddrStr {
 		t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
 	}
@@ -612,11 +697,16 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Name:   "test asset",
 		Symbol: "TEST",
@@ -628,20 +718,11 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				},
 			},
 		},
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
-		},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
 	} else if reply.ChangeAddr != changeAddrStr {
 		t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
-	}
-
-	createdAssetID := reply.AssetID.String()
-
-	if createdAssetID != "25BzKomFRYuq52dgoutjDsehgw4v9Uvcgb2fnTBLt8qqTTTAD7" {
-		t.Fatalf("Wrong assetID returned from CreateVariableCapAsset %s", reply.AssetID)
 	}
 
 	createAssetTx := UniqueTx{
@@ -655,18 +736,19 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		t.Fatalf("Failed to accept CreateVariableCapAssetTx due to: %s", err)
 	}
 
+	createdAssetID := reply.AssetID.String()
 	// Test minting of the created variable cap asset
 	mintArgs := &MintArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Amount:  200,
 		AssetID: createdAssetID,
 		To:      addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
-		},
 	}
 	mintReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -688,16 +770,17 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 
 	sendArgs := &SendArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Amount:  200,
 		AssetID: createdAssetID,
 		To:      addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
-		},
 	}
 	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Send(nil, sendArgs, sendReply); err != nil {
@@ -714,19 +797,26 @@ func TestNFTWorkflow(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
+	fromAddrs, fromAddrsStr := sampleAddrs(t, vm, addrs)
+	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Test minting of the created variable cap asset
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
 	}
-	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	createArgs := &CreateNFTAssetArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Name:   "BIG COIN",
 		Symbol: "COIN",
@@ -737,9 +827,6 @@ func TestNFTWorkflow(t *testing.T) {
 					addrStr,
 				},
 			},
-		},
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
 		},
 	}
 	createReply := &AssetIDChangeAddr{}
@@ -754,26 +841,28 @@ func TestNFTWorkflow(t *testing.T) {
 		vm:   vm,
 		txID: createReply.AssetID,
 	}
+	// Accept the transaction so that we can Mint NFTs for the test
 	if createNFTTx.Status() != choices.Processing {
 		t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
 	}
-
-	// Accept the transaction so that we can Mint NFTs for the test
 	if err := createNFTTx.Accept(); err != nil {
 		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
+	} else if verifyTxFeeDeducted(t, s, fromAddrs, 1); err != nil {
+		t.Fatal(err)
 	}
 
 	mintArgs := &MintNFTArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		AssetID: assetID.String(),
 		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
 		To:      addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
-		},
 	}
 	mintReply := &api.JsonTxIDChangeAddr{}
 
@@ -797,16 +886,17 @@ func TestNFTWorkflow(t *testing.T) {
 	}
 
 	sendArgs := &SendNFTArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		AssetID: assetID.String(),
 		GroupID: 0,
 		To:      addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
-		},
 	}
 	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
@@ -942,7 +1032,7 @@ func TestSend(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
 
@@ -954,18 +1044,20 @@ func TestSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 	args := &SendArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Amount:  500,
 		AssetID: assetID.String(),
 		To:      addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{
-			ChangeAddr: changeAddrStr,
-		},
 	}
 	reply := &api.JsonTxIDChangeAddr{}
 	vm.timer.Cancel()
@@ -1028,7 +1120,7 @@ func TestImportAVAX(t *testing.T) {
 		vm.Shutdown()
 		vm.ctx.Lock.Unlock()
 	}()
-	genesisTx := GetFirstTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
 	addr0 := keys[0].PublicKey().Address()
 

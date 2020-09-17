@@ -822,7 +822,11 @@ func (vm *VM) Spend(
 
 	for asset, amount := range amounts {
 		if amountsSpent[asset] < amount {
-			return nil, nil, nil, errInsufficientFunds
+			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
+				amount,
+				ids.NewID(asset),
+				amountsSpent[asset],
+			)
 		}
 	}
 
