@@ -48,6 +48,9 @@ import (
 )
 
 var (
+	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxStakingDuration = 365 * 24 * time.Hour
+
 	// AVAX asset ID in tests
 	avaxAssetID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
 
@@ -60,7 +63,7 @@ var (
 	defaultValidateStartTime = defaultGenesisTime
 
 	// time that genesis validators stop validating
-	defaultValidateEndTime = defaultValidateStartTime.Add(10 * MinimumStakingDuration)
+	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys []*crypto.PrivateKeySECP256K1R
@@ -186,11 +189,14 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 func defaultVM() (*VM, database.Database) {
 	vm := &VM{
-		SnowmanVM:         &core.SnowmanVM{},
-		chainManager:      chains.MockManager{},
-		txFee:             defaultTxFee,
-		minValidatorStake: minValidatorStake,
-		minDelegatorStake: minDelegatorStake,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		txFee:              defaultTxFee,
+		minValidatorStake:  minValidatorStake,
+		minDelegatorStake:  minDelegatorStake,
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	baseDB := memdb.New()
@@ -334,7 +340,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -414,7 +420,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
 
@@ -461,7 +467,7 @@ func TestAddValidatorReject(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
 
@@ -540,7 +546,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}()
 
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -620,7 +626,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}()
 
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := keys[0].PublicKey().Address()
 
 	// create valid tx
@@ -1068,7 +1074,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
@@ -1907,7 +1913,7 @@ func TestNextValidatorStartTime(t *testing.T) {
 	assert.NoError(t, err)
 
 	startTime := currentTime.Add(time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 
 	tx, err := vm.newAddValidatorTx(
 		vm.minValidatorStake,      // stake amount

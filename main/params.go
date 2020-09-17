@@ -178,6 +178,15 @@ func init() {
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	fs.Uint64Var(&Config.MinDelegatorStake, "min-delegator-stake", 5*units.MilliAvax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
 
+	// Minimum staking duration in nanoseconds
+	minStakeDuration := fs.Uint64("min-stake-duration", uint64(24*time.Hour/time.Second), "Minimum staking duration, in seconds")
+
+	// Maximum staking duration in nanoseconds
+	maxStakeDuration := fs.Uint64("max-stake-duration", uint64(365*24*time.Hour/time.Second), "Maximum staking duration, in seconds")
+
+	// Stake minting period in nanoseconds
+	stakeMintingPeriod := fs.Uint64("stake-minting-period", uint64(365*24*time.Hour/time.Second), "Consumption period of the staking function, in seconds")
+
 	// Assertions:
 	fs.BoolVar(&loggingConfig.Assertions, "assertions-enabled", true, "Turn on assertion execution")
 
@@ -503,4 +512,18 @@ func init() {
 	}
 	Config.ConsensusGossipFrequency = time.Duration(*consensusGossipFrequency)
 	Config.ConsensusShutdownTimeout = time.Duration(*consensusShutdownTimeout)
+
+	if *minStakeDuration == 0 {
+		errs.Add(errors.New("min stake duration can't be zero"))
+	}
+	if *maxStakeDuration < *minStakeDuration {
+		errs.Add(errors.New("max stake duration can't be less than min stake duration"))
+	}
+	if *stakeMintingPeriod < *maxStakeDuration {
+		errs.Add(errors.New("stake minting period can't be less than max stake duration"))
+	}
+
+	Config.MinStakeDuration = time.Duration(*minStakeDuration) * time.Second
+	Config.MaxStakeDuration = time.Duration(*maxStakeDuration) * time.Second
+	Config.StakeMintingPeriod = time.Duration(*stakeMintingPeriod) * time.Second
 }
