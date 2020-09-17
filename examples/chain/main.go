@@ -138,6 +138,8 @@ func run(config *eth.Config, a1, a2, b1, b2 int) {
 	bob := NewTestChain("bob", config, aliceBlk, bobBlk, aliceAck, bobAck)
 	alice.Start()
 	bob.Start()
+	log.Info("alice genesis", "block", alice.chain.GetGenesisBlock().Hash().Hex())
+	log.Info("bob genesis", "block", bob.chain.GetGenesisBlock().Hash().Hex())
 	alice.GenRandomTree(a1, a2)
 	log.Info("alice finished generating the tree")
 	//time.Sleep(1 * time.Second)
@@ -205,7 +207,7 @@ func main() {
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       nil,
+		IstanbulBlock:       big.NewInt(0),
 		Ethash:              nil,
 	}
 

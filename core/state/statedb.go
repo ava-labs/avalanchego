@@ -270,11 +270,12 @@ func (self *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash
 func (self *StateDB) EnableMultiCoin(addr common.Address) error {
 	stateObject := self.GetOrNewStateObject(addr)
 	if stateObject.data.Root != emptyRoot && stateObject.data.Root != zeroRoot {
-		return errors.New("not a fresh account")
+		return errors.New(fmt.Sprintf("not a fresh account: %s", stateObject.data.Root.Hex()))
 	}
 	if !stateObject.EnableMultiCoin() {
 		return errors.New("multi-coin mode already enabled")
 	}
+	log.Debug(fmt.Sprintf("enabled MC for %s", addr.Hex()))
 	return nil
 }
 
@@ -527,7 +528,7 @@ func (s *StateDB) updateStateObject(obj *stateObject) {
 	// enough to track account updates at commit time, deletions need tracking
 	// at transaction boundary level to ensure we capture state clearing.
 	if s.snap != nil {
-		s.snapAccounts[obj.addrHash] = snapshot.SlimAccountRLP(obj.data.Nonce, obj.data.Balance, obj.data.Root, obj.data.CodeHash)
+		s.snapAccounts[obj.addrHash] = snapshot.SlimAccountRLP(obj.data.Nonce, obj.data.Balance, obj.data.Root, obj.data.CodeHash, obj.data.IsMultiCoin)
 	}
 }
 

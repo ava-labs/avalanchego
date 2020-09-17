@@ -275,17 +275,19 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 		return nil, gas, ErrDepth
 	}
 
-	mcerr := evm.Context.CanTransferMC(evm.StateDB, caller.Address(), addr, coinID, value2)
+	// Fail if we're trying to transfer more than the available balance
+	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
+		return nil, gas, ErrInsufficientBalance
+	}
+
+	var to = AccountRef(addr)
+	mcerr := evm.Context.CanTransferMC(evm.StateDB, caller.Address(), to.Address(), coinID, value2)
 	if mcerr == 1 {
 		return nil, gas, ErrInsufficientBalance
 	} else if mcerr != 0 {
 		return nil, gas, ErrIncompatibleAccount
 	}
 
-	// Fail if we're trying to transfer more than the available balance
-	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
-		return nil, gas, ErrInsufficientBalance
-	}
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
 
