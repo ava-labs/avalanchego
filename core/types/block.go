@@ -330,6 +330,9 @@ func (b *Block) SetExtraData(data []byte) {
 }
 
 func (b *Block) ExtraData() []byte {
+	if b.extdata == nil {
+		return nil
+	}
 	return *b.extdata
 }
 

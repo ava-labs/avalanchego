@@ -579,10 +579,11 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				return nil
 			}
 			data = &Account{
-				Nonce:    acc.Nonce,
-				Balance:  acc.Balance,
-				CodeHash: acc.CodeHash,
-				Root:     common.BytesToHash(acc.Root),
+				Nonce:       acc.Nonce,
+				Balance:     acc.Balance,
+				CodeHash:    acc.CodeHash,
+				IsMultiCoin: acc.IsMultiCoin,
+				Root:        common.BytesToHash(acc.Root),
 			}
 			if len(data.CodeHash) == 0 {
 				data.CodeHash = emptyCodeHash

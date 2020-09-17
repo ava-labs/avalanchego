@@ -2492,13 +2492,12 @@ func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscr
 }
 
 func (bc *BlockChain) ManualHead(hash common.Hash) error {
-	return bc.FastSyncCommitHead(hash)
-	//block := bc.GetBlockByHash(hash)
-	//if block == nil {
-	//	return errors.New("block not found")
-	//}
-	//bc.chainmu.Lock()
-	//defer bc.chainmu.Unlock()
-	//bc.writeHeadBlock(block)
-	//return nil
+	block := bc.GetBlockByHash(hash)
+	if block == nil {
+		return errors.New("block not found")
+	}
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+	bc.writeHeadBlock(block)
+	return nil
 }

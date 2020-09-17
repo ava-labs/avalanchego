@@ -64,6 +64,9 @@ func main() {
 	genKey := coreth.NewKeyFromECDSA(hk)
 
 	config.Genesis = genesisBlock
+	config.TrieCleanCache += config.SnapshotCache
+	config.SnapshotCache = 0
+
 	// grab the control of block generation and disable auto uncle
 	config.Miner.ManualMining = true
 	config.Miner.ManualUncle = true
