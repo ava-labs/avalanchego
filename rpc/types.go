@@ -148,7 +148,8 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bnh.BlockNumber = &bn
 		return nil
 	case "latest":
-		bn := LatestBlockNumber
+		//*bn = LatestBlockNumber
+		bn := AcceptedBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
 	case "pending":
