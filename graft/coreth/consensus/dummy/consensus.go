@@ -262,10 +262,10 @@ func (self *DummyEngine) Finalize(
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	var extdata []byte
+	var extdata *[]byte
 	if self.cb.OnFinalizeAndAssemble != nil {
 		ret, err := self.cb.OnFinalizeAndAssemble(state, txs)
-		extdata = ret
+		extdata = &ret
 		if err != nil {
 			return nil, err
 		}

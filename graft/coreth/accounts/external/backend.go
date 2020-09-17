@@ -23,12 +23,12 @@ import (
 
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/signer/core"
 )
 

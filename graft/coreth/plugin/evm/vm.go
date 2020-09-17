@@ -22,9 +22,9 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 

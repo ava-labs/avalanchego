@@ -166,7 +166,7 @@ type Body struct {
 	Transactions []*Transaction
 	Uncles       []*Header
 	Version      uint32
-	ExtData      []byte `rlp:"nil"`
+	ExtData      *[]byte `rlp:"nil"`
 }
 
 // Block represents an entire block in the Ethereum blockchain.
@@ -175,7 +175,7 @@ type Block struct {
 	uncles       []*Header
 	transactions Transactions
 	version      uint32
-	extdata      []byte
+	extdata      *[]byte
 
 	// caches
 	hash atomic.Value
@@ -216,7 +216,7 @@ type myextblock struct {
 	Txs     []*Transaction
 	Uncles  []*Header
 	Version uint32
-	ExtData []byte `rlp:"nil"`
+	ExtData *[]byte `rlp:"nil"`
 }
 
 // [deprecated by eth/63]
@@ -235,7 +235,7 @@ type storageblock struct {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs, uncles
 // and receipts.
-func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher Hasher, extdata []byte) *Block {
+func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher Hasher, extdata *[]byte) *Block {
 	b := &Block{header: CopyHeader(header), td: new(big.Int)}
 
 	// TODO: panic if len(txs) != len(receipts)
@@ -264,8 +264,11 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 		}
 	}
 
-	b.extdata = make([]byte, len(extdata))
-	copy(b.extdata, extdata)
+	if extdata != nil {
+		data := make([]byte, len(*extdata))
+		b.extdata = &data
+		copy(*b.extdata, *extdata)
+	}
 
 	return b
 }
@@ -321,13 +324,13 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 }
 
 func (b *Block) SetExtraData(data []byte) {
-	b.extdata = data
+	b.extdata = &data
 	b.header.ExtDataHash = rlpHash(data)
 	b.hash = atomic.Value{}
 }
 
 func (b *Block) ExtraData() []byte {
-	return b.extdata
+	return *b.extdata
 }
 
 func (b *Block) SetVersion(ver uint32) {
@@ -460,16 +463,23 @@ func (b *Block) WithSeal(header *Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, version uint32, extdata []byte) *Block {
+func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, version uint32, extdata *[]byte) *Block {
+	var data *[]byte
+	if extdata != nil {
+		_data := make([]byte, len(*extdata))
+		data = &_data
+	}
 	block := &Block{
 		header:       CopyHeader(b.header),
 		transactions: make([]*Transaction, len(transactions)),
 		uncles:       make([]*Header, len(uncles)),
-		extdata:      make([]byte, len(extdata)),
+		extdata:      data,
 		version:      version,
 	}
 	copy(block.transactions, transactions)
-	copy(block.extdata, extdata)
+	if data != nil {
+		copy(*block.extdata, *extdata)
+	}
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
 	}
