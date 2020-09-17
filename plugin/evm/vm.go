@@ -22,9 +22,10 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
-	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rpc"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
@@ -291,7 +292,7 @@ func (vm *VM) Initialize(
 		return nil, nil
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
-		vm.ctx.Log.Verbo("EVM sealed a block")
+		log.Trace("EVM sealed a block")
 
 		blk := &Block{
 			id:       ids.NewID(block.Hash()),
@@ -299,6 +300,7 @@ func (vm *VM) Initialize(
 			vm:       vm,
 		}
 		if blk.Verify() != nil {
+			vm.newBlockChan <- nil
 			return errInvalidBlock
 		}
 		vm.newBlockChan <- blk
@@ -369,14 +371,14 @@ func (vm *VM) Initialize(
 		var hash common.Hash
 		if err = rlp.DecodeBytes(b, &hash); err == nil {
 			if block := chain.GetBlockByHash(hash); block == nil {
-				vm.ctx.Log.Debug("lastAccepted block not found in chaindb")
+				log.Debug("lastAccepted block not found in chaindb")
 			} else {
 				lastAccepted = block
 			}
 		}
 	}
 	if lastAccepted == nil {
-		vm.ctx.Log.Debug("lastAccepted is unavailable, setting to the genesis block")
+		log.Debug("lastAccepted is unavailable, setting to the genesis block")
 		lastAccepted = chain.GetGenesisBlock()
 	}
 	vm.lastAccepted = &Block{
@@ -385,7 +387,7 @@ func (vm *VM) Initialize(
 		vm:       vm,
 	}
 	vm.genesisHash = chain.GetGenesisBlock().Hash()
-	vm.ctx.Log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
+	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
 	// TODO: shutdown this go routine
 	go vm.ctx.Log.RecoverAndPanic(func() {
@@ -393,10 +395,10 @@ func (vm *VM) Initialize(
 		for {
 			select {
 			case <-vm.txSubmitChan:
-				vm.ctx.Log.Verbo("New tx detected, trying to generate a block")
+				log.Trace("New tx detected, trying to generate a block")
 				vm.tryBlockGen()
 			case <-vm.atomicTxSubmitChan:
-				vm.ctx.Log.Verbo("New atomic Tx detected, trying to generate a block")
+				log.Trace("New atomic Tx detected, trying to generate a block")
 				vm.tryBlockGen()
 			case <-time.After(5 * time.Second):
 				vm.tryBlockGen()
@@ -442,7 +444,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.blockDelayTimer.SetTimeoutIn(minBlockTime)
 	vm.bdlock.Unlock()
 
-	vm.ctx.Log.Debug("built block 0x%x", block.ID().Bytes())
+	log.Debug(fmt.Sprintf("built block 0x%x", block.ID().Bytes()))
 	// make sure Tx Pool is updated
 	<-vm.txPoolStabilizedOk
 	return block, nil
@@ -626,7 +628,7 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 	acceptedIDBytes, err := vm.acceptedDB.Get(heightKey)
 	if err == nil {
 		if acceptedID, err := ids.ToID(acceptedIDBytes); err != nil {
-			vm.ctx.Log.Error("snowman-eth: acceptedID bytes didn't match expected value: %s", err)
+			log.Error(fmt.Sprintf("snowman-eth: acceptedID bytes didn't match expected value: %s", err))
 		} else {
 			if acceptedID.Equals(blockID) {
 				vm.blockStatusCache.Put(blockID, choices.Accepted)
@@ -641,7 +643,7 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 	if status == choices.Accepted {
 		err := vm.acceptedDB.Put(heightKey, blockID.Bytes())
 		if err != nil {
-			vm.ctx.Log.Error("snowman-eth: failed to write back acceptedID bytes: %s", err)
+			log.Error(fmt.Sprintf("snowman-eth: failed to write back acceptedID bytes: %s", err))
 		}
 
 		tempBlock := wrappedBlk
@@ -659,7 +661,7 @@ func (vm *VM) getCachedStatus(blockID ids.ID) choices.Status {
 			}
 
 			if err := vm.acceptedDB.Put(heightKey, parentID.Bytes()); err != nil {
-				vm.ctx.Log.Error("snowman-eth: failed to write back acceptedID bytes: %s", err)
+				log.Error(fmt.Sprintf("snowman-eth: failed to write back acceptedID bytes: %s", err))
 			}
 		}
 	}
@@ -729,10 +731,10 @@ func (vm *VM) writeBackMetadata() {
 
 	b, err := rlp.EncodeToBytes(vm.lastAccepted.ethBlock.Hash())
 	if err != nil {
-		vm.ctx.Log.Error("snowman-eth: error while writing back metadata")
+		log.Error("snowman-eth: error while writing back metadata")
 		return
 	}
-	vm.ctx.Log.Debug("writing back metadata")
+	log.Debug("writing back metadata")
 	vm.chaindb.Put([]byte(lastAcceptedKey), b)
 	atomic.StoreUint32(&vm.writingMetadata, 0)
 }

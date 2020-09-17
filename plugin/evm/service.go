@@ -14,15 +14,16 @@ import (
 
 	"github.com/ava-labs/coreth"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -87,7 +88,7 @@ func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontR
 // GetGenesisBalance returns the current funds in the genesis
 func (api *DebugAPI) GetGenesisBalance(ctx context.Context) (*hexutil.Big, error) {
 	lastAccepted := api.vm.getLastAccepted()
-	api.vm.ctx.Log.Verbo("Currently accepted block front: %s", lastAccepted.ethBlock.Hash().Hex())
+	log.Trace(fmt.Sprintf("Currently accepted block front: %s", lastAccepted.ethBlock.Hash().Hex()))
 	state, err := api.vm.chain.BlockState(lastAccepted.ethBlock)
 	if err != nil {
 		return nil, err
@@ -97,7 +98,7 @@ func (api *DebugAPI) GetGenesisBalance(ctx context.Context) (*hexutil.Big, error
 
 // SpendGenesis funds
 func (api *DebugAPI) SpendGenesis(ctx context.Context, nonce uint64) error {
-	api.vm.ctx.Log.Info("Spending the genesis")
+	log.Info("Spending the genesis")
 
 	value := big.NewInt(1000000000000)
 	gasLimit := 21000
@@ -127,7 +128,7 @@ func (api *DebugAPI) SpendGenesis(ctx context.Context, nonce uint64) error {
 
 // IssueBlock to the chain
 func (api *DebugAPI) IssueBlock(ctx context.Context) error {
-	api.vm.ctx.Log.Info("Issuing a new block")
+	log.Info("Issuing a new block")
 
 	return api.vm.tryBlockGen()
 }
@@ -146,7 +147,7 @@ type ExportKeyReply struct {
 
 // ExportKey returns a private key from the provided user
 func (service *AvaxAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
-	service.vm.ctx.Log.Info("Platform: ExportKey called")
+	log.Info("EVM: ExportKey called")
 
 	address, err := service.vm.ParseEthAddress(args.Address)
 	if err != nil {
@@ -176,7 +177,7 @@ type ImportKeyArgs struct {
 
 // ImportKey adds a private key to the provided user
 func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JsonAddress) error {
-	service.vm.ctx.Log.Info("Platform: ImportKey called for user '%s'", args.Username)
+	log.Info(fmt.Sprintf("EVM: ImportKey called for user '%s'", args.Username))
 
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
@@ -228,7 +229,7 @@ type ImportAVAXArgs struct {
 // ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
 func (service *AvaxAPI) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxID) error {
-	service.vm.ctx.Log.Info("Platform: ImportAVAX called")
+	log.Info("EVM: ImportAVAX called")
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
@@ -277,7 +278,7 @@ type ExportAVAXArgs struct {
 // ExportAVAX exports AVAX from the P-Chain to the X-Chain
 // It must be imported on the X-Chain to complete the transfer
 func (service *AvaxAPI) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *api.JsonTxID) error {
-	service.vm.ctx.Log.Info("Platform: ExportAVAX called")
+	log.Info("EVM: ExportAVAX called")
 
 	if args.Amount == 0 {
 		return errors.New("argument 'amount' must be > 0")
