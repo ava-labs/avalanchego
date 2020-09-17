@@ -30,14 +30,13 @@ const (
 	UnitTestName  = "testing"
 	LocalName     = "local"
 
-	ManhattanHRP = "man"
-	MainnetHRP   = "avax"
-	CascadeHRP   = "cascade"
-	DenaliHRP    = "denali"
-	EverestHRP   = "everest"
-	UnitTestHRP  = "testing"
-	LocalHRP     = "local"
-	FallbackHRP  = "custom"
+	MainnetHRP  = "avax"
+	CascadeHRP  = "cascade"
+	DenaliHRP   = "denali"
+	EverestHRP  = "everest"
+	UnitTestHRP = "testing"
+	LocalHRP    = "local"
+	FallbackHRP = "custom"
 )
 
 // Variables to be exported
@@ -66,22 +65,20 @@ var (
 	}
 
 	NetworkIDToHRP = map[uint32]string{
-		ManhattanID: ManhattanHRP,
-		MainnetID:   MainnetHRP,
-		CascadeID:   CascadeHRP,
-		DenaliID:    DenaliHRP,
-		EverestID:   EverestHRP,
-		UnitTestID:  UnitTestHRP,
-		LocalID:     LocalHRP,
+		MainnetID:  MainnetHRP,
+		CascadeID:  CascadeHRP,
+		DenaliID:   DenaliHRP,
+		EverestID:  EverestHRP,
+		UnitTestID: UnitTestHRP,
+		LocalID:    LocalHRP,
 	}
 	NetworkHRPToNetworkID = map[string]uint32{
-		ManhattanHRP: ManhattanID,
-		MainnetHRP:   MainnetID,
-		CascadeHRP:   CascadeID,
-		DenaliHRP:    DenaliID,
-		EverestHRP:   EverestID,
-		UnitTestHRP:  UnitTestID,
-		LocalHRP:     LocalID,
+		MainnetHRP:  MainnetID,
+		CascadeHRP:  CascadeID,
+		DenaliHRP:   DenaliID,
+		EverestHRP:  EverestID,
+		UnitTestHRP: UnitTestID,
+		LocalHRP:    LocalID,
 	}
 
 	ValidNetworkName = regexp.MustCompile(`network-[0-9]+`)

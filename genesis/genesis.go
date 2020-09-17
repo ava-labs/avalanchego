@@ -166,6 +166,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					Address:  addr,
 					Message:  formatting.CB58{Bytes: allocation.ETHAddr.Bytes()},
 				})
+				amount += unlock.Amount
 			}
 		}
 

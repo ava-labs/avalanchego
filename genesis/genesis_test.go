@@ -134,7 +134,7 @@ func TestAliases(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	genesisBytes, _, err := Genesis(constants.LocalID)
+	genesisBytes, _, err := Genesis(constants.MainnetID)
 	if err != nil {
 		t.Fatal(err)
 	}
