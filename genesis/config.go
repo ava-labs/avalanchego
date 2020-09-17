@@ -138,6 +138,10 @@ var (
 	// manhattan genesis.
 	ManhattanConfig Config
 
+	// MainnetConfig is the config that should be used to generate the mainnet
+	// genesis.
+	MainnetConfig Config
+
 	// LocalConfig is the config that should be used to generate a local
 	// genesis.
 	LocalConfig Config
@@ -145,11 +149,13 @@ var (
 
 func init() {
 	unparsedManhattanConfig := UnparsedConfig{}
+	unparsedMainnetConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		json.Unmarshal([]byte(manhattanGenesisConfigJSON), &unparsedManhattanConfig),
+		json.Unmarshal([]byte(mainnetGenesisConfigJSON), &unparsedMainnetConfig),
 		json.Unmarshal([]byte(localGenesisConfigJSON), &unparsedLocalConfig),
 	)
 	if errs.Errored() {
@@ -160,9 +166,17 @@ func init() {
 	errs.Add(err)
 	ManhattanConfig = manhattanConfig
 
+	mainnetConfig, err := unparsedMainnetConfig.Parse()
+	errs.Add(err)
+	MainnetConfig = mainnetConfig
+
 	localConfig, err := unparsedLocalConfig.Parse()
 	errs.Add(err)
 	LocalConfig = localConfig
+
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 }
 
 // GetConfig ...
@@ -170,6 +184,8 @@ func GetConfig(networkID uint32) *Config {
 	switch networkID {
 	case constants.ManhattanID:
 		return &ManhattanConfig
+	case constants.MainnetID:
+		return &MainnetConfig
 	case constants.LocalID:
 		return &LocalConfig
 	default:
