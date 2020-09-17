@@ -40,7 +40,7 @@ func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
 	keystore := keystore.CreateTestKeystore()
 	if err := keystore.AddUser(username, password); err != nil {
-		t.Fatalf("couldn't add user: %w", err)
+		t.Fatalf("couldn't add user: %s", err)
 	}
 	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
 	s := &Service{vm: vm}
