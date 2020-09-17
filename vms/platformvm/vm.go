@@ -71,14 +71,6 @@ const (
 
 	// SupplyCap is the maximum amount of AVAX that should ever exist
 	SupplyCap = 720 * units.MegaAvax
-
-	// MinimumStakingDuration is the shortest amount of time a staker can bond
-	// their funds for.
-	MinimumStakingDuration = 24 * time.Hour
-
-	// MaximumStakingDuration is the longest amount of time a staker can bond
-	// their funds for.
-	MaximumStakingDuration = 365 * 24 * time.Hour
 )
 
 var (
@@ -180,14 +172,23 @@ type VM struct {
 	// Tx fee burned by a transaction
 	txFee uint64
 
+	// UptimePercentage is the minimum uptime required to be rewarded for staking.
+	uptimePercentage float64
+
 	// The minimum amount of tokens one must bond to be a validator
 	minValidatorStake uint64
 
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
 	minDelegatorStake uint64
 
-	// UptimePercentage is the minimum uptime required to be rewarded for staking.
-	uptimePercentage float64
+	// Minimum amount of time to allow a validator to stake
+	minStakeDuration time.Duration
+
+	// Maximum amount of time to allow a validator to stake
+	maxStakeDuration time.Duration
+
+	// Consumption period for the minting function
+	stakeMintingPeriod time.Duration
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
@@ -1016,7 +1017,7 @@ func (vm *VM) calculateReward(db database.Database, duration time.Duration, stak
 	if err != nil {
 		return 0, err
 	}
-	reward := Reward(duration, stakeAmount, currentSupply)
+	reward := Reward(duration, stakeAmount, currentSupply, vm.stakeMintingPeriod)
 	newSupply, err := safemath.Add64(currentSupply, reward)
 	if err != nil {
 		return 0, err

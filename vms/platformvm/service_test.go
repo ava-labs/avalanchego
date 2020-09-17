@@ -245,7 +245,7 @@ func TestGetTx(t *testing.T) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.minValidatorStake,
 					uint64(service.vm.clock.Time().Add(Delta).Unix()),
-					uint64(service.vm.clock.Time().Add(Delta).Add(MinimumStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(Delta).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
 					ids.GenerateTestShortID(),
 					0,
@@ -354,7 +354,7 @@ func TestGetStake(t *testing.T) {
 	tx, err := service.vm.newAddDelegatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
 		ids.GenerateTestShortID(),
 		ids.GenerateTestShortID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -385,7 +385,7 @@ func TestGetStake(t *testing.T) {
 	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
 		ids.GenerateTestShortID(),
 		ids.GenerateTestShortID(),
 		0,
@@ -413,7 +413,7 @@ func TestGetStake(t *testing.T) {
 	tx, err = service.vm.newAddValidatorTx(
 		stakeAmt,
 		uint64(defaultGenesisTime.Unix()),
-		uint64(defaultGenesisTime.Add(MinimumStakingDuration).Unix()),
+		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()),
 		ids.GenerateTestShortID(),
 		ids.GenerateTestShortID(),
 		0,

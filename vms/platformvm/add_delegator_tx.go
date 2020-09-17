@@ -60,12 +60,22 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	feeAmount uint64,
 	feeAssetID ids.ID,
 	minDelegatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < minStakeDuration: // Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > maxStakeDuration: // Ensure staking length is not too long
+		return errStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -115,7 +125,15 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err != nil {
+	if err := tx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -235,5 +253,13 @@ func (vm *VM) newAddDelegatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake)
+	return tx, utx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	)
 }

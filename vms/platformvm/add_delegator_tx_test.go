@@ -28,7 +28,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : tx is nil
 	var unsignedTx *UnsignedAddDelegatorTx
-	if err := unsignedTx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err == nil {
+	if err := unsignedTx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		defaultMinStakingDuration,
+		defaultMaxStakingDuration,
+	); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -48,7 +56,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		defaultMinStakingDuration,
+		defaultMaxStakingDuration,
+	); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -68,7 +84,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.NodeID = ids.ShortID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		defaultMinStakingDuration,
+		defaultMaxStakingDuration,
+	); err == nil {
 		t.Fatal("should have errored because NodeID is nil")
 	}
 
@@ -88,7 +112,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.Wght = vm.minDelegatorStake - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		defaultMinStakingDuration,
+		defaultMaxStakingDuration,
+	); err == nil {
 		t.Fatal("should have errored because of not enough weight")
 	}
 
@@ -96,7 +128,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx, err = vm.newAddDelegatorTx(
 		vm.minDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(MinimumStakingDuration).Unix()),
+		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -108,7 +140,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End-- // 1 shorter than minimum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err == nil {
+	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		defaultMinStakingDuration,
+		defaultMaxStakingDuration,
+	); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
@@ -116,7 +156,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if tx, err = vm.newAddDelegatorTx(
 		vm.minDelegatorStake,
 		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(MaximumStakingDuration).Unix()),
+		uint64(defaultValidateStartTime.Add(defaultMaxStakingDuration).Unix()),
 		nodeID,
 		rewardAddress,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
@@ -127,7 +167,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End++ // 1 longer than maximum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		defaultMinStakingDuration,
+		defaultMaxStakingDuration,
+	); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
@@ -142,7 +190,15 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minDelegatorStake); err != nil {
+	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		defaultMinStakingDuration,
+		defaultMaxStakingDuration,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
