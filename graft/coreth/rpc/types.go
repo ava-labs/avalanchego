@@ -155,6 +155,10 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bn := PendingBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
+	case "accepted":
+		bn := AcceptedBlockNumber
+		bnh.BlockNumber = &bn
+		return nil
 	default:
 		if len(input) == 66 {
 			hash := common.Hash{}
