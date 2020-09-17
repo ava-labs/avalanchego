@@ -7,7 +7,7 @@ AVALANCHE_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 DOCKER_REPO="avaplatform"
 
 E2E_TESTING_REMOTE="https://github.com/ava-labs/avalanche-testing.git"
-E2E_TAG="v0.9.3-dev.1"
+E2E_TAG="v0.9.3-dev.2"
 
 mkdir -p "$E2E_TEST_HOME"
 git clone "$E2E_TESTING_REMOTE" "$E2E_TEST_HOME"
