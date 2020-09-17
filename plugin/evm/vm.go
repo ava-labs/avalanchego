@@ -358,6 +358,7 @@ func (vm *VM) Initialize(
 	vm.shutdownSubmitChan = make(chan struct{}, 1)
 	//chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
 	vm.newTxPoolHeadChan = vm.chain.SubscribeNewMinedBlockEvent()
+	vm.shutdownWg.Add(1)
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
 	chain.Start()
 
@@ -385,6 +386,7 @@ func (vm *VM) Initialize(
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
 	// TODO: shutdown this go routine
+	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
 
@@ -728,7 +730,6 @@ func (vm *VM) writeBackMetadata() {
 // expected block hash
 // Waits for signal to shutdown from txPoolStabilizedShutdownChan chan
 func (vm *VM) awaitTxPoolStabilized() {
-	vm.shutdownWg.Add(1)
 	for {
 		select {
 		case e := <-vm.newTxPoolHeadChan.Chan():
@@ -750,7 +751,6 @@ func (vm *VM) awaitTxPoolStabilized() {
 }
 
 func (vm *VM) awaitSubmittedTxs() {
-	vm.shutdownWg.Add(1)
 	vm.txSubmitChan = vm.chain.GetTxSubmitCh()
 	for {
 		select {
