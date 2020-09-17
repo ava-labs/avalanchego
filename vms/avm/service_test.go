@@ -658,9 +658,13 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Name:         "testAsset",
 		Symbol:       "TEST",
@@ -669,8 +673,6 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			Amount:  123456789,
 			Address: addrStr,
 		}},
-		JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -698,9 +700,13 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Name:   "test asset",
 		Symbol: "TEST",
@@ -712,8 +718,6 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				},
 			},
 		},
-		JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}, &reply)
 	if err != nil {
 		t.Fatal(err)
@@ -735,14 +739,16 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	createdAssetID := reply.AssetID.String()
 	// Test minting of the created variable cap asset
 	mintArgs := &MintArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
-		Amount:         200,
-		AssetID:        createdAssetID,
-		To:             addrStr,
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		Amount:  200,
+		AssetID: createdAssetID,
+		To:      addrStr,
 	}
 	mintReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -764,15 +770,17 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 
 	sendArgs := &SendArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
-		Amount:         200,
-		AssetID:        createdAssetID,
-		To:             addrStr,
-		JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		Amount:  200,
+		AssetID: createdAssetID,
+		To:      addrStr,
 	}
 	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.Send(nil, sendArgs, sendReply); err != nil {
@@ -802,9 +810,13 @@ func TestNFTWorkflow(t *testing.T) {
 	}
 
 	createArgs := &CreateNFTAssetArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
 		Name:   "BIG COIN",
 		Symbol: "COIN",
@@ -816,8 +828,6 @@ func TestNFTWorkflow(t *testing.T) {
 				},
 			},
 		},
-		JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 	}
 	createReply := &AssetIDChangeAddr{}
 	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
@@ -842,15 +852,17 @@ func TestNFTWorkflow(t *testing.T) {
 	}
 
 	mintArgs := &MintNFTArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
-		AssetID:        assetID.String(),
-		Payload:        formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
-		To:             addrStr,
-		JsonFromAddrs:  api.JsonFromAddrs{},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		AssetID: assetID.String(),
+		Payload: formatting.CB58{Bytes: []byte{1, 2, 3, 4, 5}},
+		To:      addrStr,
 	}
 	mintReply := &api.JsonTxIDChangeAddr{}
 
@@ -874,15 +886,17 @@ func TestNFTWorkflow(t *testing.T) {
 	}
 
 	sendArgs := &SendNFTArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
-		AssetID:        assetID.String(),
-		GroupID:        0,
-		To:             addrStr,
-		JsonFromAddrs:  api.JsonFromAddrs{},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		AssetID: assetID.String(),
+		GroupID: 0,
+		To:      addrStr,
 	}
 	sendReply := &api.JsonTxIDChangeAddr{}
 	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
@@ -1033,15 +1047,17 @@ func TestSend(t *testing.T) {
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 	args := &SendArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
+		JsonSpendHeader: api.JsonSpendHeader{
+			UserPass: api.UserPass{
+				Username: username,
+				Password: password,
+			},
+			JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
+			JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
 		},
-		Amount:         500,
-		AssetID:        assetID.String(),
-		To:             addrStr,
-		JsonFromAddrs:  api.JsonFromAddrs{fromAddrsStr},
-		JsonChangeAddr: api.JsonChangeAddr{changeAddrStr},
+		Amount:  500,
+		AssetID: assetID.String(),
+		To:      addrStr,
 	}
 	reply := &api.JsonTxIDChangeAddr{}
 	vm.timer.Cancel()
