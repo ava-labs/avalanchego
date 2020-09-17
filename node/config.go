@@ -30,7 +30,21 @@ type Config struct {
 	UptimeRequirement float64
 
 	// Minimum stake, in nAVAX, required to validate the primary network
-	MinStake uint64
+	MinValidatorStake uint64
+
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	MinDelegatorStake uint64
+
+	// MinStakeDuration is the minimum amount of time a validator can validate
+	// for in a single period.
+	MinStakeDuration time.Duration
+
+	// MaxStakeDuration is the maximum amount of time a validator can validate
+	// for in a single period.
+	MaxStakeDuration time.Duration
+
+	// StakeMintingPeriod is the amount of time for a consumption period.
+	StakeMintingPeriod time.Duration
 
 	// Assertions configuration
 	EnableAssertions bool

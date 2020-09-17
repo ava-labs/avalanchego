@@ -21,6 +21,16 @@ type peer struct {
 
 	// if the version message has been received and is valid. is only modified
 	// on the connection's reader routine with the network state lock held.
+	gotVersion bool
+
+	// if the gotPeerList message has been received and is valid. is only
+	// modified on the connection's reader routine with the network state lock
+	// held.
+	gotPeerList bool
+
+	// if the version message has been received and is valid and the peerlist
+	// has been returned. is only modified on the connection's reader routine
+	// with the network state lock held.
 	connected bool
 
 	// only close the peer once
@@ -62,7 +72,7 @@ func (p *peer) Start() {
 
 	// Initially send the version to the peer
 	go p.Version()
-	go p.requestVersion()
+	go p.requestFinishHandshake()
 	go p.sendPings()
 }
 
@@ -83,13 +93,15 @@ func (p *peer) sendPings() {
 	}
 }
 
-// request the version from the peer until we get the version from them
-func (p *peer) requestVersion() {
+// request missing handshake messages from the peer
+func (p *peer) requestFinishHandshake() {
 	t := time.NewTicker(p.net.getVersionTimeout)
 	defer t.Stop()
 
 	for range t.C {
 		p.net.stateLock.Lock()
+		gotVersion := p.gotVersion
+		gotPeerList := p.gotPeerList
 		connected := p.connected
 		closed := p.closed
 		p.net.stateLock.Unlock()
@@ -98,7 +110,12 @@ func (p *peer) requestVersion() {
 			return
 		}
 
-		p.GetVersion()
+		if !gotVersion {
+			p.GetVersion()
+		}
+		if !gotPeerList {
+			p.GetPeerList()
+		}
 	}
 }
 
@@ -270,19 +287,26 @@ func (p *peer) handle(msg Msg) {
 	case Pong:
 		p.pong(msg)
 		return
+	case GetPeerList:
+		p.getPeerList(msg)
+		return
+	case PeerList:
+		p.peerList(msg)
+		return
 	}
 	if !p.connected {
 		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
 
-		// send a get version message so that the peer's future messages are hopefully not dropped
-		p.GetVersion()
+		// attempt to finish the handshake
+		if !p.gotVersion {
+			p.GetVersion()
+		}
+		if !p.gotPeerList {
+			p.GetPeerList()
+		}
 		return
 	}
 	switch op {
-	case GetPeerList:
-		p.getPeerList(msg)
-	case PeerList:
-		p.peerList(msg)
 	case GetAcceptedFrontier:
 		p.getAcceptedFrontier(msg)
 	case AcceptedFrontier:
@@ -406,7 +430,7 @@ func (p *peer) getVersion(_ Msg) { p.Version() }
 
 // assumes the stateLock is not held
 func (p *peer) version(msg Msg) {
-	if p.connected {
+	if p.gotVersion {
 		p.net.log.Verbo("dropping duplicated version message from %s", p.id)
 		return
 	}
@@ -501,26 +525,28 @@ func (p *peer) version(msg Msg) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
-	// the network connected function can only be called if disconnected wasn't
-	// already called
-	if p.closed {
-		return
-	}
-
 	p.versionStr = peerVersion.String()
-
-	p.connected = true
-	p.net.connected(p)
+	p.gotVersion = true
+	p.tryMarkConnected()
 }
 
 // assumes the stateLock is not held
-func (p *peer) getPeerList(_ Msg) { p.SendPeerList() }
+func (p *peer) getPeerList(_ Msg) {
+	if p.gotVersion {
+		p.SendPeerList()
+	}
+}
 
 // assumes the stateLock is not held
 func (p *peer) peerList(msg Msg) {
 	ips := msg.Get(Peers).([]utils.IPDesc)
 
 	p.net.stateLock.Lock()
+	defer p.net.stateLock.Unlock()
+
+	p.gotPeerList = true
+	p.tryMarkConnected()
+
 	for _, ip := range ips {
 		if !ip.Equal(p.net.ip) &&
 			!ip.IsZero() &&
@@ -529,7 +555,6 @@ func (p *peer) peerList(msg Msg) {
 			p.net.track(ip)
 		}
 	}
-	p.net.stateLock.Unlock()
 }
 
 // assumes the stateLock is not held
@@ -693,6 +718,20 @@ func (p *peer) chits(msg Msg) {
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)
+}
+
+// assumes the stateLock is held
+func (p *peer) tryMarkConnected() {
+	if !p.connected && p.gotVersion && p.gotPeerList {
+		// the network connected function can only be called if disconnected
+		// wasn't already called
+		if p.closed {
+			return
+		}
+
+		p.connected = true
+		p.net.connected(p)
+	}
 }
 
 // assumes the stateLock is not held
