@@ -48,7 +48,9 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	amount := uint64(0)
 
 	// Specify the genesis state of the AVM
-	avmArgs := avm.BuildGenesisArgs{}
+	avmArgs := avm.BuildGenesisArgs{
+		NetworkID: json.Uint32(config.NetworkID),
+	}
 	{
 		avax := avm.AssetDefinition{
 			Name:         "Avalanche",

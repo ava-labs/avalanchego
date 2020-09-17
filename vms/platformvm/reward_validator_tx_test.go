@@ -238,9 +238,10 @@ func TestOptimisticUptime(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -378,9 +379,10 @@ func TestObservedUptime(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -522,9 +524,10 @@ func TestUptimeDisallowed(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:        &core.SnowmanVM{},
-		chainManager:     chains.MockManager{},
-		uptimePercentage: .2,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		uptimePercentage:   .2,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)

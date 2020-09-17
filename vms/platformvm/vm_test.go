@@ -1396,8 +1396,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 	firstVM.vdrMgr = validators.NewManager()
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1466,8 +1469,11 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	secondVM.vdrMgr = validators.NewManager()
@@ -1497,8 +1503,11 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := memdb.New()
 
 	firstVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	firstVM.vdrMgr = validators.NewManager()
@@ -1583,8 +1592,11 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	secondVM.vdrMgr = validators.NewManager()
@@ -1619,8 +1631,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	vm.vdrMgr = validators.NewManager()
@@ -1777,8 +1792,11 @@ func TestUnverifiedParent(t *testing.T) {
 	db := memdb.New()
 
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	vm.vdrMgr = validators.NewManager()

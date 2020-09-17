@@ -29,6 +29,7 @@ type StaticService struct{}
 
 // BuildGenesisArgs are arguments for BuildGenesis
 type BuildGenesisArgs struct {
+	NetworkID   cjson.Uint32               `json:"networkID"`
 	GenesisData map[string]AssetDefinition `json:"genesisData"`
 }
 
@@ -74,6 +75,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			Alias: assetAlias,
 			CreateAssetTx: CreateAssetTx{
 				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    uint32(args.NetworkID),
 					BlockchainID: ids.Empty,
 					Memo:         assetDefinition.Memo.Bytes,
 				}},

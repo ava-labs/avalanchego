@@ -116,9 +116,9 @@ type APIChain struct {
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
 	AvaxAssetID   ids.ID                `json:"avaxAssetID"`
-	NetworkID     json.Uint32           `json:"address"`
+	NetworkID     json.Uint32           `json:"networkID"`
 	UTXOs         []APIUTXO             `json:"utxos"`
-	Validators    []APIPrimaryValidator `json:"primaryNetworkValidators"`
+	Validators    []APIPrimaryValidator `json:"validators"`
 	Chains        []APIChain            `json:"chains"`
 	Time          json.Uint64           `json:"time"`
 	InitialSupply json.Uint64           `json:"initialSupply"`

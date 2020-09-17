@@ -62,8 +62,6 @@ func (tx *UnsignedAddValidatorTx) EndTime() time.Time {
 func (tx *UnsignedAddValidatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Codec,
-	feeAmount uint64,
-	feeAssetID ids.ID,
 	minStake uint64,
 	minStakeDuration time.Duration,
 	maxStakeDuration time.Duration,
@@ -134,8 +132,6 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	if err := tx.Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
@@ -177,7 +173,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -226,10 +222,10 @@ func (vm *VM) newAddValidatorTx(
 	nodeID ids.ShortID, // ID of the node we are delegating to
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
-	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, 0, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -262,8 +258,6 @@ func (vm *VM) newAddValidatorTx(
 	return tx, utx.Verify(
 		vm.Ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
 		vm.minValidatorStake,
 		vm.minStakeDuration,
 		vm.maxStakeDuration,
