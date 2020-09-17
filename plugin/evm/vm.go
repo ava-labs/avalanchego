@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -165,9 +165,10 @@ type VM struct {
 
 	acceptedDB database.Database
 
-	txPoolStabilizedHead common.Hash
-	txPoolStabilizedOk   chan struct{}
-	txPoolStabilizedLock sync.Mutex
+	txPoolStabilizedHead         common.Hash
+	txPoolStabilizedOk           chan struct{}
+	txPoolStabilizedLock         sync.Mutex
+	txPoolStabilizedShutdownChan chan struct{}
 
 	metalock                     sync.Mutex
 	blockCache, blockStatusCache cache.LRU
@@ -183,11 +184,14 @@ type VM struct {
 	genlock               sync.Mutex
 	txSubmitChan          <-chan struct{}
 	atomicTxSubmitChan    chan struct{}
+	shutdownSubmitChan    chan struct{}
 	codec                 codec.Codec
 	clock                 timer.Clock
 	txFee                 uint64
 	pendingAtomicTxs      chan *Tx
 	blockAtomicInputCache cache.LRU
+
+	shutdownWg sync.WaitGroup
 
 	fx secp256k1fx.Fx
 }
@@ -347,29 +351,15 @@ func (vm *VM) Initialize(
 	vm.bdGenWaitFlag = true
 	//vm.newTxPoolHeadChan = make(chan core.NewTxPoolHeadEvent, 1)
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
+	vm.txPoolStabilizedShutdownChan = make(chan struct{}, 1) // Signal goroutine to shutdown
 	// TODO: read size from options
 	vm.pendingAtomicTxs = make(chan *Tx, 1024)
 	vm.atomicTxSubmitChan = make(chan struct{}, 1)
+	vm.shutdownSubmitChan = make(chan struct{}, 1)
 	//chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
 	vm.newTxPoolHeadChan = vm.chain.SubscribeNewMinedBlockEvent()
-	// TODO: shutdown this go routine
-	go ctx.Log.RecoverAndPanic(func() {
-		for {
-			select {
-			case e := <-vm.newTxPoolHeadChan.Chan():
-				switch h := e.Data.(type) {
-				case core.NewMinedBlockEvent:
-					vm.txPoolStabilizedLock.Lock()
-					if vm.txPoolStabilizedHead == h.Block.Hash() {
-						vm.txPoolStabilizedOk <- struct{}{}
-						vm.txPoolStabilizedHead = common.Hash{}
-					}
-					vm.txPoolStabilizedLock.Unlock()
-				default:
-				}
-			}
-		}
-	})
+	vm.shutdownWg.Add(1)
+	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
 	chain.Start()
 
 	var lastAccepted *types.Block
@@ -396,21 +386,8 @@ func (vm *VM) Initialize(
 	log.Info(fmt.Sprintf("lastAccepted = %s", vm.lastAccepted.ethBlock.Hash().Hex()))
 
 	// TODO: shutdown this go routine
-	go vm.ctx.Log.RecoverAndPanic(func() {
-		vm.txSubmitChan = vm.chain.GetTxSubmitCh()
-		for {
-			select {
-			case <-vm.txSubmitChan:
-				log.Trace("New tx detected, trying to generate a block")
-				vm.tryBlockGen()
-			case <-vm.atomicTxSubmitChan:
-				log.Trace("New atomic Tx detected, trying to generate a block")
-				vm.tryBlockGen()
-			case <-time.After(5 * time.Second):
-				vm.tryBlockGen()
-			}
-		}
-	})
+	vm.shutdownWg.Add(1)
+	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
 
 	return vm.fx.Initialize(vm)
@@ -431,7 +408,10 @@ func (vm *VM) Shutdown() error {
 	}
 
 	vm.writeBackMetadata()
+	close(vm.txPoolStabilizedShutdownChan)
+	close(vm.shutdownSubmitChan)
 	vm.chain.Stop()
+	vm.shutdownWg.Wait()
 	return nil
 }
 
@@ -743,6 +723,50 @@ func (vm *VM) writeBackMetadata() {
 	log.Debug("writing back metadata")
 	vm.chaindb.Put([]byte(lastAcceptedKey), b)
 	atomic.StoreUint32(&vm.writingMetadata, 0)
+}
+
+// awaitTxPoolStabilized waits for a txPoolHead channel event
+// and notifies the VM when the tx pool has stabilized to the
+// expected block hash
+// Waits for signal to shutdown from txPoolStabilizedShutdownChan chan
+func (vm *VM) awaitTxPoolStabilized() {
+	defer vm.shutdownWg.Done()
+	for {
+		select {
+		case e := <-vm.newTxPoolHeadChan.Chan():
+			switch h := e.Data.(type) {
+			case core.NewMinedBlockEvent:
+				vm.txPoolStabilizedLock.Lock()
+				if vm.txPoolStabilizedHead == h.Block.Hash() {
+					vm.txPoolStabilizedOk <- struct{}{}
+					vm.txPoolStabilizedHead = common.Hash{}
+				}
+				vm.txPoolStabilizedLock.Unlock()
+			default:
+			}
+		case <-vm.txPoolStabilizedShutdownChan:
+			return
+		}
+	}
+}
+
+func (vm *VM) awaitSubmittedTxs() {
+	defer vm.shutdownWg.Done()
+	vm.txSubmitChan = vm.chain.GetTxSubmitCh()
+	for {
+		select {
+		case <-vm.txSubmitChan:
+			log.Trace("New tx detected, trying to generate a block")
+			vm.tryBlockGen()
+		case <-vm.atomicTxSubmitChan:
+			log.Trace("New atomic Tx detected, trying to generate a block")
+			vm.tryBlockGen()
+		case <-time.After(5 * time.Second):
+			vm.tryBlockGen()
+		case <-vm.shutdownSubmitChan:
+			return
+		}
+	}
 }
 
 func (vm *VM) getLastAccepted() *Block {
