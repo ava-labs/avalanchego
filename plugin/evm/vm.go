@@ -243,6 +243,10 @@ func (vm *VM) Initialize(
 	config := eth.DefaultConfig
 	config.ManualCanonical = true
 	config.Genesis = g
+	// disable the experimental snapshot feature from geth
+	config.TrieCleanCache += config.SnapshotCache
+	config.SnapshotCache = 0
+
 	config.Miner.ManualMining = true
 	config.Miner.DisableUncle = true
 
