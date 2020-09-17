@@ -1399,6 +1399,7 @@ func (vm *VM) calculateUptime(db database.Database, nodeID ids.ShortID, startTim
 // Returns the current staker set of the Primary Network.
 // Each element corresponds to a staking transaction.
 // There may be multiple elements with the same node ID.
+// TODO implement this more efficiently
 func (vm *VM) getStakers() ([]validators.Validator, error) {
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, vm.DB)
@@ -1434,6 +1435,7 @@ func (vm *VM) getStakers() ([]validators.Validator, error) {
 // Returns the pending staker set of the Primary Network.
 // Each element corresponds to a staking transaction.
 // There may be multiple elements with the same node ID.
+// TODO implement this more efficiently
 func (vm *VM) getPendingStakers() ([]validators.Validator, error) {
 	startDBPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, startDBPrefix))
 	startDB := prefixdb.NewNested(startDBPrefix, vm.DB)
@@ -1482,4 +1484,25 @@ func (vm *VM) getTotalStake() (uint64, error) {
 		}
 	}
 	return totalStake, nil
+}
+
+// Returns the cumulative stake on the Primary Network of nodes connected
+// to this node.
+func (vm *VM) connectedStake() (uint64, error) {
+	stakers, err := vm.getStakers()
+	if err != nil {
+		return 0, fmt.Errorf("couldn't get stakers: %w", err)
+	}
+
+	connectedStake := uint64(0)
+	for _, staker := range stakers {
+		if _, connected := vm.connections[staker.ID().Key()]; !connected {
+			continue // not connected to use --> don't include
+		}
+		connectedStake, err = math.Add64(connectedStake, staker.Weight())
+		if err != nil {
+			return 0, err
+		}
+	}
+	return connectedStake, nil
 }
