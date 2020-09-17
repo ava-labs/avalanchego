@@ -114,10 +114,10 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * MinimumStakingDuration).Unix())
+	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestShortID()
 	vdrTx, err := vm.newAddValidatorTx(
-		vm.minStake, // stakeAmt
+		vm.minValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
 		vdrNodeID,        // node ID
@@ -133,7 +133,7 @@ func TestRewardDelegatorTxSemanticVerify(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 	delTx, err := vm.newAddDelegatorTx(
-		vm.minStake, // stakeAmt
+		vm.minDelegatorStake, // stakeAmt
 		delStartTime,
 		delEndTime,
 		vdrNodeID,                               // node ID
@@ -254,7 +254,7 @@ func TestOptimisticUptime(t *testing.T) {
 	}
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := firstVM.Bootstrapped(); err != nil {
 		t.Fatal(err)
@@ -273,7 +273,7 @@ func TestOptimisticUptime(t *testing.T) {
 
 	secondVM.vdrMgr = validators.NewManager()
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -402,7 +402,7 @@ func TestObservedUptime(t *testing.T) {
 
 	firstCtx.Lock.Lock()
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := firstVM.Shutdown(); err != nil {
 		t.Fatal(err)
@@ -417,7 +417,7 @@ func TestObservedUptime(t *testing.T) {
 
 	secondVM.vdrMgr = validators.NewManager()
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
@@ -534,7 +534,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	}
 
 	// Fast forward clock to time for genesis validators to leave
-	firstVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	firstVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	if err := firstVM.Bootstrapping(); err != nil {
 		t.Fatal(err)
@@ -557,7 +557,7 @@ func TestUptimeDisallowed(t *testing.T) {
 
 	secondVM.vdrMgr = validators.NewManager()
 
-	secondVM.clock.Set(defaultValidateStartTime.Add(2 * MinimumStakingDuration))
+	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondCtx := defaultContext()
 	secondCtx.Lock.Lock()
 	defer func() {
