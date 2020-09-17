@@ -730,6 +730,7 @@ func (vm *VM) writeBackMetadata() {
 // expected block hash
 // Waits for signal to shutdown from txPoolStabilizedShutdownChan chan
 func (vm *VM) awaitTxPoolStabilized() {
+	defer vm.shutdownWg.Done()
 	for {
 		select {
 		case e := <-vm.newTxPoolHeadChan.Chan():
@@ -744,13 +745,13 @@ func (vm *VM) awaitTxPoolStabilized() {
 			default:
 			}
 		case <-vm.txPoolStabilizedShutdownChan:
-			vm.shutdownWg.Done()
 			return
 		}
 	}
 }
 
 func (vm *VM) awaitSubmittedTxs() {
+	defer vm.shutdownWg.Done()
 	vm.txSubmitChan = vm.chain.GetTxSubmitCh()
 	for {
 		select {
@@ -763,7 +764,6 @@ func (vm *VM) awaitSubmittedTxs() {
 		case <-time.After(5 * time.Second):
 			vm.tryBlockGen()
 		case <-vm.shutdownSubmitChan:
-			vm.shutdownWg.Done()
 			return
 		}
 	}
