@@ -160,14 +160,14 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs.Add(ids.NewShortID([20]byte{1}))
 
 			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 
 	go func() {
 		for {
 			chainRouter.Gossip()
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 
@@ -235,14 +235,14 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			vdrIDs.Add(engine.Context().NodeID)
 
 			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 
 	go func() {
 		for {
 			chainRouter.Gossip()
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
 

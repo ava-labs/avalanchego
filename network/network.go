@@ -226,6 +226,7 @@ func NewNetwork(
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 ) Network {
+	// #nosec G404
 	netw := &network{
 		log:            log,
 		id:             id,
@@ -845,10 +846,10 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		// Randomization is only performed here to distribute reconnection
 		// attempts to a node that previously shut down. This doesn't require
 		// cryptographically secure random number generation.
-		delay = time.Duration(float64(delay) * (1 + rand.Float64()))
+		delay = time.Duration(float64(delay) * (1 + rand.Float64())) // #nosec G404
 		if delay > n.maxReconnectDelay {
 			// set the timeout to [.75, 1) * maxReconnectDelay
-			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
+			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4) // #nosec G404
 		}
 
 		n.stateLock.Lock()

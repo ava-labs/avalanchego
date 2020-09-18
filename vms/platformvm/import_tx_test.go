@@ -48,6 +48,7 @@ func TestNewImportTx(t *testing.T) {
 		sm := m.NewSharedMemory(vm.Ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(avmID)
 
+		// #nosec G404
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),
