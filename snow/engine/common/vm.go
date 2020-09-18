@@ -4,6 +4,7 @@
 package common
 
 import (
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -59,6 +60,10 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers() map[string]*HTTPHandler
+
+	// Returns a list of health checks to periodically perform that will
+	// be reported via the node's Health API
+	HealthChecks() []checks.Check
 }
 
 // StaticVM describes the functionality that allows a user to interact with a VM

@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -130,6 +132,7 @@ type ManagerConfig struct {
 	XChainID                ids.ID
 	CriticalChains          ids.Set          // Chains that can't exit gracefully
 	TimeoutManager          *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService           *health.Health
 }
 
 type manager struct {
@@ -529,6 +532,27 @@ func (m *manager) createSnowmanChain(
 		consensusParams.Metrics,
 	)
 
+	// Register health checks
+	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
+	if err != nil {
+		chainAlias = ctx.ChainID.String()
+	}
+
+	healthChecks := engine.HealthChecks()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get health checks: %w", err)
+	}
+	for _, hc := range healthChecks {
+		wrapperHc := &healthCheckWrapper{
+			chain: chainAlias,
+			Lock:  &ctx.Lock,
+			Check: hc,
+		}
+		if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+			return nil, fmt.Errorf("couldn't add health check %s: %w", hc.Name(), err)
+		}
+	}
+
 	return &chain{
 		Engine:  engine,
 		Handler: handler,
@@ -585,4 +609,30 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// Wraps a health check function byprepending chain ID/alias
+// to a health check name  and by grabbing the blockchain's
+// lock before executing the health check
+type healthCheckWrapper struct {
+	// The health check
+	checks.Check
+
+	// Grabs/releases this before/after health check func
+	Lock *sync.RWMutex
+
+	// Alias/ID of chain this health check is for
+	chain string
+}
+
+// Name is this health check's formatted name
+func (hc *healthCheckWrapper) Name() string {
+	return fmt.Sprintf("%s.%s", hc.chain, hc.Check.Name())
+}
+
+// Execute executes the health check function with the lock
+func (hc *healthCheckWrapper) Execute() (interface{}, error) {
+	hc.Lock.Lock()
+	defer hc.Lock.Unlock()
+	return hc.Check.Execute()
 }
