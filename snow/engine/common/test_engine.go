@@ -5,8 +5,9 @@ package common
 
 import (
 	"errors"
-	"github.com/AppsFlyer/go-sundheit/checks"
 	"testing"
+
+	"github.com/AppsFlyer/go-sundheit/checks"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"

@@ -232,13 +232,12 @@ func (m *manager) buildChain(chainParams ChainParameters) (*chain, error) {
 	}
 
 	ctx := &snow.Context{
-		NetworkID:   m.NetworkID,
-		SubnetID:    chainParams.SubnetID,
-		ChainID:     chainParams.ID,
-		NodeID:      m.NodeID,
-		XChainID:    m.XChainID,
-		AVAXAssetID: m.AVAXAssetID,
-
+		NetworkID:           m.NetworkID,
+		SubnetID:            chainParams.SubnetID,
+		ChainID:             chainParams.ID,
+		NodeID:              m.NodeID,
+		XChainID:            m.XChainID,
+		AVAXAssetID:         m.AVAXAssetID,
 		Log:                 chainLog,
 		DecisionDispatcher:  m.DecisionEvents,
 		ConsensusDispatcher: m.ConsensusEvents,

@@ -5,8 +5,9 @@ package health
 
 import (
 	"errors"
-	"github.com/AppsFlyer/go-sundheit/checks"
 	"time"
+
+	"github.com/AppsFlyer/go-sundheit/checks"
 )
 
 var (
