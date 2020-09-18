@@ -116,8 +116,8 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) is at or after current chain timestamp (%s)",
 			currentTimestamp,
 			validatorStartTime)}
-	} else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
+		// } else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
+		// 	return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
 	}
 
 	// Ensure that the period this validator validates the specified subnet is a
