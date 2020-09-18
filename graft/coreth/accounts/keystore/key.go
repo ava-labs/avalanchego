@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/accounts"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 )
 

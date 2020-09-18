@@ -2,7 +2,7 @@ package coreth
 
 import (
 	"crypto/ecdsa"
-	"fmt"
+	//"fmt"
 	"io"
 	"os"
 
@@ -14,11 +14,13 @@ import (
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/crypto"
-	"github.com/ava-labs/go-ethereum/ethdb"
-	"github.com/ava-labs/go-ethereum/event"
-	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/trie"
+	//"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/mattn/go-isatty"
 )
 
@@ -52,18 +54,18 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, etherBase *common.Add
 	if nodecfg == nil {
 		nodecfg = &node.Config{}
 	}
-	mux := new(event.TypeMux)
-	ctx, ep, err := node.NewServiceContext(nodecfg, mux)
+	//mux := new(event.TypeMux)
+	node, err := node.New(nodecfg)
 	if err != nil {
 		panic(err)
 	}
-	if ep != "" {
-		log.Info(fmt.Sprintf("temporary keystore = %s", ep))
-	}
+	//if ep != "" {
+	//	log.Info(fmt.Sprintf("temporary keystore = %s", ep))
+	//}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
 	bcb := new(eth.BackendCallbacks)
-	backend, _ := eth.New(&ctx, config, cb, mcb, bcb, chainDB)
+	backend, _ := eth.New(node, config, cb, mcb, bcb, chainDB)
 	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb, bcb: bcb}
 	if etherBase == nil {
 		etherBase = &BlackholeAddr
@@ -84,8 +86,12 @@ func (self *ETHChain) GenBlock() {
 	self.backend.Miner().GenBlock()
 }
 
+func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
+	return self.backend.Miner().GetWorkerMux().Subscribe(core.NewMinedBlockEvent{})
+}
+
 func (self *ETHChain) VerifyBlock(block *types.Block) bool {
-	txnHash := types.DeriveSha(block.Transactions())
+	txnHash := types.DeriveSha(block.Transactions(), new(trie.Trie))
 	uncleHash := types.CalcUncleHash(block.Uncles())
 	ethHeader := block.Header()
 	if txnHash != ethHeader.TxHash || uncleHash != ethHeader.UncleHash {

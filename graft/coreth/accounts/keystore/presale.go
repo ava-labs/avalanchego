@@ -26,7 +26,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/accounts"
-	"github.com/ava-labs/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 	"golang.org/x/crypto/pbkdf2"
 )

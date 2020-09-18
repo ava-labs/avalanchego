@@ -28,8 +28,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/accounts"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	mapset "github.com/deckarep/golang-set"
 )
 

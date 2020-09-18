@@ -23,8 +23,8 @@ import (
 	"runtime"
 
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ava-labs/go-ethereum/p2p"
-	"github.com/ava-labs/go-ethereum/p2p/nat"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
 const (
@@ -45,7 +45,6 @@ var DefaultConfig = Config{
 	HTTPTimeouts:        rpc.DefaultHTTPTimeouts,
 	WSPort:              DefaultWSPort,
 	WSModules:           []string{"net", "web3"},
-	GraphQLPort:         DefaultGraphQLPort,
 	GraphQLVirtualHosts: []string{"localhost"},
 	P2P: p2p.Config{
 		ListenAddr: ":30303",

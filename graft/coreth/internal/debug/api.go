@@ -34,7 +34,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Handler is the global debugging handler.
