@@ -736,12 +736,12 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return blk, vm.DB.Commit()
 	}
 
-	roundedTime := localTime.Round(roundInterval)
-	// If the rounded time is before the next staker change time
+	truncatedTime := localTime.Truncate(roundInterval)
+	// If the truncated time is before the next staker change time
 	// but more than [catchUpTime] past the local wall clock time
 	// then issue an advanceTime proposal to catch up to wall clock time
-	if roundedTime.Before(nextStakerChangeTime) && roundedTime.After(currentChainTimestamp.Add(catchUpTime)) {
-		advanceTimeTx, err := vm.newAdvanceTimeTx(roundedTime)
+	if truncatedTime.Before(nextStakerChangeTime) && truncatedTime.After(currentChainTimestamp.Add(catchUpTime)) {
+		advanceTimeTx, err := vm.newAdvanceTimeTx(truncatedTime)
 		if err != nil {
 			return nil, err
 		}
@@ -966,8 +966,8 @@ func (vm *VM) resetTimer() {
 		return
 	}
 
-	roundedTime := localTime.Round(roundInterval)
-	if roundedTime.Before(nextStakerChangeTime) && roundedTime.After(timestamp.Add(catchUpTime)) {
+	truncatedTime := localTime.Truncate(roundInterval)
+	if truncatedTime.Before(nextStakerChangeTime) && truncatedTime.After(timestamp.Add(catchUpTime)) {
 		// Should issue a proposal to advance timestamp closer to wall clock time
 		// without skipping any staker change times
 		vm.SnowmanVM.NotifyBlockReady()
