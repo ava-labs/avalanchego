@@ -150,8 +150,8 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
 			startTime,
 			currentTime)}
-	} else if startTime.After(currentTime.Add(maxFutureStartTime)) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", startTime, currentTime)}
+		// } else if startTime.After(currentTime.Add(maxFutureStartTime)) {
+		// 	return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", startTime, currentTime)}
 	}
 
 	_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
