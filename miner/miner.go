@@ -27,9 +27,9 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 // Backend wraps all methods required for mining.
@@ -54,55 +54,88 @@ type Config struct {
 }
 
 type Miner struct {
-	w *worker
+	worker *worker
 }
 
 func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, mcb *MinerCallbacks) *Miner {
 	return &Miner{
-		w: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, mcb),
+		worker: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true, mcb),
 	}
 }
 
-func (self *Miner) Start(coinbase common.Address) {
-	self.w.start()
+func (miner *Miner) Start(coinbase common.Address) {
+	miner.worker.start()
 }
 
-func (self *Miner) Stop() {
-	self.w.stop()
+func (miner *Miner) Stop() {
+	miner.worker.stop()
 }
 
-func (self *Miner) Mining() bool {
+func (miner *Miner) Mining() bool {
 	return false
 }
 
-func (self *Miner) HashRate() uint64 {
+func (miner *Miner) HashRate() uint64 {
 	return 0
 }
 
-func (self *Miner) SetExtra(extra []byte) error {
+func (miner *Miner) SetExtra(extra []byte) error {
 	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("Extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
+		return fmt.Errorf("extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
 	}
-	self.w.setExtra(extra)
+	miner.worker.setExtra(extra)
 	return nil
 }
 
-func (self *Miner) SetRecommitInterval(interval time.Duration) {
-	self.w.setRecommitInterval(interval)
+// SetRecommitInterval sets the interval for sealing work resubmitting.
+func (miner *Miner) SetRecommitInterval(interval time.Duration) {
+	miner.worker.setRecommitInterval(interval)
 }
 
-func (self *Miner) Pending() (*types.Block, *state.StateDB) {
-	return self.w.pending()
+// Pending returns the currently pending block and associated state.
+func (miner *Miner) Pending() (*types.Block, *state.StateDB) {
+	return miner.worker.pending()
 }
 
-func (self *Miner) PendingBlock() *types.Block {
-	return self.w.pendingBlock()
+// PendingBlock returns the currently pending block.
+//
+// Note, to access both the pending block and the pending state
+// simultaneously, please use Pending(), as the pending state can
+// change between multiple method calls
+func (miner *Miner) PendingBlock() *types.Block {
+	return miner.worker.pendingBlock()
 }
 
-func (self *Miner) SetEtherbase(addr common.Address) {
-	self.w.setEtherbase(addr)
+func (miner *Miner) SetEtherbase(addr common.Address) {
+	miner.worker.setEtherbase(addr)
 }
 
-func (self *Miner) GenBlock() {
-	self.w.genBlock()
+// EnablePreseal turns on the preseal mining feature. It's enabled by default.
+// Note this function shouldn't be exposed to API, it's unnecessary for users
+// (miners) to actually know the underlying detail. It's only for outside project
+// which uses this library.
+func (miner *Miner) EnablePreseal() {
+	miner.worker.enablePreseal()
+}
+
+// DisablePreseal turns off the preseal mining feature. It's necessary for some
+// fake consensus engine which can seal blocks instantaneously.
+// Note this function shouldn't be exposed to API, it's unnecessary for users
+// (miners) to actually know the underlying detail. It's only for outside project
+// which uses this library.
+func (miner *Miner) DisablePreseal() {
+	miner.worker.disablePreseal()
+}
+
+// SubscribePendingLogs starts delivering logs from pending transactions
+// to the given channel.
+func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
+	return miner.worker.pendingLogsFeed.Subscribe(ch)
+}
+func (miner *Miner) GenBlock() {
+	miner.worker.genBlock()
+}
+
+func (miner *Miner) GetWorkerMux() *event.TypeMux {
+	return miner.worker.mux
 }

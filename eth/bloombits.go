@@ -24,9 +24,9 @@ import (
 	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/common/bitutil"
-	"github.com/ava-labs/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/bitutil"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
@@ -54,7 +54,7 @@ func (eth *Ethereum) startBloomHandlers(sectionSize uint64) {
 		go func() {
 			for {
 				select {
-				case <-eth.shutdownChan:
+				case <-eth.closeBloomHandler:
 					return
 
 				case request := <-eth.bloomRequests:
@@ -135,4 +135,9 @@ func (b *BloomIndexer) Commit() error {
 		rawdb.WriteBloomBits(batch, uint(i), b.section, b.head, bitutil.CompressBytes(bits))
 	}
 	return batch.Write()
+}
+
+// Prune returns an empty error since we don't support pruning here.
+func (b *BloomIndexer) Prune(threshold uint64) error {
+	return nil
 }

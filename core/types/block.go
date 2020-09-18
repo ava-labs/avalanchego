@@ -24,18 +24,19 @@ import (
 	"io"
 	"math/big"
 	"reflect"
-	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/common/hexutil"
-	"github.com/ava-labs/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 )
 
 var (
-	EmptyRootHash  = DeriveSha(Transactions{})
+	EmptyRootHash  = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 	EmptyUncleHash = rlpHash([]*Header(nil))
 )
 
@@ -132,11 +133,31 @@ func (h *Header) SanityCheck() error {
 	return nil
 }
 
+// hasherPool holds LegacyKeccak hashers.
+var hasherPool = sync.Pool{
+	New: func() interface{} {
+		return sha3.NewLegacyKeccak256()
+	},
+}
+
 func rlpHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	rlp.Encode(hw, x)
-	hw.Sum(h[:0])
+	sha := hasherPool.Get().(crypto.KeccakState)
+	defer hasherPool.Put(sha)
+	sha.Reset()
+	rlp.Encode(sha, x)
+	sha.Read(h[:])
 	return h
+}
+
+// EmptyBody returns true if there is no additional 'body' to complete the header
+// that is: no transactions and no uncles.
+func (h *Header) EmptyBody() bool {
+	return h.TxHash == EmptyRootHash && h.UncleHash == EmptyUncleHash
+}
+
+// EmptyReceipts returns true if there are no receipts for this header/block.
+func (h *Header) EmptyReceipts() bool {
+	return h.ReceiptHash == EmptyRootHash
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -145,7 +166,7 @@ type Body struct {
 	Transactions []*Transaction
 	Uncles       []*Header
 	Version      uint32
-	ExtData      []byte `rlp:"nil"`
+	ExtData      *[]byte `rlp:"nil"`
 }
 
 // Block represents an entire block in the Ethereum blockchain.
@@ -154,7 +175,7 @@ type Block struct {
 	uncles       []*Header
 	transactions Transactions
 	version      uint32
-	extdata      []byte
+	extdata      *[]byte
 
 	// caches
 	hash atomic.Value
@@ -195,7 +216,7 @@ type myextblock struct {
 	Txs     []*Transaction
 	Uncles  []*Header
 	Version uint32
-	ExtData []byte `rlp:"nil"`
+	ExtData *[]byte `rlp:"nil"`
 }
 
 // [deprecated by eth/63]
@@ -214,14 +235,14 @@ type storageblock struct {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs, uncles
 // and receipts.
-func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, extdata []byte) *Block {
+func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher Hasher, extdata []byte) *Block {
 	b := &Block{header: CopyHeader(header), td: new(big.Int)}
 
 	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {
 		b.header.TxHash = EmptyRootHash
 	} else {
-		b.header.TxHash = DeriveSha(Transactions(txs))
+		b.header.TxHash = DeriveSha(Transactions(txs), hasher)
 		b.transactions = make(Transactions, len(txs))
 		copy(b.transactions, txs)
 	}
@@ -229,7 +250,7 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 	if len(receipts) == 0 {
 		b.header.ReceiptHash = EmptyRootHash
 	} else {
-		b.header.ReceiptHash = DeriveSha(Receipts(receipts))
+		b.header.ReceiptHash = DeriveSha(Receipts(receipts), hasher)
 		b.header.Bloom = CreateBloom(receipts)
 	}
 
@@ -243,8 +264,11 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 		}
 	}
 
-	b.extdata = make([]byte, len(extdata))
-	copy(b.extdata, extdata)
+	if extdata != nil {
+		_data := make([]byte, len(extdata))
+		b.extdata = &_data
+		copy(*b.extdata, extdata)
+	}
 
 	return b
 }
@@ -300,13 +324,22 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 }
 
 func (b *Block) SetExtraData(data []byte) {
-	b.extdata = data
+	if data != nil {
+		_data := make([]byte, len(data))
+		b.extdata = &_data
+		copy(*b.extdata, data)
+	} else {
+		b.extdata = nil
+	}
 	b.header.ExtDataHash = rlpHash(data)
 	b.hash = atomic.Value{}
 }
 
 func (b *Block) ExtraData() []byte {
-	return b.extdata
+	if b.extdata == nil {
+		return nil
+	}
+	return *b.extdata
 }
 
 func (b *Block) SetVersion(ver uint32) {
@@ -439,16 +472,21 @@ func (b *Block) WithSeal(header *Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, version uint32, extdata []byte) *Block {
+func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, version uint32, extdata *[]byte) *Block {
+	var extdataCopied *[]byte
+	if extdata != nil {
+		_data := make([]byte, len(*extdata))
+		extdataCopied = &_data
+		copy(*extdataCopied, *extdata)
+	}
 	block := &Block{
 		header:       CopyHeader(b.header),
 		transactions: make([]*Transaction, len(transactions)),
 		uncles:       make([]*Header, len(uncles)),
-		extdata:      make([]byte, len(extdata)),
+		extdata:      extdataCopied,
 		version:      version,
 	}
 	copy(block.transactions, transactions)
-	copy(block.extdata, extdata)
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
 	}
@@ -467,26 +505,3 @@ func (b *Block) Hash() common.Hash {
 }
 
 type Blocks []*Block
-
-type BlockBy func(b1, b2 *Block) bool
-
-func (self BlockBy) Sort(blocks Blocks) {
-	bs := blockSorter{
-		blocks: blocks,
-		by:     self,
-	}
-	sort.Sort(bs)
-}
-
-type blockSorter struct {
-	blocks Blocks
-	by     func(b1, b2 *Block) bool
-}
-
-func (self blockSorter) Len() int { return len(self.blocks) }
-func (self blockSorter) Swap(i, j int) {
-	self.blocks[i], self.blocks[j] = self.blocks[j], self.blocks[i]
-}
-func (self blockSorter) Less(i, j int) bool { return self.by(self.blocks[i], self.blocks[j]) }
-
-func Number(b1, b2 *Block) bool { return b1.header.Number.Cmp(b2.header.Number) < 0 }

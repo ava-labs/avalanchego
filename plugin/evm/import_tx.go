@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // UnsignedImportTx is an unsigned ImportTx

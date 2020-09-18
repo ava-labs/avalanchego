@@ -23,8 +23,8 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (

@@ -42,9 +42,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/accounts"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/event"
-	"github.com/ava-labs/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	pcsc "github.com/gballet/go-libpcsclite"
 )
 
@@ -220,7 +220,7 @@ func (hub *Hub) refreshWallets() {
 		// Mark the reader as present
 		seen[reader] = struct{}{}
 
-		// If we alreay know about this card, skip to the next reader, otherwise clean up
+		// If we already know about this card, skip to the next reader, otherwise clean up
 		if wallet, ok := hub.wallets[reader]; ok {
 			if err := wallet.ping(); err == nil {
 				continue

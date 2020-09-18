@@ -22,9 +22,10 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
-	ethereum "github.com/ava-labs/go-ethereum"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/event"
+	ethereum "github.com/ethereum/go-ethereum"
+	gethaccounts "github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -129,6 +130,8 @@ type Wallet interface {
 	// about which fields or actions are needed. The user may retry by providing
 	// the needed details via SignHashWithPassphrase, or by other means (e.g. unlock
 	// the account in a keystore).
+	//
+	// This method should return the signature in 'canonical' format, with v 0 or 1
 	SignText(account Account, text []byte) ([]byte, error)
 
 	// SignTextWithPassphrase is identical to Signtext, but also takes a password
@@ -199,7 +202,7 @@ func TextAndHash(data []byte) ([]byte, string) {
 
 // WalletEventType represents the different event types that can be fired by
 // the wallet subscription subsystem.
-type WalletEventType int
+type WalletEventType = gethaccounts.WalletEventType
 
 const (
 	// WalletArrived is fired when a new wallet is detected either via USB or via

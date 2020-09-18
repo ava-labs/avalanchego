@@ -21,8 +21,8 @@ import (
 
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ava-labs/coreth/core/types"
-	ethereum "github.com/ava-labs/go-ethereum"
-	"github.com/ava-labs/go-ethereum/crypto"
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original

@@ -13,14 +13,15 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ava-labs/go-ethereum/common"
-	"github.com/ava-labs/go-ethereum/rlp"
 	mapset "github.com/deckarep/golang-set"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
-type OnFinalizeCallbackType = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
+type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
 type OnFinalizeAndAssembleCallbackType = func(state *state.StateDB, txs []*types.Transaction) ([]byte, error)
-type OnAPIsCallbackType = func(consensus.ChainReader) []rpc.API
+type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
 
 type ConsensusCallbacks struct {
@@ -55,7 +56,7 @@ var (
 )
 
 // modified from consensus.go
-func (self *DummyEngine) verifyHeader(chain consensus.ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
+func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
@@ -103,7 +104,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainReader, header, paren
 	return nil
 }
 
-func (self *DummyEngine) verifyHeaderWorker(chain consensus.ChainReader, headers []*types.Header, seals []bool, index int) error {
+func (self *DummyEngine) verifyHeaderWorker(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool, index int) error {
 	var parent *types.Header
 	if index == 0 {
 		parent = chain.GetHeader(headers[0].ParentHash, headers[0].Number.Uint64()-1)
@@ -123,7 +124,7 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
-func (self *DummyEngine) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool) error {
+func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
@@ -137,7 +138,7 @@ func (self *DummyEngine) VerifyHeader(chain consensus.ChainReader, header *types
 	return self.verifyHeader(chain, header, parent, false, seal)
 }
 
-func (self *DummyEngine) VerifyHeaders(chain consensus.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (self *DummyEngine) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
 	// Spawn as many workers as allowed threads
 	workers := runtime.GOMAXPROCS(0)
 	if len(headers) < workers {
@@ -239,17 +240,17 @@ func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
-func (self *DummyEngine) VerifySeal(chain consensus.ChainReader, header *types.Header) error {
+func (self *DummyEngine) VerifySeal(chain consensus.ChainHeaderReader, header *types.Header) error {
 	return nil
 }
 
-func (self *DummyEngine) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.Difficulty = big.NewInt(1)
 	return nil
 }
 
 func (self *DummyEngine) Finalize(
-	chain consensus.ChainReader, header *types.Header,
+	chain consensus.ChainHeaderReader, header *types.Header,
 	state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header) {
 	if self.cb.OnFinalize != nil {
@@ -259,7 +260,7 @@ func (self *DummyEngine) Finalize(
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 }
 
-func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var extdata []byte
 	if self.cb.OnFinalizeAndAssemble != nil {
@@ -273,10 +274,10 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainReader, header
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, receipts, extdata), nil
+	return types.NewBlock(header, txs, uncles, receipts, new(trie.Trie), extdata), nil
 }
 
-func (self *DummyEngine) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) (err error) {
+func (self *DummyEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) (err error) {
 	if self.cb.OnSeal != nil {
 		err = self.cb.OnSeal(block)
 	} else {
@@ -314,11 +315,11 @@ func (self *DummyEngine) SealHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
-func (self *DummyEngine) CalcDifficulty(chain consensus.ChainReader, time uint64, parent *types.Header) *big.Int {
+func (self *DummyEngine) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
 	return big.NewInt(1)
 }
 
-func (self *DummyEngine) APIs(chain consensus.ChainReader) (res []rpc.API) {
+func (self *DummyEngine) APIs(chain consensus.ChainHeaderReader) (res []rpc.API) {
 	res = nil
 	if self.cb.OnAPIs != nil {
 		res = self.cb.OnAPIs(chain)

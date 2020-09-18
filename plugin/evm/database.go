@@ -6,7 +6,7 @@ package evm
 import (
 	"errors"
 
-	"github.com/ava-labs/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb"
 
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -47,11 +47,8 @@ func (db Database) Sync() error { return errOpNotSupported }
 func (db Database) NewBatch() ethdb.Batch { return Batch{db.Database.NewBatch()} }
 
 // NewIterator implements ethdb.Database
-func (db Database) NewIterator() ethdb.Iterator { return db.Database.NewIterator() }
-
-// NewIteratorWithPrefix implements ethdb.Database
-func (db Database) NewIteratorWithPrefix(prefix []byte) ethdb.Iterator {
-	return db.NewIteratorWithPrefix(prefix)
+func (db Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+	return db.NewIteratorWithStartAndPrefix(start, prefix)
 }
 
 // NewIteratorWithStart implements ethdb.Database

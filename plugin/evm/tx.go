@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // Max size of memo field

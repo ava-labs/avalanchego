@@ -8,7 +8,8 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -30,7 +31,7 @@ func (b *Block) ID() ids.ID { return b.id }
 func (b *Block) Accept() error {
 	vm := b.vm
 
-	vm.ctx.Log.Verbo("Block %s is accepted", b.id)
+	log.Trace(fmt.Sprintf("Block %s is accepted", b.ID()))
 	vm.updateStatus(b.id, choices.Accepted)
 	if err := vm.acceptedDB.Put(b.ethBlock.Number().Bytes(), b.id.Bytes()); err != nil {
 		return err
@@ -50,7 +51,7 @@ func (b *Block) Accept() error {
 
 // Reject implements the snowman.Block interface
 func (b *Block) Reject() error {
-	b.vm.ctx.Log.Verbo("Block %s is rejected", b.ID())
+	log.Trace(fmt.Sprintf("Block %s is rejected", b.ID()))
 	b.vm.updateStatus(b.ID(), choices.Rejected)
 	return nil
 }
@@ -68,10 +69,8 @@ func (b *Block) Status() choices.Status {
 func (b *Block) Parent() snowman.Block {
 	parentID := ids.NewID(b.ethBlock.ParentHash())
 	if block := b.vm.getBlock(parentID); block != nil {
-		b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", parentID, block.Status())
 		return block
 	}
-	b.vm.ctx.Log.Verbo("Parent(%s) has status: %s", parentID, choices.Unknown)
 	return &missing.Block{BlkID: parentID}
 }
 

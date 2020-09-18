@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // Key in the database whose corresponding value is the list of
