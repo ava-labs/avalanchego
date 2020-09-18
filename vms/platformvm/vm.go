@@ -181,7 +181,9 @@ type VM struct {
 	unissuedDecisionTxs []*Tx
 	unissuedAtomicTxs   []*Tx
 
-	// Tx fee burned by a transaction
+	// fee that must be burned by every state creating transaction
+	creationTxFee uint64
+	// fee that must be burned by every non-state creating transaction
 	txFee uint64
 
 	// UptimePercentage is the minimum uptime required to be rewarded for staking.

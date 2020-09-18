@@ -75,7 +75,9 @@ type VM struct {
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
-	// fee that must be burned by every transaction
+	// fee that must be burned by every state creating transaction
+	creationTxFee uint64
+	// fee that must be burned by every non-state creating transaction
 	txFee uint64
 
 	// Transaction issuing
@@ -820,7 +822,11 @@ func (vm *VM) Spend(
 
 	for asset, amount := range amounts {
 		if amountsSpent[asset] < amount {
-			return nil, nil, nil, errInsufficientFunds
+			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
+				amount,
+				ids.NewID(asset),
+				amountsSpent[asset],
+			)
 		}
 	}
 
