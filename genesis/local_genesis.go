@@ -3,27 +3,55 @@
 
 package genesis
 
+// PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => X-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
+// PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN => X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u
+
 var (
 	localGenesisConfigJSON = `{
 		"networkID": 12345,
 		"allocations": [
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
-				"avaxAddr": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-				"initialAmount": 320000000000000000,
+				"avaxAddr": "X-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2",
+				"initialAmount": 0,
 				"unlockSchedule": [
 					{
-						"amount": 40000000000000000,
+						"amount": 20000000000000000,
+						"locktime": 1633824000
+					}
+				]
+			},
+			{
+				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
+				"avaxAddr": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
+				"initialAmount": 300000000000000000,
+				"unlockSchedule": [
+					{
+						"amount": 10000000000000000
+					},
+					{
+						"amount": 10000000000000000,
+						"locktime": 1633824000
+					}
+				]
+			},
+			{
+				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
+				"avaxAddr": "X-local1ur873jhz9qnaqv5qthk5sn3e8nj3e0kmggalnu",
+				"initialAmount": 10000000000000000,
+				"unlockSchedule": [
+					{
+						"amount": 10000000000000000,
 						"locktime": 1633824000
 					}
 				]
 			}
 		],
-		"startTime": 1602288000,
+		"startTime": 1599696000,
 		"initialStakeDuration": 31536000,
 		"initialStakeDurationOffset": 5400,
 		"initialStakeAddresses": [
-			"X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u"
+			"X-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2"
 		],
 		"initialStakeNodeIDs": [
 			"NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
