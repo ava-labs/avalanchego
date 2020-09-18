@@ -154,14 +154,14 @@ func init() {
 type VM struct {
 	ctx *snow.Context
 
-	chainID           *big.Int
-	networkID         uint64
-	genesisHash       common.Hash
-	chain             *coreth.ETHChain
-	chaindb           Database
-	newBlockChan      chan *Block
-	networkChan       chan<- commonEng.Message
-	newTxPoolHeadChan *event.TypeMuxSubscription
+	chainID          *big.Int
+	networkID        uint64
+	genesisHash      common.Hash
+	chain            *coreth.ETHChain
+	chaindb          Database
+	newBlockChan     chan *Block
+	networkChan      chan<- commonEng.Message
+	newMinedBlockSub *event.TypeMuxSubscription
 
 	acceptedDB database.Database
 
@@ -349,15 +349,13 @@ func (vm *VM) Initialize(
 
 	vm.bdTimerState = bdTimerStateLong
 	vm.bdGenWaitFlag = true
-	//vm.newTxPoolHeadChan = make(chan core.NewTxPoolHeadEvent, 1)
 	vm.txPoolStabilizedOk = make(chan struct{}, 1)
 	vm.txPoolStabilizedShutdownChan = make(chan struct{}, 1) // Signal goroutine to shutdown
 	// TODO: read size from options
 	vm.pendingAtomicTxs = make(chan *Tx, 1024)
 	vm.atomicTxSubmitChan = make(chan struct{}, 1)
 	vm.shutdownSubmitChan = make(chan struct{}, 1)
-	//chain.GetTxPool().SubscribeNewHeadEvent(vm.newTxPoolHeadChan)
-	vm.newTxPoolHeadChan = vm.chain.SubscribeNewMinedBlockEvent()
+	vm.newMinedBlockSub = vm.chain.SubscribeNewMinedBlockEvent()
 	vm.shutdownWg.Add(1)
 	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
 	chain.Start()
@@ -733,7 +731,7 @@ func (vm *VM) awaitTxPoolStabilized() {
 	defer vm.shutdownWg.Done()
 	for {
 		select {
-		case e := <-vm.newTxPoolHeadChan.Chan():
+		case e := <-vm.newMinedBlockSub.Chan():
 			switch h := e.Data.(type) {
 			case core.NewMinedBlockEvent:
 				vm.txPoolStabilizedLock.Lock()
