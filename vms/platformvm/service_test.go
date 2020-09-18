@@ -303,6 +303,38 @@ func TestGetTx(t *testing.T) {
 	}
 }
 
+// Test method GetBalance
+func TestGetBalance(t *testing.T) {
+	service := defaultService(t)
+	defaultAddress(t, service)
+	service.vm.Ctx.Lock.Lock()
+	defer func() { service.vm.Shutdown(); service.vm.Ctx.Lock.Unlock() }()
+
+	// Ensure GetStake is correct for each of the genesis validators
+	genesis, _ := defaultGenesis()
+	for _, utxo := range genesis.UTXOs {
+		request := api.JsonAddress{
+			Address: fmt.Sprintf("P-%s", utxo.Address),
+		}
+		reply := GetBalanceResponse{}
+		if err := service.GetBalance(nil, &request, &reply); err != nil {
+			t.Fatal(err)
+		}
+		if reply.Balance != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong balance. Expected %d ; Returned %d", reply.Balance, defaultBalance)
+		}
+		if reply.Unlocked != cjson.Uint64(defaultBalance) {
+			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", reply.Unlocked, defaultBalance)
+		}
+		if reply.LockedStakeable != 0 {
+			t.Fatalf("Wrong locked stakeable balance. Expected %d ; Returned %d", reply.LockedStakeable, 0)
+		}
+		if reply.LockedNotStakeable != 0 {
+			t.Fatalf("Wrong locked not stakeable balance. Expected %d ; Returned %d", reply.LockedNotStakeable, 0)
+		}
+	}
+}
+
 // Test method GetStake
 func TestGetStake(t *testing.T) {
 	service := defaultService(t)

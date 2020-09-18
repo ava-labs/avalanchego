@@ -7,7 +7,7 @@ AVALANCHE_IMAGE=$(docker image ls --format="{{.Repository}}" | head -n 1)
 DOCKER_REPO="avaplatform"
 
 E2E_TESTING_REMOTE="https://github.com/ava-labs/avalanche-testing.git"
-E2E_TAG="v0.9.3-dev.2"
+E2E_TAG="v0.9.3-dev.3"
 
 mkdir -p "$E2E_TEST_HOME"
 git clone "$E2E_TESTING_REMOTE" "$E2E_TEST_HOME"
@@ -19,8 +19,8 @@ go mod edit -replace github.com/ava-labs/avalanchego="$AVALANCHE_HOME"
 bash "./scripts/rebuild_initializer_binary.sh"
 
 
-TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:everest-v0.9.2-dev"
-BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:testing-ci-stable"
+TESTING_CONTROLLER_IMAGE="$DOCKER_REPO/avalanche-testing_controller:everest-dev.1"
+BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:everest-dev.1"
 
 docker pull "$TESTING_CONTROLLER_IMAGE"
 
