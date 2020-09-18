@@ -7,7 +7,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -22,13 +21,13 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealthChecks bool
+	CantHealth bool
 
 	InitializeF                              func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() map[string]*HTTPHandler
 	CreateStaticHandlersF                    func() map[string]*HTTPHandler
-	HealthChecksF                            func() []checks.Check
+	HealthF                                  func() (interface{}, error)
 }
 
 // Default ...
@@ -39,7 +38,7 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
 	vm.CantCreateStaticHandlers = cant
-	vm.CantHealthChecks = cant
+	vm.CantHealth = cant
 }
 
 // Initialize ...
@@ -114,13 +113,13 @@ func (vm *TestVM) CreateStaticHandlers() map[string]*HTTPHandler {
 	return nil
 }
 
-// HealthChecks ...
-func (vm *TestVM) HealthChecks() []checks.Check {
-	if vm.HealthChecksF != nil {
-		return vm.HealthChecksF()
+// Health ...
+func (vm *TestVM) Health() (interface{}, error) {
+	if vm.HealthF != nil {
+		return vm.HealthF()
 	}
-	if vm.CantHealthChecks && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called HealthChecks")
+	if vm.CantHealth && vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called Health")
 	}
-	return nil
+	return nil, errors.New("Unexpectedly called Health")
 }

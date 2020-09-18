@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -437,6 +436,20 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
 
+	// Register health checks
+	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
+	if err != nil {
+		chainAlias = ctx.ChainID.String()
+	}
+	wrapperHc := &healthCheckWrapper{
+		chain: chainAlias,
+		Lock:  &ctx.Lock,
+		check: engine.Health,
+	}
+	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
+	}
+
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
 	handler.Initialize(
@@ -537,19 +550,13 @@ func (m *manager) createSnowmanChain(
 		chainAlias = ctx.ChainID.String()
 	}
 
-	healthChecks := engine.HealthChecks()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get health checks: %w", err)
+	wrapperHc := &healthCheckWrapper{
+		chain: chainAlias,
+		Lock:  &ctx.Lock,
+		check: engine.Health,
 	}
-	for _, hc := range healthChecks {
-		wrapperHc := &healthCheckWrapper{
-			chain: chainAlias,
-			Lock:  &ctx.Lock,
-			Check: hc,
-		}
-		if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
-			return nil, fmt.Errorf("couldn't add health check %s: %w", hc.Name(), err)
-		}
+	if err := m.HealthService.RegisterCheck(wrapperHc); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
 	return &chain{
@@ -610,12 +617,11 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 	return "", false
 }
 
-// Wraps a health check function byprepending chain ID/alias
+// Wraps a health check function by prepending chain ID/alias
 // to a health check name  and by grabbing the blockchain's
 // lock before executing the health check
 type healthCheckWrapper struct {
-	// The health check
-	checks.Check
+	check func() (interface{}, error)
 
 	// Grabs/releases this before/after health check func
 	Lock *sync.RWMutex
@@ -626,12 +632,12 @@ type healthCheckWrapper struct {
 
 // Name is this health check's formatted name
 func (hc *healthCheckWrapper) Name() string {
-	return fmt.Sprintf("%s.%s", hc.chain, hc.Check.Name())
+	return hc.chain
 }
 
 // Execute executes the health check function with the lock
 func (hc *healthCheckWrapper) Execute() (interface{}, error) {
 	hc.Lock.Lock()
 	defer hc.Lock.Unlock()
-	return hc.Check.Execute()
+	return hc.check()
 }
