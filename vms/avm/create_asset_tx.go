@@ -77,6 +77,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Codec,
 	txFeeAssetID ids.ID,
+	_ uint64,
 	txFee uint64,
 	numFxs int,
 ) error {
@@ -110,7 +111,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
+	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
 		return err
 	}
 

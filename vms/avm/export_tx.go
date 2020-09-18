@@ -36,6 +36,7 @@ func (t *ExportTx) SyntacticVerify(
 	c codec.Codec,
 	txFeeAssetID ids.ID,
 	txFee uint64,
+	_ uint64,
 	_ int,
 ) error {
 	switch {

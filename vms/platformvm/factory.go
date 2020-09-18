@@ -22,6 +22,7 @@ type Factory struct {
 	ChainManager       chains.Manager
 	Validators         validators.Manager
 	StakingEnabled     bool
+	CreationFee        uint64        // Transaction fee with state creation
 	Fee                uint64        // Transaction fee
 	MinValidatorStake  uint64        // Min amt required to validate primary network
 	MinDelegatorStake  uint64        // Min amt that can be delegated
@@ -37,6 +38,7 @@ func (f *Factory) New(*snow.Context) (interface{}, error) {
 		chainManager:       f.ChainManager,
 		vdrMgr:             f.Validators,
 		stakingEnabled:     f.StakingEnabled,
+		creationTxFee:      f.CreationFee,
 		txFee:              f.Fee,
 		uptimePercentage:   f.UptimePercentage,
 		minValidatorStake:  f.MinValidatorStake,

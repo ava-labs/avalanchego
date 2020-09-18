@@ -66,6 +66,7 @@ func (t *ImportTx) SyntacticVerify(
 	c codec.Codec,
 	txFeeAssetID ids.ID,
 	txFee uint64,
+	_ uint64,
 	numFxs int,
 ) error {
 	switch {

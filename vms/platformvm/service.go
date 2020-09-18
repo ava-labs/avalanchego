@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -813,12 +812,9 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 
 // AddValidatorArgs are the arguments to AddValidator
 type AddValidatorArgs struct {
-	api.UserPass
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	APIStaker
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
 	// The address the staking reward, if applicable, will go to
 	RewardAddress     string       `json:"rewardAddress"`
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
@@ -833,13 +829,16 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		return errNoRewardAddress
 	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
+	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+		return errStartTimeTooLate
 	case args.DelegationFeeRate < 0 || args.DelegationFeeRate > 100:
 		return errInvalidDelegationRate
 	}
 
+	// Parse the node ID
 	var nodeID ids.ShortID
 	if args.NodeID == "" {
-		nodeID = service.vm.Ctx.NodeID
+		nodeID = service.vm.Ctx.NodeID // If omitted, use this node's ID
 	} else {
 		nID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 		if err != nil {
@@ -848,6 +847,17 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID = nID
 	}
 
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// Parse the reward address
 	rewardAddress, err := service.vm.ParseLocalAddress(args.RewardAddress)
 	if err != nil {
 		return fmt.Errorf("problem while parsing reward address: %w", err)
@@ -859,21 +869,33 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		return fmt.Errorf("problem retrieving user '%s': %w", args.Username, err)
 	}
 
-	// Drop any potential error closing the database to report the original
-	// error
+	// Drop any potential error closing the database to report the original error
 	defer db.Close()
 
+	// Get the user's keys
 	user := user{db: db}
 	privKeys, err := user.getKeys()
 	if err != nil {
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	// If fromAddrs given, only use those addrs to pay fee
+	filteredPrivKeys := []*crypto.PrivateKeySECP256K1R{}
+	if fromAddrs.Len() == 0 {
+		filteredPrivKeys = privKeys
+	} else {
+		for _, key := range privKeys {
+			if fromAddrs.Contains(key.PublicKey().Address()) {
+				filteredPrivKeys = append(filteredPrivKeys, key)
+			}
+		}
+	}
+
 	// Parse the change address.
-	if len(privKeys) == 0 {
+	if len(filteredPrivKeys) == 0 {
 		return errNoKeys
 	}
-	changeAddr := privKeys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := filteredPrivKeys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = service.vm.ParseLocalAddress(args.ChangeAddr)
 		if err != nil {
@@ -889,7 +911,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys,                             // Private keys
+		filteredPrivKeys,                     // Private keys
 		changeAddr,                           // Change address
 	)
 	if err != nil {
@@ -910,12 +932,9 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 
 // AddDelegatorArgs are the arguments to AddDelegator
 type AddDelegatorArgs struct {
-	api.UserPass
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	APIStaker
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
 	RewardAddress string `json:"rewardAddress"`
 }
 
@@ -924,14 +943,17 @@ type AddDelegatorArgs struct {
 func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddDelegator called")
 	switch {
-	case int64(args.StartTime) < time.Now().Unix():
+	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
+	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+		return errStartTimeTooLate
 	case args.RewardAddress == "":
 		return errNoRewardAddress
 	}
 
+	// Parse the node ID
 	var nodeID ids.ShortID
-	if args.NodeID == "" { // If ID unspecified, use this node's ID as validator ID
+	if args.NodeID == "" { // If ID unspecified, use this node's ID
 		nodeID = service.vm.Ctx.NodeID
 	} else {
 		nID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
@@ -941,6 +963,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 		nodeID = nID
 	}
 
+	// Parse the reward address
 	rewardAddress, err := service.vm.ParseLocalAddress(args.RewardAddress)
 	if err != nil {
 		return fmt.Errorf("problem parsing 'rewardAddress': %w", err)
@@ -975,6 +998,28 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 		}
 	}
 
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// If fromAddrs given, only use those addrs to pay fee
+	filteredPrivKeys := []*crypto.PrivateKeySECP256K1R{}
+	if fromAddrs.Len() == 0 {
+		filteredPrivKeys = privKeys
+	} else {
+		for _, key := range privKeys {
+			if fromAddrs.Contains(key.PublicKey().Address()) {
+				filteredPrivKeys = append(filteredPrivKeys, key)
+			}
+		}
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newAddDelegatorTx(
 		uint64(args.weight()),  // Stake amount
@@ -982,7 +1027,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
 		rewardAddress,          // Reward Address
-		privKeys,               // Private keys
+		filteredPrivKeys,       // Private keys
 		changeAddr,             // Change address
 	)
 	if err != nil {
@@ -1003,12 +1048,9 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 
 // AddSubnetValidatorArgs are the arguments to AddSubnetValidator
 type AddSubnetValidatorArgs struct {
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	APIStaker
-	api.UserPass
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
 	// ID of subnet to validate
 	SubnetID string `json:"subnetID"`
 }
@@ -1020,13 +1062,19 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
+	case uint64(args.StartTime) < service.vm.clock.Unix():
+		return fmt.Errorf("start time must be in the future")
+	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+		return errStartTimeTooLate
 	}
 
+	// Parse the node ID
 	nodeID, err := ids.ShortFromPrefixedString(args.NodeID, constants.NodeIDPrefix)
 	if err != nil {
 		return fmt.Errorf("error parsing nodeID: '%s': %w", args.NodeID, err)
 	}
 
+	// Parse the subnet ID
 	subnetID, err := ids.FromString(args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("problem parsing subnetID '%s': %w", args.SubnetID, err)
@@ -1063,6 +1111,28 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		}
 	}
 
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// If fromAddrs given, only use those addrs to pay fee
+	filteredPrivKeys := []*crypto.PrivateKeySECP256K1R{}
+	if fromAddrs.Len() == 0 {
+		filteredPrivKeys = keys
+	} else {
+		for _, key := range keys {
+			if fromAddrs.Contains(key.PublicKey().Address()) {
+				filteredPrivKeys = append(filteredPrivKeys, key)
+			}
+		}
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newAddSubnetValidatorTx(
 		uint64(args.weight()),  // Stake amount
@@ -1070,7 +1140,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
 		subnetID,               // Subnet ID
-		keys,                   // Keys
+		filteredPrivKeys,       // Keys
 		changeAddr,             // Change address
 	)
 	if err != nil {
@@ -1091,14 +1161,10 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 
 // CreateSubnetArgs are the arguments to CreateSubnet
 type CreateSubnetArgs struct {
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	// The ID member of APISubnet is ignored
 	APISubnet
-	api.UserPass
-
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
 }
 
 // CreateSubnet creates and signs and issues a transaction to create a new
@@ -1106,6 +1172,7 @@ type CreateSubnetArgs struct {
 func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: CreateSubnet called")
 
+	// Parse the control keys
 	controlKeys := []ids.ShortID{}
 	for _, controlKey := range args.ControlKeys {
 		controlKeyID, err := service.vm.ParseLocalAddress(controlKey)
@@ -1144,11 +1211,33 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 		}
 	}
 
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// If fromAddrs given, only use those addrs to pay fee
+	filteredPrivKeys := []*crypto.PrivateKeySECP256K1R{}
+	if fromAddrs.Len() == 0 {
+		filteredPrivKeys = privKeys
+	} else {
+		for _, key := range privKeys {
+			if fromAddrs.Contains(key.PublicKey().Address()) {
+				filteredPrivKeys = append(filteredPrivKeys, key)
+			}
+		}
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newCreateSubnetTx(
 		uint32(args.Threshold), // Threshold
 		controlKeys,            // Control Addresses
-		privKeys,               // Private keys
+		filteredPrivKeys,       // Private keys
 		changeAddr,             // Change address
 	)
 	if err != nil {
@@ -1169,11 +1258,8 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
-	api.UserPass
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 
 	// Amount of AVAX to send
 	Amount json.Uint64 `json:"amount"`
@@ -1192,6 +1278,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 		return errors.New("argument 'amount' must be > 0")
 	}
 
+	// Parse the to address
 	chainID, to, err := service.vm.ParseAddress(args.To)
 	if err != nil {
 		return err
@@ -1226,12 +1313,34 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 		}
 	}
 
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// If fromAddrs given, only use those addrs to pay fee
+	filteredPrivKeys := []*crypto.PrivateKeySECP256K1R{}
+	if fromAddrs.Len() == 0 {
+		filteredPrivKeys = privKeys
+	} else {
+		for _, key := range privKeys {
+			if fromAddrs.Contains(key.PublicKey().Address()) {
+				filteredPrivKeys = append(filteredPrivKeys, key)
+			}
+		}
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
-		privKeys,            // Private keys
+		filteredPrivKeys,    // Private keys
 		changeAddr,          // Change address
 	)
 	if err != nil {
@@ -1252,11 +1361,8 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 
 // ImportAVAXArgs are the arguments to ImportAVAX
 type ImportAVAXArgs struct {
-	api.UserPass
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
@@ -1270,11 +1376,13 @@ type ImportAVAXArgs struct {
 func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: ImportAVAX called")
 
+	// Parse the sourceCHain
 	chainID, err := service.vm.Ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
 		return fmt.Errorf("problem parsing chainID %q: %w", args.SourceChain, err)
 	}
 
+	// Parse the to address
 	to, err := service.vm.ParseLocalAddress(args.To)
 	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
@@ -1309,7 +1417,29 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 		}
 	}
 
-	tx, err := service.vm.newImportTx(chainID, to, privKeys, changeAddr)
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// If fromAddrs given, only use those addrs to pay fee
+	filteredPrivKeys := []*crypto.PrivateKeySECP256K1R{}
+	if fromAddrs.Len() == 0 {
+		filteredPrivKeys = privKeys
+	} else {
+		for _, key := range privKeys {
+			if fromAddrs.Contains(key.PublicKey().Address()) {
+				filteredPrivKeys = append(filteredPrivKeys, key)
+			}
+		}
+	}
+
+	tx, err := service.vm.newImportTx(chainID, to, filteredPrivKeys, changeAddr)
 	if err != nil {
 		return err
 	}
@@ -1334,11 +1464,8 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 
 // CreateBlockchainArgs is the arguments for calling CreateBlockchain
 type CreateBlockchainArgs struct {
-	api.UserPass
-	// The address change will be sent to.
-	// If empty, change will be sent to one of the
-	// addresses controlled by the user
-	api.JsonChangeAddr
+	// User, password, from addrs, change addr
+	api.JsonSpendHeader
 	// ID of Subnet that validates the new blockchain
 	SubnetID ids.ID `json:"subnetID"`
 	// ID of the VM the new blockchain is running
@@ -1415,6 +1542,28 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		}
 	}
 
+	// Parse the from addresses
+	fromAddrs := ids.ShortSet{}
+	for _, addrStr := range args.From {
+		addr, err := service.vm.ParseLocalAddress(addrStr)
+		if err != nil {
+			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
+		}
+		fromAddrs.Add(addr)
+	}
+
+	// If fromAddrs given, only use those addrs to pay fee
+	filteredPrivKeys := []*crypto.PrivateKeySECP256K1R{}
+	if fromAddrs.Len() == 0 {
+		filteredPrivKeys = keys
+	} else {
+		for _, key := range keys {
+			if fromAddrs.Contains(key.PublicKey().Address()) {
+				filteredPrivKeys = append(filteredPrivKeys, key)
+			}
+		}
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newCreateChainTx(
 		args.SubnetID,
@@ -1422,7 +1571,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 		vmID,
 		fxIDs,
 		args.Name,
-		keys,
+		filteredPrivKeys,
 		changeAddr, // Change address
 	)
 	if err != nil {

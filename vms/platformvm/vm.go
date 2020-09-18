@@ -72,6 +72,17 @@ const (
 
 	// SupplyCap is the maximum amount of AVAX that should ever exist
 	SupplyCap = 720 * units.MegaAvax
+
+	// Maximum future start time for staking/delegating
+	maxFutureStartTime = 24 * 7 * 2 * time.Hour
+
+	// Time interval to round to when issuing an advanceTimeTx to
+	// catch up the chain time closer to local time
+	roundInterval = time.Hour
+
+	// Time difference between local time and current chain time
+	// at which to attempt to increase the chain time stamp
+	catchUpTime = 2 * time.Hour
 )
 
 var (
@@ -87,6 +98,7 @@ var (
 	errInvalidID                = errors.New("invalid ID")
 	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
 	errUnknownTxType            = errors.New("unknown transaction type")
+	errStartTimeTooLate         = errors.New("start time is too far in the future")
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
@@ -176,7 +188,9 @@ type VM struct {
 	unissuedDecisionTxs []*Tx
 	unissuedAtomicTxs   []*Tx
 
-	// Tx fee burned by a transaction
+	// fee that must be burned by every state creating transaction
+	creationTxFee uint64
+	// fee that must be burned by every non-state creating transaction
 	txFee uint64
 
 	// UptimePercentage is the minimum uptime required to be rewarded for staking.
@@ -745,6 +759,25 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return blk, vm.DB.Commit()
 	}
 
+	truncatedTime := localTime.Truncate(roundInterval)
+	// If the truncated time is before the next staker change time
+	// but more than [catchUpTime] past the local wall clock time
+	// then issue an advanceTime proposal to catch up to wall clock time
+	if truncatedTime.Before(nextStakerChangeTime) && truncatedTime.After(currentChainTimestamp.Add(catchUpTime)) {
+		advanceTimeTx, err := vm.newAdvanceTimeTx(truncatedTime)
+		if err != nil {
+			return nil, err
+		}
+		blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+		if err != nil {
+			return nil, err
+		}
+		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+			return nil, err
+		}
+		return blk, vm.DB.Commit()
+	}
+
 	// Propose adding a new validator but only if their start time is in the
 	// future relative to local time (plus Delta)
 	syncTime := localTime.Add(Delta)
@@ -952,6 +985,14 @@ func (vm *VM) resetTimer() {
 	localTime := vm.clock.Time()
 	if !localTime.Before(nextStakerChangeTime) { // time is at or after the time for the next validator to join/leave
 		vm.SnowmanVM.NotifyBlockReady() // Should issue a proposal to advance timestamp
+		return
+	}
+
+	truncatedTime := localTime.Truncate(roundInterval)
+	if truncatedTime.Before(nextStakerChangeTime) && truncatedTime.After(timestamp.Add(catchUpTime)) {
+		// Should issue a proposal to advance timestamp closer to wall clock time
+		// without skipping any staker change times
+		vm.SnowmanVM.NotifyBlockReady()
 		return
 	}
 
