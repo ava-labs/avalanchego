@@ -53,7 +53,7 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 	for i := 0; i < count; i++ {
 		// We don't use a cryptographically secure source of randomness here, as
 		// there's no need to ensure a truly random sampling.
-		draw := uint64(rand.Int63n(int64(s.length-uint64(i)))) + uint64(i)
+		draw := uint64(rand.Int63n(int64(s.length-uint64(i)))) + uint64(i) // #nosec G404
 
 		ret := drawn.get(draw, draw)
 		drawn[draw] = drawn.get(uint64(i), uint64(i))

@@ -12,9 +12,9 @@ func TestSort2dByteArray(t *testing.T) {
 	// Create a random 2D array
 	arr := [][]byte{}
 	for i := 0; i < numSubArrs; i++ {
-		subArrLen := rand.Intn(maxLength)
+		subArrLen := rand.Intn(maxLength) // #nosec G404
 		subArr := make([]byte, subArrLen)
-		if _, err := rand.Read(subArr); err != nil {
+		if _, err := rand.Read(subArr); err != nil { // #nosec G404
 			t.Fatal(err)
 		}
 		arr = append(arr, subArr)
