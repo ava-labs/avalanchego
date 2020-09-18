@@ -365,22 +365,22 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 	}
 	vDB.Abort()
 
-	// Case: Validator's start time too far in the future
-	if tx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,
-		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
-		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
-		nodeID,
-		nodeID,
-		PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-	); err != nil {
-		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
-		t.Fatal("should've errored because start time too far in the future")
-	}
-	vDB.Abort()
+	// // Case: Validator's start time too far in the future
+	// if tx, err := vm.newAddValidatorTx(
+	// 	vm.minValidatorStake,
+	// 	uint64(defaultValidateStartTime.Add(maxFutureStartTime).Unix()+1),
+	// 	uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
+	// 	nodeID,
+	// 	nodeID,
+	// 	PercentDenominator,
+	// 	[]*crypto.PrivateKeySECP256K1R{keys[0]},
+	// 	ids.ShortEmpty, // change addr
+	// ); err != nil {
+	// 	t.Fatal(err)
+	// } else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vDB, tx); err == nil {
+	// 	t.Fatal("should've errored because start time too far in the future")
+	// }
+	// vDB.Abort()
 
 	// Case: Validator already validating primary network
 	if tx, err := vm.newAddValidatorTx(
