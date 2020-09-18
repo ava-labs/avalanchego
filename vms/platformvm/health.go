@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 // HealthChecks implements the common.VM interface
@@ -23,10 +24,10 @@ func (vm *VM) HealthChecks() []checks.Check {
 		details := map[string]float64{
 			"percentConnected": percentConnected,
 		}
-		if percentConnected < 0.5 { // TODO put actual alpha here
-			return details, fmt.Errorf("only connected to %f percent of the stake. Should be connected to at least %f",
+		if percentConnected < constants.MinConnectedStake { // Use alpha from consensus instead of const
+			return details, fmt.Errorf("connected to %f percent of the stake; should be connected to at least %f",
 				percentConnected,
-				0.5, // todo replace
+				constants.MinConnectedStake,
 			)
 		}
 		return details, nil
