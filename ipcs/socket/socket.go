@@ -201,8 +201,7 @@ func accept(s *Socket, l net.Listener) {
 	}
 	switch conn.(type) {
 	case *net.TCPConn:
-		tcpconn := conn.(*net.TCPConn)
-		err = tcpconn.SetNoDelay(true)
+		err = conn.(*net.TCPConn).SetNoDelay(true)
 		if err != nil {
 			s.log.Error("socket nodelay error: %s", err.Error())
 		}
