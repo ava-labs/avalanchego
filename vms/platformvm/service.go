@@ -1937,7 +1937,11 @@ func (service *Service) GetStake(_ *http.Request, args *api.JsonAddresses, respo
 			if !stake.AssetID().Equals(service.vm.Ctx.AVAXAssetID) {
 				continue
 			}
-			secpOut, ok := stake.Out.(*secp256k1fx.TransferOutput)
+			out := stake.Out
+			if lockedOut, ok := out.(*StakeableLockOut); ok {
+				out = lockedOut.TransferableOut
+			}
+			secpOut, ok := out.(*secp256k1fx.TransferOutput)
 			if !ok {
 				continue
 			}
