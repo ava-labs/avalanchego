@@ -7,8 +7,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/AppsFlyer/go-sundheit/checks"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -49,7 +47,7 @@ type EngineTest struct {
 	CantConnected,
 	CantDisconnected,
 
-	CantHealthChecks bool
+	CantHealth bool
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
@@ -62,7 +60,7 @@ type EngineTest struct {
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
-	HealthChecksF             func() []checks.Check
+	HealthF                   func() (interface{}, error)
 }
 
 var _ Engine = &EngineTest{}
@@ -102,7 +100,7 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantConnected = cant
 	e.CantDisconnected = cant
 
-	e.CantHealthChecks = cant
+	e.CantHealth = cant
 }
 
 // Context ...
@@ -436,13 +434,13 @@ func (e *EngineTest) IsBootstrapped() bool {
 	return false
 }
 
-// HealthChecks ...
-func (e *EngineTest) HealthChecks() []checks.Check {
-	if e.HealthChecksF != nil {
-		return e.HealthChecksF()
+// Health ...
+func (e *EngineTest) Health() (interface{}, error) {
+	if e.HealthF != nil {
+		return e.HealthF()
 	}
-	if e.CantHealthChecks && e.T != nil {
-		e.T.Fatalf("Unexpectedly called HealthChecks")
+	if e.CantHealth && e.T != nil {
+		e.T.Fatalf("Unexpectedly called Health")
 	}
-	return nil
+	return nil, errors.New("unexpectedly called Health")
 }

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -656,8 +655,8 @@ func (t *Transitive) IsBootstrapped() bool {
 	return t.Ctx.IsBootstrapped()
 }
 
-// HealthChecks implements the common.Engine interface
-func (t *Transitive) HealthChecks() []checks.Check {
+// Health implements the common.Engine interface
+func (t *Transitive) Health() (interface{}, error) {
 	// TODO add more health checks
-	return t.VM.HealthChecks()
+	return t.VM.Health()
 }
