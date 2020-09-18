@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -622,4 +623,10 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
 	t.Sender.Get(vdr, t.RequestID, vtxID)
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
+}
+
+// HealthChecks implements the common.Engine interface
+func (t *Transitive) HealthChecks() []checks.Check {
+	// TODO add more health checks
+	return t.VM.HealthChecks()
 }

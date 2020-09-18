@@ -8,10 +8,11 @@ import (
 	"time"
 
 	health "github.com/AppsFlyer/go-sundheit"
-
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -25,7 +26,8 @@ var defaultCheckOpts = check{
 // Health observes a set of vital signs and makes them available through an HTTP
 // API.
 type Health struct {
-	log    logging.Logger
+	log logging.Logger
+	// performs the underlying health checks
 	health health.Health
 }
 
@@ -60,20 +62,17 @@ func (h *Health) Handler() (*common.HTTPHandler, error) {
 // RegisterHeartbeat adds a check with default options and a CheckFn that checks
 // the given heartbeater for a recent heartbeat
 func (h *Health) RegisterHeartbeat(name string, hb Heartbeater, max time.Duration) error {
-	return h.RegisterCheckFunc(name, HeartbeatCheckFn(hb, max))
-}
-
-// RegisterCheckFunc adds a Check with default options and the given CheckFn
-func (h *Health) RegisterCheckFunc(name string, checkFn CheckFn) error {
-	check := defaultCheckOpts
-	check.name = name
-	check.checkFn = checkFn
-	return h.RegisterCheck(check)
+	return h.RegisterCheck(&check{
+		name:            name,
+		checkFn:         HeartbeatCheckFn(hb, max),
+		initialDelay:    constants.DefaultHealthCheckInitialDelay,
+		executionPeriod: constants.DefaultHealthCheckExecutionPeriod,
+	})
 }
 
 // RegisterMonotonicCheckFunc adds a Check with default options and the given CheckFn
 // After it passes once, its logic (checkFunc) is never run again; it just passes
-func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn CheckFn) error {
+func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn func() (interface{}, error)) error {
 	check := monotonicCheck{check: defaultCheckOpts}
 	check.name = name
 	check.checkFn = checkFn
@@ -81,12 +80,11 @@ func (h *Health) RegisterMonotonicCheckFunc(name string, checkFn CheckFn) error 
 }
 
 // RegisterCheck adds the given Check
-func (h *Health) RegisterCheck(c Check) error {
+func (h *Health) RegisterCheck(c checks.Check) error {
 	return h.health.RegisterCheck(&health.Config{
-		InitialDelay:     c.InitialDelay(),
-		ExecutionPeriod:  c.ExecutionPeriod(),
-		InitiallyPassing: c.InitiallyPassing(),
-		Check:            c,
+		InitialDelay:    constants.DefaultHealthCheckInitialDelay,
+		ExecutionPeriod: constants.DefaultHealthCheckExecutionPeriod,
+		Check:           c,
 	})
 }
 

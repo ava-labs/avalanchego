@@ -4,6 +4,7 @@
 package common
 
 import (
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -17,6 +18,9 @@ type Engine interface {
 
 	// Returns true iff the chain is done bootstrapping
 	IsBootstrapped() bool
+
+	// Return health checks to periodically perform and report through the health API
+	HealthChecks() []checks.Check
 }
 
 // Handler defines the functions that are acted on the node

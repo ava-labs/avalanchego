@@ -5,6 +5,7 @@ package health
 
 import (
 	"errors"
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"time"
 )
 
@@ -14,35 +15,19 @@ var (
 	ErrHeartbeatNotDetected = errors.New("heartbeat not detected")
 )
 
-// CheckFn returns optional status information and an error indicating health or
-// non-health
-type CheckFn func() (interface{}, error)
-
-// Check defines a single health check that we want to monitor and consider as
-// part of our wider healthiness
-type Check interface {
-	// Name is the identifier for this check and must be unique among all Checks
-	Name() string
-
-	// Execute performs the health check. It returns nil if the check passes.
-	// It can also return additional information to marshal and display to the caller
-	Execute() (interface{}, error)
-
-	// ExecutionPeriod is the duration to wait between executions of this Check
-	ExecutionPeriod() time.Duration
-
-	// InitialDelay is the duration to wait before executing the first time
-	InitialDelay() time.Duration
-
-	// InitiallyPassing is whether or not to consider the Check healthy before the
-	// initial execution
-	InitiallyPassing() bool
+// NewCheck creates a new check with name [name] that calls [execute]
+// to evalute health.
+func NewCheck(name string, execute func() (interface{}, error)) checks.Check {
+	return &check{
+		name:    name,
+		checkFn: execute,
+	}
 }
 
 // check implements the Check interface
 type check struct {
 	name                          string
-	checkFn                       CheckFn
+	checkFn                       func() (interface{}, error)
 	executionPeriod, initialDelay time.Duration
 	initiallyPassing              bool
 }
@@ -88,7 +73,7 @@ type Heartbeater interface {
 
 // HeartbeatCheckFn returns a CheckFn that checks the given heartbeater has
 // pulsed within the given duration
-func HeartbeatCheckFn(hb Heartbeater, max time.Duration) CheckFn {
+func HeartbeatCheckFn(hb Heartbeater, max time.Duration) func() (interface{}, error) {
 	return func() (data interface{}, err error) {
 		// Get the heartbeat and create a data set to return to the caller
 		hb := hb.GetHeartbeat()

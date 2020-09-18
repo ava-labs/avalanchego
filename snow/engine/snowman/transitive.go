@@ -5,8 +5,7 @@ package snowman
 
 import (
 	"fmt"
-	"time"
-
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"time"
 )
 
 const (
@@ -653,4 +653,10 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (t *Transitive) IsBootstrapped() bool {
 	return t.Ctx.IsBootstrapped()
+}
+
+// HealthChecks implements the common.Engine interface
+func (t *Transitive) HealthChecks() []checks.Check {
+	// TODO add more health checks
+	return t.VM.HealthChecks()
 }

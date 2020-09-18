@@ -1527,16 +1527,21 @@ func (vm *VM) getTotalStake() (uint64, error) {
 	return totalStake, nil
 }
 
-// Returns the cumulative stake on the Primary Network of nodes connected
-// to this node.
-func (vm *VM) connectedStake() (uint64, error) {
+// Returns the percentage of the total stake on the Primary Network
+// of nodes connected to this node.
+func (vm *VM) getPercentConnected() (float64, error) {
 	stakers, err := vm.getStakers()
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get stakers: %w", err)
 	}
 
 	connectedStake := uint64(0)
+	totalStake := uint64(0)
 	for _, staker := range stakers {
+		totalStake, err = math.Add64(totalStake, staker.Weight())
+		if err != nil {
+			return 0, err
+		}
 		if _, connected := vm.connections[staker.ID().Key()]; !connected {
 			continue // not connected to use --> don't include
 		}
@@ -1545,5 +1550,6 @@ func (vm *VM) connectedStake() (uint64, error) {
 			return 0, err
 		}
 	}
-	return connectedStake, nil
+
+	return float64(connectedStake) / float64(totalStake), nil
 }

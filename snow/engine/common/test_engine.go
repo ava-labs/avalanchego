@@ -5,6 +5,7 @@ package common
 
 import (
 	"errors"
+	"github.com/AppsFlyer/go-sundheit/checks"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -42,10 +43,12 @@ type EngineTest struct {
 	CantPushQuery,
 	CantPullQuery,
 	CantQueryFailed,
-	CantChits bool
+	CantChits,
 
 	CantConnected,
-	CantDisconnected bool
+	CantDisconnected,
+
+	CantHealthChecks bool
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
@@ -58,6 +61,7 @@ type EngineTest struct {
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
+	HealthChecksF             func() []checks.Check
 }
 
 var _ Engine = &EngineTest{}
@@ -96,6 +100,8 @@ func (e *EngineTest) Default(cant bool) {
 
 	e.CantConnected = cant
 	e.CantDisconnected = cant
+
+	e.CantHealthChecks = cant
 }
 
 // Context ...
@@ -427,4 +433,15 @@ func (e *EngineTest) IsBootstrapped() bool {
 		e.T.Fatalf("Unexpectedly called IsBootstrapped")
 	}
 	return false
+}
+
+// HealthChecks ...
+func (e *EngineTest) HealthChecks() []checks.Check {
+	if e.HealthChecksF != nil {
+		return e.HealthChecksF()
+	}
+	if e.CantHealthChecks && e.T != nil {
+		e.T.Fatalf("Unexpectedly called HealthChecks")
+	}
+	return nil
 }
