@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -270,6 +271,17 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			nil,
 			true,
 			"validator stops validating primary network earlier than subnet",
+		},
+		{
+			vm.minDelegatorStake,
+			uint64(currentTimestamp.Add(maxFutureStartTime + time.Second).Unix()),
+			uint64(currentTimestamp.Add(maxFutureStartTime * 2).Unix()),
+			nodeID,
+			rewardAddress,
+			[]*crypto.PrivateKeySECP256K1R{keys[0]},
+			nil,
+			true,
+			fmt.Sprintf("validator should not be added more than (%s) in the future", maxFutureStartTime),
 		},
 		{
 			vm.minDelegatorStake,

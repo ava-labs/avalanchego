@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -830,6 +829,8 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		return errNoRewardAddress
 	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
+	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+		return errStartTimeTooLate
 	case args.DelegationFeeRate < 0 || args.DelegationFeeRate > 100:
 		return errInvalidDelegationRate
 	}
@@ -942,8 +943,10 @@ type AddDelegatorArgs struct {
 func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JsonTxIDChangeAddr) error {
 	service.vm.Ctx.Log.Info("Platform: AddDelegator called")
 	switch {
-	case int64(args.StartTime) < time.Now().Unix():
+	case uint64(args.StartTime) < service.vm.clock.Unix():
 		return fmt.Errorf("start time must be in the future")
+	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+		return errStartTimeTooLate
 	case args.RewardAddress == "":
 		return errNoRewardAddress
 	}
@@ -1059,6 +1062,10 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
+	case uint64(args.StartTime) < service.vm.clock.Unix():
+		return fmt.Errorf("start time must be in the future")
+	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+		return errStartTimeTooLate
 	}
 
 	// Parse the node ID
