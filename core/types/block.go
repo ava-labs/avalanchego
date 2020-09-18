@@ -235,7 +235,7 @@ type storageblock struct {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs, uncles
 // and receipts.
-func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher Hasher, extdata *[]byte) *Block {
+func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher Hasher, extdata []byte) *Block {
 	b := &Block{header: CopyHeader(header), td: new(big.Int)}
 
 	// TODO: panic if len(txs) != len(receipts)
@@ -265,9 +265,9 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 	}
 
 	if extdata != nil {
-		data := make([]byte, len(*extdata))
-		b.extdata = &data
-		copy(*b.extdata, *extdata)
+		_data := make([]byte, len(extdata))
+		b.extdata = &_data
+		copy(*b.extdata, extdata)
 	}
 
 	return b
@@ -324,7 +324,13 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 }
 
 func (b *Block) SetExtraData(data []byte) {
-	b.extdata = &data
+	if data != nil {
+		_data := make([]byte, len(data))
+		b.extdata = &_data
+		copy(*b.extdata, data)
+	} else {
+		b.extdata = nil
+	}
 	b.header.ExtDataHash = rlpHash(data)
 	b.hash = atomic.Value{}
 }
@@ -467,22 +473,20 @@ func (b *Block) WithSeal(header *Header) *Block {
 
 // WithBody returns a new block with the given transaction and uncle contents.
 func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, version uint32, extdata *[]byte) *Block {
-	var data *[]byte
+	var extdataCopied *[]byte
 	if extdata != nil {
 		_data := make([]byte, len(*extdata))
-		data = &_data
+		extdataCopied = &_data
+		copy(*extdataCopied, *extdata)
 	}
 	block := &Block{
 		header:       CopyHeader(b.header),
 		transactions: make([]*Transaction, len(transactions)),
 		uncles:       make([]*Header, len(uncles)),
-		extdata:      data,
+		extdata:      extdataCopied,
 		version:      version,
 	}
 	copy(block.transactions, transactions)
-	if data != nil {
-		copy(*block.extdata, *extdata)
-	}
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
 	}
