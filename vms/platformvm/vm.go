@@ -753,7 +753,6 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		return blk, vm.DB.Commit()
-
 	}
 
 	// Propose adding a new validator but only if their start time is in the
