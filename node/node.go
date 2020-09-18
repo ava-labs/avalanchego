@@ -616,11 +616,20 @@ func (n *Node) initAdminAPI() error {
 
 func (n *Node) initInfoAPI() error {
 	if !n.Config.InfoAPIEnabled {
-		n.Log.Info("skipping info API initializaion because it has been disabled")
+		n.Log.Info("skipping info API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net, n.Config.TxFee)
+	service, err := info.NewService(
+		n.Log,
+		Version,
+		n.ID,
+		n.Config.NetworkID,
+		n.chainManager,
+		n.Net,
+		n.Config.CreationTxFee,
+		n.Config.TxFee,
+	)
 	if err != nil {
 		return err
 	}
