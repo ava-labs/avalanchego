@@ -24,10 +24,21 @@ var (
 			{
 				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
 				"avaxAddr": "X-local18jma8ppw3nhx5r4ap8clazz0dps7rv5u00z96u",
-				"initialAmount": 320000000000000000,
+				"initialAmount": 310000000000000000,
 				"unlockSchedule": [
 					{
-						"amount": 20000000000000000,
+						"amount": 10000000000000000,
+						"locktime": 1633824000
+					}
+				]
+			},
+			{
+				"ethAddr": "0xb3d82b1367d362de99ab59a658165aff520cbd4d",
+				"avaxAddr": "X-local1ur873jhz9qnaqv5qthk5sn3e8nj3e0kmggalnu",
+				"initialAmount": 10000000000000000,
+				"unlockSchedule": [
+					{
+						"amount": 10000000000000000,
 						"locktime": 1633824000
 					}
 				]
