@@ -32,7 +32,14 @@ type UnsignedTx interface {
 	InputUTXOs() []*avax.UTXOID
 	UTXOs() []*avax.UTXO
 
-	SyntacticVerify(ctx *snow.Context, c codec.Codec, txFeeAssetID ids.ID, txFee uint64, numFxs int) error
+	SyntacticVerify(
+		ctx *snow.Context,
+		c codec.Codec,
+		txFeeAssetID ids.ID,
+		txFee uint64,
+		creationTxFee uint64,
+		numFxs int,
+	) error
 	SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error
 	ExecuteWithSideEffects(vm *VM, batch database.Batch) error
 }
@@ -58,6 +65,7 @@ func (t *Tx) SyntacticVerify(
 	c codec.Codec,
 	txFeeAssetID ids.ID,
 	txFee uint64,
+	creationTxFee uint64,
 	numFxs int,
 ) error {
 	switch {
@@ -65,7 +73,7 @@ func (t *Tx) SyntacticVerify(
 		return errNilTx
 	}
 
-	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, numFxs); err != nil {
+	if err := t.UnsignedTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, creationTxFee, numFxs); err != nil {
 		return err
 	}
 

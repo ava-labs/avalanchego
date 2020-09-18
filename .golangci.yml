@@ -7,10 +7,10 @@ linters:
       - gofmt
       - goimports
       - bodyclose
+      - govet
         #    - deadcode
         #    - errcheck
         #    - varcheck 
-        #    - govet
         #    - gosimple
         #    - goconst
         #    - goconst
