@@ -891,6 +891,13 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	if err != nil {
 		return err
 	}
+	switch conn.(type) {
+	case *net.TCPConn:
+		err = conn.(*net.TCPConn).SetNoDelay(true)
+		if err != nil {
+			return err
+		}
+	}
 	return n.upgrade(&peer{
 		net:  n,
 		ip:   ip,

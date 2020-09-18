@@ -199,6 +199,15 @@ func accept(s *Socket, l net.Listener) {
 	if err != nil {
 		s.log.Error("socket accept error: %s", err.Error())
 	}
+	switch conn.(type) {
+	case *net.TCPConn:
+		tcpconn := conn.(*net.TCPConn)
+		err = tcpconn.SetNoDelay(true)
+		if err != nil {
+			s.log.Error("socket nodelay error: %s", err.Error())
+		}
+
+	}
 	s.connLock.Lock()
 	s.conns[conn] = struct{}{}
 	s.connLock.Unlock()
