@@ -65,12 +65,22 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	feeAmount uint64,
 	feeAssetID ids.ID,
 	minStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < minStakeDuration: // Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > maxStakeDuration: // Ensure staking length is not too long
+		return errStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -121,7 +131,15 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
+	if err := tx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minValidatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -129,9 +147,11 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	if currentTime, err := vm.getTimestamp(db); err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or after current timestamp (%s)",
-			currentTime,
-			startTime)}
+		return nil, nil, nil, nil, permError{fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
+			startTime,
+			currentTime)}
+		// } else if startTime.After(currentTime.Add(maxFutureStartTime)) {
+		// 	return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", startTime, currentTime)}
 	}
 
 	_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
@@ -209,8 +229,9 @@ func (vm *VM) newAddValidatorTx(
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -240,5 +261,13 @@ func (vm *VM) newAddValidatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake)
+	return tx, utx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minValidatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	)
 }

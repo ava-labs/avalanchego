@@ -64,7 +64,7 @@ var (
 	genesisHashKey = []byte("genesisID")
 
 	// Version is the version of this code
-	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 8, 3)
+	Version       = version.NewDefaultVersion(constants.PlatformName, 0, 8, 4)
 	versionParser = version.NewDefaultParser()
 )
 
@@ -138,6 +138,7 @@ func (n *Node) initNetworking() error {
 			return err
 		}
 
+		// #nosec G402
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAnyClientCert,
@@ -145,7 +146,8 @@ func (n *Node) initNetworking() error {
 			// We only require an authenticated channel based on the peer's
 			// public key. Therefore, we can safely skip CA verification.
 			//
-			// TODO: Security audit required
+			// During our security audit by Quantstamp, this was investigated
+			// and determinted to be safe and correct.
 			InsecureSkipVerify: true,
 		}
 
@@ -165,6 +167,9 @@ func (n *Node) initNetworking() error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
+		if err := primaryNetworkValidators.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
+			return err
+		}
 		consensusRouter = &insecureValidatorManager{
 			Router: consensusRouter,
 			vdrs:   primaryNetworkValidators,
@@ -470,6 +475,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
 
 	n.Config.ConsensusRouter.Initialize(
+		n.ID,
 		n.Log,
 		&timeoutManager,
 		n.Config.ConsensusGossipFrequency,
@@ -514,15 +520,21 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
-			ChainManager:     n.chainManager,
-			Validators:       vdrs,
-			StakingEnabled:   n.Config.EnableStaking,
-			Fee:              n.Config.TxFee,
-			MinStake:         n.Config.MinStake,
-			UptimePercentage: n.Config.UptimeRequirement,
+			ChainManager:       n.chainManager,
+			Validators:         vdrs,
+			StakingEnabled:     n.Config.EnableStaking,
+			CreationFee:        n.Config.CreationTxFee,
+			Fee:                n.Config.TxFee,
+			UptimePercentage:   n.Config.UptimeRequirement,
+			MinValidatorStake:  n.Config.MinValidatorStake,
+			MinDelegatorStake:  n.Config.MinDelegatorStake,
+			MinStakeDuration:   n.Config.MinStakeDuration,
+			MaxStakeDuration:   n.Config.MaxStakeDuration,
+			StakeMintingPeriod: n.Config.StakeMintingPeriod,
 		}),
 		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
-			Fee: n.Config.TxFee,
+			CreationFee: n.Config.CreationTxFee,
+			Fee:         n.Config.TxFee,
 		}),
 		n.vmManager.RegisterVMFactory(genesis.EVMID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, "evm"),
@@ -606,11 +618,20 @@ func (n *Node) initAdminAPI() error {
 
 func (n *Node) initInfoAPI() error {
 	if !n.Config.InfoAPIEnabled {
-		n.Log.Info("skipping info API initializaion because it has been disabled")
+		n.Log.Info("skipping info API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing info API")
-	service, err := info.NewService(n.Log, Version, n.ID, n.Config.NetworkID, n.chainManager, n.Net, n.Config.TxFee)
+	service, err := info.NewService(
+		n.Log,
+		Version,
+		n.ID,
+		n.Config.NetworkID,
+		n.chainManager,
+		n.Net,
+		n.Config.CreationTxFee,
+		n.Config.TxFee,
+	)
 	if err != nil {
 		return err
 	}

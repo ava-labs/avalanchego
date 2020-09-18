@@ -56,7 +56,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 			// here, as the generated numbers are only used to perform an
 			// optimistic benchmark. Which means the results could be arbitrary
 			// and the correctness of the implementation wouldn't be effected.
-			samples[i] = uint64(rand.Int63n(int64(totalWeight)))
+			samples[i] = uint64(rand.Int63n(int64(totalWeight))) // #nosec G404
 		}
 	}
 

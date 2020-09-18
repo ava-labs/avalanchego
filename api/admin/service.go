@@ -134,5 +134,5 @@ func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.Succes
 
 	reply.Success = true
 	stacktrace := []byte(logging.Stacktrace{Global: true}.String())
-	return ioutil.WriteFile(stacktraceFile, stacktrace, 0644)
+	return ioutil.WriteFile(stacktraceFile, stacktrace, 0600)
 }

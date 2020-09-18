@@ -59,13 +59,23 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	c codec.Codec,
 	feeAmount uint64,
 	feeAssetID ids.ID,
-	minStake uint64,
+	minDelegatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < minStakeDuration: // Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > maxStakeDuration: // Ensure staking length is not too long
+		return errStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -92,7 +102,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return errInvalidAmount
-	case tx.Validator.Wght < minStake:
+	case tx.Validator.Wght < minDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
 	}
@@ -115,7 +125,15 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake); err != nil {
+	if err := tx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -126,6 +144,8 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		return nil, nil, nil, nil, permError{fmt.Errorf("chain timestamp (%s) not before validator's start time (%s)",
 			currentTimestamp,
 			validatorStartTime)}
+		// } else if validatorStartTime.After(currentTimestamp.Add(maxFutureStartTime)) {
+		// 	return nil, nil, nil, nil, permError{fmt.Errorf("validator start time (%s) more than two weeks after current chain timestamp (%s)", validatorStartTime, currentTimestamp)}
 	}
 
 	// Ensure that the period this delegator delegates is a subset of the time
@@ -202,10 +222,11 @@ func (vm *VM) newAddDelegatorTx(
 	startTime, // Unix time they start delegating
 	endTime uint64, // Unix time they stop delegating
 	nodeID ids.ShortID, // ID of the node we are delegating to
-	rewardAddress ids.ShortID, // Address to returned staked tokens (and maybe reward) to
+	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens + fee
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, vm.txFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -234,5 +255,13 @@ func (vm *VM) newAddDelegatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID, vm.minStake)
+	return tx, utx.Verify(
+		vm.Ctx,
+		vm.codec,
+		vm.txFee,
+		vm.Ctx.AVAXAssetID,
+		vm.minDelegatorStake,
+		vm.minStakeDuration,
+		vm.maxStakeDuration,
+	)
 }

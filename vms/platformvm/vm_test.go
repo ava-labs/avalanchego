@@ -48,6 +48,9 @@ import (
 )
 
 var (
+	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxStakingDuration = 365 * 24 * time.Hour
+
 	// AVAX asset ID in tests
 	avaxAssetID = ids.NewID([32]byte{'y', 'e', 'e', 't'})
 
@@ -60,15 +63,16 @@ var (
 	defaultValidateStartTime = defaultGenesisTime
 
 	// time that genesis validators stop validating
-	defaultValidateEndTime = defaultValidateStartTime.Add(10 * MinimumStakingDuration)
+	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys []*crypto.PrivateKeySECP256K1R
 
-	minStake = 5 * units.MilliAvax
+	minValidatorStake = 5 * units.MilliAvax
+	minDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	defaultBalance uint64 = 100 * minStake
+	defaultBalance uint64 = 100 * minValidatorStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -185,10 +189,14 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 
 func defaultVM() (*VM, database.Database) {
 	vm := &VM{
-		SnowmanVM:    &core.SnowmanVM{},
-		chainManager: chains.MockManager{},
-		txFee:        defaultTxFee,
-		minStake:     minStake,
+		SnowmanVM:          &core.SnowmanVM{},
+		chainManager:       chains.MockManager{},
+		txFee:              defaultTxFee,
+		minValidatorStake:  minValidatorStake,
+		minDelegatorStake:  minDelegatorStake,
+		minStakeDuration:   defaultMinStakingDuration,
+		maxStakeDuration:   defaultMaxStakingDuration,
+		stakeMintingPeriod: defaultMaxStakingDuration,
 	}
 
 	baseDB := memdb.New()
@@ -222,6 +230,7 @@ func defaultVM() (*VM, database.Database) {
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
+		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
 	} else if err := vm.issueTx(tx); err != nil {
@@ -331,7 +340,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, err := vm.factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -340,13 +349,14 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -410,19 +420,20 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(-Delta).Add(-1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
 
 	// create invalid tx
 	if tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if preferredHeight, err := vm.preferredHeight(); err != nil {
@@ -456,19 +467,20 @@ func TestAddValidatorReject(t *testing.T) {
 	}()
 
 	startTime := defaultGenesisTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := vm.factory.NewPrivateKey()
 	ID := key.PublicKey().Address()
 
 	// create valid tx
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,
+		vm.minValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		ID,
 		ID,
 		PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -534,7 +546,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}()
 
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
@@ -546,6 +558,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		keys[0].PublicKey().Address(),
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -613,7 +626,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}()
 
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := keys[0].PublicKey().Address()
 
 	// create valid tx
@@ -626,6 +639,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		nodeID,
 		testSubnet1.ID(),
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -982,6 +996,7 @@ func TestCreateChain(t *testing.T) {
 		nil,
 		"name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1036,7 +1051,8 @@ func TestCreateSubnet(t *testing.T) {
 			keys[0].PublicKey().Address(),
 			keys[1].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // payer
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].PublicKey().Address(), // change addr // payer
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1058,7 +1074,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	// Now that we've created a new subnet, add a validator to that subnet
 	startTime := defaultValidateStartTime.Add(Delta).Add(1 * time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subent so tx is valid
 	if addValidatorTx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,
@@ -1067,6 +1083,7 @@ func TestCreateSubnet(t *testing.T) {
 		nodeID,
 		createSubnetTx.ID(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
 	} else if err := vm.issueTx(addValidatorTx); err != nil {
@@ -1241,6 +1258,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
 	); err == nil {
 		t.Fatalf("should have errored due to missing utxos")
 	}
@@ -1277,6 +1295,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
+		ids.ShortEmpty, // change addr
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1656,7 +1675,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	go timeoutManager.Dispatch()
 
 	chainRouter := &router.ChainRouter{}
-	chainRouter.Initialize(logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
+	chainRouter.Initialize(ids.ShortEmpty, logging.NoLog{}, &timeoutManager, time.Hour, time.Second)
 
 	externalSender := &sender.ExternalSenderTest{T: t}
 	externalSender.Default(true)
@@ -1894,16 +1913,17 @@ func TestNextValidatorStartTime(t *testing.T) {
 	assert.NoError(t, err)
 
 	startTime := currentTime.Add(time.Second)
-	endTime := startTime.Add(MinimumStakingDuration)
+	endTime := startTime.Add(defaultMinStakingDuration)
 
 	tx, err := vm.newAddValidatorTx(
-		vm.minStake,                             // stake amount
-		uint64(startTime.Unix()),                // start time
-		uint64(endTime.Unix()),                  // end time
-		vm.Ctx.NodeID,                           // node ID
-		ids.GenerateTestShortID(),               // reward address
-		PercentDenominator,                      // shares
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+		vm.minValidatorStake,      // stake amount
+		uint64(startTime.Unix()),  // start time
+		uint64(endTime.Unix()),    // end time
+		vm.Ctx.NodeID,             // node ID
+		ids.GenerateTestShortID(), // reward address
+		PercentDenominator,        // shares
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr // key
 	)
 	assert.NoError(t, err)
 

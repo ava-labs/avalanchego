@@ -20,10 +20,6 @@ var (
 	// consumptionRateDenominator is the magnitude offset used to emulate
 	// floating point fractions.
 	consumptionRateDenominator = new(big.Int).SetUint64(PercentDenominator)
-
-	// consumptionInterval is the period that should be used to calculate the
-	// consumption rate given a duration.
-	consumptionInterval = new(big.Int).SetUint64(uint64(MaximumStakingDuration))
 )
 
 type rewardTx struct {
@@ -42,10 +38,12 @@ func Reward(
 	rawDuration time.Duration,
 	rawStakedAmount,
 	rawMaxExistingAmount uint64,
+	rawConsumptionInterval time.Duration,
 ) uint64 {
 	duration := new(big.Int).SetUint64(uint64(rawDuration))
 	stakedAmount := new(big.Int).SetUint64(rawStakedAmount)
 	maxExistingAmount := new(big.Int).SetUint64(rawMaxExistingAmount)
+	consumptionInterval := new(big.Int).SetUint64(uint64(rawConsumptionInterval))
 
 	adjustedConsumptionRateNumerator := new(big.Int).Mul(maxSubMinConsumptionRate, duration)
 	adjustedMinConsumptionRateNumerator := new(big.Int).Mul(minConsumptionRate, consumptionInterval)

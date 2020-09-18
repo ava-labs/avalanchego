@@ -72,13 +72,16 @@ const (
 	// SupplyCap is the maximum amount of AVAX that should ever exist
 	SupplyCap = 720 * units.MegaAvax
 
-	// MinimumStakingDuration is the shortest amount of time a staker can bond
-	// their funds for.
-	MinimumStakingDuration = 24 * time.Hour
+	// Maximum future start time for staking/delegating
+	maxFutureStartTime = 24 * 7 * 2 * time.Hour
 
-	// MaximumStakingDuration is the longest amount of time a staker can bond
-	// their funds for.
-	MaximumStakingDuration = 365 * 24 * time.Hour
+	// Time interval to round to when issuing an advanceTimeTx to
+	// catch up the chain time closer to local time
+	roundInterval = time.Hour
+
+	// Time difference between local time and current chain time
+	// at which to attempt to increase the chain time stamp
+	catchUpTime = 2 * time.Hour
 )
 
 var (
@@ -94,6 +97,7 @@ var (
 	errInvalidID                = errors.New("invalid ID")
 	errDSCantValidate           = errors.New("new blockchain can't be validated by primary network")
 	errUnknownTxType            = errors.New("unknown transaction type")
+	errStartTimeTooLate         = errors.New("start time is too far in the future")
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
@@ -150,7 +154,7 @@ type VM struct {
 	*core.SnowmanVM
 
 	// Node's validator manager
-	// Maps Subnets --> nodes in the Subnet
+	// Maps Subnets --> validators of the Subnet
 	vdrMgr validators.Manager
 
 	// true if the node is being run with staking enabled
@@ -177,15 +181,28 @@ type VM struct {
 	unissuedDecisionTxs []*Tx
 	unissuedAtomicTxs   []*Tx
 
-	// Tx fee burned by a transaction
+	// fee that must be burned by every state creating transaction
+	creationTxFee uint64
+	// fee that must be burned by every non-state creating transaction
 	txFee uint64
 
-	// The minimum amount of tokens one must bond to be a staker
-	minStake uint64
-
-	// UptimePercentage is the minimum uptime required to be rewarded for
-	// staking.
+	// UptimePercentage is the minimum uptime required to be rewarded for staking.
 	uptimePercentage float64
+
+	// The minimum amount of tokens one must bond to be a validator
+	minValidatorStake uint64
+
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	minDelegatorStake uint64
+
+	// Minimum amount of time to allow a validator to stake
+	minStakeDuration time.Duration
+
+	// Maximum amount of time to allow a validator to stake
+	maxStakeDuration time.Duration
+
+	// Consumption period for the minting function
+	stakeMintingPeriod time.Duration
 
 	// This timer goes off when it is time for the next validator to add/leave the validator set
 	// When it goes off resetTimer() is called, triggering creation of a new block
@@ -721,6 +738,25 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return blk, vm.DB.Commit()
 	}
 
+	truncatedTime := localTime.Truncate(roundInterval)
+	// If the truncated time is before the next staker change time
+	// but more than [catchUpTime] past the local wall clock time
+	// then issue an advanceTime proposal to catch up to wall clock time
+	if truncatedTime.Before(nextStakerChangeTime) && truncatedTime.After(currentChainTimestamp.Add(catchUpTime)) {
+		advanceTimeTx, err := vm.newAdvanceTimeTx(truncatedTime)
+		if err != nil {
+			return nil, err
+		}
+		blk, err := vm.newProposalBlock(preferredID, preferredHeight+1, *advanceTimeTx)
+		if err != nil {
+			return nil, err
+		}
+		if err := vm.State.PutBlock(vm.DB, blk); err != nil {
+			return nil, err
+		}
+		return blk, vm.DB.Commit()
+	}
+
 	// Propose adding a new validator but only if their start time is in the
 	// future relative to local time (plus Delta)
 	syncTime := localTime.Add(Delta)
@@ -931,6 +967,14 @@ func (vm *VM) resetTimer() {
 		return
 	}
 
+	truncatedTime := localTime.Truncate(roundInterval)
+	if truncatedTime.Before(nextStakerChangeTime) && truncatedTime.After(timestamp.Add(catchUpTime)) {
+		// Should issue a proposal to advance timestamp closer to wall clock time
+		// without skipping any staker change times
+		vm.SnowmanVM.NotifyBlockReady()
+		return
+	}
+
 	syncTime := localTime.Add(Delta)
 	for vm.unissuedProposalTxs.Len() > 0 {
 		if !syncTime.After(vm.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()) {
@@ -1014,7 +1058,7 @@ func (vm *VM) calculateReward(db database.Database, duration time.Duration, stak
 	if err != nil {
 		return 0, err
 	}
-	reward := Reward(duration, stakeAmount, currentSupply)
+	reward := Reward(duration, stakeAmount, currentSupply, vm.stakeMintingPeriod)
 	newSupply, err := safemath.Add64(currentSupply, reward)
 	if err != nil {
 		return 0, err

@@ -64,7 +64,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	TxError,
 ) {
 	// Make sure this transaction is well formed.
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -79,7 +79,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds, vm.txFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
@@ -106,8 +106,9 @@ func (vm *VM) newCreateSubnetTx(
 	threshold uint32, // [threshold] of [ownerAddrs] needed to manage this subnet
 	ownerAddrs []ids.ShortID, // control addresses for the new subnet
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
+	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.txFee)
+	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.creationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -132,5 +133,5 @@ func (vm *VM) newCreateSubnetTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.txFee, vm.Ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID)
 }

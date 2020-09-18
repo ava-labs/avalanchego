@@ -56,7 +56,7 @@ func (n *Network) Finalized() bool {
 
 func (n *Network) Round() {
 	if len(n.running) > 0 {
-		runningInd := rand.Intn(len(n.running))
+		runningInd := rand.Intn(len(n.running)) // #nosec G404
 		running := n.running[runningInd]
 
 		s := sampler.NewUniform()
