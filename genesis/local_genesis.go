@@ -44,7 +44,7 @@ var (
 				]
 			}
 		],
-		"startTime": 1602288000,
+		"startTime": 1599696000,
 		"initialStakeDuration": 31536000,
 		"initialStakeDurationOffset": 5400,
 		"initialStakeAddresses": [
