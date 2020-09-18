@@ -284,11 +284,8 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -316,11 +313,8 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -353,11 +347,8 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				validatorID,
 				chainID,
@@ -386,11 +377,8 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -413,11 +401,8 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -441,11 +426,8 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -465,11 +447,8 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -498,11 +477,8 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -539,11 +515,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				validatorID,
 				chainID,
@@ -568,11 +541,8 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 	for _, validatorID := range validatorIDs.List() {
 		vID := validatorID
-		peer, sent := n.peers[vID.Key()]
-		if sent {
-			sent = peer.send(msg)
-		}
-		if !sent {
+		peer, exists := n.peers[vID.Key()]
+		if !exists || !peer.connected || !peer.send(msg) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				validatorID,
 				chainID,
@@ -601,11 +571,8 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	peer, sent := n.peers[validatorID.Key()]
-	if sent {
-		sent = peer.send(msg)
-	}
-	if !sent {
+	peer, exists := n.peers[validatorID.Key()]
+	if !exists || !peer.connected || !peer.send(msg) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
